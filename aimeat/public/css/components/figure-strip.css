@@ -10,6 +10,8 @@
  *   Drawn by components/FigureStrip.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.6.2 — 2026-10-18 — Under 1100px, where the figures stand two to a row, the third figure starts at
+ *     the left edge as the first does (it kept the 1.1rem a figure has beside another).
  *   v1.6.1 — 2026-09-27 — .og-strip--free's number at the face's own spacing, as the old .vis-stat-val
  *     (appcat parity, sections-b; the option is appcat's alone).
  *   v1.6.0 — 2026-09-27 — .og-strip--free (FigureStrip `free`): figures without the rules, the word
@@ -69,6 +71,10 @@
 @media (max-width: 1100px) {
   .og-strip { flex-wrap: wrap; }
   .og-strip > div, .og-strip > button { flex-basis: 50%; border-right: 0; }
+  /* Two to a row: a figure that starts a row stands at the left edge like the first one, and the one
+     beside it keeps the gap (the third figure stood 1.1rem in from the first). */
+  .og-strip > :nth-child(odd) { padding-left: 0; }
+  .og-strip > :nth-child(even) { padding-left: 1.1rem; }
 }
 
 /* Free: the figures stand free inside a section, no rules, each number over its word in the row

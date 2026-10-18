@@ -17,27 +17,32 @@
  *   from the organisms the person belongs to (/js/organism-names.js, one read for the whole page), or
  *   from `organismName` when the page already has it.
  *
- *   The look is the Mark's tag (css/components/mark.css and poster.css .poster-chip): public on the
- *   sun, a link or a code in coral (a stranger can read it), private dim (it reaches nobody), the two
- *   in between plain.
+ *   The look is the Tag (poster.css .poster-chip) with css/components/audience-badge.css: as wide as
+ *   its words wherever it stands, public on the sun, a link, a code or a password in the attention
+ *   colours (ink words on the pale amber ground, never the coral of a destructive action), private
+ *   dim, the two in between plain. With `onClick` it is a button (mark.css .mark-button).
  * @structure AudienceBadge({ value, audience, app, organismName, onClick, expanded })
  * @usage
  *   html`<${AudienceBadge} value=${m.visibility} />`
  *   html`<${AudienceBadge} app=${app} />`
  *   html`<${AudienceBadge} audience=${shareAudienceOf(share.access, orgId)} />`
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Its own sheet (audience-badge.css): it sizes to its words instead of filling
+ *     a listing cell, 11.5px words, and a link or a code in the attention colours instead of coral
+ *     (3.43:1 on the page); drawn here on the Tag's classes rather than through Mark.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V6.4).
  */
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { Mark } from '/components/Mark.js';
 import { audienceOf, appAudienceOf, audienceKeys } from '/js/audience.js';
 import { useOrganismName } from '/js/organism-names.js';
 
 const html = htm.bind(h);
+const cx = (...parts) => parts.filter(Boolean).join(' ');
 
-const TONE = { public: 'sun', link: 'coral', code: 'coral', private: 'dim' };
+/** The Tag's tone for each level; a link or a code is the badge's own attention tone. */
+const TONE = { public: 'poster-chip--sun', private: 'poster-chip--dim', link: 'audience-badge--open', code: 'audience-badge--open' };
 
 /**
  * `value` is the stored audience (a visibility, an `open_to`, a share's access); `audience` a level
@@ -49,7 +54,14 @@ export function AudienceBadge({ value, audience, app, organismName, onClick, exp
   const fetched = useOrganismName(a.level === 'organism' && !organismName ? a.organismId : null);
   const name = a.level === 'organism' ? (organismName || fetched || '') : '';
   const keys = audienceKeys(a, !!name);
-  return html`<${Mark} tone=${TONE[a.level]} title=${t(keys.who, { name })} onClick=${onClick} expanded=${expanded}>${t(keys.word, { name })}<//>`;
+  const cls = cx('poster-chip', 'audience-badge', TONE[a.level]);
+  const title = t(keys.who, { name });
+  const words = t(keys.word, { name });
+  if (onClick) {
+    return html`<button type="button" class=${cx(cls, 'mark-button')} title=${title}
+      aria-expanded=${expanded === undefined ? undefined : String(!!expanded)} onClick=${onClick}>${words}</button>`;
+  }
+  return html`<span class=${cls} title=${title}>${words}</span>`;
 }
 
 export default AudienceBadge;

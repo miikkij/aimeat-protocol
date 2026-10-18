@@ -14,7 +14,7 @@
  *
  *   HOW TO CLOSE, on this page. Where the person can close a thing with one press, the row offers it
  *   (a record, a file, a board, a skill or a package made private; a workspace page no longer shared)
- *   and asks first. Where the control lives on another page, the row opens that page. Every row can
+ *   and asks first in the site's own confirm dialog (components/Modal.js useConfirm). Where the control lives on another page, the row opens that page. Every row can
  *   also copy the report's `how_to_close` for the person's AI, which names the tool and the route.
  *
  *   HONEST ABOUT ITS EDGES. A kind the report could not read (`failed`) is named, and its count is
@@ -27,6 +27,9 @@
  * @structure LEVELS · KINDS · closeOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.1.0 — 2026-10-18 — From the browser check of 1c0b57fba: the list is the cut item-kind-state-doors
+ *     (the name keeps 12rem, the doors wrap, a card under 1180px with 40px doors), "Close it" asks in
+ *     the site's confirm dialog instead of window.confirm, and the way to another page reads as a verb.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V6.2).
  */
 import { h } from 'preact';
@@ -45,6 +48,7 @@ import { Action } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { openTab } from '/components/Rail.js';
+import { useConfirm } from '/components/Modal.js';
 
 const html = htm.bind(h);
 const x = (key, vars) => t(`exposure.${key}`, vars);
@@ -151,6 +155,7 @@ export default function ExposureTab() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState('');
+  const { confirm, ConfirmUI } = useConfirm();
 
   const load = useCallback(async () => {
     try {
@@ -170,8 +175,10 @@ export default function ExposureTab() {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
-  const onClose = async (item, close) => {
-    if (!window.confirm(x('closeConfirm', { title: item.title }))) return;
+  const onClose = (item, close) => confirm(x('closeConfirm', { title: item.title }), () => runClose(item, close),
+    { title: x('closeTitle'), confirmLabel: x('closeIt'), danger: true });
+
+  const runClose = async (item, close) => {
     const ref = `${item.kind}|${item.id}`;
     setBusy(ref);
     setMessage('');
@@ -194,14 +201,15 @@ export default function ExposureTab() {
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
       title=${x('title')}
       desc=${x('intro')}
-      strip=${report ? html`<${Strip} report=${report} />` : html`<${FigureStrip} lead loading=${4} />`}>
+      strip=${report ? html`<${Strip} report=${report} />` : html`<${FigureStrip} lead loading=${4} />`}
+      after=${html`<${ConfirmUI} />`}>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}
       ${message ? html`<${Note} kind="message">${message}<//>` : null}
       ${!report && !error ? html`<${Note} kind="loading">${x('loading')}<//>` : null}
       ${report ? html`
         <${Edges} report=${report} />
         <${Section} id="ex-items" num="01" title=${x('itemsTitle')} count=${total}>
-          <${List} cols="name-kind-state-doors"
+          <${List} cols="item-kind-state-doors" keepCols
             head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
             empty=${report.failed.length ? x('emptyPartial') : x('empty')}
             rows=${items}

@@ -3032,6 +3032,7 @@
     },
     "noAddress": "sin dirección para gente de afuera",
     "closeIt": "Cerrar",
+    "closeTitle": "Cerrar a la gente de afuera",
     "goThere": "Abrir {page}",
     "copyForAi": "Copiar para tu IA",
     "aiPrompt": "Cierra esto en mi AIMEAT para que la gente de afuera ya no pueda leerlo: \"{title}\". Cómo: {how}",
