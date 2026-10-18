@@ -15,8 +15,10 @@
  *   2. Upgraded. Between the starts the suite does to the database what a node that ran before this
  *      build has: a stored node policy whose labels carry no `maxAudience`, and no record of the start
  *      step (the step's record is deleted, the policy written as a stored policy of a pre-cap node is).
- *      The node keeps its labels as they are, alice can still make a record public, and the Security
- *      page holds one `classification_default_caps` incident offering three caps. A member who is not
+ *      This start has the switch off, and no offer opens. The operator switches classification on
+ *      (PUT /v1/admin/config), and only then one `classification_default_caps` incident offers three
+ *      caps; switching off and on again through PUT /v1/classification/switch opens no second one.
+ *      The node keeps its labels as they are, and alice can still make a record public. A member who is not
  *      the operator is refused (403); closing the incident undecided is refused (409); the operator's
  *      agent keeps one cap over MCP, the operator applies two over REST, and the incident closes. The
  *      caps are in the policy, alice's public record is still public and readable by anyone, she got
@@ -27,6 +29,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification-defaults
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-classification-defaults
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The running node starts with the switch off: no offer until it is switched
+ *     on, one offer however often it is switched, none more after a restart.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L5.1, L5.2).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -71,7 +75,8 @@ const db = await ownNodeDb(`caps-${PORT}`);
 let log = '';
 let node: ChildProcess | null = null;
 
-function nodeEnv(): NodeJS.ProcessEnv {
+/** `mode`: AIMEAT_CLASSIFICATION for this start; absent leaves the switch to the node's stored value (off by default). */
+function nodeEnv(mode?: string): NodeJS.ProcessEnv {
     const env: Record<string, string | undefined> = { ...process.env };
     for (const k of Object.keys(env)) if (k.startsWith('AIMEAT_') || k === 'DATABASE_URL') delete env[k];
     Object.assign(env, db.env, {
@@ -80,16 +85,16 @@ function nodeEnv(): NodeJS.ProcessEnv {
         AIMEAT_ADMIN_PASSWORD: `Caps-Admin-${STAMP}-Pw!`,
         AIMEAT_LOG_LEVEL: 'info',
         AIMEAT_SMTP_HOST: '',
-        AIMEAT_CLASSIFICATION: 'all',
+        ...(mode ? { AIMEAT_CLASSIFICATION: mode } : {}),
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_MEMORY: '1000',
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '1000',
     });
     return env as NodeJS.ProcessEnv;
 }
 
-async function startNode(): Promise<void> {
+async function startNode(mode?: string): Promise<void> {
     log = '';
-    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], { env: nodeEnv(), stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
+    node = spawn('node', [...nodeEntryArgs(), 'start', ...db.args], { env: nodeEnv(mode), stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
     node.stdout?.on('data', (d: Buffer) => { log += d.toString(); });
     node.stderr?.on('data', (d: Buffer) => { log += d.toString(); });
     await waitForServer(node, BASE, { label: 'the default-caps node' });
@@ -141,7 +146,7 @@ const publicKey = `caps.before.${STAMP}`;
 
 try {
     // ── 1. A fresh node ──
-    await startNode();
+    await startNode('all');
     op = await registerOwner(BASE, `capsop${STAMP}`);
     alice = await registerOwner(BASE, `capsalice${STAMP}`);
 
@@ -182,16 +187,38 @@ try {
             visibility: 'private', tags: ['classification-policy'], ttlHours: null, version: 1, createdAt: at, updatedAt: at,
         });
     });
+    // Started with the switch off: the offer waits until classification is in use.
     await startNode();
     op = { ...op, token: await ownerToken(BASE, op.name) };
     alice = { ...alice, token: await ownerToken(BASE, alice.name) };
+    const setMode = (mode: string) => call('PUT', '/v1/admin/config', op.token, { changes: [{ path: 'classification.mode', value: mode }] });
 
     let incidentId = '';
-    await test('RUNNING NODE: the labels keep no cap, and alice can still make an unlabelled record public', async () => {
+    await test('RUNNING NODE, SWITCH OFF: no offer is opened while classification is off', async () => {
+        const cfg = await call('GET', '/v1/classification/policy?level=node', op.token);
+        assert(cfg.body?.data?.mode === 'off', `the switch: ${short(cfg.body?.data?.mode ?? cfg.body?.error)}`);
+        const list = await capsIncidents(op.token);
+        assert(list.length === 0, `incidents while off: ${short(list)}`);
+    });
+
+    await test('RUNNING NODE: switching classification on opens the offer; the labels keep no cap, so alice can still make an unlabelled record public', async () => {
+        const on = await setMode('all');
+        assert(on.status === 200, `switch all: ${on.status} ${short(on.body?.error)}`);
+        assert((await capsIncidents(op.token)).length === 1, 'switching on opened no offer');
         const caps = await capsOf(op.token);
         assert(caps.sisainen === null && caps.luottamuksellinen === null && caps['erittain-luottamuksellinen'] === null, `caps: ${short(caps)}`);
         const w = await write(alice.token, publicKey, 'public');
         assert(w.status === 201 && w.body.data.visibility === 'public', `public write: ${w.status} ${short(w.body?.error ?? w.body?.data?.visibility)}`);
+    });
+
+    await test('RUNNING NODE: switching off and on again (the other endpoint) opens no second offer', async () => {
+        const off = await call('PUT', '/v1/classification/switch', op.token, { mode: 'off' });
+        assert(off.status === 200, `switch off: ${off.status} ${short(off.body?.error)}`);
+        const on = await call('PUT', '/v1/classification/switch', op.token, { mode: 'owner' });
+        assert(on.status === 200, `switch owner: ${on.status} ${short(on.body?.error)}`);
+        const back = await setMode('all');
+        assert(back.status === 200, `switch all: ${back.status} ${short(back.body?.error)}`);
+        assert((await capsIncidents(op.token)).length === 1, 'a second offer was opened');
     });
 
     await test('RUNNING NODE: one Security page incident offers the three caps, each open', async () => {

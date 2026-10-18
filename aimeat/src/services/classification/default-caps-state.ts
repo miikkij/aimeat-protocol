@@ -12,6 +12,7 @@
  *                     default labels carry their caps from the first request on.
  *     node 'running'  the start found a stored node policy or an account: the node ran before, and
  *                     nothing it does changes until the operator approves a cap on the Security page.
+ *                     `pending` says the offer still waits for classification to be switched on.
  *   A node with no record (a start that could not write it, or code that reads a policy without a
  *   started node) takes no cap: without evidence the node is new, it keeps the behaviour it had.
  *
@@ -22,6 +23,7 @@
  *   const state = await readDefaultCapsState(storage, nodeId);
  *   const labels = state?.node === 'new' ? labelsWithDefaultCaps(policy.labels) : policy.labels;
  * @version-history
+ *   v1.1.0 — 2026-10-18 — `pending`: the offer of a node that ran before waits while classification is off.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L5.1).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -37,6 +39,11 @@ export interface DefaultCapsState {
   at: string;
   /** What the start found, in words: the evidence for `node`. */
   evidence: string;
+  /**
+   * 'running' only: true while the offer waits for classification to be switched on (it was off when
+   * the node was found to have run before); false or absent once the offer was made.
+   */
+  pending?: boolean;
   /** The labels whose default cap was offered to the operator ('running' only). */
   offered: string[];
   /** The Security page incident that carries the offer, or null when nothing was offered. */

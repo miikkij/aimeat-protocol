@@ -268,8 +268,10 @@ sensitive a piece of content is. On a company node it also limits who may see th
    rises, content already shown wider is narrowed at once, and the owner gets a notification.
    Content that was already wider when a limit was first set is not changed: each person's "What
    others can see" list shows it, and the owner narrows it.
-5. *A node that ran before.* It keeps its classifications as they were. Its Security page holds one
-   incident, type `classification_default_caps`, that offers each limit. Decide each one with
+5. *A node that ran before.* It keeps its classifications as they were. When classification is on
+   (or the moment you switch it on; nothing is offered while it is off), its Security page holds one
+   incident, type `classification_default_caps`, that offers each limit. Press Apply or Keep as it
+   is beside each classification on that page, or decide each one with
    `POST /v1/admin/security/incidents/{id}/resolve` and `{ "name": "<classification id>",
    "resolution": "apply" }` (or `"keep"`), or with `aimeat_admin_incident_resolve`. A decision
    changes the policy only; no content changes.

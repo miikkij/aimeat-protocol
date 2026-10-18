@@ -211,9 +211,35 @@
           "headless_browser": "El navegador propio del servidor no arranca",
           "scope_words_kept": "Permisos que la actualización dio a los agentes y las apps existentes",
           "config_setting": "Un ajuste que el servidor no aceptó, así que usa el valor predeterminado",
-          "classification_default_caps": "Límites de quién puede ver el contenido clasificado, a la espera de tu decisión"
+          "classification_default_caps": "Límites de quién puede ver el contenido clasificado"
+        },
+        "caps": {
+          "line": "{label}: {cap}",
+          "lead": "Este servidor funcionaba antes de que una clasificación pudiera limitar quién ve su contenido. Nada cambia hasta que decidas cada límite. El contenido que ya se muestra más ampliamente mantiene su nivel, y el informe Lo que otros ven lo muestra.",
+          "rowResolved": "Todos los límites están decididos.",
+          "apply": "Aplicar",
+          "keep": "Dejar como está",
+          "applied": "aplicado",
+          "kept": "sin cambio",
+          "ownCap": "límite propio",
+          "noLabel": "eliminada",
+          "level": {
+            "public": "cualquiera",
+            "link": "como máximo quien tenga el enlace",
+            "signed-in": "como máximo quienes han iniciado sesión",
+            "organism": "como máximo los miembros de una organización",
+            "private": "solo el propietario"
+          },
+          "label": {
+            "julkinen": "Público",
+            "sisainen": "Interno",
+            "luottamuksellinen": "Confidencial",
+            "erittain-luottamuksellinen": "Altamente confidencial"
+          }
         },
         "source": {
+          "start": "arranque del servidor",
+          "switch": "se activó la clasificación",
           "workspace_import": "importación de espacio de trabajo",
           "organism_import": "importación de organismo",
           "app_backup": "copia de seguridad de una app",

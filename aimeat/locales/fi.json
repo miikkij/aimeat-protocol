@@ -1113,9 +1113,35 @@
           "headless_browser": "Palvelimen oma selain ei käynnisty",
           "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille ja sovelluksille",
           "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa",
-          "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät, odottavat päätöstäsi"
+          "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät"
+        },
+        "caps": {
+          "line": "{label}: {cap}",
+          "lead": "Tämä palvelin oli käytössä, ennen kuin luokitus pystyi rajaamaan, ketkä sisällön näkevät. Mikään ei muutu, ennen kuin päätät jokaisesta rajasta. Jo laajemmin näkyvä sisältö pysyy ennallaan, ja Mitä muut näkevät -raportti näyttää sen.",
+          "rowResolved": "Jokainen raja on päätetty.",
+          "apply": "Ota käyttöön",
+          "keep": "Pidä ennallaan",
+          "applied": "käytössä",
+          "kept": "ennallaan",
+          "ownCap": "oma raja",
+          "noLabel": "poistettu",
+          "level": {
+            "public": "kuka tahansa",
+            "link": "enintään linkin saaneet",
+            "signed-in": "enintään kirjautuneet",
+            "organism": "enintään organisaation jäsenet",
+            "private": "vain omistaja"
+          },
+          "label": {
+            "julkinen": "Julkinen",
+            "sisainen": "Sisäinen",
+            "luottamuksellinen": "Luottamuksellinen",
+            "erittain-luottamuksellinen": "Erittäin luottamuksellinen"
+          }
         },
         "source": {
+          "start": "palvelimen käynnistys",
+          "switch": "luokittelu kytkettiin päälle",
           "workspace_import": "työtilan tuonti",
           "organism_import": "organismin tuonti",
           "app_backup": "sovelluksen varmuuskopio",

@@ -14,6 +14,9 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-18 — An offered limit on who may see classified content is decided from its incident's
+ *     row, Apply or Keep as it is, through the same resolve endpoint and { name, resolution } a held
+ *     name uses (plan doc-mvdipuyqraas, L5.1).
  *   2026-10-16 — The status sentence names the other test-only settings in force on a public node
  *     (now.test_switches; QA audit D8-01).
  *   v3.4.2 — 2026-10-13 — The status sentence starts with AIMEAT_TEST_MONEY_HANDLER only on a public
@@ -179,6 +182,12 @@ export default function SecurityTab(props) {
     async () => { try { await resolveHeldName(id, n.name, resolution); showOk(S('incidents.held.decided')); load(); } catch (e) { showErr((e && e.message) || t('common.error')); } },
     { danger: resolution === 'previous', title: S('title') },
   );
+  // One offered limit on who may see classified content: Apply puts it on the classification, Keep
+  // leaves it without one. Either can be changed later in the policy, so it asks nothing first.
+  const decideCap = async (id, c, resolution) => {
+    try { await resolveHeldName(id, c.label, resolution); showOk(S('incidents.held.decided')); load(); }
+    catch (e) { showErr((e && e.message) || t('common.error')); }
+  };
   const downloadQuarantine = async (id) => {
     try {
       const res = await fetch(`/v1/admin/security/incidents/${encodeURIComponent(id)}/quarantine`, { headers: authHeaders() });
@@ -209,7 +218,7 @@ export default function SecurityTab(props) {
     <${Strip} ov=${ov} switchPage=${switchPage} />
     <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
     ${held.length ? html`<${HeldSection} items=${held} number=${n()} onResolve=${resolve} onDelete=${remove} onDecide=${decide} switchPage=${switchPage} />` : null}
-    <${IncidentsSection} items=${refused} number=${n()} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} />
+    <${IncidentsSection} items=${refused} number=${n()} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecideCap=${decideCap} />
     <${Columns}>
       <${AccountsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
       <${SettingsSection} ov=${ov} number=${n()} switchPage=${switchPage} />

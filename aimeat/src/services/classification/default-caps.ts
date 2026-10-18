@@ -15,6 +15,13 @@
  *       (`classification_default_caps`), with a decision per label on REST, MCP and the page.
  *   The start never stops on this: a failure is logged and the next start tries again.
  *
+ *   THE OFFER WAITS UNTIL CLASSIFICATION IS IN USE (the lead's decision, 2026-10-18). A node that ran
+ *   before with the switch off records the offer as pending and opens nothing, because a cap changes
+ *   nothing while classification is off. The incident opens when the switch moves from off to owner
+ *   or all (offerDefaultCapsWhenSwitchedOn, from both endpoints that move it), or at a later start
+ *   with the switch on. Once made, the record says so, and a restart opens no second one. A new node
+ *   takes the caps whatever the switch says: nothing on it predates them.
+ *
  *   THE DECISION. decideDefaultCap(): "apply" writes the cap onto the label in the node's stored
  *   policy (a node with no stored policy stores its default labels with that one cap) and adds a line
  *   to the policy's history; "keep" leaves the label as it is. A label that has a cap of its own by
@@ -25,11 +32,14 @@
  *   already shown wider than the cap keeps its level: the lowering of L3.4 runs when a LABEL of
  *   content rises (audience-settle.ts, onLabelRaised), never on a policy change, and the exposure
  *   report lists what is over a cap. A later change that widens such content is refused as usual.
- * @structure DEFAULT_CAPS_INCIDENT_TYPE · settleDefaultCapsAtStart() · decideDefaultCap() · DecideCapResult
+ * @structure DEFAULT_CAPS_INCIDENT_TYPE · settleDefaultCapsAtStart() · offerDefaultCapsWhenSwitchedOn() ·
+ *   decideDefaultCap() · DecideCapResult
  * @usage
  *   await settleDefaultCapsAtStart(config, storage);        // server-bootstrap/config-init.ts
  *   await decideDefaultCap(config, storage, { incidentId, name: 'sisainen', resolution: 'apply', by });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The offer of a node that ran before waits while classification is off
+ *     (recorded as pending) and opens when the switch is turned on, or at a start with it on.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L5.1, L5.2).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -41,7 +51,7 @@ import {
   type IncidentCapOffer, type SecurityIncidentValue,
 } from '../security-incident.js';
 import { DEFAULT_LABEL_CAPS, DEFAULT_LABELS, defaultPolicy } from './defaults.js';
-import { DEFAULT_CAPS_KEY, type DefaultCapsState } from './default-caps-state.js';
+import { DEFAULT_CAPS_KEY, readDefaultCapsState, type DefaultCapsState } from './default-caps-state.js';
 import { AUDIENCE_LEVEL_WORDS, isAudienceLevel } from './audience-levels.js';
 import { validateNodePolicy } from './levels.js';
 import { NODE_POLICY_KEY, type PolicyChange } from './policy.js';
@@ -75,58 +85,99 @@ function offerDetail(offers: IncidentCapOffer[]): string {
     + 'or aimeat_admin_incident_resolve. The limits matter only while classification is on (AIMEAT_CLASSIFICATION).';
 }
 
+/** The caps to offer a node that ran before: each default label's cap its stored policy does not have. */
+async function capsToOffer(storage: Storage, system: string): Promise<IncidentCapOffer[]> {
+  const policy = await storedNodePolicy(storage, system);
+  const labels = policy && Array.isArray(policy.labels) ? policy.labels as unknown[] : null;
+  const offers: IncidentCapOffer[] = [];
+  for (const [id, cap] of Object.entries(DEFAULT_LABEL_CAPS)) {
+    if (!cap) continue;
+    if (labels) {
+      const raw = labels.find(l => isObj(l) && l.id === id) as Record<string, unknown> | undefined;
+      // Gone from the operator's policy, or capped by the operator already: nothing to offer.
+      if (!raw || isAudienceLevel(raw.maxAudience)) continue;
+    }
+    offers.push({ label: id, name: labelName(id, labels), max_audience: cap, status: 'open' });
+  }
+  return offers;
+}
+
+/** Write the start step's record. */
+async function writeState(storage: Storage, system: string, state: DefaultCapsState): Promise<void> {
+  const existing = await storage.getMemory(system, DEFAULT_CAPS_KEY);
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: DEFAULT_CAPS_KEY, ownerGaii: system, value: state, visibility: 'private', tags: ['classification-policy'],
+    ttlHours: null, version: existing ? existing.version + 1 : 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+  });
+}
+
 /**
- * Decide, once, whether this node is new or ran before, and record it. A node that ran before gets
- * one Security page incident offering each default label's cap it does not have. Never throws.
+ * Make the offer of a node that ran before: one Security page incident with each cap its policy does
+ * not have, or none when nothing is left to offer. The record then says the offer was made, so it is
+ * made once. An open offer already there (a start that stopped before the record was written) is reused.
  */
-export async function settleDefaultCapsAtStart(config: Pick<AimeatConfig, 'nodeId'>, storage: Storage): Promise<void> {
+async function openOffer(config: Pick<AimeatConfig, 'nodeId'>, storage: Storage, state: DefaultCapsState, source: string): Promise<void> {
+  const system = `system@${config.nodeId}`;
+  const offers = await capsToOffer(storage, system);
+  let incident: string | null = null;
+  if (offers.length) {
+    const open = (await listSecurityIncidents(storage, config as AimeatConfig)).items
+      .find(i => i.type === DEFAULT_CAPS_INCIDENT_TYPE && i.status === 'open');
+    incident = open?.id ?? (await recordSecurityIncident(storage, config, {
+      type: DEFAULT_CAPS_INCIDENT_TYPE, code: 'DEFAULT_CAPS_OFFERED', actorGhii: system, actorName: 'classification',
+      detail: offerDetail(offers), source, caps: offers,
+    })).id;
+    emitChange('security');
+    logger.info(`[classification] This node ran before default audience caps existed; ${offers.length} cap(s) wait for the operator on the Security page.`);
+  }
+  await writeState(storage, system, { ...state, pending: false, offered: offers.map(o => o.label), incident });
+}
+
+/**
+ * Decide, once, whether this node is new or ran before, and record it. A node that ran before is
+ * offered the caps on the Security page when classification is in use (its switch is not off); while
+ * the switch is off the offer waits, recorded as pending, and is made at the first start with the
+ * switch on or when the switch is turned on (offerDefaultCapsWhenSwitchedOn). Never throws.
+ */
+export async function settleDefaultCapsAtStart(config: Pick<AimeatConfig, 'nodeId' | 'classificationMode'>, storage: Storage): Promise<void> {
   const system = `system@${config.nodeId}`;
   try {
-    if (await storage.getMemory(system, DEFAULT_CAPS_KEY)) return;
+    const recorded = await readDefaultCapsState(storage, config.nodeId);
+    if (recorded) {
+      if (recorded.node === 'running' && recorded.pending && config.classificationMode !== 'off') await openOffer(config, storage, recorded, 'start');
+      return;
+    }
     const policy = await storedNodePolicy(storage, system);
     const accounts = (await storage.listOwners()).length;
     const at = new Date().toISOString();
-    let state: DefaultCapsState;
     if (!policy && accounts === 0) {
-      state = { node: 'new', at, evidence: 'no stored node policy and no account', offered: [], incident: null };
-    } else {
-      const labels = policy && Array.isArray(policy.labels) ? policy.labels as unknown[] : null;
-      const offers: IncidentCapOffer[] = [];
-      for (const [id, cap] of Object.entries(DEFAULT_LABEL_CAPS)) {
-        if (!cap) continue;
-        if (labels) {
-          const raw = labels.find(l => isObj(l) && l.id === id) as Record<string, unknown> | undefined;
-          // Gone from the operator's policy, or capped by the operator already: nothing to offer.
-          if (!raw || isAudienceLevel(raw.maxAudience)) continue;
-        }
-        offers.push({ label: id, name: labelName(id, labels), max_audience: cap, status: 'open' });
-      }
-      let incident: string | null = null;
-      if (offers.length) {
-        // A start that opened the incident and stopped before the record was written finds it here.
-        const open = (await listSecurityIncidents(storage, config as AimeatConfig)).items
-          .find(i => i.type === DEFAULT_CAPS_INCIDENT_TYPE && i.status === 'open');
-        incident = open?.id ?? (await recordSecurityIncident(storage, config, {
-          type: DEFAULT_CAPS_INCIDENT_TYPE, code: 'DEFAULT_CAPS_OFFERED', actorGhii: system, actorName: 'classification',
-          detail: offerDetail(offers), source: 'start', caps: offers,
-        })).id;
-        emitChange('security');
-      }
-      state = {
-        node: 'running', at,
-        evidence: policy ? 'a stored node policy' : `${accounts} account${accounts === 1 ? '' : 's'} and no stored node policy`,
-        offered: offers.map(o => o.label), incident,
-      };
+      await writeState(storage, system, { node: 'new', at, evidence: 'no stored node policy and no account', offered: [], incident: null });
+      return;
     }
-    await storage.setMemory({
-      key: DEFAULT_CAPS_KEY, ownerGaii: system, value: state, visibility: 'private', tags: ['classification-policy'],
-      ttlHours: null, version: 1, createdAt: at, updatedAt: at,
-    });
-    if (state.node === 'running' && state.offered.length) {
-      logger.info(`[classification] This node ran before default audience caps existed; ${state.offered.length} cap(s) wait for the operator on the Security page.`);
-    }
+    const state: DefaultCapsState = {
+      node: 'running', at, pending: true, offered: [], incident: null,
+      evidence: policy ? 'a stored node policy' : `${accounts} account${accounts === 1 ? '' : 's'} and no stored node policy`,
+    };
+    if (config.classificationMode === 'off') await writeState(storage, system, state);
+    else await openOffer(config, storage, state, 'start');
   } catch (err) {
     logger.warn('classification: the default audience caps could not be settled at start; the next start tries again', { error: String(err) });
+  }
+}
+
+/**
+ * The classification switch moved from off to owner or all: a node that ran before whose offer waits
+ * gets it now. Both endpoints that move the switch call it (switch.ts, routes/admin-config.ts).
+ * Never throws.
+ */
+export async function offerDefaultCapsWhenSwitchedOn(config: Pick<AimeatConfig, 'nodeId'>, storage: Storage, from: string, to: string): Promise<void> {
+  if (from !== 'off' || to === 'off') return;
+  try {
+    const recorded = await readDefaultCapsState(storage, config.nodeId);
+    if (recorded?.node === 'running' && recorded.pending) await openOffer(config, storage, recorded, 'switch');
+  } catch (err) {
+    logger.warn('classification: the default audience caps could not be offered when classification was switched on; the next start tries again', { error: String(err) });
   }
 }
 

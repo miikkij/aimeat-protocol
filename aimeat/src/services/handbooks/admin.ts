@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.18.1 -- 2026-10-18 -- The default limits' offer waits until classification is switched on.
  *   v1.18.0 -- 2026-10-18 -- Classification: the default limits a new node takes, and the Security page
  *     incident that offers them on a node that ran before (plan doc-mvdipuyqraas, L5.1).
  *   v1.17.0 -- 2026-10-18 -- Classification: a label's maxAudience and the owner's audience exception
@@ -141,8 +142,9 @@ private): content and containers under it are refused a wider level (LABEL_CAPS_
 label that rises lowers what is already wider and tells its owner; only the owner in person
 overrides it for one item, with an \`audience\` exception and a reason. A new node's default labels
 carry such limits from its first start (internal: signed-in; confidential and highly confidential:
-organism). A node that ran before keeps its labels as they were and gets one Security page incident,
-type \`classification_default_caps\`, that offers each limit: read it with
+organism). A node that ran before keeps its labels as they were; once classification is switched on
+(at once if it already is, never while it is off), it gets one Security page incident, type
+\`classification_default_caps\`, that offers each limit, decided there with Apply or Keep as it is: read it with
 \`aimeat_admin_security_overview\`, tell the operator what each limit does, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the classification id, \`resolution\`: "apply" or "keep")
 only as the operator says. No content changes either way. The node level (\`policy_set\`, \`audit\` and \`exception_list\` at
