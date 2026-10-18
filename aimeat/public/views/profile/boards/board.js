@@ -11,6 +11,7 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.14.0 — 2026-10-18 — The first tag under a board's title is the AudienceBadge: who can read the board, in words (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.13.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
  *   v1.12.0 —2026-09-26 — On the component kit (page group G7): the tags, the strip and the rail are data (the topics and the most thanked as rail items), the category filter the Tabs in the fold tone, "show more" the More line, the composer the Beside with the TextField, TextArea and Choice (a chosen category pressed again clears it), the rules the Fields with the Choice, the members the Tags with their remove mark and the TextField with its add door, the hairlines the Split. The file writes no class.
  *   v1.11.0 — 2026-09-26 — A member's ✗ is the Tag's remove mark (.poster-chip-x, poster.css): grey, coral under the pointer, where it was coral always (a unification: Jouni's decision "Remove mark").
@@ -41,7 +42,8 @@ import { t } from '/js/i18n.js';
 import { PageSection } from '/components/PageSection.js';
 import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
-import { c, rel, who, bid, visWord, ownerOf, standingWords, noticeRow, renderPage } from './frame.js';
+import { c, rel, who, bid, ownerOf, standingWords, noticeRow, renderPage } from './frame.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Hint } from '/components/Hint.js';
 import { Note } from '/components/Note.js';
 import { Mark, Marks, Label } from '/components/Mark.js';
@@ -74,7 +76,7 @@ export function renderBoard(ctx, b) {
   const ttlDays = Math.round((b.rules?.default_ttl_hours ?? 168) / 24);
 
   const marks = [
-    { label: visWord(b.visibility), tone: b.visibility === 'public' ? 'sun' : undefined },
+    html`<${AudienceBadge} key="aud" value=${b.visibility} />`,
     { label: c('chipNotices', { n: page.posts.length + (page.cursor ? '+' : '') }) },
     b.owner_gaii ? { label: mine ? c('ownBoard') : c('chipKeeper', { name: ownerOf(b.owner_gaii) }) } : null,
     { label: priceWords(b), tone: 'dim' },

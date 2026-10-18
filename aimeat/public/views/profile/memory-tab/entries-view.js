@@ -8,6 +8,7 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  *   Every part is a component of the kit that gets data; the file writes no class.
  * @version-history
+ *   v2.3.0 -- 2026-10-18 -- A key's visibility tag is the AudienceBadge: who can read it in words (Private, "<organism> members", Signed-in, Public), still the button that opens the picker (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.2.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry instead of a
  *     loading line that never ends (QA audit F6-05).
  *   v2.1.0 -- 2026-10-02 -- The question mark that explains a share pattern: memory.key_pattern (components/HelpTip.js).
@@ -71,7 +72,8 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { recipientBadge, VisibilityPill } from '../shared.js';
+import { recipientBadge } from '../shared.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { detectImage, ImageView } from '/components/ImageDeliverable.js';
 import TagCloud from '/js/components/tag-cloud.js';
 import TagEditor from '/js/components/tag-editor.js';
@@ -332,7 +334,7 @@ export function renderEntries(ctx) {
           ${formatRelativeTime(m.updated_at || m.created_at)}
         <//>
         <${Cell} line>
-          <${VisibilityPill} visibility=${m.visibility || 'private'}
+          <${AudienceBadge} value=${m.visibility || 'private'} expanded=${visPopoverFor === m.key}
             onClick=${(e) => { e.stopPropagation(); setVisPopoverFor(visPopoverFor === m.key ? null : m.key); }} />
           ${via.length > 0 ? html`
             <${Mark} title=${t('profile.memory.shSharedWith').replace('{names}', via.map(x => x.name).join(', '))}>

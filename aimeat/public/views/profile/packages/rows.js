@@ -12,6 +12,7 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.23.0 — 2026-10-18 — A package you made says who can read it with the AudienceBadge (Private, Signed-in, "<organism> members", Public), where it said private for every level but public (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.22.0 — 2026-10-04 — An opened offer shows what its apps ask for, with the check that approves
  *     them at install when the package is someone else's (sheet.js appApprovalBlock).
  *   v1.21.0 — 2026-10-01 — An opened offer shows the package's "what you get" sheet and the settings
@@ -59,6 +60,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Action } from '/components/Action.js';
 import { Code, Label } from '/components/Mark.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Note } from '/components/Note.js';
 import { Box } from '/components/Box.js';
 import { Facts } from '/components/Facts.js';
@@ -258,7 +260,7 @@ export function ownRow(ctx, p) {
         p.status === 'published' ? '' : x('statusWord.' + p.status),
         state ? listingWord(state) : x('notInGallery'),
         installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : '',
-      ].filter(Boolean).join(' · ')}>${p.visibility === 'public' ? x('vis.public') : x('vis.private')}<//>
+      ].filter(Boolean).join(' · ')}><${AudienceBadge} value=${p.visibility} /><//>
       <${Doors}>
         ${p.status === 'published' ? null
           // A draft cannot be installed by anybody, including its author, so the door that changes

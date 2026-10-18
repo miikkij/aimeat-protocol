@@ -11,6 +11,7 @@
  * @structure renderPackage · entryRow · sourceRows · relationDoors
  * @usage import { renderPackage } from './package.js';
  * @version-history
+ *   v1.18.0 -- 2026-10-18 -- Who can read the package is the first tag under its title, and a read-only entry's tag, the AudienceBadge (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.17.0 -- 2026-09-26 -- On the component kit (page group G7): the page is the SettingsPage (via
  *     frame.js renderPage, marks and the rail as data), the strip the FigureStrip, the sections
  *     Section (the details a fold, as on main); an entry is a List row (the name opens it; the
@@ -55,7 +56,7 @@ import { FigureStrip } from '/components/FigureStrip.js';
 import { Tinted } from '/components/Figure.js';
 import { Facts } from '/components/Facts.js';
 import { Select } from '/components/Select.js';
-import { Mark } from '/components/Mark.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Note } from '/components/Note.js';
 import { Tab } from '/components/Tabs.js';
 import { Action, Actions, Loud } from '/components/Action.js';
@@ -104,7 +105,7 @@ function entryRow(ctx, pkg, entry, i, allEntries) {
     <${Row} key=${key} open=${open} id=${'kp-e-' + i}>
       <${Name} onOpen=${toggle}>${label}<//>
       <${Doors}>
-        ${ctx.readOnly ? html`<${Mark} tone=${pub ? 'sun' : 'dim'}>${visWord(vis)}<//>`
+        ${ctx.readOnly ? html`<${AudienceBadge} value=${vis} />`
           : html`<${Tab} tone="fold" on=${pub} pressed=${pub} title=${`${visWord(vis)} → ${visWord(next)}`} onClick=${flip}>${visWord(vis)} ▾<//>`}
         ${!open ? html`<${Note} inline>${counts}<//>` : null}
         <${Action} small soft onClick=${toggle}>${open ? c('close') : c('open')}<//>
@@ -132,6 +133,7 @@ export function renderPackage(ctx, pkg) {
   // The tags under the title; the ones that only describe (language, version, licence, the person's
   // own tags) are dim, as main drew them.
   const marks = [
+    html`<${AudienceBadge} key="aud" value=${pkg.visibility} />`,
     { label: maturityWord(m.maturity), tone: m.maturity === 'published' || m.maturity === 'stable' ? 'sun' : undefined },
     { label: ctWord(m.content_type || 'document') },
     { label: synthWord(m.synthesis?.level) },

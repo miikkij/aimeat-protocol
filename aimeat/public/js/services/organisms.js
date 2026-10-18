@@ -13,6 +13,7 @@
  *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
  *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.13.1 — 2026-10-18 — The share's access keeps 'organism' (the workspace's own members, V3.4), which it read as 'open'.
  *   v1.13.0 — 2026-10-16 — writeDraft takes the person's `aiProvenance` declaration.
  *   v1.12.0 — 2026-10-16 — The share carries `until`, its end dates.
  *   v1.11.0 — 2026-10-16 — The registry, config, colour and source reads and writes move to
@@ -530,12 +531,14 @@ export async function retireEngagement(orgId, ws, agent, contract) {
 
 const normalizeShare = (s) => ({
   public: !!s.public, spaces: s.spaces || {}, docs: s.docs || {}, until: s.until || {},
-  access: s.access === 'password' || s.access === 'account' ? s.access : 'open',
+  // 'organism' (V3.4): only the members of the workspace's own organism. Read as 'open' until
+  // 2026-10-18, so a page shared with the members alone was said to open for anyone with the link.
+  access: s.access === 'password' || s.access === 'account' || s.access === 'organism' ? s.access : 'open',
   has_password: !!s.has_password,
 });
 
 /** Current public-sharing state:
- *  { public, spaces: {name:bool}, docs: {"type/id":bool}, access: 'open'|'password'|'account', has_password }. */
+ *  { public, spaces: {name:bool}, docs: {"type/id":bool}, access: 'open'|'password'|'account'|'organism', has_password }. */
 export async function getWorkspaceShare(orgId, ws) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/share?ws=${encodeURIComponent(ws)}`);

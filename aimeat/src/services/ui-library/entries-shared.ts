@@ -9,6 +9,8 @@
  * @structure SHARED_ENTRIES
  * @usage import { SHARED_ENTRIES } from './entries-shared.js';
  * @version-history
+ *   v1.9.0 — 2026-10-18 — AudienceBadge (components/AudienceBadge.js): who can read one thing of the
+ *     person's, in words, on the Tag (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.8.1 — 2026-10-16 — HtmlPageFrame takes `provenance` (the AI label in its strip) and `author`.
  *     AiLabel's chip cut, the app's corner mark.
  *   v1.8.0 — 2026-10-16 — HtmlPageFrame (components/HtmlPageFrame.js): a workspace's HTML page in its
@@ -78,6 +80,29 @@ export const SHARED_ENTRIES: UiEntryWritten[] = [
         useFor: ['Content made with AI that carries a record (EU AI Act, Article 50), and the start of a conversation with an AI.'],
         variants: [{ name: 'chip', class: 'ai-label--chip', prop: "variant='chip'", when: 'content that fills the screen, an HTML page in full screen: the EU icon in a pill at the bottom-left, the statement above it on hover, focus or a tap, as on a served app' }],
         example: { variant: 'inline', recordUrl: '/v1/provenance/abc' },
+    },
+    {
+        id: 'audience-badge', name: 'AudienceBadge', kind: 'component', status: 'active',
+        summary: 'Who can read one thing of the person\'s, in words on a tag: Private, "<organism> members", Signed-in, Anyone with the code (or the password), Anyone with the link, Public; the tooltip says it in a sentence. It wears the Tag.',
+        module: '/components/AudienceBadge.js', sheet: '/css/components/mark.css', classes: ['poster-chip'],
+        data: {
+            shape: 'AudienceBadge({ value, audience, app, organismName, onClick, expanded })',
+            fields: {
+                value: "the stored audience as the API returns it: a visibility ('private', 'owner', 'members', 'public', 'organism:<id>', a board's 'shared'), an app's open_to, a share's access",
+                audience: 'a level already read with /js/audience.js (shareAudienceOf, exposureAudienceOf)',
+                app: 'an app as GET /v1/apps hands it to its owner: the code, open_to and the listing decide',
+                organismName: 'the organism\'s name when the page has it; otherwise it is read from the organisms the person belongs to',
+                onClick: 'makes the tag the button that changes who can read it',
+            },
+        },
+        useFor: ['Every view that shows the owner their own content: a record, a file, a workspace page, an app, a package, a knowledge package, a board, a skill (pnpm check:audience-badge holds the list).'],
+        variants: [
+            { name: 'public', prop: "value='public'", when: 'anyone can read it and it can be listed: on the sun' },
+            { name: 'anyone with the link or a code', prop: "value='link' | 'code' | 'password'", when: 'a stranger with the address reads it: coral' },
+            { name: 'signed-in, organism members', prop: "value='members' | 'organism:<id>'", when: 'only accounts here, or one organism\'s members: plain' },
+            { name: 'private', prop: "value='private'", when: 'only the person, their agents or people they named: dim' },
+        ],
+        example: { value: 'organism:demo', organismName: 'Innokas Medical' },
     },
     {
         id: 'voice-recorder', name: 'VoiceRecorder', kind: 'component', status: 'active',

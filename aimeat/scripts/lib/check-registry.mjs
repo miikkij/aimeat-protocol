@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-18: check:audience-badge, every view that shows the owner their content draws the AudienceBadge (plan doc-mvcn6c7e4e5q, V6.4).
  *  - 2026-10-16: check:posture-defaults (invariants 8 and 10) and check:own-node-backend (a suite's own node follows the run's backend) (QA audit S10-05, P1-02).
  *  - 1.20.0 (2026-10-16): check:mcp-test-calls, the ratchet on catalog MCP tools no E2E suite calls (QA audit W27); check:denial-coverage also asks every authenticated route for a refusal test (W29, P3-08).
  *  - 1.19.1 (2026-10-16): check:silent-catch's label names what it now holds: src/static per file and per shape, and every exemption counted with its reason (W25).
@@ -58,6 +59,8 @@ export const FAST_CHECKS = [
     { script: 'check:dialogs', label: 'One dialog for the site: no hand-rolled overlay, backdrop or role="dialog" box' },
     { script: 'check:viewport', label: 'Cortex pack integrity: embed + VERSION constants + registry versions' },
     { script: 'check:ai-disclosure', label: 'AI disclosure gates: one LLM path, one publish path, labels intact' },
+    // Plan doc-mvcn6c7e4e5q, V6.4: each view printed its kind's stored word for who can read a thing.
+    { script: 'check:audience-badge', label: 'Every view that shows the owner their content says who can read it with the AudienceBadge' },
     { script: 'check:locales', label: 'Language files agree with en.json' },
     { script: 'check:licenses', label: 'Licences allowed, every served file accounted for' },
     { script: 'check:notices', label: 'Third-party notices match the tree' },

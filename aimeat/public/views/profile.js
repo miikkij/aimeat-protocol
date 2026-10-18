@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-18 — The "What others can see" tab (views/profile/exposure-tab.js): what of the person's own
+ *     a stranger can read, and how to close it (plan doc-mvcn6c7e4e5q, V6.2).
  *   2026-10-09 — The Visibility tab (views/profile/visibility-tab.js): AI visibility and on-page behaviour.
  *   2026-10-01 — The packages tab is shown from the 'new' tier: the menu names it "Get apps" (decision D8).
  *   2026-09-26 — The root and the toast pill are components (SettingsRoot in components/SettingsFrame.js,
@@ -80,6 +82,7 @@ import ExtensionsTab from './profile/extensions-tab.js';
 import FederationTab from './profile/federation-tab.js';
 import NodesTab from './profile/nodes-tab.js';
 import AccessTab from './profile/access-tab.js';
+import ExposureTab from './profile/exposure-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import AppDevTab from './profile/appdev-tab.js';
@@ -161,6 +164,7 @@ const TABS = [
   { id: 'federation',    key: 'profile.tabs.federation',     component: FederationTab,     minTier: 'experienced' },
   { id: 'nodes',         key: 'profile.tabs.nodes',          component: NodesTab,          minTier: 'experienced' },
   { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
+  { id: 'exposure',      key: 'profile.tabs.exposure',       component: ExposureTab,       minTier: 'new' },
   { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
   { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },
   // 'new', not 'experienced': this tab is where two-step sign-in is switched on, and that is not an

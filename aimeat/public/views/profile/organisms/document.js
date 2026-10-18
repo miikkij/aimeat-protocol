@@ -9,6 +9,7 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   v1.13.0 — 2026-10-18 — A picture's visibility tag is the AudienceBadge (Private / Public in words), still the button that switches it (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.12.0 — 2026-10-16 — The view shows the AI label the page owes (it draws only for a page that is
  *     public, such as one on an open share). The editor asks whether an AI wrote the page and saves
  *     the answer as its provenance (js/page-authorship.js).
@@ -54,7 +55,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { VisibilityPill } from '/views/profile/shared.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Markdown } from '/components/Markdown.js';
 import { DocView, DocSplit } from '/components/DocView.js';
 import { Facts } from '/components/Facts.js';
@@ -337,7 +338,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
             ${images.map(i => html`
               <${Row} key=${i.key}>
                 <${Name} title=${i.key}>${(i.alt)}<//>
-                <${Doors}><${VisibilityPill} visibility=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} /><//>
+                <${Doors}><${AudienceBadge} value=${i.visibility} onClick=${() => { if (!imgBusy) changeImageVisibility(i.key, i.visibility === 'public' ? 'private' : 'public'); }} /><//>
               <//>`)}
           <//>
         <//>` : null}

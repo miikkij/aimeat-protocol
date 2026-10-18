@@ -12,6 +12,7 @@
  * @structure renderPage · secWaiting · secKunto · secNewest · secFirst
  * @usage import { renderPage } from './apps/page.js';
  * @version-history
+ *   v2.4.0 -- 2026-10-18 -- An app that changed last says who can open it, in words beside its name (AudienceBadge from its access code, open_to and listing) (plan doc-mvcn6c7e4e5q, V6.4).
  *   v2.3.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry where the loading
  *     line stood (ctx.appsFailed) (QA audit F6-05).
  *   v2.2.0 -- 2026-10-04 -- A permission row names the app as the catalogue does (grantName): a grant made
@@ -70,6 +71,7 @@ import { Figure } from '/components/Figure.js';
 import { List, Row, Name, Desc, Cell, Num, Doors, Panel, Lead } from '/components/List.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Mark, Marks, Label, Code } from '/components/Mark.js';
+import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
 import { scrollToSection } from '/components/Rail.js';
@@ -273,7 +275,7 @@ function secNewest(ctx, apps) {
           return html`
             <${Row} key=${ref}>
               <${Lead} text=${initials(nameOf(app))} />
-              <${Name} meta=${a('rowMeta', { version: app.manifest?.version || '', n: app.version_number || 1, date: day(app.created_at), size: kb(app.size) })}>${nameOf(app)}<//>
+              <${Name} tag=${html`<${AudienceBadge} app=${app} />`} meta=${a('rowMeta', { version: app.manifest?.version || '', n: app.version_number || 1, date: day(app.created_at), size: kb(app.size) })}>${nameOf(app)}<//>
               <${Desc} lines=${3} sub=${requiresLine(app)}>${app.manifest?.descriptions?.[getLocale()] || app.manifest?.description || ''}<//>
               <${Cell} meta>${noteFor(app, flags, grantRefs, legal)}<//>
               <${Num} strong>${app.downloads || 0}<//>
