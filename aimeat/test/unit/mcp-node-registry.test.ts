@@ -9,6 +9,8 @@
  *   strength of a half-finished setup. And no call may ever take morsels from anybody, because
  *   morsels are a pacer and buy nothing; that failure reaches a balance rather than a log.
  * @version-history
+ *   v1.3.1 — 2026-10-18 — The upstream listens on a port the system picks; the fixed 40686 collided on
+ *     CI (EADDRINUSE at a248ddd2a, run 39097196231).
  *   v1.3.0 — 2026-09-24 — The price arms hand the chokepoint Alice's scopes as a door does
  *     (heldScopes); it no longer reads a missing list as mcp:use (secaudit 2026-09 f740ecf9bc39).
  *   v1.2.0 — 2026-09-24 — Changing one: an owner a node-wide server admits may use it and never
@@ -20,6 +22,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -36,7 +39,9 @@ import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
 
 process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
 
-const PORT = 40686;
+// The system picks the port (0) and the test reads it back: a fixed one inside Linux's ephemeral
+// range (40686) was taken by another file's socket on CI and timed the whole suite out (EADDRINUSE).
+let PORT = 0;
 const KEY = 'd'.repeat(64);
 const config = { encryptionKey: KEY, totpSecretEncryptionKey: null } as never;
 
@@ -71,7 +76,8 @@ beforeAll(async () => {
     }
     await t.handleRequest(req, res, body);
   });
-  await new Promise<void>((r) => upstream.listen(PORT, '127.0.0.1', () => r()));
+  await new Promise<void>((r) => upstream.listen(0, '127.0.0.1', () => r()));
+  PORT = (upstream.address() as AddressInfo).port;
 });
 
 afterAll(async () => {
