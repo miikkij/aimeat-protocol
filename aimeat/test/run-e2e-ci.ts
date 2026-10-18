@@ -16,6 +16,11 @@
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
  *   2026-10-18 -- e2e-classification-audience-cap.ts joins the list (not the guard tier): a label's audience cap (plan doc-mvdipuyqraas, L3).
  *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
+ *   2026-10-18 -- e2e-ext-hardening.ts and e2e-exchange-projection.ts join GUARD_SUITES (141 → 143),
+ *     measured alone three times on SQLite in the production-settings lane, and on Postgres by the
+ *     nightly sweep (no Postgres on the promoting machine). Both were red in the nightly sweep since
+ *     da1fc12cc, whose paywall rule their assertions predated; a payment refusal now stops a push
+ *     (wish wish-y-ajon-maksun-ohitus-oikea-vika-vai-vanhentunut-testi).
  *   2026-10-18 -- e2e-closed-node-levels.ts joins the list (not the guard tier): a public write on a node closed to strangers lands at the signed-in level, and the new-app feed.
  *   2026-10-18 -- e2e-page-access.ts joins the list (not the guard tier): who may open a welcome page and a company front page (V3.10).
  *   2026-10-18 -- e2e-content-defaults.ts joins the list (not the guard tier): the node's starting levels for content.
@@ -1608,6 +1613,15 @@ const GUARD_SUITES = [
     // another owner's labels, policy, audit and exceptions, the operator's word on the switch, and
     // what an export keeps behind (TARGET-082).
     'test/e2e-classification.ts',           // who may see, change and send out classified content
+    // Joined 2026-10-18. SQLite: alone, on a freshly deleted database, three consecutive 20/20 and 46/46
+    // runs in the production-settings lane. Postgres: the machine that promoted them had no Postgres, so
+    // the evidence is the nightly sweep (19/19 and 46/46 on 2026-10-17, and on 2026-10-18 the same single
+    // stale assertion as on SQLite and nothing else); CI's guard run is the first local-equivalent one.
+    // Both went red in the nightly sweep only after da1fc12cc changed the paywall rule and left their
+    // assertions on the old one, because neither ran on a push (wish
+    // wish-y-ajon-maksun-ohitus-oikea-vika-vai-vanhentunut-testi).
+    'test/e2e-ext-hardening.ts',            // a pass minted for one product excuses neither price nor pacing on another
+    'test/e2e-exchange-projection.ts',      // the raw extension route onto a sold capability is the same product, at its price
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone
