@@ -189,6 +189,57 @@ Two settings shape how a new app starts on any node: `AIMEAT_APP_DEFAULT_LISTING
 community or unlisted) and `AIMEAT_APP_DEFAULT_ACCESS` (anyone or signed-in), with
 `AIMEAT_APP_DEFAULT_ACCESS_CODE=true` giving each new app a code the publisher is told.
 
+## 6b. A company node, step by step
+
+The whole recipe for a node that one company and its approved partners use, and nobody else. Every
+setting below is also on the admin Config tab, so an operator can change it without a restart.
+
+**1. Run a version that has all of it.** The content gate, the publish gate and the starting levels
+arrived on 2026-10-17 and 2026-10-18 (plan doc-mvcn6c7e4e5q). `curl https://<node>/v1/build` gives
+the commit that runs.
+
+**2. Who can sign in** (sections 2 to 4): `AIMEAT_REGISTRATION_MODE=oauth` (or `invite`) and
+`AIMEAT_ENTRA_ALLOWED_TENANTS=<company tenant>,<partner tenant>,...`.
+
+**3. Who sees anything:** `AIMEAT_CONTENT_ACCESS=signed-in` (section 6a). On this node "signed-in"
+means the company's people and the approved partners.
+
+**4. Nothing becomes public without the owner:** `AIMEAT_PUBLISH_GATE=agents-and-apps`. An agent
+needs the `publish:public` permission, which the owner ticks separately and "Full access" does not
+include; an app needs it on its consent screen. Without it, the change is saved at the level it had
+and the owner gets a notification with Approve and Decline (`/v1/publish-requests`,
+`aimeat_publish_requests`). On a closed node this matters when the node is opened later.
+
+**5. Where new things start** when nobody names a level:
+
+```
+AIMEAT_APP_DEFAULT_ACCESS=signed-in          # a new app opens for signed-in accounts only
+AIMEAT_APP_DEFAULT_LISTING=community         # and is listed for signed-in accounts only
+AIMEAT_DEFAULT_ORGANISM_VISIBILITY=private
+AIMEAT_DEFAULT_BOARD_VISIBILITY=private
+AIMEAT_DEFAULT_SHARE_ACCESS=organism         # a first workspace share: the organism's members
+AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY=private
+AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY=members # what an app's upload gets when it names no level
+AIMEAT_DEFAULT_AGENT_LISTED=false            # a new agent is not in the agent directory
+```
+
+Memory records and stored files start private on every node. `aimeat init` writes the board,
+organism, share, data package and agent values above for a new node; a running node keeps the old
+behaviour until the operator sets them.
+
+**6. Two levels inside the company.** "Signed-in" is everyone who can sign in, partners included.
+For what only the company's own staff may read, make one organism for the company (for example
+"Innokas Medical") with the staff as members, and use its level: `organism:<id>` on records, files,
+boards, skills and packages, `open_to: organism:<id>` on an app, `access: organism:<id>` on a
+welcome page or company page, and access `organism` on a workspace share. A team app whose people
+share one data set keeps that data in the organism's workspace, not in each person's own memory;
+the app-building interview asks this before it builds (its data map step).
+
+**7. Check what is open.** After the settings, the operator reads `GET /v1/admin/exposure` (the
+node-wide numbers) and each person reads their own "What others can see" list
+(`GET /v1/exposure/mine`, `aimeat_exposure_report`). Close what was not meant for everyone who can
+sign in.
+
 ## 7. SAML and SCIM: the organisation's own identity provider (BR-04)
 
 Entra OIDC above answers "our staff sign in with Microsoft". SAML and SCIM answer the two questions
