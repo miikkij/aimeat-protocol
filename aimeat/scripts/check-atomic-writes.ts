@@ -28,7 +28,9 @@
  *
  *   RATCHET, NOT A WALL. security/atomic-write-baseline.json holds the hits of the day it was
  *   seeded, keyed `file:unit|key` (no line number, so an entry keeps covering its code when lines
- *   above it move), each with one line: why it is safe, or which wish fixes it. A new hit fails the
+ *   above it move), each with one line: `Safe: <why it is safe>`, or `DEBT: …` naming the
+ *   non-public note that holds the reason. The repository is public, so an open site's line never
+ *   says what two requests could gain there (.claude/rules/gates-ratchets.md). A new hit fails the
  *   gate, and so does a listed hit that is gone, until its line is removed. The list only shrinks.
  * @structure EXCLUDED · BASELINE · main(): report, --list, --seed, --strict
  * @usage
@@ -36,6 +38,8 @@
  *   cd aimeat && pnpm check:atomic-writes:report     # report only
  *   cd aimeat && pnpm exec tsx scripts/check-atomic-writes.ts --list   # every hit with its lines
  * @version-history
+ *   v1.0.1 — 2026-10-18 — A DEBT line names where its reason lives, not what the site lets a caller
+ *     do; the reasons moved to Platform Development Notes doc-mve1mtynyrma.
  *   v1.0.0 — 2026-10-18 — Initial (wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -97,8 +101,8 @@ export function main(): boolean {
     const listed = Object.keys(baseline.exempt);
     const fresh = hits.filter(h => baseline.exempt[hitKey(h)] === undefined);
     const gone = listed.filter(k => !hits.some(h => hitKey(h) === k));
-    // Every entry is an answer: `Safe: <the fact that makes it so>` or `DEBT: <what two requests at
-    // the same moment lose>`. A bare placeholder would let a new hit in with nobody having read it.
+    // Every entry is an answer: `Safe: <the fact that makes it so>`, or `DEBT: …` with a pointer to
+    // the non-public note that holds the reason. A bare placeholder would let a new hit in unread.
     const unreasoned = listed.filter(k => !REASON.test(baseline.exempt[k] ?? ''));
 
     console.log('');
@@ -111,7 +115,7 @@ export function main(): boolean {
     console.log('');
 
     if (unreasoned.length > 0) {
-        console.error('✖ A baseline entry needs its one line, "Safe: <why>" or "DEBT: <what is lost>":');
+        console.error('✖ A baseline entry needs its one line, "Safe: <why>" or "DEBT: <where the non-public reason is>":');
         for (const k of unreasoned) console.error(`    ${k}`);
         return false;
     }
