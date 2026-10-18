@@ -22903,6 +22903,8 @@
     "detail.favBadge": "Suosikki",
     "detail.heroHint": "Käynnistä avaa julkaistun version, jonka kaikki näkevät. Avaa luonnos avaa työkopion, jonka näet vain sinä.",
     "detail.heroHintClean": "Käynnistä avaa julkaistun version, jonka kaikki näkevät.",
+    "detail.heroHintLimited": "Käynnistä avaa julkaistun version. Avaa luonnos avaa työkopion, jonka näet vain sinä.",
+    "detail.heroHintCleanLimited": "Käynnistä avaa julkaistun version.",
     "nav.home": "Koti",
     "nav.chat": "Chat",
     "nav.apps": "Sovellukset",

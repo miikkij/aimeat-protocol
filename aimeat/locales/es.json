@@ -20708,6 +20708,8 @@
     "detail.favBadge": "Favorita",
     "detail.heroHint": "Iniciar abre la versión publicada que ve todo el mundo. Abrir el borrador abre la copia de trabajo que solo ves tú.",
     "detail.heroHintClean": "Iniciar abre la versión publicada que ve todo el mundo.",
+    "detail.heroHintLimited": "Iniciar abre la versión publicada. Abrir el borrador abre la copia de trabajo que solo ves tú.",
+    "detail.heroHintCleanLimited": "Iniciar abre la versión publicada.",
     "nav.home": "Inicio",
     "nav.chat": "Chat",
     "nav.apps": "Aplicaciones",
