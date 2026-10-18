@@ -29,6 +29,8 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-18 — A create that names no visibility, from no shape that names one, takes
+ *     visibility.organism_default (code default public; plan doc-mvcn6c7e4e5q, V5.4), before the gate.
  *   2026-10-18 — Create and update take `publishGate`, the door's caller (plan doc-mvcn6c7e4e5q, V4):
  *     making an organism public (a create's default included) by an agent without publish:public, or
  *     an app grant when the gate covers apps, makes it private (create) or keeps its level (update),
@@ -72,6 +74,7 @@ import { revokeDepartedMemberAccess } from './invitations.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
+import { organismVisibilityDefault } from './content-defaults.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -178,8 +181,9 @@ export async function createOrganismRecord(
   // the shape's type, or the first preset, and anything longer than a label is cut to one.
   const type = typeof input.type === 'string' && input.type.trim() ? input.type.trim().slice(0, ORGANISM_TYPE_MAX) : (shape?.type ?? 'community');
   const joinPolicy = pickEnum(JOIN_POLICIES, input.joinPolicy, shape?.joinPolicy ?? 'open');
-  let visibility = pickEnum(VISIBILITIES, input.visibility, shape?.visibility ?? 'public');
-  // The publish gate (plan doc-mvcn6c7e4e5q, V4): the default is public, so a create that names no
+  // No visibility named and no shape naming one: the node's starting level (plan V5.4).
+  let visibility = pickEnum(VISIBILITIES, input.visibility, shape?.visibility ?? organismVisibilityDefault(config));
+  // The publish gate (plan doc-mvcn6c7e4e5q, V4): the default may be public, so a create that names no
   // visibility asks too. Asked by a caller the node asks the owner about, the organism and its board
   // are made private, and the request is filed once the organism exists.
   const ask = organismPublishAsk(deps, input.publishGate, undefined, visibility);

@@ -7,9 +7,9 @@
  *   /v1/storage/<key> (which AIMEAT.storage.publicUrl builds) needs an Authorization header, so it
  *   works for the person who owns the file and for nobody else: a player who is signed out, or
  *   signed in as themselves, gets nothing. /v1/pub/<owner-ghii>/<key> is the anonymous read, and it
- *   is the address every asset in a manifest uses. That is why `visibility: 'public'` is the
- *   default here and why anything else is called out at the time it is uploaded, rather than
- *   discovered as a broken sprite later.
+ *   is the address every asset in a manifest uses. That is why an asset is stored public unless the
+ *   app or the node's operator says otherwise, and why anything else is called out at the time it
+ *   is uploaded, rather than discovered as a broken sprite later.
  *
  *   THE UPLOAD IS THE APP'S OWN CALL. This library never uploads on its own, never sweeps a
  *   folder, never retries in the background. The app hands it a file, it hands back an address.
@@ -19,6 +19,9 @@
  *   lib.add('images', 'hero', { file: put.url, w: 32, h: 40, bytes: put.bytes });
  *   await lib.save();
  * @version-history
+ *   v1.2.0 — 2026-10-18 — upload() sends a visibility only when the app named one; without it the node
+ *     applies its starting level for an app's upload (visibility.app_upload_default, code default
+ *     public, plan doc-mvcn6c7e4e5q V5.2). A stored level other than public is warned about as before.
  *   v1.1.0 — 2026-09-13 — upload() returns the node's versioned address (`?v=` that changes on every
  *     write) when there is one, so re-uploading an asset under the same key reaches players at once
  *     instead of after the five-minute cache on /v1/pub.
@@ -63,11 +66,23 @@ function storageKey(file, opts) {
 }
 
 /**
+ * Say, at upload time, that an asset is not readable by every player.
+ * @param {string} key
+ * @param {string} level
+ */
+function warnNotPublic(key, level) {
+  console.warn('[aimeat-assets] "' + key + '" is stored as ' + level + '. A player '
+    + 'who is not you cannot read it, so a manifest entry pointing at it will draw nothing. '
+    + 'Upload assets as public and keep saves private.');
+}
+
+/**
  * @typedef {object} UploadOptions
  * @property {string} [app]         the app this file belongs to, used to name it in storage
  * @property {string} [key]         the storage key, when the app names it itself
  * @property {string} [kind]        'images' | 'audio' | 'fonts' | …, a folder inside the app's
- * @property {'public'|'private'} [visibility]  'public' by default, because a player has to read it
+ * @property {'public'|'private'} [visibility]  when absent the node decides (public unless its
+ *   operator chose otherwise), because a player has to read it
  * @property {string} [mime_type]
  */
 
@@ -87,19 +102,21 @@ export async function upload(file, opts) {
   }
   const o = opts || /** @type {UploadOptions} */ ({});
   const key = storageKey(file, o);
-  const visibility = o.visibility || 'public';
-  if (visibility !== 'public') {
-    console.warn('[aimeat-assets] "' + key + '" is being uploaded as ' + visibility + '. A player '
-      + 'who is not you cannot read it, so a manifest entry pointing at it will draw nothing. '
-      + 'Upload assets as public and keep saves private.');
-  }
+  // A visibility is sent only when the app named one. Without it the node decides, from its
+  // starting level for an app's upload (visibility.app_upload_default, public unless the operator
+  // chose otherwise), so a node that keeps everything signed-in can keep assets so too.
+  const named = o.visibility;
+  if (named && named !== 'public') warnNotPublic(key, named);
 
   /** @type {any} */
   const written = await store.upload(file, {
     key: key,
-    visibility: visibility,
+    visibility: named || undefined,
+    nodeDefault: true,
     mime_type: o.mime_type || (file && /** @type {any} */ (file).type) || undefined,
   });
+  const stored = written && written.visibility;
+  if (!named && stored && stored !== 'public') warnNotPublic(key, stored);
 
   const owner = written && (written.owner_gaii || written.ownerGaii);
   // The VERSIONED address first. /v1/pub answers with five minutes of browser freshness and a

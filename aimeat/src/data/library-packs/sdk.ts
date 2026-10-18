@@ -10,6 +10,7 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.34.0 — 2026-10-18 — Changelogs: aimeat-assets 1.2.0, aimeat-storage 1.5.0 and aimeat-social 1.3.0 leave the visibility to the node when the app names none (plan doc-mvcn6c7e4e5q, V5).
  *   v1.33.0 — 2026-10-18 — aimeat-data: action() and adultStatus(); aimeat-commerce: payByCard,
  *     finishCardPayment, subscribe, subscriptions, cancelSubscription (Comicland v3).
  *   v1.32.0 — 2026-10-17 — Pitfall-list round, aiDocs only: aimeat-auth drops "Ed25519 auth" (removed
@@ -289,6 +290,7 @@ export const SDK_PACKS: LibraryPack[] = [
     apiSurface: 'AIMEAT.storage',
     aiDoc: 'File upload/download, chunked upload, drag & drop helper. Cross-user image display: upload with visibility "public" and reference /v1/pub/<owner-ghii>/<key> — publicUrl() returns an owner-auth URL that will NOT load for other users. Never embed images as base64 in memory values. AIMEAT.storage.viewUrl(address) returns a URL that loads in an <img> for a file that is not public; it takes a full URL, a /v1/pub/ path, a "<gaii>/<key>" reference as ctx.files.write() and the agent file tools return it, or a bare key of the signed-in person. Call it when you draw the picture: the URL expires. After a re-upload to the same key, point at the upload answer\'s versioned_url, which changes on every write. A team file is stored for the people who share an organism workspace: upload(file, { visibility: "workspace", workspace_ref: "<organismId>/<workspaceId>" }) (or workspaceRefs: [...] for several); a group file: { visibility: "group", group_id }. uploadChunked() takes the same options. Without the workspace the node refuses a "workspace" file.',
     changelog: [
+      { version: '1.5.0', date: '2026-10-18', summary: 'upload() and uploadChunked() take nodeDefault: true, which sends no visibility when none is named, so the node applies its level for an app\'s upload. Without it an upload with no visibility is still private.' },
       { version: '1.3.0', date: '2026-09-29', summary: 'upload() and uploadChunked() send the workspace or group a file is shared with: visibility "workspace" with workspace_ref "<organismId>/<workspaceId>" (or workspaceRefs), visibility "group" with group_id. They used to drop it, so a workspace file was refused.' },
       { version: '1.2.0', date: '2026-09-13', summary: 'viewUrl() reads a "<gaii>/<key>" reference as an owner and a key, so a picture an agent uploaded opens for its owner instead of answering 404. Upload answers carry versioned_url.' },
     ],
@@ -520,6 +522,7 @@ export const SDK_PACKS: LibraryPack[] = [
       'Load order: aimeat-auth and aimeat-data before this library when the manifest lives in memory; without them the library works from an inline manifest only.',
     ].join('\n'),
     changelog: [
+      { version: '1.2.0', date: '2026-10-18', summary: 'upload() sends a visibility only when you name one. Without it the node stores the file at its level for an app\'s upload, public unless the operator chose otherwise, and the library warns when the file did not land public. Name visibility: "public" to be sure.' },
       { version: '1.0.0', date: '2026-09-02', summary: 'Initial: manifest, library, upload, packAtlas, sound export, texts, preview (wish-aimeat-assets-and-game-programme). Shown working on the Design Book\'s Phaser page.' },
     ],
     demoTemplateId: undefined,
@@ -759,7 +762,9 @@ export const SDK_PACKS: LibraryPack[] = [
     license: 'MIT',
     apiSurface: 'AIMEAT.social',
     aiDoc: 'Boards — the notice board many people and agents post to and anyone can read: announcements, for sale, wanted, on offer, questions, an organism\'s discussion. A public board\'s posts (boards(), posts(), getPost(), catalogueBoards()) load WITHOUT a session, so a visitor sees them; createBoard(), post(), react(), reply() and subscribe() need a signed-in session and throw "Not logged in" otherwise — catch that and show the visitor a sign-in door. A post carries title, body, an optional category and tags, and expires after ttl_hours (default 168); posting to a public board costs morsels. Use it when the app IS a notice board; a per-user journal or the app\'s own records stay on Memory keys.',
-    changelog: [],
+    changelog: [
+      { version: '1.3.0', date: '2026-10-18', summary: 'createBoard() sends a visibility only when you name one in opts. Without it the node applies its level for a new board, public unless the operator chose otherwise.' },
+    ],
     tierHint: 'T1',
     interviewTriggers: [],
     sizeEstimate: '~6KB',

@@ -18,6 +18,8 @@
  *   const out = await publishPackage(deps, ownerGhii, { ...input, visibility: gate.visibility }, producedBy);
  *   const asked = gate.requester && out.ok ? await fileDatapackageAsk(deps, owner, gate.requester, ownerGhii, name, out.contentHash, gate.from) : {};
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A publish that names no visibility asks about visibility.datapackage_default
+ *     (code default public; plan V5.6), and the gate answers the level it decided.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: data packages).
  */
 import type { CallerContext } from '../caller-context.js';
@@ -25,12 +27,13 @@ import { isRaiseToPublic } from '../publish-gate.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
 import { readPointer } from './version-audience.js';
+import { datapackageVisibilityDefault } from '../content-defaults.js';
 
 export type DatapackageGate =
   | { kind: 'refused'; status: 403; code: string; message: string }
   | { kind: 'go'; visibility: string | undefined; requester: PublishRequester | null; from: string };
 
-/** May this caller publish the package at the requested visibility (public when not named)? */
+/** May this caller publish the package at the requested visibility (visibility.datapackage_default when not named)? */
 export async function datapackagePublishGate(
   ctx: PublishStoreCtx, caller: CallerContext, app: string | undefined, ownerGhii: string, name: string, requested: string | undefined,
 ): Promise<DatapackageGate> {
@@ -38,10 +41,12 @@ export async function datapackagePublishGate(
   // A pointer with a version and no visibility is a public package's (./audience.ts).
   const from = pointer?.contentHash ? (pointer.visibility ?? 'public') : undefined;
   const kept = from ?? 'private';
-  if (!isRaiseToPublic(from, requested ?? 'public')) return { kind: 'go', visibility: requested, requester: null, from: kept };
+  // No visibility named: the node's starting level (plan V5.6), decided before the gate is asked.
+  const level = requested ?? datapackageVisibilityDefault(ctx.config);
+  if (!isRaiseToPublic(from, level)) return { kind: 'go', visibility: level, requester: null, from: kept };
   const ask = publishAskOf(ctx, caller, app);
   if (ask.kind === 'refused') return ask;
-  if (ask.kind === 'allowed') return { kind: 'go', visibility: requested, requester: null, from: kept };
+  if (ask.kind === 'allowed') return { kind: 'go', visibility: level, requester: null, from: kept };
   return { kind: 'go', visibility: kept, requester: ask.requester, from: kept };
 }
 

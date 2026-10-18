@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-18 — Section 2: an imported entry with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — The same wait for a file made public, an import, a bulk write and a copy
  *     (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — The same wait covers an organism, a board, a skill, a cortex library and a shared
@@ -117,7 +118,8 @@ What an export leaves out, and why:
 - **Memory:** the Memory page's import (\`POST /v1/memory/import\`) takes the export file. Choose what
   happens when a key already exists: \`skip\` (the default), \`overwrite\`, or \`rename\` (the incoming
   record gets a new key). The answer counts created, updated, skipped and failed, with the reason
-  for each failure. The person's limits on keys and value size apply.
+  for each failure. The person's limits on keys and value size apply. An entry with no visibility
+  gets the level this node gives a new entry: private unless the operator chose otherwise.
 - **An organism or a workspace:** \`aimeat_organism_import\` or \`aimeat_workspace_transfer\` with
   \`direction: "import"\`. Both create a NEW organism or workspace; members and the board are not
   restored. A ZIP that fails the safety checks is refused and kept aside for the operator.

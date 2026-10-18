@@ -12,6 +12,7 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-18 — manage-my-agents: a change with no level gets the node's starting level, and a new agent may start unlisted (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 — manage-my-agents: a stored file made public, and a bulk write or an import, wait for
  *     the owner the same way (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — manage-my-agents: publish:public, and what a write that makes a record public answers
@@ -247,7 +248,9 @@ flowchart LR
   change that makes something public (a record, a file, an app, a page, an organism, a board, a
   skill, a package, a knowledge package or a data package) answers with \`publish_request\` (a bulk
   write or an import lists one per record under \`publish_requests\`): it is stored as it was (a new
-  one private), and the owner approves on their Notifications page. Tell the owner in one
+  one private), and the owner approves on their Notifications page. A change that names no level
+  gets the level this node gives new content, and when that level is public it asks the same way.
+  A new agent may start outside the public list of agents when the operator chose so. Tell the owner in one
   sentence what you asked to make public and give them the \`approve_url\` from the answer;
   \`aimeat_publish_requests\` lists the requests and their state.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.

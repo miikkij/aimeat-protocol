@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Use-case preset defaults and CONFIG_DEFAULTS map for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — NEW_NODE_CONTENT_DEFAULTS, the content starting levels a new node is written with; CONFIG_DEFAULTS states their code defaults (plan doc-mvcn6c7e4e5q, V5).
  *   v1.0.1 — 2026-10-16 — CONFIG_DEFAULTS says what the loader does for extensions (on, any owner installs), push (on) and the burn rate, held by a unit test (QA audit D8-04).
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
  */
@@ -60,6 +61,19 @@ export function buildPresets(cfg: AimeatConfig): Record<Exclude<UseCase, 'custom
   };
 }
 
+/**
+ * The recommended levels for content nobody named a level for, which `aimeat init` writes for a new
+ * node (plan doc-mvcn6c7e4e5q, V5). The code defaults (CONFIG_DEFAULTS below) are what a node did
+ * before these settings; a running node keeps them until its operator decides.
+ */
+export const NEW_NODE_CONTENT_DEFAULTS: Record<string, string> = {
+  AIMEAT_DEFAULT_BOARD_VISIBILITY: 'private',
+  AIMEAT_DEFAULT_ORGANISM_VISIBILITY: 'private',
+  AIMEAT_DEFAULT_SHARE_ACCESS: 'account',
+  AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY: 'private',
+  AIMEAT_DEFAULT_AGENT_LISTED: 'false',
+};
+
 // Defaults from config.ts for summary comparison. test/unit/config-stated-defaults.test.ts holds
 // each one to what loadConfig() resolves with no environment, so a changed loader default fails there.
 export const CONFIG_DEFAULTS: Record<string, string> = {
@@ -74,6 +88,14 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_DEV_MODE: 'false',
   AIMEAT_ANONYMOUS: 'false',
   AIMEAT_PUBLISH_GATE: 'off',
+  AIMEAT_DEFAULT_MEMORY_VISIBILITY: 'private',
+  AIMEAT_DEFAULT_FILE_VISIBILITY: 'private',
+  AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY: 'public',
+  AIMEAT_DEFAULT_BOARD_VISIBILITY: 'public',
+  AIMEAT_DEFAULT_ORGANISM_VISIBILITY: 'public',
+  AIMEAT_DEFAULT_SHARE_ACCESS: 'open',
+  AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY: 'public',
+  AIMEAT_DEFAULT_AGENT_LISTED: 'true',
   AIMEAT_EXTENDED_FEATURES: 'true',
   AIMEAT_JWT_TTL: '3600',
   AIMEAT_ACCESS_TTL: '900',

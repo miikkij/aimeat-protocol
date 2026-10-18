@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — POST /v1/memory without a visibility takes the node's starting level,
+ *     visibility.memory_default (code default private; plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — POST /v1/memory asks the publish gate: a public write by an agent without
  *     publish:public is stored at the level it had and answers 202 with `publish_request` (plan
  *     doc-mvcn6c7e4e5q, V4.4).
@@ -89,6 +91,7 @@ import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
 import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
+import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -122,7 +125,8 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
     }
 
-    const vis = visibility ?? 'private';
+    // No visibility named: the node's starting level (plan V5.1), decided before the publish gate.
+    const vis = visibility ?? memoryVisibilityDefault(config);
     // Opt-in per request: "write this under the OWNER, not me". Gated by memory:write-as-owner.
     const ownerScopeWrite = (req.body ?? {}).owner_scope === true;
 

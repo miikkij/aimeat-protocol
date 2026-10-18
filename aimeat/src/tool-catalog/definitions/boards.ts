@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./discovery-work-boards.ts
  * @version-history
+ *   v1.3.0 — 2026-10-18 — aimeat_board_create: visibility is optional, the node's starting level when omitted (plan doc-mvcn6c7e4e5q, V5.3).
  *   v1.2.0 — 2026-10-18 — aimeat_board_create says it answers publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   v1.1.0 — 2026-10-17 — aimeat_board_create takes `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.0.0 — 2026-10-05 — Extracted from discovery-work-boards.ts (pure extraction; no behavior change).
@@ -42,7 +43,7 @@ export const boardTools = [
         input: {
             name: { type: 'string', required: true, description: 'Board name.' },
             description: { type: 'string', description: 'Board description.' },
-            visibility: { type: 'string', required: true, description: 'Board visibility level: private, shared, public, or organism:<organism id> for the active members of one organisation you are a member of (never federated).', zod: z.union([z.enum(['private', 'shared', 'public']), organismAudienceInput]) },
+            visibility: { type: 'string', description: 'Board visibility level: private, shared, public, or organism:<organism id> for the active members of one organisation you are a member of (never federated). Omit it and the board gets the level this node gives a new board (public unless the operator chose otherwise).', zod: z.union([z.enum(['private', 'shared', 'public']), organismAudienceInput]) },
             allowed_gaiis: { type: 'array', description: 'GAIIs allowed to access a shared/private board.', zod: z.array(z.string()) },
             rules: { type: 'object', description: 'The board\'s own rules, all optional: posting ("owner", "members" or "anyone"), categories (at most 20 names of 64 characters; a post under any other category is refused), default_ttl_hours (more than 0, at most 8760; how long a post lives when it names no lifetime of its own, 168 when unset), post_cost (0 to 100000 morsels per post on a public board; 0 makes posting free and removes the only spam brake a board has).', zod: boardRulesInput },
         },

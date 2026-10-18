@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-10-18 — The Modes section names the content starting levels, AIMEAT_DEFAULT_* (plan doc-mvcn6c7e4e5q, V5).
  *   v1.4.0 — 2026-10-16 — Every answer reaches the .env: operator identity, AI transparency, consent, the commerce fee mode and the global rate limit have sections, and a key no section names goes under "Other settings". The JSON writer nests schema dot-paths (it wrote camelCase names the loader skips) and the INI writer keeps dot-less paths at the top level; a setting with no schema row goes under its variable name (QA audit D8-03).
  *   v1.3.1 — 2026-10-11 — The app-origin comment says what DNS and TLS it needs instead of naming a
  *     file in the gitignored docs/internal folder, which no operator has.
@@ -89,6 +90,14 @@ export function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_DEV_MODE' },
         { key: 'AIMEAT_ANONYMOUS' },
         { key: 'AIMEAT_PUBLISH_GATE', comment: 'Who asks the owner before making something public: off | agents | agents-and-apps' },
+        { key: 'AIMEAT_DEFAULT_MEMORY_VISIBILITY', comment: 'An entry saved with no level: private | owner | members' },
+        { key: 'AIMEAT_DEFAULT_FILE_VISIBILITY', comment: 'A file uploaded with no level: private | owner | members' },
+        { key: 'AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY', comment: 'A file an app uploads with no level: public | private | owner | members' },
+        { key: 'AIMEAT_DEFAULT_BOARD_VISIBILITY', comment: 'A board created with no level: public | private' },
+        { key: 'AIMEAT_DEFAULT_ORGANISM_VISIBILITY', comment: 'An organism created with no level: public | listed | private' },
+        { key: 'AIMEAT_DEFAULT_SHARE_ACCESS', comment: 'A workspace first shared with no access: open | account | organism' },
+        { key: 'AIMEAT_DEFAULT_DATAPACKAGE_VISIBILITY', comment: 'A data package published with no level: public | members | private' },
+        { key: 'AIMEAT_DEFAULT_AGENT_LISTED', comment: 'A new agent is in the public list of agents: true | false' },
       ],
     },
     {

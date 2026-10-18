@@ -740,6 +740,9 @@
     parts.push(name);
     return parts.join("/");
   }
+  function warnNotPublic(key, level) {
+    console.warn('[aimeat-assets] "' + key + '" is stored as ' + level + ". A player who is not you cannot read it, so a manifest entry pointing at it will draw nothing. Upload assets as public and keep saves private.");
+  }
   async function upload(file, opts) {
     const store = storageLib();
     if (!store || typeof store.upload !== "function") {
@@ -748,16 +751,17 @@
     const o = opts || /** @type {UploadOptions} */
     {};
     const key = storageKey(file, o);
-    const visibility = o.visibility || "public";
-    if (visibility !== "public") {
-      console.warn('[aimeat-assets] "' + key + '" is being uploaded as ' + visibility + ". A player who is not you cannot read it, so a manifest entry pointing at it will draw nothing. Upload assets as public and keep saves private.");
-    }
+    const named = o.visibility;
+    if (named && named !== "public") warnNotPublic(key, named);
     const written = await store.upload(file, {
       key,
-      visibility,
+      visibility: named || void 0,
+      nodeDefault: true,
       mime_type: o.mime_type || file && /** @type {any} */
       file.type || void 0
     });
+    const stored = written && written.visibility;
+    if (!named && stored && stored !== "public") warnNotPublic(key, stored);
     const owner = written && (written.owner_gaii || written.ownerGaii);
     const url = written && written.versioned_url || written && written.embed_url || (owner ? publicAddress(owner, written.key || key) : "");
     if (!url) {

@@ -22,6 +22,7 @@
  *   const agent = await ensureChatAgent(storage, config, ownerName);
  *   const { token } = await mintChatAgentToken(storage, config, agent);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The chat agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.1.1 — 2026-09-05 — Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts,
  *     which assembles the registry that imports services back (a cycle the dependency cruiser refuses).
  *   v1.1.0 — 2026-08-22 — It gets the scopes of the mode it registers in, which is the same list a
@@ -47,6 +48,7 @@ import { scopesForProfile } from '../tool-catalog/scopes.js';
 import { emitChange } from './event-bus.js';
 import { emitToolListChanged } from '../mcp/resource-events.js';
 import { logger } from '../utils/logger.js';
+import { agentListingTags } from './content-defaults.js';
 
 /** The agent's name component. One place, because it appears in a GAII, a UI and a log line. */
 export const CHAT_AGENT_NAME = 'chat';
@@ -132,6 +134,8 @@ export async function ensureChatAgent(
         mode: CHAT_AGENT_MODE,
         createdAt: now,
         lastSeen: now,
+        // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
+        ...agentListingTags(config),
     } as AgentRecord;
     await storage.createAgent(record);
     emitChange('agents', `${ownerName}@${config.nodeId}`);

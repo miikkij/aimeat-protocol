@@ -11,6 +11,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-storage.js"></script>
  *   await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
  * @version-history
+ *   v1.5.0 — 2026-10-18 — upload() and uploadChunked() take opts.nodeDefault: with no visibility named,
+ *     they send none and the node applies its starting level for an app's upload (plan
+ *     doc-mvcn6c7e4e5q, V5.2). Without it, an upload with no visibility is still sent as private.
  *   2026-10-16 — A failed abort after a failed chunked upload is logged, not swallowed (QA audit W25 ratchet).
  *   v1.4.0 — 2026-10-16 — uploadChunked aborts its upload on the node when a chunk or the complete
  *     fails, so the session and its bytes do not stay behind; the node now keeps at most four open
@@ -38,6 +41,18 @@ import { attach } from '../_core/namespace.js';
  * (opts.workspace_ref, a string, or opts.workspaceRefs, a list). Without them the node refuses a
  * 'workspace' file and stores a 'group' file bound to nobody.
  */
+/**
+ * The visibility an upload sends: the one the app named, else 'private'. With opts.nodeDefault true
+ * and none named, it sends none, and the node applies its own starting level for an app's upload
+ * (visibility.app_upload_default). AIMEAT.assets.upload uses that for a game's pictures and sounds.
+ * @param {any} opts
+ * @returns {string|undefined}
+ */
+function levelOf(opts) {
+  if (opts && opts.visibility) return opts.visibility;
+  return opts && opts.nodeDefault === true ? undefined : 'private';
+}
+
 function binding(opts) {
   const o = opts || {};
   const refs = o.workspaceRefs || o.workspace_refs;
@@ -60,7 +75,7 @@ const storage = {
       const file = /** @type {File} */ (fileOrData);
       key = opts?.key || file.name || ('file-' + Date.now());
       mime_type = opts?.mime_type || file.type || 'application/octet-stream';
-      visibility = opts?.visibility || 'private';
+      visibility = levelOf(opts);
       const buf = await file.arrayBuffer();
       const bytes = new Uint8Array(buf);
       let binary = '';
@@ -73,7 +88,7 @@ const storage = {
       key = opts?.key || ('file-' + Date.now());
       data = fileOrData;
       mime_type = opts?.mime_type || 'application/octet-stream';
-      visibility = opts?.visibility || 'private';
+      visibility = levelOf(opts);
     } else {
       throw new Error('upload() expects a File, Blob, or base64 string');
     }
@@ -201,7 +216,7 @@ const storage = {
     const chunkSize = opts?.chunkSize || (1024 * 1024); // 1MB default
     const key = opts?.key || file.name || ('file-' + Date.now());
     const mime_type = opts?.mime_type || file.type || 'application/octet-stream';
-    const visibility = opts?.visibility || 'private';
+    const visibility = levelOf(opts);
     const totalChunks = Math.ceil(file.size / chunkSize);
 
     // Init

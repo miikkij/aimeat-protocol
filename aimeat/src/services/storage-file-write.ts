@@ -38,6 +38,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.6.0 — 2026-10-18 — A file stored or minted without a visibility takes visibility.file_default, or
+ *     for an app grant visibility.app_upload_default (plan doc-mvcn6c7e4e5q, V5.2), before the gate.
  *   v1.5.0 — 2026-10-18 — The publish gate (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q,
  *     V4). `publishGate` on the write and the presigned mint: a file made public by a caller the node
  *     asks the owner about is stored at the level it had (a new one: private) and the result carries
@@ -86,6 +88,12 @@ import {
     fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest,
     type StoragePublishGate, type FilePublishFiled,
 } from './storage-file-publish.js';
+import { fileVisibilityDefault } from './content-defaults.js';
+
+/** The level of a file stored without one (plan V5.2): an app grant's own default for an app. */
+function defaultLevelOf(config: AimeatConfig, gate: StoragePublishGate | undefined): StorageFileRecord['visibility'] {
+    return fileVisibilityDefault(config, !!gate && 'caller' in gate && gate.caller.kind === 'app');
+}
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
  *  the token is signed with are the same value, so they cannot drift apart. */
@@ -330,7 +338,8 @@ export async function writeStorageFile(
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
 
-    const visibility = input.visibility ?? 'private';
+    // No visibility named: the node's starting level (plan V5.2), before the publish gate below.
+    const visibility = input.visibility ?? defaultLevelOf(config, input.publishGate);
     // A workspace-visible file that names no workspace is readable by nobody, so it is refused here
     // rather than stored and puzzled over later.
     if (visibility === 'workspace' && !input.workspaceRef) {
@@ -522,9 +531,12 @@ export type StorageUploadUrlResult =
 export async function mintStorageUploadUrl(
     deps: StorageWriteDeps,
     ownerGaii: string,
-    input: StorageUploadUrlInput,
+    given: StorageUploadUrlInput,
 ): Promise<StorageUploadUrlResult> {
     const { config } = deps;
+    // No visibility named: the node's starting level (plan V5.2), decided before the publish gate's
+    // carry so a default of public asks the owner as an explicit one does.
+    const input = { ...given, visibility: given.visibility ?? defaultLevelOf(config, given.publishGate) };
 
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;
@@ -549,7 +561,7 @@ export async function mintStorageUploadUrl(
         meta: buildUploadMeta('storage', {
             key: input.key,
             mime_type: contentType,
-            visibility: input.visibility ?? 'private',
+            visibility: input.visibility,
             group_id: input.groupId,
             tags: input.tags,
             workspace_refs: input.workspaceRef || undefined,

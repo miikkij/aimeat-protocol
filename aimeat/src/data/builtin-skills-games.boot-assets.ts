@@ -13,6 +13,7 @@
  * @structure PHASER_BOOT_SKILL · PHASER_ASSETS_SKILL
  * @usage import { PHASER_BOOT_SKILL, PHASER_ASSETS_SKILL } from './builtin-skills-games.boot-assets.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-18 -- aimeat-phaser-assets: upload() leaves the level to the node when none is named (plan doc-mvcn6c7e4e5q, V5.2).
  *   v1.1.0 -- 2026-09-19 -- The content audit of 2026-09-19. Both skills taught traps their module
  *     had already removed: boot.js v1.1.0 shipped the phone half as `spec.mobile` while the boot
  *     skill still said no `mobile` module existed, boot.js v1.1.1 turned the gamepad plugin on
@@ -437,8 +438,10 @@ const gallery = AIMEAT.assets.preview('#library', lib, { check: true });
 \`\`\`
 
 - **\`upload(file, { app, key, kind, visibility, mime_type })\`** returns the \`/v1/pub/<owner>/<key>\`
-  address, which is the anonymous read. \`visibility\` defaults to \`'public'\` and anything else
-  is warned about at upload time rather than found later as a blank sprite.
+  address, which is the anonymous read. Without \`visibility\` the node stores the file at its
+  level for an app's upload, which is public unless the operator chose otherwise; pass
+  \`visibility: 'public'\` to be sure. A file that does not land public is warned about at upload
+  time rather than found later as a blank sprite.
 - **\`packAtlas(images, { maxSize, padding, pot, name })\`** packs loose pictures into one sheet
   plus TexturePacker JSON, in the browser, and returns \`{ png, json, sheet }\`. \`src\` may be an
   image on the page, an ImageBitmap, a Blob or an address. Forty sprites become two requests.

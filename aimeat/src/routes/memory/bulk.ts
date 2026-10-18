@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — An entry of POST /v1/memory/bulk or POST /v1/memory/import without a visibility takes
+ *     visibility.memory_default (code default private; plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — POST /v1/memory/bulk and POST /v1/memory/import ask the publish gate, the gate
  *     POST /v1/memory asks (services/memory-publish-gate.ts; plan doc-mvcn6c7e4e5q, V4): an entry that
  *     raises its record to public, by a caller the node asks the owner about, lands at the level the
@@ -107,6 +109,7 @@ import { isOwnerInPerson, isForeignPrincipal } from '../../utils/gaii.js';
 import { organismVisibilityRefusal } from '../../services/organism-visibility.js';
 import { discoverMemory } from '../../services/memory-discover.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { memoryVisibilityDefault } from '../../services/content-defaults.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -198,7 +201,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       items.push({
         key,
         value: e.value,
-        visibility: (e.visibility ?? 'private') as MemoryRecord['visibility'],
+        // No visibility named: the node's starting level (plan V5.1).
+        visibility: (e.visibility ?? memoryVisibilityDefault(config)) as MemoryRecord['visibility'],
         tags: Array.isArray(e.tags) ? e.tags : [],
         ttlHours: typeof e.ttl_hours === 'number' ? e.ttl_hours : null,
         ...(e.group_id ? { groupId: e.group_id } : {}),
@@ -403,7 +407,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       items.push({
         key: s.key,
         value: s.entry.value,
-        visibility: (['private', 'owner', 'group', 'members', 'public'].includes(s.entry.visibility as string) ? s.entry.visibility : 'private') as MemoryRecord['visibility'],
+        // An entry with no visibility takes the node's starting level (plan V5.1); a word this
+        // import does not restore is still stored private.
+        visibility: (s.entry.visibility === undefined ? memoryVisibilityDefault(config)
+          : ['private', 'owner', 'group', 'members', 'public'].includes(s.entry.visibility as string) ? s.entry.visibility : 'private') as MemoryRecord['visibility'],
         tags: Array.isArray(s.entry.tags) ? s.entry.tags as string[] : [],
         ttlHours: typeof s.entry.ttl_hours === 'number' ? s.entry.ttl_hours : null,
         ...(typeof s.entry.ai_provenance_id === 'string' ? { aiProvenanceId: s.entry.ai_provenance_id } : {}),

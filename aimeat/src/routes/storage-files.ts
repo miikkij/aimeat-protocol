@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-18 — POST /v1/storage without a visibility takes visibility.file_default, or for an app grant
+ *     visibility.app_upload_default (plan V5.2); the presigned mint decides it in the shared write.
  *   2026-10-18 — POST /v1/storage (inline, raw body and presigned) and PATCH /v1/storage/{key}/visibility
  *     ask the publish gate (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made
  *     public by a caller the node asks the owner about keeps the level it had (a new one: private) and
@@ -153,6 +155,7 @@ import { readerFor as contentReaderFor } from '../services/classification/reader
 import { fileTarget } from '../services/classification/labels.js';
 import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
+import { fileVisibilityDefault, isAppGrantRoles } from '../services/content-defaults.js';
 
 /** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
 const INLINE_MAX_BYTES = 32 * 1024;
@@ -314,7 +317,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 return;
             }
             key = k;
-            visibility = v ?? 'private';
+            // No visibility named: the node's starting level (plan V5.2), an app grant's own one for an app.
+            visibility = v ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
             groupId = visibility === 'group' ? reqGroupId : undefined;
             // A 'workspace' file that names no workspace is refused by the shared write below, which
             // is also where the raw-body branch meets the same rule.
@@ -324,7 +328,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         } else {
             // Raw body upload
             key = req.query.key as string ?? `file-${Date.now()}`;
-            visibility = req.query.visibility as string ?? 'private';
+            visibility = req.query.visibility as string ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
             const chunks: Buffer[] = [];
             for await (const chunk of req) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);

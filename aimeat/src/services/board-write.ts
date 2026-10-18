@@ -47,6 +47,8 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.7.0 -- 2026-10-18 -- createBoard without a visibility takes visibility.board_default (code
+ *     default public; plan doc-mvcn6c7e4e5q, V5.3), before the publish gate is asked.
  *   v1.6.0 -- 2026-10-18 -- createBoard takes `publishGate`, the door's caller (plan doc-mvcn6c7e4e5q,
  *     V4): a public board by an agent without publish:public, or an app grant when the gate covers
  *     apps, is made private and the answer carries `publishRequest`. fileBoardAsk() files it, for the
@@ -83,6 +85,7 @@ import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.
 import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
+import { boardVisibilityDefault } from './content-defaults.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
 export const BOARD_RULE_LIMITS = {
@@ -310,8 +313,8 @@ export type BoardCreateResult = { ok: true; board: BoardRecord } | BoardWriteRef
 
 export interface BoardCreateInput {
     name: string;
-    /** One of the four levels, or `organism:<id>` (boardVisibilityRefusal decides). */
-    visibility: string;
+    /** One of the four levels, or `organism:<id>` (boardVisibilityRefusal decides); absent: visibility.board_default. */
+    visibility?: string;
     description?: string;
     allowedGaiis?: string[];
     federate?: boolean;
@@ -336,7 +339,9 @@ export async function createBoard(
     if (input.description && input.description.length > BOARD_LIMITS.descriptionMax) {
         return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `description must be at most ${BOARD_LIMITS.descriptionMax} characters` };
     }
-    const level = await boardVisibilityRefusal(storage, input.visibility, caller);
+    // No visibility named: the node's starting level (plan V5.3), decided before the publish gate,
+    // so a default of public asks the owner as an explicit public does.
+    const level = await boardVisibilityRefusal(storage, input.visibility ?? boardVisibilityDefault(deps.config), caller);
     if (!level.ok) return level;
     let visibility = level.visibility;
     // The publish gate (plan doc-mvcn6c7e4e5q, V4), before the first write: asked by a caller the

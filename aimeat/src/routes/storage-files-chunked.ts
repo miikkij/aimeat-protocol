@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-10-18 -- Init without a visibility stores visibility.file_default, or for an app grant
+ *     visibility.app_upload_default, with the session (plan doc-mvcn6c7e4e5q, V5.2).
  *   2026-10-18 -- Complete asks the publish gate through the shared write (services/storage-file-publish.ts;
  *     plan doc-mvcn6c7e4e5q, V4): a file the session asked as public, completed by a caller the node
  *     asks the owner about, lands at the level it had (a new one: private) and the answer is 202 with
@@ -59,6 +61,7 @@ import { versionedAddress } from '../utils/http-range.js';
 import { pubEmbedUrl } from '../services/doc-images.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { callerOf } from '../middleware/caller.js';
+import { fileVisibilityDefault, isAppGrantRoles } from '../services/content-defaults.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -93,6 +96,9 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         const gaii = resolve(req);
         const { key, mime_type, visibility, chunk_size, total_chunks, group_id, workspace_ref, workspace_refs } = req.body ?? {};
         const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, workspace_ref) : undefined;
+        // No visibility named: the node's starting level (plan V5.2), stored with the session; the
+        // publish gate asks about it at complete, as about a named one.
+        const level = visibility ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
         // Refused here, before any chunk, with the answer POST /v1/storage gives at its shared write.
         if (visibility === 'workspace' && !workspaceRef) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -146,7 +152,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             ownerGaii: gaii,
             key,
             mimeType: mime_type ?? 'application/octet-stream',
-            visibility: visibility ?? 'private',
+            visibility: level,
             groupId: visibility === 'group' ? group_id : undefined,
             workspaceRef,
             chunkSize: chunk_size ?? 10 * 1024 * 1024, // 10MB default
@@ -165,7 +171,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             { description: 'Upload chunk', method: 'PUT', url: `/v1/storage/upload/${uploadId}/0` },
             { description: 'Complete upload', method: 'POST', url: `/v1/storage/upload/${uploadId}/complete` },
         ]));
-        emitRecordChange('files', gaii, visibility ?? 'private');
+        emitRecordChange('files', gaii, level);
     });
 
     // PUT /v1/storage/upload/:id/:chunk — upload a single chunk

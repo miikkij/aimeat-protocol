@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-10-18 — A version published without a visibility takes visibility.datapackage_default (code
+ *     default public; plan doc-mvcn6c7e4e5q, V5.6). A pointer stored with no visibility still reads public.
  *   2026-10-18 — writeLatest and upsertCatalogueEntry moved to ./version-audience.ts. A publish of bytes
  *     already stored gives the version's files, the pointer and the catalogue entry the audience asked
  *     for (setVersionAudience); it moved the pointer only, so a private version published again as
@@ -71,6 +73,7 @@ import type { AudienceAuth } from '../audience.js';
 import { checkAudienceWrite } from '../audience-write.js';
 import { DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable } from './audience.js';
 import { writeLatest, upsertCatalogueEntry, setVersionAudience } from './version-audience.js';
+import { datapackageVisibilityDefault } from '../content-defaults.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -134,8 +137,9 @@ export async function publishPackage(
         return { ok: false, code: 'INVALID_INPUT', message: 'a package needs at least one resource', issues: [] };
     }
     // Who reads it, checked before anything is written: an organism the publisher is not in is
-    // refused (services/audience-write.ts). Public when not named, as every package was before.
-    const visibility = input.visibility ?? 'public';
+    // refused (services/audience-write.ts). When not named, the node's starting level (plan V5.6),
+    // public unless the operator chose otherwise, as every package was before.
+    const visibility = input.visibility ?? datapackageVisibilityDefault(config);
     const audience = await checkAudienceWrite(storage, visibility, { sub: producedBy.gaii, owner: ownerName }, DATAPACKAGE_LEVELS);
     if (!audience.ok) return { ok: false, code: audience.code, message: audience.message, issues: [] };
     const fileVisibility = fileVisibilityOf(visibility);
