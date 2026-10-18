@@ -29,6 +29,9 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-18 — The organism's board is at `organism:<id>` for a listed or private organism (was
+ *     'shared' with an empty roster, which refused the members), and update moves it with the
+ *     organism's visibility (services/organism-board.ts; plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-18 — A create that names no visibility, from no shape that names one, takes
  *     visibility.organism_default (code default public; plan doc-mvcn6c7e4e5q, V5.4), before the gate.
  *   2026-10-18 — Create and update take `publishGate`, the door's caller (plan doc-mvcn6c7e4e5q, V4):
@@ -75,6 +78,7 @@ import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 import { organismVisibilityDefault } from './content-defaults.js';
+import { organismBoardVisibility, followOrganismVisibility } from './organism-board.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -206,7 +210,8 @@ export async function createOrganismRecord(
     id: boardId,
     name: `${name} — Discussion`,
     description: `Discussion board for ${name}`,
-    visibility: visibility === 'public' ? 'public' : 'shared',
+    // A listed or private organism's board is read by its active members (services/organism-board.ts).
+    visibility: organismBoardVisibility(id, visibility),
     ownerGaii: `${creatorOwner}@${config.nodeId}`,
     allowedGaiis: [],
     createdAt: now,
@@ -389,6 +394,8 @@ export async function updateOrganismRecord(
   if (readmeSet) await setOrganismReadme(storage, config, organism.id, input.readme as string, organism.creatorGhii);
 
   const updated = await storage.updateOrganism(organism.id, updates);
+  // The organism's board follows a visibility change, unless its keeper set its level by hand.
+  await followOrganismVisibility(storage, organism, updates.visibility);
   const readme = await getOrganismReadme(storage, organism.id);
   emitChange('organisms');
   const asked = ask && input.publishGate ? await fileOrganismAsk(deps, input.publishGate, ask, organism.id, organism.visibility) : {};

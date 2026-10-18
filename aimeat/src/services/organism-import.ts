@@ -9,6 +9,8 @@
  * @structure importOrganism(storage, config, { importerGaii, importerOwner, zip }) ·
  *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, files })
  * @version-history
+ *   v1.3.0 -- 2026-10-18 -- A listed or private imported organism's board is at `organism:<id>` (was
+ *     'shared' with an empty roster, which refused the members; plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.2.0 -- 2026-08-29 -- An imported type is kept as written (free text, cut to 40 characters); only an
  *     empty one falls back to "project".
  *   v1.1.0 -- 2026-06-24 -- Secretary P5 (S-B): extract restoreOrganismFromFiles() (the create-org +
@@ -23,6 +25,7 @@ import type { AimeatConfig } from '../config.js';
 import { unzipBuffer, restoreWorkspace } from './workspace-import.js';
 import { ORG_EXPORT_VERSION } from './organism-export.js';
 import { logger } from '../utils/logger.js';
+import { organismBoardVisibility } from './organism-board.js';
 
 interface OrgJson {
   aimeatOrganismExport: string;
@@ -80,7 +83,8 @@ export async function restoreOrganismFromFiles(
   const boardId = `org-${id}`;
   await storage.createBoard({
     id: boardId, name: `${name} — Discussion`, description: `Discussion board for ${name}`,
-    visibility: visibility === 'public' ? 'public' : 'shared', ownerGaii: importerGaii, allowedGaiis: [], createdAt: now,
+    // A listed or private organism's board is read by its active members (services/organism-board.ts).
+    visibility: organismBoardVisibility(id, visibility), ownerGaii: importerGaii, allowedGaiis: [], createdAt: now,
   });
   await storage.createOrganism({
     id, name, description: o.description || '', type,
