@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-18: check:atomic-writes, a read of a record followed by an unconditional write of the same key.
  *  - 2026-10-18: check:python-shapes and check:python-daemon, the Python package against the node's schemas and the connector.
  *  - 2026-10-18: check:audience-badge, every view that shows the owner their content draws the AudienceBadge (plan doc-mvcn6c7e4e5q, V6.4).
  *  - 2026-10-16: check:posture-defaults (invariants 8 and 10) and check:own-node-backend (a suite's own node follows the run's backend) (QA audit S10-05, P1-02).
@@ -97,6 +98,9 @@ export const FAST_CHECKS = [
     // TARGET-082: stored content reaches a caller only through a loader that takes a classification
     // reader, or through a listed read that says why it is the node's own.
     { script: 'check:classification-reach', label: 'Every content read passes the classification reader or is listed with its reason' },
+    // Wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa (2026-10-18): the version
+    // condition existed and new code wrote without it, sixteen times, most on money routes.
+    { script: 'check:atomic-writes', label: 'No code reads a record and writes the same key back without a version condition, beyond the listed ones; the list only shrinks' },
     { script: 'check:storage-parity', label: 'Owner-scoped tables are in both deletion cascades' },
     // Secaudit 2026-10, M8: claimScheduledFire lived in postgres-kysely/methods/schedules.ts and in
     // sqlite/methods/federation-oauth.ts, so a fix in one provider could not find its twin.

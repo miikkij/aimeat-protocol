@@ -20,6 +20,9 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-10-18 — check:atomic-writes reports a planted read-then-write, directly and through wrappers,
+ *     passes the same with a version condition, and stays blind to two key expressions for one record
+ *     (wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa).
  *   2026-10-18 — check:identity-resolution and check:owner-principal read all of src/ less an
  *     exclusion list, and a planted name comparison in src/commerce is reported
  *     (wish wish-identiteettitarkistukset-kaupank-yntikoodiin-ja-kolmeen-muuh).
@@ -47,6 +50,7 @@ import { staleTriage } from '../../scripts/inventory/triage-clock.js';
 import { scopeParityFindings, scopeParitySources } from '../../scripts/check-scope-parity.js';
 import { readVocabulary } from '../../scripts/inventory/scope-vocabulary.js';
 import { callsInText, routeDifferences } from '../../scripts/inventory/browser-lib-routes.js';
+import { atomicWriteHits } from '../../scripts/inventory/atomic-writes.js';
 
 const AIMEAT = fileURLToPath(new URL('../..', import.meta.url));
 const TSX = import.meta.resolve('tsx');
@@ -394,5 +398,52 @@ describe('audit:browser-libs finds a route both libraries call with different pa
         const { shared, differences } = routeDifferences(portal, apps);
         expect(shared).toEqual(['/v1/memory/{}', '/v1/organisms/{}/search']);
         expect(differences).toEqual({ '/v1/memory/{}': { portal: ['soft'], apps: ['owner_scope', 'soft'] } });
+    });
+});
+
+// ── check:atomic-writes ──
+describe('check:atomic-writes finds a record read and written back with no version condition', () => {
+    const STORE = `
+interface Rec { key: string; ownerGaii: string; value: Record<string, unknown>; version: number; createdAt: string }
+interface Storage {
+  getMemory(o: string, k: string): Promise<Rec | null>; setMemory(r: Rec): Promise<Rec>;
+  setMemoryIfVersion(r: Rec, v: number): Promise<Rec | null>; transaction<T>(fn: () => Promise<T>): Promise<T>;
+}
+declare function writeMemoryRecord(d: unknown, c: unknown, i: { key: string; value: unknown; expectedVersion?: number }): Promise<void>;
+async function getRecord(s: Storage, key: string) { return s.getMemory('ns', key); }
+async function putRecord(s: Storage, key: string, value: Record<string, unknown>) {
+  const prev = await s.getMemory('ns', key);
+  await s.setMemory({ key, ownerGaii: 'ns', value, version: (prev?.version ?? 0) + 1, createdAt: prev?.createdAt ?? '' });
+}
+const subKey = (b: string) => 'subscriptions.' + b;
+`;
+    let hits: ReturnType<typeof atomicWriteHits>;
+    beforeAll(() => {
+        const t = typed({ 'src/services/fixture.ts': STORE + [
+            "export async function bump(s: Storage, key: string) { const r = await s.getMemory('o', key); if (!r) return; await s.setMemory({ ...r, value: { n: Number(r.value.n) + 1 } }); }",
+            // The shape of commerce/session-claim.ts: the conditional write, and the plain one as the
+            // fallback for a backend without it.
+            "export async function bumpCas(s: Storage, key: string) { const r = await s.getMemory('o', key); if (!r) return; const next = { ...r, key, value: { n: 1 }, version: r.version + 1 }; if (s.setMemoryIfVersion) await s.setMemoryIfVersion(next, r.version); else await s.setMemory(next); }",
+            "export async function viaService(s: Storage, key: string, v: number) { const r = await s.getMemory('o', key); await writeMemoryRecord({}, {}, { key, value: r?.value, expectedVersion: v }); }",
+            "export async function putSub(s: Storage, buyer: string) { const r = await getRecord(s, subKey(buyer)); await putRecord(s, subKey(buyer), { ...(r?.value ?? {}), x: 1 }); }",
+            "export async function inTx(s: Storage, key: string) { await s.transaction(async () => { const r = await s.getMemory('o', key); await s.setMemory({ ...r!, value: {} }); }); }",
+            "export async function twoNames(s: Storage, buyer: string) { const r = await getRecord(s, subKey(buyer)); await putRecord(s, 'subscriptions.' + buyer, { ...(r?.value ?? {}) }); }",
+        ].join('\n') });
+        hits = atomicWriteHits(t.program, t.files, t.root);
+    });
+    it('reports a read followed by setMemory of the same record, and the same through wrappers', () => {
+        expect(hits.find(h => h.unit === 'bump')).toMatchObject({ key: 'key' });
+        expect(hits.find(h => h.unit === 'putSub')).toMatchObject({ key: 'subKey(buyer)' });
+    });
+    it('passes the same with setMemoryIfVersion or expectedVersion, and does not report a blind write that only carries the version on', () => {
+        expect(hits.find(h => h.unit === 'bumpCas')).toBeUndefined();
+        expect(hits.find(h => h.unit === 'viaService')).toBeUndefined();
+        expect(hits.find(h => h.unit === 'putRecord')).toBeUndefined();
+    });
+    it('does not take a storage transaction for a guard (on PostgreSQL the read takes no lock)', () => {
+        expect(hits.find(h => h.unit === 'inTx')).toMatchObject({ inTransaction: true });
+    });
+    it('stays blind to one record named by two different key expressions (its documented limit)', () => {
+        expect(hits.find(h => h.unit === 'twoNames')).toBeUndefined();
     });
 });

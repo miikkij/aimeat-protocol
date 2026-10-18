@@ -263,7 +263,9 @@
     "audit:call-graph": "tsx scripts/inventory/build-call-graph.ts",
     "check:open-writes": "tsx scripts/check-open-writes.ts --strict",
     "check:open-writes:report": "tsx scripts/check-open-writes.ts",
-    "check:open-writes:seed": "tsx scripts/check-open-writes.ts --seed"
+    "check:open-writes:seed": "tsx scripts/check-open-writes.ts --seed",
+    "check:atomic-writes": "tsx scripts/check-atomic-writes.ts --strict",
+    "check:atomic-writes:report": "tsx scripts/check-atomic-writes.ts"
   },
   "keywords": [
     "aimeat",

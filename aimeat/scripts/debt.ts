@@ -44,6 +44,8 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   2026-10-18 — The reads followed by an unconditional write of the same key join the report
+ *     (wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa).
  *   2026-10-18 — The pairs written twice join the report: offer and signal fields the Python builders
  *     lack, the Python daemon's differences from aimeat connect, and the browser library routes called
  *     with different parameters (wish wish-vertailutarkistus-python-paketin-ja-liittimen-kahdennuksille).
@@ -158,6 +160,7 @@ const RATCHETS: Ratchet[] = [
     { file: 'aimeat/security/identity-resolution-exemptions.json', label: 'Token subjects never resolved', check: 'check:identity-resolution', count: exemptMap, open: exemptOpen, due: stampedDue },
     { file: 'aimeat/security/owner-principal-exemptions.json', label: 'Refusals on the owner name', check: 'check:owner-principal', count: exemptMap, open: exemptOpen, due: stampedDue },
     { file: 'aimeat/security/open-write-exemptions.json', label: 'Writes admitting no credential', check: 'check:open-writes', count: exemptMap, open: exemptOpen },
+    { file: 'aimeat/security/atomic-write-baseline.json', label: 'Reads written back unversioned', check: 'check:atomic-writes', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/trusted-key-exemptions.json', label: 'Server-trusted memory keys', check: 'check:trusted-keys', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/config-coverage-exemptions.json', label: 'Settings not in the Config tab', check: 'check:config-coverage', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/outbound-fetch-exemptions.json', label: 'Bare outbound fetches', check: 'check:outbound-fetch', count: exemptMap, open: exemptOpen },
