@@ -21,6 +21,9 @@
  * @structure meta · ActionsSection({ d })
  * @usage loaded by the detail view: import('./sections/actions.js')
  * @version-history
+ *   v1.2.0 — 2026-10-18 — Improve with AI, Publish and the two screenshot doors are the owner's only: a visitor saw
+ *     "Publish as v4" on somebody else's app (Jouni, 2026-10-18). Share as prompt stays, and View source
+ *     opens read-only for anybody but the owner, with no save, try or publish.
  *   v1.1.0 — 2026-09-27 — Parity with the old page (appcat sections-d): the chapter's door row
  *     (Actions `chapter`: 24px apart, the words and the slab at .78rem); the screenshot's "too large"
  *     and "set" and the delete's "sign in" said as information, the kind the old notice gave them.
@@ -78,6 +81,14 @@ export default function ActionsSection({ d }) {
 
   const viewSource = async () => {
     const text = await sourceText();
+    // Somebody else's app is shown, never edited: no save, no try, no publish (Jouni, 2026-10-18).
+    if (!d.isOwn) {
+      open('source', {
+        name, text, readOnly: true, title: x('ctx.viewSourceOnly') + ': ' + name,
+        app: { name, filename: d.filename, track: manifest.track, html: text },
+      });
+      return;
+    }
     open('source', {
       name, text, owner: d.owner, filename: d.filename, published,
       onSave: (next) => saveWork(textToB64(next)),
@@ -147,12 +158,12 @@ export default function ActionsSection({ d }) {
   };
 
   return html`<${Actions} chapter>
-    <${Action} small onClick=${viewSource}>${x('ctx.viewSource')}<//>
-    <${Action} small onClick=${improve}>${x('ctx.improveAi')}<//>
+    <${Action} small onClick=${viewSource}>${x(d.isOwn ? 'ctx.viewSource' : 'ctx.viewSourceOnly')}<//>
+    ${d.isOwn ? html`<${Action} small onClick=${improve}>${x('ctx.improveAi')}<//>` : null}
     <${Action} small onClick=${share}>${x('ctx.sharePrompt')}<//>
-    <${Loud} control onClick=${publish}>${publishLabel}<//>
-    ${published ? html`<${Action} small title=${x('actions.shotSetHint')} onClick=${pickShot}>${x('detail.setScreenshot')}<//>` : null}
-    ${published ? html`<${Action} small title=${x('actions.shotRefreshHint')} onClick=${clearShot}>${x('detail.refreshScreenshot')}<//>` : null}
+    ${d.isOwn ? html`<${Loud} control onClick=${publish}>${publishLabel}<//>` : null}
+    ${d.isOwnPublished ? html`<${Action} small title=${x('actions.shotSetHint')} onClick=${pickShot}>${x('detail.setScreenshot')}<//>` : null}
+    ${d.isOwnPublished ? html`<${Action} small title=${x('actions.shotRefreshHint')} onClick=${clearShot}>${x('detail.refreshScreenshot')}<//>` : null}
     ${d.isOwnPublished ? html`<${Action} small tone="danger" title=${x('detail.deleteHint')} onClick=${remove}>${x('ctx.delete')}<//>` : null}
     <${FileDrop} hidden accept="image/*" inputRef=${shotInput} onFiles=${([f]) => sendShot(f)} />
   <//>`;

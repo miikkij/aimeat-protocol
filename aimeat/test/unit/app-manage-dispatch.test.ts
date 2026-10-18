@@ -9,6 +9,7 @@
  *   v1.8.0 — 2026-10-17 — settings carries open_to (who may open the app).
  *   v1.7.0 — 2026-10-13 — scope_allowance and scope_allowance_remove, and the words field.
  *   v1.6.3 — 2026-10-12 — A probe value for settings.listing (listed, community, unlisted).
+ *   v1.6.3 — 2026-10-18 — Probe values for marks.info and marks.tucked.
  *   v1.6.2 — 2026-10-09 — A probe value for marks.aiUse, the third mark switch.
  *   v1.6.1 — 2026-10-05 — The shape compared is zodShapeFor('aimeat_app_manage'): src/mcp/app-manage-shape.ts
  *     is gone and both MCP surfaces register the catalog's schema (secaudit 2026-10, M3).
@@ -52,7 +53,7 @@ function recorder(answer: (s: Sent) => { ok: boolean; data?: unknown; error?: { 
 /** One distinctive value per field, so its arrival on the wire can be found. */
 const VALUE: Record<string, unknown> = {
     filename: 'shop.html', owner: 'alice', index: true, title: 'zqxtitle', description: 'zqxdesc', keywords: ['zqxkw'],
-    image: 'https://x/zqximg.png', lang: 'fi', badge: false, install: true, aiUse: false, kind: 'privacy', format: 'markdown',
+    image: 'https://x/zqximg.png', lang: 'fi', badge: false, install: true, aiUse: false, info: false, tucked: true, kind: 'privacy', format: 'markdown',
     content: 'zqxcontent', remove: true, limit: 7, playtest: true, days: 9, on: true, geo: 'region', detail: ['zqxdetail'],
     layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, listing: 'unlisted', parked: true,
     forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',

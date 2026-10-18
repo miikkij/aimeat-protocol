@@ -11,6 +11,7 @@
  * @structure meta · WorkSection({ d })
  * @usage loaded by the detail view: import('./sections/work.js')
  * @version-history
+ *   v1.2.0 — 2026-10-18 — Shown to the app's owner only: a visitor saw "only you can see it" on somebody else's app.
  *   v1.1.0 — 2026-09-27 — Parity (sections-a): the sentence and the size are the Stops' own lead and
  *     foot (the old .wc-explain and .wc-size), the verbs at the column's start as the old row stood,
  *     the screenshot named for a screen reader (a new key, appcat.wc.shotAlt).
@@ -28,7 +29,8 @@ import { fmtSize } from '/views/appcat/detail-head.js';
 
 const html = htm.bind(h);
 
-export const meta = { id: 'work', title: 'wc.lifecycle', show: () => true };
+// The owner's own working copy: nobody else has one to see here (Jouni, 2026-10-18).
+export const meta = { id: 'work', title: 'wc.lifecycle', show: (d) => !!(d && d.isOwn) };
 
 export default function WorkSection({ d }) {
   const w = d.work;

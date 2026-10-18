@@ -15,6 +15,7 @@
  * @structure meta (with doors) · AboutSection({ d })
  * @usage loaded by the detail view: import('./sections/about.js')
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The Edit door is the owner's only.
  *   v1.1.0 — 2026-10-02 — A fact says who answers ?format=md: the app's own extension action
  *     (manifest.formatMd, from aimeat-format-md) or the node's stored page and converted HTML.
  *   v1.0.0 — 2026-09-27 — Initial (appcat detail builder A): the old catalogue's detail.js aboutHtml,
@@ -46,7 +47,7 @@ export const meta = {
   title: 'detail.about',
   show: () => true,
   // The Edit door on the slab, while the editor is shut.
-  doors: (d) => (d.aboutEditing ? null : html`<${Action} small onClick=${() => d.editAbout(true)}>${x('detail.editDetails')}<//>`),
+  doors: (d) => (d.aboutEditing || !d.isOwn ? null : html`<${Action} small onClick=${() => d.editAbout(true)}>${x('detail.editDetails')}<//>`),
 };
 
 /** The editor: name, two descriptions and their translation, icon, tags. */

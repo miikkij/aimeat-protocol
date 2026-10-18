@@ -36,6 +36,10 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   v1.5.0 — 2026-10-18 — The pencil into the About editor is the owner's only, and the back link names
+ *     the view the app belongs to (Your apps, Building for others, Community): a visitor saw "← Your
+ *     apps" and an edit pencil on somebody else's app. The view starts under the site's top bar
+ *     (Overlay belowBar), so LOGOUT and SIGN IN stay in reach while it is open.
  *   v1.4.0 — 2026-10-04 — The sections stand in five groups (detail-groups.js): the page follows their
  *     order, the rail names each group, a section's chapter line names its group, a section that
  *     fixes something the app lacks is drawn as a notice in the rail with the reason as its title,
@@ -237,7 +241,9 @@ function DetailView({ given, onClose }) {
     legalLoaded: (data) => setLegal(data || null),
     isFavourite: (r) => !!(cat.favourites && cat.favourites.has && cat.favourites.has(r)),
   };
-  // The groups with the sections that show for this app.
+  // The groups with the sections that show for this app. For somebody else's app the first group holds
+  // only the versions and the actions anybody may take, so it is named after the app, not after editing.
+  const groupTitle = (g) => (g.id === 'edit' && !isOwn ? 'detail.groupApp' : g.title);
   const att = attentionOf(d, isOwn ? kunto(row, cat.skillsBound || new Set()) : null);
   const groups = GROUPS.map((g) => ({ ...g, mods: g.ids.map((id) => modules[id]).filter((mod) => mod && shows(mod, d)) }))
     .filter((g) => g.mods.length);
@@ -249,7 +255,7 @@ function DetailView({ given, onClose }) {
 
   let n = 0;
   const railNode = html`<${Rail} tone="ink" title=${x('detail.railTitle')} groups=${groups.map((g) => ({
-    label: x(g.title),
+    label: x(groupTitle(g)),
     items: g.mods.map((mod) => {
       const i = n++;
       const why = att[mod.meta.id];
@@ -259,9 +265,9 @@ function DetailView({ given, onClose }) {
   }))} />`;
 
   // The toolbar (F57, F124): the icon, the name, and the pencil into the About editor while it is shut.
-  return html`<${Overlay} normalLeading smallWords label=${meta.name} glyph=${meta.icon} title=${meta.name}
-      onEdit=${work.aboutEditing ? null : () => setAboutEditing(true)} editLabel=${x('detail.editDetails')}
-      back=${{ label: '← ' + x('view.library'), onClick: onClose }} onClose=${onClose}
+  return html`<${Overlay} normalLeading smallWords belowBar label=${meta.name} glyph=${meta.icon} title=${meta.name}
+      onEdit=${work.aboutEditing || !isOwn ? null : () => setAboutEditing(true)} editLabel=${x('detail.editDetails')}
+      back=${{ label: '← ' + x(isOwn ? 'view.library' : isBuilder ? 'view.building' : 'view.community'), onClick: onClose }} onClose=${onClose}
       closeLabel=${x('common.close')} rail=${railNode} bodyRef=${bodyRef}>
     <${DetailHead} d=${d} />
     <${DetailBand} d=${d} />
@@ -269,7 +275,7 @@ function DetailView({ given, onClose }) {
       const Body = mod.default;
       const doors = typeof mod.meta.doors === 'function' ? mod.meta.doors(d) : null;
       return html`<${Section} key=${ref + ':' + mod.meta.id} id=${DOM_ID(mod.meta.id)} first=${i === 0}
-          chapter=${x(group.title) + ' · ' + two(i + 1) + ' / ' + total} title=${x(mod.meta.title)} doors=${doors}>
+          chapter=${x(groupTitle(group)) + ' · ' + two(i + 1) + ' / ' + total} title=${x(mod.meta.title)} doors=${doors}>
         <${Guard} id=${mod.meta.id}><${Body} d=${d} /><//>
       <//>`;
     })}
