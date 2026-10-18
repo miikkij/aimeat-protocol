@@ -650,6 +650,15 @@
      "plain": "Nothing goes public without you The operator can make the node ask you before your agents, and also your apps if they choose, make anything public to anyone: a record, a file, an app anyone may open, your welcome page or a company page, an organism, a board, a skill, a workspace page open to the link, a package, a knowledge package or a data package. Without your separate permission (publish:public, which \"Full access\" does not include) the agent's change is saved as it was, and you get a notification with Approve and Decline. The agent gets the address to give you. An approval makes public only what you were asked about: if it changed in between, nothing is published. You in person are never asked. A new node starts with agents and apps asking; a running node keeps its setting until the operator changes it. visibility.publish_gate (AIMEAT_PUBLISH_GATE), /v1/publish-requests*, aimeat_publish_requests, a 202 with publish_request from the writing routes"
     },
     {
+     "slug": "g-4-your-node-s-starting-levels",
+     "cells": [
+      "<strong>Your node's starting levels</strong>",
+      "When you or your AI save something and do not say who may read it, the node decides, and the operator sets what it decides: an entry, a file, a file an app uploads (such as a game's pictures), a board, an organism, the first share of a workspace, a data package, and whether a new agent is in the public list of agents. A level you name always wins. A running node keeps what it did before until the operator changes a setting; a new node starts private: boards, organisms and data packages private, a shared workspace for accounts here, new agents unlisted. A starting level of public still asks you through the publish gate when your agent lacks the permission.",
+      "<code>visibility.memory_default</code>, <code>file_default</code>, <code>app_upload_default</code>, <code>board_default</code>, <code>organism_default</code>, <code>share_access_default</code>, <code>datapackage_default</code>, <code>agent_listed_default</code> (<code>AIMEAT_DEFAULT_*</code>); <code>visibility</code> is optional on <code>POST /v1/boards</code> and <code>aimeat_board_create</code>"
+     ],
+     "plain": "Your node's starting levels When you or your AI save something and do not say who may read it, the node decides, and the operator sets what it decides: an entry, a file, a file an app uploads (such as a game's pictures), a board, an organism, the first share of a workspace, a data package, and whether a new agent is in the public list of agents. A level you name always wins. A running node keeps what it did before until the operator changes a setting; a new node starts private: boards, organisms and data packages private, a shared workspace for accounts here, new agents unlisted. A starting level of public still asks you through the publish gate when your agent lacks the permission. visibility.memory_default, file_default, app_upload_default, board_default, organism_default, share_access_default, datapackage_default, agent_listed_default (AIMEAT_DEFAULT_*); visibility is optional on POST /v1/boards and aimeat_board_create"
+    },
+    {
      "slug": "g-4-app-grants",
      "cells": [
       "<strong>App grants</strong>",
@@ -4168,6 +4177,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 420
+  "rows": 421
  }
 }
