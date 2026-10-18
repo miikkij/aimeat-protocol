@@ -12,13 +12,15 @@
  *
  *   ORDER: a door computes the default BEFORE it asks the publish gate (services/publish-gate.ts),
  *   so a default of public is a raise to public and asks the owner like an explicit public does.
- * @structure memoryVisibilityDefault · fileVisibilityDefault · isAppGrantRoles · boardVisibilityDefault ·
+ * @structure memoryVisibilityDefault · NODE_DEFAULT_LEVEL · fileVisibilityDefault · uploadVisibilityOf · isAppGrantRoles · boardVisibilityDefault ·
  *   organismVisibilityDefault · shareAccessDefault · datapackageVisibilityDefault · agentListingTags
  * @usage
  *   const vis = visibility ?? memoryVisibilityDefault(config);
- *   const fileVis = given ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
+ *   const fileVis = uploadVisibilityOf(config, given, isAppGrantRoles(req.auth!.roles));
  *   await storage.createAgent({ ..., ...agentListingTags(config) });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — uploadVisibilityOf and NODE_DEFAULT_LEVEL: the app-upload default answers only
+ *     `visibility: 'default'`; an upload with no visibility keeps the file default for every caller.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V5.1-V5.6, V5.8).
  */
 import type {
@@ -39,11 +41,29 @@ export function isAppGrantRoles(roles: readonly string[] | undefined): boolean {
 }
 
 /**
- * A stored file uploaded without a visibility (V5.2): the app-upload default for an app grant, the
+ * The word an upload sends to ask for the node's starting level (V5.2): AIMEAT.assets.upload and
+ * AIMEAT.storage.upload with `nodeDefault` send it when the app named no visibility. Taken only by
+ * the upload routes and the presigned mint, and mapped before validation and the publish gate.
+ */
+export const NODE_DEFAULT_LEVEL = 'default';
+
+/**
+ * The level `visibility: 'default'` asks for (V5.2): the app-upload default for an app grant, the
  * file default for everyone else.
  */
 export function fileVisibilityDefault(config: Defaults, appGrant: boolean): DefaultAppUploadVisibility {
   return appGrant ? (config.defaultAppUploadVisibility ?? 'public') : (config.defaultFileVisibility ?? 'private');
+}
+
+/**
+ * The level of an upload (V5.2). 'default': fileVisibilityDefault. No visibility at all: the file
+ * default for every caller, an app grant included, which is what a direct post stored before V5
+ * (private unless the operator chose otherwise). Any other value is returned as it came, for the
+ * door's own validation.
+ */
+export function uploadVisibilityOf<T>(config: Defaults, named: T | undefined, appGrant: boolean): T | DefaultAppUploadVisibility {
+  if (named === NODE_DEFAULT_LEVEL) return fileVisibilityDefault(config, appGrant);
+  return named ?? fileVisibilityDefault(config, false);
 }
 
 /** A board created without a visibility (V5.3). */

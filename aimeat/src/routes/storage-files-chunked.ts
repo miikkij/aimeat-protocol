@@ -17,8 +17,9 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
- *   2026-10-18 -- Init without a visibility stores visibility.file_default, or for an app grant
- *     visibility.app_upload_default, with the session (plan doc-mvcn6c7e4e5q, V5.2).
+ *   2026-10-18 -- Init without a visibility stores visibility.file_default with the session; `visibility:
+ *     'default'` is mapped before the body schema to visibility.app_upload_default for an app grant and
+ *     to the file default for anyone else (plan doc-mvcn6c7e4e5q, V5.2).
  *   2026-10-18 -- Complete asks the publish gate through the shared write (services/storage-file-publish.ts;
  *     plan doc-mvcn6c7e4e5q, V4): a file the session asked as public, completed by a caller the node
  *     asks the owner about, lands at the level it had (a new one: private) and the answer is 202 with
@@ -44,7 +45,7 @@
  *     other storage upload answer (AIMEAT.storage.uploadChunked had neither).
  *   v1.0.0 -- 2026-09-08 -- Extracted from routes/storage-files.ts, unchanged.
  */
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
@@ -61,7 +62,7 @@ import { versionedAddress } from '../utils/http-range.js';
 import { pubEmbedUrl } from '../services/doc-images.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { callerOf } from '../middleware/caller.js';
-import { fileVisibilityDefault, isAppGrantRoles } from '../services/content-defaults.js';
+import { uploadVisibilityOf, isAppGrantRoles, NODE_DEFAULT_LEVEL } from '../services/content-defaults.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -84,6 +85,13 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
     const MAX_OPEN_UPLOADS = 4;
     const sessionCeilingText = () => MAX_SESSION_BYTES === MAX_CHUNKED_FILE_SIZE
       ? `${config.storageMaxChunkedFileSizeGb} GB` : `${config.storageMaxFileSizeMb} MB`;
+    // `visibility: 'default'` (the SDK's word for the node's starting level, plan V5.2) becomes the
+    // level it names BEFORE the body schema, which takes stored visibilities only.
+    const nodeDefaultLevel: RequestHandler = (req, _res, next) => {
+        const body = req.body as { visibility?: unknown } | undefined;
+        if (body && body.visibility === NODE_DEFAULT_LEVEL) body.visibility = uploadVisibilityOf(config, NODE_DEFAULT_LEVEL, isAppGrantRoles(req.auth?.roles));
+        next();
+    };
 
     // -----------------------------------------------
     // Chunked Upload — Large file support
@@ -92,13 +100,13 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
     // -----------------------------------------------
 
     // POST /v1/storage/upload/init — initiate chunked upload
-    router.post('/v1/storage/upload/init', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
+    router.post('/v1/storage/upload/init', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), nodeDefaultLevel, validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
         const gaii = resolve(req);
         const { key, mime_type, visibility, chunk_size, total_chunks, group_id, workspace_ref, workspace_refs } = req.body ?? {};
         const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, workspace_ref) : undefined;
-        // No visibility named: the node's starting level (plan V5.2), stored with the session; the
-        // publish gate asks about it at complete, as about a named one.
-        const level = visibility ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
+        // No visibility named: the file default (plan V5.2; 'default' was mapped before validation),
+        // stored with the session; the publish gate asks about it at complete, as about a named one.
+        const level = uploadVisibilityOf(config, visibility, isAppGrantRoles(req.auth!.roles));
         // Refused here, before any chunk, with the answer POST /v1/storage gives at its shared write.
         if (visibility === 'workspace' && !workspaceRef) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',

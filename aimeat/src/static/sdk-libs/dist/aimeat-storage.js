@@ -55,7 +55,7 @@
   var { getSession: getSession2, authFetch: authFetch2 } = makeSession("aimeat-storage.js");
   function levelOf(opts) {
     if (opts && opts.visibility) return opts.visibility;
-    return opts && opts.nodeDefault === true ? void 0 : "private";
+    return opts && opts.nodeDefault === true ? "default" : "private";
   }
   function binding(opts) {
     const o = opts || {};

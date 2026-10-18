@@ -38,8 +38,9 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
- *   v1.6.0 — 2026-10-18 — A file stored or minted without a visibility takes visibility.file_default, or
- *     for an app grant visibility.app_upload_default (plan doc-mvcn6c7e4e5q, V5.2), before the gate.
+ *   v1.6.0 — 2026-10-18 — A file stored or minted without a visibility takes visibility.file_default;
+ *     `visibility: 'default'` takes visibility.app_upload_default for an app grant and the file default
+ *     for anyone else (plan doc-mvcn6c7e4e5q, V5.2), before the gate.
  *   v1.5.0 — 2026-10-18 — The publish gate (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q,
  *     V4). `publishGate` on the write and the presigned mint: a file made public by a caller the node
  *     asks the owner about is stored at the level it had (a new one: private) and the result carries
@@ -88,11 +89,15 @@ import {
     fileRaiseAsk, keptFileLevel, mintPublishCarry, fileFilePublishRequest,
     type StoragePublishGate, type FilePublishFiled,
 } from './storage-file-publish.js';
-import { fileVisibilityDefault } from './content-defaults.js';
+import { uploadVisibilityOf } from './content-defaults.js';
 
-/** The level of a file stored without one (plan V5.2): an app grant's own default for an app. */
-function defaultLevelOf(config: AimeatConfig, gate: StoragePublishGate | undefined): StorageFileRecord['visibility'] {
-    return fileVisibilityDefault(config, !!gate && 'caller' in gate && gate.caller.kind === 'app');
+/**
+ * The level of a file (plan V5.2): none named is the file default for every caller; 'default' (the
+ * SDK's word) is an app grant's own default for an app. Doors map 'default' themselves; this is the
+ * same rule for a caller that reaches the write or the mint directly.
+ */
+function levelOf(config: AimeatConfig, named: string | undefined, gate: StoragePublishGate | undefined): StorageFileRecord['visibility'] {
+    return uploadVisibilityOf(config, named, !!gate && 'caller' in gate && gate.caller.kind === 'app') as StorageFileRecord['visibility'];
 }
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
@@ -339,7 +344,7 @@ export async function writeStorageFile(
     if (fenced) return fenced;
 
     // No visibility named: the node's starting level (plan V5.2), before the publish gate below.
-    const visibility = input.visibility ?? defaultLevelOf(config, input.publishGate);
+    const visibility = levelOf(config, input.visibility, input.publishGate);
     // A workspace-visible file that names no workspace is readable by nobody, so it is refused here
     // rather than stored and puzzled over later.
     if (visibility === 'workspace' && !input.workspaceRef) {
@@ -536,7 +541,7 @@ export async function mintStorageUploadUrl(
     const { config } = deps;
     // No visibility named: the node's starting level (plan V5.2), decided before the publish gate's
     // carry so a default of public asks the owner as an explicit one does.
-    const input = { ...given, visibility: given.visibility ?? defaultLevelOf(config, given.publishGate) };
+    const input = { ...given, visibility: levelOf(config, given.visibility, given.publishGate) };
 
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
     if (fenced) return fenced;

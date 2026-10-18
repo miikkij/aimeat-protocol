@@ -5,8 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
- *   v1.10.0 -- 2026-10-18 -- POST without a visibility takes visibility.file_default, or for an app grant
- *     visibility.app_upload_default (plan doc-mvcn6c7e4e5q, V5.2), before the publish gate is asked.
+ *   v1.10.0 -- 2026-10-18 -- POST without a visibility takes visibility.file_default; `visibility: 'default'`
+ *     takes visibility.app_upload_default for an app grant and the file default for anyone else (plan
+ *     doc-mvcn6c7e4e5q, V5.2), before validation and the publish gate.
  *   v1.9.0 -- 2026-10-18 -- POST (inline and presigned) and PATCH .../visibility ask the publish gate
  *     (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made public by a caller the
  *     node asks the owner about keeps the level it had (a new one: private) and the answer is 202 with
@@ -66,7 +67,7 @@ import { loadServedProvenance, setProvenanceHeaders } from '../../services/ai-pr
 import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
-import { fileVisibilityDefault, isAppGrantRoles } from '../../services/content-defaults.js';
+import { uploadVisibilityOf, isAppGrantRoles } from '../../services/content-defaults.js';
 
 export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, resolve } = ctx;
@@ -77,9 +78,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
     const gaii = resolve(req);
     const { key, content, mime_type, visibility: named, tags, workspaceRef, workspace_refs, mode, group_id } = req.body ?? {};
-    // No visibility named: the node's starting level (plan V5.2), an app grant's own one for an app,
-    // decided here so the presigned mint and the publish gate below see it.
-    const visibility = named ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
+    // The node's starting level (plan V5.2), decided before the validation, the presigned mint and the
+    // publish gate below: 'default' (the SDK's word) is the app-upload default for an app grant, none
+    // at all is the file default.
+    const visibility = uploadVisibilityOf(config, named as string | undefined, isAppGrantRoles(req.auth!.roles));
 
     // `content` is required only for the inline path; a presigned mint carries no bytes at all.
     if (!key || (mode !== 'presigned' && !content)) {

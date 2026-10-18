@@ -8,10 +8,13 @@
  *     - unset (the code default): today's level;
  *     - set by the operator (PUT /v1/admin/config): the new level when the caller names none;
  *     - a level the caller names still wins.
+ *   The app-upload level answers only `visibility: 'default'` (the word AIMEAT.assets.upload sends): an
+ *   app's direct post with no visibility still lands at the file level (private).
  *   Also asserted: a non-operator cannot set one (403); a default of public is asked about by the
  *   publish gate like an explicit public (a board by an agent without publish:public answers 202 and
  *   is stored private); every setting is put back at the end.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — An app's direct post with no visibility lands private; the SDK's 'default' gets the app-upload level.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V5).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-defaults
@@ -136,22 +139,34 @@ async function appGrant(owner: { name: string; token: string }, filename: string
     return t.body.data.access_token as string;
 }
 
-await test('V5.2 an app\'s upload: public unset; private when set; a named level wins; a person\'s upload keeps the file default', async () => {
+let app = '';
+await test('V5.2 an app\'s direct post with no visibility lands private, as before V5 (the app-upload default is not asked)', async () => {
+    await setConfig('visibility.file_default', 'private');
     const f = `cd-app-${tag}.html`;
     const a = await call('/v1/apps', { token: A.token, body: { filename: f, content: b64(`<!DOCTYPE html><html><body>${f}</body></html>`), mime_type: 'text/html', description: 'Content defaults fixture' } });
     assert(a.status === 201, `app: ${show(a)}`);
-    const app = await appGrant(A, f, 'storage:write');
-    const up = (key: string, visibility?: string) => call('/v1/storage', { token: app, body: { key, data: b64(`asset ${key}`), mime_type: 'text/plain', ...(visibility ? { visibility } : {}) } });
-    const u0 = await up(`cd/app0-${tag}.txt`);
+    app = await appGrant(A, f, 'storage:write');
+    const direct = await call('/v1/storage', { token: app, body: { key: `cd/direct-${tag}.txt`, data: b64('direct'), mime_type: 'text/plain' } });
+    assert(direct.status === 201 && direct.body.data.visibility === 'private', `direct post, app-upload default public: ${show(direct)}`);
+    const files = await call('/v1/memory/files', { token: app, body: { key: `cd/direct-mf-${tag}.txt`, content: b64('direct'), mime_type: 'text/plain' } });
+    assert(files.status === 201 && files.body.data.visibility === 'private', `direct POST /v1/memory/files: ${show(files)}`);
+});
+
+await test('V5.2 an SDK-shaped post (visibility "default"): public unset; private when set; a named level wins; a person gets the file default', async () => {
+    const up = (token: string, key: string, visibility: string) => call('/v1/storage', { token, body: { key, data: b64(`asset ${key}`), mime_type: 'text/plain', visibility } });
+    const u0 = await up(app, `cd/app0-${tag}.txt`, 'default');
     assert(u0.status === 201 && u0.body.data.visibility === 'public', `unset: ${show(u0)}`);
     await setConfig('visibility.app_upload_default', 'private');
-    const u1 = await up(`cd/app1-${tag}.txt`);
+    const u1 = await up(app, `cd/app1-${tag}.txt`, 'default');
     assert(u1.status === 201 && u1.body.data.visibility === 'private', `set: ${show(u1)}`);
-    const u2 = await up(`cd/app2-${tag}.txt`, 'public');
+    const u2 = await up(app, `cd/app2-${tag}.txt`, 'public');
     assert(u2.status === 201 && u2.body.data.visibility === 'public', `named: ${show(u2)}`);
-    // The same settings, a person in person: the file default (members, from the step before).
-    const p = await call('/v1/storage', { token: A.token, body: { key: `cd/p-${tag}.txt`, data: b64('p'), mime_type: 'text/plain' } });
-    assert(p.status === 201 && p.body.data.visibility === 'members', `a person's upload: ${show(p)}`);
+    await setConfig('visibility.file_default', 'members');
+    const p = await up(A.token, `cd/p-${tag}.txt`, 'default');
+    assert(p.status === 201 && p.body.data.visibility === 'members', `a person's "default": ${show(p)}`);
+    const init = await call('/v1/storage/upload/init', { token: app, body: { key: `cd/chunk-${tag}.bin`, mime_type: 'application/octet-stream', chunk_size: 1024, total_chunks: 1, visibility: 'default' } });
+    assert(init.status === 201, `chunked init takes "default": ${show(init)}`);
+    await call(`/v1/storage/upload/${init.body.data.upload_id}`, { token: app, method: 'DELETE' });
 });
 
 await test('V5.3 boards: public unset; private when set; a named level wins', async () => {

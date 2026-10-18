@@ -19,7 +19,7 @@
  *   lib.add('images', 'hero', { file: put.url, w: 32, h: 40, bytes: put.bytes });
  *   await lib.save();
  * @version-history
- *   v1.2.0 — 2026-10-18 — upload() sends a visibility only when the app named one; without it the node
+ *   v1.2.0 — 2026-10-18 — upload() sends visibility 'default' when the app named none, and the node
  *     applies its starting level for an app's upload (visibility.app_upload_default, code default
  *     public, plan doc-mvcn6c7e4e5q V5.2). A stored level other than public is warned about as before.
  *   v1.1.0 — 2026-09-13 — upload() returns the node's versioned address (`?v=` that changes on every
@@ -102,9 +102,10 @@ export async function upload(file, opts) {
   }
   const o = opts || /** @type {UploadOptions} */ ({});
   const key = storageKey(file, o);
-  // A visibility is sent only when the app named one. Without it the node decides, from its
-  // starting level for an app's upload (visibility.app_upload_default, public unless the operator
-  // chose otherwise), so a node that keeps everything signed-in can keep assets so too.
+  // The app's own visibility when it named one. Without it the storage library sends 'default'
+  // (nodeDefault), and the node decides from its starting level for an app's upload
+  // (visibility.app_upload_default, public unless the operator chose otherwise), so a node that
+  // keeps everything signed-in can keep assets so too.
   const named = o.visibility;
   if (named && named !== 'public') warnNotPublic(key, named);
 
