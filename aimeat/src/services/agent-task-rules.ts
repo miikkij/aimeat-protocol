@@ -45,6 +45,9 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.3.0 — 2026-10-18 — `*` stays on the floor only as the fallback for a narrowing that failed:
+ *     a ready `*` agent is narrowed before the decision (services/scope-auto-narrow.ts, Jouni
+ *     2026-10-18 superseding the hold half of ruling C).
  *   v2.2.0 — 2026-10-11 — `waitsBecause: 'stopped'`, ahead of every other reason: no task of a stopped
  *     agent starts, and nobody may start one by hand (mayStartWaitingTask). See agent-stop-rules.ts.
  *   v2.1.0 — 2026-10-02 — Rulings B and C: `memory:purge` (deleting shared records for good) is on the
@@ -93,8 +96,9 @@ export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }
 ];
 
 /**
- * The agent as the start rules read it. `wildcardReady` is filled by services/scope-use.ts
- * withWildcardFacts(): the agent holds `*` and its usage record is old enough to offer a narrowing.
+ * The agent as the start rules read it. `wildcardReady` is set by services/scope-auto-narrow.ts
+ * startFactsOf() only when the agent holds `*`, its usage record is ready, and the narrowing it then
+ * makes failed: the one case `*` still holds a task (fail closed).
  */
 type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt'>> & { wildcardReady?: boolean };
 
@@ -102,12 +106,14 @@ type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskSta
  * The floor permissions this agent's record grants BY NAME: the word itself or its domain wildcard
  * (`commerce:*`). The record is the ceiling a token is narrowed to (auth/effective-scopes.ts).
  *
- * THE GLOBAL `*` COUNTS, BUT NOT BY SURPRISE (ruling C, Jouni 2026-10-02): "all permissions" must
- * never read as "nothing dangerous". It counts once the agent's usage record is ready
- * (`wildcardReady`, services/scope-use.ts): OBSERVE_DAYS of record naming at least one permission, so
- * the owner is offered, with one press, the named permissions it actually used. Until then a `*` agent
- * starts as it did. On aimeat.io on 2026-10-02, 52 of the 53 task-runners of the busiest account held
- * `*`, and the node had no record of what any of them used. `*` itself is reported as `'*'`.
+ * THE GLOBAL `*` (ruling C, Jouni 2026-10-02, and its follow-up of 2026-10-18): "all permissions"
+ * must never read as "nothing dangerous", and it does not stay. Once the agent's usage record is
+ * ready, the start decision narrows the agent to the named permissions it used before it decides
+ * (services/scope-auto-narrow.ts), so the floor then reads those words like any agent's. `*` reaches
+ * the floor only through `wildcardReady`, which is set when that narrowing failed: the task waits for
+ * the owner rather than starting on `*`. Until the record is ready a `*` agent starts as it did. On
+ * aimeat.io on 2026-10-02, 52 of the 53 task-runners of the busiest account held `*`; when the
+ * floor held them all on 2026-10-16..18, the owner got one notice per task. `*` is reported as `'*'`.
  */
 export function floorScopesOf(agent: (Partial<Pick<AgentRecord, 'defaultScopes'>> & { wildcardReady?: boolean }) | null | undefined): string[] {
     const held = agent?.defaultScopes ?? [];

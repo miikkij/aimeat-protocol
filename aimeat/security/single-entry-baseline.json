@@ -522,7 +522,7 @@
         "why": "UNREVIEWED"
       },
       "src/services/scope-use.ts": {
-        "count": 3,
+        "count": 2,
         "why": "UNREVIEWED"
       },
       "src/services/scope-vocabulary-migration.ts": {

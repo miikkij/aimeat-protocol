@@ -20,6 +20,8 @@
  *   const out = await startWaitingTask({ storage, config, webhook }, caller, req.auth!.owner, id);
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The delegate check reads the agent through startFactsOf
+ *     (services/scope-auto-narrow.ts): a `*` agent whose record is ready is narrowed first.
  *   v1.1.0 — 2026-10-11 — A start on a stopped agent's task is refused for every caller, 409 AGENT_STOPPED.
  *   v1.0.0 — 2026-10-02 — Extracted from routes/agent-tasks/lifecycle.ts, with the agent caller and
  *     the per-transition wake id added.
@@ -30,7 +32,7 @@ import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interfa
 import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { decideTaskStart, mayStartWaitingTask, taskWakeId, type StartCaller } from './agent-task-rules.js';
 import { waitReason } from './task-start-notice.js';
-import { withWildcardFacts } from './scope-use.js';
+import { startFactsOf } from './scope-auto-narrow.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
@@ -86,7 +88,7 @@ export async function startWaitingTask(
         if (task.status !== 'queued') {
             return { ok: false, status: 403, code: 'OWNER_MUST_START', message: `Only the owner can restart a ${task.status} task.` };
         }
-        const decision = decideTaskStart(await withWildcardFacts(storage, await storage.getAgent(task.agentGaii)), { policy: task.startPolicy, todos: task.todos });
+        const decision = decideTaskStart(await startFactsOf(deps, await storage.getAgent(task.agentGaii)), { policy: task.startPolicy, todos: task.todos });
         if (!mayStartWaitingTask(caller, task.agentGaii, decision)) {
             return { ok: false, status: 403, code: 'OWNER_MUST_START',
                 message: `${waitReason(task.agentGaii.split('#')[0], decision)} Only the owner can start it, from the notification they got or from Tasks.` };

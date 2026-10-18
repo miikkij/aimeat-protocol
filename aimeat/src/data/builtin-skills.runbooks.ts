@@ -12,6 +12,9 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-18 — manage-my-agents: the node narrows an agent holding all permissions by itself after two
+ *     weeks of record, instead of holding its tasks, and the owner hears of every new refusal in the
+ *     bell and by email (services/scope-auto-narrow.ts, services/permission-ask-notice.ts).
  *   2026-10-18 — manage-my-agents: a change with no level gets the node's starting level, and a new agent may start unlisted (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 — manage-my-agents: a stored file made public, and a bulk write or an import, wait for
  *     the owner the same way (publish_requests per record; plan doc-mvcn6c7e4e5q, V4).
@@ -191,10 +194,12 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   agent answers \`waits_because: stopped\`: say that the agent is stopped and offer to start it. To
   end one task that is running, the owner cancels that task on the agent's Tasks tab. To remove an
   agent for good, that is a different act: the owner deletes it on the Agents page.
-- **All permissions (\`*\`)** counts as able to do anything: two weeks after the node starts noting
-  what such an agent uses, its tasks wait for the owner. \`aimeat_agents_list\` shows the permissions
-  it used (\`task_start_wildcard.proposal\`); read them to the owner, and when they agree, narrow the
-  agent to them with \`aimeat_agent_scope_narrow\`.
+- **All permissions (\`*\`)** counts as able to do anything, and it does not stay: two weeks after
+  the node starts noting what such an agent uses, the node narrows the agent to the permissions it
+  used at its next task, and tells the owner in the bell and by email. Its tasks then start as its
+  own setting says. \`aimeat_agents_list\` shows those permissions before it happens
+  (\`task_start_wildcard.proposal\`); when the owner wants it done now, narrow the agent with
+  \`aimeat_agent_scope_narrow\`. A permission it needs later is refused once and asked for.
 - **An agent that invites people.** \`invites_people: true\` on an agent's row means its permissions
   cover \`organism:invite\`: it can invite people into the shared spaces the owner belongs to, and an
   invitation can create a new account. That is allowed. When you describe the agent to the owner,
@@ -232,7 +237,9 @@ flowchart LR
   when last), and \`scope_request\` says what the agent asked for at its last approval. A refusal is
   often why a task waits or a run looked fine and wrote nothing. Tell the owner what the agent could
   not do, in words, and give them the address \`/v1/allow?agent=<name>&need=<permissions>\`, where they
-  allow it with one press; a powerful permission is given in Profile → Agents → Manage access rights. A refusal
+  allow it with one press; a powerful permission is given in Profile → Agents → Manage access rights. The
+  owner also hears of each new refusal from the node itself, in the bell and by email: with an Allow
+  button for a one-press permission, and with the agent's page for the rest. A refusal
   goes away when the permission is given. When a row says \`refusals_unreadable: true\`, the node
   could not read the refusals: \`refusals\` is then null and says nothing about whether any were
   refused, so ask again later rather than telling the owner there are none. Reading the owner's address book (\`aimeat_contact_list\`)

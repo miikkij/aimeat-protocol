@@ -12,9 +12,14 @@
  *        over MCP, and never its own;
  *     4. the floor holds: an agent that can spend, send or delete as the owner, or a plan that says
  *        it will, waits for the owner in person whatever the setting.
+ *   And since 2026-10-18 (section 8): an agent holding `*` whose record is two weeks old is narrowed
+ *   by the node at its next task, which is then decided on the narrowed agent, and the owner is told
+ *   once.
  *   The wake on Start is held by e2e-connect-tunnel-delivery (test 8).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=task-start
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Section 8: the node narrows a ready `*` agent itself instead of holding its
+ *     tasks (Jouni, 2026-10-18). The record's start date is moved back in the server's database.
  *   v1.0.2 — 2026-10-12 — 6a: the workspace records delete asks memory:delete (into the bin), and
  *     memory:purge alone no longer passes it.
  *   v1.0.1 — 2026-10-06 — 6d: an agent holding memory:purge alone is not offered rows_delete, since
@@ -25,11 +30,16 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { serverSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import type { Storage } from '../src/storage/interface.js';
+import { readScopeUse, writeScopeUse } from '../src/services/scope-use.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+const PROVIDER = (process.env.AIMEAT_DB ?? 'sqlite') as StorageProvider;
 
 let passed = 0;
 let failed = 0;
@@ -436,6 +446,108 @@ await test('7c. A permission it never used is refused after the narrowing, on a 
   assert(refused.status === 403, `contacts after narrowing ${refused.status}`);
 });
 
+console.log('\n8. The node narrows a `*` agent itself when its record is ready (Jouni, 2026-10-18)');
+// Until 2026-10-18 a ready record put `*` on the floor and every task of the agent waited for the
+// owner in person, one bell notice per task; on aimeat.io that held 14 scheduled agents at once.
+// The record is service-owned (no route writes it), so its start date is moved back in the database.
+const DAY_MS = 86_400_000;
+let db: Storage | null = null;
+async function scopeDb(): Promise<Storage> {
+  db ??= await createStorage({ provider: PROVIDER, sqlitePath: serverSqlitePath(), dbUrl: serverDbUrl() });
+  return db;
+}
+/** Move the record of `name` back `days`, and put `words` on it when given. */
+async function ageRecord(name: string, days: number, words?: string[]): Promise<void> {
+  const s = await scopeDb();
+  const ownerGhii = `${owner.name}@${NODE_ID}`;
+  const record = await readScopeUse(s, ownerGhii);
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+  const use = record.agents[name] ?? { since, words: {} };
+  use.since = since;
+  for (const w of words ?? []) use.words[w] = since;
+  record.agents[name] = use;
+  await writeScopeUse(s, ownerGhii, record);
+}
+async function narrowedNotices(token: string, name?: string): Promise<any[]> {
+  const { body } = await json('/v1/notifications?limit=200', { headers: auth(token) });
+  return (body?.data?.notifications ?? []).filter((n: any) => n.type === 'agent_narrowed' && (!name || n.i18n?.vars?.agent === name));
+}
+
+let autostar!: Agent;
+await test('8a. The database the server writes is reachable from this suite', async () => {
+  // The run names one backend, and that backend's handle must be there: a SQLite file or a URL.
+  const reachable = PROVIDER === 'postgres-kysely' ? !!serverDbUrl() : !!serverSqlitePath();
+  assert(reachable, `backend "${PROVIDER}" is not reachable from this process`);
+  await scopeDb();
+});
+
+await test('8b. A `*` task-runner uses memory, and its record is moved past two weeks', async () => {
+  autostar = await newAgent(owner, 'autostar', ['*'], 'task-runner');
+  const wrote = await json('/v1/memory', { method: 'POST', headers: auth(autostar.token), body: JSON.stringify({ key: 'autostar.note', value: { ok: true } }) });
+  assert(wrote.status === 201, `a new record: ${wrote.status}`);
+  // The list writes the buffered use before it reads, so the record exists in the database after it.
+  const before = await listAgent(owner.token, 'autostar');
+  assert(before.task_start_wildcard?.used?.includes('memory:write'), `used ${JSON.stringify(before.task_start_wildcard)}`);
+  await ageRecord('autostar', 15);
+  const a = await listAgent(owner.token, 'autostar');
+  assert(a.task_start_wildcard?.ready === true, `ready ${JSON.stringify(a.task_start_wildcard)}`);
+  assert(!a.task_start_held_by.includes('*'), `held_by shows no '*' any more: ${JSON.stringify(a.task_start_held_by)}`);
+});
+
+await test('8c. Another owner\'s agent cannot give it a task, so it cannot set off the narrowing (403)', async () => {
+  const x = await json(`/v1/agents/${encodeURIComponent(autostar.gaii)}/tasks`, {
+    method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ title: 'Not yours', description: 'Not yours' }),
+  });
+  assert(x.status === 403, `cross-owner task ${x.status}: ${JSON.stringify(x.body?.error)}`);
+  const a = await listAgent(owner.token, 'autostar');
+  assert((a.default_scopes ?? []).includes('*'), `still all permissions: ${JSON.stringify(a.default_scopes)}`);
+  assert((await narrowedNotices(owner.token, 'autostar')).length === 0, 'nobody was told');
+});
+
+await test('8d. Its next task starts on its own, the agent holds what it used, and the owner is told once', async () => {
+  const r = await createTask(owner.token, 'autostar', 'Nightly paper, after two weeks');
+  assert(r.status === 201 && r.body.data.task.status === 'active', `status ${r.status} ${r.body?.data?.task?.status}: ${JSON.stringify(r.body?.data?.start)}`);
+  assert(r.body.data.start.starts === 'now', `start ${JSON.stringify(r.body.data.start)}`);
+  const a = await listAgent(owner.token, 'autostar');
+  const scopes: string[] = a.default_scopes ?? [];
+  assert(!scopes.includes('*') && scopes.includes('memory:write'), `scopes ${JSON.stringify(scopes)}`);
+  assert(a.task_start_wildcard === null, `no longer all permissions ${JSON.stringify(a.task_start_wildcard)}`);
+  const told = await narrowedNotices(owner.token, 'autostar');
+  assert(told.length === 1, `one notice, got ${told.length}`);
+  assert(told[0].link === '/v1/profile?tab=agents&agent=autostar', `link ${told[0].link}`);
+  assert(!(told[0].actions ?? []).some((x: any) => x.kind === 'api'), 'a notice with nothing to press but Open');
+});
+
+await test('8e. A second task starts too, and the owner is not told again', async () => {
+  const r = await createTask(owner.token, 'autostar', 'Nightly paper, the day after');
+  assert(r.body.data.task.status === 'active', `status ${r.body.data.task.status}`);
+  assert((await narrowedNotices(owner.token, 'autostar')).length === 1, 'still one notice');
+  assert((await narrowedNotices(other.token)).length === 0, 'another owner sees none of it');
+});
+
+await test('8f. An agent that used a word on the floor is narrowed, and its task still waits for the owner', async () => {
+  await newAgent(owner, 'startrader', ['*'], 'task-runner');
+  await ageRecord('startrader', 15, ['exchange:write', 'memory:read']);
+  const r = await createTask(owner.token, 'startrader', 'Bid on the paper');
+  assert(r.status === 201 && r.body.data.task.status === 'queued', `status ${r.body?.data?.task?.status}`);
+  assert(r.body.data.start.waits_because === 'floor' && r.body.data.start.who_can_start === 'owner_in_person', `start ${JSON.stringify(r.body.data.start)}`);
+  const a = await listAgent(owner.token, 'startrader');
+  assert(JSON.stringify(a.default_scopes) === JSON.stringify(['exchange:write', 'memory:read']), `scopes ${JSON.stringify(a.default_scopes)}`);
+  assert(a.task_start_held_by.includes('exchange:write'), `held_by ${JSON.stringify(a.task_start_held_by)}`);
+  assert((await narrowedNotices(owner.token, 'startrader')).length === 1, 'told once');
+});
+
+await test('8g. A `*` agent whose record is younger than two weeks is left as it is', async () => {
+  await newAgent(owner, 'youngstar', ['*'], 'task-runner');
+  await ageRecord('youngstar', 3, ['memory:read']);
+  const r = await createTask(owner.token, 'youngstar', 'Still observed');
+  assert(r.body.data.task.status === 'active', `status ${r.body.data.task.status}`);
+  const a = await listAgent(owner.token, 'youngstar');
+  assert(JSON.stringify(a.default_scopes) === JSON.stringify(['*']), `scopes ${JSON.stringify(a.default_scopes)}`);
+  assert(a.task_start_wildcard?.ready === false && a.task_start_wildcard?.days_left === 11, `wildcard ${JSON.stringify(a.task_start_wildcard)}`);
+  assert((await narrowedNotices(owner.token, 'youngstar')).length === 0, 'nobody told');
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete both owners', async () => {
   for (const o of [owner, other]) {
@@ -443,6 +555,8 @@ await test('Cascade-delete both owners', async () => {
     assert(status === 200, `delete ${o.name}: ${status}`);
   }
 });
+
+try { await db?.close?.(); } catch (err) { console.warn(`  (the suite's database handle did not close: ${String(err)})`); }
 
 console.log(`\n${'='.repeat(50)}`);
 console.log(`Task Start E2E: ${passed} passed, ${failed} failed (${passed + failed} total)`);

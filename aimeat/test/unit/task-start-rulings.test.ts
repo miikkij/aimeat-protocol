@@ -7,9 +7,12 @@
  *     A. the one-time switch of the basic agents nobody has set, with one notice per owner;
  *     B. app grants that held memory:delete keep deleting their records (memory:purge), and the new
  *        word puts an agent on the floor;
- *     C. the record of what a `*` agent uses, when `*` starts to hold its tasks, and the narrowing.
+ *     C. the record of what a `*` agent uses, when it is ready, and the narrowing (since 2026-10-18 the
+ *        node narrows a ready agent itself; test/unit/scope-auto-narrow.test.ts holds that in full).
  * @usage pnpm test -- task-start-rulings
  * @version-history
+ *   v1.1.0 — 2026-10-18 — C: a ready record narrows the agent at the start decision (startFactsOf),
+ *     where it put `*` on the floor before.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -17,9 +20,11 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentRecord, AppGrantRecord } from '../../src/storage/interface.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce, BASIC_AGENTS_START_TYPE } from '../../src/services/task-start-migrations.js';
 import {
-    noteScopeUse, flushScopeUse, readScopeUse, wildcardStatus, withWildcardFacts, OBSERVE_DAYS, SCOPE_USE_KEY,
+    noteScopeUse, flushScopeUse, readScopeUse, wildcardStatus, OBSERVE_DAYS, SCOPE_USE_KEY,
 } from '../../src/services/scope-use.js';
 import { narrowAgent } from '../../src/services/scope-narrowing.js';
+import { startFactsOf } from '../../src/services/scope-auto-narrow.js';
+import type { AimeatConfig } from '../../src/config.js';
 import { decideTaskStart, floorScopesOf } from '../../src/services/agent-task-rules.js';
 
 const NODE = 'aimeat-test-001';
@@ -96,21 +101,25 @@ describe('C. what a `*` agent uses, and when `*` holds its tasks', () => {
         expect(status.proposal).toEqual(['memory:read', 'task:write']);
     });
 
-    it('`*` holds the tasks once the record is old enough and names something', async () => {
+    it('the record is ready once it is old enough and names something; the node then narrows the agent', async () => {
         const old = new Date(Date.now() - (OBSERVE_DAYS + 1) * 86_400_000).toISOString();
         const use = { since: old, words: { 'memory:read': old } };
         expect(wildcardStatus({ defaultScopes: ['*'] }, use).ready).toBe(true);
         expect(wildcardStatus({ defaultScopes: ['*'] }, { since: old, words: {} }).ready).toBe(false);
+        // `*` reaches the floor only when the narrowing failed (services/scope-auto-narrow.ts).
         expect(floorScopesOf({ defaultScopes: ['*'], wildcardReady: true })).toEqual(['*']);
         expect(decideTaskStart({ mode: 'task-runner', defaultScopes: ['*'], wildcardReady: true }))
             .toMatchObject({ startsNow: false, waitsBecause: 'floor' });
         expect(decideTaskStart({ mode: 'task-runner', defaultScopes: ['*'] }).startsNow).toBe(true);
 
+        // Since 2026-10-18 a ready record narrows the agent at the start decision instead of holding it.
         await storage.createAgent(agent('star', 'alice', { defaultScopes: ['*'], mode: 'task-runner' }));
         await storage.setMemory({ key: SCOPE_USE_KEY, ownerGaii: `alice@${NODE}`, value: { agents: { star: use } },
             visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: old, updatedAt: old });
-        const facts = await withWildcardFacts(storage, await storage.getAgent(`star#alice@${NODE}`));
-        expect(facts?.wildcardReady).toBe(true);
+        const facts = await startFactsOf({ storage, config: { nodeId: NODE, baseUrl: 'https://node.test' } as AimeatConfig },
+            await storage.getAgent(`star#alice@${NODE}`));
+        expect(facts?.defaultScopes).toEqual(['memory:read']);
+        expect(decideTaskStart(facts).startsNow).toBe(true);
     });
 
     it('the narrowing replaces `*` with what was used, and refuses with nothing on record', async () => {

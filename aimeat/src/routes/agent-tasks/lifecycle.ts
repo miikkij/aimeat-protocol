@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — /queue reads the agent through startFactsOf (services/scope-auto-narrow.ts): an agent
+ *     holding `*` whose record is ready is narrowed to what it used before the decision.
  *   2026-10-15 — The request-changes comment no longer says an agent inherits the owner role; it says
  *     why the agent is refused (feature-list audit #79).
  *   v1.5.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -43,7 +45,7 @@ import {
   resolveAutoActivation, autoStartEvent, decideTaskStart, taskWakeId,
 } from '../../services/agent-task-rules.js';
 import { startWaitingTask } from '../../services/task-start-op.js';
-import { withWildcardFacts } from '../../services/scope-use.js';
+import { startFactsOf } from '../../services/scope-auto-narrow.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { startCallerOf, type TaskRouteHelpers } from './helpers.js';
@@ -282,7 +284,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
 
-    const targetAgent = await withWildcardFacts(storage, await storage.getAgent(task.agentGaii));
+    const targetAgent = await startFactsOf({ storage, config }, await storage.getAgent(task.agentGaii));
     const decision = decideTaskStart(targetAgent, { policy: task.startPolicy, todos: task.todos });
     const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, 'queued');
 
