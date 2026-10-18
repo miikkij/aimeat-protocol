@@ -18,6 +18,8 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-10-18 -- classification.mode moved from off makes the default caps offer of a node that ran
+ *     before, when it waits (services/classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1).
  *   2026-10-16 -- A setting changed (PUT) or a database override removed (DELETE) writes the operator
  *     trail: a usage row in the operator's own stream naming the paths, and a log line. Never a value
  *     (QA audit E2-04).
@@ -70,6 +72,7 @@ import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
 import { CLASSIFICATION_MODE_PATH, recordSwitchChange, switchRefusal } from '../services/classification/switch.js';
+import { offerDefaultCapsWhenSwitchedOn } from '../services/classification/default-caps.js';
 import { logger } from '../utils/logger.js';
 import { recordOperatorNodeAct } from '../services/operator-access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
@@ -223,6 +226,8 @@ export function adminConfigRouter(
         const { applied, errors } = await applyConfigChanges({ config, storage, provenance }, changes as ConfigChange[]);
         if (applied.some(a => a.path === CLASSIFICATION_MODE_PATH) && config.classificationMode !== modeBefore) {
             recordSwitchChange(config.nodeId, req.auth!, modeBefore, config.classificationMode);
+            // A node that ran before gets the default caps offered when classification comes into use (L5.1).
+            await offerDefaultCapsWhenSwitchedOn(config, storage, modeBefore, config.classificationMode);
             emitChange('classification');
         }
 

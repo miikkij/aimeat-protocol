@@ -65846,9 +65846,11 @@ paths:
         resolving it without a name before that answers 409. Deciding a name again the same way answers what that decision
         did; deciding it the other way answers 409.
 
-        A node that ran before its classifications could limit who sees their content opens, at its
-        first start with that feature, one incident of type `classification_default_caps` (a new node
-        takes the limits at once and opens none). It offers, per default classification, the widest
+        A node that ran before its classifications could limit who sees their content opens one
+        incident of type `classification_default_caps` once classification is in use: at its first
+        start with that feature when `classification.mode` is owner or all, otherwise when the mode
+        is switched on, never while it is off (a new node takes the limits at once and opens none).
+        It offers, per default classification, the widest
         audience its content may be given (`caps`: `label`, `name`, `max_audience`, `status`): Internal
         at most `signed-in`, Confidential and Highly confidential at most `organism`. With
         `{ name: <classification id>, resolution }` this endpoint decides one: `apply` puts the limit

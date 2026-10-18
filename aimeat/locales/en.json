@@ -1113,9 +1113,35 @@
           "headless_browser": "The server's own browser does not start",
           "scope_words_kept": "Permissions the update gave to existing agents and apps",
           "config_setting": "A setting the server did not accept, so it runs the default",
-          "classification_default_caps": "Limits on who may see classified content, waiting for your decision"
+          "classification_default_caps": "Limits on who may see classified content"
+        },
+        "caps": {
+          "line": "{label}: {cap}",
+          "lead": "This server ran before a classification could limit who may see its content. Nothing changes until you decide each limit. Content already shown more widely keeps its level, and the What others can see report lists it.",
+          "rowResolved": "Every limit is decided.",
+          "apply": "Apply",
+          "keep": "Keep as it is",
+          "applied": "applied",
+          "kept": "kept",
+          "ownCap": "own limit",
+          "noLabel": "removed",
+          "level": {
+            "public": "anyone",
+            "link": "at most anyone with the link",
+            "signed-in": "at most everyone signed in",
+            "organism": "at most an organisation's members",
+            "private": "only the owner"
+          },
+          "label": {
+            "julkinen": "Public",
+            "sisainen": "Internal",
+            "luottamuksellinen": "Confidential",
+            "erittain-luottamuksellinen": "Highly confidential"
+          }
         },
         "source": {
+          "start": "server start",
+          "switch": "classification switched on",
           "workspace_import": "workspace import",
           "organism_import": "organism import",
           "app_backup": "app backup",

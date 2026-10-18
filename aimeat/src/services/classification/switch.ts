@@ -25,6 +25,8 @@
  * @usage
  *   const out = await setClassificationSwitch({ storage, config }, { auth: req.auth!, scopes }, 'all');
  * @version-history
+ *   v1.1.0 — 2026-10-18 — A switch from off to owner or all makes the default caps offer of a node that
+ *     ran before, when it waits (default-caps.ts, plan doc-mvdipuyqraas, L5.1).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review: the switch over MCP, and recorded).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -37,6 +39,7 @@ import { emitChange } from '../event-bus.js';
 import { askOperator } from '../operator-principal.js';
 import { callerPrincipal } from '../../utils/gaii.js';
 import { recordClassificationAudit } from './audit.js';
+import { offerDefaultCapsWhenSwitchedOn } from './default-caps.js';
 import { ClassificationError } from './labels.js';
 import { readerKindOf } from './reader-kind.js';
 
@@ -122,6 +125,8 @@ export async function setClassificationSwitch(
     throw new ClassificationError('NOT_SAVED', 500, errors.map(e => e.reason).join(' '));
   }
   recordSwitchChange(config.nodeId, caller, from, next);
+  // A node that ran before gets the default caps offered when classification comes into use (L5.1).
+  await offerDefaultCapsWhenSwitchedOn(config, storage, from, next);
   emitChange('config');
   emitChange('classification');
   return { applied: true, mode: next, from };

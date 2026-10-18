@@ -7,20 +7,23 @@
  *   account), runs once, offers only the caps a stored policy does not have, and a decision writes the
  *   node policy and nothing else. The three starts of one database are e2e-classification-defaults.ts.
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The offer waits while classification is off, and is made once when it is
+ *     switched on or at a start with it on; a new node takes the caps with it off too.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L5.1).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { DEFAULT_LABELS, defaultPolicy } from '../../src/services/classification/defaults.js';
 import { readDefaultCapsState } from '../../src/services/classification/default-caps-state.js';
-import { DEFAULT_CAPS_INCIDENT_TYPE, decideDefaultCap, settleDefaultCapsAtStart } from '../../src/services/classification/default-caps.js';
+import { DEFAULT_CAPS_INCIDENT_TYPE, decideDefaultCap, offerDefaultCapsWhenSwitchedOn, settleDefaultCapsAtStart } from '../../src/services/classification/default-caps.js';
 import { NODE_POLICY_KEY, readNodePolicy } from '../../src/services/classification/policy.js';
 import { listSecurityIncidents, resolveSecurityIncident } from '../../src/services/security-incident.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const N = 'n';
 const SYSTEM = `system@${N}`;
-const config = { nodeId: N } as AimeatConfig;
+const config = { nodeId: N, classificationMode: 'all' } as AimeatConfig;
+const off = { nodeId: N, classificationMode: 'off' } as AimeatConfig;
 const AT = '2026-10-18T00:00:00.000Z';
 const OP = { principal: `op@${N}`, kind: 'human' as const };
 
@@ -68,6 +71,40 @@ describe('the default audience caps', () => {
     const [incident] = await offers(storage);
     expect(incident?.caps?.map(c => c.status)).toEqual(['open', 'open', 'open']);
     expect(await resolveSecurityIncident(storage, config, incident!.id)).toMatchObject({ ok: false, code: 'CONFLICT' });
+  });
+
+  it('a node that ran before with classification off: the offer waits (pending), and the switch turned on makes it once', async () => {
+    await storage.createOwner({ name: 'alice', displayName: 'alice', publicKey: 'pk', roles: ['owner'], createdAt: AT } as never);
+    await settleDefaultCapsAtStart(off, storage);
+    expect(await readDefaultCapsState(storage, N)).toMatchObject({ node: 'running', pending: true, incident: null });
+    expect(await offers(storage)).toHaveLength(0);
+    // A start with the switch still off leaves it waiting.
+    await settleDefaultCapsAtStart(off, storage);
+    expect(await offers(storage)).toHaveLength(0);
+    // A change that does not leave off makes nothing.
+    await offerDefaultCapsWhenSwitchedOn(config, storage, 'owner', 'all');
+    expect(await offers(storage)).toHaveLength(0);
+    await offerDefaultCapsWhenSwitchedOn(config, storage, 'off', 'owner');
+    expect(await readDefaultCapsState(storage, N)).toMatchObject({ pending: false });
+    expect(await offers(storage)).toHaveLength(1);
+    // Off and on again, and a start with it on, make no second offer.
+    await offerDefaultCapsWhenSwitchedOn(config, storage, 'off', 'all');
+    await settleDefaultCapsAtStart(config, storage);
+    expect(await offers(storage)).toHaveLength(1);
+  });
+
+  it('a waiting offer is made at a later start with classification on', async () => {
+    await storage.createOwner({ name: 'alice', displayName: 'alice', publicKey: 'pk', roles: ['owner'], createdAt: AT } as never);
+    await settleDefaultCapsAtStart(off, storage);
+    await settleDefaultCapsAtStart(config, storage);
+    expect(await readDefaultCapsState(storage, N)).toMatchObject({ node: 'running', pending: false });
+    expect((await offers(storage))[0]?.caps).toHaveLength(3);
+  });
+
+  it('a new node takes the caps with classification off too', async () => {
+    await settleDefaultCapsAtStart(off, storage);
+    expect((await readDefaultCapsState(storage, N))?.node).toBe('new');
+    expect(await capOf(storage, 'sisainen')).toBe('signed-in');
   });
 
   it('a stored policy is evidence too, and a label the operator capped already is not offered', async () => {

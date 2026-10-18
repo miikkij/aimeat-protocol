@@ -7,8 +7,12 @@
  *   kept (one row per incident, the one loud action on the open one), who holds the keys (rows in
  *   words with a button to the page that acts), the security settings (read as sentences, each with a
  *   button to Settings), and the paste for the operator's own AI.
- * @structure HeldSection · IncidentsSection · AccountsSection · SettingsSection · AskAiSection · isHeldIncident
+ * @structure HeldSection · IncidentsSection (CapOffers) · AccountsSection · SettingsSection · AskAiSection · isHeldIncident
  * @version-history
+ *   v2.5.0 — 2026-10-18 — An incident that offers the default limits on who may see classified content
+ *     (classification_default_caps) lists under its row each classification with its limit in words
+ *     and two buttons, Apply and Keep as it is; Resolve and Delete stand beside it only when every
+ *     limit is decided (plan doc-mvdipuyqraas, L5.1).
  *   v2.4.0 — 2026-10-04 — The apps line says how to give apps addresses of their own on a node one
  *     person uses too, not only on a shared one.
  *   v2.3.0 — 2026-09-26 — A held name counts its app grants and access tokens, each on its own line,
@@ -155,6 +159,44 @@ function HeldNames({ i, onDecide }) {
 /** An incident whose names are decided one by one: the update at start opened it. */
 export const isHeldIncident = (i) => Array.isArray(i.names);
 
+/** A classification's name in the page's language: the default ones by their id, any other by its English name. */
+const capLabel = (c) => tOr('admin.security.incidents.caps.label.' + c.label, c.name || c.label);
+
+/** "Sisäinen: enintään kirjautuneet": the classification and the limit offered for it, in words. */
+const capLine = (c) => S('incidents.caps.line', {
+  label: capLabel(c), cap: tOr('admin.security.incidents.caps.level.' + c.max_audience, c.max_audience),
+});
+
+/** The mark of an offered limit: still to decide, or what the decision did. */
+const capMark = (c) => (c.status === 'open' ? S('incidents.held.toDecide')
+  : S('incidents.caps.' + ({ 'own-cap': 'ownCap', 'no-label': 'noLabel', kept: 'kept' }[c.done] || 'applied')));
+
+/**
+ * Under an incident that offers the default limits on who may see classified content: each
+ * classification with its limit in words, and its two buttons under it while it is open (Apply, Keep
+ * as it is). The incident closes with the last decision, as a held name's does.
+ */
+function CapOffers({ i, onDecideCap }) {
+  return html`
+    <${List} under dense keepCols cols="state-name-who-doors" rows=${i.caps} render=${(c) => {
+      const open = c.status === 'open';
+      return html`
+      <${Row} key=${c.label} below=${open ? html`
+        <${Actions} tight>
+          <${Action} small onClick=${() => onDecideCap(i.id, c, 'apply')}>${S('incidents.caps.apply')}<//>
+          <${Action} small soft onClick=${() => onDecideCap(i.id, c, 'keep')}>${S('incidents.caps.keep')}<//>
+        <//>` : undefined}>
+        <${Cell} line><${Mark} kind="status" tone=${open ? 'danger' : 'fine'}>${capMark(c)}<//><//>
+        <${Name}>${capLine(c)}<//>
+        <${Who}>${c.label}<//>
+        ${open ? null : html`<${Doors} />`}
+      <//>`;
+    }} />`;
+}
+
+/** An incident whose offered limits are decided one by one. */
+const capsOf = (i) => (Array.isArray(i.caps) ? i.caps : []);
+
 const typeWord = (type) => tOr('admin.security.incidents.type.' + type, type);
 const sourceWord = (source) => source ? tOr('admin.security.incidents.source.' + source, source) : '';
 const whenLine = (i) => `${dt(i.createdAt)}${i.resolvedAt ? ' · ' + S('incidents.resolvedOn', { date: dt(i.resolvedAt) }) : ''}`;
@@ -191,7 +233,7 @@ export function HeldSection({ items, number, onResolve, onDelete, onDecide, swit
 }
 
 /** Section "Refused and kept": the incidents of refused uploads, whose bytes were kept when small enough. */
-export function IncidentsSection({ items, number, onResolve, onDelete, onPayload }) {
+export function IncidentsSection({ items, number, onResolve, onDelete, onPayload, onDecideCap }) {
   const open = items.filter(i => i.status === 'open').length;
   const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
   return html`
@@ -200,18 +242,26 @@ export function IncidentsSection({ items, number, onResolve, onDelete, onPayload
       ${items.length === 0 ? html`<${Note} kind="quiet">${S('incidents.none')}<//>` : null}
       ${items.length > 0 && open === 0 ? html`<${Note} kind="quiet">${lastResolved ? S('incidents.noneOpen', { date: fmtDate(lastResolved) }) : S('incidents.noneOpenPlain')}<//>` : null}
       ${items.length > 0 ? html`
-        <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => html`
-          <${Row} key=${i.id}>
+        <${List} cols="state-name-who-when-doors" rows=${items} render=${(i) => {
+          // An incident that offers limits closes with its last decision, so neither Resolve nor
+          // Delete stands beside a limit still to decide.
+          const caps = capsOf(i);
+          const undecided = caps.filter(c => c.status === 'open').length;
+          const capsLine = caps.length ? (undecided ? S('incidents.held.rowOpen', { n: num(undecided), total: num(caps.length) }) : S('incidents.caps.rowResolved')) : '';
+          return html`
+          <${Row} key=${i.id} below=${caps.length ? html`<${CapOffers} i=${i} onDecideCap=${onDecideCap} />` : undefined}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
-            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${i.detail || undefined}>${typeWord(i.type)}<//>
-            <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>
+            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${caps.length ? `${capsLine} ${S('incidents.caps.lead')}` : i.detail || undefined}>${typeWord(i.type)}<//>
+            ${caps.length ? html`<${Who}>${sourceWord(i.source)}<//>` : html`
+            <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
             <${When}>${whenLine(i)}<//>
             <${Doors}>
               ${i.quarantine_key ? html`<${Action} small onClick=${() => onPayload(i.id)}>${S('incidents.payload')}<//>` : null}
-              ${i.status === 'open' ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
-              <${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>
+              ${i.status === 'open' && !undecided ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
+              ${!undecided ? html`<${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>` : null}
             <//>
-          <//>`} />` : null}
+          <//>`;
+        }} />` : null}
     <//>`;
 }
 
