@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.38.0 -- 2026-10-18 -- What others can read: each item's classification, and the conflicts first
+ *     with lower_to (plan doc-mvdipuyqraas, L4.1).
  *   v1.37.0 -- 2026-10-18 -- Classified content: an agent's clearance hides what is classified above
  *     it, and only the owner raises it (plan doc-mvdipuyqraas, L2).
  *   v1.36.0 -- 2026-10-18 -- Classified content: a classification's audience cap, LABEL_CAPS_AUDIENCE,
@@ -98,7 +100,10 @@ a handle/URL, not bytes — never read large binaries into context.
 included) that someone else can read: open to anyone, to anyone holding the link, to every signed-in
 account of this node, or to one organisation's members, each with how to close it. Use it when your
 owner asks what a stranger can see, or hesitates to put something in. Tell them what is open to
-everyone first, and close nothing without asking.
+everyone first, and close nothing without asking. Where classification is on, an item carries its
+\`classification\`, and one whose \`conflict\` is true is open to more people than its classification
+allows: these come first, with \`lower_to\`, the widest level within the cap. Name them first and offer
+to lower each one; an \`excepted\` item is one your owner chose to keep open.
 
 **Making something public may wait for your owner.** When this node asks the owner first and you do
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is

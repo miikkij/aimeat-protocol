@@ -11,6 +11,7 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-18 -- e2e-exposure-conflicts.ts joins the list (not the guard tier): the conflicts in what others can see (plan doc-mvdipuyqraas, L4.1).
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
  *   2026-10-18 -- e2e-classification-audience-cap.ts joins the list (not the guard tier): a label's audience cap (plan doc-mvdipuyqraas, L3).
  *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
@@ -972,6 +973,9 @@ const ALL_SUITES = [
     'test/e2e-audience-packages.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
+    // The conflicts in that report: each item's effective classification and cap, conflicts first,
+    // the owner's exception, the node-wide count, lowering, the refusals (plan doc-mvdipuyqraas, L4.1).
+    'test/e2e-exposure-conflicts.ts',
     // Who may make something public without the owner, and the request the others file (plan doc-mvcn6c7e4e5q, V4.5).
     'test/e2e-publish-gate.ts',
     // The same gate on stored files and on memory bulk, import and copy (plan doc-mvcn6c7e4e5q, V4).

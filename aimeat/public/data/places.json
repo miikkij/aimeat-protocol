@@ -213,8 +213,9 @@
           { "id": "ac-roads", "num": "08", "labelKey": "accesspage.secRoads" }
         ] },
         { "id": "exposure", "labelKey": "profile.tabs.exposure", "sections": [
-          { "id": "ex-items", "num": "01", "labelKey": "exposure.itemsTitle" },
-          { "id": "ex-notes", "num": "02", "labelKey": "exposure.notesTitle" }
+          { "id": "ex-conflicts", "num": "01", "labelKey": "exposure.cls.conflictsTitle" },
+          { "id": "ex-items", "num": "02", "labelKey": "exposure.itemsTitle" },
+          { "id": "ex-notes", "num": "03", "labelKey": "exposure.notesTitle" }
         ] }
       ] },
       { "titleKey": "profile.landing.menuInfra", "operator": true, "items": [

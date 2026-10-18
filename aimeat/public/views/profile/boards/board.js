@@ -11,6 +11,8 @@
  * @structure renderBoard · composer · rulesFold · membersBlock
  * @usage import { renderBoard } from './board.js';
  * @version-history
+ *   v1.15.0 — 2026-10-18 — The rules fold shows the board's classification, and its keeper changes it there,
+ *     while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v1.14.1 — 2026-10-18 — The notices tag in the language's plural form ("1 notice").
  *   v1.14.0 — 2026-10-18 — The first tag under a board's title is the AudienceBadge: who can read the board, in words (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.13.0 — 2026-10-02 — The question mark that explains morsels: commerce.morsels on the price TextField (components/HelpTip.js).
@@ -45,6 +47,7 @@ import { Section } from '/components/Section.js';
 import { scrollToSection } from '/components/Rail.js';
 import { c, rel, who, bid, ownerOf, standingWords, noticeRow, renderPage } from './frame.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
+import { ContainerLabel } from '/views/profile/classification/container-label.js';
 import { Hint } from '/components/Hint.js';
 import { Note } from '/components/Note.js';
 import { Mark, Marks, Label } from '/components/Mark.js';
@@ -170,6 +173,7 @@ function rulesFold(ctx, b, mine) {
     <//>
     ${mine ? html`<${Space} above="large"><${Actions}><${Loud} control disabled=${ctx.savingRules} onClick=${save}>${c('saveRules')}<//><//><//>` : null}
     ${mine && (b.visibility === 'shared' || r.visibility === 'shared') ? membersBlock(ctx, b) : null}
+    ${mine ? html`<${Split} pad="large"><${ContainerLabel} kind="board" boardId=${bid(b)} canSet showToast=${ctx.showToast} /><//>` : null}
     ${mine ? html`<${Split} above="small" pad="large"><${Actions}><${Action} small tone="danger" onClick=${remove}>${c('deleteBoard')}<//><//><//>` : null}`;
 }
 

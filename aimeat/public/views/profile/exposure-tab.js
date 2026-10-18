@@ -24,9 +24,21 @@
  *
  *   Live data by the `aimeat-live-update` event: the report is read again when something it lists
  *   changes, never on a timer.
- * @structure LEVELS · KINDS · closeOf(item) · placeOf(item) · ExposureTab (default)
+ *
+ *   CONFLICTS FIRST (plan doc-mvdipuyqraas, L4.2, L4.3). Where classification is on, the report gives
+ *   each item its classification, and the page draws it on the ClassificationBadge beside the
+ *   AudienceBadge. An item open to more people than its classification allows is a conflict: the
+ *   section Conflicts comes first, and each of its rows offers "Lower the level", which sets the
+ *   item to the widest level its classification allows (`lower_to`) through the route that changes
+ *   that item, after the site's confirm dialog. There is no "Raise the classification": a conflict
+ *   is a level too wide for its classification, and a higher classification allows fewer people, so
+ *   raising it would widen the gap. Where the item is lowered on another page (an app that needs an
+ *   access code), the row opens that page.
+ * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.3.0 — 2026-10-18 — Each item's classification beside who can read it, and the conflicts first with
+ *     "Lower the level" (plan doc-mvdipuyqraas, L4.2, L4.3).
  *   v1.2.0 — 2026-10-18 — The figures are the stacked strip (number, word and line on shared rows), and
  *     "Copy for your AI" says so in the site's toast.
  *   v1.1.0 — 2026-10-18 — From the browser check of 1c0b57fba: the list is the cut item-kind-state-doors
@@ -40,8 +52,11 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { setWorkspaceShare } from '/js/services/organisms.js';
+import { setWorkspaceShare, updateOrganism } from '/js/services/organisms.js';
 import { exposureAudienceOf } from '/js/audience.js';
+import { labelName } from '/js/services/classification.js';
+import { ClassificationBadge } from '/components/ClassificationBadge.js';
+import { Marks } from '/components/Mark.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -97,6 +112,53 @@ function closeOf(item) {
   }
 }
 
+/** A record's, a file's or a skill's stored visibility for a level the report names in `lower_to`. */
+function visibilityFor(to, skill) {
+  if (to.level === 'signed-in' || to.level === 'link') return 'members';
+  if (to.level === 'organism' && to.organism_id) return `organism:${to.organism_id}`;
+  return skill ? 'owner' : 'private';
+}
+
+/**
+ * The one press that lowers a conflict to the widest level its classification allows, or null when
+ * the item is lowered on its own page. `lower_to` is the report's (services/exposure/
+ * exposure-classification.ts lowerTo); each press is the route that changes that item, the same one
+ * `how_to_close` names.
+ */
+function lowerOf(item) {
+  const to = item.classification?.lower_to;
+  if (!item.classification?.conflict || !to) return null;
+  const id = item.id;
+  switch (item.kind) {
+    case 'memory':
+      return heldByAgent(id) ? null : () => apiPatch(`/v1/memory/${enc(id)}`, { patch: {}, visibility: visibilityFor(to) });
+    case 'file':
+      return heldByAgent(id) ? null : () => apiPatch(`/v1/storage/${keyPath(id)}/visibility`, { visibility: visibilityFor(to) });
+    case 'skill':
+      return () => apiPatch(`/v1/skills/${enc(id)}`, { visibility: visibilityFor(to, true) });
+    case 'board':
+      return () => apiPatch(`/v1/boards/${enc(id)}/visibility`, { visibility: 'private' });
+    case 'app':
+      if (to.level === 'link') return () => apiPatch(`/v1/apps/${enc(id)}`, { listing: 'unlisted' });
+      if (to.level === 'signed-in') return () => apiPatch(`/v1/apps/${enc(id)}`, { open_to: 'signed-in' });
+      return null;
+    case 'workspace_share': {
+      const [org, ws, type, ...rest] = String(id).split('/');
+      if (!org || !ws || !type || !rest.length) return null;
+      if (to.level === 'signed-in') return () => setWorkspaceShare(org, ws, { access: 'account' });
+      if (to.level === 'organism') return () => setWorkspaceShare(org, ws, { access: 'organism' });
+      return () => setWorkspaceShare(org, ws, { docs: { [`${type}/${rest.join('/')}`]: false } });
+    }
+    case 'organism': {
+      const [org, part] = String(id).split('#');
+      if (part === 'members') return () => updateOrganism(org, { member_visibility: to.level === 'signed-in' ? 'authenticated' : 'members' });
+      return () => updateOrganism(org, { visibility: 'private' });
+    }
+    default:
+      return null;
+  }
+}
+
 /**
  * The Settings page that holds the control, for a kind this page cannot close itself: the tab and
  * the key of its name. An app's open-to, listing and code are set in the App Catalog (appcat).
@@ -112,6 +174,26 @@ const PLACE = {
 
 /** A level's locale key: the report's 'signed-in' is `signedIn` in the files. */
 const levelKey = (lv) => (lv === 'signed-in' ? 'signedIn' : lv);
+
+/** A level in words, private included: the cap a classification allows, or where a conflict goes. */
+const levelWords = (lv) => (lv === 'private' ? x('cls.private') : x(`level.${levelKey(lv)}`));
+
+/** The sentence a conflict's or an exception's mark says: the classification, its cap, and the level now. */
+function capSentence(item, key) {
+  const c = item.classification;
+  return x(key, { label: labelName(c), cap: levelWords(c.max_audience), now: levelWords(item.level) });
+}
+
+/** Who can read it, and how sensitive it is: the two badges side by side. */
+function WhoCell({ item }) {
+  const c = item.classification;
+  return html`<${Cell}><${Marks}>
+    <${AudienceBadge} audience=${exposureAudienceOf(item)} />
+    ${c ? html`<${ClassificationBadge} label=${c} from=${c.from}
+      conflict=${c.conflict} conflictTitle=${c.conflict ? capSentence(item, 'cls.conflictTitle') : undefined}
+      excepted=${c.excepted} exceptedTitle=${c.excepted ? capSentence(item, 'cls.exceptedTitle') : undefined} />` : null}
+  <//><//>`;
+}
 
 function Strip({ report }) {
   const failed = report.failed.length > 0;
@@ -142,9 +224,33 @@ function ItemRow({ item, busy, onClose, onCopied }) {
     <${Row}>
       <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')}>${item.title}<//>
       <${Cell} meta>${kindWord(item.kind)}<//>
-      <${Cell}><${AudienceBadge} audience=${exposureAudienceOf(item)} /><//>
+      <${WhoCell} item=${item} />
       <${Doors}>
         ${close ? html`<${Action} small row tone="danger" disabled=${busy} onClick=${() => onClose(item, close)}>${x('closeIt')}<//>` : null}
+        ${place ? html`<${Action} small row onClick=${() => openTab(place[0])}>${x('goThere', { page: t(place[1]) })}<//>` : null}
+        ${appHref ? html`<${Action} small row href=${appHref} newTab>${x('goThere', { page: t('catalog.title') })}<//>` : null}
+        <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${x('copyForAi')}<//>
+      <//>
+    <//>`;
+}
+
+/**
+ * One conflict: what it is, the sentence that says its classification's cap, both badges, and the
+ * press that lowers it (or the page where it is lowered), with the words for the person's AI.
+ */
+function ConflictRow({ item, busy, onLower, onCopied }) {
+  const lower = lowerOf(item);
+  const place = lower ? null : PLACE[item.kind];
+  const appHref = !lower && item.kind === 'app' ? `/v1/appcat?q=${enc(item.title)}` : null;
+  const c = item.classification;
+  const forAi = x('cls.aiPrompt', { title: item.title, label: labelName(c), cap: levelWords(c.max_audience), how: item.how_to_close });
+  return html`
+    <${Row} rail="notice">
+      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')} desc=${capSentence(item, 'cls.capSentence')}>${item.title}<//>
+      <${Cell} meta>${kindWord(item.kind)}<//>
+      <${WhoCell} item=${item} />
+      <${Doors}>
+        ${lower ? html`<${Action} small row disabled=${busy} onClick=${() => onLower(item, lower)}>${x('cls.lowerIt')}<//>` : null}
         ${place ? html`<${Action} small row onClick=${() => openTab(place[0])}>${x('goThere', { page: t(place[1]) })}<//>` : null}
         ${appHref ? html`<${Action} small row href=${appHref} newTab>${x('goThere', { page: t('catalog.title') })}<//>` : null}
         <${Action} small row soft copy=${forAi} onCopied=${onCopied}>${x('copyForAi')}<//>
@@ -197,11 +303,39 @@ export default function ExposureTab({ showToast }) {
     }
   };
 
+  const onLower = (item, lower) => {
+    const to = levelWords(item.classification.lower_to.level);
+    confirm(x('cls.lowerConfirm', { title: item.title, level: to, label: labelName(item.classification) }), () => runLower(item, lower, to),
+      { title: x('cls.lowerTitle'), confirmLabel: x('cls.lowerIt') });
+  };
+
+  const runLower = async (item, lower, to) => {
+    const ref = `${item.kind}|${item.id}`;
+    setBusy(ref);
+    setMessage('');
+    try {
+      const out = await lower();
+      // Some services answer a refusal as { ok: false } rather than throwing (services/organisms.js).
+      if (out && out.ok === false) throw new Error(out.error?.message || x('cls.lowerFailed'));
+      setMessage(x('cls.lowered', { title: item.title, level: to }));
+      await load();
+    } catch (err) {
+      swallowed('exposure-tab: lower failed', err);
+      setError(err?.message || x('cls.lowerFailed'));
+    } finally {
+      setBusy('');
+    }
+  };
+
   // The site's toast after a copy, as the other copy doors say it (the link's own "✓ Copied" too).
   const copied = () => showToast?.(x('copiedForAi'));
 
   const items = report?.items ?? [];
   const total = report?.counts?.total ?? 0;
+  // Where classification is on, the conflicts come first, in a section of their own.
+  const cls = report?.classification ?? null;
+  const conflicts = items.filter((i) => i.classification?.conflict);
+  const num = (n) => String(n + (cls ? 1 : 0)).padStart(2, '0');
   return html`
     <${SettingsPage}
       crumb=${[t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.exposure')]}
@@ -214,7 +348,19 @@ export default function ExposureTab({ showToast }) {
       ${!report && !error ? html`<${Note} kind="loading">${x('loading')}<//>` : null}
       ${report ? html`
         <${Edges} report=${report} />
-        <${Section} id="ex-items" num="01" title=${x('itemsTitle')} count=${total}>
+        ${cls ? html`
+          <${Section} id="ex-conflicts" num="01" title=${x('cls.conflictsTitle')} count=${cls.conflicts} sub=${x('cls.conflictsSub')}>
+            <${List} cols="item-kind-state-doors" keepCols
+              head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
+              empty=${x('cls.conflictsEmpty')}
+              rows=${conflicts}
+              render=${(item) => html`<${ConflictRow} key=${`c|${item.kind}|${item.id}|${item.level}`} item=${item}
+                busy=${busy === `${item.kind}|${item.id}`} onLower=${onLower} onCopied=${copied} />`} />
+            ${conflicts.length < cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsHidden', { n: cls.conflicts - conflicts.length })}<//>` : null}
+            ${cls.conflicts ? html`<${Note} kind="hint">${x('cls.conflictsWhy')}<//>` : null}
+            ${cls.excepted ? html`<${Note} kind="hint">${x('cls.excepted', { n: cls.excepted })}<//>` : null}
+          <//>` : null}
+        <${Section} id="ex-items" num=${num(1)} title=${x('itemsTitle')} count=${total}>
           <${List} cols="item-kind-state-doors" keepCols
             head=${[x('colWhat'), x('colKind'), x('colWho'), '']}
             empty=${report.failed.length ? x('emptyPartial') : x('empty')}
@@ -224,7 +370,7 @@ export default function ExposureTab({ showToast }) {
           ${items.length < total ? html`<${Note} kind="hint">${x('countedNotListed', { n: total - items.length })}<//>` : null}
           <${Note} kind="hint">${x('askYourAi')}<//>
         <//>
-        <${Section} fold id="ex-notes" num="02" title=${x('notesTitle')} sub=${x('notesSub')}>
+        <${Section} fold id="ex-notes" num=${num(2)} title=${x('notesTitle')} sub=${x('notesSub')}>
           ${report.notes.map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
         <//>` : null}
     <//>`;
