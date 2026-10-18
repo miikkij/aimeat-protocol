@@ -9,6 +9,8 @@
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-10-18 — A visually hidden ": " between the headline and its count, so a screen reader says
+ *     "What is open: 10" instead of "What is open10"; nothing changes on the screen.
  *   2026-10-11 — `ends` (with the default, `band` and `group` cuts): the section shows where it
  *     stops, more air under its body and before what follows (Jouni, 2026-10-11: sections on a
  *     long page ran into each other); additive, first used by the home's agent pages.
@@ -33,6 +35,12 @@ import { h } from 'preact';
 import htm from 'htm';
 
 const html = htm.bind(h);
+
+/**
+ * Said, not seen, between a headline and its count: a screen reader read "What is open10" as one
+ * word. The colon and space are visually hidden (page-base.css .visually-hidden); the look is unchanged.
+ */
+const saidApart = () => html`<span class="visually-hidden">: </span>`;
 
 /**
  * `count` wins over `num` beside the title; `first` drops the rule on top.
@@ -78,7 +86,7 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
     return html`
       <section class=${`og-sec og-sec--list${first ? ' og-sec--first' : ''}`} id=${id}>
         <div class=${`og-sec-h og-sec-h--band${folds ? ' og-sec-h--folds' : ''}${spaced ? ' og-sec-h--spaced' : ''}`} onClick=${folds ? onFold : undefined}>
-          <h2 class="poster-section-title"><span>${title}</span>${count !== null && count !== undefined && count !== '' ? html`<small>${count}</small>` : null}</h2>
+          <h2 class="poster-section-title"><span>${title}</span>${count !== null && count !== undefined && count !== '' ? html`<small>${saidApart()}${count}</small>` : null}</h2>
           ${folds ? html`<button type="button" class=${`og-sec-fold${folded ? ' og-sec-fold--shut' : ''}`} aria-expanded=${folded ? 'false' : 'true'}
             aria-label=${foldLabel} title=${foldLabel} onClick=${(e) => { e.stopPropagation(); onFold(e); }}>▼</button>` : null}
         </div>
@@ -92,7 +100,7 @@ export function PageSection({ id, num, title, count, doors, first, plain, band, 
   return html`
     <section class=${`og-sec${first ? ' og-sec--first' : ''}${group ? ' og-sec--group' : ''}${ends ? ' og-sec--ends' : ''}`} id=${id}>
       <div class=${band || group ? 'og-sec-h og-sec-h--band' : 'og-sec-h'}>
-        <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${count}</small>` : html`<small>${num}</small>`}</h2>
+        <h2 class="poster-section-title">${title}${count !== null && count !== undefined ? html`<small>${saidApart()}${count}</small>` : html`<small>${num}</small>`}</h2>
         ${doors ? html`<div class="og-doors">${doors}</div>` : null}
       </div>
       ${children}
