@@ -112,13 +112,13 @@
       "digest": "sha256:0616f65dadb980487d16a50a"
     },
     "node:aimeat-app-builder": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/services/node-templates.ts",
         "aimeat/src/services/app-spec-gate.ts"
       ],
-      "digest": "sha256:a2ad997c2c2fa2963d71770b",
+      "digest": "sha256:1ceef6c22f4bc674f2887fa2",
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
@@ -378,14 +378,14 @@
       "digest": "sha256:30db4fa9b91cb702b8fbb38a"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:7107f05b3945d1064f6ad7c0",
+      "digest": "sha256:5e69b70471eb13d0b3d4b9e2",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -432,12 +432,12 @@
       "digest": "sha256:e85afc8e3cb9f610c0140d11"
     },
     "project:aimeat-app-building": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/services/build-app-layers.ts",
         "aimeat/src/routes/app-templates.ts"
       ],
-      "digest": "sha256:27b14f85ebba7bd1cc99ee51"
+      "digest": "sha256:e4aaa83addb7f75e5b29bd76"
     },
     "project:aimeat-design-language": {
       "reviewedOn": "2026-10-16",
@@ -526,7 +526,7 @@
       "aimeat/src/services/app-publish-next-steps.ts": "9754eccc2c25fb6f"
     },
     "node:aimeat-app-builder": {
-      "aimeat/src/services/build-app-layers.ts": "396ea813d4abb404",
+      "aimeat/src/services/build-app-layers.ts": "dab09d22f4255723",
       "aimeat/src/services/node-templates.ts": "bcf0b92f35579c1e",
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
@@ -642,7 +642,7 @@
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
-      "aimeat/src/services/build-app-layers.ts": "396ea813d4abb404",
+      "aimeat/src/services/build-app-layers.ts": "dab09d22f4255723",
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85"
     },
     "project:aimeat-design-language": {
@@ -755,7 +755,7 @@
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "0db9f1cfe9b9c080",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
-      "aimeat/src/routes/odata.ts": "29300210ceeea2c6"
+      "aimeat/src/routes/odata.ts": "408c9159bd3b8250"
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
