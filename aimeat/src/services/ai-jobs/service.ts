@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.10.1 — 2026-10-18 — The job record is stored once the answer is written, so result_version
+ *     survives a restart during on_done and ctx.ai.result still reads the answer after it.
  *   v1.10.0 — 2026-10-18 — `readResult`, the service side of `ctx.ai.result(job_id)`: an extension
  *     reads the answer of a job it started, which `on_done` also receives in its input. The job keeps
  *     the version of the record it wrote (`result_version`), and writes the answer on the version it
@@ -376,7 +378,10 @@ export class AiJobService implements AiJobStarter {
 
             const written = await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
             // Before the callback, so readResult already hands the answer to the on_done action.
+            // Stored too, not only kept in this process: a restart during on_done folds the stored
+            // record into the log, and ctx.ai.result reads the answer from there.
             entry.job = { ...entry.job, result_version: written.version };
+            await writeJob(this.storage, entry.job);
 
             // The callback, and the reason a green job can still be a failure. See on-done.ts.
             if (entry.job.on_done) {
@@ -606,9 +611,14 @@ export class AiJobService implements AiJobStarter {
             if (!job) { await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId); continue; }
 
             if (job.state === 'running') {
+                // With result_version the answer was written and only the on_done action was cut
+                // off: the answer stays readable (ctx.ai.result), so the message must not say lost.
+                const message = job.result_version !== undefined
+                    ? 'The node restarted while this job\'s on_done action was running. The answer was written and can be read; the action did not finish.'
+                    : 'The node restarted while this job was running, so its answer was lost. Start it again.';
                 await foldIntoLog(this.storage, {
                     ...job, state: 'failed', finished_at: new Date().toISOString(),
-                    error: { code: 'node_restarted', message: 'The node restarted while this job was running, so its answer was lost. Start it again.' },
+                    error: { code: 'node_restarted', message },
                 });
                 await removeFromActiveIndex(this.storage, this.config.nodeId, ref.jobId);
                 failed++;
