@@ -21,6 +21,8 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   2026-10-18 -- A held-names refusal now says how to decide, so the two CONFLICT checks match the
+ *     code rather than the whole answer (plan doc-mvdipuyqraas, L5).
  *   2026-10-16 -- The header counts 73 repository interfaces (it said 44). What a list returns, compared as a
  *     sequence, is in storage-conformance-lists.test.ts (QA audit P4-09).
  *   v1.21.0 -- 2026-10-09 -- deleteAgent takes the agent's connections, the delegations over them and
@@ -1528,8 +1530,8 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft(value?.bindings_left, `${name}: a binding that names nothing now is not listed as a gate that lets everything pass`)
                 .toContainEqual({ hook: 'pre_work_request', ref: `act-g-${tag}#${gone}`, gate: true });
             expect.soft((await openHeldNamesIncident(config, storage)).id, `${name}: a second start opened a second incident`).toBeUndefined();
-            expect.soft(await resolveSecurityIncident(storage, config, id), `${name}: the incident closed with names undecided`).toEqual({ ok: false, code: 'CONFLICT' });
-            expect.soft(await deleteSecurityIncident(storage, config, id), `${name}: the incident was deleted with names undecided`).toEqual({ ok: false, code: 'CONFLICT' });
+            expect.soft(await resolveSecurityIncident(storage, config, id), `${name}: the incident closed with names undecided`).toMatchObject({ ok: false, code: 'CONFLICT' });
+            expect.soft(await deleteSecurityIncident(storage, config, id), `${name}: the incident was deleted with names undecided`).toMatchObject({ ok: false, code: 'CONFLICT' });
 
             // A: it is the holder's.
             const ra = await resolveHeldName(config, storage, { incidentId: id, name: A, resolution: 'holder' });
