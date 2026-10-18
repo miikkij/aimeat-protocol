@@ -12,7 +12,7 @@
  *   await AIMEAT.storage.upload(file); await AIMEAT.storage.download('key');
  * @version-history
  *   v1.5.0 — 2026-10-18 — upload() and uploadChunked() take opts.nodeDefault: with no visibility named,
- *     they send none and the node applies its starting level for an app's upload (plan
+ *     they send visibility 'default' and the node applies its starting level for an app's upload (plan
  *     doc-mvcn6c7e4e5q, V5.2). Without it, an upload with no visibility is still sent as private.
  *   2026-10-16 — A failed abort after a failed chunked upload is logged, not swallowed (QA audit W25 ratchet).
  *   v1.4.0 — 2026-10-16 — uploadChunked aborts its upload on the node when a chunk or the complete
@@ -43,14 +43,15 @@ import { attach } from '../_core/namespace.js';
  */
 /**
  * The visibility an upload sends: the one the app named, else 'private'. With opts.nodeDefault true
- * and none named, it sends none, and the node applies its own starting level for an app's upload
- * (visibility.app_upload_default). AIMEAT.assets.upload uses that for a game's pictures and sounds.
+ * and none named, it sends 'default', and the node applies its own starting level for an app's
+ * upload (visibility.app_upload_default). AIMEAT.assets.upload uses that for a game's pictures and
+ * sounds.
  * @param {any} opts
- * @returns {string|undefined}
+ * @returns {string}
  */
 function levelOf(opts) {
   if (opts && opts.visibility) return opts.visibility;
-  return opts && opts.nodeDefault === true ? undefined : 'private';
+  return opts && opts.nodeDefault === true ? 'default' : 'private';
 }
 
 function binding(opts) {

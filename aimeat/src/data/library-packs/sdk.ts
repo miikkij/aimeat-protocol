@@ -290,7 +290,7 @@ export const SDK_PACKS: LibraryPack[] = [
     apiSurface: 'AIMEAT.storage',
     aiDoc: 'File upload/download, chunked upload, drag & drop helper. Cross-user image display: upload with visibility "public" and reference /v1/pub/<owner-ghii>/<key> — publicUrl() returns an owner-auth URL that will NOT load for other users. Never embed images as base64 in memory values. AIMEAT.storage.viewUrl(address) returns a URL that loads in an <img> for a file that is not public; it takes a full URL, a /v1/pub/ path, a "<gaii>/<key>" reference as ctx.files.write() and the agent file tools return it, or a bare key of the signed-in person. Call it when you draw the picture: the URL expires. After a re-upload to the same key, point at the upload answer\'s versioned_url, which changes on every write. A team file is stored for the people who share an organism workspace: upload(file, { visibility: "workspace", workspace_ref: "<organismId>/<workspaceId>" }) (or workspaceRefs: [...] for several); a group file: { visibility: "group", group_id }. uploadChunked() takes the same options. Without the workspace the node refuses a "workspace" file.',
     changelog: [
-      { version: '1.5.0', date: '2026-10-18', summary: 'upload() and uploadChunked() take nodeDefault: true, which sends no visibility when none is named, so the node applies its level for an app\'s upload. Without it an upload with no visibility is still private.' },
+      { version: '1.5.0', date: '2026-10-18', summary: 'upload() and uploadChunked() take nodeDefault: true, which sends visibility "default" when none is named, so the node applies its level for an app\'s upload. Without it an upload with no visibility is still private.' },
       { version: '1.3.0', date: '2026-09-29', summary: 'upload() and uploadChunked() send the workspace or group a file is shared with: visibility "workspace" with workspace_ref "<organismId>/<workspaceId>" (or workspaceRefs), visibility "group" with group_id. They used to drop it, so a workspace file was refused.' },
       { version: '1.2.0', date: '2026-09-13', summary: 'viewUrl() reads a "<gaii>/<key>" reference as an owner and a key, so a picture an agent uploaded opens for its owner instead of answering 404. Upload answers carry versioned_url.' },
     ],
@@ -522,7 +522,7 @@ export const SDK_PACKS: LibraryPack[] = [
       'Load order: aimeat-auth and aimeat-data before this library when the manifest lives in memory; without them the library works from an inline manifest only.',
     ].join('\n'),
     changelog: [
-      { version: '1.2.0', date: '2026-10-18', summary: 'upload() sends a visibility only when you name one. Without it the node stores the file at its level for an app\'s upload, public unless the operator chose otherwise, and the library warns when the file did not land public. Name visibility: "public" to be sure.' },
+      { version: '1.2.0', date: '2026-10-18', summary: 'upload() sends visibility "default" when you name none, and the node stores the file at its level for an app\'s upload, public unless the operator chose otherwise, and the library warns when the file did not land public. Name visibility: "public" to be sure.' },
       { version: '1.0.0', date: '2026-09-02', summary: 'Initial: manifest, library, upload, packAtlas, sound export, texts, preview (wish-aimeat-assets-and-game-programme). Shown working on the Design Book\'s Phaser page.' },
     ],
     demoTemplateId: undefined,

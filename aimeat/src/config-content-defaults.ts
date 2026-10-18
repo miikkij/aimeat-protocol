@@ -25,6 +25,7 @@
  *   import { contentDefaults } from './config-content-defaults.js';
  *   const config = { ...contentDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-10-18 — defaultAppUploadVisibility answers only `visibility: 'default'`; an upload with no visibility keeps the file default for every caller.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V5.1-V5.6, V5.8).
  */
 
@@ -50,11 +51,15 @@ export type DefaultDatapackageVisibility = typeof CONTENT_DEFAULT_VALUES.datapac
 export interface ContentDefaultsConfig {
   /** A memory record written without a visibility (POST/PATCH /v1/memory, bulk, aimeat_memory_write). Code default private. */
   defaultMemoryVisibility: DefaultMemoryVisibility;
-  /** A stored file uploaded without a visibility, by anyone but an app grant. Code default private. */
+  /**
+   * A stored file uploaded without a visibility, by any caller, and one uploaded with
+   * `visibility: 'default'` by anyone but an app grant. Code default private.
+   */
   defaultFileVisibility: DefaultFileVisibility;
   /**
-   * A stored file an app grant uploads without a visibility. Code default public: AIMEAT.assets.upload
-   * sent 'public' itself until V5.2, and an asset a player cannot read draws nothing.
+   * A stored file an app grant uploads with `visibility: 'default'`, the word AIMEAT.assets.upload
+   * sends when the app names none. Code default public: the library sent 'public' itself until V5.2,
+   * and an asset a player cannot read draws nothing.
    */
   defaultAppUploadVisibility: DefaultAppUploadVisibility;
   /** A board created without a visibility. Code default public, what AIMEAT.social.createBoard sent. */

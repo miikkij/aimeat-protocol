@@ -11,8 +11,9 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
- *   2026-10-18 — POST /v1/storage without a visibility takes visibility.file_default, or for an app grant
- *     visibility.app_upload_default (plan V5.2); the presigned mint decides it in the shared write.
+ *   2026-10-18 — POST /v1/storage (inline, raw body, presigned) without a visibility takes
+ *     visibility.file_default; `visibility: 'default'` (the SDK's word) takes visibility.app_upload_default
+ *     for an app grant and the file default for anyone else (plan V5.2), before validation and the gate.
  *   2026-10-18 — POST /v1/storage (inline, raw body and presigned) and PATCH /v1/storage/{key}/visibility
  *     ask the publish gate (services/storage-file-publish.ts; plan doc-mvcn6c7e4e5q, V4): a file made
  *     public by a caller the node asks the owner about keeps the level it had (a new one: private) and
@@ -155,7 +156,7 @@ import { readerFor as contentReaderFor } from '../services/classification/reader
 import { fileTarget } from '../services/classification/labels.js';
 import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
-import { fileVisibilityDefault, isAppGrantRoles } from '../services/content-defaults.js';
+import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
 
 /** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
 const INLINE_MAX_BYTES = 32 * 1024;
@@ -269,8 +270,11 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         let provenance: StorageProvenanceInput & { wireBlock?: unknown } = { actor: gaii, scopes: req.auth!.scopes, pipeline: 'rest.storage' };
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: v, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef, workspace_refs: reqWorkspaceRefs } = req.body ?? {};
+            const { key: k, visibility: asked, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef, workspace_refs: reqWorkspaceRefs } = req.body ?? {};
             federateFlag = reqFederate === true;
+            // The node's starting level (plan V5.2), before anything reads the level: 'default' (the
+            // SDK's word) is the app-upload default for an app grant; none at all is the file default.
+            const v = uploadVisibilityOf(config, asked as string | undefined, isAppGrantRoles(req.auth!.roles));
             const stated = storageProvenanceFromBody(req.body, gaii, 'rest.storage', req.auth!.scopes);
             if (!stated.ok) {
                 res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', 'The ai_provenance block does not validate.', undefined, { violations: stated.violations }));
@@ -317,8 +321,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 return;
             }
             key = k;
-            // No visibility named: the node's starting level (plan V5.2), an app grant's own one for an app.
-            visibility = v ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
+            visibility = v;
             groupId = visibility === 'group' ? reqGroupId : undefined;
             // A 'workspace' file that names no workspace is refused by the shared write below, which
             // is also where the raw-body branch meets the same rule.
@@ -328,7 +331,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         } else {
             // Raw body upload
             key = req.query.key as string ?? `file-${Date.now()}`;
-            visibility = req.query.visibility as string ?? fileVisibilityDefault(config, isAppGrantRoles(req.auth!.roles));
+            visibility = uploadVisibilityOf(config, req.query.visibility as string | undefined, isAppGrantRoles(req.auth!.roles));
             const chunks: Buffer[] = [];
             for await (const chunk of req) {
                 chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);

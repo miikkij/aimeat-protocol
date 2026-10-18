@@ -738,6 +738,21 @@ components:
           enum: [private, owner, group, workspace, members, public]
         - $ref: '#/components/schemas/OrganismVisibility'
 
+    UploadVisibility:
+      description: >
+        The level of an uploaded file: any StoredFileVisibility, or `default`, which asks for the
+        node's starting level and is mapped before validation and before the publish gate. `default`
+        is `visibility.app_upload_default` (AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY, public unless the
+        operator chose otherwise) for an app grant and `visibility.file_default`
+        (AIMEAT_DEFAULT_FILE_VISIBILITY) for anyone else; AIMEAT.assets.upload sends it when the app
+        names no level. Omitted entirely, the file gets `visibility.file_default` (private unless the
+        operator chose otherwise), for every caller. Only the upload routes and the presigned mint take
+        `default`.
+      oneOf:
+        - $ref: '#/components/schemas/StoredFileVisibility'
+        - type: string
+          enum: [default]
+
     DisputeEventType:
       type: string
       enum: [dispute_opened, counter_dispute, message, re_delivery, accept_redelivery, withdraw_dispute, accept_fault, partial_offer, partial_accepted, partial_rejected, escalated, operator_ruled, timeout_resolved]
@@ -24463,7 +24478,7 @@ paths:
                   items:
                     type: string
                 visibility:
-                  $ref: '#/components/schemas/StoredFileVisibility'
+                  $ref: '#/components/schemas/UploadVisibility'
                 workspace_refs:
                   description: 'For `visibility: workspace` — one or more `<organismId>/<workspaceId>`.'
                   oneOf:
@@ -25266,7 +25281,7 @@ paths:
                     `upload_url`, `upload_method`, `content_type`, `max_size_bytes` and
                     `expires_in_seconds`.
                 visibility:
-                  $ref: '#/components/schemas/StoredFileVisibility'
+                  $ref: '#/components/schemas/UploadVisibility'
                 group_id:
                   type: string
                   description: Sharing group ID (required when visibility is 'group')
@@ -25308,7 +25323,7 @@ paths:
                 key:
                   type: string
                 visibility:
-                  $ref: '#/components/schemas/StoredFileVisibility'
+                  $ref: '#/components/schemas/UploadVisibility'
                 group_id:
                   type: string
                   description: Sharing group ID (required when visibility is 'group')
@@ -30669,7 +30684,7 @@ paths:
                 chunk_size:
                   type: integer
                 visibility:
-                  $ref: '#/components/schemas/StoredFileVisibility'
+                  $ref: '#/components/schemas/UploadVisibility'
                 total_chunks:
                   type: integer
                 group_id:

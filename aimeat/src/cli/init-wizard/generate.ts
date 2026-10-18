@@ -92,7 +92,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_PUBLISH_GATE', comment: 'Who asks the owner before making something public: off | agents | agents-and-apps' },
         { key: 'AIMEAT_DEFAULT_MEMORY_VISIBILITY', comment: 'An entry saved with no level: private | owner | members' },
         { key: 'AIMEAT_DEFAULT_FILE_VISIBILITY', comment: 'A file uploaded with no level: private | owner | members' },
-        { key: 'AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY', comment: 'A file an app uploads with no level: public | private | owner | members' },
+        { key: 'AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY', comment: 'A file an app uploads with visibility "default" (the asset library): public | private | owner | members' },
         { key: 'AIMEAT_DEFAULT_BOARD_VISIBILITY', comment: 'A board created with no level: public | private' },
         { key: 'AIMEAT_DEFAULT_ORGANISM_VISIBILITY', comment: 'An organism created with no level: public | listed | private' },
         { key: 'AIMEAT_DEFAULT_SHARE_ACCESS', comment: 'A workspace first shared with no access: open | account | organism' },

@@ -153,7 +153,7 @@
         "aimeat/src/static/sdk-libs/phaser/assets.js",
         "aimeat/src/static/sdk-libs/assets"
       ],
-      "digest": "sha256:add04c923acbd88516aab0d5"
+      "digest": "sha256:171faa791b541f1ad35db784"
     },
     "node:aimeat-phaser-saves": {
       "reviewedOn": "2026-09-19",
@@ -552,7 +552,7 @@
       "aimeat/src/static/sdk-libs/assets/preview.js": "84cff76abb12a292",
       "aimeat/src/static/sdk-libs/assets/sound.js": "27807ae3b0e5256b",
       "aimeat/src/static/sdk-libs/assets/texts.js": "5693f84c7d86493d",
-      "aimeat/src/static/sdk-libs/assets/upload.js": "d1e8d2539d36869f"
+      "aimeat/src/static/sdk-libs/assets/upload.js": "ba3420a13813c330"
     },
     "node:aimeat-phaser-saves": {
       "aimeat/src/static/sdk-libs/phaser/save.js": "423e7f284289c0dc"
