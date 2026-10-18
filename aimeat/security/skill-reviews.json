@@ -302,7 +302,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:7f57aea9adaf8afd0211b570"
+      "digest": "sha256:48b66899636de21b0b9278f8"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-18",
@@ -339,7 +339,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:28938c468226f8f8cb15f1bd"
+      "digest": "sha256:3f134e87de098dd75a2a6a74"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-18",
@@ -389,7 +389,7 @@
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
-      "reviewedOn": "2026-10-12",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/services/ai/capabilities.ts",
         "aimeat/src/services/ai-embed.ts",
@@ -397,7 +397,7 @@
         "aimeat/src/static/sdk-libs/ai/index.js",
         "aimeat/src/services/ai-jobs/ext-capability.ts"
       ],
-      "digest": "sha256:d69beca32c17c758bd59892c"
+      "digest": "sha256:6755bbcd8d8eb137c30c7701"
     },
     "node:use-app-bound-skills": {
       "reviewedOn": "2026-10-18",
@@ -470,7 +470,7 @@
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:193246f6af0273a51b0d492a"
+      "digest": "sha256:1f0f1b6c40fc39b5da57ac87"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -659,7 +659,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "ba558088830eb13c",
-      "aimeat/src/services/build-extension-prompt.ts": "3b937c3c781dd61d"
+      "aimeat/src/services/build-extension-prompt.ts": "8f1b9a82cee850e8"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -693,7 +693,7 @@
       "aimeat/src/services/ai-embed.ts": "1f5aa10952622806",
       "aimeat/src/services/app-ai-capability-hints.ts": "3a684ecb1285421d",
       "aimeat/src/static/sdk-libs/ai/index.js": "09556928446b7c7b",
-      "aimeat/src/services/ai-jobs/ext-capability.ts": "7899a2526e2df8ba"
+      "aimeat/src/services/ai-jobs/ext-capability.ts": "262ac35f448cc87e"
     },
     "node:aimeat-refinery": {
       "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
@@ -720,8 +720,8 @@
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "3b937c3c781dd61d",
-      "aimeat/src/services/extension-ctx-contract.ts": "62a541dd3db3a02a",
+      "aimeat/src/services/build-extension-prompt.ts": "8f1b9a82cee850e8",
+      "aimeat/src/services/extension-ctx-contract.ts": "a072f7eef334ecf9",
       "aimeat/src/services/extension-manifest.ts": "9a9178947db5f3fe",
       "aimeat/src/routes/extensions/paywall.ts": "e93944dd10ba1fb2",
       "aimeat/src/routes/extensions/crud.ts": "d9197a969e9160e8",
@@ -760,7 +760,7 @@
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
       "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
-      "aimeat/src/services/extension-ctx-contract.ts": "62a541dd3db3a02a",
+      "aimeat/src/services/extension-ctx-contract.ts": "a072f7eef334ecf9",
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/services/workspace-rows/row-service.ts": "436bea50a33f2989",
       "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
