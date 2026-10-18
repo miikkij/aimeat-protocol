@@ -37,7 +37,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:461569dadd555501b8c0aa4b"
+      "digest": "sha256:3cfa1c0a1b12c28b8b5743ee"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -222,7 +222,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:67898b30c8e6a0239033d444"
+      "digest": "sha256:daa32ca557873a1eca9d5bd5"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-08",
@@ -263,7 +263,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:ade587c90bf215b4442b6551"
+      "digest": "sha256:6556b86776e20e4d9f908996"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-12",
@@ -591,7 +591,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "4738119e3505b76f",
+      "aimeat/src/routes/agents/device-auth.ts": "93d655f5fdc45cb3",
       "aimeat/src/routes/ghii/register-login.ts": "5f61c62761b5e510",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -610,10 +610,10 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "4738119e3505b76f",
+      "aimeat/src/routes/agents/device-auth.ts": "93d655f5fdc45cb3",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "3b7a3b4ae645a502",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "51c1a333fe0addcd",
       "aimeat/src/data/basic-agents.ts": "24d901efdc265451"
     },
     "node:set-up-content-pipeline": {
@@ -673,7 +673,7 @@
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "985289110e69d190",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
-      "aimeat/src/routes/agents-v2/agent-proposals.ts": "3b7a3b4ae645a502",
+      "aimeat/src/routes/agents-v2/agent-proposals.ts": "51c1a333fe0addcd",
       "aimeat/src/services/schedule-write.ts": "39fccaf66cdad7fe"
     },
     "node:aimeat-decide": {
