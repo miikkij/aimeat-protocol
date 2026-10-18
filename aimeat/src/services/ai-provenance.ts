@@ -677,7 +677,7 @@ export const INFERRED_FROM_PRINCIPAL_NOTE =
   + 'rather than as human-written; an agent relaying text a person wrote can say so explicitly.';
 
 /** A GAII (`agent#owner@node`) or a GEAI (`eco:app#owner@node`) — anything that is not a person. */
-function isNonHumanPrincipal(principal: string): boolean {
+export function isNonHumanPrincipal(principal: string): boolean {
   return isGEAI(principal) || parseGAII(principal) !== null;
 }
 

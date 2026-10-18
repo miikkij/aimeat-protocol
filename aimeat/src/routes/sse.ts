@@ -14,6 +14,10 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   v1.8.0 -- 2026-10-18 -- A workspace's own domain, `workspace:<organismId>/<ws>`
+ *     (services/event-bus.ts emitWorkspaceChange), goes only to the streams of that organism's
+ *     members, so an open workspace page re-reads when its workspace changed and not on every memory
+ *     write on the node (wish-reaaliaikainen-tapahtuma-kertoo-mink-ty-tilan-tieto-muuttui).
  *   v1.7.0 -- 2026-10-18 -- Every stream opens with `event: hello` carrying the build, so an open SPA
  *     page reloads after a restart on new code without asking /v1/build on a timer. A ticket may
  *     follow one app (`{ app: "owner/filename" }`): the stream then carries that app's `event: app`
@@ -67,6 +71,8 @@ import { BUILD_ID } from './portal-spa.js';
 import { resolveIdentity, localAccountName, runAsNode } from '../utils/gaii.js';
 import { presence } from '../services/presence.js';
 import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-domain-scopes.js';
+import { isOrganismMember, type AudienceAuth } from '../services/audience.js';
+import { logger } from '../utils/logger.js';
 
 interface Ticket {
   sub: string;
@@ -90,6 +96,11 @@ interface Ticket {
   app?: AppStreamTopic;
   /** Opened without an account: counted against the visitor caps, carries no domain at all. */
   visitorIp?: string;
+  /**
+   * Who opened the stream, as services/audience.ts asks it: a workspace's domain goes only to the
+   * streams of that organism's members. Frozen at mint time with the rest, from `req.auth`.
+   */
+  audience?: AudienceAuth;
 }
 
 const tickets = createSingleUseTicketStore<Ticket>();
@@ -106,6 +117,9 @@ const visitorStreamsByIp = new Map<string, number>();
 
 /** A draft written in many small saves is told at most once a second, like the domain frames. */
 const DRAFT_COALESCE_MS = 1000;
+
+/** How long one stream trusts its answer to "is this account a member of that organism". */
+const MEMBERSHIP_TTL_MS = 30_000;
 
 export function sseRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -130,6 +144,7 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       presenceGhii: resolveIdentity(req.auth!, config.nodeId),
       allow: owner ? null : allowedDomains(req.auth!.scopes),
       presenceEligible: owner && !app,
+      audience: { sub: req.auth!.sub, owner: req.auth!.owner, anonymous: req.auth!.anonymous, federated: req.auth!.federated },
       ...(app ? { app } : {}),
     }, 30_000);
     res.json(success(config.nodeId, { ticket, expires: 30 }));
@@ -276,14 +291,8 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     // The bus calls this as whoever emitted the event, which in a process that serves more than one
     // node can be another node. So it runs as THIS node, and matches the owner for the node that
     // opened the stream. A production process serves one node, so nothing there changes.
-    const handler = (evt: ChangeEvent): void => runAsNode(config.nodeId, () => {
-      // Owner-private events for a different owner are not this client's business.
-      if (evt.ownerGaii && localAccountName(evt.ownerGaii) !== ownerKey) return;
-      // Scope gate: a restricted principal (app grant, agent, eco app) is told only about the
-      // domains its granted scopes cover. The payload is just a domain name, but the name plus
-      // its timing is metadata the owner never consented to hand this app.
-      if (!filterDomains([evt.domain], t.allow).length) return;
-      pending.add(evt.domain);
+    const queue = (domain: string): void => {
+      pending.add(domain);
       if (trailingTimer) return; // a flush is already scheduled; it covers this event
       const since = Date.now() - lastSent;
       if (since >= COALESCE_MS) {
@@ -291,6 +300,35 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       } else {
         trailingTimer = setTimeout(() => { trailingTimer = null; flushChange(); }, COALESCE_MS - since);
       }
+    };
+    // 3. MEMBERS ONLY — a workspace's domain names the workspace, so it goes to the streams of the
+    //    organism's members alone. The answer is kept for a short while per organism: a busy
+    //    workspace changes many times a second and the membership does not.
+    const membership = new Map<string, { member: boolean; at: number }>();
+    const isMember = async (organismId: string): Promise<boolean> => {
+      const known = membership.get(organismId);
+      if (known && Date.now() - known.at < MEMBERSHIP_TTL_MS) return known.member;
+      // An unreadable membership tells this stream nothing about the workspace, and says so in the log.
+      const member = await isOrganismMember(storage, organismId, t.audience).catch((err: unknown) => {
+        logger.warn('sse: organism membership unread, the workspace event is not sent to this stream', { organismId, error: String(err) });
+        return false;
+      });
+      membership.set(organismId, { member, at: Date.now() });
+      return member;
+    };
+    const handler = (evt: ChangeEvent): void => runAsNode(config.nodeId, () => {
+      // Owner-private events for a different owner are not this client's business.
+      if (evt.ownerGaii && localAccountName(evt.ownerGaii) !== ownerKey) return;
+      // Scope gate: a restricted principal (app grant, agent, eco app) is told only about the
+      // domains its granted scopes cover. The payload is just a domain name, but the name plus
+      // its timing is metadata the owner never consented to hand this app.
+      if (!filterDomains([evt.domain], t.allow).length) return;
+      if (evt.organismId) {
+        const organismId = evt.organismId;
+        void isMember(organismId).then(member => { if (member) runAsNode(config.nodeId, () => queue(evt.domain)); });
+        return;
+      }
+      queue(evt.domain);
     });
     // A stream opened for one app, or by a visitor, carries no domain frame: the page that holds it
     // listens for its app and the build, and the domains are the business of the signed-in shell.

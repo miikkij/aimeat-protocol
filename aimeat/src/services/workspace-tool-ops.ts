@@ -30,6 +30,8 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-18 — A draft write tells the workspace's live domain (services/event-bus.ts
+ *     emitWorkspaceChange); a publish tells it through emitMemoryWritten.
  *   2026-10-18 — publishWorkspaceOp and publishRecordsBatchOp take a space by its name as well as its
  *     namespace (resolveSpaceNamespace), as the write op does, before the role check and the fence.
  *   2026-10-16 — An HTML page (a document value with `html`) is checked and given its text before the
@@ -127,7 +129,7 @@ import { loadWorkspaceContent } from './workspace-content.js';
 import type { ContentReader } from './classification/reader.js';
 import { warningFieldSnake } from './classification-exits.js';
 import { readStoredSections } from './workspace-sections.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, emitWorkspaceChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
 import { normalizeWriteItems, resolveWriteItem, resolveSpaceNamespace, type ResolvedWriteItem } from './workspace-write-items.js';
@@ -494,6 +496,7 @@ export async function writeWorkspaceDraftsOp(
         written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null, ...(filing ? { section_filing: filing } : {}), version: outcome.version });
     }
     emitChange('organisms');
+    emitWorkspaceChange(organismId, ws);
     const echo = await writeProvenanceEcho(storage, config, lastProvenanceId);
     return { ok: true, data: batch ? { count: written.length, items: written, ...echo } : { ...written[0], ...echo } };
 }
