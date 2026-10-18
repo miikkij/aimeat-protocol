@@ -26,6 +26,8 @@
  * @structure RuleHit · REGEX_TEXT · ruleApplies() · matchRules() · resetRegexBudgets()
  * @usage const hit = matchRules(policy, target, text); if (hit) await setLabel(deps, ruleActor, target, { label: hit.label });
  * @version-history
+ *   v1.4.0 — 2026-10-18 — A container (organism, workspace, board, app) is matched only by a rule
+ *     whose appliesTo.kinds names it, on its name and description (plan doc-mvdipuyqraas, L1.6).
  *   v1.3.0 — 2026-10-05 — The budget of personal content is its owner's, whichever agent holds it,
  *     and the node has a cap of its own (NODE_MS_PER_MINUTE): an owner with many agents multiplied
  *     the budget (secaudit 2026-10, DATA-1).
@@ -121,10 +123,15 @@ export function resetRegexBudgets(): void {
   scopeSpent.clear();
 }
 
+/** The containers, which a rule matches only when its scope names them (defaults.ts RuleScope). */
+const CONTAINERS: ReadonlySet<string> = new Set(['organism', 'workspace', 'board', 'app']);
+
 /** Whether `rule` applies to `target` at all, before its pattern is tried. */
 export function ruleApplies(rule: ClassificationRule, target: ContentLabelTarget): boolean {
   if (!rule.enabled || rule.kind === 'classifier') return false;
   const s = rule.appliesTo;
+  // A container's name and description meet only a rule written for that kind of container.
+  if (CONTAINERS.has(target.kind)) return !!s?.kinds?.includes(target.kind) && (!s.organismId || scopeOrganism(target.scope) === s.organismId);
   if (!s) return true;
   if (s.kinds?.length && !s.kinds.includes(target.kind)) return false;
   if (s.organismId && scopeOrganism(target.scope) !== s.organismId) return false;

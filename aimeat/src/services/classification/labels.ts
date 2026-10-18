@@ -36,14 +36,27 @@
  *   justification being demanded, and accepts a suggestion that lowers one; each such lowering is
  *   recorded in the exceptions list (exceptions.ts) with the app and the act as its reason. An AI
  *   credential keeps every refusal it had.
- * @structure ClassificationError · LabelActor · labelActorOf() · isOwnerPerson() · isAppActor() ·
- *   appNameOf() · documentKeyOf() · memoryTarget() · labelAddressOf() · documentContentKeys() ·
- *   fileTarget() · fileAddressOf() · rowTarget() · setLabel() · reviewLabel() · labelsFor() · targetOf() ·
- *   readContentLabel() · labelForException()
+ *
+ *   CONTAINERS (plan doc-mvdipuyqraas, L1). An organism, a workspace, a board and an app carry a
+ *   label with the same row, history, source, lock and rules as content; containers.ts says where it
+ *   is stored and who may read or set it, and the label read reports the content's EFFECTIVE label
+ *   beside its own (effective.ts): the highest of its own and its containers'.
+ *
+ *   The shared shapes (ClassificationError, LabelActor, …) live in label-core.ts and the label
+ *   address and batch read (memoryTarget, labelsFor, …) in label-rows.ts; this file re-exports them.
+ * @structure labelActorOf() · fileTarget() · fileAddressOf() · rowTarget() · setLabel() · reviewLabel() ·
+ *   targetOf() · readContentLabel() · labelForException(); re-exported: ClassificationError ·
+ *   ClassificationDeps · LabelActor · isOwnerPerson() · isAppActor() · appNameOf() · documentKeyOf() ·
+ *   memoryTarget() · labelAddressOf() · documentContentKeys() · labelsFor() · targetId()
  * @usage
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.9.0 — 2026-10-18 — Container labels (plan doc-mvdipuyqraas, L1.1-L1.3): targetOf takes kind
+ *     organism, workspace, board and app; assertMayLabel hands a container to containers.ts; the
+ *     label read carries `effective` ({ label, from }); an exception is refused for a container. The
+ *     shared shapes moved to label-core.ts and the address and batch read to label-rows.ts
+ *     unchanged (the 800-line limit), re-exported here.
  *   v1.8.2 — 2026-10-13 — The organism namespace rule is asked with the actor's scopes, which the
  *     fenced-space rule reads (services/fenced-space.ts; a session that covers organism:direct
  *     writes a record space that names extensions directly, ruled 2026-10-13).
@@ -78,9 +91,9 @@
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage, ContentLabelRow, ContentLabelTarget, ContentLabelKind } from '../../storage/interface.js';
+import type { Storage, ContentLabelRow, ContentLabelTarget } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { isSameOwner, isForeignPrincipal, isOwnerInPerson, callerPrincipal, localAccountOf, isGEAI, ownerGhiiOf } from '../../utils/gaii.js';
+import { isSameOwner, isForeignPrincipal, callerPrincipal, localAccountOf, isGEAI, ownerGhiiOf } from '../../utils/gaii.js';
 import { agentBarred } from '../organism-agent-access.js';
 import { decideWorkspaceRead } from '../workspace-access.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
@@ -93,41 +106,20 @@ import { audienceCheck } from './audience.js';
 import { recordClassificationAudit } from './audit.js';
 import { emitChange } from '../event-bus.js';
 import { recordAutoException } from './exceptions.js';
+import {
+  ClassificationError, isAppActor, isOwnerPerson, appNameOf, rolesOf, type ClassificationDeps, type LabelActor,
+} from './label-core.js';
+import { currentRow, labelAddressOf, memoryTarget, targetId } from './label-rows.js';
+import {
+  assertMayLabelContainer, containerTargetOf, isContainerKind, resolveContainer, CONTAINER_KINDS,
+} from './containers.js';
+import { effectiveLabels, type EffectiveLabel } from './effective.js';
+
+export { ClassificationError, isAppActor, isOwnerPerson, appNameOf, type ClassificationDeps, type LabelActor } from './label-core.js';
+export { documentKeyOf, memoryTarget, labelAddressOf, documentContentKeys, labelsFor, targetId } from './label-rows.js';
 
 /** How many changes a label row keeps; the oldest go first (TARGET-082 review finding 7). */
 const HISTORY_MAX = 50;
-
-export class ClassificationError extends Error {
-  constructor(public code: string, public status: number, message: string) {
-    super(message);
-    this.name = 'ClassificationError';
-  }
-}
-
-export interface ClassificationDeps {
-  storage: Storage;
-  config: Pick<AimeatConfig, 'classificationMode' | 'nodeId'>;
-  /** ISO time; injectable for tests. */
-  now?: () => string;
-}
-
-/** Who is labelling. `rule` is the node's own detection, never a caller. */
-export interface LabelActor {
-  principal: string;
-  ownerGhii: string;
-  ownerName: string | null;
-  kind: 'human' | 'ai' | 'rule';
-  /** The node's own classifier (classifier.ts): it labels any scope, as a rule does, but an AI's
-   *  label still follows the AI rules. No request can set it. */
-  nodeOwn?: boolean;
-  /** The credential's roles, for the organism namespace rule. Absent: read from `kind`. */
-  roles?: string[];
-  /** An app credential's app id (`owner/file.html`), named in the exceptions it records. */
-  app?: string;
-  /** The credential's granted words, for the node level: something acting for the operator passes
-   *  only on "operator:admin" (askOperator in services/operator-principal.ts). */
-  scopes?: string[];
-}
 
 /** The actor behind a request. A visitor from another node labels nothing here. */
 export function labelActorOf(
@@ -143,95 +135,6 @@ export function labelActorOf(
     scopes: [...(auth.scopes ?? [])],
     ...(auth.roles.includes('app') && auth.app ? { app: auth.app } : {}),
   };
-}
-
-/** The suffixes a workspace document or an organism record is stored under besides its bare key. */
-const COPY_SUFFIX = /^(organism\.[^.]+\.(.+))\.(?:draft|latest|version\.\d+)$/;
-const COPY_ROLE = /^(?:draft|latest|version\.\d+)$/;
-
-/**
- * The one label address of a workspace document or an organism record (decided 2026-09-30): its key
- * without the `.draft`, `.latest` or `.version.N` suffix the workspace stores its copies under
- * (services/workspace-write.ts deleteWorkspaceInstance names the same family). A label set on any
- * copy is the document's, so publishing never makes an unlabelled copy. The address needs a
- * namespace and an instance before the suffix: `organism.<id>.w.<ws>.<ns>.<instance>` in a
- * workspace, `organism.<id>.<ns>.<instance>` outside one. Any other key is its own address.
- */
-export function documentKeyOf(key: string): string {
-  const m = COPY_SUFFIX.exec(key);
-  if (!m) return key;
-  const rest = m[2]!.split('.');
-  return rest.length >= (rest[0] === 'w' ? 4 : 2) ? m[1]! : key;
-}
-
-/** A memory key's label address: an organism key belongs to the organism, whoever wrote it, and a
- *  document's copies share the document's address (documentKeyOf). */
-export function memoryTarget(ownerGaii: string, key: string): ContentLabelTarget {
-  if (key.startsWith('organism.')) {
-    const id = key.split('.')[1];
-    if (id) return { kind: 'memory', scope: `organism:${id}`, key: documentKeyOf(key) };
-  }
-  return { kind: 'memory', scope: ownerGaii, key };
-}
-
-/**
- * A target as its label address: an organism memory key named by one of its copies' keys (a queued
- * item or a caller that built the target itself) is moved to the document's address.
- */
-export function labelAddressOf(t: ContentLabelTarget): ContentLabelTarget {
-  if (t.kind !== 'memory' || !scopeOrganism(t.scope)) return t;
-  const key = documentKeyOf(t.key);
-  return key === t.key ? t : { ...t, key };
-}
-
-/**
- * The memory keys a document's current content is stored under (the bare key, `.latest`, `.draft`),
- * for a reader of its text such as the classifier's queue; any other key is only itself.
- */
-export function documentContentKeys(key: string): string[] {
-  const doc = documentKeyOf(key);
-  if (!doc.startsWith('organism.') || documentKeyOf(`${doc}.latest`) !== doc) return [key];
-  return [doc, `${doc}.latest`, `${doc}.draft`];
-}
-
-/**
- * The key prefix under which a document address's copies carried labels of their own before a
- * document had one address, or null when the target is not a document address.
- */
-function copyPrefixOf(t: ContentLabelTarget): string | null {
-  if (t.kind !== 'memory' || !scopeOrganism(t.scope)) return null;
-  return documentKeyOf(`${t.key}.latest`) === t.key ? `${t.key}.` : null;
-}
-
-/** Is this stored row a label a copy of the document at `prefix` carried under its own key? */
-const isCopyRow = (row: ContentLabelRow, prefix: string) => row.key.startsWith(prefix) && COPY_ROLE.test(row.key.slice(prefix.length));
-
-/** The strictest of a document's rows: the highest rank in the policy, a person's label on a tie. */
-function strictestRow(policy: ClassificationPolicy, rows: ContentLabelRow[]): ContentLabelRow | null {
-  let best: ContentLabelRow | null = null;
-  const rank = (r: ContentLabelRow) => labelById(policy, r.label)?.rank ?? -1;
-  for (const r of rows) {
-    if (!best || rank(r) > rank(best) || (rank(r) === rank(best) && r.locked && !best.locked)) best = r;
-  }
-  return best;
-}
-
-/**
- * The row a target's label is read from and written over. For a document address it is the
- * strictest of the document's own row and the rows its copies carried under their own keys before
- * (so nothing already labelled reads weaker), moved to the document address; `stale` names the copy
- * rows, which the next write folds away so the document keeps one row.
- */
-async function currentRow(storage: Storage, policy: ClassificationPolicy, target: ContentLabelTarget): Promise<{ row: ContentLabelRow | undefined; stale: ContentLabelTarget[] }> {
-  const own = await storage.getContentLabel(target);
-  const prefix = copyPrefixOf(target);
-  if (!prefix) return { row: own, stale: [] };
-  const copies = (await storage.getContentLabelsUnder(target.kind, target.scope, [prefix])).filter(r => isCopyRow(r, prefix));
-  if (!copies.length) return { row: own, stale: [] };
-  const best = strictestRow(policy, own ? [own, ...copies] : copies)!;
-  const suggestion = best.suggestion ?? [own, ...copies].find(r => r?.suggestion)?.suggestion ?? null;
-  const row: ContentLabelRow = { ...best, id: own?.id ?? randomUUID(), key: target.key, suggestion, history: [...best.history] };
-  return { row, stale: copies.map(r => ({ kind: r.kind, scope: r.scope, key: r.key })) };
 }
 
 /**
@@ -267,28 +170,14 @@ export function rowTarget(organismId: string, ws: string, space: string, rowId: 
   return { kind: 'row', scope: `organism:${organismId}`, key: `${ws}/${space}/${rowId}` };
 }
 
-/** The credential's roles, or the ones its kind implies when the actor was built without them. */
-function rolesOf(actor: LabelActor): string[] {
-  return actor.roles ?? (actor.kind === 'human' ? ['owner'] : ['agent']);
-}
-
-/** Is this the account holder in their own session (not an agent, an app or an ecosystem app)? */
-export function isOwnerPerson(actor: LabelActor): boolean {
-  // labelActorOf refuses a visitor from another node, so the roles are the whole question here.
-  return actor.kind === 'human' && isOwnerInPerson({ roles: rolesOf(actor) });
-}
-
 /**
- * Is this an app credential (a hosted app's grant, read as the person's screen)? An app does what it
- * is built for, and an act against a label is recorded as an exception rather than refused (decided
- * 2026-09-30). An AI credential (agent, ecosystem app, PAT, unattended run) never is one.
+ * The label address of what a caller named: a board gets its owner's scope (containers.ts), a file
+ * shared into a workspace the organism's address (fileAddressOf), and a document's copy the
+ * document's (labelAddressOf). An address already resolved comes back as it was.
  */
-export function isAppActor(actor: LabelActor): boolean {
-  return actor.kind === 'human' && rolesOf(actor).includes('app');
+async function addressOf(storage: Storage, named: ContentLabelTarget): Promise<ContentLabelTarget> {
+  return labelAddressOf(await fileAddressOf(storage, await resolveContainer(storage, named)));
 }
-
-/** How an app is named in the exceptions it records. */
-export const appNameOf = (actor: LabelActor): string => actor.app ?? actor.principal;
 
 /**
  * The memory key the organism namespace rule reads for a target, and its workspace. A row lives in
@@ -315,10 +204,12 @@ const NOT_A_READER = 'No such content, or you may not read the workspace or the 
  * that plus the namespace rule's WRITE answer to change it; content outside a workspace needs the
  * rule's read or write answer (the organism's meta namespace is written by its creator and admins).
  * An ecosystem app also needs its owner-granted data area for the key (ecoMayReadKey, ecoMayWriteKey).
- * Every refusal is the same 404, so it does not say whether the content exists.
+ * Every refusal is the same 404, so it does not say whether the content exists. A container's label
+ * follows the container rules instead (containers.ts assertMayLabelContainer).
  */
 async function assertMayLabel(deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget, mode: 'read' | 'write'): Promise<void> {
   if (actor.kind === 'rule' || actor.nodeOwn) return;
+  if (isContainerKind(target.kind)) return assertMayLabelContainer(deps, actor, target, mode);
   const owner = scopeOwner(target.scope);
   if (owner) {
     if (isSameOwner(owner, actor.ownerGhii)) return;
@@ -442,7 +333,7 @@ export async function setLabel(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget, input: SetLabelInput,
   opts: { via?: 'review' } = {},
 ): Promise<SetLabelResult> {
-  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
+  const target = await addressOf(deps.storage, named);
   const justification = trimmed(input.justification, 'justification', 2000);
   const humanSaid = trimmed(input.humanSaid, 'humanSaid', 2000);
   const reason = trimmed(input.reason, 'reason', 1000);
@@ -564,7 +455,7 @@ export async function reviewLabel(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
   input: { decision: 'accept' | 'reject'; justification?: string | null; humanSaid?: string | null },
 ): Promise<SetLabelResult> {
-  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
+  const target = await addressOf(deps.storage, named);
   const humanSaid = trimmed(input.humanSaid, 'humanSaid', 2000);
   if (actor.kind === 'rule' || (actor.kind === 'ai' && !humanSaid)) {
     throw new ClassificationError('PERSON_REQUIRED', 403, 'A person reviews a suggestion. An AI relays their decision with their own words in humanSaid.');
@@ -604,45 +495,9 @@ export async function reviewLabel(
 }
 
 /**
- * The effective label of each target: its row, or the policy's default. One query per kind+scope,
- * and one more for an organism's document addresses: a document reads as the strictest of its own
- * row and the rows its copies carried under their own keys before (currentRow).
+ * What a caller names: a memory key, a stored file, a row of a row space, or a container (an
+ * organism by organism_id, a workspace by organism_id and ws, a board by board_id, an app by `app`).
  */
-export async function labelsFor(
-  storage: Storage, policy: ClassificationPolicy, targets: ContentLabelTarget[],
-): Promise<Map<string, { label: string; row: ContentLabelRow | null }>> {
-  // `keys` are the caller's keys; each is read at its label address (labelAddressOf) and answered
-  // under the caller's own target id.
-  const groups = new Map<string, { kind: ContentLabelKind; scope: string; keys: string[] }>();
-  for (const t of targets) {
-    const g = `${t.kind}\u0000${t.scope}`;
-    const cur = groups.get(g) ?? { kind: t.kind, scope: t.scope, keys: [] };
-    cur.keys.push(t.key);
-    groups.set(g, cur);
-  }
-  const out = new Map<string, { label: string; row: ContentLabelRow | null }>();
-  for (const g of groups.values()) {
-    const addr = (k: string) => labelAddressOf({ kind: g.kind, scope: g.scope, key: k });
-    const rows = await storage.getContentLabels(g.kind, g.scope, g.keys.map(k => addr(k).key));
-    const byKey = new Map(rows.map(r => [r.key, r]));
-    const prefixes = new Map<string, string>();
-    for (const k of g.keys) {
-      const p = copyPrefixOf(addr(k));
-      if (p) prefixes.set(k, p);
-    }
-    const copyRows = prefixes.size ? await storage.getContentLabelsUnder(g.kind, g.scope, [...new Set(prefixes.values())]) : [];
-    for (const k of g.keys) {
-      const own = byKey.get(addr(k).key) ?? null;
-      const p = prefixes.get(k);
-      const copies = p ? copyRows.filter(r => isCopyRow(r, p)) : [];
-      const row = copies.length ? strictestRow(policy, own ? [own, ...copies] : copies) : own;
-      out.set(targetId({ kind: g.kind, scope: g.scope, key: k }), { label: row?.label ?? policy.defaultLabel, row });
-    }
-  }
-  return out;
-}
-
-/** What a caller names as the content: a memory key, a stored file, or a row of a row space. */
 export interface TargetInput {
   kind?: unknown;
   key?: unknown;
@@ -650,6 +505,9 @@ export interface TargetInput {
   ws?: unknown;
   space?: unknown;
   row_id?: unknown;
+  board_id?: unknown;
+  /** kind app: the filename of the caller's hosted app, or the name of their ecosystem app. */
+  app?: unknown;
   /**
    * For memory and files: whose namespace holds it, when that is not the owner's own. The owner
    * names one of their agents (`claude#alice@node`) or ecosystem apps (`eco:drum#alice@node`) to
@@ -683,30 +541,44 @@ export function targetOf(actor: LabelActor, input: TargetInput): ContentLabelTar
   if (kind === 'memory') return memoryTarget(holderOf(actor, input.owner), s(input.key, 'key'));
   if (kind === 'file') return fileTarget(holderOf(actor, input.owner), s(input.key, 'key'));
   if (kind === 'row') return rowTarget(s(input.organism_id, 'organism_id'), s(input.ws, 'ws'), s(input.space, 'space'), s(input.row_id, 'row_id'));
-  throw new ClassificationError('INVALID_INPUT', 400, 'kind is memory, file or row.');
+  if (isContainerKind(kind)) return containerTargetOf(actor, kind, input);
+  throw new ClassificationError('INVALID_INPUT', 400, `kind is memory, file, row, ${CONTAINER_KINDS.join(', ')}.`);
 }
 
 export interface LabelView {
   target: ContentLabelTarget;
+  /** The label set on this content itself, or the policy's default. */
   label: string;
   /** The label's own fields, from the policy that applies to this content. */
   labelDetail: ClassificationLabel | null;
+  /**
+   * What the content effectively carries: the highest of its own label and its containers'
+   * (effective.ts), and where that came from. The reader, the federation exit and the exposure
+   * report decide on this one.
+   */
+  effective: EffectiveLabel & { labelDetail: ClassificationLabel | null };
   source: ContentLabelRow['source'];
   locked: boolean;
   suggestion: ContentLabelRow['suggestion'];
   history: ContentLabelRow['history'];
 }
 
-/** The label a piece of content carries, with its waiting suggestion and its last changes. */
+/** The label a piece of content carries, with its effective label, its waiting suggestion and its last changes. */
 export async function readContentLabel(deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget): Promise<LabelView> {
-  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
+  const target = await addressOf(deps.storage, named);
   await assertMayLabel(deps, actor, target, 'read');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row } = await currentRow(deps.storage, policy, target);
   const label = row?.label ?? policy.defaultLabel;
   await assertInsideCurrent(deps, actor, target, labelById(policy, label));
+  const eff = (await effectiveLabels(deps.storage, policy, [target])).get(targetId(target));
+  // currentRow folds a document's older copy rows in; the effective label takes the stricter of the two.
+  const effective: EffectiveLabel = !eff || (labelById(policy, label)?.rank ?? -1) >= (labelById(policy, eff.label)?.rank ?? -1)
+    ? { label, from: 'own' } : { label: eff.label, from: eff.from };
   return {
-    target, label, labelDetail: labelById(policy, label) ?? null, source: row?.source ?? 'default',
+    target, label, labelDetail: labelById(policy, label) ?? null,
+    effective: { ...effective, labelDetail: labelById(policy, effective.label) ?? null },
+    source: row?.source ?? 'default',
     locked: !!row?.locked, suggestion: row?.suggestion ?? null, history: (row?.history ?? []).slice(-10),
   };
 }
@@ -719,7 +591,11 @@ export async function readContentLabel(deps: ClassificationDeps, actor: LabelAct
 export async function labelForException(
   deps: ClassificationDeps, actor: LabelActor, named: ContentLabelTarget,
 ): Promise<{ target: ContentLabelTarget; label: string; labelDetail: ClassificationLabel | null }> {
-  const target = labelAddressOf(await fileAddressOf(deps.storage, named));
+  // An exception lets one item through; a container is no item. Its label is changed with set.
+  if (isContainerKind(named.kind)) {
+    throw new ClassificationError('INVALID_INPUT', 400, `An exception is made for one item of content. The classification of a ${named.kind} is changed with set, by its owner or, for an organism, its creator or an admin.`);
+  }
+  const target = await addressOf(deps.storage, named);
   await assertMayLabel(deps, actor, target, 'write');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row } = await currentRow(deps.storage, policy, target);
@@ -727,9 +603,4 @@ export async function labelForException(
   const labelDetail = labelById(policy, label) ?? null;
   await assertInsideCurrent(deps, actor, target, labelDetail ?? undefined);
   return { target, label, labelDetail };
-}
-
-/** The map key labelsFor answers under. */
-export function targetId(t: ContentLabelTarget): string {
-  return `${t.kind}\u0000${t.scope}\u0000${t.key}`;
 }

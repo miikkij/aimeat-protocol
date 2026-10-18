@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.35.0 -- 2026-10-18 -- Classified content: an organism, a workspace, a board and an app carry a
+ *     classification, and `get` answers the effective one (plan doc-mvdipuyqraas, L1).
  *   v1.34.0 -- 2026-10-18 -- Adult status, subscriptions, provenance in exported files (Comicland v3).
  *   v1.33.0 -- 2026-10-18 -- Making something public may wait for the owner: publish_request and
  *     aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.6).
@@ -109,7 +111,10 @@ came with, so the file says how it was made wherever it goes.
 
 **Classified content — read the warning, respect what is hidden.** Every memory record, stored file
 and workspace row has a classification (public, internal, confidential, highly confidential, or a
-level your owner or an organism added) that decides which people and which AI may read it. By
+level your owner or an organism added) that decides which people and which AI may read it. An
+organism, a workspace, a board and an app have one too, and what they hold reads at least as strict
+(\`get\` answers \`effective\` and where it came from; name one with \`kind\` organism, workspace,
+board or app). By
 default you see everything: no default classification hides content from you, and confidential and
 highly confidential records reach you with \`classification_warning\`: use them only for the task
 you were given, and copy them nowhere else. Your owner or an organism may choose a classification

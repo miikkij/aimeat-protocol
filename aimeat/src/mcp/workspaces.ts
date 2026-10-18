@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-18 — aimeat_workspace_update: a new name meets the detection rules written for
+ *     workspaces (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   2026-10-18 — aimeat_workspace_share asks the publish gate with the session's caller: opening the
  *     share to anyone with the link answers `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — aimeat_workspace_share runs setWorkspaceShareOp (services/workspace-share.ts), the code
@@ -190,6 +192,8 @@ import { buildOrganismOverview, buildWorkspaceOverview } from '../services/struc
 import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
+import { workspaceTarget } from '../services/classification/containers.js';
+import { classifyContainerAfterWrite } from '../services/classify-on-write.js';
 import { writeWorkspaceRecord, deleteWorkspaceInstance } from '../services/workspace-write.js';
 import { workspaceCallerOf, readWorkspaceOp, writeWorkspaceDraftsOp, publishWorkspaceOp, type WorkspaceOpsCaller } from '../services/workspace-tool-ops.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
@@ -528,6 +532,8 @@ export function registerWorkspaceTools(
                     memberChanges: member_changes,
                 });
                 emitChange('organisms');
+                // A new name meets the detection rules written for workspaces (plan doc-mvdipuyqraas, L1.6).
+                if (result.name) classifyContainerAfterWrite({ storage, config }, workspaceTarget(organism_id, ws), result.name);
                 void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(err => { logger.warn('async: timeline best-effort', { error: String(err) }); });
                 return ok(result);
             } catch (e) {

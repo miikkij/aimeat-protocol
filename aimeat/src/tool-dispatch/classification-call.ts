@@ -17,6 +17,8 @@
  * @structure classificationCall
  * @usage return envelopeResult(await classificationCall(client, args));
  * @version-history
+ *   v1.3.0 — 2026-10-18 — get, set and review pass board_id and app for a container (plan
+ *     doc-mvdipuyqraas, L1.5); exception_set passes the content fields only.
  *   v1.2.0 — 2026-09-30 — exception_list → GET /v1/classification/exceptions (exception_action as
  *     the `action` query parameter), exception_set → POST /v1/classification/exceptions
  *     (exception_action as `action` in the body).
@@ -42,7 +44,9 @@ function q(v: unknown): string | number | undefined {
     return typeof v === 'string' || typeof v === 'number' ? v : undefined;
 }
 
-const TARGET = ['kind', 'key', 'organism_id', 'ws', 'space', 'row_id', 'owner'];
+/** What names one item of content (exception_set), and content or a container (get, set, review). */
+const CONTENT_TARGET = ['kind', 'key', 'organism_id', 'ws', 'space', 'row_id', 'owner'];
+const TARGET = [...CONTENT_TARGET, 'board_id', 'app'];
 
 /** `human_said` under the name the REST bodies read. */
 function humanSaid(input: Input): Input {
@@ -64,6 +68,7 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
             return client.get(`/v1/classification/label${query({
                 kind: q(input.kind), key: q(input.key), organism_id: q(input.organism_id),
                 ws: q(input.ws), space: q(input.space), row_id: q(input.row_id), owner: q(input.owner),
+                board_id: q(input.board_id), app: q(input.app),
             })}`);
         case 'set':
             return client.put('/v1/classification/label', {
@@ -115,7 +120,7 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
         case 'exception_set':
             // The node refuses an AI credential with PERSON_REQUIRED; the same answer as the node MCP.
             return client.post('/v1/classification/exceptions', {
-                ...pick(input, [...TARGET, 'reason', 'until']),
+                ...pick(input, [...CONTENT_TARGET, 'reason', 'until']),
                 ...(input.exception_action !== undefined && input.exception_action !== null ? { action: input.exception_action } : {}),
             });
         default:

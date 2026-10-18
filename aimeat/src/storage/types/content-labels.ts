@@ -12,19 +12,27 @@
  *              workspace key (whoever wrote the record, the label belongs to the organism's key);
  *     file   — scope is the owner identity, key is the storage key;
  *     row    — scope is `organism:<id>`, key is `<ws>/<space>/<rowId>`.
+ *   A CONTAINER carries a label of its own, the floor for everything in it (plan doc-mvdipuyqraas, L1):
+ *     organism  — scope is `organism:<id>`, key is the organism id;
+ *     workspace — scope is `organism:<id>`, key is the workspace id;
+ *     board     — scope is the board's owner identity, key is the board id (a post is read as
+ *                 `<boardId>/<postId>` under its board and never stored);
+ *     app       — scope is the owner GHII, key is the app's slug (utils/gaii.ts appSlug).
  *   `ownerGaii` names the person whose content it is, for erasure; it is null on organism content,
  *   which goes with the organism.
  * @structure ContentLabelKind · ContentLabelSource · ContentLabelSuggestion · ContentLabelEvent ·
  *   ContentLabelRow · ContentLabelTarget · ContentLabelListQuery
  * @usage import type { ContentLabelRow } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-10-18 — The container kinds organism, workspace, board and app (plan
+ *     doc-mvdipuyqraas, L1.1). The column is text in both providers, so no migration.
  *   v1.1.0 — 2026-09-30 — A suggestion carries the person's words an AI relayed (humanSaid) and the
  *     justification that came with them, for the PERSON_APPROVES suggestion (TARGET-082).
  *   v1.0.0 — 2026-09-29 — TARGET-082 V1. Initial.
  */
 
-/** What a label points at. */
-export type ContentLabelKind = 'memory' | 'file' | 'row';
+/** What a label points at: content (memory, file, row) or a container of content. */
+export type ContentLabelKind = 'memory' | 'file' | 'row' | 'organism' | 'workspace' | 'board' | 'app';
 
 /**
  * Who set the label. `human` is a person on their own screen; `human-via-ai` is an AI relaying a

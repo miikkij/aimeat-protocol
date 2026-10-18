@@ -13,6 +13,7 @@
  *   6. the reach gate counts the reads it missed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-exits-review.test.ts
  * @version-history
+ *   2026-10-18 — A left_out entry carries `from` (plan doc-mvdipuyqraas, L1.3).
  *   2026-10-16 — The auth fixtures carry `scopes`, as every real token does: the by-identity read now asks the caller for memory:read (QA audit S3-03), and an owner fixture without the field was not a token the node issues.
  *   v1.2.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so each test still proves what a hiding label does.
@@ -151,7 +152,7 @@ describe('TARGET-082 review: what leaves, and what the answer says stayed', () =
         const body = await (await call('GET', '/v1/memory/export', 'owner')).json() as { data: { entries: Array<{ key: string }>; left_out?: unknown[]; count: number } };
         expect(body.data.entries.map(e => e.key)).toEqual(['notes.mine']);
         expect(body.data.count).toBe(1);
-        expect(body.data.left_out).toEqual([{ key: ORG_KEY, label: 'sisainen', reason: expect.stringContaining('may not leave its organism') }]);
+        expect(body.data.left_out).toEqual([{ key: ORG_KEY, label: 'sisainen', from: 'own', reason: expect.stringContaining('may not leave its organism') }]);
       });
 
       // Decided by Jouni 2026-09-30: the GDPR export is the person's legal right to their own data,

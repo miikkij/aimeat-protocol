@@ -25,9 +25,17 @@
  *   Who a share or an organism belongs to: an organism counts for the people who hold it
  *   (services/organism-ownership.ts); a workspace share for its workspace's creator and for the
  *   organism's creator, owners and admins, because each of them can close it.
+ *
+ *   EACH PLACE NAMES ITS CLASSIFICATION ADDRESS (`content`): the app, the board, the organism, and
+ *   for a workspace share the workspace. The report passes it through the caller's reader, so a
+ *   place whose classification (its own, or for a workspace its organism's) hides it from this
+ *   caller is counted and not listed (plan doc-mvdipuyqraas, L1.3).
  * @structure appSource · workspaceShareSource · organismSource · boardSource · portfolioSource · companySource
  * @usage import { appSource } from './sources-places.js';
  * @version-history
+ *   v1.2.0 — 2026-10-18 — An app, a board, an organism and a workspace share carry their container's
+ *     classification address, so the report decides them on the effective label (plan
+ *     doc-mvdipuyqraas, L1.3).
  *   v1.1.0 — 2026-10-18 — The welcome page and a company front page are counted at the level their
  *     `access` names (signed-in or one organism), not always public (V3.10).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
@@ -45,8 +53,9 @@ import { companyAddress } from '../company/company-service.js';
 import { listPublishedMembers } from '../portfolio-members.js';
 import { portfolioSwitchState } from '../portfolio-config.js';
 import { pageAccessLevel } from '../page-access.js';
+import { appTarget, boardTarget, organismTarget, workspaceTarget } from '../classification/containers.js';
 import {
-  type ExposureContext, type ExposureItem, type ExposureLevel, type ExposureSource,
+  type ExposureContext, type ExposureFound, type ExposureItem, type ExposureLevel, type ExposureSource,
   levelOfVisibility, ownerIdentities,
 } from './exposure-types.js';
 
@@ -81,10 +90,10 @@ export const appSource: ExposureSource = {
       open.push({ filename: app.filename, title: typeof name === 'string' && name ? name : app.filename, ...lv });
     }
     const urls = await resolveAppUrls(ctx.config, ctx.storage, open.map(a => ({ owner: ownerName, filename: a.filename })));
-    return open.map(({ filename, title, ...lv }): ExposureItem => {
+    return open.map(({ filename, title, ...lv }): ExposureFound => {
       const url = urls[`${ownerName}/${filename}`];
       return {
-        kind: 'app', id: filename, title, ...lv, ...(url ? { url } : {}),
+        kind: 'app', id: filename, title, ...lv, ...(url ? { url } : {}), content: appTarget(ownerGhii, filename),
         how_to_close: lv.level === 'public'
           ? `Take it off every list with aimeat_app_manage (action "settings", listing "unlisted"), and choose who may open it there: open_to "signed-in" or "organism:<id>", or an access_code (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`
           : `Choose who may open it with aimeat_app_manage (action "settings"): open_to "organism:<id>" for one organisation, or an access_code so only people with the code open it (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`,
@@ -139,7 +148,7 @@ function servedByShare(ctx: ExposureContext, orgId: string, ws: string): Promise
 export const workspaceShareSource: ExposureSource = {
   kind: 'workspace_share',
   async list(ctx, ownerName, ownerGhii) {
-    const out: ExposureItem[] = [];
+    const out: ExposureFound[] = [];
     for (const { org, role } of await organismsOf(ctx, ownerName, ownerGhii)) {
       const manager = role === 'creator' || role === 'admin' || isOrganismOwner(org, ownerName);
       const regs = await ctx.memo(`regs:${org.id}`, () => workspaceRegistrations(ctx.storage, org.id));
@@ -152,7 +161,7 @@ export const workspaceShareSource: ExposureSource = {
           out.push({
             kind: 'workspace_share', id: `${org.id}/${ws}/${p.type}/${p.id}`,
             title: `${org.name} / ${wsName}: ${p.title}`, level: served.level,
-            url: `${ctx.base}${publicViewerPath(org.id, ws, p.type, p.id)}`,
+            url: `${ctx.base}${publicViewerPath(org.id, ws, p.type, p.id)}`, content: workspaceTarget(org.id, ws),
             how_to_close: `Stop sharing it with aimeat_workspace_share (organism_id "${org.id}", ws "${ws}", space "${p.type}", id "${p.id}", shared false), or PUT /v1/organisms/${enc(org.id)}/workspace/share?ws=${enc(ws)} with {"docs":{"${p.type}/${p.id}":false}}.`,
           });
         }
@@ -165,19 +174,20 @@ export const workspaceShareSource: ExposureSource = {
 export const organismSource: ExposureSource = {
   kind: 'organism',
   async list(ctx, ownerName, ownerGhii) {
-    const out: ExposureItem[] = [];
+    const out: ExposureFound[] = [];
     for (const { org } of await organismsOf(ctx, ownerName, ownerGhii)) {
       if (!isOrganismOwner(org, ownerName)) continue;
       if (org.visibility === 'public' || org.visibility === 'listed') {
         out.push({
           kind: 'organism', id: org.id, title: org.name, level: 'public', url: `${ctx.base}/v1/organisms/${enc(org.id)}`,
+          content: organismTarget(org.id),
           how_to_close: `Make it private with aimeat_organism_update and visibility "private" (PUT /v1/organisms/${enc(org.id)} with {"visibility":"private"}).`,
         });
       }
       if (org.memberVisibility === 'public') {
         out.push({
           kind: 'organism', id: `${org.id}#members`, title: `Who belongs to ${org.name}`, level: 'public',
-          url: `${ctx.base}/v1/organisms/${enc(org.id)}/members`,
+          url: `${ctx.base}/v1/organisms/${enc(org.id)}/members`, content: organismTarget(org.id),
           how_to_close: `Show the member list to signed-in people only with PUT /v1/organisms/${enc(org.id)} and {"member_visibility":"authenticated"}.`,
         });
       }
@@ -191,13 +201,13 @@ export const boardSource: ExposureSource = {
   async list(ctx, ownerName, ownerGhii) {
     const ids = new Set((await ownerIdentities(ctx, ownerName, ownerGhii)).all);
     const boards = await ctx.memo('boards', () => ctx.storage.listBoards());
-    const out: ExposureItem[] = [];
+    const out: ExposureFound[] = [];
     for (const b of boards) {
       if (!ids.has(b.ownerGaii)) continue;
       const lv = levelOfVisibility(b.visibility);
       if (!lv) continue;
       out.push({
-        kind: 'board', id: b.id, title: b.name, ...lv, url: `${ctx.base}/v1/boards/${enc(b.id)}/posts`,
+        kind: 'board', id: b.id, title: b.name, ...lv, url: `${ctx.base}/v1/boards/${enc(b.id)}/posts`, content: boardTarget(b),
         how_to_close: `Close it with PATCH /v1/boards/${enc(b.id)}/visibility and {"visibility":"private"}, or remove it with aimeat_board_delete.`,
       });
     }

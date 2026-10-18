@@ -18,10 +18,12 @@
  *   On a node set to show its content to its own accounts only (config contentAccess 'signed-in'),
  *   every public and link item is listed as signed-in, and the first note says why.
  *
- *   A RECORD THE CALLER MAY NOT SEE IS NOT LISTED TO THEM. Each record or file item passes the
- *   caller's classification reader before it is listed, so an AI is not handed the key of a record
- *   the person's classification hides from AI; it is counted, and `hidden_by_classification` says
- *   how many.
+ *   A RECORD THE CALLER MAY NOT SEE IS NOT LISTED TO THEM. Each record or file item, and each app,
+ *   board, organism and workspace share, passes the caller's classification reader before it is
+ *   listed, decided on its EFFECTIVE label (classification/effective.ts: its own, raised to its
+ *   workspace's, organism's, board's or app's), so an AI is not handed the key of a record the
+ *   person's classification hides from AI; it is counted, and `hidden_by_classification` says how
+ *   many.
  *   A report with every source failed is no report: exposureUnreadable() says so, and the doors
  *   answer it as a failure.
  * @structure ExposureReport · NodeExposureReport · buildExposureReport · buildNodeExposureReport ·
@@ -29,6 +31,8 @@
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.3.0 — 2026-10-18 — The places carry a classification address too, and the reader decides on
+ *     the effective label (plan doc-mvdipuyqraas, L1.3).
  *   v1.2.0 — 2026-10-18 — NODE_SIGNED_IN_NOTE says that what is made public now is saved for signed-in accounts (plan V1.6).
  *   v1.1.0 — 2026-10-18 — exposureUnreadable: every source failed is answered as a failure, not as an
  *     empty report (test/unit/node-mcp-error-flag.test.ts).

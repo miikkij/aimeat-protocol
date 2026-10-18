@@ -64,7 +64,7 @@
         "aimeat/src/services/organism-lifecycle.ts",
         "aimeat/src/services/organism-shape-apply.ts"
       ],
-      "digest": "sha256:ade712ed66c21710a2f29320",
+      "digest": "sha256:e05d8ad428afbf61288b66e4",
       "note": "The shapes table and what each makes come from organism-shapes.ts; the shape parameter, its defaults and the refusal of an unknown shape from the lifecycle service."
     },
     "node:aimeat-welcome-pages": {
@@ -305,7 +305,7 @@
       "digest": "sha256:7f57aea9adaf8afd0211b570"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -314,7 +314,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:15293ea9a8da008a841a7de9"
+      "digest": "sha256:149ebc5b5b0de5941d354d2a"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-18",
@@ -479,11 +479,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:7ba8397ea600088d33f9b534"
+      "digest": "sha256:c4bc89976e9f0d656a1ad7d2"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -663,7 +663,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "4d32f5c7c7b12200"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "e5f75254a4adb99c"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -708,13 +708,13 @@
     },
     "node:aimeat-organisms": {
       "aimeat/src/data/organism-shapes.ts": "e876d870cd931846",
-      "aimeat/src/services/organism-lifecycle.ts": "c89128b2fabeed41",
+      "aimeat/src/services/organism-lifecycle.ts": "a25a5929af42f96c",
       "aimeat/src/services/organism-shape-apply.ts": "190c0a20e5cb806c"
     },
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "4d32f5c7c7b12200",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "e5f75254a4adb99c",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
       "aimeat/src/services/agent-task-rules.ts": "920bd83aa13aebf4"

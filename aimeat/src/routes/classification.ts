@@ -18,6 +18,9 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.6.0 — 2026-10-18 — The label routes take a container: kind organism, workspace, board
+ *     (board_id) or app (`app`); GET /v1/classification/label answers `effective` (plan
+ *     doc-mvdipuyqraas, L1.5).
  *   v1.5.0 — 2026-09-30 — The exceptions list: POST, GET and DELETE /v1/classification/exceptions
  *     (services/classification/exception-admin.ts), decided by Jouni 2026-09-30.
  *   v1.4.0 — 2026-09-29 — GET /v1/classification/labels (the explorer: the classifications on the
@@ -178,6 +181,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const target = targetOf(actor, {
         kind: req.query.kind, key: req.query.key, organism_id: req.query.organism_id,
         ws: req.query.ws, space: req.query.space, row_id: req.query.row_id, owner: req.query.owner,
+        board_id: req.query.board_id, app: req.query.app,
       });
       res.json(success(config.nodeId, await readContentLabel(deps, actor, target)));
     } catch (err) { fail(res, err); }
@@ -191,6 +195,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const target = targetOf(actor, {
         kind: body.kind, key: body.key, organism_id: body.organism_id,
         ws: body.ws, space: body.space, row_id: body.row_id, owner: body.owner,
+        board_id: body.board_id, app: body.app,
       });
       const out = await setLabel(deps, actor, target, {
         // Passed as sent: the service answers 400 for a value that is not text.
@@ -210,6 +215,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const target = targetOf(actor, {
         kind: body.kind, key: body.key, organism_id: body.organism_id,
         ws: body.ws, space: body.space, row_id: body.row_id, owner: body.owner,
+        board_id: body.board_id, app: body.app,
       });
       const out = await reviewLabel(deps, actor, target, {
         decision, justification: body.justification as string | undefined, humanSaid: body.humanSaid as string | undefined,

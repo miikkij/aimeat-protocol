@@ -24,6 +24,10 @@
  *     in force for an item shows it to an AI reader ("the AI cannot send what it cannot see",
  *     decided 2026-09-30), and each such showing is audited as the exception's use; the audience
  *     rule still applies, and an anonymous reader gets nothing from it.
+ *   THE LABEL DECIDED ON IS THE EFFECTIVE ONE (plan doc-mvdipuyqraas, L1.3): the item's own label
+ *     or the default, raised to the label of its workspace, its organism, its board or its app when
+ *     that is higher (effective.ts). A refusal's audit row and a left-behind reason say "from its
+ *     workspace" (or organism, board, app) when the container's label decided.
  *   - useForAi: refuses the whole call (CLASSIFIED, naming the labels and the first keys) when any
  *     item is hidden from AI or outside its audience, whoever asked, because what reaches a model
  *     is decided by the content's label.
@@ -54,6 +58,9 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.6.0 — 2026-10-18 — decideAll decides on the effective label (effective.ts effectiveLabels,
+ *     container labels in one batch per kind and scope); a refusal and a left-behind item name the
+ *     container whose label decided, and leave() returns `from` (plan doc-mvdipuyqraas, L1.3).
  *   v2.5.1 — 2026-10-10 — useForAi() records an app's automatic 'ai-send' exception only after the
  *     refusal check passes, so a refused mixed call records none (secaudit 2026-10-10 I10).
  *   v2.5.0 — 2026-09-30 — An exception covers its item only while the item's label is no stricter
@@ -84,7 +91,8 @@ import { readerKindOf, type ReaderKind } from './reader-kind.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
 import { ownerOfScope, readLevel, readNodePolicy, scopeOrganism } from './policy.js';
 import { mergePolicy, weakerFields, type PolicyLayer } from './levels.js';
-import { ClassificationError, labelsFor, targetId } from './labels.js';
+import { ClassificationError, targetId } from './labels.js';
+import { effectiveLabels, type EffectiveFrom } from './effective.js';
 import { audienceCheck } from './audience.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
 import { activeExceptionsFor, recordAutoException, recordExceptionUse, type ClassificationException } from './exceptions.js';
@@ -123,8 +131,9 @@ export interface ContentReader {
   readonly warnings: Array<{ key: string; label: string; name: string }>;
   show<T>(items: readonly T[], targetOf: (item: T) => ContentLabelTarget | null): Promise<T[]>;
   useForAi(targets: readonly ContentLabelTarget[], use: { capability: string; model?: string }): Promise<void>;
+  /** `from` on what stayed behind: the item's own label, or the container whose label kept it. */
   leave<T>(items: readonly T[], targetOf: (item: T) => ContentLabelTarget | null, where: EgressDestination):
-    Promise<{ kept: T[]; left: Array<{ item: T; label: string; reason: string }> }>;
+    Promise<{ kept: T[]; left: Array<{ item: T; label: string; reason: string; from: EffectiveFrom }> }>;
 }
 
 interface ReaderDeps {
@@ -138,6 +147,8 @@ interface Decided {
   label: ClassificationLabel;
   /** The merged policy the label came from, for comparing it with an exception's label. */
   policy: ClassificationPolicy;
+  /** Whether the label is the item's own or one of its containers' (effective.ts). */
+  from: EffectiveFrom;
 }
 
 /**
@@ -162,31 +173,30 @@ export async function activePolicies(deps: ReaderDeps, scopes: Iterable<string>)
 }
 
 /**
- * The label of each target where classification is on, in one pass: the policies once (see
- * activePolicies), the labels in one batch per kind and scope, the scopes concurrently. A row with
- * no label of its own takes its row space's (decided 2026-09-29), addressed as the row key without
- * the row id. Off reads nothing.
+ * The EFFECTIVE label of each target where classification is on, in one pass: the policies once
+ * (see activePolicies), then per scope the content's own labels and every distinct container's in
+ * one batch per kind and scope (effective.ts effectiveLabels), the scopes concurrently. A row with
+ * no label of its own takes its row space's (decided 2026-09-29). Off reads nothing.
  */
 async function decideAll(deps: ReaderDeps, targets: ReadonlyArray<ContentLabelTarget | null>): Promise<Array<Decided | null>> {
   if (deps.config.classificationMode === 'off') return targets.map(() => null);
   const policies = await activePolicies(deps, targets.filter((t): t is ContentLabelTarget => !!t).map(t => t.scope));
   const out: Array<Decided | null> = targets.map(() => null);
-  const spaceOf = (t: ContentLabelTarget) => ({ ...t, key: t.key.split('/').slice(0, 2).join('/') });
   await Promise.all([...policies].map(async ([scope, policy]) => {
     const idx = targets.map((t, i) => (t && t.scope === scope ? i : -1)).filter(i => i >= 0);
-    const own = await labelsFor(deps.storage, policy, idx.map(i => targets[i]!));
-    const orphanRows = idx.filter(i => targets[i]!.kind === 'row' && !own.get(targetId(targets[i]!))?.row);
-    const spaces = orphanRows.length ? await labelsFor(deps.storage, policy, orphanRows.map(i => spaceOf(targets[i]!))) : new Map();
+    const eff = await effectiveLabels(deps.storage, policy, idx.map(i => targets[i]!));
     for (const i of idx) {
       const t = targets[i]!;
-      const mine = own.get(targetId(t));
-      const id = mine?.row ? mine.label : t.kind === 'row' ? (spaces.get(targetId(spaceOf(t)))?.label ?? policy.defaultLabel) : (mine?.label ?? policy.defaultLabel);
-      const label = labelById(policy, id) ?? labelById(policy, policy.defaultLabel);
-      if (label) out[i] = { target: t, label, policy };
+      const e = eff.get(targetId(t));
+      const label = labelById(policy, e?.label) ?? labelById(policy, policy.defaultLabel);
+      if (label) out[i] = { target: t, label, policy, from: e?.from ?? 'own' };
     }
   }));
   return out;
 }
+
+/** What an audit row or a refusal adds when the label came from a container, not the item itself. */
+const viaContainer = (d: Decided): string => (d.from === 'own' ? '' : ` (from its ${d.from})`);
 
 /** An item's address in the map exceptionsFor() answers: scope, kind and key. */
 const exceptionKey = (t: ContentLabelTarget) => `${t.scope}\u0000${t.kind}\u0000${t.key}`;
@@ -291,13 +301,13 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       for (let i = 0; i < items.length; i++) {
         const d = decided[i];
         if (!d) { out.push(items[i]); continue; }
-        if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', 'audience'); continue; }
+        if (!(await inside(d.label.audience, d.target.scope))) { audit(d, 'refused', `audience${viaContainer(d)}`); continue; }
         // An anonymous reader is read the strictest way, as an AI (decided 2026-09-30): nothing
         // tells who is behind it, so what the label hides from an AI does not reach it either.
         if (who.kind === 'ai' || who.kind === 'anonymous') {
           if (d.label.aiVisibility === 'hidden') {
             const aiSend = (excepted.get(exceptionKey(d.target)) ?? []).find(e => e.action === 'ai-send');
-            if (!aiSend) { audit(d, 'refused', 'hidden from AI'); continue; }
+            if (!aiSend) { audit(d, 'refused', `hidden from AI${viaContainer(d)}`); continue; }
             recordExceptionUse(aiSend, who.principal, who.kind, 'shown');
             out.push(items[i]);
             continue;
@@ -380,7 +390,7 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       const active = app ? new Map<string, ClassificationException[]>()
         : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i]));
       const kept: typeof items[number][] = [];
-      const left: Array<{ item: typeof items[number]; label: string; reason: string }> = [];
+      const left: Array<{ item: typeof items[number]; label: string; reason: string; from: EffectiveFrom }> = [];
       const appActs = new Map<string, { d: Decided; n: number }>();
       for (let i = 0; i < items.length; i++) {
         const d = decided[i];
@@ -399,12 +409,12 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
           kept.push(items[i]);
           continue;
         }
-        audit(d, 'refused', where.kind);
+        audit(d, 'refused', `${where.kind}${viaContainer(d)}`);
         left.push({
-          item: items[i], label: d.label.id,
+          item: items[i], label: d.label.id, from: d.from,
           reason: rule === 'organism'
-            ? `classified ${d.label.name.en}, which may not leave its organism. ${EXCEPTION_HINT}`
-            : `classified ${d.label.name.en}, which no AI may send out. ${EXCEPTION_HINT}`,
+            ? `classified ${d.label.name.en}${viaContainer(d)}, which may not leave its organism. ${EXCEPTION_HINT}`
+            : `classified ${d.label.name.en}${viaContainer(d)}, which no AI may send out. ${EXCEPTION_HINT}`,
         });
       }
       for (const { d, n } of appActs.values()) {

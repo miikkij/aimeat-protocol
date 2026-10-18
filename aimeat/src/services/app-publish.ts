@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-18 — A published app's name and description meet the detection rules written for apps (plan doc-mvdipuyqraas, L1.6).
  *   2026-10-18 — The board post and the public feed announce a version only when the app is really public (listed, open to anyone, no access code); the board post moved to services/app-announce.ts (Jouni's ruling, plan doc-mvcn6c7e4e5q).
  *   2026-10-18 — `publishGate`: a first publish the node's defaults make public, by a caller the owner is asked about, is stored unlisted and files a request to list it (`publishAsked`; services/app-publish-gate.ts, plan doc-mvcn6c7e4e5q V4). provenanceModelFindings moved to app-ai-model-hints.ts.
  *   2026-10-18 — The live channel hears which app got which version (emitAppVersion), so an open page of it reloads.
@@ -113,6 +114,8 @@
  *     routes/upload.ts and routes/apps/drafts.ts, which each held a partial copy of it.
  */
 import { isDeepStrictEqual } from 'node:util';
+import { classifyContainerAfterWrite } from './classify-on-write.js';
+import { appTarget } from './classification/containers.js';
 import { accountOf } from './app-members.js';
 import { effectiveDevLevel, mayAct, isSharedApp } from './app-dev-grant.js';
 import { roadmapGate, addRoadmapEntry, roadmapStamp } from './app-roadmap.js';
@@ -628,6 +631,8 @@ export async function publishApp(
     });
   });
 
+  // The detection rules written for apps read its name and description (plan doc-mvdipuyqraas, L1.6).
+  classifyContainerAfterWrite({ storage, config }, appTarget(ownerGhii, filename), String(manifest.name || filename), manifest.description);
   // The dependency map follows the bytes: what this version loads and calls, read from the source
   // just stored, replaces whatever the previous version had. Best-effort, the publish stands.
   await refreshAppDependencies(storage, { ownerName, filename, versionNumber: newVersion, mimeType, data, manifest })

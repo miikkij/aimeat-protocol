@@ -17675,7 +17675,7 @@ paths:
         - { name: organism_id, in: query, schema: { type: string } }
         - { name: label, in: query, schema: { type: string }, description: Only items with this label id. }
         - { name: pending, in: query, schema: { type: boolean, default: false } }
-        - { name: kind, in: query, schema: { type: string, enum: [memory, file, row] } }
+        - { name: kind, in: query, schema: { type: string, enum: [memory, file, row, organism, workspace, board, app] }, description: "Only this kind. The containers are listed first: the organism and its workspaces at level organism, the owner's boards and apps at level owner." }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
         - { name: cursor, in: query, schema: { type: string } }
       responses:
@@ -17712,20 +17712,31 @@ paths:
 
   /v1/classification/label:
     get:
-      summary: The classification of one piece of content
-      description: The label, where it came from, whether a person locked it, a waiting suggestion and the last changes. Personal content is always the caller's own; organism content needs membership.
+      summary: The classification of one piece of content or one container
+      description: |
+        The label, where it came from, whether a person locked it, a waiting suggestion and the last
+        changes. `effective` is what the content carries: the highest of its own label and its
+        containers' (its workspace's and organism's; a board post's board; what an app keeps in its
+        own namespace, the app's), with `from` naming which (own, workspace, organism, board, app).
+        Personal content is always the caller's own; organism content needs membership. A container
+        is named by kind: organism (organism_id), workspace (organism_id and ws), board (board_id),
+        app (app). Any member reads an organism's or a workspace's; a board's and an app's owner reads
+        theirs.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [memory, file, row], default: memory } }
+        - { name: kind, in: query, schema: { type: string, enum: [memory, file, row, organism, workspace, board, app], default: memory } }
         - { name: key, in: query, schema: { type: string }, description: The memory key or stored file key. }
         - { name: organism_id, in: query, schema: { type: string } }
         - { name: ws, in: query, schema: { type: string } }
         - { name: space, in: query, schema: { type: string } }
         - { name: row_id, in: query, schema: { type: string } }
         - { name: owner, in: query, schema: { type: string }, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+        - { name: board_id, in: query, schema: { type: string }, description: 'kind board: the board id.' }
+        - { name: app, in: query, schema: { type: string }, description: "kind app: the filename of the caller's hosted app or the name of their ecosystem app." }
       responses:
-        '200': { description: The classification. }
+        '200': { description: '{ target, label, labelDetail, effective: { label, from, labelDetail }, source, locked, suggestion, history }.' }
+        '403': { description: "NOT_ALLOWED: a member who is not the organism's creator or an admin, or another owner's board everyone can read." }
         '404': { description: No such content, or not the caller's to read. }
     put:
       summary: Set the classification of one piece of content
@@ -17739,6 +17750,10 @@ paths:
         except from an app, whose lowering is recorded on the exceptions list instead.
         A workspace document or an organism record has one classification: its `.draft`, `.latest`
         and `.version.N` keys all name the document's.
+        A container takes the same rules: an organism's or a workspace's label is set by the
+        organism's creator or an admin (a member gets 403 NOT_ALLOWED), a board's or an app's by its
+        owner (another owner gets 403 on a board everyone can read, 404 otherwise). Its label is the
+        floor for everything in it.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -17749,13 +17764,15 @@ paths:
               type: object
               required: [label]
               properties:
-                kind: { type: string, enum: [memory, file, row] }
+                kind: { type: string, enum: [memory, file, row, organism, workspace, board, app] }
                 key: { type: string }
                 organism_id: { type: string }
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
                 owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+                board_id: { type: string, description: 'kind board: the board id.' }
+                app: { type: string, description: "kind app: the filename of the caller's hosted app or the name of their ecosystem app." }
                 label: { type: string }
                 justification: { type: string }
                 humanSaid: { type: string }
@@ -17764,7 +17781,7 @@ paths:
       responses:
         '200': { description: Applied, or kept as a suggestion. }
         '400': { description: LABEL_UNKNOWN, JUSTIFICATION_REQUIRED or INVALID_INPUT. }
-        '403': { description: AI_LABELLING_OFF. }
+        '403': { description: "AI_LABELLING_OFF, or NOT_ALLOWED for a container the caller may see but not classify." }
         '404': { description: No such content, or not the caller's to label. }
 
   /v1/classification/label/review:
@@ -17785,13 +17802,15 @@ paths:
               type: object
               required: [decision]
               properties:
-                kind: { type: string, enum: [memory, file, row] }
+                kind: { type: string, enum: [memory, file, row, organism, workspace, board, app] }
                 key: { type: string }
                 organism_id: { type: string }
                 ws: { type: string }
                 space: { type: string }
                 row_id: { type: string }
                 owner: { type: string, description: "A memory key or a stored file held by one of the caller's owner's agents or apps: that identity. Absent: the owner's own." }
+                board_id: { type: string, description: 'kind board: the board id.' }
+                app: { type: string, description: "kind app: the filename of the caller's hosted app or the name of their ecosystem app." }
                 decision: { type: string, enum: [accept, reject] }
                 justification: { type: string }
                 humanSaid: { type: string }

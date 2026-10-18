@@ -47,6 +47,8 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.8.0 -- 2026-10-18 -- A new board's name and description meet the detection rules written for
+ *     boards (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.7.0 -- 2026-10-18 -- createBoard without a visibility takes visibility.board_default (code
  *     default public; plan doc-mvcn6c7e4e5q, V5.3), before the publish gate is asked.
  *   v1.6.0 -- 2026-10-18 -- createBoard takes `publishGate`, the door's caller (plan doc-mvcn6c7e4e5q,
@@ -86,6 +88,8 @@ import { isRaiseToPublic } from './publish-gate.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 import { boardVisibilityDefault } from './content-defaults.js';
+import { classifyContainerAfterWrite } from './classify-on-write.js';
+import { boardTarget } from './classification/containers.js';
 
 /** The bounds BoardRulesSchema applies on the HTTP door. */
 export const BOARD_RULE_LIMITS = {
@@ -383,6 +387,8 @@ export async function createBoard(
     // A board list open in a browser listens on the 'boards' domain. Without this the new board
     // waits for a reload.
     emitChange('boards');
+    // The detection rules written for boards read its name and description (plan doc-mvdipuyqraas, L1.6).
+    classifyContainerAfterWrite(deps, boardTarget(board), board.name, board.description);
     if (ask && input.publishGate) return { ok: true, board, ...(await fileBoardAsk(deps, input.publishGate, ask, board)) };
     return { ok: true, board };
 }

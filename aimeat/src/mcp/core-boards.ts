@@ -12,6 +12,8 @@
  * @structure registerCoreBoardTools(mcp, deps, caller)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-10-18 — aimeat_board_read passes the posts through the session's classification reader with
+ *     the board's classification (classifiedBoardPosts; plan doc-mvdipuyqraas, L1.3).
  *   2026-10-17 — Both tools hand the session's auth to the board services, which decide an organism
  *     board (`organism:<id>`) by membership (plan doc-mvcn6c7e4e5q, V3.5).
  *   2026-10-08 — aimeat_board_post hands the session's scopes to the post service, which refuses a
@@ -28,7 +30,8 @@ import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { createBoardPost } from '../services/board-post.js';
-import { boardReadRefusal } from '../services/board-read-access.js';
+import { boardReadRefusal, classifiedBoardPosts } from '../services/board-read-access.js';
+import { readerFor } from '../services/classification/reader.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -57,8 +60,10 @@ mcp.tool(
 
         // The same hiding rule GET /v1/boards/:id/posts applies: a post flags have hidden is
         // left out for everyone but its author and the board's owner.
-        const posts = await withoutHiddenPosts({ storage, config }, board, agentGaii,
-            await storage.listPosts(board_id, { category, limit: limit ?? 20 }));
+        // A post reads as its board's classification (plan doc-mvdipuyqraas, L1.3), after the flags.
+        const posts = await classifiedBoardPosts(readerFor({ storage, config }, caller().auth), board,
+            await withoutHiddenPosts({ storage, config }, board, agentGaii,
+                await storage.listPosts(board_id, { category, limit: limit ?? 20 })));
         // TARGET-058: an agent asked to summarise a board has to be able to say which posts a
         // model wrote. One query for the page — see readProvenanceMany's N+1 note.
         const provFor = await readProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));

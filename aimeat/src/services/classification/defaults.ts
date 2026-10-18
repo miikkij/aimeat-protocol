@@ -13,6 +13,7 @@
  *   defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.5.0 — 2026-10-18 — RuleScope.kinds names the containers too (plan doc-mvdipuyqraas, L1.6).
  *   v1.4.0 — 2026-09-30 — Option B, decided by Jouni: no default label hides content from AI. Highly
  *     confidential is a warning to an AI (and audited); 'hidden' stays a label an owner, an organism
  *     or the operator may choose.
@@ -61,9 +62,15 @@ export interface ClassificationLabel {
   audience?: LabelAudience | null;
 }
 
-/** Where a rule applies. Absent fields mean everywhere. */
+/**
+ * Where a rule applies. Absent fields mean all content (memory, files, rows). A container (organism,
+ * workspace, board, app) is matched on its name and description only by a rule whose `kinds` names
+ * it (plan doc-mvdipuyqraas, L1.6): a container's label is the floor for everything in it, so a
+ * content rule that found an e-mail address in an organism's description would raise the whole
+ * organism.
+ */
 export interface RuleScope {
-  kinds?: Array<'memory' | 'file' | 'row'>;
+  kinds?: Array<'memory' | 'file' | 'row' | 'organism' | 'workspace' | 'board' | 'app'>;
   organismId?: string;
   ws?: string;
   keyPrefix?: string;

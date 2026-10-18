@@ -29,6 +29,8 @@
  *   const r = await createOrganismRecord({ storage, config }, ownerName, { name, visibility });
  *   if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
  * @version-history
+ *   2026-10-18 — A created or renamed organism's name and description meet the detection rules
+ *     written for organisms (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   2026-10-18 — The organism's board is at `organism:<id>` for a listed or private organism (was
  *     'shared' with an empty roster, which refused the members), and update moves it with the
  *     organism's visibility (services/organism-board.ts; plan doc-mvcn6c7e4e5q, V3.5).
@@ -79,6 +81,8 @@ import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import { fileAskForDoor, type DoorAsk, type PublishGateInput } from './publish-requests/door.js';
 import { organismVisibilityDefault } from './content-defaults.js';
 import { organismBoardVisibility, followOrganismVisibility } from './organism-board.js';
+import { classifyContainerAfterWrite } from './classify-on-write.js';
+import { organismTarget } from './classification/containers.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -279,6 +283,8 @@ export async function createOrganismRecord(
     shaped = { workspaces: made, workspacesNotCreated: notCreated };
   }
   const asked = ask && input.publishGate ? await fileOrganismAsk(deps, input.publishGate, ask, id, visibility) : {};
+  // The detection rules written for organisms read its name and description (off the request path).
+  classifyContainerAfterWrite(deps, organismTarget(id), organism.name, organism.description);
   return { ok: true, organism, ...(shaped ?? {}), ...asked };
 }
 
@@ -399,7 +405,9 @@ export async function updateOrganismRecord(
   const readme = await getOrganismReadme(storage, organism.id);
   emitChange('organisms');
   const asked = ask && input.publishGate ? await fileOrganismAsk(deps, input.publishGate, ask, organism.id, organism.visibility) : {};
-  return { ok: true, organism: updated ?? { ...organism, ...updates }, readme, readmeSet, ...asked };
+  const now = updated ?? { ...organism, ...updates };
+  if (updates.name !== undefined || updates.description !== undefined) classifyContainerAfterWrite(deps, organismTarget(organism.id), now.name, now.description);
+  return { ok: true, organism: now, readme, readmeSet, ...asked };
 }
 
 export type JoinOrganismResult =

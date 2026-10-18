@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.23.0 -- 2026-10-18 -- A renamed workspace's name meets the detection rules written for
+ *     workspaces (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.22.0 -- 2026-10-18 -- PUT …/workspace/share asks the publish gate: opening the share to anyone
  *     with the link by an agent without publish:public stores the rest and answers 202 with
  *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -95,6 +97,8 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
+import { workspaceTarget } from '../../services/classification/containers.js';
+import { classifyContainerAfterWrite } from '../../services/classify-on-write.js';
 import { withItemProvenance, shareOpenedIdsOf } from '../../services/share-provenance.js';
 import { loadServedProvenance, loadServedProvenanceMany, setProvenanceHeaders, envelopeMeta, provenanceMarkdownNote } from '../../services/ai-provenance-marks.js';
 import type { OrganismHelpers } from './shared.js';
@@ -382,6 +386,8 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         memberChanges: req.body?.member_changes,
       });
       emitChange('organisms');
+      // A new name meets the detection rules written for workspaces (plan doc-mvdipuyqraas, L1.6).
+      if (result.name) classifyContainerAfterWrite({ storage, config }, workspaceTarget(id, ws), result.name);
       res.json(success(config.nodeId, result));
       // Manifest/space/name edits change the structure → record a timeline snapshot (dedup handles no-ops).
       void updateOrganismStructure(storage, config, id, { event: 'workspace updated', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('PUT /v1/organisms/:id/workspace: best-effort', { error: String(err) }); });

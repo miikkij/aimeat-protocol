@@ -29,17 +29,23 @@
  *   - boardOrganismAudience() — the organism audience of a board's visibility, or null
  *   - organismBoardAdmits() — the read decision for an organism board
  *   - boardReadRefusal() — a refusal, or null when the read is allowed
+ *   - classifiedBoardPosts() — the posts the reader may see by the board's classification
  * @usage
  *   const refusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
  *   if (refusal) return fail(refusal.message);
+ *   const shown = await classifiedBoardPosts(readerFor({ storage, config }, req.auth), board, posts);
  * @version-history
+ *   v1.2.0 — 2026-10-18 — classifiedBoardPosts: a post reads as its board's classification (plan
+ *     doc-mvdipuyqraas, L1.3).
  *   v1.1.0 — 2026-10-17 — The organism level: boardOrganismAudience, organismBoardAdmits, and
  *     boardReadRefusal takes the caller's auth for it (plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.0.0 — 2026-08-11 — Extracted from routes/boards.ts (August 2026 audit, the side-effect sweep's
  *     read-path half) after aimeat_board_read was found reading private boards.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, BoardRecord } from '../storage/interface.js';
+import type { Storage, BoardRecord, BoardPostRecord } from '../storage/interface.js';
+import type { ContentReader } from './classification/reader.js';
+import { boardPostTarget } from './classification/containers.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from './audience.js';
@@ -116,4 +122,17 @@ export async function boardReadRefusal(
     await auditDataAccess(storage, consentResult.consentId ?? null,
         board.ownerGaii, gaii, `board:${board.id}`, 'read', false);
     return { status: 403, code: 'CONSENT_REQUIRED', message: 'You do not have consent to access this board' };
+}
+
+/**
+ * The posts of a board this reader may see by the board's classification (plan doc-mvdipuyqraas,
+ * L1.3). A post has no classification of its own: it reads as its board's (classification/
+ * containers.ts boardPostTarget), so a board classified hidden from AI is absent to an AI, and a
+ * board classification with a reader audience narrows who reads its posts. Asked after
+ * boardReadRefusal, never instead of it. With classification off it reads nothing.
+ */
+export function classifiedBoardPosts<T extends Pick<BoardPostRecord, 'id'>>(
+    reader: ContentReader, board: Pick<BoardRecord, 'id' | 'ownerGaii'>, posts: T[],
+): Promise<T[]> {
+    return reader.show(posts, p => boardPostTarget(board, p.id));
 }

@@ -28,6 +28,7 @@
  *   const effective = mergePolicy(node, layer);
  *   const given = loosenings(before, after);         // [] when the change only tightens
  * @version-history
+ *   v1.3.0 — 2026-10-18 — A rule's appliesTo.kinds may name the containers (plan doc-mvdipuyqraas, L1.6).
  *   v1.2.1 — 2026-10-02 — readRule() leaves the syntax check to unsafeRegexReason(), which already
  *     refuses an invalid pattern with the engine's message; an invalid pattern was reported twice.
  *   v1.2.0 — 2026-09-29 —TARGET-082 review. loosenings() compares what content effectively gets: a
@@ -151,13 +152,16 @@ function readLabel(v: unknown, i: number, problems: string[], base?: Classificat
   };
 }
 
+/** What a rule may apply to: content, and the containers by name and description (L1.6). */
+const RULE_KINDS = new Set(['memory', 'file', 'row', 'organism', 'workspace', 'board', 'app']);
+
 function readScope(v: unknown, where: string, problems: string[]): RuleScope | null {
   if (v === undefined || v === null) return null;
   if (!isObj(v)) { problems.push(`${where}.appliesTo is an object.`); return null; }
   const s: RuleScope = {};
   if (v.kinds !== undefined) {
-    if (!Array.isArray(v.kinds) || v.kinds.some(k => k !== 'memory' && k !== 'file' && k !== 'row')) {
-      problems.push(`${where}.appliesTo.kinds lists memory, file and row.`);
+    if (!Array.isArray(v.kinds) || v.kinds.some(k => !RULE_KINDS.has(k))) {
+      problems.push(`${where}.appliesTo.kinds lists memory, file, row, organism, workspace, board and app.`);
     } else if (v.kinds.length) s.kinds = [...new Set(v.kinds)] as RuleScope['kinds'];
   }
   for (const f of ['organismId', 'ws', 'keyPrefix'] as const) {
