@@ -632,6 +632,15 @@
      "plain": "A node for its own people only The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, pages load without content until the person signs in, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Nothing stored changes, so switching back restores what was public. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node. visibility.content_access (AIMEAT_CONTENT_ACCESS=signed-in), admin Config, content_access in GET /?format=json"
     },
     {
+     "slug": "g-4-nothing-goes-public-without-you",
+     "cells": [
+      "<strong>Nothing goes public without you</strong>",
+      "The operator can make the node ask you before your agents, and also your apps if they choose, make anything public to anyone: a record, a file, an app anyone may open, your welcome page or a company page, an organism, a board, a skill, a workspace page open to the link, a package, a knowledge package or a data package. Without your separate permission (<code>publish:public</code>, which &quot;Full access&quot; does not include) the agent's change is saved as it was, and you get a notification with Approve and Decline. The agent gets the address to give you. An approval makes public only what you were asked about: if it changed in between, nothing is published. You in person are never asked. A new node starts with agents and apps asking; a running node keeps its setting until the operator changes it.",
+      "<code>visibility.publish_gate</code> (<code>AIMEAT_PUBLISH_GATE</code>), <code>/v1/publish-requests*</code>, <code>aimeat_publish_requests</code>, a <code>202</code> with <code>publish_request</code> from the writing routes"
+     ],
+     "plain": "Nothing goes public without you The operator can make the node ask you before your agents, and also your apps if they choose, make anything public to anyone: a record, a file, an app anyone may open, your welcome page or a company page, an organism, a board, a skill, a workspace page open to the link, a package, a knowledge package or a data package. Without your separate permission (publish:public, which \"Full access\" does not include) the agent's change is saved as it was, and you get a notification with Approve and Decline. The agent gets the address to give you. An approval makes public only what you were asked about: if it changed in between, nothing is published. You in person are never asked. A new node starts with agents and apps asking; a running node keeps its setting until the operator changes it. visibility.publish_gate (AIMEAT_PUBLISH_GATE), /v1/publish-requests*, aimeat_publish_requests, a 202 with publish_request from the writing routes"
+    },
+    {
      "slug": "g-4-app-grants",
      "cells": [
       "<strong>App grants</strong>",
@@ -4105,6 +4114,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 413
+  "rows": 414
  }
 }
