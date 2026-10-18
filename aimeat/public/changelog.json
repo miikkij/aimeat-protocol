@@ -5,6 +5,18 @@
       "date": "2026-10-18",
       "kind": "feature",
       "title": {
+        "en": "Classify whole places and set what each agent may read",
+        "fi": "Luokittele kokonaisia paikkoja ja päätä, mitä kukin agentti saa lukea"
+      },
+      "body": {
+        "en": "Where classification is on, an organisation, a workspace, a board and an app can now carry a classification of their own, such as Confidential. Everything inside it is then at least that classification. Each classification can also say how widely its content may be shown: on a new node, Internal reaches at most everyone signed in, and Confidential and Highly confidential at most the members of one organisation. Anything that tries to go wider is refused, whether you, your agent or an app asks. Only you can make an exception, and you write down why. When a classification rises over something already shown more widely, the node narrows it at once and tells you. You can also give each agent the highest classification it may read, so a customer service agent never sees Confidential material. What others can see of yours now lists the conflicts first, and one press fixes each one. On a node that already runs, the operator decides whether the new limits apply.",
+        "fi": "Kun luokittelu on käytössä, organisaatiolla, työtilalla, taululla ja sovelluksella voi nyt olla oma luokka, esimerkiksi Luottamuksellinen. Kaikki sen sisällä on silloin vähintään tätä luokkaa. Luokka voi myös rajata, kuinka laajasti sen sisältöä saa näyttää: uudella nodella Sisäinen näkyy enintään kirjautuneille ja Luottamuksellinen ja Erittäin luottamuksellinen enintään yhden organisaation jäsenille. Laajempi näkyvyys hylätään, pyysitpä sitä sinä, agenttisi tai sovellus. Vain sinä voit tehdä poikkeuksen, ja kirjoitat sille perustelun. Jos luokka nousee ja jokin näkyy jo liian laajasti, node rajaa näkyvyyden heti ja kertoo siitä sinulle. Voit myös antaa jokaiselle agentille korkeimman luokan, jonka se saa lukea, joten asiakaspalvelun agentti ei näe luottamuksellista aineistoa. Mitä muut näkevät -sivu näyttää nyt ristiriidat ensin, ja korjaat kunkin yhdellä painalluksella. Jo käynnissä olevalla nodella ylläpitäjä päättää, otetaanko uudet rajat käyttöön."
+      }
+    },
+    {
+      "date": "2026-10-18",
+      "kind": "feature",
+      "title": {
         "en": "Nothing becomes public without you",
         "fi": "Mitään ei tule julkiseksi ilman sinua"
       },
