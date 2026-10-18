@@ -6,6 +6,7 @@
  *   red suite and carry the first failed tests, a message cannot end its workflow command early, and
  *   the job summary lists each red suite (scripts/lib/e2e-github-report.ts).
  * @version-history
+ *   v1.1.0 -- 2026-10-18 -- The suites past the eighth carry their first failure in the list annotation.
  *   v1.0.0 -- 2026-10-16 -- Initial: the nightly sweep names its red suites in public.
  */
 import { describe, expect, it } from 'vitest';
@@ -40,6 +41,24 @@ describe('githubAnnotations', () => {
         const lines = githubAnnotations(Array.from({ length: 20 }, (_, i) => red(`e2e-${i}`)), 'postgres-kysely');
         expect(lines).toHaveLength(9);
         expect(lines[0]).toContain('e2e-19');
+    });
+    it('gives the suites past the eighth their first failure in the list annotation, one line each, after the names', () => {
+        const many = Array.from({ length: 10 }, (_, i) => red(`e2e-${i}`, i === 9 ? { failures: [], note: 'TIMED OUT' } : {}));
+        const lines = githubAnnotations(many, 'sqlite');
+        expect(lines).toHaveLength(9);
+        // Lifecycle Central's ci_sweep_ingest reads this shape anonymously: the first line names every
+        // red suite, each later line is "<suite>: <passed>/<total> passed[; note][ · first failure]".
+        const message = lines[0].split('::').slice(2).join('::').split('%0A');
+        expect(message[0]).toBe(many.map(r => r.name).join(', '));
+        expect(message.slice(1)).toEqual([
+            'e2e-8: 3/4 passed · ❌ e2e-8 1a: expected 200, got 403',
+            'e2e-9: 3/4 passed; TIMED OUT',
+        ]);
+        expect(lines.slice(1).some(l => l.includes('E2E e2e-8 on'))).toBe(false);
+    });
+    it('keeps the list annotation to the names alone when every red suite has an annotation of its own', () => {
+        const [first] = githubAnnotations(Array.from({ length: 8 }, (_, i) => red(`e2e-${i}`)), 'sqlite');
+        expect(first).not.toContain('%0A');
     });
     it('escapes what would end the command early: newline and % in the message, : and , in the title', () => {
         const [, line] = githubAnnotations([red('e2e-x', { failures: ['❌ 100% done\r\nnext'] })], 'a:b,c');
