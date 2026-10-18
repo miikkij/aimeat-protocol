@@ -391,8 +391,14 @@ export interface ExtensionRecord {
      */
     tollMorsels?: number;
     /**
+     * The action also answers a caller without an account (Comicland v3 A-7): a visitor's run reads
+     * the extension's memory and may fetch, and its writes are refused. Never with a price or a
+     * pacing toll, which a visitor cannot pay; the manifest validator refuses both together.
+     */
+    public?: boolean;
+    /**
      * Priced raw call. Present => a non-owner caller pays the owner money per call (owner is always
-     * free). Absent => free (the script's `public_access` decides who may call).
+     * free). Absent => free for every signed-in caller; `public` admits a visitor too.
      */
     commercial?: {
       /**

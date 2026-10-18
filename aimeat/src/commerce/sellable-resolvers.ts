@@ -16,6 +16,9 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-10-18 — An ext-call whose split names its payees per call (dynamic) books no shares at the
+ *     checkout: the seller's net rides on the pay token and is split when the paid call names its
+ *     payees (sharesAtUse; Comicland v3 A-6). The payees were lost on this path.
  *   2026-10-16 — An app tool with no backing capability is marked fulfillsAsTask: it only queues a
  *     task, so the invoice rail stays open for it (QA audit S8-03).
  *   v1.7.0 — 2026-10-11 — Two values per item (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-
@@ -50,7 +53,9 @@ import { AppToolsDocSchema, appToolsKey, applyLockedInput, toolMoneyPrices, type
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { listPaymentHandlers } from './payment-handlers.js';
-import { integerMicros } from './money.js';
+import { integerMicros, percentFee } from './money.js';
+import { readSplit } from './beneficiary-split.js';
+import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { membersOnlyRefusal, membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 
 /** Core 'pacing-pack' kind (pacing-pack.ts), re-exported so the route loader registers every core kind from one module. */
@@ -335,17 +340,27 @@ export function extCallSellableResolver(): SellableResolver {
       const sellerGhii = `${sellerOwner}@${config.nodeId}`;
       const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
       const unitPrice = integerMicros(payMoney.amount);
+      // A split that names its payees per call (one series' creators, out of one extension's sales)
+      // cannot be booked here: the call that names them has not run. Its share rides on the token.
+      const split = await readSplit(storage, sellerGhii, extName, actionId);
+      const sharesAtUse = !!split && split.state === 'active' && split.dynamic === true;
       return {
         kind: 'ext-call', agentGaii: extName, agentName: extName, offerId: actionId,
         title: `${extName} · ${actionId}`, sellerOwner, sellerGhii,
         // The pacing of the call is charged where the call runs (the paywall), not here, or it would be charged twice.
         unitPrice, tollMorsels: 0, psp: pspRec?.value ?? undefined,
+        ...(sharesAtUse ? { sharesAtUse: true } : {}),
         // Payment already settled by the time fulfill runs (collect → fulfill). Mint the one-time
         // token bound to this buyer + ext + action; the buyer replays it to the raw endpoint.
-        async fulfill(ctx, { session }) {
+        async fulfill(ctx, { session, item }) {
           const { mintExtPayToken } = await import('../services/ext-pay-token.js');
+          const gross = item.unitPrice * item.quantity;
           const { token, expiresAt } = await mintExtPayToken(ctx.storage, {
             buyerOwner: session.buyerOwner, ext: extName, action: actionId, currency, amount: unitPrice,
+            ...(sharesAtUse ? { share: {
+              net: gross - percentFee(gross, commerceFeePercent(ctx.config)), sellerGhii,
+              buyerGhii: session.buyerGhii, reference: `checkout:${session.id}:${extName}:${actionId}`,
+            } } : {}),
           });
           return {
             result: { pay_token: token, expiresAt, retry: `POST /v1/ext/${extName}/${actionId} with header 'x-aimeat-pay-token: ${token}'` },

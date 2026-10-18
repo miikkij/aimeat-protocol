@@ -14,12 +14,17 @@
  *   const { token } = await mintExtPayToken(storage, { buyerOwner, ext, action, currency, amount });
  *   const r = await consumeExtPayToken(storage, token, { buyerOwner, ext, action });
  * @version-history
+ *   v1.2.0 — 2026-10-18 — A token may carry the seller's net of its sale (`share`), and a spent token
+ *     returns its grant, so the paywall splits that net by the payees the call names (Comicland v3 A-6).
  *   v1.1.0 — 2026-10-09 — consumeExtPayToken compares buyer, extension and action before it deletes,
  *     so a refused presentation leaves the buyer's token spendable (secrets audit 2026-10-09, S-3).
  *   v1.0.0 — 2026-07-17 — Initial (Phase 3 — money-channel one-time token, D1/D3)
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { readSplit, computeSplit, type DynamicDesignation, type SplitResult } from '../commerce/beneficiary-split.js';
+import { bookBeneficiaryShares } from '../commerce/beneficiary-book.js';
+import { logger } from '../utils/logger.js';
 
 /** Token namespace (system-owned memory; server-side only, never client-readable). */
 const NS = 'ext-pay-token';
@@ -32,6 +37,39 @@ export interface ExtPayGrant {
   action: string;
   currency: string;
   amount: number;
+  /**
+   * The seller's net of this sale, when the action's split names its payees per call: it is split
+   * when the token is spent, by the payees the action's result names (Comicland v3 A-6).
+   */
+  share?: { net: number; sellerGhii: string; buyerGhii: string; reference: string };
+}
+
+/**
+ * Split the seller's net a spent token carries, by the payees the paid call named (a dynamic split:
+ * one series' creators and translators out of one extension's sales). Out of the seller's net, never
+ * added to what the buyer paid, and booked once per token (the token is the tracking code). Never
+ * throws: the money moved at the checkout and the call delivered; a booking failure is logged.
+ */
+export async function accrueTokenShare(
+  storage: Storage, grant: ExtPayGrant, token: string, designations: DynamicDesignation[] = [],
+): Promise<SplitResult | null> {
+  const share = grant.share;
+  if (!share || share.net <= 0) return null;
+  try {
+    const split = await readSplit(storage, share.sellerGhii, grant.ext, grant.action);
+    const result = computeSplit(share.net, split, designations);
+    if (!result.lines.length) return result;
+    await bookBeneficiaryShares(storage, {
+      lines: result.lines, trackingCode: `chk_tok_${token}`, fromGhii: share.sellerGhii,
+      currency: grant.currency, buyerGhii: share.buyerGhii, reference: share.reference,
+    });
+    return result;
+  } catch (err) {
+    logger.error('[ext-pay-token] the paid call\'s revenue split was not booked; the seller keeps the whole cut', {
+      ext: grant.ext, action: grant.action, error: String(err),
+    });
+    return null;
+  }
 }
 
 /** Mint a single-use token for a settled money payment. Returns the token + its expiry. */
@@ -64,7 +102,7 @@ export async function consumeExtPayToken(
   storage: Storage,
   token: string | undefined,
   expect: { buyerOwner: string; ext: string; action: string },
-): Promise<{ ok: boolean; reason?: string }> {
+): Promise<{ ok: boolean; reason?: string; grant?: ExtPayGrant }> {
   if (!token) return { ok: false, reason: 'missing' };
   const rec = await storage.getMemory(NS, token);
   if (!rec) return { ok: false, reason: 'invalid_or_used' };
@@ -79,5 +117,5 @@ export async function consumeExtPayToken(
   // Single-use gate: whoever deletes it wins; a racing replay gets deleted=false.
   const deleted = await storage.deleteMemory(NS, token);
   if (!deleted) return { ok: false, reason: 'replayed' };
-  return { ok: true };
+  return { ok: true, grant: g };
 }

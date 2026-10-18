@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.12.0 — 2026-10-18 — Adult status, subscriptions, provenance in exported files (Comicland v3).
  *   v1.11.0 — 2026-10-18 — A write that answers publish_request waits for the person (plan doc-mvcn6c7e4e5q, V4.6).
  *   v1.10.0 — 2026-10-17 — What others can read of the person: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.9.0 — 2026-10-17 — The tools the person can allow with one press are on the list too, and a
@@ -74,6 +75,12 @@ nothing without asking.
 asks them first, and you do not hold publish:public. It is stored as it was. Tell them in one
 sentence what you asked to make public and give them the \`approve_url\`; \`aimeat_publish_requests\`
 shows the state.
+
+**Before adult content, ask \`aimeat_adult_status\`**: yes or no, the method and the time, never a
+birth date. The person becomes a verified adult with a bank identification or by paying with a credit
+card. Their subscriptions to plans extensions offer are \`aimeat_subscription_list\` and
+\`aimeat_subscription_cancel\`. When they export something made with AI as a PNG, JPEG, PDF or CBZ,
+\`aimeat_provenance_embed\` writes the provenance into the file itself.
 
 **When you do not know where something is, or what the person can reach, start with
 \`aimeat_discover\`.** It is the master directory: one query across every kind of content

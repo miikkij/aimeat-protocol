@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.0 — 2026-10-18 — An action with `public: true` answers a visitor, read-only (the sentence that
+ *     said every action needs a signed-in caller became false); ctx.caller.adult and
+ *     ctx.caller.subscriptions, and the `subscription.plans` record (Comicland v3 A-7, A-3, A-5).
  *   v1.6.1 — 2026-10-12 — deleteRecords puts records in the bin and needs memory:delete (it said for good, memory:purge).
  *   v1.6.2 — 2026-10-13 — ADDITIVE: ctx.calendar in the ctx table (five rows) and the road table.
  *   v1.6.1 — 2026-10-13 — ADDITIVE: ctx.workspace.readRow in the ctx table, and `timeoutMs` on
@@ -188,9 +191,19 @@ function sandboxSection(): string {
     'To show something to the extension\'s owner and nobody else, keep it private and serve it through',
     'an action that compares `ctx.extension.owner` with `ctx.caller.owner`.',
     '',
-    'Every action needs a signed-in caller; `config.public_access` in a manifest does nothing. To serve',
-    'data to visitors without an account, write it with `{ visibility: \'public\' }` and read it from the',
-    'browser with `GET /v1/memory/ext:{name}/{key}?soft=1` (null for a key that does not exist yet).',
+    'An action needs a signed-in caller unless it says `public: true` in the manifest; `config.public_access`',
+    'does nothing. A public action also answers a visitor with no account (a reader browsing a catalogue):',
+    'then `ctx.caller.anonymous` is true, owner, roles and scopes are empty, `ctx.memory.set` and `delete`',
+    'throw VISITOR_READ_ONLY, and wallet, files, notify, buy, workspace, ai and email are absent. A public',
+    'action takes no price and no `tollMorsels`. To serve data that never changes per caller, you can also',
+    'write it with `{ visibility: \'public\' }` and read it from the browser with',
+    '`GET /v1/memory/ext:{name}/{key}?soft=1` (null for a key that does not exist yet).',
+    'The node resolves two more facts about a signed-in caller before the run: `ctx.caller.adult`',
+    '(`{ verified, method, at }`: a verified adult or not, never a birth date) and `ctx.caller.subscriptions`',
+    '(`[{ plan, active_until }]`: the caller\'s running subscriptions to THIS extension\'s plans, which the',
+    'extension offers by writing `subscription.plans` = `{ plans: [{ id, title, amount, currency, period_days,',
+    'beneficiaries? }] }` in its own memory). Gate adult content and subscribed content on these, never on',
+    'something the caller sends.',
     'A workflow signal reads the OWNER\'s namespace, so it cannot see what an action wrote to',
     '`ext:{name}`: declare `result_to_key` on the extension step, and the engine writes the action\'s',
     'return value there for the signal to read.',

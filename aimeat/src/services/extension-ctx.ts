@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.17.0 — 2026-10-18 — `visitor`: a run for nobody signed in refuses memory set and delete with
+ *     VISITOR_READ_ONLY (Comicland v3 A-7).
  *   v1.16.0 — 2026-10-13 — ctx.calendar on every code path (services/extension-calendar.ts).
  *   v1.15.0 — 2026-10-13 — ctx.fetch takes `timeoutMs`, the script's own deadline for one call
  *     (100 ms to 30 s, inside the run's): past it the call throws FETCH_TIMEOUT, which the script
@@ -177,7 +179,13 @@ export interface ExtensionCtxDeps {
     /** Set when the extension runs as an AI provider (System 2 plan V6): ctx.fetch reaches only these
      *  hosts, and `inject` is added to a request to exactly one of them, outside the sandbox. */
     providerCall?: { hosts: readonly string[]; inject?: { name: string; value: string } };
+
+    /** A visitor's run (a public action, nobody signed in): the memory reads, its writes are refused. */
+    visitor?: boolean;
 }
+
+/** The refusal a visitor's write meets. A public action serves reading; a write needs an account. */
+const VISITOR_READ_ONLY = 'VISITOR_READ_ONLY: this action was called without an account, so it reads and never writes. Sign in to change anything.';
 
 /**
  * In a provider run (System 2 plan V6), refuse an address whose hostname is not EXACTLY one of the
@@ -738,6 +746,12 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // Pure computation with no storage and no network behind it, so it is on every code path and
     // asks for no capability (services/extension-calendar.ts).
     ctx.calendar = buildExtensionCalendar();
+
+    // A visitor reads. Refused here, in the context, so every write path of the guest meets it.
+    if (deps.visitor) {
+        ctx.memory.set = async () => { throw new Error(VISITOR_READ_ONLY); };
+        ctx.memory.delete = async () => { throw new Error(VISITOR_READ_ONLY); };
+    }
 
     return ctx;
 }

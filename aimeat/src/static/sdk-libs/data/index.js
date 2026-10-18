@@ -9,10 +9,13 @@
  *   the legacy string form baked in via `${config.baseUrl}` / `${config.nodeId}`.
  * @structure imports NODE_URL/NODE_ID (config), authFetch (session), attach (namespace);
  *   withProvenance()/publicEntryResponse()/mapAtMost()/discoverRow(); data.set/get/getEntry/update/
- *   delete/list/count/discover/search/getPublic/getPublicEntry; attach('data', …).
+ *   delete/list/count/discover/search/getPublic/getPublicEntry/action; attach('data', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
+ *   v1.8.0 — 2026-10-18 — action(ext, actionId, input): an extension action as the signed-in person,
+ *     or with nobody signed in for an action the manifest marks public (Comicland v3 A-7).
+ *     adultStatus(): verified adult yes or no, the method and the time (A-3).
  *   v1.7.0 — 2026-10-16 — A refused read is an error, never an empty one (QA audit F6-03). get()
  *     resolves null only when the key does not exist (NOT_FOUND, or the soft 200 with no value); every
  *     other refusal (401, 403, 429, 5xx) throws an Error carrying the node's `code` and `details`,
@@ -465,6 +468,48 @@ const data = {
     const view = await appConfigView();
     const links = view && view.workspaces;
     return (links && links[contract]) || null;
+  },
+
+  /**
+   * Run an extension action and resolve with its result. A signed-in person calls as themselves; with
+   * nobody signed in, the call goes without a sign-in and only an action whose manifest says
+   * `public: true` answers (any other throws with code UNAUTHORIZED). A visitor's run reads and never
+   * writes, so a reader page can list a catalogue or open a free episode for anyone. A refusal throws
+   * with the node's `code` (EXTENSION_ERROR, EXTENSION_INACTIVE, RATE_LIMITED, …).
+   * @param {string} ext The extension's name, or `name/instanceId` for one copy of it.
+   * @param {string} actionId
+   * @param {object} [input]
+   * @returns {Promise<any>}
+   */
+  /**
+   * Whether the signed-in person is a verified adult: { verified, method, verified_at }, never a birth
+   * date. `method` is 'ftn' (bank identification), 'eudiw' (EUDI wallet) or 'credit-card' (a payment
+   * with a credit card). Nobody signed in reads as not verified. Show adult content only when
+   * `verified` is true, and gate it in the extension too (ctx.caller.adult), not only in the page.
+   * @returns {Promise<{ verified: boolean, method: string|null, verified_at: string|null }>}
+   */
+  async adultStatus() {
+    const auth = window.AIMEAT && window.AIMEAT.auth;
+    if (!(auth && auth.getSession && auth.getSession())) return { verified: false, method: null, verified_at: null };
+    const res = await authFetch('/v1/ghii/me/adult');
+    if (!res.ok) throw refusal(res, 'The adult check could not be read.');
+    return res.data;
+  },
+
+  async action(ext, actionId, input) {
+    const path = '/v1/ext/' + String(ext).split('/').map(encodeURIComponent).join('/') + '/' + encodeURIComponent(actionId);
+    const opts = { method: 'POST', body: JSON.stringify(input || {}) };
+    const auth = window.AIMEAT && window.AIMEAT.auth;
+    const signedIn = !!(auth && auth.getSession && auth.getSession());
+    let res;
+    if (signedIn) {
+      res = await authFetch(path, opts);
+    } else {
+      const r = await fetch(NODE_URL + path, { ...opts, headers: { 'Content-Type': 'application/json' } });
+      res = await r.json().catch(() => ({ ok: false, error: { code: 'HTTP_' + r.status, message: 'The action did not answer (HTTP ' + r.status + ').' } }));
+    }
+    if (!res || !res.ok) throw refusal(res, 'The action failed.', 'EXTENSION_ERROR');
+    return res.data;
   },
 };
 

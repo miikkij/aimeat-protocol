@@ -20,6 +20,9 @@
  * @structure STRIPE_HANDLER_ID · stripeIdempotencyKey · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   2026-10-18 — collect reads the paying card's funding type (expand latest_charge), and a credit card
+ *     records the buyer as a verified adult (recordCreditCardAdult; Comicland v3 A-4). stripeApi and
+ *     sellerKey are exported for the hosted Checkout handler (commerce/stripe-checkout.ts).
  *   2026-10-16 — refund answers `refunded` or `failed` instead of nothing, so a failed reversal is no
  *     longer reported to the buyer as a refund (QA audit F5-01).
  *   2026-10-16 — Every charge Stripe could make twice carries an Idempotency-Key (stripeIdempotencyKey):
@@ -49,6 +52,9 @@ import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { redactKeyShaped } from '../utils/redact-credentials.js';
 import { MONEY_CURRENCIES, microsToStripeMinor } from './money.js';
+import type { Storage } from '../storage/interface.js';
+import { recordAdult } from '../services/adult-assurance.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 
 type EncryptionConfig = { encryptionKey: string | null; totpSecretEncryptionKey: string | null };
 
@@ -59,7 +65,7 @@ export const SPT_STRIPE_VERSION = '2026-09-30.preview';
 
 /** The seller's own Stripe secret, or a 403 naming the fix. Never logged, never returned. The stored
  *  value is sealed (commerce/psp-secrets.ts) and opened here, at the one call that sends it. */
-function sellerKey(config: EncryptionConfig, seller: { psp?: unknown } | undefined): string {
+export function sellerKey(config: EncryptionConfig, seller: { psp?: unknown } | undefined): string {
   const psp = seller?.psp as { secretKey?: unknown } | undefined;
   const key = openPspSecret(config, psp?.secretKey);
   if (!key) {
@@ -83,7 +89,7 @@ const STRIPE_UNREADABLE = 'The card payment provider gave an answer the node cou
  * form-encoded, bracket notation included. Stripe's own 4xx becomes a 422 the buyer can act on; an
  * auth failure or 5xx becomes a 502, because it is the seller's or Stripe's problem, not the call's.
  */
-async function stripeApi(
+export async function stripeApi(
   key: string, method: string, path: string, params?: Record<string, string>, version?: string, idempotencyKey?: string,
 ): Promise<Record<string, unknown>> {
   const headers: Record<string, string> = { Authorization: `Bearer ${key}` };
@@ -130,6 +136,30 @@ async function stripeApi(
  * checkout paid with the same card gets the same key, so it is charged once however often the
  * request arrives; another card is a new attempt, so a declined card does not block a second one.
  */
+/**
+ * The funding type of the card that paid a PaymentIntent (`credit`, `debit`, `prepaid`, `unknown`),
+ * from its expanded `latest_charge`; null when the intent was not expanded or no card paid.
+ */
+export function cardFundingOf(intent: Record<string, unknown> | null | undefined): string | null {
+  const charge = intent?.latest_charge as { payment_method_details?: { card?: { funding?: unknown } } } | string | null | undefined;
+  const funding = typeof charge === 'object' && charge ? charge.payment_method_details?.card?.funding : undefined;
+  return typeof funding === 'string' ? funding : null;
+}
+
+/**
+ * A CREDIT card payment shows the buyer is an adult (Jouni's ruling, Comicland v3 A-4); a debit or a
+ * prepaid card does not, because a minor can hold one. Never fails the payment it follows: the money
+ * has moved, and a bookkeeping failure is logged.
+ */
+export async function recordCreditCardAdult(storage: Storage, buyerGhii: string, funding: string | null): Promise<void> {
+  if (funding !== 'credit') return;
+  try {
+    await recordAdult(storage, ownerGhiiOf(buyerGhii), 'credit-card');
+  } catch (err) {
+    logger.error('[stripe] the credit card payment was not recorded as an adult check', { buyer: buyerGhii, error: String(err) });
+  }
+}
+
 export function stripeIdempotencyKey(kind: string, reference: string, instrument?: string): string {
   const card = instrument ? `-${createHash('sha256').update(instrument).digest('hex').slice(0, 16)}` : '';
   return `aimeat-${kind}-${reference}${card}`.slice(0, 255);
@@ -146,7 +176,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
     title: 'Card payment on the seller\'s own Stripe account',
     currencies: [...MONEY_CURRENCIES],
 
-    async collect(_ctx, { amount, currency, reference, instrument, seller, saveForLater }) {
+    async collect(ctx, { buyerGhii, amount, currency, reference, instrument, seller, saveForLater }) {
       if (typeof instrument !== 'string' || !instrument) {
         throw new PaymentError(
           'PAYMENT_INSTRUMENT_REQUIRED', 402,
@@ -184,10 +214,13 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
         }),
         description: `AIMEAT checkout ${reference}`,
         ...(customer ? { customer, setup_future_usage: 'off_session' } : {}),
+        // The charge comes back with the card's funding type, which a credit card's adult check reads.
+        'expand[]': 'latest_charge',
       }, isSpt ? SPT_STRIPE_VERSION : undefined, chargeKey);
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }
+      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent));
       return { trackingCode: String(intent.id), ...(customer ? { saved: { customer, payment_method: instrument } } : {}) };
     },
 

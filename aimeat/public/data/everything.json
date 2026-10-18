@@ -422,6 +422,15 @@
      "plain": "Identity verification off Finnish Trust Network: the bank sign-in through Suomi.fi raises the account's verification level, when the operator has configured it. EU Digital Identity Wallet verification (OpenID4VP, SD-JWT) is not available in this release, because its check does not yet tie a credential to the wallet it was issued to: the node refuses to start with it switched on, and the admin setting refuses to turn it on. /v1/ghii/verify/eudiw/*, /v1/ghii/verify/ftn/*"
     },
     {
+     "slug": "g-2-verified-adult-yes-or-no",
+     "cells": [
+      "<strong>Verified adult, yes or no</strong>",
+      "An app or an extension that shows adult content asks one question: is this person a verified adult. The answer is yes or no, the method and when, never a birth date or a name. A bank identification that shows 18 or older answers yes, and so does a payment with a credit card; a debit or prepaid card does not, because a minor can hold one. The answer belongs to the account, so every app reads the same one, and nobody can write it through the memory routes. An extension gets it on every call and can gate on it in its own code. Limits: verifications made before 2026-10-18 kept no birth date, so the person verifies again; the EUDI wallet path is off on every node until its holder binding exists.",
+      "<code>GET /v1/ghii/me/adult</code>, <code>AIMEAT.data.adultStatus()</code>, <code>ctx.caller.adult</code>, <code>aimeat_adult_status</code>"
+     ],
+     "plain": "Verified adult, yes or no An app or an extension that shows adult content asks one question: is this person a verified adult. The answer is yes or no, the method and when, never a birth date or a name. A bank identification that shows 18 or older answers yes, and so does a payment with a credit card; a debit or prepaid card does not, because a minor can hold one. The answer belongs to the account, so every app reads the same one, and nobody can write it through the memory routes. An extension gets it on every call and can gate on it in its own code. Limits: verifications made before 2026-10-18 kept no birth date, so the person verifies again; the EUDI wallet path is off on every node until its holder binding exists. GET /v1/ghii/me/adult, AIMEAT.data.adultStatus(), ctx.caller.adult, aimeat_adult_status"
+    },
+    {
      "slug": "g-2-verifiable-credential",
      "cells": [
       "<strong>Verifiable credential</strong>",
@@ -1567,6 +1576,15 @@
       "<code>/v1/extensions</code>, <code>/v1/ext/:name/:action</code>, <code>aimeat_extension_*</code> (<code>aimeat_extension_get</code> returns <code>limits</code>), <code>ctx.fetch(url, { gunzip: true, timeoutMs })</code>, <code>ctx.calendar.*</code>, manifest <code>limits.fetch_max_mb</code>"
      ],
      "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the ceiling is kept on the installed extension, where your AI reads it, and the install approval does not show it. A script can give one outbound call its own time limit, so one address that does not answer does not fail the whole run, and every run ends at a wall-clock limit (twelve times its CPU limit, at least a minute), also one that only waits. Calendar arithmetic is given to a script by the node: occurrences of repeating events, free time, a time zone's local time to an instant and back, and ICS text to events and back, with the same library the browser uses, because a script has no time-zone data of its own. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_* (aimeat_extension_get returns limits), ctx.fetch(url, { gunzip: true, timeoutMs }), ctx.calendar.*, manifest limits.fetch_max_mb"
+    },
+    {
+     "slug": "g-8-extension-actions-for-visitors-without-an-account",
+     "cells": [
+      "<strong>Extension actions for visitors without an account</strong>",
+      "An action that says <code>public: true</code> in its manifest also answers someone who has not signed in, so a stranger can browse a catalogue or read a free episode. A visitor's call reads and never writes: the action's memory writes are refused, and the wallet, files, notifications, purchases, workspace, AI and mail are not there. The action knows it is serving a visitor. Every other action still needs a sign-in, and a visitor learns nothing about which extensions or actions exist. Limits: a public action takes no price and no pacing; visitor calls are counted per client address.",
+      "<code>POST /v1/ext/{name}/{action}</code>, <code>AIMEAT.data.action()</code>, manifest <code>public: true</code>"
+     ],
+     "plain": "Extension actions for visitors without an account An action that says public: true in its manifest also answers someone who has not signed in, so a stranger can browse a catalogue or read a free episode. A visitor's call reads and never writes: the action's memory writes are refused, and the wallet, files, notifications, purchases, workspace, AI and mail are not there. The action knows it is serving a visitor. Every other action still needs a sign-in, and a visitor learns nothing about which extensions or actions exist. Limits: a public action takes no price and no pacing; visitor calls are counted per client address. POST /v1/ext/{name}/{action}, AIMEAT.data.action(), manifest public: true"
     },
     {
      "slug": "g-8-an-extension-names-the-services-it-calls",
@@ -2813,6 +2831,24 @@
      "plain": "x402 off testnet Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. /.well-known/x402.json"
     },
     {
+     "slug": "g-14-pay-by-card-on-stripe-s-own-page",
+     "cells": [
+      "<strong>Pay by card on Stripe's own page</strong>",
+      "A person pays a checkout by card on Stripe's own payment page, on the seller's Stripe account, and comes back to the app; the card never touches the node. The node reads the payment back from Stripe before it delivers anything, and the seller's Stripe webhook finishes the purchase when the person never comes back. Limits: for a person only (an agent pays with x402 or a card its owner saved); the seller needs a Stripe key.",
+      "<code>POST /v1/commerce/checkout-sessions/{id}/card</code>, handler <code>com.stripe.checkout</code>, <code>AIMEAT.commerce.payByCard()</code>, <code>finishCardPayment()</code>"
+     ],
+     "plain": "Pay by card on Stripe's own page A person pays a checkout by card on Stripe's own payment page, on the seller's Stripe account, and comes back to the app; the card never touches the node. The node reads the payment back from Stripe before it delivers anything, and the seller's Stripe webhook finishes the purchase when the person never comes back. Limits: for a person only (an agent pays with x402 or a card its owner saved); the seller needs a Stripe key. POST /v1/commerce/checkout-sessions/{id}/card, handler com.stripe.checkout, AIMEAT.commerce.payByCard(), finishCardPayment()"
+    },
+    {
+     "slug": "g-14-subscriptions",
+     "cells": [
+      "<strong>Subscriptions</strong>",
+      "A reader subscribes to a creator or a studio for a period (a month, say) and reads everything the plan covers while it runs. The plan belongs to the extension that serves the content, which knows its creators; the plan names who shares its revenue. The card is kept on the seller's account and the node renews three days before the end; a failed renewal tells the reader once and is tried daily, and the subscription ends at its date by itself. Cancelling keeps the paid period. The extension sees the reader's running subscriptions on every call. Limits: one price and one period per plan; nothing is refunded on cancelling.",
+      "checkout item <code>{ kind: &quot;subscription&quot; }</code>, <code>GET /v1/commerce/subscriptions</code>, <code>POST /v1/commerce/subscriptions/{ext}/{plan}/cancel</code>, <code>ctx.caller.subscriptions</code>, <code>AIMEAT.commerce.subscribe()</code>, <code>aimeat_subscription_list</code>, <code>aimeat_subscription_cancel</code>"
+     ],
+     "plain": "Subscriptions A reader subscribes to a creator or a studio for a period (a month, say) and reads everything the plan covers while it runs. The plan belongs to the extension that serves the content, which knows its creators; the plan names who shares its revenue. The card is kept on the seller's account and the node renews three days before the end; a failed renewal tells the reader once and is tried daily, and the subscription ends at its date by itself. Cancelling keeps the paid period. The extension sees the reader's running subscriptions on every call. Limits: one price and one period per plan; nothing is refunded on cancelling. checkout item { kind: \"subscription\" }, GET /v1/commerce/subscriptions, POST /v1/commerce/subscriptions/{ext}/{plan}/cancel, ctx.caller.subscriptions, AIMEAT.commerce.subscribe(), aimeat_subscription_list, aimeat_subscription_cancel"
+    },
+    {
      "slug": "g-14-a-daily-purchase-limit-for-each-agent",
      "cells": [
       "<strong>A daily purchase limit for each agent</strong>",
@@ -2834,10 +2870,10 @@
      "slug": "g-14-revenue-splits",
      "cells": [
       "<strong>Revenue splits</strong>",
-      "A provider sets who shares what one of its capabilities earns. The shares come out of the provider's own cut after the operator's share, so the buyer's price does not change. Beneficiaries see what they are owed and whether it can be paid yet. The operator verifies each beneficiary once before money can reach them; the provider then releases each share it owes, or pays it onchain. Each split names who declared it: the agent, when an agent did.",
+      "A provider sets who shares what one of its capabilities earns. The shares come out of the provider's own cut after the operator's share, so the buyer's price does not change. Beneficiaries see what they are owed and whether it can be paid yet. The operator verifies each beneficiary once before money can reach them; the provider then releases each share it owes, or pays it onchain. Each split names who declared it: the agent, when an agent did. A split whose payees the capability names per call works the same on a contract, on an app tool and on a one-off purchase of a priced action, so one extension can pay each series' own creators out of its sales.",
       "<code>/v1/commerce/beneficiary-splits</code>, <code>aimeat_commerce_beneficiary_*</code>"
      ],
-     "plain": "Revenue splits A provider sets who shares what one of its capabilities earns. The shares come out of the provider's own cut after the operator's share, so the buyer's price does not change. Beneficiaries see what they are owed and whether it can be paid yet. The operator verifies each beneficiary once before money can reach them; the provider then releases each share it owes, or pays it onchain. Each split names who declared it: the agent, when an agent did. /v1/commerce/beneficiary-splits, aimeat_commerce_beneficiary_*"
+     "plain": "Revenue splits A provider sets who shares what one of its capabilities earns. The shares come out of the provider's own cut after the operator's share, so the buyer's price does not change. Beneficiaries see what they are owed and whether it can be paid yet. The operator verifies each beneficiary once before money can reach them; the provider then releases each share it owes, or pays it onchain. Each split names who declared it: the agent, when an agent did. A split whose payees the capability names per call works the same on a contract, on an app tool and on a one-off purchase of a priced action, so one extension can pay each series' own creators out of its sales. /v1/commerce/beneficiary-splits, aimeat_commerce_beneficiary_*"
     },
     {
      "slug": "g-14-paid-work-between-agents",
@@ -3141,6 +3177,15 @@
       "<code>POST /v1/provenance</code>, <code>ai_provenance</code> on MCP write tools"
      ],
      "plain": "AI provenance records Content a model wrote carries a record: how much a model made, whether a person reviewed the substance, which model, when, what kind of thing it is (text, image, audio, video, code such as an app, or data), and a hash of the exact bytes. Records are append-only. See ai-transparency.md. POST /v1/provenance, ai_provenance on MCP write tools"
+    },
+    {
+     "slug": "g-17-provenance-inside-an-exported-file",
+     "cells": [
+      "<strong>Provenance inside an exported file</strong>",
+      "An exported PNG, JPEG, PDF or CBZ carries its AI provenance itself, wherever it goes: the IPTC digital source type that image tools and platforms read, and the address of each record it was made from. A comic page with its lettering says it combines AI and human work. The node writes a marked copy and keeps the original. A PDF keeps its own bytes and gets the facts in its metadata; a CBZ has every page marked. Limits: not a signed C2PA manifest, which needs a signing certificate; a private record's address answers only its owner.",
+      "<code>POST /v1/provenance/embed</code>, <code>aimeat_provenance_embed</code>"
+     ],
+     "plain": "Provenance inside an exported file An exported PNG, JPEG, PDF or CBZ carries its AI provenance itself, wherever it goes: the IPTC digital source type that image tools and platforms read, and the address of each record it was made from. A comic page with its lettering says it combines AI and human work. The node writes a marked copy and keeps the original. A PDF keeps its own bytes and gets the facts in its metadata; a CBZ has every page marked. Limits: not a signed C2PA manifest, which needs a signing certificate; a private record's address answers only its owner. POST /v1/provenance/embed, aimeat_provenance_embed"
     },
     {
      "slug": "g-17-visible-labels",
@@ -4123,6 +4168,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 414
+  "rows": 420
  }
 }

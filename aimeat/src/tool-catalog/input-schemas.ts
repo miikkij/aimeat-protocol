@@ -10,6 +10,7 @@
  *   questionsSchema · boardRulesInput · organismAudienceInput · wsGrantShape · tokenMap
  * @usage import { flexibleBoolean } from '../input-schemas.js';  owner_scope: { …, zod: flexibleBoolean }
  * @version-history
+ *   v1.3.0 — 2026-10-18 — itemShape takes kind `subscription` (Comicland v3 A-5).
  *   v1.2.0 — 2026-10-17 — organismAudienceInput: the `organism:<id>` level a board or a skill may take
  *     (plan doc-mvcn6c7e4e5q, V3.5 and V3.9).
  *   v1.1.0 — 2026-10-11 — A checkout item may be of kind `pacing-pack` (pacing capacity bought with money).
@@ -39,7 +40,7 @@ export const LinkSchema = z.object({
 
 /** The items of a checkout session (src/commerce/session-service.ts). */
 export const itemShape = z.array(z.object({
-    kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack']).optional(),
+    kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack', 'subscription']).optional(),
     agent: z.string().max(300).optional(),
     offer_id: z.string().max(100).optional(),
     org: z.string().max(200).optional(),

@@ -13,6 +13,8 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-10-18 — ctx.caller.anonymous (a visitor on a public action), ctx.caller.adult (verified
+ *     adult yes/no, method, time) and ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
  *   2026-10-16 — ExtensionLimits.wallClockMs: the wall-clock limit of a whole run (QA audit S7-02).
  *   v1.10.0 — 2026-10-13 — `ctx.calendar`: the calendar library's computation as host calls
  *     (services/extension-calendar.ts).
@@ -289,6 +291,23 @@ export interface ExtensionCtx {
       scopes?: string[];
       member?: { role: string; level: number | null; since: string; note: string } | null;
       isAppOwner?: boolean;
+      /**
+       * True when nobody is signed in: a visitor calling an action the manifest marks `public`. The
+       * gaii is then `anonymous@<node>`, owner, roles and scopes are empty, memory writes are refused
+       * (VISITOR_READ_ONLY) and the capabilities that act for a person are absent (Comicland v3 A-7).
+       */
+      anonymous?: boolean;
+      /**
+       * Whether the caller's account holder is a verified adult, resolved by the node before the run:
+       * `{ verified, method, at }`, never a birth date or any other personal data. `verified: false`
+       * for a visitor and for anyone not verified (Comicland v3 A-3, A-4).
+       */
+      adult?: { verified: boolean; method: string | null; at: string | null };
+      /**
+       * The caller's running subscriptions to THIS extension's plans ({ plan, active_until }), resolved
+       * by the node from the records only it writes; empty for a visitor (Comicland v3 A-5).
+       */
+      subscriptions?: Array<{ plan: string; active_until: string }>;
     };
     config: Record<string, unknown>;
     /**

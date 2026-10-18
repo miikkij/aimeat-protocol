@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-10-18 — Seed core:subscription-renewals (daily 05:19; Comicland v3 A-5).
  *   2026-10-15 — Seed core:gate-expiry (every 10 minutes; feature-list audit #59) and
  *     core:intake-thread-retention (hourly at :50; feature-list audit #64).
  *   v1.13.0 — 2026-10-09 — Seed core:nonce-cleanup on every node, not only with FTN or EUDIW on
@@ -69,6 +70,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     // Automatic renewals of the package update services this node sold (package-renewals.ts). Daily at
     // 05:13; three days before a date, once per period; nothing to do on a node that sells nothing.
     { id: 'core:package-renewals', name: 'Package Automatic Renewals', coreHandler: 'package-renewals', cron: '13 5 * * *' },
+    // Subscriptions to an extension's plans renewed on the kept card (commerce/subscriptions.ts). Daily
+    // at 05:19; three days before the end, once per period; nothing to do on a node that sells none.
+    { id: 'core:subscription-renewals', name: 'Subscription Renewals', coreHandler: 'subscription-renewals', cron: '19 5 * * *' },
     // Packages-only peers nothing uses any more (no grant, nobody's seller, 30 days old) removed
     // (package-peer-limits.ts). Daily at 05:29; nothing to do on a node that is no repository.
     { id: 'core:package-peer-cleanup', name: 'Package Peer Cleanup', coreHandler: 'package-peer-cleanup', cron: '29 5 * * *' },

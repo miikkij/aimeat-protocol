@@ -527,6 +527,12 @@ const ALL_SUITES = [
     'test/e2e-login-attach-email.ts',
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
+    // A public extension action answers a caller without an account, read-only (Comicland v3 A-7).
+    'test/e2e-ext-visitor-actions.ts',
+    // Subscriptions to an extension's plans and the card page route's refusals (Comicland v3 A-5, A-4).
+    'test/e2e-subscriptions.ts',
+    // AI provenance written into an exported file, as a marked copy (Comicland v3 A-8).
+    'test/e2e-provenance-embed.ts',
     'test/e2e-ext-files.ts',
     // ctx.workspace: an extension acting on its CALLER's organism workspace, as the caller, through
     // the same functions the MCP tools run. One happy path and seven refusals, each a door.

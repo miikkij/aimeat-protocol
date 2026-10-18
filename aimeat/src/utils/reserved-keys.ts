@@ -20,6 +20,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.25.0 — 2026-10-18 — `identity.adult.` is service-owned: the verified-adult record, written
+ *     only by services/adult-assurance.ts (Comicland v3 A-3). `commerce.subscription.` too: a paid
+ *     subscription's end date and kept card, written only by commerce/subscriptions.ts (A-5).
  *   v1.24.0 — 2026-10-18 — `publish.requests.` joins the list: a publish request is an instruction the
  *     decision door performs as the owner (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.23.0 — 2026-10-14 — `commerce.session.` is service-owned: no memory route writes, restores
@@ -325,8 +328,18 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * what completion charged. The checkout services (commerce/session-service.ts and
  * commerce/ucp-guest-checkout.ts) are its writers, straight to storage, and the buyer reads and
  * changes a session through /v1/commerce/checkout-sessions.
+ *
+ * `identity.adult.` (2026-10-18, Comicland v3 A-3) says the account holder is a verified adult, by
+ * which method and when. Apps and extensions decide what adult content to show from it, so a
+ * principal that could write it could unlock that content for a child. services/adult-assurance.ts is
+ * its one writer, straight to storage, after an EUDI wallet, a bank identification or a credit card.
+ *
+ * `commerce.subscription.` (2026-10-18, Comicland v3 A-5) is a subscription the buyer paid for: its end
+ * date, which an extension reads as the right to the subscribed content, and the kept card a renewal
+ * charges. A principal that could write it could give itself any period for free.
+ * commerce/subscriptions.ts is its one writer; the buyer cancels through /v1/commerce/subscriptions.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'commerce.session.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.'];
 
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {

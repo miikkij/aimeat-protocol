@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-18 — A `public: true` action answers a visitor, read-only; ctx.caller.adult and
+ *     ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
  *   2026-10-16 — A run ends at a wall-clock limit, waiting included (QA audit S7-02).
  *   v2.1.0 — 2026-10-12 — Instances: calling an action asks ext:invoke, reading the instances ext:invoke or
  *     ext:write (the REST scope gates of 4.0.0, auth/rest-scope-gate.ts).
@@ -131,7 +133,13 @@ may already do it.
 - The sandbox starts fresh for each call. All state lives in memory.
 - Check the caller in the script: \`ctx.caller.roles\` (an owner in person has \`['owner']\` and no
   scopes, an unattended run has \`['operator']\`), \`ctx.caller.scopes\` (what an agent's or app's
-  credential carries).
+  credential carries). The node also resolves \`ctx.caller.adult\` (\`{ verified, method, at }\`, never a
+  birth date) and \`ctx.caller.subscriptions\` (the caller's running subscriptions to this
+  extension's plans): gate adult and subscribed content on these, never on the input.
+- An action needs a signed-in caller unless the manifest says \`public: true\` on it. A public action
+  also answers a visitor with no account, read-only: \`ctx.caller.anonymous\` is true, memory writes
+  throw VISITOR_READ_ONLY, and the capabilities that act for a person are absent. It takes no price
+  and no \`tollMorsels\`. Use it for what a stranger may read: a catalogue, a free episode.
 
 ## 5. What an extension cannot do
 

@@ -6,6 +6,7 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-18 — GET /v1/ghii/me/adult: verified adult yes or no, the method and the time (Comicland v3 A-3).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.4.0 — 2026-09-12 — GET /v1/ghii/me splits its response instead of taking a gate, which closes
@@ -44,6 +45,8 @@ import { success, error } from '../../middleware/envelope.js';
 import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { readAdult, NOT_VERIFIED } from '../../services/adult-assurance.js';
+import { callerOf } from '../../middleware/caller.js';
 
 export function registerProfileRoutes(
     router: Router,
@@ -182,6 +185,18 @@ export function registerProfileRoutes(
             inherited: !updated.allowedOrigins,
         }));
         emitChange('ghii');
+    });
+
+    // GET /v1/ghii/me/adult — Is the account holder a verified adult: yes or no, the method and the time,
+    // never a birth date (Comicland v3 A-3). Any principal acting for the account asks: the person, an
+    // app they opened, their agent, an ecosystem app. A visitor from another node is answered "not
+    // verified": their verification lives on their home node.
+    // memory:read: the answer is a record of the account (identity.adult.status), read for whoever acts for it.
+    router.get('/v1/ghii/me/adult', requireAuth(), requireScope('memory:read'), async (req, res) => {
+        const status = isForeignPrincipal(req.auth) ? NOT_VERIFIED : await readAdult(storage, callerOf(req, config.nodeId, storage).ownerGhii);
+        res.json(success(config.nodeId, { verified: status.verified, method: status.method, verified_at: status.at }, [
+            ...(status.verified ? [] : [{ description: 'Verify with an EUDI wallet', method: 'GET', url: '/v1/ghii/verify/eudiw/request' }]),
+        ]));
     });
 
     // GET /v1/ghii/me — Own profile with private fields (auth required)

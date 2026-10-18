@@ -12,6 +12,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-commerce.js"></script>
  *   const s = await AIMEAT.commerce.buyOffer('vendor#alice@node', 'translate-doc');
  * @version-history
+ *   v1.4.0 — 2026-10-18 — payByCard(id) and finishCardPayment(): a person pays by card on Stripe's own
+ *     page, on the seller's Stripe account, and the return page completes the checkout (Comicland v3 A-4).
+ *     subscribe(ext, plan), subscriptions(), cancelSubscription(ext, plan) (A-5).
  *   v1.3.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): priceOf reads money only (priceMoney, pricesMoney) and returns null for
  *     'morsel'; pacingOf reads tollMorsels first and the old morsel price fields after; fmtPacing,
@@ -312,6 +315,70 @@ const commerce = {
     });
     if (!res.ok) throw commerceError(res, 'Failed to complete checkout');
     return res.data.session;
+  },
+
+  /**
+   * Pay a money session by card on Stripe's own page, on the seller's Stripe account, then come back.
+   * Sends the person to the card page; `returnUrl` (default: this page) is where they come back to.
+   * On that page call finishCardPayment(): it completes the checkout and resolves with the session.
+   * @param {string} id The open checkout session.
+   * @param {{ returnUrl?: string, redirect?: boolean }} [opts] redirect: false resolves with { url } instead.
+   */
+  async payByCard(id, opts) {
+    const returnUrl = (opts && opts.returnUrl) || window.location.href.split('#')[0];
+    const res = await authFetch('/v1/commerce/checkout-sessions/' + encodeURIComponent(id) + '/card', {
+      method: 'POST', body: JSON.stringify({ return_url: returnUrl }),
+    });
+    if (!res.ok) throw commerceError(res, 'The card page could not be opened');
+    if (opts && opts.redirect === false) return res.data;
+    window.location.assign(res.data.url);
+    return res.data;
+  },
+
+  /**
+   * On the page the card page returned to: complete the checkout the person just paid. Resolves with
+   * the completed session, with { cancelled: true } when they gave up on the card page, or null when
+   * this page was not opened by a card page. A purchase the node already finished from Stripe's own
+   * notice resolves with that session too.
+   */
+  async finishCardPayment() {
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get('aimeat_checkout');
+    if (!id) return null;
+    if (q.get('cancelled') === '1') return { cancelled: true, id: id };
+    const res = await authFetch('/v1/commerce/checkout-sessions/' + encodeURIComponent(id) + '/complete', {
+      method: 'POST', body: JSON.stringify({ payment: { handler: 'com.stripe.checkout', instrument: q.get('stripe_session') } }),
+    });
+    if (res.ok) return res.data.session;
+    if (res.error && res.error.code === 'SESSION_NOT_OPEN') return commerce.getCheckout(id);
+    throw commerceError(res, 'The card payment could not be completed');
+  },
+
+  /**
+   * Subscribe to a plan an extension offers (its `subscription.plans` record): opens a checkout for one
+   * period and sends the person to the card page, which keeps the card for the renewals. Back on the
+   * return page, finishCardPayment() completes it. `autoRenew: false` buys one period only.
+   * @param {string} ext The extension that offers the plan.
+   * @param {string} plan The plan id.
+   * @param {{ autoRenew?: boolean, currency?: string, returnUrl?: string, redirect?: boolean }} [opts]
+   */
+  async subscribe(ext, plan, opts) {
+    const session = await commerce.openCheckout([{ kind: 'subscription', app: ext, tool: plan, input: { auto_renew: !(opts && opts.autoRenew === false) } }], opts);
+    return commerce.payByCard(session.id, opts);
+  },
+
+  /** The person's subscriptions, running and ended: { ext, plan, title, active_until, active, auto_renew, ... }. */
+  async subscriptions() {
+    const res = await authFetch('/v1/commerce/subscriptions');
+    if (!res.ok) throw commerceError(res, 'Failed to list subscriptions');
+    return res.data.subscriptions;
+  },
+
+  /** Stop a subscription's renewal; the period already paid runs to its end. */
+  async cancelSubscription(ext, plan) {
+    const res = await authFetch('/v1/commerce/subscriptions/' + encodeURIComponent(ext) + '/' + encodeURIComponent(plan) + '/cancel', { method: 'POST', body: '{}' });
+    if (!res.ok) throw commerceError(res, 'Failed to cancel the subscription');
+    return res.data.subscription;
   },
 
   /** One-call purchase: open a session for one offer and complete it immediately. */

@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.34.0 -- 2026-10-18 -- Adult status, subscriptions, provenance in exported files (Comicland v3).
  *   v1.33.0 -- 2026-10-18 -- Making something public may wait for the owner: publish_request and
  *     aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.6).
  *   v1.32.0 -- 2026-10-17 -- What others can read: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
@@ -97,6 +98,14 @@ everyone first, and close nothing without asking.
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is
 stored as it was (a new one private). Tell your owner in one sentence what you asked to make public
 and give them the \`approve_url\`. \`aimeat_publish_requests\` lists the requests and their state.
+
+**Adult content, subscriptions and exported files.** \`aimeat_adult_status\` says whether your owner
+is a verified adult (yes or no, the method, the time; never a birth date): ask it before you buy or
+open adult content for them. \`aimeat_subscription_list\` and \`aimeat_subscription_cancel\` are their
+subscriptions to plans extensions offer; you subscribe with a checkout item \`{ kind: "subscription" }\`.
+When you export something your owner made with AI (a comic episode as PDF, PNG or CBZ),
+\`aimeat_provenance_embed\` writes the provenance into the file itself, with the records its pictures
+came with, so the file says how it was made wherever it goes.
 
 **Classified content — read the warning, respect what is hidden.** Every memory record, stored file
 and workspace row has a classification (public, internal, confidential, highly confidential, or a

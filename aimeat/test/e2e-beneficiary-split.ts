@@ -1078,5 +1078,42 @@ await test('An agent WITH the words does the same work (the permission is not a 
   assert(gone.status === 200, `a ticked agent could not withdraw what it declared: ${gone.status}`);
 });
 
+// ── One extension, a different split per series: the one-off purchase (Comicland v3 A-6) ──
+//
+// A reader buys one call of a priced action through a checkout (kind ext-call), gets a pay token and
+// spends it. The action names this series' creators in its result. Until 2026-10-18 this path booked
+// the static rows at the checkout and dropped the named payees when the call ran, so a per-series
+// split worked on a contract and not on a purchase.
+let moneyRail = false;
+try {
+  const ucp = await fetch(`${BASE}/.well-known/ucp/2026-04-08`).then((r) => r.json()) as any;
+  moneyRail = (ucp.ucp?.payment_handlers || []).some((h: any) => String(h.id) === 'test.money');
+} catch { /* leave false */ }
+if (!moneyRail) {
+  console.log('  ⏭  one-off purchase split skipped — no test.money handler (AIMEAT_TEST_MONEY_HANDLER=true)');
+} else {
+  await test('A one-off purchase of a priced action pays the payees the call names, out of the seller\'s net, once', async () => {
+    // `dyn` carries the dynamic 100 % pool declared above.
+    const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(consumer.token),
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: EXT, tool: 'dyn' }] }) });
+    assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
+    const before = await accrued(alpha.token);
+    const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
+      method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ payment: { handler: 'test.money' } }) });
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body?.error)}`);
+    const net = Number(done.body.data.session.receipt.earned);
+    const token = done.body.data.session.fulfillment?.results?.[0]?.result?.pay_token as string;
+    assert(typeof token === 'string' && token, 'a pay token');
+    assert(await accrued(alpha.token) === before, 'the checkout books nobody: the call has not named its payees yet');
+
+    const call = await json(`/v1/ext/${EXT}/dyn`, { method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-pay-token': token }, body: JSON.stringify({ pay_to: alpha.ghii }) });
+    assert(call.status === 200, `the paid call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+    assert(!('_revenue' in (call.body.data ?? {})), 'the buyer never sees the designation');
+    assert(await accrued(alpha.token) === before + net, `alpha is owed the seller's whole net (${net}), got ${await accrued(alpha.token) - before}`);
+    // Single use of the token is e2e-ext-paywall's; here the consumer also holds a contract for `dyn`
+    // from above, so a second call is paid by the contract and would prove nothing about the token.
+  });
+}
+
 console.log(`\n=== BENEFICIARY SPLIT E2E: ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

@@ -421,6 +421,46 @@
       const view = await appConfigView();
       const links = view && view.workspaces;
       return links && links[contract] || null;
+    },
+    /**
+     * Run an extension action and resolve with its result. A signed-in person calls as themselves; with
+     * nobody signed in, the call goes without a sign-in and only an action whose manifest says
+     * `public: true` answers (any other throws with code UNAUTHORIZED). A visitor's run reads and never
+     * writes, so a reader page can list a catalogue or open a free episode for anyone. A refusal throws
+     * with the node's `code` (EXTENSION_ERROR, EXTENSION_INACTIVE, RATE_LIMITED, …).
+     * @param {string} ext The extension's name, or `name/instanceId` for one copy of it.
+     * @param {string} actionId
+     * @param {object} [input]
+     * @returns {Promise<any>}
+     */
+    /**
+     * Whether the signed-in person is a verified adult: { verified, method, verified_at }, never a birth
+     * date. `method` is 'ftn' (bank identification), 'eudiw' (EUDI wallet) or 'credit-card' (a payment
+     * with a credit card). Nobody signed in reads as not verified. Show adult content only when
+     * `verified` is true, and gate it in the extension too (ctx.caller.adult), not only in the page.
+     * @returns {Promise<{ verified: boolean, method: string|null, verified_at: string|null }>}
+     */
+    async adultStatus() {
+      const auth = window.AIMEAT && window.AIMEAT.auth;
+      if (!(auth && auth.getSession && auth.getSession())) return { verified: false, method: null, verified_at: null };
+      const res = await authFetch2("/v1/ghii/me/adult");
+      if (!res.ok) throw refusal(res, "The adult check could not be read.");
+      return res.data;
+    },
+    async action(ext, actionId, input) {
+      const path = "/v1/ext/" + String(ext).split("/").map(encodeURIComponent).join("/") + "/" + encodeURIComponent(actionId);
+      const opts = { method: "POST", body: JSON.stringify(input || {}) };
+      const auth = window.AIMEAT && window.AIMEAT.auth;
+      const signedIn = !!(auth && auth.getSession && auth.getSession());
+      let res;
+      if (signedIn) {
+        res = await authFetch2(path, opts);
+      } else {
+        const r = await fetch(NODE_URL + path, { ...opts, headers: { "Content-Type": "application/json" } });
+        res = await r.json().catch(() => ({ ok: false, error: { code: "HTTP_" + r.status, message: "The action did not answer (HTTP " + r.status + ")." } }));
+      }
+      if (!res || !res.ok) throw refusal(res, "The action failed.", "EXTENSION_ERROR");
+      return res.data;
     }
   };
   attach("data", data);
