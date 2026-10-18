@@ -15,11 +15,15 @@
  *   encloses this" silently answers nothing — not an error, an empty result. It cost one analyser its
  *   enclosing-function attribution on the day it was written, and a copy that omits it looks exactly
  *   like a copy that does not.
- * @structure srcProgram(area?) — the program plus the source files under src/, optionally narrowed
+ * @structure srcProgram(area?) — the program plus the source files under src/, optionally narrowed;
+ *   GATE_SCAN_EXCLUDE + inGateScope() — all of src/ less tests, generated, static and data
  * @usage
  *   const { program, files } = srcProgram();                       // all of src/
  *   const { program, files } = srcProgram(/[/\\]src[/\\]routes[/\\]/);  // one area
+ *   const scanned = srcProgram().files.filter(f => inGateScope(f.fileName));
  * @version-history
+ *   v1.2.0 — 2026-10-18 — GATE_SCAN_EXCLUDE and inGateScope(): the identity gates scan all of src/
+ *     less an exclusion list (wish wish-identiteettitarkistukset-kaupank-yntikoodiin-ja-kolmeen-muuh).
  *   v1.1.0 — 2026-09-05 — Built once per process. Five hook gates each built it (62 s of every
  *     commit), and check-invariants now runs them in one process against one program.
  *   v1.0.0 — 2026-09-04 — Extracted from the nine scripts that each had it.
@@ -50,6 +54,25 @@ export function srcProgram(area?: RegExp): SrcProgram {
         && !f.fileName.includes('node_modules')
         && (area === undefined || area.test(f.fileName)));
     return { program, files };
+}
+
+/**
+ * What a gate that reads "all of src/" leaves out, each with its reason. An exclusion list rather than
+ * an inclusion list, so a directory added tomorrow is scanned by default: until 2026-10-18 the two
+ * identity gates named `routes|services|mcp`, and `src/commerce`, `src/auth`, `src/middleware`,
+ * `src/tool-dispatch` and four more directories (24.6 % of the lines added since 2026-09-27) were
+ * never read while both gates reported green.
+ */
+export const GATE_SCAN_EXCLUDE: ReadonlyArray<{ pattern: RegExp; why: string }> = [
+    { pattern: /[/\\]__tests__[/\\]|\.test\.ts$/, why: 'unit tests: fixtures, not request handling' },
+    { pattern: /\.generated\.ts$|[/\\]src[/\\]generated[/\\]/, why: 'generated: fixed by its generator, not by hand' },
+    { pattern: /[/\\]src[/\\]static[/\\]/, why: 'static: served browser code, never sees a verified token' },
+    { pattern: /[/\\]src[/\\]data[/\\]/, why: 'data: seeded content (skills, templates, catalogues)' },
+];
+
+/** Is this file inside the scan of a gate that reads all of src/ less GATE_SCAN_EXCLUDE? */
+export function inGateScope(fileName: string): boolean {
+    return /[/\\]src[/\\]/.test(fileName) && !GATE_SCAN_EXCLUDE.some(x => x.pattern.test(fileName));
 }
 
 let cached: ts.Program | undefined;
