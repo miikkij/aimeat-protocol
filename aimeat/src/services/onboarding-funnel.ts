@@ -25,6 +25,9 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.5.2 — 2026-10-18 — writeMarkerOnce creates the marker with createMemoryIfAbsent and answers
+ *     whether this call created it; the AI detection and the welcome-mat count write with
+ *     updateRecord; the rescue pass writes its marker before the email, not after.
  *   v1.5.1 — 2026-10-11 — The AI detection record keeps `meets_conditions`, the answer to the
  *     conditions question the Gemini app raises.
  *   v1.5.0 — 2026-10-03 — The return email names the welcome-mat page as the person's profile, a
@@ -55,6 +58,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { logger } from '../utils/logger.js';
@@ -148,17 +152,21 @@ export async function writeMarkerOnce(
     const existing = await storage.getMemory(ownerGaii, key);
     if (existing) return false;
     const now = new Date().toISOString();
-    await storage.setMemory({
+    const marker = {
         key,
         ownerGaii,
         value,
-        visibility: 'private',
+        visibility: 'private' as const,
         tags: ['onboarding-funnel'],
         ttlHours: null,
         version: 1,
         createdAt: now,
         updatedAt: now,
-    });
+    };
+    // Created only if still absent (createMemoryIfAbsent): of two callers at once, one writes the
+    // marker and is answered true, and the other is answered false.
+    if (storage.createMemoryIfAbsent) return !!await storage.createMemoryIfAbsent(marker);
+    await storage.setMemory(marker);
     return true;
 }
 
@@ -398,14 +406,18 @@ export interface AiDetection {
  * frozen in the funnel even after the person corrected it, and every later read would be of the
  * less reliable of the two answers we had.
  */
+/** The stored AI detection record, as far as the ordering below reads it. */
+type StoredAiDetection = { source?: string; client?: string | null; has_paid_plan?: boolean; meets_conditions?: boolean; [field: string]: unknown };
+
 export async function recordAiModelDetected(
     storage: Storage, config: AimeatConfig, owner: string, detection: AiDetection,
 ): Promise<void> {
     if (!owner) return;
     const gaii = ownerGhii(config, owner);
     try {
-        const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.aiModelDetected);
-        const prev = (existing?.value ?? null) as { source?: string; client?: string | null; has_paid_plan?: boolean; meets_conditions?: boolean } | null;
+        // Decided and written on the version that was read (updateRecord): a reading that lands
+        // first is read again, and the ordering below is applied to it.
+        await updateRecord(storage, gaii, ONBOARDING_KEYS.aiModelDetected, v => (v ?? null) as StoredAiDetection | null, prev => {
         // Ordering, weakest to strongest: a page's claim < the person's answer ABOUT that page <
         // a NEW page. A fresh mat supersedes everything, because it is a new artifact made in a
         // different app — this is the whole mechanism of branch B, where someone takes up an app
@@ -424,12 +436,9 @@ export async function recordAiModelDetected(
         const answers = detection.source === 'asked' && prev?.source === 'asked'
             && ((typeof detection.hasPaidPlan === 'boolean' && detection.hasPaidPlan !== prev.has_paid_plan)
                 || (typeof detection.meetsConditions === 'boolean' && detection.meetsConditions !== prev.meets_conditions));
-        if (prev && !detection.supersedes && !refines && !answers && !(detection.source === 'asked' && prev.source !== 'asked')) return;
+        if (prev && !detection.supersedes && !refines && !answers && !(detection.source === 'asked' && prev.source !== 'asked')) return UNCHANGED;
         const now = new Date().toISOString();
-        await storage.setMemory({
-            key: ONBOARDING_KEYS.aiModelDetected,
-            ownerGaii: gaii,
-            value: {
+        return {
                 model: detection.model, vendor: detection.vendor, client: detection.client,
                 mcp: detection.mcp, source: detection.source, at: now,
                 ...(detection.unknownClient ? { unknown_client: detection.unknownClient } : {}),
@@ -439,14 +448,8 @@ export async function recordAiModelDetected(
                 // What the page said, kept when the person's answer supersedes it — the gap
                 // between the two IS the measure of how much a model's self-report is worth.
                 ...(prev ? { superseded: prev } : {}),
-            },
-            visibility: 'private',
-            tags: ['onboarding-funnel'],
-            ttlHours: null,
-            version: existing ? existing.version + 1 : 1,
-            createdAt: existing?.createdAt ?? now,
-            updatedAt: now,
-        });
+        };
+        }, { tag: 'onboarding-funnel' });
     } catch (err) {
         logger.warn('onboarding-funnel: ai_model_detected marker failed', { owner, error: String(err) });
     }
@@ -463,22 +466,17 @@ export async function recordWelcomeMatPasted(
     storage: Storage, config: AimeatConfig, owner: string, result: 'ok' | 'failed',
 ): Promise<{ attempts: number }> {
     const gaii = ownerGhii(config, owner);
-    const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.welcomeMatPasted);
-    const prev = (existing?.value ?? {}) as { attempts?: number; result?: string };
-    const attempts = (typeof prev.attempts === 'number' ? prev.attempts : 0) + 1;
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key: ONBOARDING_KEYS.welcomeMatPasted,
-        ownerGaii: gaii,
-        // The mat's CONTENT never enters telemetry (05-mittaus.md): the page is the person's own.
-        value: { result, attempts, at: now },
-        visibility: 'private',
-        tags: ['onboarding-funnel'],
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-    });
+    // The count is raised on the version that was read (updateRecord), so two pastes at once both
+    // count; `prev` is the record this write replaced.
+    let prev: { attempts?: number; result?: string } = {};
+    // The mat's CONTENT never enters telemetry (05-mittaus.md): the page is the person's own.
+    const stored = await updateRecord(storage, gaii, ONBOARDING_KEYS.welcomeMatPasted,
+        v => (v ?? {}) as { attempts?: number; result?: string; at?: string },
+        cur => {
+            prev = cur;
+            return { result, attempts: (typeof cur.attempts === 'number' ? cur.attempts : 0) + 1, at: new Date().toISOString() };
+        }, { tag: 'onboarding-funnel' });
+    const attempts = stored.attempts as number;
 
     // The one row this function owes the person's record. It cannot come through
     // recordOnboardingEvent(), which fires on a write-once marker, because this marker is the one
@@ -776,17 +774,19 @@ export async function runMcpOnboardingRescueJob(
         const textBody = [...c.paragraphs, ...c.checklist.map(i => `- ${i}`), '', c.closing].join('\n');
         const { html, text } = outboundEmailHtml(c.heading, bodyHtml, textBody, locale);
 
+        // Marked sent BEFORE the send, and even when the send then fails: this email must never
+        // become a retry loop against an address that bounces, and of two passes at once (a manual
+        // run beside a scheduled one) only the one whose marker landed sends.
+        if (!await writeMarkerOnce(storage, g.ghii, MCP_RESCUE_SENT_KEY, { at: new Date().toISOString(), delivered: false })) continue;
         const ok = await email.sendRaw(g.notificationEmail, c.subject, html, text).catch(err => {
             logger.warn('onboarding-funnel: rescue email send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });
-        // Marked sent even on a failed attempt: this email must never become a retry loop
-        // against an address that bounces.
-        await writeMarkerOnce(storage, g.ghii, MCP_RESCUE_SENT_KEY, {
-            at: new Date().toISOString(),
-            delivered: ok,
-        });
-        if (ok) sent++;
+        if (ok) {
+            await updateRecord(storage, g.ghii, MCP_RESCUE_SENT_KEY, v => (v ?? {}) as Record<string, unknown>,
+                cur => ({ ...cur, delivered: true }), { tag: 'onboarding-funnel' });
+            sent++;
+        }
     }
 
     if (sent > 0) logger.info(`MCP onboarding rescue: sent ${sent} email(s)`);

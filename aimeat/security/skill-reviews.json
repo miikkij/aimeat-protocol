@@ -13,14 +13,14 @@
       "digest": "sha256:aee6d40ee34edece3dc19e74"
     },
     "node:aimeat-refinery": {
-      "reviewedOn": "2026-10-13",
+      "reviewedOn": "2026-10-18",
       "watches": [
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/services/refinery/message.ts",
         "aimeat/src/services/refinery/schedule-input.ts",
         "aimeat/src/data/refinery-classes.ts"
       ],
-      "digest": "sha256:5846c0714eb80fa8c0f94ddf"
+      "digest": "sha256:4501071b3e79ee48592a7d7a"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-10-17",
@@ -339,7 +339,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:3f134e87de098dd75a2a6a74"
+      "digest": "sha256:91a1e3efff9dcdc505a63d01"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-18",
@@ -696,7 +696,7 @@
       "aimeat/src/services/ai-jobs/ext-capability.ts": "262ac35f448cc87e"
     },
     "node:aimeat-refinery": {
-      "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
+      "aimeat/src/services/refinery/pipeline.ts": "5a26add0ca7f5509",
       "aimeat/src/services/refinery/message.ts": "049996a45f32b89a",
       "aimeat/src/services/refinery/schedule-input.ts": "a2229bb9b8d28948",
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
@@ -763,7 +763,7 @@
       "aimeat/src/services/extension-ctx-contract.ts": "a072f7eef334ecf9",
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/services/workspace-rows/row-service.ts": "436bea50a33f2989",
-      "aimeat/src/services/refinery/pipeline.ts": "e51d2a097f60fede",
+      "aimeat/src/services/refinery/pipeline.ts": "5a26add0ca7f5509",
       "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
     },
     "node:aimeat-html-page": {

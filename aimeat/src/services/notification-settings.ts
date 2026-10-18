@@ -17,6 +17,8 @@
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
  *   await updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }));
  * @version-history
+ *   v1.3.1 — 2026-10-18 — appendMailLog and updateNotificationSettings write with updateRecord, on the
+ *     version they read; serialByKey stays for this process's own order.
  *   v1.3.0 — 2026-10-18 — EmailPrefs.agentNarrowed (on unless switched off) and the mail log kind
  *     `agent_narrowed`: the email when the node narrows an agent that held all permissions
  *     (services/scope-auto-narrow.ts).
@@ -35,6 +37,7 @@
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { serialByKey } from '../utils/serial-by-key.js';
+import { updateRecord } from './record-cas.js';
 
 /** Under the reserved `notifications.` prefix (utils/reserved-keys.ts): a granted app cannot write it. */
 export const NOTIF_SETTINGS_KEY = 'notifications.settings';
@@ -92,14 +95,12 @@ export async function readMailLog(storage: Storage, ownerGhii: string): Promise<
 /** Best-effort: a failure to log never fails the send it describes. */
 export async function appendMailLog(storage: Storage, ownerGhii: string, entry: { kind: MailLogKind; subject: string }): Promise<void> {
   try {
-    const existing = await storage.getMemory(ownerGhii, MAIL_LOG_KEY);
-    const list = Array.isArray(existing?.value) ? (existing!.value as MailLogEntry[]) : [];
-    const now = new Date().toISOString();
-    const next = [{ kind: entry.kind, subject: entry.subject.slice(0, 200), at: now }, ...list].slice(0, MAIL_LOG_MAX);
-    await storage.setMemory({
-      key: MAIL_LOG_KEY, ownerGaii: ownerGhii, value: next, visibility: 'private', tags: ['notifications'],
-      ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now,
-    });
+    const line: MailLogEntry = { kind: entry.kind, subject: entry.subject.slice(0, 200), at: new Date().toISOString() };
+    // Prepended to the log as stored, on its version (updateRecord): two sends at once both land.
+    await updateRecord(storage, ownerGhii, MAIL_LOG_KEY,
+      v => (Array.isArray(v) ? v as MailLogEntry[] : []),
+      list => [line, ...list].slice(0, MAIL_LOG_MAX),
+      { tag: 'notifications' });
   } catch (err) { logger.warn('notification-settings: mail log append failed', { error: String(err) }); }
 }
 
@@ -188,17 +189,12 @@ export async function readNotificationSettings(storage: Storage, ownerGhii: stri
 export function updateNotificationSettings(
   storage: Storage, ownerGhii: string, change: (current: NotificationSettings) => NotificationSettings,
 ): Promise<NotificationSettings> {
-  return serialByKey(`notification-settings ${ownerGhii}`, async () => {
-    const existing = await storage.getMemory(ownerGhii, NOTIF_SETTINGS_KEY);
-    const current = existing ? normalizeSettings(existing.value) : defaultSettings();
-    const clean = normalizeSettings(change(current));
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: NOTIF_SETTINGS_KEY, ownerGaii: ownerGhii, value: clean, visibility: 'private', tags: ['settings'],
-      ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || now, updatedAt: now,
-    });
-    return clean;
-  });
+  // The chain orders this process's writes; the write itself is made on the version that was read
+  // (updateRecord), and `change` is applied again to a fresh read when another process wrote first.
+  return serialByKey(`notification-settings ${ownerGhii}`, () => updateRecord(storage, ownerGhii, NOTIF_SETTINGS_KEY,
+    v => (v === undefined || v === null ? defaultSettings() : normalizeSettings(v)),
+    current => normalizeSettings(change(current)),
+    { tag: 'settings' }));
 }
 
 /** Which of the node's own groups a notification type belongs to. */

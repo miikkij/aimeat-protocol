@@ -5,6 +5,9 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — Replicate compares the timestamps against the stored record and writes the replica on
+ *     the version it compared (createMemoryIfAbsent / setMemoryIfVersion), reading again on a conflict;
+ *     the conflict copy and its notice follow the stored write.
  *   2026-10-17 — A first message from a sender whose account the recipient already accepted (one of its
  *     agents, or the person) is accepted, not held (services/contact-same-account.ts).
  *   2026-10-17 — A received message keeps sentByAgent / sentByAgentName, the agent that sent it in the
@@ -82,6 +85,7 @@ import { generateDownloadToken } from '../../services/download-token.js';
 import { duplicateMessageAttachments } from '../../services/attachment-duplication.js';
 import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
+import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 
 /**
  * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
@@ -204,13 +208,16 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const replicaKey = `replica:${source_node}:${key}`;
         const incomingUpdatedAt = timestamp ?? new Date().toISOString();
 
-        // C.2: LWW (Last-Writer-Wins) conflict resolution
-        const existing = await storage.getMemory(gaii, replicaKey);
-        if (existing) {
-            const existingTime = new Date(existing.updatedAt).getTime();
-            const incomingTime = new Date(incomingUpdatedAt).getTime();
-
-            if (incomingTime <= existingTime) {
+        // C.2: LWW (Last-Writer-Wins) conflict resolution. The comparison is made against the record
+        // as stored and the replica is written on the version that was compared (createMemoryIfAbsent
+        // / setMemoryIfVersion); when another write landed in between, the record is read and
+        // compared again.
+        const incomingTime = new Date(incomingUpdatedAt).getTime();
+        let existing: Awaited<ReturnType<typeof storage.getMemory>> = null;
+        let stored = false;
+        for (let attempt = 0; attempt < CAS_ATTEMPTS && !stored; attempt++) {
+            existing = await storage.getMemory(gaii, replicaKey);
+            if (existing && incomingTime <= new Date(existing.updatedAt).getTime()) {
                 // Incoming is older or equal — reject silently
                 res.json(success(config.nodeId, {
                     replicated: true,
@@ -223,8 +230,30 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 emitChange('federation');
                 return;
             }
+            const replica = {
+                key: replicaKey,
+                ownerGaii: gaii,
+                value,
+                visibility: visibility ?? 'public',
+                tags: [`replica:${source_node}`],
+                ttlHours: null,
+                version,
+                createdAt: timestamp ?? new Date().toISOString(),
+                updatedAt: incomingUpdatedAt,
+            };
+            if (!existing) {
+                stored = storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(replica) : (await storage.setMemory(replica), true);
+            } else {
+                stored = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(replica, existing.version) : (await storage.setMemory(replica), true);
+            }
+        }
+        if (!stored) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'This record changed under every attempt to store the replica. Send it again.'));
+            return;
+        }
 
-            // Incoming is newer — preserve losing version as conflict backup. The copy stays under
+        if (existing) {
+            // Incoming is newer and is stored — preserve losing version as conflict backup. The copy stays under
             // the replica prefix: `<key>._conflict_<ms>` put a value the peer chose under any key
             // family of the namespace, where a prefix scan (tracked-response., appmember.) read it
             // as this node's own record (QA audit S6-02).
@@ -252,18 +281,6 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 createdAt: new Date().toISOString(),
             });
         }
-
-        await storage.setMemory({
-            key: replicaKey,
-            ownerGaii: gaii,
-            value,
-            visibility: visibility ?? 'public',
-            tags: [`replica:${source_node}`],
-            ttlHours: null,
-            version,
-            createdAt: timestamp ?? new Date().toISOString(),
-            updatedAt: incomingUpdatedAt,
-        });
 
         res.json(success(config.nodeId, {
             replicated: true,

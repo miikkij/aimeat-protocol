@@ -26,6 +26,8 @@
  *   void reportPeerIncident(storage, config.nodeId, { kind: 'id-held', nodeId, presented: { key, url },
  *       held: { key: peer.publicKey, url: peer.url }, via: 'introduce', actor: node_id });
  * @version-history
+ *   2026-10-18 — The marker is claimed with createMemoryIfAbsent before the incident is recorded, the
+ *     bounds are counted after the claim, and the incident id is written on the claim's version.
  *   v1.0.0 — 2026-10-01 — Initial (follow-up to the peer-registration incident, items 5 and 6).
  */
 import { createHash } from 'node:crypto';
@@ -60,10 +62,26 @@ export async function reportPeerIncident(storage: Storage, thisNodeId: string, e
         const keyHash = createHash('sha256').update(e.presented.key).digest('hex').slice(0, 16);
         const marker = `${markerPrefix(e.nodeId)}${e.kind}.${keyHash}`;
         if (await storage.getMemory(NS_PEER_ORIGIN, marker)) return;
+        // The marker is claimed BEFORE the incident is recorded (createMemoryIfAbsent), and the bounds
+        // are counted after the claim, own marker included: of two identical events one claim lands,
+        // and a marker that finds itself past a bound is removed again, so the bound holds on what
+        // is stored.
+        const now = new Date().toISOString();
+        const claimed = {
+            key: marker, ownerGaii: NS_PEER_ORIGIN, value: { nodeId: e.nodeId, kind: e.kind, incident: null as string | null, at: now },
+            visibility: 'private' as const, tags: ['peer-incident'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        };
+        if (storage.createMemoryIfAbsent) {
+            if (!await storage.createMemoryIfAbsent(claimed)) return;
+        } else {
+            await storage.setMemory(claimed);
+        }
+        const unclaim = () => storage.deleteMemory(NS_PEER_ORIGIN, marker);
         const all = await storage.listMemory(NS_PEER_ORIGIN, { prefix: 'incident.' });
         // By the recorded node id, not the key prefix: a node id may contain dots, so one id's prefix can begin another's.
         const forNode = all.filter(r => (r.value as { nodeId?: string } | undefined)?.nodeId === e.nodeId).length;
-        if (forNode >= PER_NODE || all.length >= TOTAL) {
+        if (forNode > PER_NODE || all.length > TOTAL) {
+            await unclaim();
             logger.warn('Federation peer event not recorded: the Security page already holds as many as it takes', { ...e });
             return;
         }
@@ -79,12 +97,11 @@ export async function reportPeerIncident(storage: Storage, thisNodeId: string, e
             type: 'federation_peer', code: e.kind === 'proof-failed' ? 'PEER_PROOF_FAILED' : 'PEER_ID_HELD',
             actorGhii: e.actor, detail, source: e.via,
         });
-        if (!out.recorded) return;
-        const now = new Date().toISOString();
-        await storage.setMemory({
-            key: marker, ownerGaii: NS_PEER_ORIGIN, value: { nodeId: e.nodeId, kind: e.kind, incident: out.id, at: now },
-            visibility: 'private', tags: ['peer-incident'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-        });
+        if (!out.recorded) { await unclaim(); return; }
+        // On the claim's own version: a marker removed meanwhile (forgetPeer) is not written back.
+        const recorded = { ...claimed, value: { ...claimed.value, incident: out.id }, updatedAt: new Date().toISOString() };
+        if (storage.setMemoryIfVersion) await storage.setMemoryIfVersion(recorded, claimed.version);
+        else await storage.setMemory(recorded);
     } catch (err) {
         logger.warn('reportPeerIncident: the Security page entry is best-effort', { error: String(err), nodeId: e.nodeId, kind: e.kind });
     }

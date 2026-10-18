@@ -1480,7 +1480,7 @@
     },
     "src/services/ecosystem-events.ts": {
       "reads": {
-        "getMemory": 3
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The subscription index and inbound log, read to append."
     },
@@ -1664,12 +1664,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Applied install-set records, read for repository node ids. 2026-10-02 (package sale design, phase 3): the claimed-repositories record in the same install-sets system namespace, a list of repository node ids the operator redeemed a claim at."
     },
-    "src/services/intake-daily-count.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-13, the node's own read: the per-form count of today's public intake submissions in the system namespace (a day and a number), read to decide whether the form takes one more. No caller is handed it. 2026-10-15 (feature-list audit #63): the second read is releaseDailySlot, which reads the same count to give back the slot of a submission that was not stored."
-    },
     "src/services/intake-thread-retention.ts": {
       "reads": {
         "getMemory": 1,
@@ -1709,12 +1703,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings for the margin."
     },
-    "src/services/ledger-budget-alerts.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The budget-alert state record."
-    },
     "src/services/ledger-budget.ts": {
       "reads": {
         "getMemory": 1
@@ -1736,7 +1724,7 @@
     },
     "src/services/living-pulse.ts": {
       "reads": {
-        "getMemory": 6,
+        "getMemory": 5,
         "listMemory": 1,
         "listAllMemory": 2,
         "listAllMemoryMeta": 1,
@@ -1832,7 +1820,7 @@
     },
     "src/services/notification-settings.ts": {
       "reads": {
-        "getMemory": 4
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Mail log and notification settings."
     },
@@ -1859,7 +1847,7 @@
     },
     "src/services/onboarding-funnel.ts": {
       "reads": {
-        "getMemory": 7,
+        "getMemory": 5,
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
@@ -1947,12 +1935,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-02, the node's own read: the composer's own tool list for an app they put in a package, copied into the package without prices. Tool names and schemas are the app's interface, not classified content, and the composer reads their own record."
-    },
-    "src/services/packages/compose/package-notices.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: An update-notice marker. Moved from package-upstream-refresh.ts unchanged on 2026-10-02."
     },
     "src/services/packages/compose/package-withdrawals.ts": {
       "reads": {

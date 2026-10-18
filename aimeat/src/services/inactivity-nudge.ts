@@ -30,6 +30,8 @@
  *   // Registered as core handler 'inactivity-nudge' in services/core-jobs.ts.
  *   await runInactivityNudgeJob(config, storage);
  * @version-history
+ *   v1.0.2 — 2026-10-18 — The marker is written before the email, on the version the pass read
+ *     (createMemoryIfAbsent / setMemoryIfVersion), and marked delivered after a send that worked.
  *   v1.0.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-08-07 — Initial.
  */
@@ -168,8 +170,9 @@ export function nudgeEmailContent(config: AimeatConfig, locale: 'en' | 'fi', dis
  * The nightly pass. One email per quiet account, at most once every cooldown.
  *
  * Order matters and is the same order the rescue uses, for the same reason: eligibility, then
- * CONSENT, then send, then marker. Writing the marker before the consent check would mean someone
- * who later turns notifications back on is never reached again.
+ * CONSENT, then marker, then send. Writing the marker before the consent check would mean someone
+ * who later turns notifications back on is never reached again; writing it before the send means
+ * two passes at once send once.
  */
 export async function runInactivityNudgeJob(
     config: AimeatConfig,
@@ -220,27 +223,37 @@ export async function runInactivityNudgeJob(
         const textBody = [...c.paragraphs, '', prompt, '', c.closing].join('\n');
         const { html, text } = outboundEmailHtml(c.heading, bodyHtml, textBody, locale);
 
+        // Recorded BEFORE the send and even when delivery then fails, and OVERWRITING the previous
+        // marker rather than writing once: this is a repeatable event, and the cooldown is measured
+        // from the last attempt. A bouncing address must not be retried nightly. The marker is
+        // written on the version read above, so of two passes at once (a manual run beside a
+        // scheduled one) only the one whose marker landed sends.
+        const at = new Date(now).toISOString();
+        const history = (marker?.value as { count?: number } | undefined)?.count ?? 0;
+        const value = { sentAt: at, delivered: false, count: history + 1, quietSince: new Date(seen).toISOString() };
+        const claim = {
+            key: ONBOARDING_KEYS.inactivityNudge,
+            ownerGaii: g.ghii,
+            value,
+            visibility: 'private' as const,
+            tags: ['onboarding-funnel'],
+            ttlHours: null,
+            version: (marker?.version ?? 0) + 1,
+            createdAt: marker?.createdAt ?? at,
+            updatedAt: at,
+        };
+        const landed = !marker
+            ? (storage.createMemoryIfAbsent ? !!await storage.createMemoryIfAbsent(claim) : (await storage.setMemory(claim), true))
+            : (storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(claim, marker.version) : (await storage.setMemory(claim), true));
+        if (!landed) continue;
+
         const ok = await email.sendRaw(g.notificationEmail, c.subject, html, text).catch(err => {
             logger.warn('inactivity-nudge: send failed', { owner: g.ownerName, error: String(err) });
             return false;
         });
-
-        // Recorded even when delivery failed, and OVERWRITING the previous marker rather than
-        // writing once: this is a repeatable event, and the cooldown is measured from the last
-        // attempt. A bouncing address must not be retried nightly.
-        const at = new Date(now).toISOString();
-        const history = (marker?.value as { count?: number } | undefined)?.count ?? 0;
-        await storage.setMemory({
-            key: ONBOARDING_KEYS.inactivityNudge,
-            ownerGaii: g.ghii,
-            value: { sentAt: at, delivered: ok, count: history + 1, quietSince: new Date(seen).toISOString() },
-            visibility: 'private',
-            tags: ['onboarding-funnel'],
-            ttlHours: null,
-            version: 1,
-            createdAt: marker?.createdAt ?? at,
-            updatedAt: at,
-        });
+        if (ok && storage.setMemoryIfVersion) {
+            await storage.setMemoryIfVersion({ ...claim, value: { ...value, delivered: true }, version: claim.version + 1, updatedAt: new Date().toISOString() }, claim.version);
+        }
         if (ok) {
             sent++;
             // After the marker, on purpose: the marker is the record the cooldown reads, and the

@@ -16,6 +16,8 @@
  * @usage
  *   import { evaluateBudgetAlerts } from '../services/ledger-budget-alerts.js';
  * @version-history
+ *   2026-10-18 -- The threshold is marked fired with updateRecord (on the version read) before the
+ *     alert is sent, and unmarked again when the send fails.
  *   v1.0.0 -- 2026-07-11 -- Initial creation for LEDGER TARGET-017
  */
 
@@ -24,6 +26,7 @@ import { getOwnerBudgetStatus } from './ledger-budget.js';
 import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 interface AlertState { fired: number[]; updatedAt: string }
 
@@ -40,39 +43,47 @@ export async function evaluateBudgetAlerts(storage: Storage, ownerGhii: string):
   const crossed = status.level === 'over' ? 100 : 80;
 
   const stateKey = `budget-alerts.${ownerGhii}.${status.date}`;
-  const stateRec = await storage.getMemory(ownerGhii, stateKey);
-  const prev = (stateRec?.value as AlertState | undefined)?.fired;
-  const fired: number[] = Array.isArray(prev) ? prev : [];
-  if (fired.includes(crossed)) return; // already alerted at this level today
+  // Crossing 'over' implies 'warn' too — mark both so we don't later also fire the warn.
+  const marks = crossed === 100 ? [80, 100] : [80];
+  const stateOpts = { tag: 'budget-alert', tags: ['ledger', 'budget-alert'], ttlHours: 24 * 3 }; // self-clears a few days after the day it covers
+  const stateOf = (v: unknown): AlertState => {
+    const prev = (v as AlertState | undefined)?.fired;
+    return { fired: Array.isArray(prev) ? prev : [], updatedAt: (v as AlertState | undefined)?.updatedAt ?? '' };
+  };
+
+  // The level is marked fired BEFORE the alert is sent, on the version that was read (updateRecord):
+  // of two usage events at once, one marks it and sends, and the other re-reads it as fired.
+  const claim: { before: number[] | null } = { before: null };
+  await updateRecord(storage, ownerGhii, stateKey, stateOf, cur => {
+    claim.before = null;
+    if (cur.fired.includes(crossed)) return UNCHANGED; // already alerted at this level today
+    claim.before = cur.fired;
+    return { fired: [...new Set([...cur.fired, ...marks])], updatedAt: new Date().toISOString() };
+  }, stateOpts);
+  const firedBefore = claim.before;
+  if (!firedBefore) return;
 
   const pct = crossed === 100 ? '100%' : '80%';
   const top = status.topConsumers
     .map(c => `${c.agentGaii} $${c.costUsd.toFixed(4)}`)
     .join(', ');
 
-  await notify(storage, ownerGhii, {
-    type: 'budget_alert',
-    title: `AI budget ${pct} used ($${status.spentUsd.toFixed(4)} / $${status.dailyBudgetUsd})`,
-    body: `Today's LLM spend reached ${pct} of the daily budget.`
-      + (top ? ` Top consumers: ${top}.` : ''),
-    link: '/v1/profile?tab=agents',
-  });
+  try {
+    await notify(storage, ownerGhii, {
+      type: 'budget_alert',
+      title: `AI budget ${pct} used ($${status.spentUsd.toFixed(4)} / $${status.dailyBudgetUsd})`,
+      body: `Today's LLM spend reached ${pct} of the daily budget.`
+        + (top ? ` Top consumers: ${top}.` : ''),
+      link: '/v1/profile?tab=agents',
+    });
+  } catch (err) {
+    // The alert did not go out, so the level is unmarked again and the next usage event tries again.
+    await updateRecord(storage, ownerGhii, stateKey, stateOf,
+      cur => ({ fired: cur.fired.filter(n => firedBefore.includes(n) || !marks.includes(n)), updatedAt: new Date().toISOString() }),
+      stateOpts).catch((undo: unknown) => logger.warn('ledger: budget alert mark not undone', { ownerGhii, error: String(undo) }));
+    throw err;
+  }
   emitChange('notifications', ownerGhii);
-
-  // Crossing 'over' implies 'warn' too — mark both so we don't later also fire the warn.
-  const nextFired = [...new Set([...fired, ...(crossed === 100 ? [80, 100] : [80])])];
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key: stateKey,
-    ownerGaii: ownerGhii,
-    value: { fired: nextFired, updatedAt: now } satisfies AlertState,
-    visibility: 'private',
-    tags: ['ledger', 'budget-alert'],
-    ttlHours: 24 * 3, // self-clears a few days after the day it covers
-    version: stateRec ? stateRec.version + 1 : 1,
-    createdAt: stateRec?.createdAt ?? now,
-    updatedAt: now,
-  });
 
   logger.info('ledger: budget alert fired', { ownerGhii, level: status.level, crossed });
 }
