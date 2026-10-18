@@ -13,6 +13,7 @@
  *   out of the backup until it is named here.
  * @structure OWNER_FIELDS · AGENT_FIELDS · BACKUP_OMITTED · backupOwner · backupAgent · backupMemories
  * @version-history
+ *   v1.0.2 — 2026-10-18 — Agent.clearance travels in a backup (migration 0107).
  *   v1.0.1 — 2026-10-11 — Agent.stoppedAt and stoppedBy travel in a backup (migration 0101).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, finding 1.9).
  */
@@ -29,7 +30,7 @@ const AGENT_FIELDS = [
   'dailySpendLimit', 'scheduleConstraintDefaults', 'federate', 'technicalCapabilities',
   'domainCapabilities', 'languages', 'activityStats', 'modulesLoaded', 'agentLimitations', 'platform',
   'platformVersion', 'platformDetectedBy', 'model', 'modelDetectedBy', 'tags', 'mode',
-  'maxConcurrentTasks', 'consoleUrl', 'registeredBy', 'runMode', 'taskStart', 'stoppedAt', 'stoppedBy', 'runtimeSource',
+  'maxConcurrentTasks', 'consoleUrl', 'registeredBy', 'runMode', 'taskStart', 'stoppedAt', 'stoppedBy', 'clearance', 'runtimeSource',
   'identityVersion', 'cardIssuedAt', 'enrolledAt', 'mcpClient', 'mcpLastSeen',
 ] as const;
 

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-18 — AgentRecord.clearance: the highest classification label the agent may read
+ *     (migration 0107, plan doc-mvdipuyqraas L2).
  *   v1.8.0 — 2026-10-11 — AgentRecord.stoppedAt and stoppedBy: an agent the owner stopped (migration 0101).
  *   v1.7.0 — 2026-10-10 — EnrolmentGrantKind, with 'move': a grant that pins a new key over an
  *     enrolled agent's old one, for an agent the owner moves to another connector.
@@ -271,6 +273,18 @@ export interface AgentRecord {
    */
   mcpClient?: string | null;
   mcpLastSeen?: string | null;
+  /**
+   * THE HIGHEST CLASSIFICATION LABEL THIS AGENT MAY READ, as a label id of the policy (plan
+   * doc-mvdipuyqraas, L2). Content whose effective label ranks above it is hidden from the agent
+   * and counted, as the other classification hiding is (services/classification/reader.ts). Null or
+   * absent = no limit, which is every agent created before 2026-10-18 and every new agent unless the
+   * node sets `classification.agent_clearance_default`. Only read while classification is on.
+   *
+   * Set by the owner, or by a same-owner agent holding `agent:permissions`, and then only lowered:
+   * raising it or removing it gives reach away and needs the owner in person, and an agent never
+   * changes its own (services/agent-clearance.ts). Null clears it on both providers (see runMode).
+   */
+  clearance?: string | null;
 }
 
 /**

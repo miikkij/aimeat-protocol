@@ -6,6 +6,7 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — The account's app agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-16 — POST /v1/ghii/register-web takes `setupCode`: the first account on a node whose base URL
  *     is not loopback needs the one-time setup code and is refused 403 SETUP_CODE_REQUIRED /
@@ -81,6 +82,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
 import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
 import { agentListingTags } from '../../services/content-defaults.js';
+import { newAgentClearance } from '../../services/agent-clearance.js';
 
 /**
  * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
@@ -153,6 +155,7 @@ async function appAgentWithFreshKey(
         lastSeen: now,
         // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
         ...agentListingTags(config),
+        ...newAgentClearance(config),
     });
     return { agent, privateKey: keys.privateKey };
 }

@@ -11891,6 +11891,81 @@ paths:
         '404':
           description: No such agent
 
+  /v1/agents/{name}/clearance:
+    patch:
+      operationId: setAgentClearance
+      summary: The highest classification an agent may read
+      description: |
+        Sets the agent's clearance: the id of the highest classification it may read, or `null` for
+        no limit. While classification is on, content whose effective classification (its own, or
+        the higher one of its workspace, organism, board or app) ranks above the clearance is hidden
+        from the agent on every read: memory list, search and read, files, workspace documents and
+        rows, board posts, over REST and MCP. The hidden items are counted in the owner's
+        classification log as refused (`purpose: clearance`), not listed. Content going to an AI call
+        or leaving the node is held back the same way. While classification is off it is stored and
+        does nothing.
+
+        Who: the owner, or another of the owner's agents holding `agent:permissions`. Never the agent
+        itself (403 ACCESS_DENIED). Raising it, or removing it with `null`, lets the agent read more,
+        so only the owner signed in themselves does that (403 PERSON_REQUIRED for an agent); an agent
+        may lower another agent's clearance or set one where there was none. Each change is a
+        `changed` row of the owner's classification log. A new agent starts with the node setting
+        `classification.agent_clearance_default` (empty = no limit). Also `aimeat_operator_agent_configure`
+        (`clearance`).
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [clearance]
+              properties:
+                clearance:
+                  type: string
+                  nullable: true
+                  description: A classification id of the owner's policy (for example `sisainen`), or null for no limit.
+      responses:
+        '200':
+          description: The agent's clearance now
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          clearance: { type: string, nullable: true }
+                          clearance_label:
+                            type: object
+                            nullable: true
+                            properties:
+                              id: { type: string }
+                              name: { type: object, properties: { fi: { type: string }, en: { type: string }, es: { type: string } } }
+                              rank: { type: integer }
+                          from: { type: string, nullable: true, description: The clearance before this call. }
+                          changed: { type: boolean }
+                          classification: { type: string, enum: [off, owner, all], description: The node's classification switch; off means the clearance does nothing yet. }
+        '400':
+          description: No such classification in the owner's policy, or no `clearance` in the body
+        '403':
+          description: Not your agent; the agent itself asked; an agent asked to raise or remove it (PERSON_REQUIRED); or an agent without agent:permissions
+        '404':
+          description: No such agent
+
   /v1/agents/{name}/run-mode:
     patch:
       operationId: setAgentRunMode
@@ -12543,6 +12618,10 @@ paths:
                                       type: string
                                       nullable: true
                                       description: The identity that stopped it, the owner or another of the owner's agents. Null while it is not stopped.
+                                    clearance:
+                                      type: string
+                                      nullable: true
+                                      description: The highest classification the agent may read, as a classification id of the owner's policy (GET /v1/classification/policy has its names). Content classified higher is hidden from it while classification is on. Null = no limit. Set with PATCH .../clearance.
                                     task_start_wildcard:
                                       type: object
                                       nullable: true

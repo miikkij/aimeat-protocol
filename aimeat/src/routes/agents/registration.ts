@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.8.0 — 2026-10-18 — A registered agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.7.0 — 2026-10-14 — POST /v1/agents/connect is removed with the connectivity-key mint that fed
  *     it (Jouni, feature-list audit row 202). Device authorization and MCP connect an agent; key rows
@@ -48,6 +49,7 @@ import { createOnboardingTestTask } from '../../services/onboarding-test-task.js
 import { detectPlatform } from '../../services/platform-detector.js';
 import { exceedsCeiling } from '../../utils/scope-coverage.js';
 import { agentListingTags } from '../../services/content-defaults.js';
+import { newAgentClearance } from '../../services/agent-clearance.js';
 
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
@@ -122,6 +124,7 @@ export function registerRegistrationRoutes(
       mode: mode ?? 'interactive',
       // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
       ...agentListingTags(config),
+      ...newAgentClearance(config),
       // This door is owner-only (requireRole('owner') + requireLocalSession), so the person asked
       // for it themselves. Same field the device-authorization path writes; see AgentRecord.
       registeredBy: req.auth!.owner,

@@ -10697,7 +10697,9 @@
     "cfgDesc_docsign_app_url": "La dirección de la aplicación de firma. La persona a la que se le pide firmar recibe una notificación que la abre en la solicitud. Vacío: la notificación nombra la solicitud sin enlace.",
     "cfgDesc_docsign_eudi_enabled": "Una persona puede firmar un PDF con una cartera de identidad digital de la UE: la cartera hace la firma y este servidor deja su sello de que se dio. Necesita el certificado de acceso a la cartera (docsign.eudi_rp_credential). Apagado por defecto.",
     "cfgDesc_docsign_eudi_rp_credential": "Un archivo PEM con el certificado de acceso a la cartera de este servidor: la clave privada EC, luego el certificado que nombra a este servidor (DNS:<host> o URI:https://<host>) y luego el de su autoridad de certificación, si la hay. Lo emite un registrador (para la cartera de referencia de la UE, registry.serviceproviders.eudiw.dev); convierte su archivo .p12 a PEM con openssl. Se define en .env y requiere reiniciar. Vacío: la firma con cartera no está lista. Guía paso a paso: docs/document-signing.md.",
-    "cfgDesc_docsign_eudi_test_roots": "Confía en las autoridades de certificación de prueba de la cartera de referencia de la UE al verificar una firma. Una firma que encadena a una de ellas se informa como firma de prueba sin efecto legal, nunca como cualificada. Apágalo cuando las carteras nacionales estén en uso."
+    "cfgDesc_docsign_eudi_test_roots": "Confía en las autoridades de certificación de prueba de la cartera de referencia de la UE al verificar una firma. Una firma que encadena a una de ellas se informa como firma de prueba sin efecto legal, nunca como cualificada. Apágalo cuando las carteras nacionales estén en uso.",
+    "cfg_classification_agent_clearance_default": "Lo que un agente nuevo puede leer como máximo",
+    "cfgDesc_classification_agent_clearance_default": "El identificador de la clasificación más alta que puede leer un agente nuevo, como sisainen para Interno. Vacío: sin límite. Los agentes que existen conservan el suyo."
   },
   "dev": {
     "crumb": "Para desarrolladores",
@@ -16233,6 +16235,19 @@
         "byYou": "ti",
         "byAgent": "tu agente {name}",
         "byApp": "la aplicación {name}"
+      },
+      "clearance": {
+        "label": "Puede leer como máximo",
+        "none": "sin límite",
+        "change": "Cambiar",
+        "close": "Cerrar",
+        "choose": "La clasificación más alta que este agente puede leer",
+        "noLimit": "Sin límite",
+        "save": "Guardar",
+        "saved": "Este agente ahora puede leer como máximo: {label}.",
+        "cleared": "Este agente ahora puede leer todo lo que alcanzan sus permisos.",
+        "failed": "El cambio no se guardó.",
+        "hint": "El agente no ve el contenido con una clasificación más alta. Tus otros agentes pueden bajar este límite, y solo tú puedes subirlo."
       }
     },
     "scopes": {
@@ -22087,6 +22102,19 @@
         "ex2": "50 EUR y ningún límite en dólares: el agente puede pagar en euros, y se rechaza una compra con precio en dólares.",
         "ex3": "500 EUR: un agente que pide materiales para tu empresa. Los pedidos de cada día quedan por debajo de 500 euros.",
         "tip": "Fija el límite más bajo con el que el agente pueda hacer su trabajo, y mira en la tarjeta cuánto ha gastado hoy. El límite no afecta a tus propias compras ni al ritmo. Solo tú puedes cambiar el límite, con tu propia sesión iniciada."
+      },
+      "clearance": {
+        "title": "Puede leer como máximo",
+        "short": "La clasificación más alta que este agente puede leer. El contenido con una clasificación más alta queda oculto para él.",
+        "what": "El contenido de tu AIMEAT puede tener una clasificación, como Público, Interno o Confidencial. Aquí eliges la clasificación más alta que este agente puede leer. El contenido con una clasificación más alta queda oculto para el agente en todas partes: en la memoria, los archivos, los documentos de los espacios de trabajo y los mensajes de los tableros. Si un espacio de trabajo, un organismo, un tablero o una app tiene una clasificación más alta, todo lo que contiene cuenta con esa clasificación. Tu registro de clasificación cuenta cada vez que el contenido quedó oculto para el agente. El agente tampoco puede enviar ese contenido a una IA ni fuera de tu AIMEAT. Solo se aplica mientras la clasificación está activada.",
+        "range": "Una de las clasificaciones de tu política de clasificación, o Sin límite. Un agente nuevo empieza con Sin límite, salvo que el operador del servicio haya elegido otro valor inicial.",
+        "lowLabel": "Una clasificación baja, como Interno",
+        "low": "El agente solo lee contenido que no es sensible. Útil para un agente que habla con clientes o trabaja para muchas personas.",
+        "highLabel": "Sin límite",
+        "high": "El agente lee todo lo que alcanzan sus permisos, como antes.",
+        "ex1": "Interno: un agente de atención al cliente lee tus notas de producto, pero no los contratos confidenciales.",
+        "ex2": "Confidencial: un agente de investigación lee tus planes confidenciales, pero no los altamente confidenciales.",
+        "tip": "Otro de tus agentes puede bajar este límite si le diste el permiso de cambiar los permisos de los agentes. Solo tú, con tu propia sesión, puedes subirlo o quitar el límite, y un agente nunca puede cambiar el suyo."
       }
     },
     "access": {
@@ -22852,6 +22880,15 @@
           "ex1": "Ambas (el predeterminado): la mayoría de los servidores. Los cambios llegan rápido, y la ronda recoge lo que se escapó.",
           "ex2": "Programada: un servidor con una conexión lenta o que se cobra por uso, que lo manda todo de una vez.",
           "tip": "Déjalo en Ambas. Elige Programada solo cuando el tráfico entre servidores deba ser bajo."
+        }
+      },
+      "classification": {
+        "agent_clearance_default": {
+          "title": "Valor inicial de lo que puede leer un agente nuevo",
+          "short": "La clasificación más alta que puede leer un agente nuevo. Vacío: sin límite.",
+          "what": "Cada agente puede tener una clasificación más alta que puede leer. El contenido con una clasificación más alta queda oculto para el agente y se cuenta. Este ajuste da ese valor a cada agente creado después del cambio. Los agentes que ya existen conservan el suyo, y cada propietario puede cambiarlo en la página del agente. Solo se aplica mientras la clasificación está activada.",
+          "range": "El identificador de una clasificación de la política de clasificación de este servicio, como sisainen para Interno o luottamuksellinen para Confidencial. Vacío (el valor predeterminado): sin límite.",
+          "tip": "Déjalo vacío salvo que los agentes de este servicio deban empezar limitados. En un servicio de empresa donde los agentes atienden a muchas personas, Interno es un buen valor inicial."
         }
       }
     },

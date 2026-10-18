@@ -1,0 +1,23 @@
+-- 0107_agent_clearance.sql
+--
+-- An agent's clearance: the highest classification label it may read (plan doc-mvdipuyqraas, L2).
+--
+-- Classification labels content (Public, Internal, Confidential, ...). Until now every agent read
+-- every label its other permissions reached, so an owner could not give a customer-service agent
+-- the internal notes and keep the confidential ones away from it. The reader
+-- (services/classification/reader.ts) now hides content whose effective label ranks above the
+-- agent's clearance and counts it, as the other classification hiding does.
+--
+--   "Agent"."clearance"   a label id of the classification policy (for example 'sisainen'), or NULL.
+--                         NULL = no limit, which is every existing agent, so nothing changes for
+--                         them. A new agent gets the node's classification.agent_clearance_default.
+--
+-- TEXT, like "taskStart", so both providers store and read the same string and an update to NULL
+-- clears it on both (docs/coding-guidelines/storage-sync.md). The rank is read from the policy at
+-- the time of each read, so a policy change never needs this column rewritten.
+--
+-- Who may change it is decided in code (services/agent-clearance.ts): raising or removing it needs
+-- the owner in person; an agent holding agent:permissions may only lower another agent's.
+--
+-- Mirrors the SQLite column added in schema-columns-agents.ts.
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "clearance" TEXT;

@@ -12387,7 +12387,9 @@
     "cfgDesc_docsign_app_url": "Allekirjoitussovelluksen osoite. Allekirjoittamaan pyydetty henkilö saa ilmoituksen, joka avaa sovelluksen suoraan pyyntöön. Tyhjä: ilmoitus nimeää pyynnön ilman linkkiä.",
     "cfgDesc_docsign_eudi_enabled": "Henkilö voi allekirjoittaa PDF:n EU:n digitaalisen identiteetin lompakolla: lompakko tekee allekirjoituksen, ja tämä palvelin vahvistaa sinetillään, että se annettiin. Vaatii lompakon käyttövarmenteen (docsign.eudi_rp_credential). Oletuksena pois päältä.",
     "cfgDesc_docsign_eudi_rp_credential": "PEM-tiedosto, jossa on tämän palvelimen lompakon käyttövarmenne: ensin EC-yksityisavain, sitten varmenne, joka nimeää tämän palvelimen (DNS:<host> tai URI:https://<host>), ja sitten sen varmentajan varmenne, jos sellainen on. Varmenteen myöntää rekisterinpitäjä (EU:n viitelompakolle registry.serviceproviders.eudiw.dev); muunna sen .p12-tiedosto PEM-muotoon openssl-komennolla. Aseta .env-tiedostossa ja käynnistä palvelin uudelleen. Tyhjä: lompakkoallekirjoitus ei ole käyttövalmis. Vaiheittainen ohje: docs/document-signing.md.",
-    "cfgDesc_docsign_eudi_test_roots": "Luottaa EU:n viitelompakon testivarmentajiin allekirjoitusta tarkistettaessa. Allekirjoitus, joka ketjuttuu sellaiseen, ilmoitetaan testiallekirjoitukseksi, jolla ei ole oikeusvaikutusta, eikä koskaan hyväksytyksi. Kytke pois, kun kansalliset lompakot ovat käytössä."
+    "cfgDesc_docsign_eudi_test_roots": "Luottaa EU:n viitelompakon testivarmentajiin allekirjoitusta tarkistettaessa. Allekirjoitus, joka ketjuttuu sellaiseen, ilmoitetaan testiallekirjoitukseksi, jolla ei ole oikeusvaikutusta, eikä koskaan hyväksytyksi. Kytke pois, kun kansalliset lompakot ovat käytössä.",
+    "cfg_classification_agent_clearance_default": "Uusi agentti saa lukea enintään",
+    "cfgDesc_classification_agent_clearance_default": "Korkeimman luokituksen tunniste, jonka uusi agentti saa lukea, esimerkiksi sisainen (Sisäinen). Tyhjä: ei rajaa. Olemassa olevat agentit pitävät arvonsa."
   },
   "dev": {
     "crumb": "Kehittäjille",
@@ -18178,6 +18180,19 @@
         "byYou": "sinä",
         "byAgent": "agenttisi {name}",
         "byApp": "sovellus {name}"
+      },
+      "clearance": {
+        "label": "Saa lukea enintään",
+        "none": "ei rajaa",
+        "change": "Muuta",
+        "close": "Sulje",
+        "choose": "Korkein luokitus, jonka tämä agentti saa lukea",
+        "noLimit": "Ei rajaa",
+        "save": "Tallenna",
+        "saved": "Agentti saa nyt lukea enintään: {label}.",
+        "cleared": "Agentti saa nyt lukea kaiken, mihin sen oikeudet ulottuvat.",
+        "failed": "Muutosta ei tallennettu.",
+        "hint": "Agentti ei näe sisältöä, jonka luokitus on tätä korkeampi. Muut agenttisi voivat laskea rajaa, ja vain sinä voit nostaa sitä."
       }
     },
     "scopes": {
@@ -24282,6 +24297,19 @@
         "ex2": "50 EUR eikä rajaa dollareille: agentti voi maksaa euroina, ja dollareina hinnoiteltu osto hylätään.",
         "ex3": "500 EUR: agentti tilaa tarvikkeita yrityksellesi. Päivän tilaukset pysyvät alle 500 euron.",
         "tip": "Aseta pienin raja, jolla agentti pystyy tekemään työnsä, ja seuraa kortilta, paljonko se on käyttänyt tänään. Raja ei koske omia ostojasi eikä tahdistusta. Vain sinä voit muuttaa rajaa, kun olet itse kirjautuneena."
+      },
+      "clearance": {
+        "title": "Saa lukea enintään",
+        "short": "Korkein luokitus, jonka agentti saa lukea. Agentti ei näe sisältöä, jonka luokitus on korkeampi.",
+        "what": "AIMEATissasi sisällöllä voi olla luokitus, esimerkiksi Julkinen, Sisäinen tai Luottamuksellinen. Tässä valitset korkeimman luokituksen, jonka tämä agentti saa lukea. Agentti ei näe korkeammin luokiteltua sisältöä missään: ei muistissa, tiedostoissa, työtilojen dokumenteissa eikä taulujen viesteissä. Jos työtila, organismi, taulu tai sovellus on luokiteltu korkeammin, kaikki sen sisältö lasketaan yhtä korkeaksi. Luokittelun lokiisi kirjataan jokainen kerta, kun sisältö jäi agentilta piiloon. Agentti ei myöskään voi lähettää tällaista sisältöä tekoälylle eikä AIMEATisi ulkopuolelle. Raja on voimassa vain, kun luokittelu on päällä.",
+        "range": "Jokin luokittelukäytäntösi luokituksista tai Ei rajaa. Uusi agentti saa aluksi arvon Ei rajaa, jos palvelun ylläpitäjä ei ole valinnut muuta.",
+        "lowLabel": "Matala luokitus, esimerkiksi Sisäinen",
+        "low": "Agentti lukee vain sisältöä, joka ei ole arkaluonteista. Sopii agentille, joka puhuu asiakkaiden kanssa tai palvelee monia ihmisiä.",
+        "highLabel": "Ei rajaa",
+        "high": "Agentti lukee kaiken, mihin sen oikeudet ulottuvat, kuten ennenkin.",
+        "ex1": "Sisäinen: asiakaspalvelun agentti lukee tuotemuistiinpanosi mutta ei luottamuksellisia sopimuksia.",
+        "ex2": "Luottamuksellinen: tutkimusagentti lukee luottamukselliset suunnitelmasi mutta ei erittäin luottamuksellisia.",
+        "tip": "Toinen agenttisi voi laskea rajaa, jos annoit sille oikeuden muuttaa agenttien oikeuksia. Vain sinä voit nostaa rajaa tai poistaa sen, ja sinun pitää olla itse kirjautuneena. Agentti ei koskaan voi muuttaa omaa rajaansa."
       }
     },
     "access": {
@@ -25047,6 +25075,15 @@
           "ex1": "Molemmat (oletus): useimmat palvelimet. Muutokset tulevat nopeasti, ja kierros korjaa sen, mikä jäi välistä.",
           "ex2": "Ajastettu: palvelin hitaan tai käytön mukaan laskutettavan yhteyden takana. Se lähettää kaiken yhdellä kertaa.",
           "tip": "Pidä Molemmat. Valitse Ajastettu vain, kun palvelinten välisen liikenteen pitää pysyä pienenä."
+        }
+      },
+      "classification": {
+        "agent_clearance_default": {
+          "title": "Mitä uusi agentti saa lukea enintään",
+          "short": "Korkein luokitus, jonka uusi agentti saa lukea. Tyhjä: ei rajaa.",
+          "what": "Jokaisella agentilla voi olla korkein luokitus, jonka se saa lukea. Agentti ei näe korkeammin luokiteltua sisältöä, ja jokainen piiloon jäänyt kerta kirjataan lokiin. Tämä asetus antaa arvon jokaiselle agentille, joka luodaan muutoksen jälkeen. Olemassa olevat agentit pitävät arvonsa, ja omistaja voi muuttaa sen agentin sivulla. Asetus on voimassa vain, kun luokittelu on päällä.",
+          "range": "Palvelun luokittelukäytännön luokituksen tunniste, esimerkiksi sisainen (Sisäinen) tai luottamuksellinen (Luottamuksellinen). Tyhjä (oletus): ei rajaa.",
+          "tip": "Jätä tyhjäksi, ellei agenttien pidä aloittaa rajattuina. Yrityksen palvelussa, jossa agentit palvelevat monia ihmisiä, aloitusarvo Sisäinen on hyvä."
         }
       }
     },

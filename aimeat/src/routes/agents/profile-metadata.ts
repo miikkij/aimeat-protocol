@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-18 — GET /v1/agents carries each agent's `clearance` (plan doc-mvdipuyqraas L2).
  *   2026-10-15 — GET /v1/agents answers `refusals: null` and `refusals_unreadable: true` on every row
  *     when the refusal notes cannot be read, instead of an empty list (feature-list audit #30).
  *   v1.17.0 — 2026-10-12 — GET /v1/agents asks agent:read from 4.0.0 (requireRestScope; counted with a
@@ -317,6 +318,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // Whether the owner stopped it, when and who did (services/agent-stop-rules.ts). A stopped
         // agent starts no new work until it is started again; a runtime reads its roster here.
         ...stoppedView(a),
+        // The highest classification label it may read, as a label id; null = no limit (plan
+        // doc-mvdipuyqraas L2). Its names are in the owner's classification policy.
+        clearance: a.clearance ?? null,
         // What code backs it, as the runtime last said. The only answer this node has to "what was
         // running when this ran" for a crew whose definition lives on someone else's disk.
         runtime_source: a.runtimeSource ?? null,
