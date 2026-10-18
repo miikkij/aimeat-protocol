@@ -1,12 +1,22 @@
 {
-  "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
+  "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-see-when-an-app-or-an-agent-can-invite-people",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "See when an app or an agent can invite people",
         "fi": "Näet, kun sovellus tai agentti voi kutsua ihmisiä"
+      },
+      "summary": {
+        "en": "You can now see which apps and agents may invite people into your shared spaces, and how.",
+        "fi": "Näet nyt, mitkä sovellukset ja agentit voivat kutsua ihmisiä jaettuihin tiloihisi ja miten."
       },
       "body": {
         "en": "An app or an agent can invite people into the shared spaces you belong to, and an invitation can create a new account. That stays possible, because sometimes it is part of the job. Now you can see it. An app's page says under Where this app puts what whom it invites and how: invitations by email, invitation codes or new accounts. An app that can invite people and does not say so gets a note for its owner. An agent that can invite people says so on its page, on its card and in the proposal you approve, and your AI reads the same from the list of your agents.",
@@ -16,9 +26,19 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-classify-whole-places-and-set-what-each-agent-ma",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Classify whole places and set what each agent may read",
         "fi": "Luokittele kokonaisia paikkoja ja päätä, mitä kukin agentti saa lukea"
+      },
+      "summary": {
+        "en": "One classification now covers a whole workspace or app, and you set what each agent may read.",
+        "fi": "Voit luokitella koko työtilan tai sovelluksen kerralla ja päättää, mitä kukin agentti saa lukea."
       },
       "body": {
         "en": "Where classification is on, an organisation, a workspace, a board and an app can now carry a classification of their own, such as Confidential. Everything inside it is then at least that classification. Each classification can also say how widely its content may be shown: on a new node, Internal reaches at most everyone signed in, and Confidential and Highly confidential at most the members of one organisation. Anything that tries to go wider is refused, whether you, your agent or an app asks. Only you can make an exception, and you write down why. When a classification rises over something already shown more widely, the node narrows it at once and tells you. You can also give each agent the highest classification it may read, so a customer service agent never sees Confidential material. What others can see of yours now lists the conflicts first, and one press fixes each one. On a node that already runs, the operator decides whether the new limits apply.",
@@ -28,9 +48,19 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-nothing-becomes-public-without-you",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Nothing becomes public without you",
         "fi": "Mitään ei tule julkiseksi ilman sinua"
+      },
+      "summary": {
+        "en": "Nothing your agent or an app does becomes public until you approve it with one press.",
+        "fi": "Agenttisi tai sovellus ei voi tehdä mitään julkiseksi, ennen kuin hyväksyt sen."
       },
       "body": {
         "en": "When your agent or an app tries to make something public to anyone, such as a record, a file, an app, a page, a board, a skill or a package, the change is saved as it was, and you get a notification with Approve and Decline. Your agent gives you the same link in the chat. If you want an agent to publish on its own, you give it a separate permission; full access does not include it. If the content changes after the request, approving it publishes nothing: only what you were asked about can become public. The person running the service decides whether it asks for agents only or for apps too.",
@@ -40,9 +70,19 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-share-with-one-organisation-or-run-aimeat-for-yo",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Share with one organisation, or run AIMEAT for your company only",
         "fi": "Jaa yhdelle organisaatiolle tai pidä AIMEAT vain oman yrityksesi käytössä"
+      },
+      "summary": {
+        "en": "Share things with one organisation's members only, or keep a whole AIMEAT for your company.",
+        "fi": "Jaa asioita vain yhden organisaation jäsenille tai pidä koko AIMEAT oman yrityksesi käytössä."
       },
       "body": {
         "en": "A record, a file, a board, a skill, a package, a workspace link, an app and your welcome page can now be open to the members of one organisation only. There are four levels: private, the members of one organisation, everyone signed in here, and public. For an app you choose who may open it: anyone, people signed in here, or one organisation's members; a visitor is asked to sign in and the app opens right after. The person running the service can also show everything to signed-in accounts only, so that someone who is not signed in sees nothing, and together with a Microsoft sign-in limited to chosen organisations it becomes your company's own AIMEAT. They also choose the level new things start at when nobody names one.",
@@ -52,9 +92,19 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-see-what-others-can-see-of-yours-and-close-it",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "See what others can see of yours, and close it",
         "fi": "Näe, mitä sinusta näkyy muille, ja sulje se"
+      },
+      "summary": {
+        "en": "One page lists everything of yours that others can read, and closes each item with one press.",
+        "fi": "Uusi sivu näyttää kaiken sisältösi, jota muut voivat lukea, ja suljet kunkin yhdellä painalluksella."
       },
       "body": {
         "en": "A new page in your settings, What others can see, lists everything of yours that someone else can read: open to anyone, to anyone holding the link, to everyone signed in here, or to one organisation's members. Each row shows its level and a Close button. Your AI can list the same and tells you how to close each one; it closes nothing without asking you. Every list of your records, files, boards, apps, packages and skills now shows who can read each item. The person running the service sees the same as numbers for the whole service.",
@@ -64,9 +114,19 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-your-ai-asks-whose-data-is-whose-before-it-build",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Your AI asks whose data is whose before it builds an app",
         "fi": "Tekoälysi kysyy ennen sovelluksen rakentamista, kenen data on kenenkin"
+      },
+      "summary": {
+        "en": "Team apps your AI builds now share one list, because it asks first whose data is whose.",
+        "fi": "Tekoälysi kysyy ennen rakentamista, kenen tietoa mikin on, joten tiimin sovellus saa yhteisen listan."
       },
       "body": {
         "en": "When your AI builds an app with you, it first asks who opens the app and, for each kind of data, whether it is each person's own, shared by the whole team, or public. Then it tells you in two or three sentences, with names from your own idea, how it understood you, and it builds only after you say yes. A team app then keeps one shared list for everybody, instead of giving each person an empty copy of their own.",
@@ -76,21 +136,45 @@
     {
       "date": "2026-10-18",
       "kind": "security",
+      "id": "2026-10-18-private-organisations-app-links-and-organisation",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Private organisations, app links and organisation boards fixed",
         "fi": "Yksityiset organisaatiot, sovelluslinkit ja organisaatioiden taulut korjattu"
       },
+      "summary": {
+        "en": "Private organisation names stay hidden, and a copied app link no longer skips the sign-in.",
+        "fi": "Yksityisten organisaatioiden nimet pysyvät piilossa, eikä kopioitu sovelluslinkki ohita kirjautumista."
+      },
       "body": {
         "en": "The names of private organisations could be listed by someone who was not signed in; now they cannot. When an app or a page opened only for signed-in people, its permission stayed in the browser's address bar for an hour, so a copied link opened it without signing in; now the permission leaves the address at once. An organisation's own discussion board did not open for its members; a new or changed organisation's board now does.",
         "fi": "Yksityisten organisaatioiden nimiä pystyi listaamaan kirjautumatta. Nyt ei pysty. Kun sovellus tai sivu aukesi vain kirjautuneille, sen lupa jäi tunniksi selaimen osoiteriville, joten kopioitu linkki avasi sen ilman kirjautumista. Nyt lupa poistuu osoitteesta heti. Organisaation oma keskustelutaulu ei auennut sen jäsenille. Uuden tai muutetun organisaation taulu aukeaa nyt."
+      },
+      "impact": {
+        "en": "Nothing for you to do; organisation boards now also open for their members.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Organisaation taulu aukeaa nyt myös sen jäsenille."
       }
     },
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-a-character-keeps-its-look-from-picture-to-pictu",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "A character keeps its look from picture to picture, and people can read without an account, subscribe and pay by card",
         "fi": "Hahmo pysyy samana kuvasta toiseen, lukea voi ilman tiliä, ja tilaus ja korttimaksu toimivat"
+      },
+      "summary": {
+        "en": "Pictures keep a character's look, apps can sell monthly subscriptions, and readers need no account.",
+        "fi": "Hahmo pysyy samannäköisenä kuvasta toiseen, sovellus voi myydä kuukausitilauksia, eikä lukija tarvitse tiliä."
       },
       "body": {
         "en": "When an app or your AI makes a picture, it can give the model earlier pictures to work from, so a character, a place or a style stays the same from one picture to the next. It can also redraw one part of a picture and keep the rest. An app can let people read without an account: a stranger browses its catalogue or opens a free episode, and cannot change anything. You can pay by card on Stripe's own payment page, and a creator or a studio can offer a monthly subscription that renews by itself until you cancel it. A credit card payment or a bank identification tells apps that you are an adult. An app gets only yes or no, never your date of birth. When many people make one thing together, each of them gets their own share of every sale. A picture, a PDF or a comic book file you export says inside itself how it was made, wherever it goes.",
@@ -100,9 +184,19 @@
     {
       "date": "2026-10-18",
       "kind": "feature",
+      "id": "2026-10-18-an-app-tells-you-what-is-new-in-it-and-an-open-a",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "An app tells you what is new in it, and an open app updates itself",
         "fi": "Sovellus kertoo, mitä siinä on uutta, ja avoin sovellus päivittyy itse"
+      },
+      "summary": {
+        "en": "An open app reloads itself when a new version comes out, and its info mark shows what changed.",
+        "fi": "Auki oleva sovellus latautuu itse, kun uusi versio tulee, ja tietomerkistä näet, mikä muuttui."
       },
       "body": {
         "en": "Every published app has a round info mark in its corner. Press it and you see which version runs, when it was last updated and what the latest versions changed, with a link to the app in the catalogue. When the owner publishes a new version, an app you have open reloads itself; you no longer press F5. If you build the app, as its owner or with a development right, the mark also shows the version being made and what it changes. Visitors do not see it. You can tuck the marks in the corner away until you move the pointer there; the AI label and the cookie mark stay in view. In the App Catalog, an app opens in the right list, and while it is open, signing in and out stays in reach.",
@@ -112,9 +206,18 @@
     {
       "date": "2026-10-17",
       "kind": "feature",
+      "id": "2026-10-17-share-an-html-page-that-fills-the-whole-window",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Share an HTML page that fills the whole window",
         "fi": "HTML-sivun voi jakaa koko ikkunan kokoisena"
+      },
+      "summary": {
+        "en": "Share an HTML page on a link that fills the whole browser window.",
+        "fi": "Voit jakaa HTML-sivun linkillä, joka avaa sivun koko selainikkunaan."
       },
       "body": {
         "en": "A shared HTML page now has a second link that opens the page alone in the whole browser window, with only its AI label in the corner. Copy it from the bar above the page, or ask your AI: it gets the link when it shares the page. A page's own pictures, stylesheets, scripts and fonts now load in every browser. Before this fix the browser blocked them.",
@@ -124,9 +227,19 @@
     {
       "date": "2026-10-17",
       "kind": "feature",
+      "id": "2026-10-17-you-see-who-wrote-a-message-and-you-reply-in-you",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "You see who wrote a message, and you reply in your agent's conversations",
         "fi": "Näet, kuka viestin kirjoitti, ja vastaat agenttisi keskusteluihin"
+      },
+      "summary": {
+        "en": "You see which agent wrote each message, and you can reply in your agent's conversations yourself.",
+        "fi": "Näet, mikä agentti kirjoitti viestin, ja voit itse vastata agenttisi keskusteluihin."
       },
       "body": {
         "en": "Your messages are on the right and everyone else's on the left, also your own agent's when it writes in its own name, under its name. When your agent sends a message in your name, the message says which agent wrote it, to you and to the person who gets it. A conversation your agent has with someone is one conversation in your list, and you reply in it yourself or let another of your agents reply in your name. Your agent sees what you said there. A person who accepted your agent gets your messages without a new contact request.",
@@ -136,9 +249,19 @@
     {
       "date": "2026-10-17",
       "kind": "feature",
+      "id": "2026-10-17-when-your-ai-needs-your-permission-you-allow-it",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "When your AI needs your permission, you allow it with one press",
         "fi": "Kun tekoälysi tarvitsee luvan, sallit sen yhdellä painalluksella"
+      },
+      "summary": {
+        "en": "When your AI needs a permission, you get a plain question and allow it with one press.",
+        "fi": "Kun tekoälysi tarvitsee luvan, saat selkeän kysymyksen ja sallit sen yhdellä painalluksella."
       },
       "body": {
         "en": "When your AI tries something for you that you have not allowed yet, it no longer tells you the name of a permission. It gives you a link, and the page there asks one question in your language: what it wants to do, with Allow and Don't allow. Press Allow and your AI goes on in the same conversation. You also get the same question in your notifications and by email, which you can switch off on the Email page. A new AI connection can now send messages for you and save files from the start.",
@@ -148,9 +271,19 @@
     {
       "date": "2026-10-16",
       "kind": "feature",
+      "id": "2026-10-16-the-ai-label-on-every-page-that-shows-content-an",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "The AI label on every page that shows content an AI made",
         "fi": "Tekoälymerkintä jokaisella sivulla, jolla on tekoälyn tekemää sisältöä"
+      },
+      "summary": {
+        "en": "A page an AI made shows the EU AI label when you share it on an open link.",
+        "fi": "Tekoälyn tekemässä sivussa näkyy EU:n tekoälymerkintä, kun jaat sen avoimella linkillä."
       },
       "body": {
         "en": "When an AI made a page and you share it on an open link, its readers now see the EU AI label. It appears on shared workspace pages and HTML pages, on knowledge packages and on each entry an AI wrote, on portfolios, on the front page's passages and notices, and on Design Book parts. Inside the workspace, members see the same label and who made the page. When you paste a page from another AI into the workspace editor, you tick that an AI made it, and the page keeps that record. A page shared behind a password or only with signed-in accounts is not public, so it needs no label. Your compliance report and the operator's now count pages shared on an open link as public content.",
@@ -160,9 +293,19 @@
     {
       "date": "2026-10-16",
       "kind": "feature",
+      "id": "2026-10-16-bring-a-presentation-into-a-workspace-as-an-html",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Bring a presentation into a workspace as an HTML page",
         "fi": "Tuo esitys työtilaan HTML-sivuna"
+      },
+      "summary": {
+        "en": "Keep a presentation or a report with charts in a workspace, made by your AI as an HTML page.",
+        "fi": "Pyydä tekoälyäsi tekemään esitys tai raportti kaavioineen, niin se tallentuu työtilaan HTML-sivuna."
       },
       "body": {
         "en": "A document space in a workspace now holds HTML pages beside the Markdown pages: a presentation, a report with charts, or a page with pictures and some interaction. Ask your AI for one, and it writes the page, publishes it, shares it and gives you the link. If your AI cannot connect, the + HTML page button in the workspace gives you a ready-made prompt to run in any AI chat. The page's script runs in an isolated frame. It has no network, it cannot reach your account or anybody else's, and a link in it opens only after the reader confirms the address. The link to a shared HTML page works for 90 days unless you choose another end date, and one press adds 90 more days. The pictures of a shared Markdown page now load for everyone who may read the page. The workspace marks a page that nobody opened or changed in six months, and your AI offers to archive it.",
@@ -172,9 +315,19 @@
     {
       "date": "2026-10-15",
       "kind": "feature",
+      "id": "2026-10-15-find-a-place-in-settings-controls-and-on-the-adm",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Find a place in Settings & Controls and on the admin pages by typing",
         "fi": "Löydä kohta Asetukset ja hallinta -sivuilta ja ylläpidosta kirjoittamalla"
+      },
+      "summary": {
+        "en": "Type a word in the settings or admin menu to go straight to the right page and section.",
+        "fi": "Kirjoita sana asetusten tai ylläpidon valikkoon, niin pääset suoraan oikealle sivulle ja osioon."
       },
       "body": {
         "en": "A find field is now at the top of the Settings & Controls menu and of the admin menu. Type a word, and the menu shows only the places that match: pages, sections inside a page and, on the admin pages, the Config settings. A place is found by its name or by another word for it, in English, Finnish or Spanish. Enter opens the page at the right section. The / key moves you into the field from anywhere on the page. When nothing in the menus matches, the field offers to search your content instead. Your AI can answer \"where do I find this?\" the same way, with a link to the page. The Search everything dialog no longer scrolls sideways.",
@@ -185,22 +338,47 @@
       "date": "2026-10-13",
       "version": "4.0.1",
       "kind": "fix",
+      "id": "2026-10-13-agents-and-apps-that-worked-before-4-0-0-keep-wo",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator",
+        "developer"
+      ],
       "title": {
         "en": "Agents and apps that worked before 4.0.0 keep working",
         "fi": "Ennen versiota 4.0.0 toimineet agentit ja sovellukset toimivat edelleen"
       },
+      "summary": {
+        "en": "Agents and apps made before version 4.0.0 got the permissions they need, so they still work.",
+        "fi": "Ennen versiota 4.0.0 tehdyt agentit ja sovellukset saivat tarvitsemansa oikeudet ja toimivat yhä."
+      },
       "body": {
         "en": "Version 4.0.0 asks every agent and app for the permission word of each route it calls. On its first start, 4.0.1 gives each agent and each approved outside app that existed before 4.0.0 the words those checks ask for, once. What worked before keeps working, and nobody has to go through their agents by hand. Your home page names the agents and the words they got, and you can remove a word. A word you remove stays removed. A published app whose code calls a route that its permissions do not name keeps that word too. The App Catalog shows it, and the app's owner can remove it. An app published for the first time from now on gets no such word: the publish answer says which word its code needs, so the app can declare it. An app can now also say that its records are written only through its own tool. An agent's direct write to such a record space is refused, and a new agent that watches the space gets the app's tool. 4.0.0 already carried two security fixes from code scanning that its notes did not name: a pattern match that a long address could slow down at MCP sign-in, and the text answer of the agent prompt route, which now tells the browser not to guess its type.",
         "fi": "Versio 4.0.0 vaatii jokaiselta agentilta ja sovellukselta käyttöoikeuden jokaiseen reittiin, jota se kutsuu. Kun 4.0.1 käynnistyy ensimmäisen kerran, se antaa kerran jokaiselle ennen versiota 4.0.0 tehdylle agentille ja hyväksytylle ulkoiselle sovellukselle ne käyttöoikeudet, joita tarkistukset vaativat. Se, mikä toimi ennen, toimii edelleen, eikä kenenkään tarvitse käydä agenttejaan läpi käsin. Kotisivusi kertoo, mitkä agentit saivat minkäkin oikeuden, ja voit poistaa oikeuden. Poistamasi oikeus pysyy poissa. Myös julkaistu sovellus saa pitää oikeuden, jos sen koodi kutsuu reittiä, jota sen omat käyttöoikeudet eivät nimeä. Sovelluskatalogi näyttää oikeuden, ja sovelluksen omistaja voi poistaa sen. Tästä eteenpäin ensimmäistä kertaa julkaistu sovellus ei saa tällaista oikeutta. Julkaisun vastaus kertoo, mitä oikeutta sen koodi tarvitsee, jotta sovellus voi ilmoittaa sen itse. Sovellus voi nyt myös määrätä, että sen tietueisiin kirjoitetaan vain sen oman työkalun kautta. Agentin suora kirjoitus tällaiseen tietuetilaan hylätään, ja uusi agentti, joka seuraa tilaa, saa sovelluksen työkalun. Versiossa 4.0.0 oli jo kaksi koodiskannauksen löytämää tietoturvakorjausta, joita sen julkaisutiedot eivät maininneet: säännöllinen lauseke, jota pitkä osoite saattoi hidastaa MCP-kirjautumisessa, ja agenttikehotteen reitin tekstivastaus, joka nyt kieltää selainta arvaamasta sisällön tyyppiä."
+      },
+      "impact": {
+        "en": "Nothing to do; your home page lists what each agent got, and you can remove it.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Kotisivusi näyttää, mitä kukin agentti sai, ja voit poistaa sen."
       }
     },
     {
       "date": "2026-10-13",
       "version": "4.0.0",
       "kind": "notice",
+      "id": "2026-10-13-aimeat-4-0-0-the-old-ways-are-gone-and-aimeat-co",
+      "highlight": true,
+      "audience": [
+        "operator",
+        "developer"
+      ],
       "title": {
         "en": "AIMEAT 4.0.0: the old ways are gone, and AIMEAT Core 2026-11 is the protocol",
         "fi": "AIMEAT 4.0.0: vanhat tavat poistuvat, ja AIMEAT Core 2026-11 on nyt protokolla"
+      },
+      "summary": {
+        "en": "Version 4.0.0 removes the old, less safe ways in; operators read the upgrade guide first.",
+        "fi": "Versio 4.0.0 poistaa vanhat, heikommin suojatut tavat. Ylläpitäjä, lue päivitysohje ennen päivitystä."
       },
       "body": {
         "en": "Version 4.0.0 finishes what 3.27.0 announced. Sign-in, your agents' tokens and the messages between servers now work only in their safer forms, so an old form can no longer be used to reach your data. AIMEAT Core 2026-11 is now the protocol: a server states it when another one asks, and anyone can build a server that works with this one from that text. 4.0.0 removes the sign-in with the account's private key (you sign in with a password, a passkey or an outside account), a session token in a socket address, messages between servers that do not name their receiver and their send time, the choice to accept a forwarded request without its signature, the old morsel price fields, the AI settings routes from before providers, the fixed TURN user name and password, an MCP sign-in without PKCE, a REST call from an agent or app that lacks the permission word the route asks for, and an MCP sign-in token used on a REST route. A workflow can no longer set a cost cap in morsels. When you share something and do not say how far it may go, it now stays on this server. Two names made a morsel look like a price: a knowledge package's sharing.morsel_price and a capability's cost.morsels. Both are now toll_morsels. The old names still work in 4.x, and the answer warns about them. A morsel paces use and is never a price. Operators: read the upgrading guide (https://github.com/miikkij/aimeat-protocol/blob/main/docs/operations/upgrading.md) before you upgrade, and check GET /v1/stats to see what still uses an old form.",
@@ -210,9 +388,19 @@
     {
       "date": "2026-10-11",
       "kind": "feature",
+      "id": "2026-10-11-every-offer-has-a-money-price-and-a-pacing-amoun",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Every offer has a money price and a pacing amount",
         "fi": "Jokaisella tarjouksella on rahahinta ja tahdistus"
+      },
+      "summary": {
+        "en": "Each offer shows a money price or Free, and how many morsels one use takes.",
+        "fi": "Jokaisesta tarjouksesta näet rahahinnan tai sanan Maksuton ja sen, montako murusta yksi käyttö ottaa."
       },
       "body": {
         "en": "Offers, app tools, apps and agent work now carry two values. The money price is optional: an item without one is free, and it stays free. The pacing amount is the number of morsels one use takes from your balance, so nobody can use a service faster than their morsels allow. Part of those morsels burns, the operator keeps the share it had before, and the rest goes to the person who offers the item. A morsel is never a price and pays for nothing. When your morsels run out, the daily allowance gives you more, and when the operator sells a pacing pack, you can buy more morsels with money. Items that had a price in morsels kept that number as their pacing amount, so nothing disappeared.",
@@ -222,9 +410,19 @@
     {
       "date": "2026-10-11",
       "kind": "feature",
+      "id": "2026-10-11-your-ai-finds-this-service-s-guidance-as-built-i",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Your AI finds this service's guidance as built-in skills, and the connect guide covers 15 tools",
         "fi": "Tekoälysi löytää palvelun ohjeet valmiina taitoina, ja yhdistämisohje kattaa 15 työkalua"
+      },
+      "summary": {
+        "en": "Your AI reads this service's guides as soon as it connects, and 15 AI tools now have connect steps.",
+        "fi": "Tekoälysi löytää palvelun ohjeet heti yhdistyttyään, ja yhdistämisohje kattaa nyt 15 tekoälytyökalua."
       },
       "body": {
         "en": "Every AIMEAT now ships its guidance for AIs as built-in skills, so your AI can read them as soon as it connects: how to build an agent that works inside a workspace, how an app uses AI, and how to put recurring work on a schedule. The guide to connecting your AI covers 15 tools, each checked against its maker's own pages, among them Mistral, LM Studio, Gemini CLI, Perplexity, OpenClaw and Copilot Studio.",
@@ -234,21 +432,45 @@
     {
       "date": "2026-10-11",
       "kind": "fix",
+      "id": "2026-10-11-shopping-ais-see-money-prices-only-and-service-t",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Shopping AIs see money prices only, and service templates keep the limits they state",
         "fi": "Ostoksia tekevät tekoälyt näkevät vain rahahinnat, ja palvelumallit pitävät lupaamansa rajat"
       },
+      "summary": {
+        "en": "Shopping AIs see only real money prices, and service templates enforce the limits they promise.",
+        "fi": "Ostoksia tekevät tekoälyt näkevät vain rahahinnat, ja palvelumallit pitävät kiinni lupaamistaan rajoista."
+      },
       "body": {
         "en": "Shopping AIs that read this service's product list, or buy through its ACP and UCP checkouts, now see money prices only, and an item without a money price is not offered to them. The service templates now enforce the limits they state, such as the shortest title. Records that describe themselves point at a description you can open, and your identity credential names this service's own vocabulary.",
         "fi": "Ostoksia tekevät tekoälyt, jotka lukevat palvelun tuotelistaa tai ostavat sen ACP- ja UCP-kassoilla, näkevät nyt vain rahahinnat. Tuotetta, jolla ei ole rahahintaa, ei tarjota niille. Palvelumallit valvovat nyt rajat, jotka ne lupaavat, esimerkiksi otsikon vähimmäispituuden. Itsensä kuvaavat tietueet osoittavat kuvaukseen, jonka voit avata, ja henkilöllisyystodisteesi käyttää tämän palvelun omaa sanastoa."
+      },
+      "impact": {
+        "en": "Nothing to do; an item with no money price is no longer offered to shopping AIs.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Tuotetta ilman rahahintaa ei enää tarjota ostaville tekoälyille."
       }
     },
     {
       "date": "2026-10-11",
       "kind": "feature",
+      "id": "2026-10-11-make-an-agent-from-your-home-page-and-choose-the",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Make an agent from your home page, and choose the computer that runs it",
         "fi": "Tee agentti kotisivultasi ja valitse tietokone, joka ajaa sitä"
+      },
+      "summary": {
+        "en": "Describe an agent in one sentence on your home page, check it, and pick the computer that runs it.",
+        "fi": "Kuvaa agentti yhdellä lauseella kotisivullasi, tarkista se ja valitse tietokone, joka ajaa sitä."
       },
       "body": {
         "en": "Your home now has a block for your agents. Write one sentence about what you want done, and a page shows the agent before anything is made: what it does, when it works, what it can reach and which computer runs it. You change what you want and start it. An agent can work when you ask, by the clock or when someone writes to it. It can also stay on all the time on a computer that keeps agents running. A computer is your own laptop, a server, a computer in the cloud or an AIMEAT instance from the store, and you give each one a name. On an agent's own page you can talk to it, give it a task and move it to another computer. Your own AI can do the same from a chat: it proposes the agent, names the computer, and you approve.",
@@ -258,9 +480,18 @@
     {
       "date": "2026-10-10",
       "kind": "feature",
+      "id": "2026-10-10-sign-a-pdf-with-your-eu-digital-identity-wallet",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Sign a PDF with your EU Digital Identity Wallet (test phase)",
         "fi": "Allekirjoita PDF EU-lompakolla (testivaihe)"
+      },
+      "summary": {
+        "en": "Try signing a PDF with the EU wallet on your phone, with no signature provider contract.",
+        "fi": "Voit kokeilla PDF:n allekirjoitusta puhelimen EU-lompakolla ilman sopimusta allekirjoituspalvelun kanssa."
       },
       "body": {
         "en": "A party to a signing request can now sign a PDF in their EU Digital Identity Wallet instead of with a passkey. You open a link on the phone that holds the wallet, or scan a QR code with it. The wallet shows the document, you confirm, and the wallet makes the signature through its own trust service, so no contract with a signature provider is needed. The signed PDF is stored in your files, and every party can download it. When someone else signs after you, they sign the same file. Your AI can start the signature for you and follow it. For now this works with the EU's reference wallet on Android, whose certificates are test certificates: the signature is a test and has no legal effect. Finland's own wallet is expected in 2027, and it will give a qualified electronic signature.",
@@ -270,9 +501,19 @@
     {
       "date": "2026-10-09",
       "kind": "feature",
+      "id": "2026-10-09-sign-documents-with-a-passkey-and-check-any-sign",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Sign documents with a passkey, and check any signed PDF",
         "fi": "Allekirjoita dokumentteja pääsyavaimella ja tarkista allekirjoitettu PDF"
+      },
+      "summary": {
+        "en": "Ask people to sign a document with their passkey, and check any PDF signed elsewhere.",
+        "fi": "Pyydä ihmisiä allekirjoittamaan dokumentti pääsyavaimella ja tarkista muualla allekirjoitettu PDF."
       },
       "body": {
         "en": "Ask people to sign a document, and they sign with their passkey: a fingerprint, their face or the device PIN. Only a hash of the document is kept, never the file. AIMEAT seals each signature with its own key, so anyone who has the document can check who signed it, without an account. Your AI can create the request, follow it and tell you when everyone has signed. An agent signs only in its own name, never for you. You can also check a document signed somewhere else, a PDF or a signature file. Each signature is valid, invalid or could not be confirmed, and you see why. The check compares the certificate with the EU trusted lists, asks whether it was revoked, and tells you when a signature is a qualified electronic signature, which equals a handwritten one in EU law. On aimeat.io you do both in the Allekirjoitus app. An AIMEAT signature is an electronic signature, not a qualified one.",
@@ -282,9 +523,19 @@
     {
       "date": "2026-10-09",
       "kind": "feature",
+      "id": "2026-10-09-your-visitors-own-ai-can-now-use-your-app",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "user"
+      ],
       "title": {
         "en": "Your visitors' own AI can now use your app",
         "fi": "Kävijän oma tekoäly voi nyt käyttää sovellustasi"
+      },
+      "summary": {
+        "en": "Visitors to your app see that their own AI can use it, and get three ways to start.",
+        "fi": "Sovelluksesi kävijät näkevät, että heidän oma tekoälynsä voi käyttää sovellusta, ja saavat ohjeet alkuun."
       },
       "body": {
         "en": "When your app has app tools or skills, it now shows a round button beside the AI label. The button tells the visitor that their own AI can use the app, and opens the app's own page. The page lists the tools and the skills, and shows three ways to start: an AI that connects to this service, any chat AI that reads the app's guide and helps the visitor step by step, and a program that calls the tools over HTTP. Anyone can now read the text of a public skill without signing in. You can switch the button off in the app's Marks and authorship. A skill can now be attached only to an app of its own owner, so nobody can put their text under your app.",
@@ -295,9 +546,19 @@
       "date": "2026-10-09",
       "version": "3.25.0",
       "kind": "feature",
+      "id": "2026-10-09-ai-made-sound-pictures-and-files-say-how-they-we",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "AI-made sound, pictures and files say how they were made",
         "fi": "Tekoälyn tekemä ääni, kuva ja tiedosto kertovat, miten ne on tehty"
+      },
+      "summary": {
+        "en": "Pictures, sound and files an AI made say how they were made, and the AI label goes with them.",
+        "fi": "Tekoälyn tekemä kuva, ääni tai tiedosto kertoo, miten se on tehty, ja tekoälymerkintä kulkee mukana."
       },
       "body": {
         "en": "A speech clip, a picture or any file you store now carries the record of how it was made. When you publish it, the AI label goes with it, and anyone can check it. The label says what the thing is: a clip says AI made this audio, not this text. Whether a label is needed is decided when the content is shown, so something you make public later gets the label it now needs. When an AI provider refuses a request, you see its reason and what to change, instead of being told to try again. The same record now travels with messages, board notices, delivered work, shared documents and skills. A statement your permissions do not allow is refused before anything is charged.",
@@ -307,9 +568,19 @@
     {
       "date": "2026-10-09",
       "kind": "feature",
+      "id": "2026-10-09-see-how-people-and-ais-find-you-and-what-they-do",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "See how people and AIs find you, and what they do on your apps",
         "fi": "Näe, miten ihmiset ja tekoälyt löytävät sinut ja mitä he tekevät sovelluksissasi"
+      },
+      "summary": {
+        "en": "See where your app visitors came from, which AI sent them, and which clicks changed nothing.",
+        "fi": "Näet, mistä sovellustesi kävijät tulivat, mikä tekoäly heidät lähetti ja mitkä klikkaukset eivät muuttaneet mitään."
       },
       "body": {
         "en": "A new Visibility page in Settings shows where the people who open your apps came from, and which AI answer sent them. It shows which of your pages an AI read because a person asked it, who read the files AIs use to learn your place, and which purchases followed. Your own AI reads the same report. It only counts: no address, cookie or visitor id is kept, so it works from the start. On your apps you see the clicks that changed nothing and the spots people clicked again and again, on phones and computers. You can switch on a weekly helper: your own AI writes a corrected draft of the app, and nothing changes until you publish it. You also see where AI agents stop when they buy from you or call your tools. You can add your own Microsoft Clarity or Google Analytics, and they wait for the visitor's consent when the cookie banner is on. Your products with a price in US dollars can go to Microsoft Copilot Checkout and to your own Stripe, and AI shopping services can buy through your own checkout.",
@@ -320,21 +591,45 @@
       "date": "2026-10-06",
       "version": "3.25.0",
       "kind": "security",
+      "id": "2026-10-06-a-security-review-and-what-it-changed-for-you",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "A security review, and what it changed for you",
         "fi": "Tietoturva tarkistettiin: mitä muuttui sinulle"
       },
+      "summary": {
+        "en": "Sign-in links work once, and you are told when the service's operator changes your account.",
+        "fi": "Kirjautumislinkki toimii vain kerran, ja saat tiedon, kun palvelun ylläpitäjä muuttaa tiliäsi."
+      },
       "body": {
         "en": "In October we reviewed the node's security and code, and fixed what we found. A sign-in link now checks your account again when you open it, works once, and opens only your own apps. An account made from an invitation link starts with its email unverified. When the person who runs this service makes a change in your account, the change is recorded and you are told about it. A package's extensions and apps get only what you approved, and a claim code or a purchase limit cannot be used twice. Every AI call records who asked, and a schedule or a workflow asks as the person it works for. When the server's AI allowance is spent, the person who runs this service decides what happens next, and a new server stops the calls. A file you share into an organism takes the organism's classification, and the name of an erased account leaves other people's records. A page the server opens to take a screenshot cannot reach the network. A company's description now says when an AI wrote it. The person who runs this service can now let their own AI agent run it over MCP, with the same rights they have on the web pages.",
         "fi": "Kävimme lokakuussa läpi noden tietoturvan ja koodin ja korjasimme sen, mitä löysimme. Kirjautumislinkki tarkistaa nyt tilisi uudelleen, kun avaat sen. Linkki toimii vain kerran ja avaa vain omat sovelluksesi. Kun tili luodaan kutsulinkillä, sen sähköpostiosoite on aluksi vahvistamaton. Kun palvelun ylläpitäjä muuttaa jotakin tililläsi, muutos kirjataan ja sinulle kerrotaan siitä. Paketin laajennukset ja sovellukset saavat vain sen, minkä hyväksyit, eikä lunastuskoodia tai ostorajaa voi käyttää kahdesti. Jokainen tekoälykutsu kirjaa, kuka kysyi. Ajastus tai työnkulku kysyy sen ihmisen nimissä, jonka puolesta se toimii. Kun palvelimen tekoälysaldo on käytetty, palvelun ylläpitäjä päättää, mitä sitten tapahtuu. Uusi palvelin lopettaa silloin kutsut. Organismiin jakamasi tiedosto saa organismin luokituksen. Poistetun tilin nimi poistuu muiden ihmisten tiedoista. Palvelimen avaama sivu ei pääse verkkoon, kun palvelin ottaa siitä kuvakaappauksen. Yrityksen kuvaus kertoo nyt, jos tekoäly kirjoitti sen. Palvelun ylläpitäjä voi nyt antaa oman tekoälyagenttinsa ylläpitää palvelua MCP:n kautta samoin oikeuksin, jotka hänellä on verkkosivuilla."
+      },
+      "impact": {
+        "en": "Nothing changes in daily use, and you need to do nothing.",
+        "fi": "Käyttö ei muutu, eikä sinun tarvitse tehdä mitään."
       }
     },
     {
       "date": "2026-10-05",
       "kind": "feature",
+      "id": "2026-10-05-forms-say-what-is-wrong-field-by-field",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Forms say what is wrong, field by field",
         "fi": "Lomake kertoo kentän vieressä, mikä on väärin"
+      },
+      "summary": {
+        "en": "App forms tell you next to each field what is wrong, in your own language.",
+        "fi": "Sovelluksen lomake kertoo kentän vieressä omalla kielelläsi, mikä on väärin."
       },
       "body": {
         "en": "A form in an app now tells you next to each field what to do, in your language: \"Fill in this field\", or \"The check digit of the Business ID does not match\". A field that needs a format shows an example before you type. Finnish Business IDs, personal identity codes, IBANs, postal codes and phone numbers are checked with their check digits. A Next or Send button waits until the fields are right and says which ones still need you. The app's builder writes the rules once, and the same rules guard the workspace, so what an AI writes there is checked the same way as what you type.",
@@ -344,9 +639,18 @@
     {
       "date": "2026-10-04",
       "kind": "feature",
+      "id": "2026-10-04-apps-you-buy-come-ready",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Apps you buy come ready",
         "fi": "Ostamasi sovellukset ovat valmiina"
+      },
+      "summary": {
+        "en": "Apps in an AIMEAT you buy are approved already and sign you in without asking again.",
+        "fi": "Ostamasi AIMEATin sovellukset on jo hyväksytty, ja ne kirjaavat sinut sisään kysymättä uudestaan."
       },
       "body": {
         "en": "When you buy a node, its apps are already approved for what they say they use. They sign you in without asking again, and your welcome link opens the app with you signed in. When you install a package yourself, the apps of your own package are approved at once. For someone else's package, your AI shows what each app asks for, and you choose: approve them now, or let each app ask on its first visit. An update that asks for more still asks you, and you can take any approval away under Profile › Access. A new person can also create an account straight from an app's sign-in window.",
@@ -356,9 +660,18 @@
     {
       "date": "2026-10-03",
       "kind": "feature",
+      "id": "2026-10-03-fonts-of-your-own-for-the-node-s-themes",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
       "title": {
         "en": "Fonts of your own for the node's themes",
         "fi": "Omat fontit noden teemoihin"
+      },
+      "summary": {
+        "en": "You can add fonts to your server while it runs, and themes can use them at once.",
+        "fi": "Voit lisätä palvelimelle fontteja sen ollessa käynnissä, ja teemat voivat käyttää niitä heti."
       },
       "body": {
         "en": "The person who runs a node can now add fonts to it while it runs, in Admin → Themes & Styles → Fonts or by asking their AI. A theme and a Design Book look can use an added font at once, with no update to the node. The Fonts tab shows every font the node has: the ones it ships with and the ones added, with a sample line, the weights, the licence and the themes that use each. An added font is always marked as added, and one without licence details is marked as such, so it is seen at an audit. An app built with the kit loads an added font only when its look names one.",
@@ -368,9 +681,18 @@
     {
       "date": "2026-10-02",
       "kind": "feature",
+      "id": "2026-10-02-the-chat-answers-sooner-and-costs-less",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The chat answers sooner and costs less",
         "fi": "Chat vastaa nopeammin ja maksaa vähemmän"
+      },
+      "summary": {
+        "en": "The chat tells you within two seconds what it is doing, and short questions cost less.",
+        "fi": "Chat kertoo kahdessa sekunnissa, mitä se tekee, ja lyhyt kysymys maksaa vähemmän."
       },
       "body": {
         "en": "When a request takes several steps, the chat now says within two seconds what it is doing, and writes a sentence between its steps. A request that runs long answers with what it has: asked for a new agent, it writes the proposal and gives you the address where you approve it. Stopping an answer now stops the agent too. The chat also carries less with every message: it starts with the tools most jobs need and adds the others when a job needs them, so a short question no longer pays for the description of every tool on the server. Everything is still within reach.",
@@ -380,9 +702,20 @@
     {
       "date": "2026-09-29",
       "kind": "feature",
+      "id": "2026-09-29-data-classification-you-decide-which-ai-may-read",
+      "highlight": true,
+      "audience": [
+        "user",
+        "operator",
+        "agent"
+      ],
       "title": {
         "en": "Data classification: you decide which AI may read what",
         "fi": "Tietojen luokittelu: sinä päätät, mitä tekoäly saa lukea"
+      },
+      "summary": {
+        "en": "You can mark content public, internal or confidential and decide what an AI may read.",
+        "fi": "Voit luokitella sisältösi ja päättää, mitä tekoäly saa siitä lukea."
       },
       "body": {
         "en": "Everything on your AIMEAT can now carry a classification: public, internal, confidential, highly confidential, or a level you or your organism add, such as top secret. The classification decides what an AI sees. By default an AI sees everything: confidential and highly confidential content reaches it with a warning. You can set a level to hide content from AI: then that content does not appear in an AI's lists or searches, and an AI call that names it is refused. A level can also name who may read it at all, people and AI alike. An organism's content that may not leave it stays out of exports, share links, other AIMEATs and outside services, and the answer says what was left out. Your AI can set a classification, but it never lowers one and never changes one you set; a change to the rules that gives anything away waits until you accept it yourself. The Content Classifier suggests classifications: detection rules first, then the decision model or your text model, with personal data removed before anything leaves. Your Data Wallet shows your classifications and a log of what an AI was shown or used, and the operator finds the server's rules and log on the Security page. The operator turns classification on in the configuration, for everyone or for each owner to decide. It is off by default, and off changes nothing. One change applies already: when your AI reads an organism's workspace, it follows the same rules as the web pages.",
@@ -392,9 +725,18 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-install-packages-your-aimeat-in-use-from-the-fir",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
       "title": {
         "en": "Install packages: your AIMEAT in use from the first day",
         "fi": "Asennuspaketti: AIMEAT on käytössä ensimmäisestä päivästä alkaen"
+      },
+      "summary": {
+        "en": "One install package sets up your whole AIMEAT at once: apps, shared places, users and agents.",
+        "fi": "Asennuspaketti asentaa kerralla koko AIMEATisi: sovellukset, yhteiset paikat, käyttäjät ja agentit."
       },
       "body": {
         "en": "An install package puts everything your own AIMEAT needs in place at once: the apps and their settings, the organisms and their workspaces, the users, and the AI agents the apps bring with them. Every user needs an email address. A user can get an account at once and sign in with a link sent by email, a Google account or Microsoft Entra ID, or get an invitation by email. Before anything is created, your own AI makes a plan and asks you for the settings that are missing. The code and look of the apps come from the package, and updates come from the package repository, the package maker's service. You choose whether the updates install by themselves, and you decide the settings. If you fork the install, you get a copy of your own to change freely, and it gets no more updates. The package maker can release a new version first to the customers on the beta channel. If the monthly fee for the update service ends, your AIMEAT keeps working and gets no newer versions.",
@@ -404,9 +746,18 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-the-ai-page-your-providers-which-one-answers-wha",
+      "highlight": true,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The AI page: your providers, which one answers what, and which models are allowed",
         "fi": "Tekoälysivu: tarjoajasi, mikä niistä vastaa mihinkin ja mitkä mallit ovat sallittuja"
+      },
+      "summary": {
+        "en": "One AI page lets you add your own AI providers, pick which answers what, and limit models.",
+        "fi": "Tekoälysivulla lisäät omat tekoälyn tarjoajasi, valitset kuka vastaa mihinkin ja rajaat mallit."
       },
       "body": {
         "en": "The AI page in Settings & Controls has three new sections. Providers: add OpenAI, Anthropic, Mistral, xAI, OpenRouter, a model server on your own machine, any OpenAI-compatible address or an extension, give it a key, choose what it does and with which model, and test it with the smallest real call. Routing: for each kind of work, the provider that answers first and two to try next when it does not answer, and the rules for moving on. Model policy: any model, the recommended models, or your own list, and whose calls it covers. Your AI can do all of this for you as well; the page shows what is set.",
@@ -416,9 +767,19 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-an-extension-can-be-your-ai-provider-and-it-neve",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "An extension can be your AI provider, and it never sees your key",
         "fi": "Laajennus voi olla tekoälyn tarjoajasi, eikä se koskaan näe avaintasi"
+      },
+      "summary": {
+        "en": "Any AI service, such as your company's own, can answer through an extension that never sees your key.",
+        "fi": "Mikä tahansa tekoälypalvelu, myös yrityksesi oma, toimii laajennuksen kautta, eikä laajennus näe avaintasi."
       },
       "body": {
         "en": "A service this AIMEAT has no built-in support for, such as your company's own model service or a new vendor, can serve your AI calls through an extension you install. The extension states where your data goes and which addresses it calls. Your key is added to its calls outside the extension, only to those addresses and only over https, so the extension's code never reads it.",
@@ -428,9 +789,19 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-apps-and-agents-ask-for-a-capability-not-a-model",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "agent"
+      ],
       "title": {
         "en": "Apps and agents ask for a capability, not a model",
         "fi": "Sovellukset ja agentit pyytävät kykyä, eivät mallia"
+      },
+      "summary": {
+        "en": "Apps and your AI can ask what they can do for you, and say how to turn on what is off.",
+        "fi": "Sovellus ja tekoälysi näkevät, mitä ne voivat tehdä puolestasi, ja kertovat, miten puuttuvan saa käyttöön."
       },
       "body": {
         "en": "An app, an agent or your own AI first asks what it can do for you: write text, read an image, read a file or a PDF, make a picture, speak, transcribe, or make embeddings. The answer names the model, the provider and the price, and when something is off, what you can do to turn it on. Apps show that instead of a button that silently does nothing. Speech, transcription and embeddings run on your own providers and budget, and background jobs and workflow steps can make pictures and transcribe too. The built-in chat runs on your own providers as well.",
@@ -440,9 +811,18 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-a-model-catalogue-what-each-model-can-do-and-wha",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "A model catalogue: what each model can do and what it costs",
         "fi": "Malliluettelo: mitä kukin malli osaa ja mitä se maksaa"
+      },
+      "summary": {
+        "en": "Every AI model's abilities and price are listed, and a retiring model is marked where you use it.",
+        "fi": "Näet jokaisen tekoälymallin kyvyt ja hinnan, ja poistuva malli merkitään siellä, missä käytät sitä."
       },
       "body": {
         "en": "This AIMEAT keeps a list of AI models from public sources: what each one can do, how much text it reads, and what it costs. A call to a direct provider is priced from it, a model that is being retired is marked where you use it, and when a model is not available the same model at another provider can answer instead.",
@@ -452,9 +832,18 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-your-own-ai-accounts-side-by-side-with-fallback",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Your own AI accounts side by side, with fallback when one does not answer",
         "fi": "Omat tekoälytilisi rinnakkain, ja varalle siirtyminen, kun yksi ei vastaa"
+      },
+      "summary": {
+        "en": "Use several AI accounts side by side; when one does not answer, the next one does.",
+        "fi": "Voit käyttää useaa tekoälytiliä rinnakkain, ja kun yksi ei vastaa, seuraava vastaa sen sijaan."
       },
       "body": {
         "en": "Use your own accounts at OpenAI, Anthropic, Mistral, xAI and OpenRouter, or a model server on your own machine, side by side. You choose which one answers each kind of work, and when one times out, is rate limited or refuses its key, the next one answers. By default a call that started on your own machine never moves to a service outside it. Every answer says which provider answered. Your keys are stored encrypted and go only to their own provider's address.",
@@ -464,9 +853,18 @@
     {
       "date": "2026-09-28",
       "kind": "feature",
+      "id": "2026-09-28-model-policy-keep-weak-models-out-of-your-work",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Model policy: keep weak models out of your work",
         "fi": "Mallirajaus: pidä heikot mallit poissa työstäsi"
+      },
+      "summary": {
+        "en": "You decide which AI models you, your agents and your apps may use.",
+        "fi": "Voit päättää, mitä tekoälymalleja sinä, agenttisi ja sovelluksesi saatte käyttää."
       },
       "body": {
         "en": "Choose the models the people who run this AIMEAT recommend, or a list of your own, and say whose calls it covers: your own, the chat, your agents, your apps. An app can limit itself further. A call for a model the rules leave out is refused and told which models are allowed. Every layer can only tighten, and your AI proposes a change that you confirm.",
@@ -477,9 +875,19 @@
       "date": "2026-09-24",
       "version": "3.19.0",
       "kind": "feature",
+      "id": "2026-09-24-decision-providers-choose-who-answers-your-decis",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Decision providers: choose who answers your decisions, and run a decision model on your own machine",
         "fi": "Päätösmallin tarjoajat: valitse, kuka vastaa päätöksiisi, ja aja päätösmallia omalla koneellasi"
+      },
+      "summary": {
+        "en": "You choose who answers your decisions, and can run a decision model free on your own computer.",
+        "fi": "Valitset, kuka vastaa päätöksiisi, ja voit ajaa päätösmallia maksutta omalla tietokoneellasi."
       },
       "body": {
         "en": "TypeSafe's Jev is no longer the only model that can answer your decision questions. Any service that answers the same request can be a decision provider: one the server's operator runs, or your own with its own address and key. You choose a default, give an agent its own, or fix the provider in a rule, and every decision records which provider answered. Each provider says what it can carry (how many options, how much text), and a question it cannot carry is refused by name before anything is sent. Three open models now run as local decision models on your own machine: Laya, which also reads Finnish content, von and jeff. A local model needs no key and costs nothing, and your content does not leave the machine; personal data is still removed first. The repository starts all three with one Docker command, on a processor or a graphics card, with the model inside the image. The server's operator lists the exact addresses of these models, and the server may reach those addresses for decisions and nothing else, so a public server can run them safely.",
@@ -489,22 +897,47 @@
     {
       "date": "2026-09-24",
       "kind": "fix",
+      "id": "2026-09-24-search-engines-that-do-not-run-javascript-now-se",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Search engines that do not run JavaScript now see what the pages say",
         "fi": "Hakukone, joka ei aja JavaScriptiä, näkee nyt, mitä sivuilla lukee"
       },
+      "summary": {
+        "en": "Search engines such as Bing can now read the public pages and list your public apps.",
+        "fi": "Bingin kaltaiset hakukoneet lukevat nyt julkiset sivut ja voivat listata julkiset sovelluksesi."
+      },
       "body": {
         "en": "Bing reads a page mostly as the server sends it, and our public pages drew their content only in the browser. Bing found 100 to 230 words on each of them, judged the site thin and did not list it. The front page, the store, the change log, the members page, the help page and the API documentation now send their content ready in the page: the apps whose owners allowed search engines, every change, the help questions and every API endpoint. A visitor sees the same page as before. The pages name only what their owner allowed: an app appears only when its owner has let search engines find it, and a person only when their portfolio allows it. An app's sitemap now lists the app and its legal pages, and no longer the documents written for AI agents. The screenshots on the front page carry the app's name as their alternative text.",
         "fi": "Bing lukee sivun pääosin sellaisena kuin palvelin sen lähettää, mutta julkiset sivumme piirsivät sisältönsä vasta selaimessa. Bing löysi jokaiselta niistä 100–230 sanaa, piti sivustoa ohuena eikä listannut sitä. Nyt etusivu, kauppa, muutosloki, jäsensivu, ohjesivu ja API-dokumentaatio lähettävät sisältönsä valmiina: sovellukset, joiden omistaja on sallinut hakukoneet, kaikki muutokset, ohjeen kysymykset ja kaikki rajapinnat. Kävijä näkee saman sivun kuin ennenkin. Sivuilla mainitaan vain se, minkä omistaja on sallinut: sovellus näkyy vain, jos sen omistaja on antanut hakukoneiden löytää sen, ja ihminen vain, jos hänen portfolionsa sallii sen. Sovelluksen sivukartassa ovat nyt sovellus ja sen juridiset sivut, eivät enää tekoälyagenteille kirjoitetut dokumentit. Etusivun kuvakaappauksissa on vaihtoehtoisena tekstinä sovelluksen nimi."
+      },
+      "impact": {
+        "en": "Pages look the same and show only what owners allowed; you need to do nothing.",
+        "fi": "Sivut näyttävät samalta, ja niissä näkyy vain sallittu sisältö. Sinun ei tarvitse tehdä mitään."
       }
     },
     {
       "date": "2026-09-20",
       "version": "3.18.0",
       "kind": "feature",
+      "id": "2026-09-20-decision-rules-write-a-judgement-once-and-let-yo",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
       "title": {
         "en": "Decision rules: write a judgement once, and let your apps and agents use it",
         "fi": "Päätössäännöt: kirjoita harkinta kerran, ja sovelluksesi ja agenttisi käyttävät sitä"
+      },
+      "summary": {
+        "en": "Write a judgement once as a rule, and your apps and agents decide by it the same way every time.",
+        "fi": "Kirjoitat harkinnan kerran päätössäännöksi, ja sovelluksesi ja agenttisi päättävät sen mukaan aina samoin."
       },
       "body": {
         "en": "When an AI agent has to judge something (is this a bug or a billing question, is this reply good enough to send, should I act or ask a person), that step was until now a text answer with no probability, no threshold and no record. You can now write the judgement once as a decision rule: the questions, the value each answer must reach, and two bands that turn the answers into act, ask a person, or stop. Your apps and agents run the rule by its name and send only the content to judge. They cannot change the questions or the numbers, and you say whether a rule is for agents, for apps or for both. An agent may propose a rule, and nothing exists until you approve it from your open items. A rule that guards an action that cannot be undone is a gate. With the gate on for an agent, an unsure answer becomes a task on your list and the agent is told not to act. With the gate off the agent acts and the decision is still recorded. The gate is off until you turn it on, so that you can first compare how the agent does without it. Every rule and every agent shows how many decisions were made, how many a gate stopped, how many a person changed and what they cost, which is what you tune the thresholds from. You can also give one agent a key of its own, for the decision model and for the text model, with a daily cap: the agent's key pays first, then yours, then the server's, and every decision records which one paid. A key is never shown again and never sent to the agent. One change to know about: a text completion that your agent asks for is now paid from your account and counts against your daily AI budget, the same as its decisions. Until now it was counted in the agent's own account, where your own key and your budget did not reach it. Set it up in this order: a key, test the key, write a rule and try it, give the rule to an agent in its Crew tab, decide about the gate, then read the decisions and tune. Rules are under Settings, AI, Decision model; an agent's key, cap and gate are on the agent's page. For builders: `rule` on aimeat_decide and POST /v1/ai/decide, aimeat_decide_rules, aimeat_decide_rule_propose, and AIMEAT.decide.rule(id) in aimeat-decide.js.",
@@ -515,9 +948,19 @@
       "date": "2026-09-19",
       "version": "3.17.0",
       "kind": "feature",
+      "id": "2026-09-19-a-decision-model-beside-the-text-model-sort-scre",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "A decision model beside the text model: sort, screen and route what arrives",
         "fi": "Päätösmalli tekstimallin rinnalle: lajittele, seulo ja ohjaa saapuva tieto"
+      },
+      "summary": {
+        "en": "Your apps and agents can sort what arrives, such as mail, with yes-or-no answers you can trace.",
+        "fi": "Sovelluksesi ja agenttisi voivat lajitella saapuvat viestit vastauksilla, joiden perusteet näet jälkikäteen."
       },
       "body": {
         "en": "Your apps and AI agents can now ask closed questions about a message or a record (yes or no, pick one option, a scale) and get typed answers with probabilities. The model is TypeSafe's Jev; it writes no text, so it is for deciding which folder a mail goes to, whether a message needs an answer today, or how upset a customer is. Before anything is sent, e-mail addresses, phone numbers, Finnish personal identity codes, bank account numbers, street addresses and the names of your contacts are removed, and put back into the answer. What else an app sends is the app's responsibility, and the publish check tells its builder where it departs from the rules. Every decision is recorded with the model version, the thresholds it was compared with and whether a person reviewed it, so you can later ask what was decided about a record and why. Pay with your own TypeSafe key or from your AI allowance on the server's key, and test the key with one press. Set it up under Settings, AI, Decision model. For builders: the aimeat-decide.js library, the aimeat_decide tools over MCP, and POST /v1/ai/decide.",
@@ -527,9 +970,18 @@
     {
       "date": "2026-09-13",
       "kind": "notice",
+      "id": "2026-09-13-a-message-that-did-not-go-out-is-answered-as-an",
+      "highlight": true,
+      "audience": [
+        "developer"
+      ],
       "title": {
         "en": "A message that did not go out is answered as an error",
         "fi": "Viesti, joka ei lähtenyt, palautuu virheenä"
+      },
+      "summary": {
+        "en": "A message that could not be sent now returns an error, so your integration knows it failed.",
+        "fi": "Jos viestiä ei saada lähetettyä, rajapinta palauttaa nyt virheen, joten integraatiosi tietää siitä."
       },
       "body": {
         "en": "When a message could not be sent, because the mail server, the connected mailbox or the recipient's inbox here refused it, or because the server had no way to send mail at all, POST /v1/outbound/send still answered 200 and put the failure in data.status. An integration that checked the status code told its user the message was on its way. It now answers with the error SEND_FAILED: 502 when the message was refused or failed on the way out, 503 when there was nothing to send it through. error.details carries the send-log identifier and the reason, so the attempt can still be found in the send log. A message that went out answers 200 exactly as before. If your integration reads data.status to spot a failure, read the error instead. The AI tools answer the same way, and so does an app writing to a contact picked from the address book.",
@@ -540,22 +992,45 @@
       "date": "2026-09-06",
       "version": "3.13.0",
       "kind": "fix",
+      "id": "2026-09-06-an-agent-waiting-for-work-is-not-offline",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "An agent waiting for work is not offline",
         "fi": "Työtä odottava agentti ei ole poissa"
       },
+      "summary": {
+        "en": "An agent that waits for work now shows as available instead of offline.",
+        "fi": "Työtä odottava agentti näkyy nyt käytettävissä olevana eikä poissa olevana."
+      },
       "body": {
         "en": "An agent that starts only when there is work to do was being reported as offline between jobs, because what was read was when it last worked rather than whether anything could reach it. A nightly workflow mailed its owner a failure for an edition that came out complete, two nights running, and nine agents on this node showed as problems while their runtime was connected the whole time. Reachability is now read from the connection itself, so an agent waiting for work counts as available in a workflow, on the Agents page, on the home card and on the app shelf, and the page says work reaches it over a live link instead of naming a poll it never makes. An agent nothing is holding open is still reported, and a workflow step still gives up on it quickly.",
         "fi": "Agentti, joka käynnistyy vasta kun työtä tulee, näkyi töiden välissä poissaolevana, koska luettiin milloin se viimeksi teki työtä eikä sitä saako siihen yhteyden. Yöllinen työnkulku lähetti omistajalleen kahtena yönä peräkkäin virheilmoituksen lehdestä, joka tuli ulos kokonaisena, ja yhdeksän tämän noden agenttia näkyi ongelmana, vaikka niiden ajoympäristö oli koko ajan kiinni. Tavoitettavuus luetaan nyt itse yhteydestä, joten työtä odottava agentti on käytettävissä työnkulussa, Agentit-sivulla, etusivun kortissa ja sovellushyllyllä, ja sivu kertoo työn kulkevan suoraa yhteyttä pitkin sen sijaan että nimeäisi kyselyn, jota agentti ei tee. Agentti, jonka yhteyttä ei pidä auki kukaan, ilmoitetaan edelleen, ja työnkulun askel luovuttaa sen kohdalla nopeasti."
+      },
+      "impact": {
+        "en": "You need to do nothing, and workflows stop sending false failure mails.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Työnkulut eivät enää lähetä turhia virheilmoituksia."
       }
     },
     {
       "date": "2026-09-05",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-05-a-part-that-is-nearly-right-is-made-yours-not-co",
+      "highlight": false,
+      "audience": [
+        "developer"
+      ],
       "title": {
         "en": "A part that is nearly right is made yours, not copied",
         "fi": "Melkein sopiva osa tehdään omaksi, ei kopioida"
+      },
+      "summary": {
+        "en": "A kit part that is nearly right can be adjusted to fit and keeps everything it already does.",
+        "fi": "Melkein sopivan kitin osan voi muokata omaksi, ja se säilyttää kaiken, mitä se jo tekee."
       },
       "body": {
         "en": "Every list, table, card grid, queue, timeline, kanban, hero, KPI row, section, tab strip and dialog in the Atelier kit now has four doors for the case where it is almost what you need: named parts your own styles reach by name, slots that fill a line or a figure the kit leaves empty (a third line on a row, a value on the right, a kicker over a title), variants you pick instead of override (dense, numbered, wide, tall, trend), and per-part sizes and colours you set as one variable. A customised part keeps everything the kit gives it: the entrance, the glide, the pick, the empty state. Your AI asks the kit what a part offers with describe(), and the Design Book shows it on every card under 'make it yours'. Copying a part out of the kit is the last step, and the kit says what it costs.",
@@ -566,9 +1041,19 @@
       "date": "2026-09-05",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-05-an-atelier-app-moves-on-its-own",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "An Atelier app moves on its own",
         "fi": "Atelier-sovellus liikkuu itsestään"
+      },
+      "summary": {
+        "en": "Apps built with the kit now animate their changes, and the less-motion switch stops it all.",
+        "fi": "Kitillä tehdyt sovellukset näyttävät muutokset liikkeenä, ja Vähemmän liikettä -kytkin pysäyttää kaiken."
       },
       "body": {
         "en": "A screen built with the Atelier kit now arrives, changes and leaves in front of you without the app asking for it: a row that is new rises in, one that left fades out where it stood, one that moved glides there, a number counts to its new value, a tab or a picked row crosses into the next view, a dialog and a toast leave the way they came. The pace and the distance are the look's own, so a calm look stays calm. The bar's Less-motion switch and your system's reduced-motion setting stop all of it, and now they also stop the stylesheet's own animations, which they never did before.",
@@ -579,22 +1064,45 @@
       "date": "2026-09-05",
       "version": "3.13.0",
       "kind": "fix",
+      "id": "2026-09-05-the-kit-and-the-genres-work-on-a-phone-and-read",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "The kit and the genres work on a phone and read on a desktop",
         "fi": "Kitti ja genret toimivat puhelimessa ja luettavat työpöydällä"
       },
+      "summary": {
+        "en": "Apps built with the kit now fit a phone screen and read well on a large screen.",
+        "fi": "Kitillä tehdyt sovellukset mahtuvat nyt puhelimen ruutuun ja näkyvät hyvin isolla näytöllä."
+      },
       "body": {
         "en": "Every Design Book part and every genre was measured at phone, tablet and desktop widths in both themes, and what the numbers found was fixed: eight genres that were cut off at the edge of a phone screen now fold; text under 11 pixels is gone; every control is at least a finger wide; a strip that scrolls sideways fades at the edge that has more; a hero's drift stops under reduced motion; the starting shapes fill a desktop instead of leaving most of it bare; the colours that fell under the contrast line were deepened a shade. The badge in the corner of every app carries a drawn bolt instead of an emoji and reads against any background.",
         "fi": "Jokainen Design Bookin osa ja jokainen genre mitattiin puhelimen, tabletin ja työpöydän leveydellä molemmissa teemoissa, ja se mitä luvut löysivät korjattiin: kahdeksan genreä, jotka katkesivat puhelimen ruudun reunaan, taittuvat nyt; alle 11 pikselin teksti on poissa; jokainen painike on vähintään sormen levyinen; sivuttain vierivä rivi häivyttää reunan, jolla on lisää; heron ajelehdinta pysähtyy liikkeenvähennyksen alla; aloitusmuodot täyttävät työpöydän sen sijaan että jättäisivät sen enimmäkseen tyhjäksi; kontrastirajan alle jääneet värit syvennettiin sävyllä. Jokaisen sovelluksen kulman merkissä on piirretty salama emojin sijaan, ja se erottuu miltä tahansa pohjalta."
+      },
+      "impact": {
+        "en": "You need to do nothing; the apps show better on every screen.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Sovellukset näkyvät nyt paremmin joka näytöllä."
       }
     },
     {
       "date": "2026-09-05",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-05-an-atelier-app-starts-from-a-genre-and-an-extens",
+      "highlight": false,
+      "audience": [
+        "developer"
+      ],
       "title": {
         "en": "An Atelier app starts from a genre, and an extension can work in your workspace",
         "fi": "Atelier-sovellus alkaa genrestä, ja laajennus voi työskennellä työtilassasi"
+      },
+      "summary": {
+        "en": "A kit app starts from a Design Book genre, and an extension can work in a workspace for its caller.",
+        "fi": "Kitillä tehty sovellus alkaa Design Bookin genrestä, ja laajennus voi toimia työtilassa kutsujan oikeuksin."
       },
       "body": {
         "en": "An app on the Atelier track now names the register it commits to, a Design Book genre or one of its own, and the node refuses to publish a bare shell in the default look: the refusal says which genre shelf to start from. An existing Atelier app without that line is refused on its next publish, with the one line to add. Separately, an extension that declares it may now read and write in an organism workspace on behalf of whoever called it, under that person's own rights, so a tool your AI calls can keep its rules on the node instead of trusting the caller to follow them.",
@@ -605,9 +1113,19 @@
       "date": "2026-09-05",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-05-every-key-to-your-account-on-one-page-said-in-wo",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Every key to your account on one page, said in words",
         "fi": "Kaikki tilisi avaimet yhdellä sivulla, sanoin"
+      },
+      "summary": {
+        "en": "One page shows every way into your account, and you can take a single right away from an app.",
+        "fi": "Yksi sivu näyttää kaikki tiet tilillesi, ja voit ottaa sovellukselta pois yksittäisen oikeuden."
       },
       "body": {
         "en": "The Access page under Account now holds every way into your account: how you sign in (password, two-step, passkeys, the devices that are signed in right now), the apps and tokens that act in your name, the accounts you have connected at other services, your sharing groups, and the addresses an AI uses to find you. Two-step sign-in and passkeys used to sit on a tab only an operator could open; every member can switch them on here. An app's rights are said in words, one row per family such as your memory or your automations, and you can take a single right away without revoking the whole key; the change bites within a few minutes, when the app's current token runs out. Keys not used in thirty days are marked and can be revoked together, and the list of open sessions shows only the ones that still work, grouped by device and by agent, with one button that signs out every other device. A right you took away no longer comes back at the next restart. Your AI can read the same page through the aimeat_access_list tool.",
@@ -618,9 +1136,18 @@
       "date": "2026-09-04",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-04-sign-in-with-your-fingerprint-and-no-password-at",
+      "highlight": true,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Sign in with your fingerprint, and no password at all",
         "fi": "Kirjaudu sormenjäljellä, ilman salasanaa"
+      },
+      "summary": {
+        "en": "Sign in with your fingerprint, face or screen lock, without typing a password.",
+        "fi": "Voit kirjautua sormenjäljellä, kasvoilla tai näytön lukituksella ilman salasanaa."
       },
       "body": {
         "en": "There is a passkey button on the sign-in form now. Press it with the name field empty and your device asks for your fingerprint, your face or your screen lock, and you are in — nothing typed, nothing remembered, nothing to be phished, because the device checks for itself which site is asking before it answers. Add the devices you use under Account security, name them so you can tell them apart, and take one away the day you stop using it. A passkey replaces nothing: your password stays, two-step sign-in stays if you armed it, and either of them still gets you in on a machine you have not registered.",
@@ -631,22 +1158,46 @@
       "date": "2026-09-04",
       "version": "3.13.0",
       "kind": "security",
+      "id": "2026-09-04-two-step-sign-in-and-a-way-back-if-you-lose-the",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "Two-step sign-in, and a way back if you lose the phone",
         "fi": "Kaksivaiheinen kirjautuminen, ja tie takaisin jos puhelin katoaa"
       },
+      "summary": {
+        "en": "Two-step sign-in protects your account, and an operator can help if you lose your phone.",
+        "fi": "Kaksivaiheinen kirjautuminen suojaa tiliäsi, ja ylläpitäjä voi auttaa, jos puhelimesi katoaa."
+      },
       "body": {
         "en": "Account security now shows a QR code you scan with an authenticator app, the ten backup codes to write down, and the field that turns it on. After that a sign-in asks for the six digits your app shows, or one backup code when the phone is not with you. Losing both used to be the end of the account, because taking the second step off asked for a code from the very device you no longer had; an operator can now remove it for you, and you are told on your own account feed who did it and when, because a second step that can disappear quietly is not a second step. Turning it off yourself destroys the secret for good, which on one of the two databases it had not been doing.",
         "fi": "Tilin turvallisuus näyttää nyt QR-koodin jonka luet todennussovelluksella, kymmenen varakoodia talteen kirjoitettavaksi, ja kentän joka kytkee sen päälle. Sen jälkeen kirjautuminen kysyy sovelluksen näyttämät kuusi numeroa, tai yhden varakoodin silloin kun puhelin ei ole mukanasi. Molempien menettäminen oli ennen tilin loppu, koska toisen vaiheen poistaminen vaati koodin juuri siltä laitteelta jota sinulla ei enää ollut; nyt operaattori voi poistaa sen puolestasi, ja näet omalta tapahtumalistaltasi kuka sen teki ja milloin, koska toinen vaihe joka voi kadota huomaamatta ei ole toinen vaihe. Kun poistat sen itse, salaisuus tuhoutuu lopullisesti — mitä se toisessa kahdesta tietokannasta ei ollut tehnyt."
+      },
+      "impact": {
+        "en": "Turn it on under Account security if you want it; nothing changes until you do.",
+        "fi": "Ota se käyttöön kohdassa Tilin turvallisuus, jos haluat. Muuten mikään ei muutu."
       }
     },
     {
       "date": "2026-09-04",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-04-your-agents-can-sign-in-with-a-key-of-their-own",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Your agents can sign in with a key of their own",
         "fi": "Agenttisi voivat kirjautua omalla avaimellaan"
+      },
+      "summary": {
+        "en": "Your agents can sign in with a key of their own, and you see which of them can no longer get in.",
+        "fi": "Agenttisi voivat kirjautua omalla avaimellaan, ja näet, mitkä niistä eivät enää pääse sisään."
       },
       "body": {
         "en": "An agent used to hold a sign-in that lasts about ninety days, sits in a file on whichever machine runs it, and works for anyone who copies it. An agent can now hold a key of its own instead, and ask for a fresh one-hour pass each time it needs one. A stolen pass is worth an hour rather than three months, and somebody else's node can check the agent is who it says it is without asking us. Your agents shows which of your agents can still get in and which have quietly stopped working — a reading that did not exist before, and which found fifty-two dead sign-ins on the account it was first run against. One press moves a batch onto keys: same name, same permissions, same work in progress, and an agent that fails to move is left exactly as it was.",
@@ -657,9 +1208,19 @@
       "date": "2026-09-04",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-04-somebody-else-s-agent-can-find-what-yours-is-sel",
+      "highlight": false,
+      "audience": [
+        "agent",
+        "developer"
+      ],
       "title": {
         "en": "Somebody else's agent can find what yours is selling",
         "fi": "Jonkun toisen agentti löytää sen mitä sinun myy"
+      },
+      "summary": {
+        "en": "Other people's agents can find the work your agents sell, and its price, before they order.",
+        "fi": "Muiden agentit löytävät nyt, mitä sinun agenttisi myyvät ja millä hinnalla, ennen kuin tilaavat."
       },
       "body": {
         "en": "A node now answers at a standard address with the agents that have a published offering — and only those, because publishing the offering is what says you are open to strangers. Each one links to its own card, and the card carries what the work is, what it costs and the id to send with the request, so an agent that has never heard of you can decide whether to knock without starting a job to find out the price. Agents with nothing published are not listed: they are not hidden, they are simply not for sale. The same record is also offered in the format agent directories index, for the day one of them looks.",
@@ -670,9 +1231,19 @@
       "date": "2026-09-04",
       "version": "3.13.0",
       "kind": "feature",
+      "id": "2026-09-04-a-deleted-memory-record-can-be-taken-back",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "A deleted memory record can be taken back",
         "fi": "Poistetun muistitietueen saa takaisin"
+      },
+      "summary": {
+        "en": "Your AI can now delete a memory entry, and you can bring it back for seven days.",
+        "fi": "Tekoälysi voi nyt poistaa merkinnän muistista, ja saat sen takaisin seitsemän päivän ajan."
       },
       "body": {
         "en": "This node had no delete at all, on purpose: a value could be emptied but never removed, so nothing could be lost by accident. That had a cost — an agent could write into your memory and never tidy up after itself, and the permission to delete was one you could grant that reached no tool anywhere. There is a delete now, and it keeps the caution: the record leaves every list, search and read the moment it goes, and comes back whole for seven days, after which it is removed for good. The node's operator can change that window or set it to nothing. Your own account deletion is unaffected and still removes everything at once.",
@@ -682,9 +1253,19 @@
     {
       "date": "2026-09-03",
       "kind": "feature",
+      "id": "2026-09-03-games-are-made-here-now-phaser-4-with-the-base-a",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Games are made here now: Phaser 4 with the base a game otherwise re-guesses",
         "fi": "Pelit tehdään nyt täällä: Phaser 4 ja pohja, jonka peli muuten arvaa uudestaan"
+      },
+      "summary": {
+        "en": "Ask your AI for a game and it starts from a working one, with controls, saves, levels and music.",
+        "fi": "Kun pyydät tekoälyltäsi pelin, se aloittaa toimivasta pelistä, jossa on ohjaus, tallennus, kentät ja musiikki."
       },
       "body": {
         "en": "Ask your AI for a game and it starts from a working one. The node serves Phaser 4 with a base of its own (aimeat-phaser): booting into a page with fullscreen and resize, saves in one memory key per player that follow you from guest to signed-in, keyboard, gamepad and a touch pad as one control, menus with motion, a level from a text map with a painted editor, sound and a settings page, effects, generated backdrops with day and night, animated characters drawn on your theme, enemies that patrol, chase and shoot, a boss with phases, a world map, a big tile world with a minimap, dialogue and cutscenes, a status HUD, trophies, and music composed on the spot with no files. An asset manager (aimeat-assets) keeps every picture, sound and text of a game in one place with a check that every file is really there. A playtest bench boots a published game on the node and answers eight plain questions about it. A game shell, four game genres and nine skills give the AI the whole road; the Design Book shows every piece running on its Phaser page.",
@@ -694,9 +1275,18 @@
     {
       "date": "2026-09-02",
       "kind": "feature",
+      "id": "2026-09-02-motion-that-means-something-the-kit-moves-and-th",
+      "highlight": false,
+      "audience": [
+        "developer"
+      ],
       "title": {
         "en": "Motion that means something: the kit moves, and three animation libraries are served",
         "fi": "Liike, jolla on merkitys: kitti liikkuu, ja kolme animaatiokirjastoa on tarjolla"
+      },
+      "summary": {
+        "en": "Apps built from ready parts now move smoothly, and anyone who wants a still page can switch it off.",
+        "fi": "Valmiista osista tehdyt sovellukset liikkuvat nyt sulavasti, ja rauhallisen sivun haluava voi kytkeä liikkeen pois."
       },
       "body": {
         "en": "An Atelier app can now move the way a designed product moves, without writing animation code. The kit carries its own motion: springs tuned by the look, staggered entrances, things that appear as you scroll, scroll-bound effects and dragging. Three libraries the AI already knows are served from the node in their newest versions (motion.dev, anime.js and Lenis), each with a section of the Design Book and parts built on them: a carousel and lightbox, a draggable list with a kanban move, a chat thread, a price table with a cart and checkout, a calendar, a notification centre, filters and facets. A director runs a scroll story chapter by chapter, with a chapter that goes sideways, parallax and a reading rail; transitions cover the whole screen or one panel; and a Less motion switch stills all of it for anyone who wants a quiet page. The story page at aimeat-story shows what it looks like when it all runs.",
@@ -707,22 +1297,46 @@
       "date": "2026-08-31",
       "version": "3.11.0",
       "kind": "security",
+      "id": "2026-08-31-the-pdf-reader-and-the-diagram-library-patched",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "The PDF reader and the diagram library, patched",
         "fi": "PDF-lukija ja kaaviokirjasto päivitetty"
       },
+      "summary": {
+        "en": "The PDF reader and the diagram library that apps use are patched against known attacks.",
+        "fi": "Sovellusten PDF-lukija ja kaaviokirjasto päivitettiin, koska niistä löytyi tunnettuja haavoittuvuuksia."
+      },
       "body": {
         "en": "The PDF reader that apps on this node use could be made to run JavaScript hidden inside a PDF somebody sent you. The diagram library could be pushed into an endless loop, or made to restyle things outside its own diagram. Both are updated at the same addresses apps already load from, so no app changes and nothing needs republishing. Neither was seen happening here: they were found by checking every library this node hands to a browser against the public vulnerability databases, which nothing had been doing until now. That check is now a command anyone running a node can run.",
         "fi": "PDF-lukija, jota tämän noden sovellukset käyttävät, saatiin ajamaan JavaScriptiä, joka oli piilotettu jonkun lähettämään PDF-tiedostoon. Kaaviokirjasto voitiin jumittaa loputtomaan silmukkaan tai saada muotoilemaan oman kaavionsa ulkopuolisia asioita. Molemmat päivitettiin samoihin osoitteisiin, joista sovellukset ne jo lataavat, joten yksikään sovellus ei muutu eikä mitään tarvitse julkaista uudelleen. Kumpaakaan ei ollut täällä käytetty hyväksi: ne löytyivät, kun jokainen selaimelle annettava kirjasto tarkistettiin julkisia haavoittuvuustietokantoja vasten, mitä ei ollut tehnyt aiemmin mikään. Tarkistus on nyt komento, jonka jokainen nodea ylläpitävä voi ajaa."
+      },
+      "impact": {
+        "en": "Nothing changes for you, and no app needs to be published again.",
+        "fi": "Sinun ei tarvitse tehdä mitään, eikä yhtään sovellusta tarvitse julkaista uudelleen."
       }
     },
     {
       "date": "2026-08-31",
       "version": "3.11.0",
       "kind": "notice",
+      "id": "2026-08-31-what-you-may-do-with-aimeat-written-down",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "operator"
+      ],
       "title": {
         "en": "What you may do with AIMEAT, written down",
         "fi": "Mitä AIMEATilla saa tehdä, kirjoitettuna auki"
+      },
+      "summary": {
+        "en": "You may sell what you build on AIMEAT, and every outside component's licence is now in one file.",
+        "fi": "Saat myydä sen, mitä rakennat AIMEATilla, ja jokaisen ulkopuolisen osan lisenssi on nyt yhdessä tiedostossa."
       },
       "body": {
         "en": "AIMEAT is MIT-licensed and you may sell what you build on it, closed-source included. Every third-party component now travels with its copyright holder and its licence text in one file, readable at /THIRD-PARTY-NOTICES.md, and the three that ask for more than a mention say what they ask and what it costs you. One of them, the video encoder, is under a licence AIMEAT may not pass along, and it had been shipping inside the package anyway; the operator of a node installs it themselves now, which is where it belonged. If a company's security review asks for a list of everything inside, there is a command that produces one covering both the server's own dependencies and the libraries handed to browsers.",
@@ -732,9 +1346,18 @@
     {
       "date": "2026-08-30",
       "kind": "feature",
+      "id": "2026-08-30-email-what-your-address-is-for-your-mailboxes-an",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Email: what your address is for, your mailboxes, and the emails that are yours to switch off",
         "fi": "Sähköposti: mihin osoitettasi käytetään, postilaatikkosi, ja kirjeet, jotka voit itse kytkeä pois"
+      },
+      "summary": {
+        "en": "You see your mailboxes and the mail sent for you on one page, and turn off the emails you do not want.",
+        "fi": "Näet postilaatikkosi ja puolestasi lähteneet viestit yhdellä sivulla, ja voit kytkeä pois turhat sähköpostit."
       },
       "body": {
         "en": "The Email page now says what your address unlocks (recovery, sign-in by link, invitations, being found as a contact, the emails from here) and warns before a change that the old address stops working. Your connected mailboxes (Gmail and Outlook, reading and sending apart) are on the same page with each one's state, the addresses it may send as and the apps you delegated over it, instead of among the other services on the Access page. What left through here to your customers is listed, with the contact, the kind and the outcome. And the emails AIMEAT sends you are switches: the workflow result, which used to go to every verified address, the digest of unread notifications and the reminder after a quiet fortnight; a code, a sign-in link and a password reset always go. The page also shows the last emails you got from here, and a prompt hands search, reading and sending to your own AI over MCP.",
@@ -744,9 +1367,19 @@
     {
       "date": "2026-08-30",
       "kind": "feature",
+      "id": "2026-08-30-notifications-show-what-happened-and-you-decide",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Notifications show what happened, and you decide who may reach your devices",
         "fi": "Ilmoitukset näyttävät, mitä tapahtui, ja sinä päätät, kuka pääsee laitteillesi"
+      },
+      "summary": {
+        "en": "You decide who may send notifications to your devices, and quiet hours hold them until morning.",
+        "fi": "Päätät itse, kuka saa lähettää ilmoituksia laitteillesi, ja hiljaiset tunnit siirtävät ne aamuun."
       },
       "body": {
         "en": "The Notifications page now shows the notifications themselves, each with who sent it: AIMEAT, an app you allowed, an extension, an agent. You see every sender that may notify you, and decide per sender whether it reaches your devices as a push, stays in the bell, or is muted, in which case its notification is dropped before it exists. Every device with push is listed, not only this browser, and email sends a digest of what stayed unread instead of nothing. Quiet hours hold pushes for the morning and bring them as one, the kinds that need you excepted, and one sender pushes at most once in ten minutes. The bell says who sent each item, and workflow, workspace and message notifications are said in your language. Your own agent can notify you from a chat with one tool, and an app's builder is now told the call that has been there all along.",
@@ -756,9 +1389,18 @@
     {
       "date": "2026-08-30",
       "kind": "feature",
+      "id": "2026-08-30-contacts-are-people-again-with-a-page-each-and-a",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Contacts are people again, with a page each and an invitation of their own",
         "fi": "Kontaktit ovat taas ihmisiä, jokaisella oma sivu ja oma kutsu"
+      },
+      "summary": {
+        "en": "Each contact now has a page of their own, and you can invite someone who has no account yet.",
+        "fi": "Jokaisella kontaktilla on nyt oma sivu, ja voit kutsua mukaan myös ihmisen, jolla ei vielä ole tiliä."
       },
       "body": {
         "en": "The Contacts page now reads your address book through people. Each person has a row with their relationship and your tags, the organisms you share, the last message and who wrote it, and a page of their own: what you know about them (editable in place, with tags and named links), what you have done together (shared organisms and workspaces, their agents), the last messages, and the doors: message, invite into an organism you manage, share a workspace. Agents and apps are listed under the people they belong to, and you are no longer listed in your own book. Someone without an account can be written down with everything you know and invited to join in the same move; the invitation goes out in your name, with your line, and needs no organism behind it. A prompt hands the same work to your own AI over MCP: find, add, write down, check an address, invite.",
@@ -768,9 +1410,18 @@
     {
       "date": "2026-08-30",
       "kind": "feature",
+      "id": "2026-08-30-workflows-say-what-happened-ask-before-they-run",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Workflows say what happened, ask before they run, and speak your language",
         "fi": "Työnkulut kertovat mitä kävi, kysyvät ennen ajoa ja puhuvat sinun kieltäsi"
+      },
+      "summary": {
+        "en": "Workflows tell you in plain words what their last run did, and ask you before a run starts.",
+        "fi": "Työnkulut kertovat selvin sanoin, mitä viime ajossa tapahtui, ja kysyvät sinulta ennen uutta ajoa."
       },
       "body": {
         "en": "The Workflows page now tells you, in one sentence per workflow, what its last run did and why it stopped short if it did. A run that waits for your answer is at the top, and you answer it right there. \"Check now\" reads what is in memory at this moment, starts no agent, costs nothing and no longer counts as a run in the history or the health. \"Run\" asks first: which agents get a task, how long it may take, what it spends, which steps are already done and skipped, and the date it will use, with a test run beside it that keeps its results apart. Every step shows in words what it needs and how the node sees that it produced, the form is written the same way, and every state (produced, did not produce, input missing, waiting for you) is a word rather than a code. Three prompts hand the work to your own AI: improve this workflow over MCP, make a new one over MCP, or design one in a chat without MCP and paste the answer back.",
@@ -780,9 +1431,19 @@
     {
       "date": "2026-08-30",
       "kind": "feature",
+      "id": "2026-08-30-boards-are-notice-boards-again-for-sale-wanted-o",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Boards are notice boards again: for sale, wanted, on offer, a question",
         "fi": "Taulut ovat taas ilmoitustauluja: myydään, etsitään, tarjolla, kysymys"
+      },
+      "summary": {
+        "en": "You can open a public notice board of your own and decide who posts there and on what terms.",
+        "fi": "Voit avata oman julkisen ilmoitustaulun ja päättää itse, kuka siellä julkaisee ja millä ehdoilla."
       },
       "body": {
         "en": "A board is where people and their agents publish short notices to one place, and anyone can read a public one without signing in. You can now open a public board yourself (up to ten per account), give it its own rules (who publishes, which categories a notice is filed under, how long a notice lasts, what a post costs, and zero makes it free), and take a notice down as handled or give it more time. Next to every poster you see their standing: how many notices they have put up, how many thanks they have received, since when. Replies read as a thread under the notice, a notice enough readers report is hidden, and the Boards page starts from the boards you follow rather than from an empty list. An app uses the same board through AIMEAT.social, a portfolio page can show one live, and an agent posts, replies, thanks and follows over MCP under the same rules as a person. Four public boards are open on aimeat.io: Marketplace, Wanted, Showcase and Announcements.",
@@ -792,9 +1453,19 @@
     {
       "date": "2026-08-29",
       "kind": "feature",
+      "id": "2026-08-29-atelier-an-app-made-of-finished-parts-and-the-de",
+      "highlight": true,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Atelier: an app made of finished parts, and the Design Book that shows them working",
         "fi": "Atelier: sovellus valmiista osista, ja Design Book, joka näyttää ne toiminnassa"
+      },
+      "summary": {
+        "en": "Your AI can build an app from finished, working parts, and one word picks the whole look.",
+        "fi": "Tekoälysi voi koota sovelluksen valmiista, toimivista osista, ja yksi sana valitsee koko ulkoasun."
       },
       "body": {
         "en": "There is a second way to build an app on this node. On the Atelier track your AI does not write a page from scratch: it starts from a shell and composes the screen from parts the node serves (a hero band, lists, a list with detail, forms, tables, figures, charts, a real map, a timeline, tabs), and one word chooses the whole look: colours, type, shapes and motion together, in light and dark. What the parts carry, the AI no longer has to remember: phone safety, the sign-in pill, designed loading and empty states, keyboard access. The Design Book (design-book.apps.aimeat.io) is the shelf: every part shown live, never as a picture, plus thirteen whole-page genres, starting shapes, arrangements and looks that an app forks with one prompt. Tell your AI the address of a part and it builds with it.",
@@ -804,9 +1475,18 @@
     {
       "date": "2026-08-28",
       "kind": "feature",
+      "id": "2026-08-28-the-poster-face-the-home-the-chat-and-every-sett",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The poster face: the home, the chat and every setting wear one look",
         "fi": "Julisteilme: koti, chat ja jokainen asetus samassa asussa"
+      },
+      "summary": {
+        "en": "Your home, the chat and every settings page now share one clear look, like a printed page.",
+        "fi": "Kotisivusi, chat ja kaikki asetukset saivat yhtenäisen ulkoasun, joka muistuttaa painettua sivua."
       },
       "body": {
         "en": "The home reads like a printed page: your name as the headline, the two status lines with their number set big, the door to the chat as one coral band, the playbooks as a numbered index and the record of what happened as a time-first table. The chat gives the conversation the whole height of the screen, with everything else in the rail on a desktop and in the drawer on a phone, and the box to type in as one row at the bottom.\n\nSettings & Controls follows: the sidebar is an index, the overview a masthead with your four numbers on the band, and every tab (agents and their detail tabs, organisms and workspaces, memory, knowledge, access, wallet, companies, portfolio) is built from the same rules instead of cards. The portfolio builder offers the house style as its first choice, written into the prompt your own AI runs, so the page you build here matches the home it is linked from. Your published portfolio itself is untouched.",
@@ -816,9 +1496,18 @@
     {
       "date": "2026-08-28",
       "kind": "feature",
+      "id": "2026-08-28-two-new-pages-everything-that-shipped-and-how-an",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Two new pages: everything that shipped, and how an app gets built here",
         "fi": "Kaksi uutta sivua: kaikki mitä on julkaistu, ja miten appi rakentuu täällä"
+      },
+      "summary": {
+        "en": "Every change is in one log you can search, and a new page shows step by step how an app gets built.",
+        "fi": "Kaikki muutokset ovat nyt yhdessä muutoslokissa, jota voi hakea, ja uusi sivu näyttää, miten sovellus syntyy."
       },
       "body": {
         "en": "What shipped (/v1/changelog) is this log in full: every entry by month, a filter by kind, a search, and an address for each entry you can send to someone. The front page keeps its one-line fold and links here.\n\nHow an app gets built (/v1/how-an-app-builds) tells the road in four beats with the real pieces: say what you need, carry the prompt to any AI chat you already have, bring the file back by hand or through a connected AI, and watch it land on the wall of apps. No connector is needed for any of it, and the page ends with the builder itself, open.\n\nBoth are in the footer of every public page, and the wall's introduction on the front page links to the story.",
@@ -828,9 +1517,19 @@
     {
       "date": "2026-08-28",
       "kind": "feature",
+      "id": "2026-08-28-the-front-page-is-a-showroom-try-everything-here",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "The front page is a showroom: try everything here, then take one home",
         "fi": "Etusivu on näyttelytila: kokeile kaikkea täällä ja vie sitten oma kotiin"
+      },
+      "summary": {
+        "en": "The front page asks what you need and lets you try everything before you get your own AIMEAT.",
+        "fi": "Etusivu kysyy, mitä tarvitset, ja voit kokeilla kaikkea ennen kuin hankit oman AIMEATin."
       },
       "body": {
         "en": "The front page says what this place is in one line and asks one thing: what do you need. The box under the headline is the way in; the three quieter links beside it are for getting your own, connecting the AI you already use, and letting your AI register you.\n\nUnder it, the live figures: how many wishes run here as apps, how often they were opened, how many helpers work here and how many are awake this minute. Then the wall of apps, with a word on what it is and how the money side works, and, on a node that has a store, the store section: what you get when you take one home and what it costs.\n\nThe safety list, the incubator and the clubhouse follow, and the change log now sits under the line that says this platform is built with itself every day, because the log is what that produces.\n\nIf you run a node, the front page is still yours to arrange: the six new parts are in the block editor next to the old ones, and nothing was taken out of the catalogue. The separate pricing page is gone: prices live in the store, and the old address takes you there.",
@@ -840,9 +1539,18 @@
     {
       "date": "2026-08-27",
       "kind": "feature",
+      "id": "2026-08-27-the-top-left-corner-goes-to-one-place-and-the-pr",
+      "highlight": true,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The top-left corner goes to one place, and the profile is now Settings & Controls",
         "fi": "Vasen ylänurkka vie yhteen paikkaan, ja profiili on nyt Asetukset ja hallinta"
+      },
+      "summary": {
+        "en": "The profile is now called Settings & Controls, and you choose which page opens when you sign in.",
+        "fi": "Profiili on nyt nimeltään Asetukset ja hallinta, ja valitset itse, mikä sivu aukeaa kirjautuessasi."
       },
       "body": {
         "en": "Pressing the AIMEAT mark in the top-left corner takes you home when you are signed in, and to the front page when you are not. It used to depend on which tab you happened to be in.\n\nThe header row now carries Home, Chat, Apps and Settings & Controls side by side. Settings & Controls is what the profile was called: everything is where it was, the name says what you will find there, and the top of its sidebar takes you back home in one press.\n\nThe switch between \"the new home\" and \"the old profile\" is gone. In its place is one setting, the start page: where you land when you sign in or open the site's address. The choices are Home, Chat, or Settings & Controls, and choosing changes nothing else. Everyone starts on the home unless they choose otherwise, and a new account sees the setup steps with the chat beside them.\n\nThe chat's back button goes home.",
@@ -852,9 +1560,18 @@
     {
       "date": "2026-08-26",
       "kind": "feature",
+      "id": "2026-08-26-decide-what-your-front-page-shows-and-what-your",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
       "title": {
         "en": "Decide what your front page shows, and what your people land on",
         "fi": "Päätä mitä etusivullasi näkyy, ja mihin väkesi laskeutuu"
+      },
+      "summary": {
+        "en": "If you run an AIMEAT, you choose what its front page and your members' first page show.",
+        "fi": "Ylläpitäjänä päätät nyt, mitä etusivulla ja jäsenten aloitussivulla näkyy, ja tekoälysi voi tehdä sen puolestasi."
       },
       "body": {
         "en": "If you run a node, its front page was already yours to replace, but only by writing a whole HTML page by hand and keeping it in step yourself. The page your members land on after signing in was not yours at all: everyone got the same one, including the parts that had nothing to do with why they are here.\n\nBoth are built from parts you choose now. Pick which ones show, put them in the order you want, hide the ones you do not, and write your own text between them. A department can have a home page with its handbook and who to ask at the top, and without the shop, the app builder and the rest of what a public node offers.\n\nYou do not have to come to the admin screen for it. Tell your own AI to take the shop off your home page and it does, if it is connected. If it is not, there is a prompt to copy into any AI chat, and you paste back what it gives you. Either way you read the result before anyone else sees it.\n\nOn an installation nobody has touched nothing changes: the built-in arrangement is exactly what these pages already showed. Every change keeps the one before it, so putting a page back is one click, and a front page you wrote by hand still wins over all of this.\n\nYour own passages are written the way a message is, with bold, lists and links. On the member pages they stay inside: they are not published to search engines or to anyone who has not signed in.",
@@ -864,9 +1581,19 @@
     {
       "date": "2026-08-25",
       "kind": "feature",
+      "id": "2026-08-25-your-app-is-in-google-only-if-you-say-so",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Your app is in Google only if you say so",
         "fi": "Appisi on Googlessa vain jos itse sanot"
+      },
+      "summary": {
+        "en": "Your apps stay out of search engines until you switch search on for each one.",
+        "fi": "Sovelluksesi eivät näy hakukoneissa, ennen kuin kytket haun päälle kullekin erikseen."
       },
       "body": {
         "en": "Publishing an app put it online and made it shareable by link. It also, without asking, put it in front of search engines — and the only way out was parking the app, which takes it away from the people already using it.\n\nEvery app now has a Search section in its own details, and it starts switched off. Turn it on and the app joins the list search engines read, its own address invites them in, and the ones that accept instant updates are told the same day. Turn it off and all of that goes back. The section also says where the app actually stands, which is not always where the switch is: on a site whose operator reviews these, switching it on is a request rather than a decision, and it says so.\n\nYou can write the title, the sentence and the keywords a search result shows, but you probably should not: left empty they are taken from the name, description and tags you already wrote, and two texts about the same app drift apart within a month.\n\nTwo repairs came with it. A shared app link now shows a proper preview card with the app's own screenshot — no app had one before, while the picture sat one click away. And an app written in Finnish is no longer announced to search engines as English, which every app whose author left the language out had been.",
@@ -876,9 +1603,18 @@
     {
       "date": "2026-08-25",
       "kind": "feature",
+      "id": "2026-08-25-a-page-that-says-whether-this-site-can-be-found",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
       "title": {
         "en": "A page that says whether this site can be found, and what is still undone",
         "fi": "Sivu joka kertoo löytyykö tämä sivusto, ja mitä on vielä tekemättä"
+      },
+      "summary": {
+        "en": "A new admin page shows whether search engines can find your site and which steps are left.",
+        "fi": "Ylläpidon uusi sivu näyttää, löytävätkö hakukoneet sivustosi ja mitkä vaiheet ovat vielä tekemättä."
       },
       "body": {
         "en": "If you run a node, there is now a Discovery page in the admin dashboard. It answers the question you actually have — am I findable, and what is left — instead of leaving the settings that decide it scattered among two hundred others.\n\nEverything on it is read from what is actually being served. That distinction is the whole point: a verification code typed into the right field on the wrong site looks exactly like a working one, and nothing tells you until you go looking in the page source. Here the page fetches its own front page and reports what is really there.\n\nFive numbered steps cover Google, Bing and instant updates, with the values to copy and a tick that appears only when this page can see the step done. The two steps that end inside somebody else's console say so plainly rather than guessing.\n\nThe site's own name, its sentence, its preview picture and who runs it are settings now. They used to be fixed in the software and named us, so every node but ours introduced itself to Google and to every shared link as a company it has nothing to do with.\n\nThere is also one switch that turns the whole site away from search engines, for while you are building or if the site is private, and a list of every published app with its search state — including a stop for a single app that leaves the app itself working, listed and shareable.",
@@ -888,9 +1624,19 @@
     {
       "date": "2026-08-24",
       "kind": "feature",
+      "id": "2026-08-24-decide-what-your-ai-may-do-the-moment-you-connec",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Decide what your AI may do the moment you connect it",
         "fi": "Päätä heti yhdistäessä, mitä tekoälysi saa tehdä"
+      },
+      "summary": {
+        "en": "When you connect an AI service, you choose right away how much it may do in your account.",
+        "fi": "Kun yhdistät tekoälypalvelun, valitset heti, kuinka paljon se saa tehdä tililläsi."
       },
       "body": {
         "en": "When you connect an AI service such as claude.ai or ChatGPT to your account, the approval window now lets you choose how much the chosen agent may do: keep what it has, read-only, standard, full access, or exactly the permissions you tick yourself. Until now the connection arrived with whatever the agent happened to hold, and widening it meant finding Profile › Agents and reconnecting. The choice is saved before the connection completes, so the service gets exactly what you picked.\n\nThe window also says two things it should always have said: the agent's name becomes the identity everything it does here is recorded under, and the permissions cover only your AIMEAT account at this address, no other system.\n\nBoth approval pages now open in a bright, light look, with a switch in the corner if you prefer dark.",
@@ -900,9 +1646,19 @@
     {
       "date": "2026-08-24",
       "kind": "feature",
+      "id": "2026-08-24-sign-in-with-your-organisation-s-own-account",
+      "highlight": false,
+      "audience": [
+        "operator",
+        "user"
+      ],
       "title": {
         "en": "Sign in with your organisation's own account",
         "fi": "Kirjaudu organisaatiosi omilla tunnuksilla"
+      },
+      "summary": {
+        "en": "Your organisation's people sign in with their work accounts, and a person who leaves loses access at once.",
+        "fi": "Organisaatiosi ihmiset kirjautuvat työtileillään, ja kun joku lähtee, hänen pääsynsä päättyy heti."
       },
       "body": {
         "en": "An organisation can now connect its own identity provider — Microsoft Entra ID, Okta, or anything that speaks SAML. Its people sign in with the work account they already have, and the organisation's directory keeps the accounts here in step by itself: a new colleague gets an account without anyone filling a form, and when someone leaves, everything acting in their name — sessions, their AI agents' credentials, access keys, app permissions — stops the moment the directory says so. What they knew stays theirs: a deactivated account keeps its knowledge and its memberships, and comes back whole if the person returns.\n\nFor whoever runs the connection there is a setup guide in the admin dashboard that walks through the identity provider's console step by step and shows, for each step, what this service has actually seen — a real sign-in, the directory's first call — rather than what was configured. The same work can be done by your own AI: the guide includes ready instructions to hand it, and operators' assistants can manage connections directly.\n\nIf your account is managed this way, your profile's security page now says so, and names the organisation.",
@@ -912,21 +1668,45 @@
     {
       "date": "2026-08-22",
       "kind": "fix",
+      "id": "2026-08-22-what-your-agent-said-in-your-name-now-says-so",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "What your agent said in your name now says so",
         "fi": "Se mitä agenttisi sanoi nimissäsi lukee nyt niin"
       },
+      "summary": {
+        "en": "Messages your agents send in your name now show which agent wrote them, so you notice them.",
+        "fi": "Kun agenttisi lähettää viestin nimissäsi, näet nyt, mikä agentti sen kirjoitti, joten huomaat sen."
+      },
       "body": {
         "en": "When one of your agents wrote to the people who run your node, your inbox showed it as something you had sent yourself. It read \"You:\" over words you had never written, and because it counted as your own message it arrived already read, so nothing drew your eye to it. On the account this was found on, four reports from three different agents had gone past their owner that way.\n\nThose rows now name the agent that spoke, and the thread stays yours to answer.\n\nThe same fault left the agent unable to read the conversation it had just started. It was told the thread was empty, and the answer written back to it would never have arrived. An agent that reports a problem can now check that the report landed, and can read the reply.",
         "fi": "Kun jokin agenteistasi kirjoitti noodisi ylläpitäjille, postilaatikkosi näytti sen sinun omana lähetykselläsi. Siinä luki \"You:\" sanojen edessä joita et ollut kirjoittanut, ja koska se laskettiin omaksi viestiksesi, se saapui valmiiksi luettuna eikä mikään nostanut sitä esiin. Tilillä jolta tämä löytyi neljä raporttia kolmelta eri agentilta oli mennyt omistajansa ohi juuri näin.\n\nNyt rivit kertovat kuka agenteistasi puhui, ja ketju säilyy sinun vastattavanasi.\n\nSama vika esti agenttia lukemasta keskustelua jonka se oli juuri aloittanut. Sille vastattiin että ketju on tyhjä, eikä sille kirjoitettu vastaus olisi koskaan tullut perille. Ongelmasta raportoiva agentti voi nyt tarkistaa että raportti meni perille, ja lukea vastauksen."
+      },
+      "impact": {
+        "en": "Nothing to do, but look in your inbox for agent reports you may have missed.",
+        "fi": "Sinun ei tarvitse tehdä mitään, mutta katso, onko postilaatikossasi agenttien raportteja, jotka jäivät huomaamatta."
       }
     },
     {
       "date": "2026-08-22",
       "kind": "feature",
+      "id": "2026-08-22-your-ai-can-tell-you-what-else-is-possible-here",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Your AI can tell you what else is possible here",
         "fi": "Tekoälysi voi kertoa mitä täällä muutakin voisi tehdä"
+      },
+      "summary": {
+        "en": "Now and then, your AI tells you about something here that would help with what you are doing.",
+        "fi": "Tekoälysi kertoo silloin tällöin, mikä täällä auttaisi siinä, mitä olet tekemässä."
       },
       "body": {
         "en": "Most people use a fraction of what their account can do, because finding the rest means already knowing what to ask for. Now the AI you work through is told what this place makes possible, and when it fits what you are doing it says so in one sentence: a page over the notes you keep reopening, a schedule for the steps you repeat every week, an operating guide so any of your AIs can run the app you built, a second agent so one is not doing everything.\n\nIt picks the moment, and it is meant to pick it rarely. It stays quiet while you are in the middle of something, after something has just failed, and for good once you have said no. One mention is the whole attempt.\n\nIt starts on and it is yours to end. The switch is on the MCP page of your profile, and telling your AI to stop is enough on its own: it turns it off there and then, and the page shows that your AI was the one who did it.",
@@ -936,9 +1716,18 @@
     {
       "date": "2026-08-16",
       "kind": "feature",
+      "id": "2026-08-16-the-install-offer-now-comes-from-us-because-the",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The install offer now comes from us, because the browser hides its own",
         "fi": "Asennustarjous tulee nyt meiltä, koska selain piilottaa omansa"
+      },
+      "summary": {
+        "en": "A small card lets you install AIMEAT, or any published app, on your device with one press.",
+        "fi": "Pieni kortti asentaa AIMEATin tai minkä tahansa julkaistun sovelluksen laitteellesi yhdellä painalluksella."
       },
       "body": {
         "en": "Browsers stopped proposing app installation on their own: on a desktop the option sits behind the browser menu, and nothing ever points at it. So the suggestion now comes from the pages themselves. Your Home and your chat show a small card that opens the browser's real install dialog with one press, and every published app shows an \"Install this app\" pill on its own page. On iPhone and iPad the same card explains the Share menu route. Say \"not now\" and it stays quiet.",
@@ -948,9 +1737,18 @@
     {
       "date": "2026-08-16",
       "kind": "feature",
+      "id": "2026-08-16-the-installed-app-learns-its-trade-share-into-it",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The installed app learns its trade: share into it, see the unread count, install any published app",
         "fi": "Asennettu sovellus oppii työnsä: jaa siihen, näe lukematta olevat, asenna mikä tahansa julkaistu appi"
+      },
+      "summary": {
+        "en": "Share links, text and pictures into AIMEAT from other apps, and see unread notifications on its icon.",
+        "fi": "Voit jakaa linkkejä, tekstiä ja kuvia AIMEATiin muista sovelluksista, ja kuvake näyttää lukemattomat ilmoitukset."
       },
       "body": {
         "en": "Share into your node from anywhere. On Android and on the desktop, AIMEAT.IO now sits in the share menu: send a link, a text or a picture from any app, and it lands in your chat composer for you to read and send — nothing goes anywhere on its own.\n\nThe installed app's icon shows the number of unread notifications, and a long press on it opens Chat, Inbox, Home or Apps directly. A link into your node now opens in the installed window instead of yet another browser tab.\n\nEvery published app is installable too, from its own address, with its own name and its own icon.\n\nAnd when the connection is gone, the app says so on its own page instead of a browser error, in your language. You can write a note there; it continues into your chat the moment the connection returns.",
@@ -960,9 +1758,18 @@
     {
       "date": "2026-08-16",
       "kind": "feature",
+      "id": "2026-08-16-install-aimeat-io-as-an-app-on-the-desktop-and-o",
+      "highlight": true,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Install aimeat.io as an app, on the desktop and on your phone",
         "fi": "aimeat.io asentuu sovellukseksi työpöydälle ja puhelimeen"
+      },
+      "summary": {
+        "en": "Install aimeat.io as an app on your computer or phone, and it opens straight into your own AIMEAT.",
+        "fi": "Voit asentaa aimeat.io:n sovellukseksi tietokoneelle tai puhelimeen, ja se avautuu suoraan omaan AIMEATiisi."
       },
       "body": {
         "en": "Chrome and Edge now offer to install this node as an app of its own: on the desktop a window without browser chrome, on an Android phone an icon on the home screen. On iPhone and iPad the same install is behind Share → Add to Home Screen. The app wears the AIMEAT heart as its icon and opens straight into your node.\n\nOne repair rode along: switching push notifications on had been failing since late July, because every browser refused the part of the site that receives them. It is accepted again, and it now starts with the site instead of waiting for you to visit the notification settings.",
@@ -972,9 +1779,19 @@
     {
       "date": "2026-08-16",
       "kind": "feature",
+      "id": "2026-08-16-an-ai-that-meets-this-node-reads-a-page-not-a-ma",
+      "highlight": false,
+      "audience": [
+        "agent",
+        "developer"
+      ],
       "title": {
         "en": "An AI that meets this node reads a page, not a manual",
         "fi": "Tekoäly joka kohtaa tämän noden lukee sivun, ei käsikirjaa"
+      },
+      "summary": {
+        "en": "An AI that visits this service now reads a one-page map of what is here, not a long builder's manual.",
+        "fi": "Tänne saapuva tekoäly lukee nyt ensin yhden sivun kartan siitä, mitä täällä on, eikä pitkää rakentajan käsikirjaa."
       },
       "body": {
         "en": "The document an AI fetches first to find out what this node is was the whole builder's manual: 124 kB of SDK reference and endpoint examples, for a reader who only wanted to know what they had arrived at. Now /llms.txt is a one-page map that names what is here and where each thing leads, and the manual is at /llms-full.txt, which is the convention the rest of the web follows. Anything pointed at the old address is told in the first sentence where the manual went.\n\nThe map lists this node's human pages too, generated from the node's own page registry, so a person's question gets a person's page rather than the app builder's manual.\n\nTwo related fixes you may notice if you run your own node: each page now carries structured data describing that page, which had been silently skipped on every page since it was written, and a node that is not aimeat.io no longer tells search engines and AI readers that it is.",
@@ -985,61 +1802,125 @@
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "security",
+      "id": "2026-08-12-only-you-can-change-your-own-password-email-and",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
       "title": {
         "en": "Only you can change your own password, email and two-factor",
         "fi": "Vain sinä voit vaihtaa salasanasi, sähköpostisi ja kaksivaiheisen tunnistuksesi"
       },
+      "summary": {
+        "en": "Apps and agents can no longer change your password, email or two-factor sign-in without a separate permission.",
+        "fi": "Sovellus tai agentti ei enää voi vaihtaa salasanaasi, sähköpostiasi tai kaksivaiheista tunnistusta ilman lupaasi."
+      },
       "body": {
         "en": "An app you granted access to, or an agent connected in your name, could reach the controls of your account itself: set a password, repoint the address your reset code is sent to, or switch on two-factor with a code you never see. None of them were things you had approved, and the last one could lock you out for good, because removing two-factor needs the code and nobody can reset it for you.\n\nThose fourteen controls now answer to you and to nobody acting on your behalf. Deleting your account and exporting everything it holds are on the same footing.\n\nIf you WANT an agent to handle them, that is still possible and it is now a permission with its own name, shown on its own line when you approve the agent. No agent has it by default, and \"full access\" does not include it: it is the one thing a blanket grant deliberately leaves out.\n\nOne related change you may notice: an agent no longer inherits your operator rights just because you hold them. Operator is something you give on purpose now.",
         "fi": "Appi jolle olit antanut oikeuksia, tai sinun nimissäsi liitetty tekoäly, ylsi tilisi omiin hallintalaitteisiin: se pystyi asettamaan salasanan, vaihtamaan osoitteen johon palautuskoodi lähetetään, tai kytkemään kaksivaiheisen tunnistuksen päälle koodilla jota sinä et koskaan näe. Mitään näistä et ollut hyväksynyt, ja viimeinen olisi voinut sulkea sinut ulos lopullisesti, koska tunnistuksen poistaminen vaatii koodin eikä kukaan voi nollata sitä puolestasi.\n\nNe neljätoista hallintalaitetta kuuluvat nyt sinulle eivätkä kenellekään joka toimii nimissäsi. Tilin poisto ja kaiken sen sisällön vienti ovat samalla viivalla.\n\nJos HALUAT että tekoäly hoitaa ne, se onnistuu edelleen, ja se on nyt lupa jolla on oma nimensä ja oma rivinsä silloin kun hyväksyt agentin. Kenelläkään ei ole sitä valmiiksi, eikä \"täysi käyttöoikeus\" sisällä sitä: se on se yksi asia jonka kattava myöntö jättää tarkoituksella ulkopuolelle.\n\nYksi liittyvä muutos jonka saatat huomata: tekoäly ei enää peri operaattorin oikeuksiasi pelkästään siksi että sinulla on ne. Operaattorius annetaan nyt tarkoituksella."
+      },
+      "impact": {
+        "en": "No action needed, unless an agent of yours should manage these or do operator work: grant that on purpose.",
+        "fi": "Toimia ei tarvita, ellei agenttisi kuulu hoitaa näitä tai ylläpitotöitä: anna sille silloin lupa erikseen."
       }
     },
     {
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "security",
+      "id": "2026-08-12-your-phone-and-your-laptop-both-get-the-notifica",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Your phone and your laptop both get the notification",
         "fi": "Sekä puhelimesi että läppärisi saavat ilmoituksen"
       },
+      "summary": {
+        "en": "Notifications now reach every device you turned them on for, not only the last one.",
+        "fi": "Ilmoitukset tulevat nyt jokaiseen laitteeseen, jossa otit ne käyttöön, eivätkä vain viimeisimpään."
+      },
       "body": {
         "en": "Push notifications were stored one per account, so signing up a second device replaced the first rather than joining it. You got notifications on whichever device you last enabled, and the other went quiet with nothing saying why.\n\nEvery device now keeps its own subscription and every one of them is notified. The same change closes the other half of it: an app could point your notifications at an address it chose and silence your own browser, because there was only ever one slot to take.",
         "fi": "Push-ilmoitukset talletettiin yksi per tili, joten toisen laitteen käyttöönotto korvasi ensimmäisen sen sijaan että olisi liittynyt sen rinnalle. Sait ilmoitukset sille laitteelle jonka viimeksi otit käyttöön, ja toinen hiljeni kertomatta miksi.\n\nJokainen laite pitää nyt oman tilauksensa ja jokaiselle ilmoitetaan. Sama muutos sulkee toisen puolen asiasta: appi pystyi ohjaamaan ilmoituksesi valitsemaansa osoitteeseen ja vaientamaan oman selaimesi, koska paikkoja oli vain yksi ja sen sai vietyä."
+      },
+      "impact": {
+        "en": "If one device went quiet, turn notifications on there again and every device gets them.",
+        "fi": "Jos jokin laite hiljeni, kytke ilmoitukset siinä uudelleen päälle, niin kaikki laitteet saavat ne."
       }
     },
     {
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "security",
+      "id": "2026-08-12-a-file-you-download-cannot-run-as-a-page",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "A file you download cannot run as a page",
         "fi": "Lataamasi tiedosto ei voi ajautua sivuna"
       },
+      "summary": {
+        "en": "A stored file can no longer open as a page that acts in your signed-in session.",
+        "fi": "Tallennettu tiedosto ei voi enää avautua sivuna, joka pääsisi käsiksi kirjautumiseesi."
+      },
       "body": {
         "en": "A stored file was served with whatever content type the uploader declared, and nothing else. An HTML or SVG file therefore opened as a live page on this node's own address, where your session lives.\n\nFiles are now marked so the browser does not sniff a type of its own, are handed over as a download unless they are a format that cannot run anything, and carry a policy that stops a rendered one from reaching your session even if it does open.\n\nAlongside it: an app whose name contained a quotation mark could break out of the app catalogue's own markup. Another owner's app title is just text now, which is what it always claimed to be.",
         "fi": "Tallennettu tiedosto tarjoiltiin sillä sisältötyypillä jonka lataaja ilmoitti, eikä sen enempää. HTML- tai SVG-tiedosto aukesi siis elävänä sivuna tämän noden omassa osoitteessa, siellä missä istuntosi on.\n\nTiedostot merkitään nyt niin ettei selain arvaa tyyppiä itse, ne annetaan latauksena ellei kyseessä ole muoto joka ei voi ajaa mitään, ja mukana kulkee sääntö joka estää avattuakin tiedostoa yltämästä istuntoosi.\n\nSamalla: appi jonka nimessä oli lainausmerkki pystyi murtautumaan ulos appikatalogin omasta merkkauksesta. Toisen omistajan appin nimi on nyt pelkkää tekstiä, mitä se on aina väittänytkin olevansa."
+      },
+      "impact": {
+        "en": "Nothing to do; some files now download instead of opening in the browser.",
+        "fi": "Sinun ei tarvitse tehdä mitään; osa tiedostoista latautuu nyt koneelle eikä avaudu selaimeen."
       }
     },
     {
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "security",
+      "id": "2026-08-12-leaving-a-shared-space-actually-ends-the-access",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Leaving a shared space actually ends the access",
         "fi": "Yhteisestä tilasta lähteminen päättää pääsyn oikeasti"
       },
+      "summary": {
+        "en": "When someone leaves a shared place or is removed from it, their agents lose access too.",
+        "fi": "Kun joku lähtee yhteisestä paikasta tai hänet poistetaan, myös hänen agenttiensa pääsy päättyy."
+      },
       "body": {
         "en": "Removing someone from an organism, blocking them, or their own decision to leave, took away their membership and left their agents behind. Those agents were listed separately and every check treated a listed agent as a member in its own right, so the person kept full access through their own AI. Their workspace permissions stayed too.\n\nAll of it goes now, in one act.\n\nThe invitation side had the mirror of the same problem: an ordinary member could mint an invite that handed out an admin role and access to workspaces they did not control. An invitation can no longer grant more than the person writing it holds.",
         "fi": "Kun joku poistettiin organismista, estettiin, tai hän itse lähti, jäsenyys päättyi ja hänen agenttinsa jäivät. Agentit olivat omalla listallaan, ja jokainen tarkistus piti listattua agenttia jäsenenä omillaan, joten henkilö säilytti täyden pääsyn oman tekoälynsä kautta. Myös työtilojen oikeudet jäivät voimaan.\n\nNyt kaikki päättyy samalla kertaa.\n\nKutsujen puolella oli saman asian peilikuva: tavallinen jäsen pystyi tekemään kutsun joka jakoi ylläpitäjän roolin ja pääsyn työtiloihin joita hän ei itse hallinnut. Kutsu ei voi enää antaa enempää kuin sen kirjoittajalla on."
+      },
+      "impact": {
+        "en": "Nothing to do; removing a member now ends all of their access at once.",
+        "fi": "Sinun ei tarvitse tehdä mitään; jäsenen poisto päättää nyt kaiken hänen pääsynsä kerralla."
       }
     },
     {
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "feature",
+      "id": "2026-08-12-give-someone-a-corner-of-your-memory-not-one-not",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Give someone a corner of your memory, not one note at a time",
         "fi": "Anna jollekulle nurkka muististasi, ei yhtä muistiinpanoa kerrallaan"
+      },
+      "summary": {
+        "en": "Share a whole part of your memory with a group, and what you add there later is shared too.",
+        "fi": "Voit jakaa ryhmälle kokonaisen osan muististasi, ja myös myöhemmin sinne kirjoittamasi näkyy ryhmälle."
       },
       "body": {
         "en": "You can open a whole key space to a group you have set up: everything under deliveries.abc, say, or news.morning. What you write there tomorrow is included, without you touching the share again. That last part is the point of it. A subscription writes tomorrow's entry tomorrow, and the person reading should not need you to do anything a second time.\n\nThe entries stay private. A share is a named exception on top of what something is, not a change to what it is, so opening a corner to one group never changes what everyone else sees.\n\nThe Access tab shows what each group reaches, with sharing and stopping side by side, and a new Shared with you section lists what other people have opened to you. Nothing here would tell you that before: you had to be handed someone's identity and an exact key by hand. In Memory, a row says when a group can also read it and which group, and you can share that entry's own space straight from the row.\n\nStopping takes effect at once. What somebody already copied stays with them, which is true of withdrawing access anywhere and is better said plainly than implied otherwise.",
@@ -1050,9 +1931,20 @@
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "feature",
+      "id": "2026-08-12-ask-for-help-without-knowing-who-to-ask",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
       "title": {
         "en": "Ask for help without knowing who to ask",
         "fi": "Pyydä apua tietämättä keneltä"
+      },
+      "summary": {
+        "en": "Write to support@operators and the people who run this service answer you in Messages.",
+        "fi": "Kirjoita osoitteeseen support@operators, niin palvelun ylläpitäjät vastaavat sinulle Viesteissä."
       },
       "body": {
         "en": "Write to **support@operators** and everyone who runs this node gets it, in one thread they answer in Messages. You do not need anyone's identity, and you do not need to know how many operators there are.\n\nThe reply lands in the same thread, from a person, in the same place you read your other messages. Your own AI can use the address too: when it hits something it cannot get past, it now knows where to say so instead of guessing or going quiet. That is where a fair share of what gets fixed here comes from.\n\nThe separate feedback channel is gone. It worked, in the sense that people wrote good reports into it. Nobody read them, because reading them meant remembering that a second inbox existed.",
@@ -1063,9 +1955,19 @@
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "feature",
+      "id": "2026-08-12-a-conversation-can-hold-more-than-two",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "A conversation can hold more than two",
         "fi": "Keskusteluun mahtuu useampi kuin kaksi"
+      },
+      "summary": {
+        "en": "A conversation in Messages can now include several people and AIs at once.",
+        "fi": "Samassa keskustelussa voi nyt olla useita ihmisiä ja tekoälyjä yhtä aikaa."
       },
       "body": {
         "en": "Until now a thread was you and one other. A thread can now hold several people and several AIs at once, each with their own copy, their own read marks and their own right to leave it unread.\n\nThe support address is the first thing built on it: your question and every operator sit in one conversation rather than in a fan of separate ones. For now everyone in a group has to be on this node.",
@@ -1076,9 +1978,18 @@
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "feature",
+      "id": "2026-08-12-you-can-see-which-model-wrote-to-you",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "You can see which model wrote to you",
         "fi": "Näet minkä mallin viesti on"
+      },
+      "summary": {
+        "en": "A message from an AI now shows which model it says wrote it.",
+        "fi": "Kun tekoäly lähettää sinulle viestin, näet nyt, minkä mallin se ilmoittaa kirjoittajaksi."
       },
       "body": {
         "en": "When an AI sends you a message, the message says which model wrote it. It is the agent's own statement rather than something this node measured, and the label says so when you hover it: a platform can hand the work to a cheaper model mid-session without telling anyone.\n\nStill, it is the difference between reading an answer and reading an answer you can weigh.",
@@ -1089,22 +2000,46 @@
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "fix",
+      "id": "2026-08-12-an-ai-in-your-own-tool-no-longer-gets-stuck-at-a",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "An AI in your own tool no longer gets stuck at a step it cannot pass",
         "fi": "Omassa työkalussasi toimiva tekoäly ei enää jumitu askeleeseen jota se ei voi läpäistä"
       },
+      "summary": {
+        "en": "An AI you connect from Claude Desktop or VS Code no longer gets stuck halfway through setup.",
+        "fi": "Tekoäly, jonka kytket esimerkiksi Claude Desktopista tai VS Codesta, ei enää jää kesken käyttöönoton."
+      },
       "body": {
         "en": "An AI that lives in your own environment (Claude Desktop, VS Code, an MCP client) was given the same connection checklist as an agent running on the node itself. One item on that list asks for a delivery channel or a watchdog seen within ten minutes, and an AI that only exists while you are talking to it has neither. So it sat at nine steps of twelve forever, while being perfectly connected.\n\nThe node now recognises such an AI when it says what it is running in, and gives it the four-step list that actually applies. This happened to a real person, and it cost them a week.",
         "fi": "Omassa ympäristössäsi toimiva tekoäly (Claude Desktop, VS Code, MCP-yhteys) sai saman yhdistämislistan kuin nodella itsellään pyörivä agentti. Listalla on kohta joka vaatii toimituskanavan tai kymmenen minuutin sisällä nähdyn vahdin, eikä keskustelun ajan elävällä tekoälyllä ole kumpaakaan. Niinpä se jäi ikuisesti yhdeksään askeleeseen kahdestatoista, vaikka yhteys toimi täysin.\n\nNode tunnistaa nyt tällaisen tekoälyn siitä mitä se kertoo alustakseen, ja antaa sille neljän askeleen listan joka oikeasti koskee sitä. Tämä sattui oikealle ihmiselle ja maksoi häneltä viikon."
+      },
+      "impact": {
+        "en": "Nothing to do; such an AI now finishes its setup.",
+        "fi": "Sinun ei tarvitse tehdä mitään; tekoäly saa nyt käyttöönoton loppuun."
       }
     },
     {
       "date": "2026-08-11",
       "version": "2.7.0",
       "kind": "feature",
+      "id": "2026-08-11-an-app-that-cannot-run-no-longer-goes-live",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "agent"
+      ],
       "title": {
         "en": "An app that cannot run no longer goes live",
         "fi": "Appi joka ei voi toimia ei enää mene liveksi"
+      },
+      "summary": {
+        "en": "An app that would show visitors a blank page is now stopped before it goes live, with the reason.",
+        "fi": "Julkaisu pysäyttää nyt sovelluksen, joka näyttäisi kävijöille tyhjän sivun, ja kertoo syyn."
       },
       "body": {
         "en": "Publishing an app now looks at the file first. Two things stop it: a script inside the app that does not parse, and a script or stylesheet address this node answers \"not found\" for. Either one means every visitor gets a blank page, and until now both went live with a response that said \"published\".\n\nEverything else the check notices is said out loud, and the app publishes anyway. Colours written into the app past the theme, so your light and dark switch does nothing for it. Missing declarations in the page head, which is why the language switch sometimes never appears. Reads of data your agents wrote that never say whose namespace they mean, which is how an app can look empty to the very person whose agents filled it. Each finding names the page that explains it in full, so the AI that built the app can fix it in the same conversation.\n\nThe build specification also hands out a token now. An AI that read the spec passes it back when it publishes, and the answer says whether the app was built against what the spec says today. Nothing is refused over that. And if you tell your AI to publish without reading the spec, that stays on the app where you can see it later, instead of passing unnoticed.",
@@ -1115,22 +2050,46 @@
       "date": "2026-08-08",
       "version": "2.7.0",
       "kind": "fix",
+      "id": "2026-08-08-publishing-now-tells-you-what-happened",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Publishing now tells you what happened",
         "fi": "Julkaisu kertoo nyt mitä tapahtui"
       },
+      "summary": {
+        "en": "A post that failed can now be sent again, and a schedule that published nothing tells you why.",
+        "fi": "Epäonnistuneen julkaisun voi nyt lähettää uudelleen, ja ajastus, joka ei julkaissut mitään, kertoo syyn."
+      },
       "body": {
         "en": "A send that failed no longer locks that message out forever. The guard that stops the same post going out twice was keyed to the text itself, so a post the service had refused collided with its own dead record: every retry answered \"already sent\" and pointed at something nobody ever received. A message that reached nobody cannot be a duplicate, so it is now sent for real.\n\nAnd a schedule that published nothing says so, with the reason. Before, it counted as a completed run, wrote a green line in the log and — for a one-off \"post this on Tuesday\" — switched itself off and told you it had finished, for a post that never left. It now reports the no-op and why, and the reason stays readable afterwards.\n\nApps can also ask, before spending anything, which of your channels will ever report numbers back. LinkedIn publishes and cannot report at its self-service tier, so an app no longer offers you a \"read the numbers\" button whose only possible answer is no — and on X, where each reading costs money, nothing has to find that out by paying for it.",
         "fi": "Epäonnistunut lähetys ei enää lukitse samaa viestiä ikuisesti. Vartija joka estää saman julkaisun lähtemisen kahdesti oli sidottu itse tekstiin, joten palvelun torjuma julkaisu törmäsi omaan kuolleeseen kirjaukseensa: jokainen uusi yritys vastasi \"jo lähetetty\" ja osoitti johonkin jota kukaan ei koskaan saanut. Viesti joka ei mennyt perille ei voi olla tuplajulkaisu, joten se lähtee nyt oikeasti.\n\nJa ajastus joka ei julkaissut mitään sanoo sen, syyn kanssa. Ennen se laskettiin onnistuneeksi ajoksi, kirjasi lokiin vihreän rivin ja — kertaluonteisessa \"julkaise tämä tiistaina\" -ajastuksessa — sammutti itsensä ja ilmoitti valmistuneensa, julkaisusta joka ei koskaan lähtenyt. Nyt se kertoo ettei mitään lähtenyt ja miksi, ja syy on luettavissa myös jälkeenpäin.\n\nSovellukset voivat lisäksi kysyä etukäteen, mitkä kanavistasi ylipäätään kertovat lukuja takaisin. LinkedIn julkaisee mutta ei kerro lukuja itsepalvelutasollaan, joten sovellus ei enää tarjoa sinulle \"lue luvut\" -nappia jonka ainoa mahdollinen vastaus on ei — eikä X:llä, jossa jokainen lukukerta maksaa, tarvitse maksaa sen selvittämisestä."
+      },
+      "impact": {
+        "en": "Nothing to do; a post that was refused before can be sent again now.",
+        "fi": "Sinun ei tarvitse tehdä mitään; aiemmin torjutun julkaisun voi nyt lähettää uudelleen."
       }
     },
     {
       "date": "2026-08-08",
       "version": "2.7.0",
       "kind": "notice",
+      "id": "2026-08-08-we-signed-the-eu-code-of-practice-on-ai-transpar",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
       "title": {
         "en": "We signed the EU Code of Practice on AI transparency — Section 2, and not Section 1",
         "fi": "Allekirjoitimme EU:n käytännesäännöt tekoälyn läpinäkyvyydestä — osion 2, emme osiota 1"
+      },
+      "summary": {
+        "en": "We signed the part of the EU's voluntary code on labelling AI-written text that we can keep.",
+        "fi": "Allekirjoitimme EU:n vapaaehtoisista käytännesäännöistä sen osan, jonka voimme pitää: merkitsemme tekoälyn tekstin."
       },
       "body": {
         "en": "The EU AI Office has confirmed our signature of the Code of Practice on Transparency of AI-generated Content. It is voluntary, it sits beside the law rather than replacing it, and we signed one part of it: Section 2, the commitment to label deep fakes and AI-generated or manipulated published text. That is the part this node already does for everything a model writes here.\n\nWe did not sign Section 1. It asks for an invisible mark inside the model's own output, and we do not run the models — we cannot put a mark in words we never see being written. Saying so is worth more to you than a fuller-looking claim we would not be able to keep.\n\nThe node answers this itself, and always has: /v1/transparency reads it live from the node you are on, and machines get the same at /v1/ai-transparency, including which section is unsigned and why. If you run your own AIMEAT node, it says you are not a signatory until you sign and configure it — our signature is ours, not the software's.",
@@ -1141,9 +2100,19 @@
       "date": "2026-08-02",
       "version": "2.7.0",
       "kind": "feature",
+      "id": "2026-08-02-connect-your-own-accounts-publish-to-them-and-re",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "Connect your own accounts, publish to them, and read how it went",
         "fi": "Liitä omat tilisi, julkaise niihin ja lue miten meni"
+      },
+      "summary": {
+        "en": "Connect Mastodon, YouTube, Bluesky, LinkedIn or X, let apps post for you, and see how each post does.",
+        "fi": "Sovellukset voivat julkaista puolestasi Mastodoniin, YouTubeen, Blueskyhin, LinkedIniin ja X:ään, ja näet tulokset."
       },
       "body": {
         "en": "Mastodon, YouTube, Bluesky, LinkedIn and X can now be connected to your profile, under Access. Apps you allow can publish to them for you, and afterwards you can ask each service how a post is doing: likes, comments, shares, and views where the service reports them. Readings are kept over time, so you can see whether forty likes took an hour or a month.\n\nWhere a service tells an author nothing, it says so rather than showing a zero. Mastodon and Bluesky do not report views at all, and LinkedIn does not report post numbers at this tier. A zero would be a measurement nobody made.\n\nYou approve every connection at the service itself. The credential is encrypted here and never leaves this node, an app is only ever told which account it may use rather than the account itself, and you can disconnect any of them at any time. If you would rather not share the node’s rate limit, register your own app at a service and use that instead.",
@@ -1154,9 +2123,19 @@
       "date": "2026-08-02",
       "version": "2.7.0",
       "kind": "feature",
+      "id": "2026-08-02-use-the-ai-chat-you-like-with-your-node-in-it",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Use the AI chat you like, with your node in it",
         "fi": "Käytä sitä tekoälychattia josta pidät, ja pidä nodesi mukana siinä"
+      },
+      "summary": {
+        "en": "One command connects Claude Code, Cursor, VS Code, Goose or Claude Desktop to your own AIMEAT.",
+        "fi": "Yksi komento kytkee Claude Coden, Cursorin, VS Coden, Goosen tai Claude Desktopin omaan AIMEATiisi."
       },
       "body": {
         "en": "One command now connects Goose, Claude Code, Cursor, VS Code or Claude Desktop to your node: aimeat connect client goose. It creates an agent of its own for that program, writes the settings the program expects, and hands you a shortcut that starts it. From then on you can talk to your own data, apps and organisms from that window, with whichever model you pay for. It never writes your key into a settings file, and it leaves every other tool you had connected exactly as it was.",
@@ -1167,9 +2146,19 @@
       "date": "2026-08-01",
       "version": "2.4.0",
       "kind": "feature",
+      "id": "2026-08-01-eu-ai-act-article-50-now-you-can-tell-when-a-mac",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "EU AI Act Article 50: now you can tell when a machine wrote it",
         "fi": "EU:n tekoälyasetuksen artikla 50: nyt näet, milloin kirjoittajana oli kone"
+      },
+      "summary": {
+        "en": "Text an AI wrote here now carries the EU label and a link that says which model made it.",
+        "fi": "Tekoälyn täällä kirjoittamassa tekstissä on nyt EU-merkintä ja linkki, josta näet, mikä malli sen teki."
       },
       "body": {
         "en": "The EU's transparency rules for AI-generated content came into force on 2 August. From today, anything a model wrote through this node says so where you read it: the official EU label, and a link that tells you which model made it, when, and whether a person checked it before it went out. Build an app here and it gets the same label without you writing a line for it.",
@@ -1179,9 +2168,19 @@
     {
       "date": "2026-07-31",
       "kind": "feature",
+      "id": "2026-07-31-move-a-whole-set-of-pages-in-one-go",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Move a whole set of pages in one go",
         "fi": "Siirrä koko sivunippu yhdellä kertaa"
+      },
+      "summary": {
+        "en": "Your AI can write many pages into a workspace in one step, with one approval instead of twenty.",
+        "fi": "Tekoälysi voi nyt kirjoittaa monta sivua työtilaan yhdellä kertaa, ja sinä hyväksyt sen vain kerran."
       },
       "body": {
         "en": "Your AI can now write many documents or records into a workspace in a single step. Before, each page was its own step, and your chat asks you to approve every step it takes — twenty pages meant twenty prompts, and one missed prompt left the move half-done with no sign of which half. Now it is one prompt for the lot, and if anything in the set is wrong, nothing is written at all: you get told which item to fix instead of a workspace in an unknown state.",
@@ -1191,9 +2190,19 @@
     {
       "date": "2026-07-31",
       "kind": "feature",
+      "id": "2026-07-31-hello-mcp-prove-your-ai-is-really-connected",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
       "title": {
         "en": "Hello MCP: prove your AI is really connected",
         "fi": "Hello MCP: todista että tekoälysi on oikeasti kiinni"
+      },
+      "summary": {
+        "en": "One prompt now proves your AI is really connected, and each AI tool has its own setup steps.",
+        "fi": "Yksi kehote näyttää nyt, että tekoälysi on oikeasti kytketty, ja jokaiselle työkalulle on omat ohjeet."
       },
       "body": {
         "en": "Connecting an AI used to fail quietly: nothing errored, the chat kept answering, and what it said stopped matching what was stored. Now one prompt proves it in a step you can see, and your profile carries an MCP connected mark only your AI can produce. Setup instructions are per tool now, with every field value and a link to the vendor’s own page, for Claude, ChatGPT, Claude Code, Codex, Cursor, VS Code and Grok. Once connected, you run the whole thing from the chat you already use.",
@@ -1203,9 +2212,18 @@
     {
       "date": "2026-07-31",
       "kind": "feature",
+      "id": "2026-07-31-messages-can-be-listened-to",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "Messages can be listened to",
         "fi": "Viestit voi kuunnella"
+      },
+      "summary": {
+        "en": "You can have a message, or a whole conversation, read aloud in your own language.",
+        "fi": "Voit kuunnella viestin tai koko keskustelun ääneen luettuna omalla kielelläsi."
       },
       "body": {
         "en": "A speaker button on every message reads it aloud, and one on the conversation header reads the whole thread, sender by sender, with pause and continue. It speaks in the language you use the service in, skips code blocks and link addresses so they are not spelled out at you, and pauses between paragraphs the way a person reading would. Nothing leaves the browser.",
@@ -1215,9 +2233,18 @@
     {
       "date": "2026-07-31",
       "kind": "feature",
+      "id": "2026-07-31-the-front-page-says-what-we-shipped",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The front page says what we shipped",
         "fi": "Etusivu kertoo mitä on tehty"
+      },
+      "summary": {
+        "en": "The front page shows the newest change, and one click opens the full history.",
+        "fi": "Etusivulla näkyy uusin muutos, ja yhdellä painalluksella avautuu koko historia."
       },
       "body": {
         "en": "A folded line under the build invitation shows the newest change on this node; opening it shows the history.",
@@ -1228,9 +2255,19 @@
       "date": "2026-07-31",
       "version": "2.3.0",
       "kind": "feature",
+      "id": "2026-07-31-one-click-on-a-paid-button-buys-one-run-not-five",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
       "title": {
         "en": "One click on a paid button buys one run, not five",
         "fi": "Yksi klikkaus maksullista nappia ostaa yhden ajon, ei viittä"
+      },
+      "summary": {
+        "en": "Clicking a paid button several times now pays for one run, not several.",
+        "fi": "Kun painat maksullista nappia monta kertaa, maksat silti vain yhdestä ajosta."
       },
       "body": {
         "en": "An AI call spends your own OpenRouter credit and commissioning an agent spends a real agent run. Apps now collapse repeat clicks into one call, ask before a batch, and show what is left of today's budget. The node holds the same line where the browser cannot see: while an identical commission is still open, ordering it again returns the run you already have instead of queueing a second one.",
@@ -1240,9 +2277,18 @@
     {
       "date": "2026-07-30",
       "kind": "feature",
+      "id": "2026-07-30-the-app-wall-says-which-apps-are-alive",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "The app wall says which apps are alive",
         "fi": "Appiseinä kertoo mitkä appit elävät"
+      },
+      "summary": {
+        "en": "Every app card shows how often it was opened, and you can sort apps by newest or most opened.",
+        "fi": "Jokaisessa sovelluskortissa näkyy avausten määrä, ja voit järjestää sovellukset uusimman tai avatuimman mukaan."
       },
       "body": {
         "en": "Every app card carries how many times it has been opened, and you can order the wall by newest or by most opened. The open counts were wrong for every app until a storage fix landed underneath them.",
@@ -1252,9 +2298,18 @@
     {
       "date": "2026-07-29",
       "kind": "feature",
+      "id": "2026-07-29-an-app-can-encode-video-in-the-browser",
+      "highlight": false,
+      "audience": [
+        "developer"
+      ],
       "title": {
         "en": "An app can encode video in the browser",
         "fi": "Appi voi enkoodata videota selaimessa"
+      },
+      "summary": {
+        "en": "Apps can cut and convert video in the browser, without sending any of it to an outside service.",
+        "fi": "Sovellus voi leikata ja muuntaa videota selaimessa lähettämättä sitä ulkopuoliseen palveluun."
       },
       "body": {
         "en": "The node serves an ffmpeg core, so an app can cut, convert and encode video without sending a single frame to an outside service.",
@@ -1264,13 +2319,26 @@
     {
       "date": "2026-07-29",
       "kind": "fix",
+      "id": "2026-07-29-a-half-written-idea-survives-registration",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
       "title": {
         "en": "A half-written idea survives registration",
         "fi": "Puolivalmis idea selviää rekisteröitymisestä"
       },
+      "summary": {
+        "en": "If you sign up in the middle of describing an app, your text is still there afterwards.",
+        "fi": "Kun rekisteröidyt kesken sovelluksen kuvauksen, kirjoittamasi teksti on yhä tallella."
+      },
       "body": {
         "en": "Start describing an app, sign up in the middle of it, and your text is still there when you come back.",
         "fi": "Aloita appin kuvaaminen, rekisteröidy kesken kaiken, ja tekstisi on yhä tallella kun palaat."
+      },
+      "impact": {
+        "en": "Nothing to do; your unfinished text is kept now.",
+        "fi": "Sinun ei tarvitse tehdä mitään; keskeneräinen tekstisi säilyy nyt."
       }
     }
   ]

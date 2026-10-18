@@ -14,6 +14,9 @@
  * @structure monthKey · monthLabel · entryId · default export Changelog({ navigate })
  * @usage routed at /v1/changelog by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Each entry shows whom it is for, its one-line summary, a highlight tag and a
+ *     fix's impact on use; a second row of chips filters by audience and to the highlights. The
+ *     anchor function moved to js/services/news.js (entryAddress), unchanged.
  *   2026-09-13 -- V2: compose showroom actions and asides from shared shape classes.
  *   v1.0.0 — 2026-08-28 — Initial, built to the design canvas "Changelog and Build Story".
  */
@@ -24,6 +27,8 @@ const html = htm.bind(h);
 import { t, getLocale, onLocaleChange } from '/js/i18n.js';
 import { pick, fmtDate, KIND_LABEL } from '/views/landing-changelog.js';
 import { swallowed } from '/js/swallowed.js';
+import { entryAddress, audienceOf, AUDIENCES } from '/js/services/news.js';
+import { Mark } from '/components/Mark.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -41,17 +46,23 @@ function monthLabel(key) {
   } catch (err) { swallowed('changelog: monthLabel', err); return key; }
 }
 
-/** The address of an entry: its date, then its position among that day's entries. */
-function entryId(entries, index) {
-  const date = entries[index]?.date || 'undated';
-  let n = 0;
-  for (let i = 0; i < index; i++) if (entries[i]?.date === date) n++;
-  return n === 0 ? date : `${date}-${n + 1}`;
-}
+/** The address of an entry: its date, then its position among that day's entries. The home's news
+ *  band links to the same addresses, so both read it from one function. */
+const entryId = entryAddress;
+
+/** Whom an entry is for, in the words the home's news band uses. */
+const WHO = {
+  user: () => tr('news.who.user', 'You'),
+  agent: () => tr('news.who.agent', 'Your AI and agents'),
+  operator: () => tr('news.who.operator', 'Operator'),
+  developer: () => tr('news.who.developer', 'App builders'),
+};
 
 export default function Changelog({ navigate }) {
   const [entries, setEntries] = useState(null);
   const [kind, setKind] = useState('all');
+  const [who, setWho] = useState('all');
+  const [onlyHighlights, setOnlyHighlights] = useState(false);
   const [q, setQ] = useState('');
   // The entries carry their own translations, so a language switch re-renders them.
   const [lang, setLang] = useState(getLocale());
@@ -79,6 +90,12 @@ export default function Changelog({ navigate }) {
     for (const k of KINDS) c[k] = all.filter(e => (e.kind || 'notice') === k).length;
     return c;
   }, [all]);
+  const whoCounts = useMemo(() => {
+    const c = {};
+    for (const a of AUDIENCES) c[a] = all.filter(e => audienceOf(e).includes(a)).length;
+    c.highlights = all.filter(e => e.highlight === true).length;
+    return c;
+  }, [all]);
   const months = useMemo(() => {
     const m = new Map();
     for (const e of all) { const k = monthKey(e.date); m.set(k, (m.get(k) || 0) + 1); }
@@ -89,7 +106,9 @@ export default function Changelog({ navigate }) {
   const shown = all
     .map((e, i) => ({ e, i }))
     .filter(({ e }) => kind === 'all' || (e.kind || 'notice') === kind)
-    .filter(({ e }) => !ql || [pick(e.title, lang), pick(e.body, lang)].some(s => s.toLowerCase().includes(ql)));
+    .filter(({ e }) => who === 'all' || audienceOf(e).includes(who))
+    .filter(({ e }) => !onlyHighlights || e.highlight === true)
+    .filter(({ e }) => !ql || [pick(e.title, lang), pick(e.summary, lang), pick(e.body, lang)].some(s => s.toLowerCase().includes(ql)));
 
   // The month headings are drawn where a month begins in the SHOWN list, so a filter never
   // leaves an empty heading behind.
@@ -113,6 +132,18 @@ export default function Changelog({ navigate }) {
             <button type="button" key=${k} class=${`chg-chip ${kind === k ? 'is-on' : ''}`} aria-pressed=${kind === k} onClick=${() => setKind(k)}>
               ${KIND_LABEL[k]()} · ${counts[k] || 0}
             </button>`)}
+        </div>
+        <div class="chg-chips" role="group" aria-label=${tr('changelog.whoLabel', 'For whom')}>
+          <button type="button" class=${`chg-chip ${who === 'all' ? 'is-on' : ''}`} aria-pressed=${who === 'all'} onClick=${() => setWho('all')}>
+            ${tr('changelog.everyone', 'Everyone')}
+          </button>
+          ${AUDIENCES.map(a => html`
+            <button type="button" key=${a} class=${`chg-chip ${who === a ? 'is-on' : ''}`} aria-pressed=${who === a} onClick=${() => setWho(a)}>
+              ${WHO[a]()} · ${whoCounts[a] || 0}
+            </button>`)}
+          <button type="button" class=${`chg-chip ${onlyHighlights ? 'is-on' : ''}`} aria-pressed=${onlyHighlights} onClick=${() => setOnlyHighlights(v => !v)}>
+            ${tr('changelog.onlyHighlights', 'Only the important ones')} · ${whoCounts.highlights || 0}
+          </button>
         </div>
         <input class="chg-search" type="search" value=${q} onInput=${(e) => setQ(e.target.value)}
           placeholder=${tr('changelog.searchPh', 'Search the log…')} aria-label=${tr('changelog.searchPh', 'Search the log')} />
@@ -146,14 +177,18 @@ export default function Changelog({ navigate }) {
             const k = e.kind || 'notice';
             return html`
               ${heading ? html`<h2 class="chg-month" id=${'m-' + mk}>${monthLabel(mk)}</h2>` : ''}
-              <article class="chg-entry" id=${id} key=${id}>
+              <article class=${'chg-entry' + (e.highlight === true ? ' is-highlight' : '')} id=${id} key=${id}>
                 <div class="chg-meta">
                   <span class="chg-date">${fmtDate(e.date, lang)}</span>
+                  ${e.highlight === true ? html`<${Mark} tone="sun">${tr('news.highlights', 'Important')}<//>` : ''}
                   <span class=${'chg-kind chg-kind-' + k}>${(KIND_LABEL[k] || KIND_LABEL.notice)()}</span>
+                  <span class="chg-who">${tr('news.for', 'For: {who}').replace('{who}', audienceOf(e).map(a => WHO[a]()).join(', '))}</span>
                   ${e.version ? html`<span class="chg-version">v${e.version}</span>` : ''}
                   <a class="chg-anchor" href=${'#' + id} title=${tr('changelog.anchor', 'The address of this entry')}>#${id}</a>
                 </div>
                 <h3 class="chg-entry-title">${pick(e.title, lang)}</h3>
+                ${pick(e.summary, lang) ? html`<p class="chg-entry-summary">${pick(e.summary, lang)}</p>` : ''}
+                ${pick(e.impact, lang) ? html`<p class="chg-entry-impact"><b>${tr('changelog.impact', 'For you:')}</b>${' '}${pick(e.impact, lang)}</p>` : ''}
                 ${pick(e.body, lang) ? html`<p class="chg-entry-body">${pick(e.body, lang)}</p>` : ''}
               </article>`;
           })}

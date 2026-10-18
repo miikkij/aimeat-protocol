@@ -16,6 +16,8 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-10-18: The home opens with what is new since the person last looked (news-band.js), above
+ *     the layout, so no layout can hide it before it is read.
  *   2026-10-16: The layout's passages carry their records (freeformProvenance), for the AI label.
  *   2026-09-27: "Sign in" is the Loud component and the failure line the ToastBox (held, said as a
  *     status), the same markup; the page writes no class (page group G9, a move).
@@ -69,6 +71,7 @@ import { ActionRow } from '/components/ActionRow.js';
 import { Loud } from '/components/Action.js';
 import { ToastBox } from '/components/Toast.js';
 import { HomeJourney } from './journey.js';
+import NewsBand from '/views/home/news-band.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import { useHomeState } from '/views/surface/home-state.js';
@@ -151,6 +154,10 @@ export default function HomeView({ navigate }) {
 
   return html`
     <${PageFrame}>
+      ${/* What is new since the person last looked, on both homes, so the count on the header's Home
+            link always points at something here. Outside the layout, because it goes away by being
+            read rather than by being arranged. */''}
+      <${NewsBand} session=${session} navigate=${navigate} />
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}

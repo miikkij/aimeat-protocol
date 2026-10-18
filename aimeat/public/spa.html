@@ -776,6 +776,9 @@
       "/views/home/agent-watch-parts.js": "/views/home/agent-watch-parts.js",
       "/js/services/agent-ties.js": "/js/services/agent-ties.js",
       "/views/home/machines.js": "/views/home/machines.js",
+      "/views/home/news-data.js": "/views/home/news-data.js",
+      "/js/services/news.js": "/js/services/news.js",
+      "/views/home/news-band.js": "/views/home/news-band.js",
       "/js/services/agent-draft.js": "/js/services/agent-draft.js",
       "/js/services/agent-draft-known.js": "/js/services/agent-draft-known.js",
       "/views/profile/agents/crew-templates.js": "/views/profile/agents/crew-templates.js",
@@ -1050,6 +1053,8 @@
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
+    import { Mark } from '/components/Mark.js';
+    import { useNews } from '/views/home/news-data.js';
     import { isRunnableActionEndpoint } from '/js/services/notifications.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
     import { NodeUpdateNotice } from '/components/NodeUpdateNotice.js';
@@ -1530,6 +1535,9 @@
       // notification bell and the "Me" menu rendered next to a "Sign In" button after a logout.
       const session = useSession();
       const [morsels, setMorsels] = useState(null);
+      // How many changes on this node the person has not confirmed yet: the count on the Home link,
+      // where the home's news band (views/home/news-band.js) lists them.
+      const news = useNews(session);
       // Whether the operator's new-version tag is on the bar: it arrives after a read and widens the bar.
       const [updateShown, setUpdateShown] = useState(false);
       const [menuOpen, setMenuOpen] = useState(false);
@@ -1580,7 +1588,7 @@
         // link appearing, a different nav config arriving, or the language switching. And when
         // the burger menu closes: a language switched from inside the open menu was measured
         // with the menu's own rows in the bar, which kept the bar compact after a row that fits.
-      }, [session, locale, navConfig, morsels, updateShown, menuOpen]);
+      }, [session, locale, navConfig, morsels, updateShown, menuOpen, news.count]);
 
       // Load operator-configured header nav (public endpoint, no auth needed).
       useEffect(() => {
@@ -1686,7 +1694,8 @@
                    home's agents band on a page of its own (views/home/agents-page.js). -->
               ${session && html`
                 <a href="/v1/home" class="${currentPath === '/v1/home' && !onAgentPage ? 'active' : ''}"
-                  onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}</a>
+                  onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>${t('nav.home') || 'Home'}${news.count > 0 && html`${' '}<${Mark} kind="count" tone="waiting"
+                    title=${(t('news.countTitle') || '{n} new changes on your home').replace('{n}', String(news.count))}>${news.count}<//>`}</a>
                 <a href="/v1/profile?tab=messages"
                   onClick=${(e) => { e.preventDefault(); openNotificationLink('/v1/profile?tab=messages', navigate); setMenuOpen(false); }}>${t('nav.messages') || 'Messages'}</a>
                 <a href="/v1/home?agents=1" class="${onAgentPage ? 'active' : ''}"
