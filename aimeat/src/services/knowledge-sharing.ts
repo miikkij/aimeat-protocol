@@ -16,6 +16,8 @@
  *   const { manifest } = await setKnowledgeSharing({ storage, config }, found, packageId, { audience: 'public' });
  * @version-history
  *   v1.0.0 — 2026-10-18 — Extracted from routes/knowledge/sharing.ts (plan doc-mvcn6c7e4e5q, V4).
+ *   v1.0.1 — 2026-10-19 — setKnowledgeEntryVisibility sets the entry record's visibility on the
+ *     record's version (record-cas.ts updateMemoryRecord) (check:atomic-writes).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, KnowledgeManifest, MemoryRecord } from '../storage/interface.js';
@@ -24,6 +26,7 @@ import { recordPublicActivity } from './public-activity.js';
 import { presentKnowledgeManifest } from './toll-morsels-names.js';
 import { manifestRecordVisibility, entryRecordVisibility } from './knowledge-audience.js';
 import { logger } from '../utils/logger.js';
+import { updateMemoryRecord, UNCHANGED } from './record-cas.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
 
@@ -129,18 +132,11 @@ export async function setKnowledgeEntryVisibility(
   manifest.updated = new Date().toISOString();
   await writeManifest(storage, row, packageId, manifest);
 
-  // Also update the individual entry's memory record visibility
-  const now = new Date().toISOString();
-  const entryRecord = await storage.getMemory(row.ownerGaii, knowledgeEntryKey(packageId, entry.key));
-  if (entryRecord) {
-    await storage.setMemory({
-      ...entryRecord,
-      visibility: entryRecordVisibility(visibility),
-      groupId: visibility === 'group' ? groupId : undefined,
-      updatedAt: now,
-      version: (entryRecord.version || 0) + 1,
-    });
-  }
+  // Also update the individual entry's memory record visibility, on the record's version
+  // (record-cas.ts), so an edit of the entry that lands meanwhile keeps its text.
+  await updateMemoryRecord(storage, row.ownerGaii, knowledgeEntryKey(packageId, entry.key), (entryRecord) => (entryRecord
+    ? { visibility: entryRecordVisibility(visibility), groupId: visibility === 'group' ? groupId : undefined }
+    : UNCHANGED));
   emitChange('knowledge');
   return true;
 }

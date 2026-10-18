@@ -30,6 +30,9 @@
  * @structure DesignBookReasons: record · keep · forPart · queue · forget
  * @usage await new DesignBookReasons(storage, config).record({ ... });
  * @version-history
+ *   v1.2.0 — 2026-10-19 — record, keep and forget change each record on the version that was read
+ *     (record-cas.ts updateMemoryRecord) and re-apply their change on a fresh read after a conflict,
+ *     where they wrote back the copy they had read (check:atomic-writes).
  *   v1.1.0 — 2026-09-20 — keptState(): whether the owner said an app turned out well and what its
  *     kept version made by hand, which is what a component's publishing is earned from.
  *   v1.0.0 — 2026-09-20 — Initial (wish-atelierin-ui-kehitys-haltuun-miksi-osa-otettiin-miksi-tehtii).
@@ -38,6 +41,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import type { BuildNotes } from '../app-build-notes.js';
+import { updateMemoryRecord, UNCHANGED } from '../record-cas.js';
 
 export const REASONS_KEY_PREFIX = 'atelier.book.reasons.';
 export const MADE_KEY = 'atelier.book.made';
@@ -68,13 +72,19 @@ export class DesignBookReasons {
 
   private book(): string { return systemGhiiFor(this.config.nodeId); }
 
-  private async put(owner: string, key: string, value: unknown, visibility: 'public' | 'private', tags: string[]): Promise<void> {
-    const prev = await this.storage.getMemory(owner, key);
-    const now = new Date().toISOString();
-    await this.storage.setMemory({
-      key, ownerGaii: owner, value: JSON.stringify(value), visibility, tags, ttlHours: null,
-      version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
+  /**
+   * Change one record on the version that was read, and again on a fresh read when another write
+   * landed meanwhile (record-cas.ts), so two publishes, a keep or a delete at the same moment each
+   * keep the other's rows. `mutate` changes the copy it is given (null when there is none) and
+   * answers it, or UNCHANGED to write nothing. Answers what was written, or null.
+   */
+  private async change<T>(owner: string, key: string, visibility: 'public' | 'private', tags: string[],
+    mutate: (cur: T | null) => T | typeof UNCHANGED): Promise<T | null> {
+    const written = await updateMemoryRecord(this.storage, owner, key, (rec) => {
+      const next = mutate(parse<T>(rec));
+      return next === UNCHANGED ? UNCHANGED : { value: JSON.stringify(next), visibility, tags };
     });
+    return written ? parse<T>(written) : null;
   }
 
   /**
@@ -89,11 +99,12 @@ export class DesignBookReasons {
     const at = new Date().toISOString();
 
     const ownerKey = OWNER_NOTES_PREFIX + input.filename;
-    const mine = parse<OwnerNotesRecord>(await this.storage.getMemory(input.ownerGhii, ownerKey))
-      ?? { spec: 'aimeat.buildnotes/v1' as const, app, kept_version: null, kept_at: null, versions: [] };
-    mine.versions = [...mine.versions.filter(v => v.version !== input.version),
-      { version: input.version, at, level: input.level, register: input.register, ...input.notes }].slice(-VERSIONS_KEPT);
-    await this.put(input.ownerGhii, ownerKey, mine, 'private', ['atelier', 'buildnotes']);
+    await this.change<OwnerNotesRecord>(input.ownerGhii, ownerKey, 'private', ['atelier', 'buildnotes'], (cur) => {
+      const mine = cur ?? { spec: 'aimeat.buildnotes/v1' as const, app, kept_version: null, kept_at: null, versions: [] };
+      mine.versions = [...mine.versions.filter(v => v.version !== input.version),
+        { version: input.version, at, level: input.level, register: input.register, ...input.notes }].slice(-VERSIONS_KEPT);
+      return mine;
+    });
 
     if (input.shareable) {
       // A new version is not yet one the owner called good, whatever the last one was.
@@ -101,18 +112,21 @@ export class DesignBookReasons {
       const touched = new Set([...input.notes.took, ...input.notes.passed].map(n => n.part));
       for (const id of touched) {
         const key = REASONS_KEY_PREFIX + id;
-        const rec = parse<PartReasons>(await this.storage.getMemory(this.book(), key))
-          ?? { spec: 'aimeat.designbook.reasons/v1' as const, id, took: [], passed: [] };
-        const took = input.notes.took.find(n => n.part === id);
-        const passed = input.notes.passed.find(n => n.part === id);
-        rec.took = [...rec.took.filter(r => r.app !== app), ...(took ? [row(took.why)] : [])].slice(-ROWS_PER_PART);
-        rec.passed = [...rec.passed.filter(r => r.app !== app), ...(passed ? [row(passed.why)] : [])].slice(-ROWS_PER_PART);
-        await this.put(this.book(), key, rec, 'public', ['designbook', 'reasons']);
+        await this.change<PartReasons>(this.book(), key, 'public', ['designbook', 'reasons'], (cur) => {
+          const rec = cur ?? { spec: 'aimeat.designbook.reasons/v1' as const, id, took: [], passed: [] };
+          const took = input.notes.took.find(n => n.part === id);
+          const passed = input.notes.passed.find(n => n.part === id);
+          rec.took = [...rec.took.filter(r => r.app !== app), ...(took ? [row(took.why)] : [])].slice(-ROWS_PER_PART);
+          rec.passed = [...rec.passed.filter(r => r.app !== app), ...(passed ? [row(passed.why)] : [])].slice(-ROWS_PER_PART);
+          return rec;
+        });
       }
-      const made = parse<MadeRecord>(await this.storage.getMemory(this.book(), MADE_KEY)) ?? { spec: 'aimeat.designbook.made/v1' as const, rows: [] };
-      made.rows = [...made.rows.filter(r => r.app !== app),
-        ...input.notes.made.map(m => ({ ...row(m.why), name: m.name, what: m.what }))].slice(-MADE_ROWS);
-      await this.put(this.book(), MADE_KEY, made, 'public', ['designbook', 'made']);
+      await this.change<MadeRecord>(this.book(), MADE_KEY, 'public', ['designbook', 'made'], (cur) => {
+        const made = cur ?? { spec: 'aimeat.designbook.made/v1' as const, rows: [] };
+        made.rows = [...made.rows.filter(r => r.app !== app),
+          ...input.notes.made.map(m => ({ ...row(m.why), name: m.name, what: m.what }))].slice(-MADE_ROWS);
+        return made;
+      });
     }
     return { took: input.notes.took.length, passed: input.notes.passed.length, made: input.notes.made.length, shared: input.shareable };
   }
@@ -127,27 +141,30 @@ export class DesignBookReasons {
   > {
     const app = `${input.ownerName}/${input.filename}`;
     const ownerKey = OWNER_NOTES_PREFIX + input.filename;
-    const mine = parse<OwnerNotesRecord>(await this.storage.getMemory(input.ownerGhii, ownerKey));
-    const latest = mine?.versions.at(-1);
-    if (!mine || !latest) return null;
-    mine.kept_version = input.kept ? latest.version : null;
-    mine.kept_at = input.kept ? new Date().toISOString() : null;
-    await this.put(input.ownerGhii, ownerKey, mine, 'private', ['atelier', 'buildnotes']);
+    let latest = undefined as OwnerVersionNotes | undefined;
+    await this.change<OwnerNotesRecord>(input.ownerGhii, ownerKey, 'private', ['atelier', 'buildnotes'], (mine) => {
+      latest = mine?.versions.at(-1);
+      if (!mine || !latest) return UNCHANGED;
+      mine.kept_version = input.kept ? latest.version : null;
+      mine.kept_at = input.kept ? new Date().toISOString() : null;
+      return mine;
+    });
+    if (!latest) return null;
 
+    const mark = (r: ReasonRow): ReasonRow => (r.app === app ? { ...r, kept: input.kept } : r);
     for (const id of new Set([...latest.took, ...latest.passed].map(n => n.part))) {
-      const key = REASONS_KEY_PREFIX + id;
-      const rec = parse<PartReasons>(await this.storage.getMemory(this.book(), key));
-      if (!rec) continue;
-      const mark = (r: ReasonRow): ReasonRow => (r.app === app ? { ...r, kept: input.kept } : r);
-      rec.took = rec.took.map(mark);
-      rec.passed = rec.passed.map(mark);
-      await this.put(this.book(), key, rec, 'public', ['designbook', 'reasons']);
+      await this.change<PartReasons>(this.book(), REASONS_KEY_PREFIX + id, 'public', ['designbook', 'reasons'], (rec) => {
+        if (!rec) return UNCHANGED;
+        rec.took = rec.took.map(mark);
+        rec.passed = rec.passed.map(mark);
+        return rec;
+      });
     }
-    const made = parse<MadeRecord>(await this.storage.getMemory(this.book(), MADE_KEY));
-    if (made?.rows.some(r => r.app === app)) {
+    await this.change<MadeRecord>(this.book(), MADE_KEY, 'public', ['designbook', 'made'], (made) => {
+      if (!made?.rows.some(r => r.app === app)) return UNCHANGED;
       made.rows = made.rows.map(r => (r.app === app ? { ...r, kept: input.kept } : r));
-      await this.put(this.book(), MADE_KEY, made, 'public', ['designbook', 'made']);
-    }
+      return made;
+    });
     return { app, kept: input.kept, version: latest.version, register: latest.register ?? null, took: latest.took, made: latest.made };
   }
 
@@ -201,17 +218,17 @@ export class DesignBookReasons {
     const mine = parse<OwnerNotesRecord>(await this.storage.getMemory(ownerGhii, OWNER_NOTES_PREFIX + filename));
     const partIds = (mine?.versions ?? []).flatMap(v => [...v.took, ...v.passed].map(n => n.part));
     for (const id of new Set(partIds)) {
-      const key = REASONS_KEY_PREFIX + id;
-      const rec = parse<PartReasons>(await this.storage.getMemory(this.book(), key));
-      if (!rec) continue;
-      rec.took = rec.took.filter(r => r.app !== app);
-      rec.passed = rec.passed.filter(r => r.app !== app);
-      await this.put(this.book(), key, rec, 'public', ['designbook', 'reasons']);
+      await this.change<PartReasons>(this.book(), REASONS_KEY_PREFIX + id, 'public', ['designbook', 'reasons'], (rec) => {
+        if (!rec) return UNCHANGED;
+        rec.took = rec.took.filter(r => r.app !== app);
+        rec.passed = rec.passed.filter(r => r.app !== app);
+        return rec;
+      });
     }
-    const made = parse<MadeRecord>(await this.storage.getMemory(this.book(), MADE_KEY));
-    if (made?.rows.some(r => r.app === app)) {
+    await this.change<MadeRecord>(this.book(), MADE_KEY, 'public', ['designbook', 'made'], (made) => {
+      if (!made?.rows.some(r => r.app === app)) return UNCHANGED;
       made.rows = made.rows.filter(r => r.app !== app);
-      await this.put(this.book(), MADE_KEY, made, 'public', ['designbook', 'made']);
-    }
+      return made;
+    });
   }
 }

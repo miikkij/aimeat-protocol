@@ -6,6 +6,8 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-19 — POST /v1/knowledge/:id/contribute adds the organism tag on the manifest's version
+ *     (record-cas.ts updateMemoryRecord), where it wrote back the manifest it had read (check:atomic-writes).
  *   2026-10-15 — GET /v1/knowledge/:id/reputation reads the manifest by helpers.ts findReadableManifest
  *     and names the last review only to the package owner (feature-list audit 207).
  *   2026-10-13 — GET /v1/knowledge/organism/:id answers a contributed manifest's pacing amount as
@@ -28,6 +30,7 @@ import { emitChange } from '../../services/event-bus.js';
 import type { KnowledgeHelpers } from './helpers.js';
 import { agentBarred, agentBarredMessage, barredAgentFor } from '../../services/organism-agent-access.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -96,14 +99,12 @@ export function registerOrganismRoutes(
       revokedAt: null,
     });
 
-    // Tag the manifest with the organism
-    const existingTags = manifest.tags || [];
-    if (!existingTags.includes(`organism:${organism_id}`)) {
-      manifest.tags = [...existingTags, `organism:${organism_id}`];
-      manifest.updatedAt = now;
-      manifest.version += 1;
-      await storage.setMemory(manifest);
-    }
+    // Tag the manifest with the organism: on the stored manifest's version (record-cas.ts), so a
+    // contribution to another organism at the same moment keeps its tag.
+    await updateMemoryRecord(storage, ownerGaii, manifestKey, (rec) => {
+      const existingTags = rec?.tags || [];
+      return !rec || existingTags.includes(`organism:${organism_id}`) ? UNCHANGED : { tags: [...existingTags, `organism:${organism_id}`] };
+    });
 
     res.status(201).json(success(config.nodeId, {
       package_id: packageId,

@@ -39,6 +39,8 @@
  *     mcp/appdev-proofs.ts, with the storage write replaced by writeMemoryRecord().
  *   v1.0.1 -- 2026-09-26 -- The caller's account comes from localAccountOf, so a visitor from another
  *     node resolves to no owner here, never to the local namesake (secaudit 2026-09, F-1).
+ *   v1.0.2 -- 2026-10-19 -- Both ledgers are written with expectedVersion, and the proof is checked
+ *     and appended again on a fresh read after a VERSION_CONFLICT (check:atomic-writes).
  */
 
 import type { AimeatConfig } from '../config.js';
@@ -47,6 +49,7 @@ import type { ContributionProof } from '../models/contribution-proof.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
 import { getTemplateProposal, templateProposalKey } from './app-template-proposals.js';
+import { CAS_ATTEMPTS } from './record-cas.js';
 
 /** The community pack's append-only proof ledger: one public record per pack, under its owner. */
 export const packProofsKey = (packId: string): string => `libpack.proofs.${packId}`;
@@ -92,6 +95,8 @@ export type AttachProofResult =
 
 const DUPLICATE_MESSAGE =
     'Duplicate proof (same model + test set + date) — the ledger is append-only, one entry per run';
+const CONFLICT_MESSAGE =
+    `The record changed under every one of ${CAS_ATTEMPTS} attempts; attach the proof again`;
 
 /** The caller's account on this node and its GHII; none for an ecosystem app or another node's identity. */
 function ownerOf(principal: string, config: AimeatConfig): { owner: string; ownerGhii: string } | null {
@@ -141,65 +146,78 @@ export async function attachContributionProof(
             return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Only the pack owner may attach proofs to it' };
         }
 
+        // The ledger is written on the version that was read. A proof attached at the same moment
+        // lands first; this one is then checked and appended against a fresh read.
         const key = packProofsKey(input.subjectId);
-        const existing = await storage.getMemory(who.ownerGhii, key);
-        const value = (existing?.value ?? { packId: input.subjectId, proofs: [] }) as { packId: string; proofs: ContributionProof[] };
-        const proofs = Array.isArray(value.proofs) ? value.proofs : [];
+        for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+            const existing = await storage.getMemory(who.ownerGhii, key);
+            const value = (existing?.value ?? { packId: input.subjectId, proofs: [] }) as { packId: string; proofs: ContributionProof[] };
+            const proofs = Array.isArray(value.proofs) ? value.proofs : [];
+            if (isDuplicate(proofs)) {
+                return { ok: false, status: 409, code: 'DUPLICATE_PROOF', message: DUPLICATE_MESSAGE };
+            }
+            proofs.push(proof);
+
+            const written = await writeMemoryRecord({ storage, config }, {
+                principal: caller.principal, targetGaii: who.ownerGhii,
+                scopes: caller.scopes, roles: caller.roles,
+            }, {
+                key,
+                value: { packId: input.subjectId, proofs },
+                visibility: 'public',
+                tags: ['libpack-proofs'],
+                ttlHours: null,
+                expectedVersion: existing?.version ?? 0,
+                pipeline: input.pipeline,
+                ownerScoped: true,
+            });
+            if (!written.ok && written.code === 'VERSION_CONFLICT') continue;
+            if (!written.ok) {
+                return { ok: false, status: written.status, code: written.code, message: written.message };
+            }
+            return { ok: true, subjectType: input.subjectType, subjectId: input.subjectId, proofsTotal: proofs.length, proof };
+        }
+        return { ok: false, status: 409, code: 'VERSION_CONFLICT', message: CONFLICT_MESSAGE };
+    }
+
+    // app_template: append to the caller's own proposal manifest, on the version that was read, and
+    // against a fresh read when a re-proposal or another proof landed meanwhile.
+    for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+        const found = await getTemplateProposal(storage, config, caller.principal, input.subjectId);
+        if (!found) {
+            return { ok: false, status: 404, code: 'NOT_FOUND', message: `Template proposal not found: ${input.subjectId}` };
+        }
+        const manifest = found.manifest;
+        const proofs = Array.isArray(manifest.proofs) ? manifest.proofs : [];
         if (isDuplicate(proofs)) {
             return { ok: false, status: 409, code: 'DUPLICATE_PROOF', message: DUPLICATE_MESSAGE };
         }
         proofs.push(proof);
+        manifest.proofs = proofs;
+        manifest.updatedAt = now;
 
+        // The proposal's own visibility and tags are the proposal's business, so they are carried over
+        // rather than restated here: this write appends a proof, it does not re-decide who may read it.
         const written = await writeMemoryRecord({ storage, config }, {
-            principal: caller.principal, targetGaii: who.ownerGhii,
+            principal: caller.principal, targetGaii: found.record.ownerGaii,
             scopes: caller.scopes, roles: caller.roles,
         }, {
-            key,
-            value: { packId: input.subjectId, proofs },
-            visibility: 'public',
-            tags: ['libpack-proofs'],
-            ttlHours: null,
+            key: templateProposalKey(input.subjectId),
+            value: manifest,
+            visibility: found.record.visibility,
+            tags: found.record.tags,
+            ttlHours: found.record.ttlHours,
+            ...(found.record.groupId ? { groupId: found.record.groupId } : {}),
+            ...(found.record.workspaceRef !== undefined ? { workspaceRef: found.record.workspaceRef } : {}),
+            expectedVersion: found.record.version,
             pipeline: input.pipeline,
             ownerScoped: true,
         });
+        if (!written.ok && written.code === 'VERSION_CONFLICT') continue;
         if (!written.ok) {
             return { ok: false, status: written.status, code: written.code, message: written.message };
         }
         return { ok: true, subjectType: input.subjectType, subjectId: input.subjectId, proofsTotal: proofs.length, proof };
     }
-
-    // app_template: append to the caller's own proposal manifest.
-    const found = await getTemplateProposal(storage, config, caller.principal, input.subjectId);
-    if (!found) {
-        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Template proposal not found: ${input.subjectId}` };
-    }
-    const manifest = found.manifest;
-    const proofs = Array.isArray(manifest.proofs) ? manifest.proofs : [];
-    if (isDuplicate(proofs)) {
-        return { ok: false, status: 409, code: 'DUPLICATE_PROOF', message: DUPLICATE_MESSAGE };
-    }
-    proofs.push(proof);
-    manifest.proofs = proofs;
-    manifest.updatedAt = now;
-
-    // The proposal's own visibility and tags are the proposal's business, so they are carried over
-    // rather than restated here: this write appends a proof, it does not re-decide who may read it.
-    const written = await writeMemoryRecord({ storage, config }, {
-        principal: caller.principal, targetGaii: found.record.ownerGaii,
-        scopes: caller.scopes, roles: caller.roles,
-    }, {
-        key: templateProposalKey(input.subjectId),
-        value: manifest,
-        visibility: found.record.visibility,
-        tags: found.record.tags,
-        ttlHours: found.record.ttlHours,
-        ...(found.record.groupId ? { groupId: found.record.groupId } : {}),
-        ...(found.record.workspaceRef !== undefined ? { workspaceRef: found.record.workspaceRef } : {}),
-        pipeline: input.pipeline,
-        ownerScoped: true,
-    });
-    if (!written.ok) {
-        return { ok: false, status: written.status, code: written.code, message: written.message };
-    }
-    return { ok: true, subjectType: input.subjectType, subjectId: input.subjectId, proofsTotal: proofs.length, proof };
+    return { ok: false, status: 409, code: 'VERSION_CONFLICT', message: CONFLICT_MESSAGE };
 }

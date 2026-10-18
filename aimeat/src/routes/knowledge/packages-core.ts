@@ -6,6 +6,8 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-19 — POST /v1/knowledge/:id/link appends to the manifest's links on the manifest's version
+ *     (record-cas.ts updateMemoryRecord), where it wrote back the manifest it had read (check:atomic-writes).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, POST /v1/knowledge/import
  *     stores a listed package at the audience 'members' (unlisted) and a public entry at 'members', with
  *     the warning PUBLIC_IS_SIGNED_IN_HERE, before the publish gate (plan V1.6).
@@ -69,6 +71,7 @@ import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../servi
 import { knowledgePublishAsk, fileKnowledgeAsk } from '../../services/knowledge-publish-ask.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
+import { updateMemoryRecord, UNCHANGED } from '../../services/record-cas.js';
 
 // The validator is shared with the operator's import, which used to write a manifest nothing
 // checked. → ./manifest-validator.ts
@@ -440,15 +443,16 @@ export function registerPackagesCoreRoutes(
 
     await storage.createLink(link);
 
-    // Also update the manifest's links array
-    const manifestValue = existing.value as KnowledgeManifest;
-    manifestValue.links = manifestValue.links ?? [];
-    manifestValue.links.push({ target, relation, description, linked_at: now });
-    manifestValue.updated = now;
-    existing.value = manifestValue;
-    existing.updatedAt = now;
-    existing.version += 1;
-    await storage.setMemory(existing);
+    // Also update the manifest's links array: on the stored manifest's version (record-cas.ts), so a
+    // link added at the same moment stays.
+    await updateMemoryRecord(storage, ownerGaii, manifestKey, (rec) => {
+      if (!rec) return UNCHANGED;
+      const manifestValue = structuredClone(rec.value) as KnowledgeManifest;
+      manifestValue.links = manifestValue.links ?? [];
+      manifestValue.links.push({ target, relation, description, linked_at: now });
+      manifestValue.updated = now;
+      return { value: manifestValue };
+    });
 
     res.status(201).json(success(config.nodeId, { link }, [
       { description: 'List package links', method: 'GET', url: `/v1/knowledge/${packageId}/links` },

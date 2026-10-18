@@ -40,12 +40,15 @@
  *     reserved-package guard and the manifest index line move out of src/mcp/knowledge.ts, and the
  *     manifest write joins the entry write inside services/memory-write.ts.
  *   v1.0.1 — 2026-10-08 — The manifest rewrite keeps the manifest's provenance record (aiprov E10).
+ *   v1.0.2 — 2026-10-19 — The manifest's index line is written with expectedVersion, and added to a
+ *     fresh read of the manifest after a VERSION_CONFLICT (check:atomic-writes).
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { writeMemoryRecord, type MemoryWriteCaller, type MemoryWriteFanout } from './memory-write.js';
 import type { DeclaredProvenance } from './ai-provenance.js';
 import { PITFALL_PACKAGE_ID } from './appdev-kb.js';
+import { CAS_ATTEMPTS } from './record-cas.js';
 
 /** An entry reference stored in a knowledge-package manifest's `entries` list. */
 export interface KnowledgeEntryRef {
@@ -125,7 +128,8 @@ export async function addKnowledgePackageEntry(
     }
 
     const manifestKey = `packages/${input.packageId}/manifest`;
-    const manifest = await storage.getMemory(caller.targetGaii, manifestKey);
+    const readManifest = (): Promise<MemoryRecord | null> => storage.getMemory(caller.targetGaii, manifestKey);
+    const manifest = await readManifest();
     if (!manifest) {
         return {
             ok: false, status: 404, code: 'NOT_FOUND',
@@ -166,13 +170,21 @@ export async function addKnowledgePackageEntry(
     if (!written.ok) return written;
 
     // The manifest's entries list is what the knowledge views and the export, clone and visibility
-    // routes read. An entry with no index line is an entry nobody finds.
-    const manifestValue = (manifest.value ?? {}) as KnowledgeManifestValue;
-    const manifestEntries: KnowledgeEntryRef[] = manifestValue.entries ?? [];
-    const alreadyIndexed = manifestEntries.some(
-        e => e.key === fullEntryKey || e.key === input.entryKey,
-    );
-    if (!alreadyIndexed) {
+    // routes read. An entry with no index line is an entry nobody finds. The line is written on the
+    // manifest's version, so an entry added at the same moment keeps its own line: on a conflict the
+    // manifest is read again and the line added to that.
+    const refused = (message: string): KnowledgePackageEntryResult => ({
+        ok: true, entryKey: fullEntryKey, record: written.record, manifestUpdated: false, manifestWarning: message,
+    });
+    let current: MemoryRecord | null = manifest;
+    for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+        if (!current) return refused(`NOT_FOUND: Package not found: ${input.packageId}`);
+        const manifestValue = structuredClone(current.value ?? {}) as KnowledgeManifestValue;
+        const manifestEntries: KnowledgeEntryRef[] = manifestValue.entries ?? [];
+        const alreadyIndexed = manifestEntries.some(
+            e => e.key === fullEntryKey || e.key === input.entryKey,
+        );
+        if (alreadyIndexed) return { ok: true, entryKey: fullEntryKey, record: written.record, manifestUpdated: false };
         manifestEntries.push({ key: fullEntryKey, title: input.entryKey, visibility: 'owner' });
         manifestValue.entries = manifestEntries;
         manifestValue.updated = new Date().toISOString();
@@ -180,37 +192,29 @@ export async function addKnowledgePackageEntry(
         const indexed = await writeMemoryRecord(deps, caller, {
             key: manifestKey,
             value: manifestValue,
-            visibility: manifest.visibility,
-            tags: manifest.tags,
-            ttlHours: manifest.ttlHours,
-            ...(manifest.groupId ? { groupId: manifest.groupId } : {}),
-            ...(manifest.workspaceRef ? { workspaceRef: manifest.workspaceRef } : {}),
+            visibility: current.visibility,
+            tags: current.tags,
+            ttlHours: current.ttlHours,
+            ...(current.groupId ? { groupId: current.groupId } : {}),
+            ...(current.workspaceRef ? { workspaceRef: current.workspaceRef } : {}),
             // An index line added is not new writing in the package: the record of how the package
             // was made stays on its manifest. Without this the rewrite dropped it, or replaced it with
             // a stamp about the contributor (aiprov E10).
-            ...(manifest.aiProvenanceId ? { declaredProvenanceId: manifest.aiProvenanceId } : {}),
+            ...(current.aiProvenanceId ? { declaredProvenanceId: current.aiProvenanceId } : {}),
+            expectedVersion: current.version,
             pipeline: input.pipeline,
             ownerScoped: true,
         });
-        if (!indexed.ok) {
-            return {
-                ok: true,
-                entryKey: fullEntryKey,
-                record: written.record,
-                manifestUpdated: false,
-                manifestWarning: `${indexed.code}: ${indexed.message}`,
-            };
+        if (!indexed.ok && indexed.code === 'VERSION_CONFLICT') {
+            current = await readManifest();
+            continue;
         }
+        if (!indexed.ok) return refused(`${indexed.code}: ${indexed.message}`);
         // The knowledge routes emit this when a package changes. The entry's own write emits
         // 'memory' through memory-write; the manifest needs its own signal, and it fires AFTER the
         // write rather than before it, so a listener that re-reads immediately sees the index line.
         emitChange('knowledge');
+        return { ok: true, entryKey: fullEntryKey, record: written.record, manifestUpdated: true };
     }
-
-    return {
-        ok: true,
-        entryKey: fullEntryKey,
-        record: written.record,
-        manifestUpdated: !alreadyIndexed,
-    };
+    return refused(`VERSION_CONFLICT: the manifest changed under every one of ${CAS_ATTEMPTS} attempts; add the entry again`);
 }
