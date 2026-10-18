@@ -1982,19 +1982,19 @@
      "slug": "g-10-edit-with-ai",
      "cells": [
       "<strong>Edit with AI</strong>",
-      "Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. A preview (a proposal, a working copy, a checkpoint) runs in a sandboxed frame and signs in with the app's own grant, never with your session; the code of an app that is not yours gets nothing until you agree in the consent window.",
+      "Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. A preview (a proposal, a working copy, a checkpoint) runs in a sandboxed frame and signs in with the app's own grant, never with your session; the code of an app that is not yours gets nothing until you agree in the consent window. Only the app's owner sees this section.",
       "App Catalog &gt; app details &gt; Edit with AI"
      ],
-     "plain": "Edit with AI Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. A preview (a proposal, a working copy, a checkpoint) runs in a sandboxed frame and signs in with the app's own grant, never with your session; the code of an app that is not yours gets nothing until you agree in the consent window. App Catalog > app details > Edit with AI"
+     "plain": "Edit with AI Describe a change, preview the proposed app and choose whether to keep or discard it. AI editing uses the owner's configured model; publishing remains a separate action. A preview (a proposal, a working copy, a checkpoint) runs in a sandboxed frame and signs in with the app's own grant, never with your session; the code of an app that is not yours gets nothing until you agree in the consent window. Only the app's owner sees this section. App Catalog > app details > Edit with AI"
     },
     {
      "slug": "g-10-saved-working-copy-and-checkpoints",
      "cells": [
       "<strong>Saved working copy and checkpoints</strong>",
-      "Save an unpublished working copy on the node so it survives a reload. In the App Catalog, each save keeps the copy it replaced as a checkpoint with its change note, which you can restore; the newest 8 are kept per app. Limits: a checkpoint is one memory record, so an app larger than about three quarters of the node's record size limit (1 MB by default) gets no checkpoint, and the save still goes through; a working copy your AI saves keeps no checkpoint.",
-      "App Catalog &gt; Working-copy history, <code>aimeat_app_draft_*</code>"
+      "Save an unpublished working copy on the node so it survives a reload. In the App Catalog, each save keeps the copy it replaced as a checkpoint with its change note, which you can restore; the newest 8 are kept per app. Limits: a checkpoint is one memory record, so an app larger than about three quarters of the node's record size limit (1 MB by default) gets no checkpoint, and the save still goes through; a working copy your AI saves keeps no checkpoint. Only the app's owner sees the working copy and its history in the App Catalog; somebody else opening the app gets its source read-only, with no save or publish. A working copy can carry one sentence on what it changes, which the people who build the app see on the app itself (see &quot;What is new in an app, on the app&quot;).",
+      "App Catalog &gt; Working-copy history, <code>aimeat_app_draft_*</code> (<code>notice</code>)"
      ],
-     "plain": "Saved working copy and checkpoints Save an unpublished working copy on the node so it survives a reload. In the App Catalog, each save keeps the copy it replaced as a checkpoint with its change note, which you can restore; the newest 8 are kept per app. Limits: a checkpoint is one memory record, so an app larger than about three quarters of the node's record size limit (1 MB by default) gets no checkpoint, and the save still goes through; a working copy your AI saves keeps no checkpoint. App Catalog > Working-copy history, aimeat_app_draft_*"
+     "plain": "Saved working copy and checkpoints Save an unpublished working copy on the node so it survives a reload. In the App Catalog, each save keeps the copy it replaced as a checkpoint with its change note, which you can restore; the newest 8 are kept per app. Limits: a checkpoint is one memory record, so an app larger than about three quarters of the node's record size limit (1 MB by default) gets no checkpoint, and the save still goes through; a working copy your AI saves keeps no checkpoint. Only the app's owner sees the working copy and its history in the App Catalog; somebody else opening the app gets its source read-only, with no save or publish. A working copy can carry one sentence on what it changes, which the people who build the app see on the app itself (see \"What is new in an app, on the app\"). App Catalog > Working-copy history, aimeat_app_draft_* (notice)"
     },
     {
      "slug": "g-10-staging-preview",
@@ -2126,10 +2126,19 @@
      "slug": "g-10-marks-and-authorship",
      "cells": [
       "<strong>Marks and authorship</strong>",
-      "Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules.",
-      "<code>aimeat_app_manage</code> action <code>marks</code>, App Catalog &gt; Marks and authorship"
+      "Set the app's marks and authorship information: the &quot;publish your own app&quot; badge, the install offer, the &quot;Use with your AI&quot; mark, the app-info mark, and whether the marks start tucked away for a visitor (in view unless you choose; a visitor's own choice wins; the AI label and the cookie mark always stay). Naming the person responsible for an app is a separate declaration with its own approval rules.",
+      "<code>aimeat_app_manage</code> action <code>marks</code> (<code>badge</code>, <code>install</code>, <code>aiUse</code>, <code>info</code>, <code>tucked</code>), App Catalog &gt; Marks and authorship"
      ],
-     "plain": "Marks and authorship Set the app's marks and authorship information. Naming the person responsible for an app is a separate declaration with its own approval rules. aimeat_app_manage action marks, App Catalog > Marks and authorship"
+     "plain": "Marks and authorship Set the app's marks and authorship information: the \"publish your own app\" badge, the install offer, the \"Use with your AI\" mark, the app-info mark, and whether the marks start tucked away for a visitor (in view unless you choose; a visitor's own choice wins; the AI label and the cookie mark always stay). Naming the person responsible for an app is a separate declaration with its own approval rules. aimeat_app_manage action marks (badge, install, aiUse, info, tucked), App Catalog > Marks and authorship"
+    },
+    {
+     "slug": "g-10-open-one-app-in-the-app-catalog",
+     "cells": [
+      "<strong>Open one app in the App Catalog</strong>",
+      "A link names one app and opens its details in the list it belongs to: Your apps when it is yours, Building for others when you hold a development right on it, the community's otherwise, signed in or not. The search finds an app by its file name too. While the details are open, the top bar stays in reach, so you sign in and out without closing them. Somebody else's app shows the parts anybody may use (versions, sharing as a prompt, the source to read, what it needs, its skills and roadmap) and none of the owner's controls.",
+      "<code>/v1/appcat?app=&lt;owner&gt;/&lt;filename&gt;</code>, <code>/v1/appcat?q=</code>"
+     ],
+     "plain": "Open one app in the App Catalog A link names one app and opens its details in the list it belongs to: Your apps when it is yours, Building for others when you hold a development right on it, the community's otherwise, signed in or not. The search finds an app by its file name too. While the details are open, the top bar stays in reach, so you sign in and out without closing them. Somebody else's app shows the parts anybody may use (versions, sharing as a prompt, the source to read, what it needs, its skills and roadmap) and none of the owner's controls. /v1/appcat?app=<owner>/<filename>, /v1/appcat?q="
     },
     {
      "slug": "g-10-app-config",
@@ -4177,6 +4186,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 421
+  "rows": 422
  }
 }
