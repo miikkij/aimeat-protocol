@@ -8,10 +8,10 @@
       "note": "one language-context row added (invites people, invitation code); no instruction changed; Jouni ruled to skip the aimeat-writing eval on 2026-10-18, relayed by the lead session"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:a60067cbbd449303b182d67c",
+      "digest": "sha256:0c076318d9a7159108354e5e",
       "decision": "skipped",
-      "on": "2026-10-11",
-      "note": "New sections 0, 2c, 2d, 2e and the extension paragraph from docs/app-developer-ai-guide.md (docs audit phase 3); the sections the six cases measure are unchanged; Jouni decided 2026-10-11: 'Ohita eval'"
+      "on": "2026-10-18",
+      "note": "one added fact (on_done input.result and ctx.ai.result), no change to the skill's guidance; Jouni, 2026-10-18"
     }
   }
 }
