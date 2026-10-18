@@ -514,6 +514,9 @@ const ALL_SUITES = [
     // Two requests at once on the money paths, on an own in-process node (40296) whose card handlers
     // are stand-ins: password lock, EXCHANGE delivery, UCP idempotency and completion, renewal.
     'test/e2e-money-path-races.ts',
+    // Two writers of one record at once on the commerce books, the UCP checkout, the package sales
+    // catalogue and the AI settings record, on an own in-process node (40473) with a stand-in platform.
+    'test/e2e-atomic-money.ts',
     // Starts a REAL OAuth provider on a fixed loopback port (agreed with the server env above) that
     // rotates its refresh token, so the concurrency assertions test the guard rather than a stub.
     'test/e2e-connections.ts',

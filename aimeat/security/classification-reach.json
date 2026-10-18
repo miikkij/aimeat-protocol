@@ -22,7 +22,7 @@
     },
     "src/commerce/beneficiary-book.ts": {
       "reads": {
-        "getMemory": 4,
+        "getMemory": 1,
         "listAllMemory": 1,
         "listMemory": 1,
         "listAllMemoryPages": 1
@@ -63,7 +63,6 @@
     },
     "src/commerce/payable-book.ts": {
       "reads": {
-        "getMemory": 1,
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A node-written payables ledger: read-to-update and owner listing."
@@ -107,7 +106,7 @@
     },
     "src/commerce/ucp-guest-checkout.ts": {
       "reads": {
-        "getMemory": 9,
+        "getMemory": 7,
         "listMemoryKeysByPrefix": 2
       },
       "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the UCP guest checkout's own records under the seller (commerce.ucp.session.*, commerce.order.*, commerce.ucp.pending.*) and the sealed selling key (commerce.psp) for the seller's own Stripe charge; the key listing only counts open checkouts and finds webhooks that wait. No content."
@@ -272,7 +271,7 @@
     "src/routes/ai.ts": {
       "reads": {
         "generateDownloadToken": 1,
-        "getMemory": 4
+        "getMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: the owner's AI budget settings; the download token is minted for the picture the paying caller has just generated, their own new output."
     },
@@ -552,7 +551,7 @@
     },
     "src/routes/openrouter.ts": {
       "reads": {
-        "getMemory": 9
+        "getMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI settings and key configuration, and project existence checks."
     },
@@ -735,7 +734,7 @@
     },
     "src/services/agent-ai-keys.ts": {
       "reads": {
-        "getMemory": 9
+        "getMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Per-agent encrypted AI keys, usage counters and settings."
     },
@@ -888,7 +887,7 @@
     },
     "src/services/ai/provider-store.ts": {
       "reads": {
-        "getMemory": 16,
+        "getMemory": 15,
         "listMemoryMeta": 3,
         "listMemory": 1
       },

@@ -16,6 +16,9 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-10-18 — aimeat_operator_ai_config writes `openrouter.settings` on the version it read
+ *     (expectedVersion) and merges into a write made in between, read again, so an agent's cap or a
+ *     POST /v1/ai/settings at the same moment persists (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, the highest classification the
  *     agent may read, written through services/agent-clearance.ts: lowering only, never the caller's
  *     own, checked at propose time as a dry run (plan doc-mvdipuyqraas, L2.3).
@@ -65,6 +68,7 @@ import { logger } from '../utils/logger.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { CAS_ATTEMPTS } from '../services/record-cas.js';
 import { recommendedModelsOf } from '../services/ai/policy-store.js';
 import {
     normaliseAgentProfile, resolveAgentTarget, setAgentProfile,
@@ -287,7 +291,9 @@ export function registerOperatorConfigTools(
             });
             if ('deny' in target) return err(`${target.deny.error}: ${target.deny.message} ${target.deny.how_to_fix}`);
             const ownerGhii = target.gaii;
-            const record = await storage.getMemory(ownerGhii, AI_SETTINGS_KEY);
+            // One read, made again when the versioned write below finds a write made in between.
+            const readSettings = () => storage.getMemory(ownerGhii, AI_SETTINGS_KEY);
+            const record = await readSettings();
             const settings = (record?.value ?? {}) as Record<string, unknown>;
 
             const proposed: AiConfigChange = {};
@@ -346,29 +352,38 @@ export function registerOperatorConfigTools(
                 throw e;
             }
 
-            const merged: Record<string, unknown> = { ...settings };
-            if (proposed.daily_budget_usd !== undefined) merged.daily_budget_usd = proposed.daily_budget_usd;
-            if (proposed.model !== undefined) merged.model = proposed.model;
-            if (proposed.reasoning_model !== undefined) merged.reasoningModel = proposed.reasoning_model;
-            if (proposed.execution_model !== undefined) merged.executionModel = proposed.execution_model;
             // ONE implementation. services/memory-write.ts owns the record shape, the ceilings, the
             // archive guard, the provenance stamp and everything a write sets off, the same way
             // POST /v1/memory does — this door used to reach storage itself, so a change to the
             // owner's AI settings landed with none of it and nothing else on the node heard about it.
-            const written = await writeMemoryRecord({ storage, config }, {
-                ...caller().principalView, targetGaii: ownerGhii,
-            }, {
-                key: AI_SETTINGS_KEY,
-                value: merged,
-                visibility: record?.visibility ?? 'private',
-                tags: record?.tags ?? ['openrouter'],
-                pipeline: 'mcp.operator_ai_config',
-                ownerScoped: true,
-                // The word the owner ticked for this door (tool-catalog/scopes.ts), rather than a
-                // memory:write that nobody granting an operator agent was asked about.
-                authorisingScope: 'memory:write-reserved',
-            });
-            if (!written.ok) return err(`${written.code}: ${written.message}`);
+            // The write is on the version read (expectedVersion), and a write made in between (an
+            // agent's cap, POST /v1/ai/settings) is read again and merged into, so it stays.
+            let stored = record;
+            let written: Awaited<ReturnType<typeof writeMemoryRecord>> | null = null;
+            for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+                if (attempt > 0) stored = await readSettings();
+                const merged: Record<string, unknown> = { ...((stored?.value ?? {}) as Record<string, unknown>) };
+                if (proposed.daily_budget_usd !== undefined) merged.daily_budget_usd = proposed.daily_budget_usd;
+                if (proposed.model !== undefined) merged.model = proposed.model;
+                if (proposed.reasoning_model !== undefined) merged.reasoningModel = proposed.reasoning_model;
+                if (proposed.execution_model !== undefined) merged.executionModel = proposed.execution_model;
+                written = await writeMemoryRecord({ storage, config }, {
+                    ...caller().principalView, targetGaii: ownerGhii,
+                }, {
+                    key: AI_SETTINGS_KEY,
+                    value: merged,
+                    visibility: stored?.visibility ?? 'private',
+                    tags: stored?.tags ?? ['openrouter'],
+                    pipeline: 'mcp.operator_ai_config',
+                    ownerScoped: true,
+                    expectedVersion: stored?.version ?? 0,
+                    // The word the owner ticked for this door (tool-catalog/scopes.ts), rather than a
+                    // memory:write that nobody granting an operator agent was asked about.
+                    authorisingScope: 'memory:write-reserved',
+                });
+                if (written.ok || written.code !== 'VERSION_CONFLICT') break;
+            }
+            if (!written?.ok) return err(written ? `${written.code}: ${written.message}` : 'The AI settings could not be written.');
             logger.info(`Operator ai-config applied for ${callerOwner}`, { by: agentGaii, fields: Object.keys(diff) });
             return ok({ mode: 'applied', applied: diff });
         },

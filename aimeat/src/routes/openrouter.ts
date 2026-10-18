@@ -14,6 +14,9 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.22.0 -- 2026-10-18 -- PUT /v1/openrouter/settings merges into `openrouter.settings` on the
+ *     record's version (updatePrivateRecord), the way POST /v1/ai/settings does
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.21.0 -- 2026-10-12 -- legacyAiSettingsRoute guards the three /v1/openrouter settings routes only:
  *     GET and POST /v1/ai/settings stay in 4.0.0 (the budget has no other REST route), so the counted
  *     notice no longer names them.
@@ -103,6 +106,7 @@ import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
+import { updatePrivateRecord } from '../services/private-record.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
@@ -339,53 +343,53 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // Save preferences (plaintext). A new record names NO model: the node's default applies until
       // the owner chooses one (ai-model-defaults.ts). Until 2026-10-02 a key-only save wrote
       // 'openrouter/free' here, and an owner's own key then thought with a free model.
-      const existing = await storage.getMemory(gaii, 'openrouter.settings');
-      const base: Record<string, unknown> = existing
-        ? { ...(existing.value as Record<string, unknown>) }
-        : { autoRetry: true, maxRetries: DEFAULT_EMPTY_RETRIES };
-      if (holdsImplicitFreeModel(base)) delete base.model;
+      // Merged into the record as stored, on its version (services/private-record.ts): the budget,
+      // the agents' caps and the MCP AI config are fields of the same record.
+      await updatePrivateRecord(storage, gaii, 'openrouter.settings', (stored) => {
+        const base: Record<string, unknown> = stored ?? { autoRetry: true, maxRetries: DEFAULT_EMPTY_RETRIES };
+        if (holdsImplicitFreeModel(base)) delete base.model;
 
-      const prefs: Record<string, unknown> = {
-        ...base,
-        provider: effectiveProvider,
-        baseUrl: effectiveBaseUrl,
-      };
-      // An explicit model is the owner's choice and is marked as one, so the free router counts when
-      // they picked it; '' or null clears the choice and the node's default applies again.
-      if (model !== undefined) {
-        if (typeof model === 'string' && model.trim()) { prefs.model = model; prefs.modelChosen = true; }
-        else { delete prefs.model; delete prefs.modelChosen; }
-      }
-      if (reasoningModel !== undefined) prefs.reasoningModel = reasoningModel;
-      if (executionModel !== undefined) prefs.executionModel = executionModel;
-      // visionModel: a vision-capable model (e.g. qwen/qwen-2.5-vl-...) used for image inputs
-      // (the Secretary's doc/image intake). '' / null clears it → image calls fall back to the default.
-      if (visionModel !== undefined) prefs.visionModel = (visionModel === null || visionModel === '') ? null : visionModel;
-      // sttModel: a transcription model (e.g. openai/whisper-large-v3) for voice messages and
-      // /v1/ai/transcribe. Cleared means transcription is OFF, not "fall back to the default model" —
-      // the default is a text model, and handing it audio yields an opaque provider error instead of
-      // an instruction the owner can act on.
-      if (sttModel !== undefined) prefs.sttModel = (sttModel === null || sttModel === '') ? null : sttModel;
-      // imageModel: an IMAGE model (one whose output modality is image), used by POST /v1/ai/image.
-      // Cleared the same way as the others: '' or null means "let the node decide".
-      if (imageModel !== undefined) prefs.imageModel = (imageModel === null || imageModel === '') ? null : imageModel;
-      // sttLanguage: ISO-639-1 hint. Empty = auto-detect, which is what mixed-language speech wants;
-      // a hint measurably helps a single known language (Finnish in particular).
-      if (sttLanguage !== undefined) prefs.sttLanguage = (sttLanguage === null || sttLanguage === '') ? null : String(sttLanguage).slice(0, 8);
-      if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
-      if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || DEFAULT_EMPTY_RETRIES));
-      // null = clear (use model default), number = set explicit value, undefined = don't change
-      if (temperature !== undefined) prefs.temperature = (temperature === null || isNaN(Number(temperature))) ? null : Math.max(0, Math.min(2, Number(temperature)));
-      if (top_p !== undefined) prefs.top_p = (top_p === null || isNaN(Number(top_p))) ? null : Math.max(0, Math.min(1, Number(top_p)));
-      if (max_tokens !== undefined) prefs.max_tokens = (max_tokens === null || isNaN(Number(max_tokens))) ? null : Math.max(1, Math.min(128000, Math.floor(Number(max_tokens))));
-      // reasoning: OpenRouter's reasoning parameter, stored as given and sent as given on every
-      // completion that does not set its own. null clears it; an empty object is the same as null.
-      if (reasoning !== undefined) {
-        if (parsedReasoning && Object.keys(parsedReasoning).length > 0) prefs.reasoning = parsedReasoning;
-        else delete prefs.reasoning;
-      }
-
-      await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
+        const prefs: Record<string, unknown> = {
+          ...base,
+          provider: effectiveProvider,
+          baseUrl: effectiveBaseUrl,
+        };
+        // An explicit model is the owner's choice and is marked as one, so the free router counts when
+        // they picked it; '' or null clears the choice and the node's default applies again.
+        if (model !== undefined) {
+          if (typeof model === 'string' && model.trim()) { prefs.model = model; prefs.modelChosen = true; }
+          else { delete prefs.model; delete prefs.modelChosen; }
+        }
+        if (reasoningModel !== undefined) prefs.reasoningModel = reasoningModel;
+        if (executionModel !== undefined) prefs.executionModel = executionModel;
+        // visionModel: a vision-capable model (e.g. qwen/qwen-2.5-vl-...) used for image inputs
+        // (the Secretary's doc/image intake). '' / null clears it → image calls fall back to the default.
+        if (visionModel !== undefined) prefs.visionModel = (visionModel === null || visionModel === '') ? null : visionModel;
+        // sttModel: a transcription model (e.g. openai/whisper-large-v3) for voice messages and
+        // /v1/ai/transcribe. Cleared means transcription is OFF, not "fall back to the default model" —
+        // the default is a text model, and handing it audio yields an opaque provider error instead of
+        // an instruction the owner can act on.
+        if (sttModel !== undefined) prefs.sttModel = (sttModel === null || sttModel === '') ? null : sttModel;
+        // imageModel: an IMAGE model (one whose output modality is image), used by POST /v1/ai/image.
+        // Cleared the same way as the others: '' or null means "let the node decide".
+        if (imageModel !== undefined) prefs.imageModel = (imageModel === null || imageModel === '') ? null : imageModel;
+        // sttLanguage: ISO-639-1 hint. Empty = auto-detect, which is what mixed-language speech wants;
+        // a hint measurably helps a single known language (Finnish in particular).
+        if (sttLanguage !== undefined) prefs.sttLanguage = (sttLanguage === null || sttLanguage === '') ? null : String(sttLanguage).slice(0, 8);
+        if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
+        if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || DEFAULT_EMPTY_RETRIES));
+        // null = clear (use model default), number = set explicit value, undefined = don't change
+        if (temperature !== undefined) prefs.temperature = (temperature === null || isNaN(Number(temperature))) ? null : Math.max(0, Math.min(2, Number(temperature)));
+        if (top_p !== undefined) prefs.top_p = (top_p === null || isNaN(Number(top_p))) ? null : Math.max(0, Math.min(1, Number(top_p)));
+        if (max_tokens !== undefined) prefs.max_tokens = (max_tokens === null || isNaN(Number(max_tokens))) ? null : Math.max(1, Math.min(128000, Math.floor(Number(max_tokens))));
+        // reasoning: OpenRouter's reasoning parameter, stored as given and sent as given on every
+        // completion that does not set its own. null clears it; an empty object is the same as null.
+        if (reasoning !== undefined) {
+          if (parsedReasoning && Object.keys(parsedReasoning).length > 0) prefs.reasoning = parsedReasoning;
+          else delete prefs.reasoning;
+        }
+        return prefs;
+      }, ['openrouter', 'settings']);
 
       res.json(success(config.nodeId, { saved: true }));
     });

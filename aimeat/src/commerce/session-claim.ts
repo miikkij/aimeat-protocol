@@ -20,12 +20,14 @@
  *   grant, a one-time pay token, a pacing pack) nothing can be withheld, so the buyer may name the
  *   invoice rail for it only when the seller has said they give credit for it: `invoiceImmediate:
  *   true` in their payment settings (commerce.psp), set with PUT /v1/commerce/payout/invoice.
- * @structure claimSessionForCompletion · releaseSessionClaim · recordCollected · deliversOnCompletion ·
- *   sellerAcceptsImmediateInvoice · invoiceRailRefusal
+ * @structure claimSessionForCompletion · expireOverdueSession · releaseSessionClaim · recordCollected ·
+ *   deliversOnCompletion · sellerAcceptsImmediateInvoice · invoiceRailRefusal
  * @usage
  *   await claimSessionForCompletion(storage, session, key);   // throws SESSION_NOT_OPEN
  *   const refusal = invoiceRailRefusal(handler?.id, sellables); if (refusal) throw refusal;
  * @version-history
+ *   v1.1.0 — 2026-10-18 — expireOverdueSession, for getSession's lazy expiry
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit S8-03, S8-04).
  */
 import type { Storage } from '../storage/interface.js';
@@ -33,6 +35,7 @@ import type { CheckoutSessionRecord, Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { putRecord } from './platform-fee.js';
 import { INVOICE_HANDLER_ID } from './invoice-handler.js';
+import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 
 const NOT_OPEN = (status: string) => new CommerceError('SESSION_NOT_OPEN', 409,
   status === 'completing'
@@ -59,6 +62,23 @@ export async function claimSessionForCompletion(storage: Storage, session: Check
     ? await storage.setMemoryIfVersion(record, stored.version)
     : await storage.setMemory(record);
   if (!written) throw NOT_OPEN('completing');
+}
+
+/**
+ * Move an overdue `open` session to `expired` on the record's version (services/record-cas.ts). The
+ * check is made on the stored record, so of two reads at the same moment one writes it, and a
+ * session another request claimed or expired meanwhile stays as that request left it. Answers the
+ * session as stored, and whether this call expired it (the caller counts the stage only then).
+ */
+export async function expireOverdueSession(
+  storage: Storage, buyerGhii: string, key: string,
+): Promise<{ stored: CheckoutSessionRecord | null; expired: boolean }> {
+  let expired = false;
+  const stored = await updateRecord<CheckoutSessionRecord | null>(storage, buyerGhii, key, v => (v ?? null) as CheckoutSessionRecord | null, cur => {
+    expired = !!cur && cur.status === 'open' && Date.now() > new Date(cur.expiresAt).getTime();
+    return expired ? { ...cur!, status: 'expired' as const, updatedAt: new Date().toISOString() } : UNCHANGED;
+  }, { tag: 'commerce', visibility: 'owner' });
+  return { stored, expired };
 }
 
 /** Put a claimed session back to `open`, after a refusal that moved no money (or refunded it). */

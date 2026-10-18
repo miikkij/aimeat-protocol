@@ -29,6 +29,9 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.2.3 — 2026-10-18 — deleteOwnerAiProvider's reset of the legacy address and persistHealth write
+ *     onto the record as stored, on its version (updatePrivateRecord)
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.2.2 — 2026-10-13 — deleteOwnerAiProvider removes the legacy records also for a provider the
  *     owner took over from the migration, when they still describe it: until now the next read
  *     migrated them into it again, so the deleted provider came back with the old key paying.
@@ -45,7 +48,8 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
-import { upsertPrivateRecord } from '../private-record.js';
+import { upsertPrivateRecord, updatePrivateRecord } from '../private-record.js';
+import { UNCHANGED } from '../record-cas.js';
 import { emitChange } from '../event-bus.js';
 import { recordAccountEvent } from '../account-events.js';
 import { readAgentKey } from '../agent-ai-keys.js';
@@ -360,8 +364,11 @@ export async function deleteOwnerAiProvider(storage: Storage, config: AimeatConf
   // owner had changed brought it back on the next read, with the legacy key paying again.
   if (wasLegacy || legacyIdOf(s) === id) {
     if (await storage.getMemory(ownerGhii, LEGACY_KEY)) await storage.deleteMemory(ownerGhii, LEGACY_KEY);
+    // Onto the settings as stored, on the record's version: a budget or an agent cap written while
+    // the agent keys above were removed stays.
     if (s && isObj(s.value)) {
-      await upsertPrivateRecord(storage, ownerGhii, LEGACY_SETTINGS, { ...s.value, provider: 'openrouter', baseUrl: '' }, s.tags ?? ['openrouter', 'settings']);
+      await updatePrivateRecord(storage, ownerGhii, LEGACY_SETTINGS, cur => (cur ? { ...cur, provider: 'openrouter', baseUrl: '' } : UNCHANGED),
+        stored => stored?.tags ?? ['openrouter', 'settings']);
     }
   }
   clearHealth(ownerGhii, id);
@@ -494,11 +501,13 @@ export async function persistHealth(
   storage: Storage, ownerGhii: string, id: string, capability: AiCapability, health: CapabilityHealth,
 ): Promise<void> {
   try {
-    const rec = await storage.getMemory(ownerGhii, `${PROVIDER_PREFIX}${id}`);
-    if (!rec || !isObj(rec.value)) return;
-    const h = isObj(rec.value.health) && isObj(rec.value.health.byCapability) ? rec.value.health.byCapability : {};
-    await upsertPrivateRecord(storage, ownerGhii, `${PROVIDER_PREFIX}${id}`,
-      { ...rec.value, health: { byCapability: { ...h, [capability]: health } } }, rec.tags ?? ['ai', 'provider']);
+    // Onto the provider as stored, on the record's version: the owner's save of the provider, or
+    // another capability's health written at the same moment, stays.
+    await updatePrivateRecord(storage, ownerGhii, `${PROVIDER_PREFIX}${id}`, cur => {
+      if (!cur) return UNCHANGED;
+      const h = isObj(cur.health) && isObj(cur.health.byCapability) ? cur.health.byCapability : {};
+      return { ...cur, health: { byCapability: { ...h, [capability]: health } } };
+    }, stored => stored?.tags ?? ['ai', 'provider']);
   } catch (err) {
     logger.warn('[ai] a provider\'s health could not be written; the process still knows it', { owner: ownerGhii, provider: id, error: String(err) });
   }

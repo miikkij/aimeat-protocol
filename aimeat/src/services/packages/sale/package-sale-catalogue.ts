@@ -25,6 +25,9 @@
  *   allSubscriptions() · nodeHolder() · claimNodeHolder() · releaseNodeHolder() · SaleRequest ·
  *   readRequests() · putRequest() · claimRequest()
  * @version-history
+ *   v1.5.0 — 2026-10-18 — setCatalogueEntry, recordReview (updateCatalogue) and putSubscription write
+ *     on the record's version too, so an edit of one package or one subscription keeps the others
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.4.0 — 2026-10-18 — The holders and requests records are written on their version
  *     (services/record-cas.ts). claimNodeHolder replaces putNodeHolder and is taken before the grant,
  *     so two sales naming one node at the same moment grant it once; claimRequest decides a waiting
@@ -75,15 +78,6 @@ async function getRecord<T>(storage: Storage, key: string): Promise<{ value: T |
     return { value: (prev?.value as T | undefined) ?? null, prev };
 }
 
-async function putRecord(storage: Storage, key: string, value: unknown, prev: Awaited<ReturnType<Storage['getMemory']>>, tag: string): Promise<void> {
-    const now = new Date().toISOString();
-    await storage.setMemory({
-        key, ownerGaii: NS_PACKAGE_SALES, value: value as Record<string, unknown>,
-        visibility: 'private', tags: [tag], ttlHours: null,
-        version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
-    });
-}
-
 export async function readCatalogue(storage: Storage): Promise<CatalogueEntry[]> {
     const { value } = await getRecord<{ entries: Record<string, CatalogueEntry> }>(storage, 'catalogue');
     return Object.values(value?.entries ?? {});
@@ -113,15 +107,13 @@ export async function setCatalogueEntry(
     if (input.state !== undefined && input.state !== 'on_sale' && input.state !== 'paused' && input.state !== 'ended') {
         return fail(400, 'INVALID_INPUT', 'state is "on_sale", "paused" or "ended".');
     }
-    const { value, prev } = await getRecord<{ entries: Record<string, CatalogueEntry> }>(storage, 'catalogue');
-    const entries = { ...(value?.entries ?? {}) };
-    const before = entries[entryKey(repository, groupId)];
-    let price: Money | null = before?.price ?? null;
+    // The input is checked first, from the input alone; the entry is then made from the stored one.
+    let price: Money | null | undefined;
     if (input.price !== undefined) {
         if (input.price === null) price = null;
         else { const p = money(input.price, 'price'); if ('ok' in p) return p; price = p; }
     }
-    let renewal: CatalogueEntry['renewal'] = before?.renewal ?? null;
+    let renewal: CatalogueEntry['renewal'] | undefined;
     if (input.renewal !== undefined) {
         if (input.renewal === null) renewal = null;
         else {
@@ -132,32 +124,53 @@ export async function setCatalogueEntry(
             renewal = { ...m, period_days: period };
         }
     }
-    const entry: CatalogueEntry = {
-        repository, group_id: groupId,
-        seller_of_record: typeof input.seller_of_record === 'string' && input.seller_of_record ? input.seller_of_record : before?.seller_of_record ?? caller.owner,
-        price, renewal,
-        ...(typeof input.title === 'string' && input.title ? { title: input.title.slice(0, 200) } : before?.title ? { title: before.title } : {}),
-        state: (input.state as CatalogueEntry['state'] | undefined) ?? before?.state ?? 'on_sale',
-        ...(before?.reviewed ? { reviewed: before.reviewed } : {}),
-        updatedAt: new Date().toISOString(),
-    };
-    entries[entryKey(repository, groupId)] = entry;
-    await putRecord(storage, 'catalogue', { entries }, prev, 'package-sales-catalogue');
+    let entry!: CatalogueEntry;
+    await updateCatalogue(storage, entries => {
+        const before = entries[entryKey(repository, groupId)];
+        entry = {
+            repository, group_id: groupId,
+            seller_of_record: typeof input.seller_of_record === 'string' && input.seller_of_record ? input.seller_of_record : before?.seller_of_record ?? caller.owner,
+            price: price === undefined ? before?.price ?? null : price,
+            renewal: renewal === undefined ? before?.renewal ?? null : renewal,
+            ...(typeof input.title === 'string' && input.title ? { title: input.title.slice(0, 200) } : before?.title ? { title: before.title } : {}),
+            state: (input.state as CatalogueEntry['state'] | undefined) ?? before?.state ?? 'on_sale',
+            ...(before?.reviewed ? { reviewed: before.reviewed } : {}),
+            updatedAt: new Date().toISOString(),
+        };
+        return { ...entries, [entryKey(repository, groupId)]: entry };
+    });
     return { ok: true, entry };
+}
+
+type Catalogue = { entries: Record<string, CatalogueEntry> };
+const parseCatalogue = (v: unknown): Catalogue => ({ entries: { ...((v as Partial<Catalogue> | null | undefined)?.entries ?? {}) } });
+
+/**
+ * Change the catalogue's entries on the record's version (services/record-cas.ts): `change` gets
+ * the stored entries and runs again on the fresh record when another edit wrote it in between, so
+ * an edit of one package keeps every other package's entry. UNCHANGED writes nothing.
+ */
+async function updateCatalogue(
+    storage: Storage, change: (entries: Record<string, CatalogueEntry>) => Record<string, CatalogueEntry> | typeof UNCHANGED,
+): Promise<void> {
+    await updateRecord(storage, NS_PACKAGE_SALES, 'catalogue', parseCatalogue, cur => {
+        const entries = change(cur.entries);
+        return entries === UNCHANGED ? UNCHANGED : { ...cur, entries };
+    }, { tag: 'package-sales-catalogue' });
 }
 
 /** Record the operator's review of the version on sale. The entry must exist: price it first. */
 export async function recordReview(
     storage: Storage, repository: string, groupId: string, reviewed: NonNullable<CatalogueEntry['reviewed']>,
 ): Promise<{ ok: true; entry: CatalogueEntry } | Fail> {
-    const { value, prev } = await getRecord<{ entries: Record<string, CatalogueEntry> }>(storage, 'catalogue');
-    const entries = { ...(value?.entries ?? {}) };
-    const before = entries[entryKey(repository, groupId)];
-    if (!before) return fail(404, 'NOT_FOR_SALE', `This node has not priced ${groupId}. Price it first (action price), then review it.`);
-    const entry: CatalogueEntry = { ...before, reviewed, updatedAt: new Date().toISOString() };
-    entries[entryKey(repository, groupId)] = entry;
-    await putRecord(storage, 'catalogue', { entries }, prev, 'package-sales-catalogue');
-    return { ok: true, entry };
+    const out: { entry: CatalogueEntry | null } = { entry: null };
+    await updateCatalogue(storage, entries => {
+        const before = entries[entryKey(repository, groupId)];
+        out.entry = before ? { ...before, reviewed, updatedAt: new Date().toISOString() } : null;
+        return out.entry ? { ...entries, [entryKey(repository, groupId)]: out.entry } : UNCHANGED;
+    });
+    if (!out.entry) return fail(404, 'NOT_FOR_SALE', `This node has not priced ${groupId}. Price it first (action price), then review it.`);
+    return { ok: true, entry: out.entry };
 }
 
 // ── Subscriptions ────────────────────────────────────────────────────────────────────────────
@@ -196,9 +209,13 @@ export async function subscriptionFor(storage: Storage, buyer: string, repositor
     return (await subscriptionsOf(storage, buyer)).find(s => s.repository === repository && s.group_id === groupId && s.node_id === nodeId) ?? null;
 }
 
+type Subs = { subs: Record<string, Subscription> };
+const parseSubs = (v: unknown): Subs => ({ subs: { ...((v as Partial<Subs> | null | undefined)?.subs ?? {}) } });
+
+/** Write one subscription into the buyer's record, on its version, keeping every other one as stored. */
 export async function putSubscription(storage: Storage, sub: Subscription): Promise<void> {
-    const { value, prev } = await getRecord<{ subs: Record<string, Subscription> }>(storage, subKey(sub.buyer));
-    await putRecord(storage, subKey(sub.buyer), { subs: { ...(value?.subs ?? {}), [subId(sub)]: sub } }, prev, 'package-sales-subscriptions');
+    await updateRecord(storage, NS_PACKAGE_SALES, subKey(sub.buyer), parseSubs,
+        cur => ({ ...cur, subs: { ...cur.subs, [subId(sub)]: sub } }), { tag: 'package-sales-subscriptions' });
 }
 
 /**

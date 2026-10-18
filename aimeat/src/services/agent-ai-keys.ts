@@ -34,6 +34,9 @@
  *   const agent = agentNameOf(caller.principal, caller.gaii);
  *   const key = agent ? await readAgentKey(storage, config, caller.gaii, agent, 'decide') : null;
  * @version-history
+ *   v1.3.0 — 2026-10-18 — writeAgentKey and writeAgentCap merge into the record as stored, on its
+ *     version (updatePrivateRecord), so two changes at the same moment both persist
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.2.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.2.0 — 2026-10-03 — addAgentSpend splits an agent's spend by app or endpoint (`per_app`), so the
  *     owner's usage says what each agent spent on what.
@@ -44,7 +47,8 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
-import { upsertPrivateRecord } from './private-record.js';
+import { updatePrivateRecord } from './private-record.js';
+import { UNCHANGED } from './record-cas.js';
 import { emitChange } from './event-bus.js';
 import { parseGAII, isValidAgentName } from '../utils/gaii.js';
 
@@ -126,33 +130,43 @@ export async function writeAgentKey(
 ): Promise<void> {
   assertAgentName(agent);
   const key = agentKeyRecord(model, agent);
-  const existing = (await storage.getMemory(ownerGhii, key))?.value as { encrypted?: string; env?: string; set_at?: string } | undefined;
-  const next: { encrypted?: string; env?: string; set_at?: string } = { ...(existing ?? {}) };
-
+  // The input is checked and the key encrypted first, from the input alone.
+  let encrypted: string | null | undefined;
   if (input.apiKey !== undefined) {
-    if (input.apiKey === null || input.apiKey === '') { delete next.encrypted; delete next.set_at; }
+    if (input.apiKey === null || input.apiKey === '') encrypted = null;
     else {
       if (typeof input.apiKey !== 'string' || input.apiKey.trim().length < 8 || input.apiKey.length > 512 || /\s/.test(input.apiKey.trim())) {
         throw new AgentAiKeyError('INVALID_BODY', 400, 'api_key must be the key as issued: one token, no spaces.');
       }
-      next.encrypted = encrypt(input.apiKey.trim(), encryptionKeyOf(config));
-      next.set_at = new Date().toISOString();
+      encrypted = encrypt(input.apiKey.trim(), encryptionKeyOf(config));
     }
   }
+  let env: string | null | undefined;
   if (input.env !== undefined) {
-    if (input.env === null || input.env === '') delete next.env;
+    if (input.env === null || input.env === '') env = null;
     else {
       if (typeof input.env !== 'string' || !ENV_RE.test(input.env)) {
         throw new AgentAiKeyError('INVALID_BODY', 400, 'key_env is the NAME of an environment variable (for example TYPESAFE_API_KEY), never the key itself.');
       }
-      next.env = input.env;
+      env = input.env;
     }
   }
 
-  if (!next.encrypted && !next.env) {
-    if (existing) await storage.deleteMemory(ownerGhii, key);
-  } else {
-    await upsertPrivateRecord(storage, ownerGhii, key, next, ['ai', 'secret', 'agent']);
+  // Merged into the record as stored, on its version (services/private-record.ts), so a key and an
+  // environment name set at the same moment both persist. A record left with neither is emptied on
+  // its version and then removed, unless another write gave it one of the two meanwhile.
+  const stored = await updatePrivateRecord(storage, ownerGhii, key, (cur) => {
+    if (!cur && encrypted == null && env == null) return UNCHANGED;
+    const next: { encrypted?: string; env?: string; set_at?: string } = { ...(cur ?? {}) };
+    if (encrypted === null) { delete next.encrypted; delete next.set_at; }
+    else if (encrypted !== undefined) { next.encrypted = encrypted; next.set_at = new Date().toISOString(); }
+    if (env === null) delete next.env;
+    else if (env !== undefined) next.env = env;
+    return next.encrypted || next.env ? next : {};
+  }, ['ai', 'secret', 'agent']);
+  if (stored && !stored.encrypted && !stored.env) {
+    const now = (await storage.getMemory(ownerGhii, key))?.value as { encrypted?: string; env?: string } | undefined;
+    if (now && !now.encrypted && !now.env) await storage.deleteMemory(ownerGhii, key);
   }
   emitChange('agents', ownerGhii);
 }
@@ -227,12 +241,15 @@ export async function writeAgentCap(storage: Storage, ownerGhii: string, agent: 
   if (dailyUsd !== null && (typeof dailyUsd !== 'number' || !Number.isFinite(dailyUsd) || dailyUsd < 0 || dailyUsd > 10_000)) {
     throw new AgentAiKeyError('INVALID_BODY', 400, 'daily_usd is a number from 0 to 10000, or null for no cap of its own.');
   }
-  const rec = await storage.getMemory(ownerGhii, SETTINGS_RECORD);
-  const prefs = { ...((rec?.value as Record<string, unknown>) ?? {}) };
-  const quotas = { ...((prefs.agent_quotas as Record<string, unknown>) ?? {}) };
-  if (dailyUsd === null) delete quotas[agent]; else quotas[agent] = { daily_usd: dailyUsd };
-  prefs.agent_quotas = quotas;
-  await upsertPrivateRecord(storage, ownerGhii, SETTINGS_RECORD, prefs, (rec?.tags as string[] | undefined) ?? ['ai', 'settings']);
+  // Merged into the owner's AI settings as stored, on the record's version (services/private-record.ts):
+  // the budget, the model routing and every other agent's cap are fields of the same record.
+  await updatePrivateRecord(storage, ownerGhii, SETTINGS_RECORD, (cur) => {
+    const prefs = { ...(cur ?? {}) };
+    const quotas = { ...((prefs.agent_quotas as Record<string, unknown>) ?? {}) };
+    if (dailyUsd === null) delete quotas[agent]; else quotas[agent] = { daily_usd: dailyUsd };
+    prefs.agent_quotas = quotas;
+    return prefs;
+  }, (stored) => (stored?.tags as string[] | undefined) ?? ['ai', 'settings']);
   emitChange('agents', ownerGhii);
 }
 

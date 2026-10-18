@@ -33,6 +33,10 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   v1.1.0 — 2026-10-18 — Written on the record's version (services/record-cas.ts): readGuestCheckout's
+ *     lazy cancel decides on the stored checkout, onUcpTaskDone adds its line to the order as stored,
+ *     and deliverOrderWebhook claims the pending record for one send (claimPending) and writes its
+ *     retry onto the record it claimed (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.1 — 2026-10-11 — An item with no money price is not sold to a guest: it is free and paced, and
  *     a guest has no morsel balance (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
@@ -146,12 +150,14 @@ export function sellerOfOrderId(id: string, config: AimeatConfig): string | null
   return sellerOfSessionId(id.replace(/^uco_/, 'ucs_'), config);
 }
 
+const UCP_TAGS = ['commerce', 'ucp'];
+
 async function putRecord(storage: Storage, ownerGhii: string, key: string, value: unknown, ttlHours: number | null): Promise<void> {
   const existing = await storage.getMemory(ownerGhii, key);
   const now = nowIso();
   await storage.setMemory({
     key, ownerGaii: ownerGhii, value: value as Record<string, unknown>, visibility: 'owner',
-    tags: ['commerce', 'ucp'], ttlHours, version: (existing?.version ?? 0) + 1,
+    tags: UCP_TAGS, ttlHours, version: (existing?.version ?? 0) + 1,
     createdAt: existing?.createdAt ?? now, updatedAt: now,
   } as MemoryRecord);
 }
@@ -280,13 +286,24 @@ export async function readGuestCheckout(storage: Storage, config: AimeatConfig, 
   const session = row?.value as UcpGuestSession | undefined;
   // One answer for "no such checkout" and "not yours": the id is the only thing a stranger has.
   if (!session || session.platformProfile !== profileUrl) throw new UcpError(404, 'not_found', 'No such checkout.');
-  if ((session.status === 'incomplete' || session.status === 'ready_for_complete') && Date.parse(session.expiresAt) < Date.now()) {
-    session.status = 'canceled';
-    session.updatedAt = nowIso();
-    await putRecord(storage, session.sellerGhii, sessionKey(id), session, KEEP_HOURS);
-    recordCheckoutStage(storage, config, { sellerGhii: session.sellerGhii, family: session.platformFamily, stage: 'expired' });
+  if (overdue(session)) {
+    // Decided on the stored record (services/record-cas.ts): a completion that claimed the checkout
+    // after this read keeps its claim, and of two reads at the same moment one writes the cancel.
+    let canceled = false;
+    const stored = await updateRecord(storage, session.sellerGhii, sessionKey(id), (v) => (v ?? null) as UcpGuestSession | null, (cur) => {
+      canceled = !!cur && overdue(cur);
+      return canceled ? { ...cur!, status: 'canceled' as const, updatedAt: nowIso() } : UNCHANGED;
+    }, { tag: 'ucp', tags: UCP_TAGS, ttlHours: KEEP_HOURS, visibility: 'owner' });
+    if (!stored) throw new UcpError(404, 'not_found', 'No such checkout.');
+    if (canceled) recordCheckoutStage(storage, config, { sellerGhii: stored.sellerGhii, family: stored.platformFamily, stage: 'expired' });
+    return stored;
   }
   return session;
+}
+
+/** A checkout still open for change whose time has run out. */
+function overdue(s: UcpGuestSession): boolean {
+  return (s.status === 'incomplete' || s.status === 'ready_for_complete') && Date.parse(s.expiresAt) < Date.now();
 }
 
 function requireChangeable(s: UcpGuestSession): void {
@@ -568,32 +585,60 @@ export async function onUcpTaskDone(storage: Storage, config: AimeatConfig, task
     if (typeof orderId !== 'string' || !orderId.startsWith('uco_')) return;
     const seller = sellerOfOrderId(orderId, config);
     if (!seller || seller !== task.ownerGaii) return;
-    const row = await storage.getMemory(seller, orderKey(orderId));
-    const order = row?.value as CheckoutSessionRecord | undefined;
-    if (!order?.ucpOrder) return;
-    const idx = (order.fulfillment?.taskIds ?? []).indexOf(task.id);
-    if (idx < 0) return;
-    const lineId = order.ucpOrder.lineIds[idx] ?? `li_${idx + 1}`;
-    const item = order.items[idx]!;
-    if ((order.ucpOrder.fulfilled[lineId] ?? 0) >= item.quantity) return;
-    order.ucpOrder.fulfilled[lineId] = item.quantity;
-    order.ucpOrder.events.push({
-      id: `ev_${randomUUID()}`, occurred_at: nowIso(), type: 'delivered',
-      line_items: [{ id: lineId, quantity: item.quantity }],
-      // UCP asks for tracking on every event past processing; a digital delivery's tracking is the
-      // order itself and the task that delivered it.
-      tracking_number: task.id, tracking_url: orderPermalink(config, orderId),
-      description: 'Delivered by the seller.',
-    });
-    order.updatedAt = nowIso();
-    await putRecord(storage, seller, orderKey(orderId), order, null);
+    // Written on the order's version (services/record-cas.ts), so two tasks of one order finishing
+    // at the same moment each add their line to the order as stored.
+    let delivered = false;
+    await updateRecord(storage, seller, orderKey(orderId), (v) => (v ? structuredClone(v) : null) as CheckoutSessionRecord | null, (order) => {
+      delivered = false;
+      if (!order?.ucpOrder) return UNCHANGED;
+      const idx = (order.fulfillment?.taskIds ?? []).indexOf(task.id);
+      if (idx < 0) return UNCHANGED;
+      const lineId = order.ucpOrder.lineIds[idx] ?? `li_${idx + 1}`;
+      const item = order.items[idx]!;
+      if ((order.ucpOrder.fulfilled[lineId] ?? 0) >= item.quantity) return UNCHANGED;
+      order.ucpOrder.fulfilled[lineId] = item.quantity;
+      order.ucpOrder.events.push({
+        id: `ev_${randomUUID()}`, occurred_at: nowIso(), type: 'delivered',
+        line_items: [{ id: lineId, quantity: item.quantity }],
+        // UCP asks for tracking on every event past processing; a digital delivery's tracking is the
+        // order itself and the task that delivered it.
+        tracking_number: task.id, tracking_url: orderPermalink(config, orderId),
+        description: 'Delivered by the seller.',
+      });
+      order.updatedAt = nowIso();
+      delivered = true;
+      return order;
+    }, { tag: 'ucp', tags: UCP_TAGS, ttlHours: null, visibility: 'owner' });
+    if (!delivered) return;
     await queueOrderWebhook(storage, config, seller, orderId);
   } catch (e) {
     logger.error('ucp: a delivered task could not update its order', { task: task.id, error: String(e) });
   }
 }
 
-interface Pending { orderId: string; attempts: number; nextAt: string; lastStatus: number | null }
+interface Pending { orderId: string; attempts: number; nextAt: string; lastStatus: number | null; sendingUntil?: string }
+
+/** How long a delivery holds its claim on the pending record: the send's timeout and some margin. */
+const SEND_CLAIM_MS = 30_000;
+const parsePending = (v: unknown): Pending | null => (v ? { ...(v as Pending) } : null);
+
+/**
+ * Claim the pending webhook for one send, on the record's version (services/record-cas.ts). Of two
+ * deliveries at the same moment (the send right after a queue and the upkeep run), one holds it and
+ * sends; the other sees the claim and leaves it. A claim older than SEND_CLAIM_MS is taken over, so a
+ * process that stopped mid-send does not hold the webhook forever. `null` when nothing is pending.
+ */
+async function claimPending(storage: Storage, sellerGhii: string, orderId: string): Promise<{ pending: Pending | null; busy: boolean }> {
+  const out: { pending: Pending | null; busy: boolean } = { pending: null, busy: false };
+  await updateRecord(storage, sellerGhii, pendingKey(orderId), parsePending, (cur) => {
+    out.pending = cur;
+    out.busy = !!cur?.sendingUntil && Date.parse(cur.sendingUntil) > Date.now();
+    if (!cur || out.busy) return UNCHANGED;
+    out.pending = { ...cur, sendingUntil: new Date(Date.now() + SEND_CLAIM_MS).toISOString() };
+    return out.pending;
+  }, { tag: 'ucp', tags: UCP_TAGS, ttlHours: null, visibility: 'owner' });
+  return out;
+}
 
 async function queueOrderWebhook(storage: Storage, config: AimeatConfig, sellerGhii: string, orderId: string): Promise<void> {
   await putRecord(storage, sellerGhii, pendingKey(orderId), { orderId, attempts: 0, nextAt: nowIso(), lastStatus: null } satisfies Pending, null);
@@ -606,8 +651,9 @@ async function queueOrderWebhook(storage: Storage, config: AimeatConfig, sellerG
  * the last one it is dropped and the failure is logged. Never throws.
  */
 export async function deliverOrderWebhook(storage: Storage, config: AimeatConfig, sellerGhii: string, orderId: string): Promise<boolean> {
-  const pending = (await storage.getMemory(sellerGhii, pendingKey(orderId)))?.value as Pending | undefined;
+  const { pending, busy } = await claimPending(storage, sellerGhii, orderId);
   if (!pending) return true;
+  if (busy) return false;
   try {
     const order = (await storage.getMemory(sellerGhii, orderKey(orderId)))?.value as CheckoutSessionRecord | undefined;
     const profileUrl = order?.guest?.profileUrl;
@@ -645,10 +691,15 @@ export async function deliverOrderWebhook(storage: Storage, config: AimeatConfig
       return false;
     }
     logger.warn('ucp: an order webhook will be tried again', { orderId, attempts, error: String(e) });
-    await putRecord(storage, sellerGhii, pendingKey(orderId), {
+    // Onto the record this send claimed, on its version: a webhook queued again meanwhile (a newer
+    // snapshot) has its own send and is left as it is.
+    const next: Pending = {
       orderId, attempts, nextAt: new Date(Date.now() + BACKOFF_MS[attempts - 1]!).toISOString(),
       lastStatus: (e as { status?: number }).status ?? null,
-    } satisfies Pending, null);
+    };
+    await updateRecord(storage, sellerGhii, pendingKey(orderId), parsePending,
+      (cur) => (cur && cur.sendingUntil === pending.sendingUntil ? next : UNCHANGED),
+      { tag: 'ucp', tags: UCP_TAGS, ttlHours: null, visibility: 'owner' });
     return false;
   }
 }

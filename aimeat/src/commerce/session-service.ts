@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-18 — getSession expires an overdue session on its version (session-claim.ts expireOverdueSession): of two reads at the same moment one writes it and counts the stage.
  *   2026-10-16 — meteredCoordinateOf moved to commerce/metered-coordinate.ts, unchanged, to keep this file under 800 lines.
  *   2026-10-16 — A failed fulfilment after the collect words the buyer's message from the refund's outcome: only a refund the rail confirmed says "refunded"; a payment taken and not returned (x402, a failed Stripe refund) says so, names the checkout reference, and is stored as `commerce.undelivered.{id}` under the seller, logged and told to the operator (QA audit F5-01, F7e-01, S8-05).
  *   2026-10-16 — completeSession claims the session (open → completing, compare-and-swap) before the
@@ -90,7 +91,7 @@ import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
-import { claimSessionForCompletion, releaseSessionClaim, recordCollected, invoiceRailRefusal } from './session-claim.js';
+import { claimSessionForCompletion, releaseSessionClaim, recordCollected, invoiceRailRefusal, expireOverdueSession } from './session-claim.js';
 
 export { CommerceError } from './errors.js';
 // Moved to platform-fee.ts (2026-10-11); re-exported for the callers that import it from here.
@@ -246,10 +247,9 @@ export async function getSession(
   if (!rec) return null;
   const session = rec.value as unknown as CheckoutSessionRecord;
   if (session.status === 'open' && Date.now() > new Date(session.expiresAt).getTime()) {
-    session.status = 'expired';
-    session.updatedAt = new Date().toISOString();
-    await putRecord(storage, buyerGhii, sessionKey(id), session);
-    agentStage(storage, config, session, 'expired');
+    const { stored, expired } = await expireOverdueSession(storage, buyerGhii, sessionKey(id));
+    if (expired && stored) agentStage(storage, config, stored, 'expired');
+    return stored;
   }
   return session;
 }
