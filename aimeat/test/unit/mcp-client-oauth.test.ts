@@ -15,6 +15,7 @@
  *   round that "works" against a server which never checks the verifier proves nothing about the
  *   half that never travels.
  * @version-history
+ *   2026-10-18 — The authorization server listens on a port the system picks, not the fixed 40688.
  *   2026-10-15 — The renewal: a refused refresh token and a credential with no refresh token both
  *     answer 'renewal-failed' and park the server in needs_reauth at once; a working refresh token
  *     renews and keeps the server active (feature-list audit #9).
@@ -25,6 +26,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { createHash, randomUUID } from 'node:crypto';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
@@ -40,9 +42,10 @@ process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = 'true';
 const BINDING = 'the-owners-browser';
 const bindBrowser = (): string => bindingHash(BINDING);
 
-const PORT = 40688;
+// The authorization server listens on a port the system picks (see beforeAll): a fixed one inside
+// Linux's ephemeral range can be taken by another file's socket on CI.
 const KEY = 'c'.repeat(64);
-const BASE = `http://127.0.0.1:${PORT}`;
+let BASE = '';
 
 const config = {
   nodeId: 'test-node-001',
@@ -127,7 +130,8 @@ beforeAll(async () => {
     }
     return json({ error: 'not_found' }, 404);
   });
-  await new Promise<void>((r) => server.listen(PORT, '127.0.0.1', () => r()));
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  BASE = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 
 afterAll(async () => {
