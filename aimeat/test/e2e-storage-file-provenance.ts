@@ -25,6 +25,9 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-storage-file-provenance
  * @version-history
+ *   v1.2.0 -- 2026-10-18 -- B10: the portfolio page's record resolves while the page is on and answers
+ *     404 once it is switched off. It answered 404 while on since the page file became owner-only
+ *     (plan doc-mvcn6c7e4e5q V0.3); services/served-page-provenance.ts is the source fix.
  *   v1.1.0 -- 2026-10-12 -- Each owner aims the node at the peer with a provider of their own
  *     (PUT /v1/ai/providers/:id and PUT /v1/ai/routing) instead of PUT /v1/openrouter/settings, which
  *     node 4.0.0 removes (the 4.0.0 sweep). The assertions are unchanged.
@@ -312,6 +315,12 @@ try {
     assert(pub.data.data.ai_provenance.record.attestation.stampedBy === 'node', 'an undeclared agent page is stamped by the node');
     const rec = await call(`/v1/provenance/${id}`, undefined, undefined, 'GET');
     assert(rec.status === 200, `record: ${rec.status}`);
+    // The page file is owner-only (plan doc-mvcn6c7e4e5q V0.3); the record follows the switch.
+    const off = await call('/v1/portfolio/config', { enabled: false }, alice.token, 'PUT');
+    assert(off.status === 200, `switch off: ${off.status} ${off.text}`);
+    assert((await call(`/v1/provenance/${id}`, undefined, undefined, 'GET')).status === 404, 'a page switched off keeps its record public');
+    const on = await call('/v1/portfolio/config', { enabled: true }, alice.token, 'PUT');
+    assert(on.status === 200, `switch on: ${on.status}`);
   });
 
   await test('a single-segment key still changes visibility', async () => {

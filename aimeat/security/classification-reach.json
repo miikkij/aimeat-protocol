@@ -1975,6 +1975,12 @@
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
     },
+    "src/services/served-page-provenance.ts": {
+      "reads": {
+        "getStorageFileMeta": 2
+      },
+      "why": "Reviewed 2026-10-18, the node's own read: the metadata of a welcome page or a company front page (which provenance record it carries), to tell whether that record belongs to a page served to anyone now. No content is read or returned."
+    },
     "src/services/publish-requests/apply-company.ts": {
       "reads": {
         "getStorageFileMeta": 1

@@ -24,6 +24,9 @@
  *     E14 memory list and search name each item's record; a company description is minted for the
  *         owner's surface
  * @version-history
+ *   v1.1.0 — 2026-10-18 — E2: a proposed Design Book part is for signed-in accounts (plan
+ *     doc-mvcn6c7e4e5q V0.4), so its owner reads the record and a visitor gets 404. The test had
+ *     asserted the leak V0.4 closed: a proposal's record resolved for anyone.
  *   v1.0.0 — 2026-10-08 — Initial (aiprov workstream E).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ai-provenance-content
@@ -268,24 +271,28 @@ const GOOD_BODY = {
 };
 let partRecord = '';
 
-await test('E2 an agent\'s part is stamped and its record resolves while the part is public', async () => {
+// A proposed part is stored for signed-in accounts only since plan doc-mvcn6c7e4e5q V0.4
+// (2026-10-17): until then the record resolved for any visitor because the proposal was public,
+// which was the leak. Its owner reads the record; a visitor gets the one 404.
+await test('E2 an agent\'s part is stamped; its owner reads the record and a visitor does not', async () => {
   const p = await call('/v1/designbook', { token: plain.token, body: { part: { id: PART, kind: 'fill', title: 'Prov fill', summary: 'A cover over a list, proposed by an agent.', body: GOOD_BODY } } });
   assert(p.status === 201, `propose: ${p.status} ${JSON.stringify(p.body.error)}`);
   partRecord = (await mine(A.token)).find(r => r.pipeline === 'design-book.propose')?.id ?? '';
   assert(partRecord.length > 0, 'the propose minted no record');
-  assert((await record(partRecord)).status === 200, 'the public part\'s record does not resolve');
+  assert((await record(partRecord, A.token)).status === 200, 'the owner cannot read the part\'s record');
+  assert((await record(partRecord)).status === 404, 'a proposed part\'s record resolves for a visitor');
 });
 
 await test('E2 retiring the part keeps its record', async () => {
   const s = await call(`/v1/designbook/${PART}/status`, { token: plain.token, body: { status: 'retired' } });
   assert(s.status === 200, `retire: ${s.status} ${JSON.stringify(s.body.error)}`);
-  assert((await record(partRecord)).status === 200, 'the status change erased the part\'s record');
+  assert((await record(partRecord, A.token)).status === 200, 'the status change erased the part\'s record');
 });
 
 await test('E2 → another owner cannot change the part\'s status (403), and the record stays', async () => {
   const s = await call(`/v1/designbook/${PART}/status`, { token: B.token, body: { status: 'retired' } });
   assert(s.status === 403, `another owner: ${s.status}`);
-  assert((await record(partRecord)).status === 200, 'the record went away');
+  assert((await record(partRecord, A.token)).status === 200, 'the record went away');
 });
 
 // ── A workspace for E1, E3, E8, E11, E13 ──────────────────────────────────────────────────────────
