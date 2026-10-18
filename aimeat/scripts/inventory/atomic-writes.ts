@@ -359,9 +359,9 @@ function boundSymbols(checker: ts.TypeChecker, call: ts.CallExpression): ts.Symb
 /**
  * Do two sites name the same owner? Measured on 2026-10-18 and NOT used to drop a pair: comparing
  * the owner expressions removed one false positive (POST /v1/memory/copy reads `source_gaii` and
- * writes `callerGaii`) and one true race on a money route (readGuestCheckout reads `seller` and
- * writes `session.sellerGhii`, the same value). Two texts can name one owner, so a difference proves
- * nothing; it only orders which read a write pairs with.
+ * writes `callerGaii`) and also a real hit, where the read and the write name one owner through two
+ * different expressions. Two texts can name one owner, so a difference proves nothing; it only
+ * orders which read a write pairs with.
  */
 function sameOwner(checker: ts.TypeChecker, a: Site, b: Site): boolean {
     return !a.owner || !b.owner || sameKey(checker, a.owner, b.owner);
