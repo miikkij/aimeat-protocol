@@ -387,6 +387,12 @@ jobs:
       # its red suites as error annotations (scripts/lib/e2e-github-report.ts); the leg's annotations
       # with a title are copied here. The runner's "Process completed with exit code" line has no
       # title and is left out.
+      #
+      # THE SAME ANNOTATIONS OPEN ONE INCIDENT PER RED SUITE (2026-10-18). Lifecycle Central's
+      # ci_sweep_ingest reads them through the public API with no token, and opens or updates an
+      # incident per suite in AIMEAT CODING CENTRAL with its backends, first failure and the commits
+      # between its last green and first red night. Their shapes are a contract with that reader:
+      # see the header of aimeat/scripts/lib/e2e-github-report.ts before changing them.
       - name: Open or update the issue for a red sweep
         if: steps.sweep.outputs.conclusion != 'success'
         env:

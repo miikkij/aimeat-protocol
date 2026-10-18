@@ -14,9 +14,20 @@
  *   these annotations into the issue comment.
  *
  *   LIMITS. GitHub keeps at most 10 error annotations per step, so the first annotation names every
- *   red suite and at most eight more carry one red suite each with its first failed tests.
+ *   red suite and at most eight more carry one red suite each with its first failed tests. The
+ *   suites past the eighth get one line each in the first annotation, after the names.
+ *
+ *   A READER DEPENDS ON THESE SHAPES. Lifecycle Central's `ci_sweep_ingest` (aimeat-apps,
+ *   lifecycle-central/extension/scripts/ci_sweep_ingest.js) reads the nightly sweep's annotations
+ *   anonymously and opens one incident per red suite: it matches the titles
+ *   "<n> red E2E suite(s) on <backend>" and "E2E <suite> on <backend>", takes the first line of the
+ *   list annotation as the comma-separated names and each later line as "<suite>: <detail>", and
+ *   reads a red leg with no list annotation as a run that did not finish. A change to those shapes
+ *   changes that action in the same piece of work.
  * @structure failedTestLines() · githubAnnotations() · githubSummary()
  * @version-history
+ *   v1.1.0 -- 2026-10-18 -- The list annotation carries a line per suite past the eighth, and the
+ *     header names the reader (wish-lifecycle-central-y-ajon-punainen-sarja-h-iri-ksi-commit-v-l).
  *   v1.0.0 -- 2026-10-16 -- Initial: the nightly sweep names its red suites in public.
  */
 
@@ -64,7 +75,15 @@ function describeSuite(r: RedSuite): string {
  */
 export function githubAnnotations(red: RedSuite[], backend: string): string[] {
     if (red.length === 0) return [];
-    const lines = [`::error title=${escapeProperty(`${red.length} red E2E suite(s) on ${backend}`)}::${escapeData(red.map(r => r.name).join(', '))}`];
+    // The suites past the eighth have no annotation of their own, so the list annotation carries
+    // one line for each of them after the names: "<suite>: <passed>/<total> passed[; note][ · first
+    // failure]". A night with eleven red suites otherwise named three of them with no failure at all.
+    const rest = red.slice(PER_SUITE_ANNOTATIONS).map(r => {
+        const head = `${r.passed}/${r.total} passed${r.note ? `; ${r.note}` : ''}`;
+        return `${r.name}: ${r.failures[0] ? `${head} · ${r.failures[0]}` : head}`;
+    });
+    const listMessage = [red.map(r => r.name).join(', '), ...rest].join('\n');
+    const lines = [`::error title=${escapeProperty(`${red.length} red E2E suite(s) on ${backend}`)}::${escapeData(listMessage)}`];
     for (const r of red.slice(0, PER_SUITE_ANNOTATIONS)) {
         lines.push(`::error title=${escapeProperty(`E2E ${r.name} on ${backend}`)}::${escapeData(describeSuite(r))}`);
     }
