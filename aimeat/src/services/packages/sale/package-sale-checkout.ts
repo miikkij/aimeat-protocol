@@ -27,6 +27,9 @@
  * @structure packageSellableResolver() · carryOutSale() · parsePackageLine() · readOfferAsSeller() ·
  *   decideSaleRequest() · reviewSale()
  * @version-history
+ *   v1.3.2 — 2026-10-18 — A sale naming a node claims its holder before the grant, and a decision
+ *     claims its request before anything is granted, both on the record's version; two at the same
+ *     moment grant once (wish-rahapolkujen-kilpatilanteet).
  *   v1.3.1 — 2026-10-11 — An absent currency, or the deprecated 'morsel', means the package's own
  *     currency, instead of a refusal; a package line carries no pacing (unitPrice, tollMorsels 0).
  *   v1.3.0 — 2026-10-06 — A purchase an agent completes with automatic renewal names that agent on the
@@ -48,7 +51,7 @@ import { CommerceError } from '../../../commerce/errors.js';
 import { listPaymentHandlers } from '../../../commerce/payment-handlers.js';
 import { saleOffer, saleGrant, saleClaim } from './package-sale-client.js';
 import {
-    catalogueEntry, subscriptionFor, putSubscription, putRequest, readRequests, recordReview, nodeHolder, putNodeHolder,
+    catalogueEntry, subscriptionFor, putSubscription, putRequest, readRequests, recordReview, claimNodeHolder, releaseNodeHolder, claimRequest,
     type CatalogueEntry, type Subscription, type SaleRequest,
 } from './package-sale-catalogue.js';
 import { notify } from '../../notify.js';
@@ -212,16 +215,23 @@ export async function carryOutSale(
         // A node another buyer on this node holds is theirs: the repository cannot tell our buyers
         // apart, so this is the one place that can refuse (secaudit 2026-10, PKG-2). A throw here
         // refunds the payment.
-        const holder = await nodeHolder(deps.storage, entry.repository, entry.group_id, nodeId);
-        if (holder && holder !== buyer) {
+        // The holder is claimed before the grant, on the record's version, so of two sales naming one
+        // node at the same moment only one reaches the repository.
+        const held = await claimNodeHolder(deps.storage, entry.repository, entry.group_id, nodeId, buyer);
+        if (held.holder !== buyer) {
             throw new CommerceError('NODE_HELD', 409, `${nodeId} already holds this package through another buyer. Buy for a node of your own, or without a node for a claim code.`);
         }
-        const data = fromRepository(await saleGrant(deps, entry.repository, entry.group_id, nodeId, {
-            node: { url: input.node.url, public_key: input.node.public_key },
-            updates_until: until, channel: terms.channel, terms_id: terms.id, note: `order ${order}`,
-        }), 'grant');
+        let data: Record<string, unknown>;
+        try {
+            data = fromRepository(await saleGrant(deps, entry.repository, entry.group_id, nodeId, {
+                node: { url: input.node.url, public_key: input.node.public_key },
+                updates_until: until, channel: terms.channel, terms_id: terms.id, note: `order ${order}`,
+            }), 'grant');
+        } catch (err) {
+            if (held.claimed) await releaseNodeHolder(deps.storage, entry.repository, entry.group_id, nodeId, buyer);
+            throw err;
+        }
         granted = { entitlement: data.entitlement, peer_registered: data.peer_registered, peer_pending: data.peer_pending };
-        if (!holder) await putNodeHolder(deps.storage, entry.repository, entry.group_id, nodeId, buyer);
     } else {
         const data = fromRepository(await saleClaim(deps, entry.repository, entry.group_id, {
             updates_until: until, channel: terms.channel, terms_id: terms.id, note: `order ${order}`,
@@ -296,17 +306,23 @@ export async function decideSaleRequest(
     if (!req) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'No such request waits here.' };
     if (req.state !== 'waiting') return { ok: false, status: 409, code: 'ALREADY_DECIDED', message: `This request was ${req.state} already.` };
     const buyerGhii = `${req.buyer}@${deps.config.nodeId}`;
+    // The decision is claimed on the record's version before anything is granted: of two decisions
+    // at the same moment, the second is ALREADY_DECIDED and grants nothing.
+    const claimed = await claimRequest(deps.storage, id, decision === 'approve' ? 'approved' : 'refused');
+    if (!claimed) return { ok: false, status: 409, code: 'ALREADY_DECIDED', message: 'This request was decided already.' };
     if (decision === 'refuse') {
-        const done = await putRequest(deps.storage, { ...req, state: 'refused' });
         await notify(deps.storage, buyerGhii, {
             type: 'package_sale_request_decided', title: `Your request for ${req.group_id} was not approved`,
             body: 'The seller did not approve this request. Nothing was installed or charged.',
             link: '/v1/profile?tab=packages', i18n: { key: 'package_sale_request_refused', vars: { name: req.group_id } },
         });
-        return { ok: true, request: done };
+        return { ok: true, request: claimed };
     }
     const entry = await catalogueEntry(deps.storage, req.repository, req.group_id);
-    if (!entry) return { ok: false, status: 409, code: 'NOT_FOR_SALE', message: 'This node does not sell the package any more.' };
+    if (!entry) {
+        await putRequest(deps.storage, req);
+        return { ok: false, status: 409, code: 'NOT_FOR_SALE', message: 'This node does not sell the package any more.' };
+    }
     let outcome: Record<string, unknown>;
     try {
         const offer = await readOfferAsSeller(deps, req.repository, req.group_id);
@@ -315,6 +331,7 @@ export async function decideSaleRequest(
             input: req.node ? { node: req.node } : {}, paid: { amount: 0, currency: entry.price?.currency ?? 'EUR' }, approved: true,
         });
     } catch (err) {
+        await putRequest(deps.storage, req);
         const e = err as { code?: string; status?: number; message?: string };
         return { ok: false, status: e.status ?? 502, code: e.code ?? 'SALE_REFUSED', message: e.message ?? String(err) };
     }

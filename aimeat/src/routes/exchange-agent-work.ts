@@ -11,6 +11,9 @@
  * @usage
  *   registerExchangeAgentWorkRoutes(router, config, storage, notify);
  * @version-history
+ *   v1.2.1 — 2026-10-18 — A delivery claims the work (claimWorkForDelivery) before it settles, so two
+ *     deliveries at the same moment charge the consumer once; the second is 409 WORK_NOT_OPEN
+ *     (wish-rahapolkujen-kilpatilanteet).
  *   v1.2.0 — 2026-10-08 — POST /v1/exchange/work/:id/deliver records how the answer was made, as
  *     aimeat_exchange_work_deliver does: it takes ai_provenance and ai_provenance_id, refuses a
  *     declaration the caller may not make (403 SCOPE_DENIED) before anything settles, stamps the
@@ -35,6 +38,7 @@ import { getOffering } from '../services/exchange-market.js';
 import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
 import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
+  claimWorkForDelivery, releaseWorkClaim,
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
@@ -136,6 +140,12 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     });
     const noteOf = (): string => (typeof b.note === 'string' ? b.note : '');
 
+    // The work is claimed before anything settles: of two deliveries at the same moment, the second
+    // is refused here and charges nothing. A refusal below that settles nothing puts it back to open.
+    if (!await claimWorkForDelivery(storage, w.workId)) {
+      return res.status(409).json(error(config.nodeId, 'WORK_NOT_OPEN', 'This work is being delivered or was delivered already, so it cannot be changed now. Open it to see where it got to.'));
+    }
+
     // WORK PAID UP FRONT SETTLES ONCE, AND IT ALREADY HAS. A buyer from another node holds no
     // contract and no balance here — its money moved onchain at the A2A door before the work was
     // opened — so metering it again on delivery would either refuse a task the provider was paid
@@ -158,12 +168,14 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
     // Settle the per-task price against the CONSUMER's contract (the consumer pays; the provider is credited).
     const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
     if (!before || before.state !== 'active') {
+      await releaseWorkClaim(storage, w);
       return res.status(402).json(error(config.nodeId, 'CONTRACT_INACTIVE', 'The agreement behind this work has ended, so it cannot be settled. Ask the other side to renew it.'));
     }
     const outcome = await settleMeteredCoordinate({
       config, storage, coordExt: w.ext, coordAction: w.action, label: `${w.agentGaii}:${w.taskType}`,
       callerGaii: w.consumerGaii, res,
     });
+    if (!outcome || !outcome.ok) await releaseWorkClaim(storage, w);
     if (!outcome) return res.status(402).json(error(config.nodeId, 'NO_CONTRACT', 'There is no live agreement to settle against. Accept one first, then deliver.'));
     if (!outcome.ok) return; // 402/429 already sent (budget/rate) — work stays open
     const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);

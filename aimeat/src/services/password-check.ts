@@ -25,6 +25,10 @@
  *   const pw = await checkPassword(storage, config, ghiiRecord, password);
  *   if (!pw.ok) { res.status(pw.status).json(error(config.nodeId, pw.code, pw.message)); return; }
  * @version-history
+ *   v1.1.0 — 2026-10-18 — The failed-attempt count is an increment on a record of its own, written on
+ *     the record's version, and the lock is decided from the count written. It was the account
+ *     record's count plus one, read before the verify, so wrong guesses sent at the same moment each
+ *     wrote 1 and never reached the lock (wish-rahapolkujen-kilpatilanteet).
  *   v1.0.1 — 2026-10-09 — The TOTP check reads the node's general key too (services/totp.ts reads a
  *     secret under either key; secrets audit 2026-10-09, S4).
  *   v1.0.0 — 2026-10-05 — Initial: the sign-in route's password and TOTP blocks, moved here unchanged,
@@ -34,6 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { hashPassword, verifyPassword, isLegacyHash } from './password.js';
 import { validateTotpCode, validateBackupCode, totpConfigOf } from './totp.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 export type CheckRefusal = { ok: false; status: number; code: string; message: string };
 export type CheckResult = { ok: true } | CheckRefusal;
@@ -43,6 +48,31 @@ type TotpCheckConfig = Pick<AimeatConfig, 'totpIssuer' | 'totpPeriod' | 'totpWin
   | 'totpSecretEncryptionKey' | 'encryptionKey' | 'totpMaxFailedAttempts' | 'totpLockoutSeconds'>;
 
 const WRONG: CheckRefusal = { ok: false, status: 401, code: 'AUTH_REQUIRED', message: 'Invalid username or password' };
+
+/**
+ * The failed-attempt count, one record per account in a namespace of its own that no principal can
+ * address, keyed by the GHII. It is changed only by updateRecord (services/record-cas.ts), which
+ * writes on the record's version and re-reads on a conflict, so two wrong guesses at the same
+ * moment count two. The account record's `passwordFailedAttempts` is written from it, for every
+ * reader of the account; a count started before this record existed carries on from that field.
+ */
+const ATTEMPTS_NS = 'password-attempts';
+const parseCount = (v: unknown): number | null => {
+  const n = (v as { count?: unknown } | null | undefined)?.count;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 0 ? n : null;
+};
+
+/** Add one failed attempt and answer the count as written. */
+async function countFailedAttempt(storage: Storage, rec: GHIIRecord): Promise<number> {
+  const written = await updateRecord(storage, ATTEMPTS_NS, rec.ghii, v => ({ count: parseCount(v) }),
+    cur => ({ count: (cur.count ?? rec.passwordFailedAttempts ?? 0) + 1 }), { tag: ATTEMPTS_NS });
+  return written.count ?? 0;
+}
+
+async function resetAttempts(storage: Storage, ghii: string): Promise<void> {
+  await updateRecord(storage, ATTEMPTS_NS, ghii, v => ({ count: parseCount(v) }),
+    cur => (cur.count ? { count: 0 } : UNCHANGED), { tag: ATTEMPTS_NS });
+}
 
 /**
  * Check `password` against the account's hash, with the per-account lock. An account with no
@@ -61,12 +91,16 @@ export async function checkPassword(storage: Storage, config: PasswordConfig, re
         message: `Account temporarily locked due to too many failed login attempts. Try again after ${rec.passwordLockedUntil}` };
     }
     await storage.updateGHII(rec.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
+    await resetAttempts(storage, rec.ghii);
     rec.passwordFailedAttempts = 0;
     rec.passwordLockedUntil = undefined;
   }
 
   if (!await verifyPassword(password, rec.passwordHash)) {
-    const attempts = (rec.passwordFailedAttempts ?? 0) + 1;
+    // The count is the one written by the increment, not the account record read before the
+    // verify: wrong guesses sent at the same moment each add one, and the one that reaches the
+    // limit sets the lock.
+    const attempts = await countFailedAttempt(storage, rec);
     const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
     if (attempts >= config.passwordLockoutAttempts) {
       update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
@@ -79,6 +113,7 @@ export async function checkPassword(storage: Storage, config: PasswordConfig, re
   if (rec.passwordFailedAttempts) {
     await storage.updateGHII(rec.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
   }
+  await resetAttempts(storage, rec.ghii);
 
   // Transparent scrypt parameter upgrade (v1 -> v2)
   if (isLegacyHash(rec.passwordHash)) {

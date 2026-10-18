@@ -21,6 +21,9 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-18 — aimeat_exchange_work_deliver claims the work before it settles (claimWorkForDelivery),
+ *     so two deliveries at the same moment charge once; the second is WORK_NOT_OPEN
+ *     (wish-rahapolkujen-kilpatilanteet).
  *   2026-10-11 — A refusal for want of morsels names the daily allowance and the pacing pack, as REST does.
  *   2026-10-11 — aimeat_app_tool_invoke charges a free tool's pacing amount before the call (paceFreeToolUse,
  *     the REST twin's function), gives it back when the call throws, and answers `pacing` with the result
@@ -78,6 +81,7 @@ import { readEntitlementForCall } from '../services/metered-entitlements.js';
 import { getOffering } from '../services/exchange-market.js';
 import {
     type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider, workView, workViews,
+    claimWorkForDelivery, releaseWorkClaim,
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import {
@@ -326,11 +330,15 @@ export function registerExchangeRunTools(
                 principal: callerGaii, declaredId: ai_provenance_id, declared, enabled: config.aiProvenance, scopes,
             });
             if (provenanceRefused) return fail(`${provenanceRefused.code}: ${provenanceRefused.message}`);
+            // Claimed before it settles, as POST /v1/exchange/work/:id/deliver does: of two deliveries
+            // at the same moment, the second is refused here and charges nothing.
+            if (!await claimWorkForDelivery(storage, w.workId)) return fail('WORK_NOT_OPEN: this work is being delivered or was delivered already');
             const workLabel = `${w.agentGaii}:${w.taskType}`;
             const outcome = await authoriseMeteredCall({
                 config, storage, caller: w.consumerGaii,
                 product: { ext: w.ext, action: w.action, label: workLabel },
             });
+            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') await releaseWorkClaim(storage, w);
             if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
             if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
                 const r = meteredRefusalText(outcome, workLabel, config);

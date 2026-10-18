@@ -22,8 +22,13 @@
  *   for the seller of record.
  * @structure NS_PACKAGE_SALES · CatalogueEntry · readCatalogue() · catalogueEntry() · setCatalogueEntry()
  *   · Subscription · subscriptionsOf() · subscriptionFor() · putSubscription() · setAutoRenew() ·
- *   allSubscriptions() · nodeHolder() · putNodeHolder() · SaleRequest · readRequests() · putRequest()
+ *   allSubscriptions() · nodeHolder() · claimNodeHolder() · releaseNodeHolder() · SaleRequest ·
+ *   readRequests() · putRequest() · claimRequest()
  * @version-history
+ *   v1.4.0 — 2026-10-18 — The holders and requests records are written on their version
+ *     (services/record-cas.ts). claimNodeHolder replaces putNodeHolder and is taken before the grant,
+ *     so two sales naming one node at the same moment grant it once; claimRequest decides a waiting
+ *     request once, so two approvals at the same moment grant once (wish-rahapolkujen-kilpatilanteet).
  *   v1.3.0 — 2026-10-06 — A subscription names the agent that turned automatic renewal on
  *     (`auto_renew_by`), so each renewal is held to that agent's daily purchase limit (secaudit
  *     2026-10 follow-up, A6). The owner turning it on in person removes the name.
@@ -36,6 +41,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../../../storage/interface.js';
 import { MONEY_CURRENCIES, integerMicros } from '../../../commerce/money.js';
+import { updateRecord, UNCHANGED } from '../../record-cas.js';
 
 export const NS_PACKAGE_SALES = 'package-sales';
 
@@ -232,9 +238,36 @@ export async function nodeHolder(storage: Storage, repository: string, groupId: 
     return value?.nodes?.[holderId(repository, groupId, nodeId)] ?? null;
 }
 
-export async function putNodeHolder(storage: Storage, repository: string, groupId: string, nodeId: string, buyer: string): Promise<void> {
-    const { value, prev } = await getRecord<{ nodes: Record<string, string> }>(storage, 'holders');
-    await putRecord(storage, 'holders', { nodes: { ...(value?.nodes ?? {}), [holderId(repository, groupId, nodeId)]: buyer } }, prev, 'package-sales-holders');
+type Holders = { nodes: Record<string, string> };
+const parseHolders = (v: unknown): Holders => ({ nodes: { ...((v as Partial<Holders> | null | undefined)?.nodes ?? {}) } });
+
+/**
+ * Claim a node's grant for `buyer` before the sale asks the repository for it, on the record's
+ * version (services/record-cas.ts): of two sales naming one node at the same moment, one holds it,
+ * and the other reads the holder it lost to. A claim of a node held by nobody keeps every other
+ * node's holder, which a whole-record write from a stale copy used to lose. Answers who holds the
+ * node now, and whether this call made the claim (so a refused grant can take it back).
+ */
+export async function claimNodeHolder(storage: Storage, repository: string, groupId: string, nodeId: string, buyer: string): Promise<{ holder: string; claimed: boolean }> {
+    const id = holderId(repository, groupId, nodeId);
+    const out = { holder: buyer, claimed: false };
+    await updateRecord(storage, NS_PACKAGE_SALES, 'holders', parseHolders, cur => {
+        out.holder = cur.nodes[id] ?? buyer;
+        out.claimed = !cur.nodes[id];
+        return out.claimed ? { nodes: { ...cur.nodes, [id]: buyer } } : UNCHANGED;
+    }, { tag: 'package-sales-holders' });
+    return out;
+}
+
+/** Take back a claim this sale made, when the repository refused the grant it was for. */
+export async function releaseNodeHolder(storage: Storage, repository: string, groupId: string, nodeId: string, buyer: string): Promise<void> {
+    const id = holderId(repository, groupId, nodeId);
+    await updateRecord(storage, NS_PACKAGE_SALES, 'holders', parseHolders, cur => {
+        if (cur.nodes[id] !== buyer) return UNCHANGED;
+        const nodes = { ...cur.nodes };
+        delete nodes[id];
+        return { nodes };
+    }, { tag: 'package-sales-holders' });
 }
 
 /** Every buyer's subscriptions, for the daily renewal job. */
@@ -264,8 +297,10 @@ export async function readRequests(storage: Storage): Promise<SaleRequest[]> {
     return Object.values(value?.requests ?? {}).filter(r => r.state !== 'waiting' || Date.parse(r.expiresAt) > now);
 }
 
+type Requests = { requests: Record<string, SaleRequest> };
+const parseRequests = (v: unknown): Requests => ({ requests: { ...((v as Partial<Requests> | null | undefined)?.requests ?? {}) } });
+
 export async function putRequest(storage: Storage, req: Omit<SaleRequest, 'id' | 'createdAt' | 'expiresAt'> & Partial<Pick<SaleRequest, 'id' | 'createdAt' | 'expiresAt'>>): Promise<SaleRequest> {
-    const { value, prev } = await getRecord<{ requests: Record<string, SaleRequest> }>(storage, 'requests');
     const now = Date.now();
     const full: SaleRequest = {
         ...req, id: req.id ?? `psr_${randomUUID()}`,
@@ -273,7 +308,25 @@ export async function putRequest(storage: Storage, req: Omit<SaleRequest, 'id' |
         expiresAt: req.expiresAt ?? new Date(now + 30 * 86_400_000).toISOString(),
     };
     // Settled and expired requests older than 90 days leave the record, so it does not grow forever.
-    const keep = Object.fromEntries(Object.entries(value?.requests ?? {}).filter(([, r]) => Date.parse(r.createdAt) > now - 90 * 86_400_000));
-    await putRecord(storage, 'requests', { requests: { ...keep, [full.id]: full } }, prev, 'package-sales-requests');
+    // Written on the record's version, so a request filed while another is decided is kept.
+    await updateRecord(storage, NS_PACKAGE_SALES, 'requests', parseRequests, cur => {
+        const keep = Object.fromEntries(Object.entries(cur.requests).filter(([, r]) => Date.parse(r.createdAt) > now - 90 * 86_400_000));
+        return { requests: { ...keep, [full.id]: full } };
+    }, { tag: 'package-sales-requests' });
     return full;
+}
+
+/**
+ * Decide a waiting request on the record's version: of two decisions at the same moment, one moves
+ * it from `waiting` to `state` and gets it back, the other gets null (ALREADY_DECIDED), before
+ * anything is granted. An approval that then fails puts the request back with putRequest.
+ */
+export async function claimRequest(storage: Storage, id: string, state: 'approved' | 'refused'): Promise<SaleRequest | null> {
+    const out: { claimed: SaleRequest | null } = { claimed: null };
+    await updateRecord(storage, NS_PACKAGE_SALES, 'requests', parseRequests, cur => {
+        const r = cur.requests[id];
+        out.claimed = r && r.state === 'waiting' && Date.parse(r.expiresAt) > Date.now() ? { ...r, state } : null;
+        return out.claimed ? { requests: { ...cur.requests, [id]: out.claimed } } : UNCHANGED;
+    }, { tag: 'package-sales-requests' });
+    return out.claimed;
 }

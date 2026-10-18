@@ -18,7 +18,9 @@
  *   - Phase 6: automatic renewal: charged and moved once; a declined card is told once
  *   - Phase 7: a grant the repository refuses refunds the payment; when the refund fails, the buyer is
  *     told the money was not returned and the seller gets an undelivered-payment record
- *   - Phase 8: an offer granted on approval: refused, then approved, the buyer told each time
+ *   - Phase 8: an offer granted on approval: refused, then approved, the buyer told each time; two
+ *     approvals at the same moment grant once; two buyers naming one node at the same moment, and one
+ *     buyer naming two nodes, leave one holder per node
  *   - Phase 8b: a version R withdraws reaches B's copy at B's check (phase 5, T6)
  *   - Phase 8c: a new version that can do more waits for S's review; renewals go on (phase 5)
  *   - Phase 8d: discovery finds the package for sale; the packages-only peer cap (phase 5, finding F)
@@ -26,6 +28,8 @@
  *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
+ *   2026-10-18 — Phase 8: three sales and decisions fired at the same moment, each failing on the code
+ *     before the holder and request records were written on their version (wish-rahapolkujen-kilpatilanteet).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — Phase 7: the refused-sale assertion matched only the word "refunded", which the old
  *     fixed text "Payment refunded" carried whatever the rail did; it now asserts the sentence for a
@@ -526,6 +530,47 @@ await test('A request waits; refused, the buyer is told and nothing is granted; 
     const twice = await decide(second.request_id, opsToken, 'approve');
     assert(twice.status === 409 && twice.body.error?.code === 'ALREADY_DECIDED', `decided once: ${twice.status}`);
     assert((await notifsOf('package_sale_request_decided')).length === 2, 'the buyer is told each time');
+});
+
+// Quality round 2026-10-18 (wish-rahapolkujen-kilpatilanteet): the decision read the request, asked
+// R for the grant, then wrote `approved`, so two approvals at the same moment each minted a claim code.
+await test('Two approvals of one request at the same moment: one approves with one claim code, the other is 409 ALREADY_DECIDED', async () => {
+    const asked = resultOf((await buy({ app: desk })).done);
+    assert(asked.status === 'awaiting_seller', `waiting: ${JSON.stringify(asked)}`);
+    const approve = () => S.json(`/v1/package-sales/requests/${encodeURIComponent(asked.request_id)}/decision`, {
+        method: 'POST', headers: auth(opsToken), body: JSON.stringify({ decision: 'approve' }),
+    });
+    const results = await Promise.all([approve(), approve()]);
+    const done = results.filter(r => r.status === 200);
+    const refused = results.filter(r => r.status === 409 && r.body.error?.code === 'ALREADY_DECIDED');
+    assert(done.length === 1 && refused.length === 1, `one approves, one is refused: ${JSON.stringify(results.map(r => [r.status, r.body.error?.code, r.body.data?.request?.outcome?.claim_code]))}`);
+    assert(typeof done[0]!.body.data.request.outcome?.claim_code === 'string', `a claim code: ${JSON.stringify(done[0]!.body.data.request)}`);
+});
+
+// The holder was read before the grant and written after it, so two buyers naming one node at the
+// same moment both passed the check and both reached R (secaudit 2026-10, PKG-2, at the same moment).
+await test('Two buyers buy for one node at the same moment: one holds it, the other is refused and refunded', async () => {
+    const one = await fakeNode('race1');
+    const otherToken = await signUp(S, `buyer3${ts}`);
+    const results = await Promise.all([
+        buy({ app: kit, input: { node: one } }),
+        buy({ app: kit, input: { node: one } }, 'card-ok', 'EUR', otherToken),
+    ]);
+    const done = results.filter(r => r.done?.status === 200);
+    const refused = results.filter(r => r.done && r.done.status !== 200 && /another buyer/.test(r.done.body.error?.message ?? '') && /refunded/i.test(r.done.body.error?.message ?? ''));
+    assert(done.length === 1 && refused.length === 1, `one sale, one refusal: ${JSON.stringify(results.map(r => [r.done?.status, r.done?.body.error?.message?.slice(0, 60)]))}`);
+});
+
+// The holders record was written as a stale copy plus one node, so two sales for two nodes at the
+// same moment could leave one of them out, and that node could then be sold to another buyer.
+await test('One buyer buys for two nodes at the same moment: both are theirs in the holders record', async () => {
+    const [two, three] = [await fakeNode('race2'), await fakeNode('race3')];
+    const results = await Promise.all([buy({ app: kit, input: { node: two } }), buy({ app: kit, input: { node: three } })]);
+    assert(results.every(r => r.done?.status === 200), `both sold: ${JSON.stringify(results.map(r => [r.done?.status, r.done?.body.error]))}`);
+    const nodes = ((await S.storage.getMemory('package-sales', 'holders'))?.value as { nodes?: Record<string, string> } | undefined)?.nodes ?? {};
+    for (const n of [two, three]) {
+        assert(nodes[`${R.nodeId}|${kit}|${n.node_id}`] === buyer, `${n.node_id} is held by the buyer: ${JSON.stringify(nodes)}`);
+    }
 });
 
 console.log('\nPhase 8b — A withdrawn version reaches the customer node');
