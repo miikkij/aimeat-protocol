@@ -11,6 +11,9 @@
  *   caller holding only the read word can call a tool, and whether a tool saying no is told apart
  *   from the proxy failing. Each of those has a named test below.
  * @version-history
+ *   v1.1.2 — 2026-10-20 — The server that will not answer is at a port the system handed out and the
+ *     test closed again, not the fixed 40690, which another file's listen(0) can hold on CI
+ *     (check:unit-ports).
  *   v1.1.1 — 2026-10-18 — The upstream and the refusing server listen on ports the system picks, not
  *     the fixed 40691 and 40684.
  *   v1.1.0 — 2026-09-24 — A server the node offers: an owner it admits may call it, and gets 404 on
@@ -209,9 +212,14 @@ describe('attaching a server', () => {
   it('refuses a server that will not answer, as a bad gateway rather than our own error', async () => {
     const storage = new SqliteStorage(':memory:');
     const app = appFor(storage, () => ALICE);
+    // A port nothing listens on: the system hands one out and the test closes it again at once.
+    const closed = http.createServer();
+    await new Promise<void>((r) => closed.listen(0, '127.0.0.1', () => r()));
+    const deadPort = (closed.address() as AddressInfo).port;
+    await new Promise<void>((r) => closed.close(() => r()));
 
     const res = await call(app, 'POST', '/v1/mcp-servers', {
-      name: 'dead', url: 'http://127.0.0.1:40690/mcp',
+      name: 'dead', url: `http://127.0.0.1:${deadPort}/mcp`,
     });
     expect(res.status).toBe(502);
   });

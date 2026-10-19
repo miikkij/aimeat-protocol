@@ -45,7 +45,7 @@ jobs:
           PKG="$(jq -r .version aimeat/package.json)"
           echo "tag=$TAG server.json=$SERVER aimeat/package.json=$PKG"
           if [ "$TAG" != "$SERVER" ] || [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag v$TAG does not match server.json ($SERVER) and aimeat/package.json ($PKG). Bump both, commit, then tag."
+            echo "::error::Tag v$TAG does not match server.json ($SERVER) and aimeat/package.json ($PKG). Run pnpm release:bump $TAG, commit what it lists, then tag."
             exit 1
           fi
 
