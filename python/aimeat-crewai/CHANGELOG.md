@@ -3,7 +3,7 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
-## 0.36.0 - 2026-10-18
+## 0.36.0 - 2026-10-19
 
 - **`build_offer()` asks for a `deliverable`, as the node does.** The node refuses an offer without
   one, and its catalogue then left out every offer of that agent, with no message. Now
