@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.32.1 — 2026-10-20 — serveApp's viewer is the resolved caller (resolveIdentity), not the token's
+ *     `sub`, so an owner's own app open lands in their per-owner usage rows and a watermark names the
+ *     full identity.
  *   v1.32.0 — 2026-10-18 — SECURITY: a restricted app's grant leaves the address. The app origin
  *     accepts `?access=` once, sets it as the host-only `aimeat_app_access` cookie and answers 302 to
  *     the address without it; later requests are granted by the cookie (routes/origin-grant-cookie.ts).
@@ -170,7 +173,7 @@ import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent-face.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
+import { localAccountName, resolveIdentity } from '../utils/gaii.js';
 import { registerAppOriginWebmcp } from './subdomain-webmcp.js';
 import { registerAppOriginDocs, appOriginFor } from './subdomain-origin-docs.js';
 import { detectLocale, type Locale } from '../i18n.js';
@@ -604,7 +607,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       // The front page is an app, so it is served through the app path unchanged: same CSP,
       // same serve-time marks, same download accounting.
       await serveApp(res, storage, companyApp, csp, apexOrigin,
-        { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) },
+        { config, viewer: req.auth ? resolveIdentity(req.auth, config.nodeId) : 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) },
         { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, companyApp.ownerGaii, companyApp.filename) },
         await loadServedProvenance(storage, config, companyApp.aiProvenanceId),
         { config, locale: detectLocale(req.headers['accept-language']) });
@@ -706,7 +709,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       origin: appOriginFor(req, config),
     };
     await serveApp(res, storage, app, appCspForRequest, apexOrigin,
-      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discover,
+      { config, viewer: req.auth ? resolveIdentity(req.auth, config.nodeId) : 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discover,
       await loadServedProvenance(storage, config, app.aiProvenanceId),  // the SDK (aimeat-auth.js) does the silent SSO itself
       { config, locale: detectLocale(req.headers['accept-language']) });
   });
@@ -762,7 +765,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const discoverShared ={ baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
     await serveApp(res, storage, app, csp, apexOrigin,
-      { config, viewer: req.auth?.sub ?? 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discoverShared,
+      { config, viewer: req.auth ? resolveIdentity(req.auth, config.nodeId) : 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) }, discoverShared,
       await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)
       { config, locale: detectLocale(req.headers['accept-language']) });
   });

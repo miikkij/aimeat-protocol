@@ -16,6 +16,8 @@
  * @structure registerOrganismWorkspaceDocumentRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceDocumentRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.1.1 — 2026-10-20 — The caller's principal is resolveIdentity's answer, the same value the MCP
+ *     tools pass, not the token's `sub`.
  *   v1.1.0 — 2026-10-13 — The caller carries the session's scopes, which the fenced-space rule reads
  *     (services/fenced-space.ts): a session that covers organism:direct edits a document of a space
  *     that names extensions directly (ruled by the developer on 2026-10-13).
@@ -27,6 +29,7 @@ import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import {
     appendToDocument, replaceDocumentSection, WorkspaceDocError, type DocEditCaller, type DocEditResult,
 } from '../../services/workspace-doc-edit.js';
@@ -36,9 +39,13 @@ export function registerOrganismWorkspaceDocumentRoutes(
 ): void {
     const deps = { storage, config };
 
-    /** The session, in the shape the service's gate decides on. */
+    /**
+     * The session, in the shape the service's gate decides on. The principal is the resolved caller,
+     * as the MCP tools pass it (caller().principalView): an owner session's `sub` is the bare account
+     * name, and a provenance record or the write tally must carry the GHII.
+     */
     const callerOf = (req: Request): DocEditCaller => ({
-        principal: req.auth?.sub ?? '',
+        principal: req.auth ? resolveIdentity(req.auth, config.nodeId) : '',
         owner: (req.auth?.owner as string) ?? '',
         roles: req.auth?.roles ?? [],
         // The fenced-space rule reads the session's scopes (services/fenced-space.ts).

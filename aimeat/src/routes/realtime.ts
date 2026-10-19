@@ -12,6 +12,9 @@
  *   - additional room listing/lookup routes over realtimeManager
  *
  * @version-history
+ *   v1.3.1 — 2026-10-20 — A room's creator is the resolved caller, on create and on the close check,
+ *     so its Yjs snapshots are filed under the GHII and never under the bare account name. Rooms live
+ *     in memory only, so no stored room carries the old spelling.
  *   v1.3.0 — 2026-10-09 — GET /v1/realtime/ice-servers hands an expiring TURN credential derived per
  *     caller from AIMEAT_TURN_SECRET (services/turn-credentials.ts) instead of the static pair, gives
  *     a visitor from another node no TURN entry, and answers Cache-Control: no-store.
@@ -33,6 +36,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { turnEntryFor, type IceServer } from '../services/turn-credentials.js';
 import { callerOf } from '../middleware/caller.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeManager: RealtimeManager, peers?: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -58,7 +62,9 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
       const room = await realtimeManager.createRoom({
         appType: app_type,
         name,
-        createdBy: req.auth!.sub,
+        // The resolved caller: the room's Yjs snapshots are memory records filed under this identity
+        // (realtime-manager saveAllYjsSnapshots), and an owner session's `sub` is the bare account name.
+        createdBy: resolveIdentity(req.auth!, config.nodeId),
         maxPeers: max_peers,
         isPublic: is_public,
         tags,
@@ -174,7 +180,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
 
     // Only room creator or operator can close; the operator closing another person's room writes
     // the operator trail.
-    const isCreator = room.createdBy === req.auth!.sub;
+    const isCreator = room.createdBy === resolveIdentity(req.auth!, config.nodeId);
     if (!isCreator && !(await operatorOverride(storage, config, req.auth, {
       ownerOf: room.createdBy, area: 'realtime-room', action: 'close', subject: roomId,
     }))) {

@@ -19,6 +19,8 @@
  *   - Phase 5: compose and a cortex's extension calls
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-guards
  * @version-history
+ *   v1.1.0 — 2026-10-20 — The owner changes and removes by hand the lock their own package set, and
+ *     another owner gets 403 on both.
  *   v1.0.0 — 2026-10-02 — Initial (package sale design, phase 1).
  */
 
@@ -189,6 +191,29 @@ await test('Two owners install the same package: the lock is the same structure,
     assert(del.status === 200, `B uninstalls: ${del.status} ${JSON.stringify(del.body)}`);
     const lock = await lockOf(SHARED);
     assert(JSON.stringify(lock).includes('"title"') && String(lock.data?.locked_by).startsWith(A), `A's lock stays: ${JSON.stringify(lock)}`);
+});
+
+const OWN = `guardown${stamp}.items`;
+
+// A package stores its lock under the installer's GHII, and an owner's own session token names the
+// bare account name. Until 2026-10-20 the schema route compared the two spellings exactly and told
+// the owner the lock was somebody else's (the identity-resolution re-read). B, not A: A is the
+// operator, whose override passes either way.
+await test('The owner changes and removes, by hand, the lock their own package set; another owner still cannot', async () => {
+    const group = await publish(bToken, `guardownpkg${stamp}`, [cortexWithSchema(`guardowncx${stamp}`, OWN)]);
+    const r = await install(bToken, group);
+    assert(r.status === 201, `B installs: ${r.status} ${JSON.stringify(r.body)}`);
+    const cToken = await newOwner(`guardc${stamp}`);
+    const shape = { schema: { type: 'object', properties: { title: { type: 'string' }, note: { type: 'string' } } }, apply_to: 'prefix', schema_mode: 'strict' };
+    const byC = await json(`/v1/memory/${encodeURIComponent(OWN)}/schema`, { method: 'PUT', headers: authed(cToken), body: JSON.stringify(shape) });
+    assert(byC.status === 403, `C changes B's lock: ${byC.status} ${JSON.stringify(byC.body)}`);
+    const byB = await json(`/v1/memory/${encodeURIComponent(OWN)}/schema`, { method: 'PUT', headers: authed(bToken), body: JSON.stringify(shape) });
+    assert(byB.status === 200, `B changes the lock B's package set: ${byB.status} ${JSON.stringify(byB.body)}`);
+    assert(JSON.stringify(await lockOf(OWN)).includes('"note"'), 'the lock carries B\'s change');
+    const delC = await json(`/v1/memory/${encodeURIComponent(OWN)}/schema?apply_to=prefix`, { method: 'DELETE', headers: authed(cToken) });
+    assert(delC.status === 403, `C removes B's lock: ${delC.status} ${JSON.stringify(delC.body)}`);
+    const delB = await json(`/v1/memory/${encodeURIComponent(OWN)}/schema?apply_to=prefix`, { method: 'DELETE', headers: authed(bToken) });
+    assert(delB.status === 200, `B removes it: ${delB.status} ${JSON.stringify(delB.body)}`);
 });
 
 console.log('\nPhase 3 — The gallery');
