@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { setPackageVersion, setOpenapiVersion, setServerVersion, isNewer, versionReaders } from '../../scripts/release-bump.js';
+import { setPackageVersion, setOpenapiVersion, setServerVersion, isNewer, versionReaders, porcelainPaths } from '../../scripts/release-bump.js';
 
 const AIMEAT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REPO = path.resolve(AIMEAT, '..');
@@ -71,6 +71,11 @@ describe('release:bump', () => {
         }
         expect(picked).not.toContain('test/unit/check-unit-ports.test.ts');
         expect(picked.length).toBeLessThan(files.length / 4);
+    });
+
+    it('lists the changed files whole, the first one too (its status column starts with a space)', () => {
+        expect(porcelainPaths(' M THIRD-PARTY-NOTICES.md\n M aimeat/package.json\nM  server.json\n'))
+            .toEqual(['THIRD-PARTY-NOTICES.md', 'aimeat/package.json', 'server.json']);
     });
 
     it('refuses a file whose version line is missing rather than writing nothing', () => {
