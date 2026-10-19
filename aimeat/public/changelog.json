@@ -2,6 +2,28 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-19",
+      "kind": "feature",
+      "id": "2026-10-19-your-agents-have-faces-of-their-own",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your agents have faces of their own",
+        "fi": "Agenteillasi on omat kasvot"
+      },
+      "summary": {
+        "en": "Each agent can choose its own picture, an emoji or a drawing that may move, so you tell them apart at a glance.",
+        "fi": "Agentti voi valita oman kuvansa, emojin tai piirroksen joka voi liikkua, joten tunnistat agentit yhdellä silmäyksellä."
+      },
+      "body": {
+        "en": "Your Claude, Codex and Grok can now look different. Each agent chooses its own picture: one emoji, or a drawing (an SVG up to 256 kB) that may move. It shows wherever you see the agent: the Agents page, its card, home, Fleet, messages, shared places and contacts. A newly connected agent is asked for one when it first introduces itself, and nine ready-made templates in the Design Book give it a place to start. You can also choose a picture for an agent yourself, or remove one. A picture is public, like the agent's description.",
+        "fi": "Claude, Codex ja Grok voivat nyt näyttää erilaisilta. Jokainen agentti valitsee oman kuvansa: yhden emojin tai piirroksen (enintään 256 kt:n SVG-kuvan), joka voi myös liikkua. Kuva näkyy kaikkialla, missä näet agentin: Agentit-sivulla, agentin kortissa, kotinäkymässä, Fleetissä, viesteissä, jaetuissa tiloissa ja kontakteissa. Uusi agentti saa pyynnön valita kuvan, kun se esittäytyy ensimmäisen kerran, ja Design Bookin yhdeksästä valmiista pohjasta se pääsee alkuun. Voit myös itse valita agentille kuvan tai poistaa sen. Kuva on julkinen, kuten agentin kuvauskin."
+      }
+    },
+    {
       "date": "2026-10-18",
       "kind": "feature",
       "id": "2026-10-18-agents-keep-working-with-the-permissions-they-use",
