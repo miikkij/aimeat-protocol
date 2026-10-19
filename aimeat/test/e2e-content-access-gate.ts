@@ -33,7 +33,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hostRequest } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
-import { registerOwner } from './helpers/owner-login.js';
+import { registerOwner, ownerToken } from './helpers/owner-login.js';
 
 const PORT = process.env.E2E_CONTENT_GATE_PORT ?? '40265';
 const BASE = `http://localhost:${PORT}`;
@@ -345,6 +345,49 @@ async function main() {
             assert(lib.status === 200, `a library on the page origin: ${lib.status}`);
             const content = await hostRequest(BASE, `/v1/portfolio/data/${owner}`, host, { headers: originHeaders });
             assert(content.status === 404 && !content.body.includes(PAGE_TEXT), `a content route on the page origin: ${content.status}`);
+        });
+
+        await test('signing out closes the app and the welcome page on their origins: the grant names the session it came from', async () => {
+            // The grant cookie lives on the origin, which a sign-out on the apex cannot clear. It used to
+            // keep opening the app for up to an hour after the person signed out (innokas.aimeat.io,
+            // 2026-10-19: the page loaded two seconds after the sign-out).
+            // A second sign-in of the owner: the app is open to one organism by now, and the owner's
+            // first session stays signed in for the last check.
+            const viewer = { token: await ownerToken(BASE, owner) };
+            const granted = async (openPath: string, host: string, originHeaders: Record<string, string>, cookieName: string) => {
+                const open = await json(openPath, { method: 'POST', headers: { Authorization: `Bearer ${viewer.token}` }, body: '{}' });
+                assert(open.status === 200 && typeof open.body.data?.url === 'string', `${openPath}: ${open.status} ${JSON.stringify(open.body.error)}`);
+                const u = new URL(open.body.data.url);
+                const hop = await hostRequest(BASE, `${u.pathname}${u.search}`, host, { headers: { ...originHeaders, Accept: 'text/html' } });
+                const cookie = (hop.header('set-cookie') ?? '').split(';')[0];
+                assert(hop.status === 302 && cookie.startsWith(`${cookieName}=`), `${openPath} grant hop: ${hop.status}`);
+                return { cookie, path: hop.header('location')! };
+            };
+            const appSub = 'gate-demo';
+            const appHost = `${appSub}.${APP_HOST}:${PORT}`;
+            const appHeaders = { 'x-app-origin': '1', 'x-subdomain': appSub };
+            const pageHost = `${owner}.${PORTFOLIO_HOST}:${PORT}`;
+            const pageHeaders = { 'x-portfolio-origin': '1', 'x-subdomain': owner };
+            const a = await granted(`/v1/apps/${owner}/${filename}/open`, appHost, appHeaders, 'aimeat_app_access');
+            const p = await granted(`/v1/portfolio/${owner}/open`, pageHost, pageHeaders, 'aimeat_page_access');
+            const before = await hostRequest(BASE, a.path, appHost, { headers: { ...appHeaders, Accept: 'text/html', Cookie: a.cookie } });
+            assert(before.status === 200 && before.body.includes(APP_TEXT), `the app before sign-out: ${before.status}`);
+            const pageBefore = await hostRequest(BASE, p.path, pageHost, { headers: { ...pageHeaders, Accept: 'text/html', Cookie: p.cookie } });
+            assert(pageBefore.status === 200, `the page before sign-out: ${pageBefore.status}`);
+
+            const out = await json('/v1/auth/revoke', { method: 'POST', headers: { Authorization: `Bearer ${viewer.token}` }, body: '{}' });
+            assert(out.status === 200, `sign-out ${out.status}`);
+
+            const after = await hostRequest(BASE, a.path, appHost, { headers: { ...appHeaders, Accept: 'text/html', Cookie: a.cookie } });
+            assert(after.status !== 200 && !after.body.includes(APP_TEXT), `the app after sign-out: ${after.status}`);
+            const pageAfter = await hostRequest(BASE, p.path, pageHost, { headers: { ...pageHeaders, Accept: 'text/html', Cookie: p.cookie } });
+            assert(pageAfter.status !== 200 && !pageAfter.body.includes('GATE WELCOME PAGE'), `the page after sign-out: ${pageAfter.status}`);
+            // Only that session's grants end: the owner's other sign-in, still signed in, keeps the app open.
+            const open = await json(`/v1/apps/${owner}/${filename}/open`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: '{}' });
+            const u = new URL(open.body.data.url);
+            const hop = await hostRequest(BASE, `${u.pathname}${u.search}`, appHost, { headers: { ...appHeaders, Accept: 'text/html' } });
+            const still = await hostRequest(BASE, hop.header('location')!, appHost, { headers: { ...appHeaders, Accept: 'text/html', Cookie: (hop.header('set-cookie') ?? '').split(';')[0] } });
+            assert(still.status === 200 && still.body.includes(APP_TEXT), `another signed-in person's grant: ${still.status}`);
         });
 
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

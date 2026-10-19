@@ -20,6 +20,8 @@
  *   if (await pageOriginRefused(req, res, config, { kind: 'portfolio', owner: sub }, access, notFound)) return;
  *   await answerPageOpen(req, res, config, storage, { ref, access, ownerName, url });
  * @version-history
+ *   v1.2.0 — 2026-10-19 — The page grant carries the sign-in session it came from, so it stops opening
+ *     the page when the person signs out (services/app-access-token.ts).
  *   v1.1.0 — 2026-10-18 — SECURITY: the page origin accepts `?access=` once, sets it as the host-only
  *     `aimeat_page_access` cookie and answers 302 to the address without it, so a copied address
  *     carries no grant; later requests are granted by the cookie (routes/origin-grant-cookie.ts). The
@@ -89,7 +91,7 @@ export async function answerPageOpen(
     return;
   }
   // The grant names the person it was handed to (`viewer`); the page origin still authorizes on the page alone.
-  const grant = await generatePageAccessToken(page.ref, APP_ACCESS_TTL_SECONDS, resolveIdentity(req.auth!, config.nodeId));
+  const grant = await generatePageAccessToken(page.ref, APP_ACCESS_TTL_SECONDS, resolveIdentity(req.auth!, config.nodeId), req.auth!.sessionId);
   const sep = page.url.includes('?') ? '&' : '?';
   res.json(success(config.nodeId, { url: `${page.url}${sep}access=${encodeURIComponent(grant)}`, expires_in: APP_ACCESS_TTL_SECONDS }));
 }

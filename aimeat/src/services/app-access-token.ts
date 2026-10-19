@@ -37,6 +37,9 @@
  *   if (!(await appAccessGranted(req.query.access, app.ownerName, app.filename))) return notFound();
  *   if (!(await pageAccessGranted(req.query.access, { kind: 'company', id: company.id }))) → redirect or 404
  * @version-history
+ *   v1.3.0 — 2026-10-19 — A grant minted for a signed-in person carries `sid`, the sign-in session it
+ *     came from, and stops opening the app or the page when that session ends: signing out used to
+ *     leave the app open on its origin for up to an hour.
  *   v1.2.0 — 2026-10-18 — A grant minted for a signed-in person carries a `viewer` claim, that
  *     person's GHII (plan doc-mvcn6c7e4e5q, V2): the open routes set it, the access-code flow has no
  *     person and sets none. `sub` keeps its meaning (the app owner). grantExpiresAt() reads the
@@ -51,6 +54,7 @@
 import { SignJWT, jwtVerify, decodeJwt } from 'jose';
 import { randomUUID } from 'node:crypto';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
+import { sessionStorage } from '../auth/node-auth.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -72,11 +76,28 @@ export interface AppAccessTokenPayload {
      * it names who the grant was handed to.
      */
     viewer?: string;
+    /**
+     * The sign-in session the viewer opened the app from (the access token's `jti`). The grant
+     * stops opening the app when that session ends, so signing out closes the app on its origin too.
+     */
+    session?: string;
 }
 
 /** The owner's account name, with this node's `@node-id` removed; another node's identity stays whole. */
 function bare(owner: string): string {
     return localAccountName(owner);
+}
+
+/**
+ * Has the sign-in session a grant was minted from ended? The origin holds no session of its own, so
+ * without this a grant outlived a sign-out by up to an hour (seen on innokas.aimeat.io 2026-10-19:
+ * the app still loaded two seconds after the person signed out). A grant with no `sid` (the
+ * access-code flow) is unaffected. Throws when the store cannot answer; the caller fails closed.
+ */
+async function grantSessionEnded(sid: unknown): Promise<boolean> {
+    if (typeof sid !== 'string' || sid === '') return false;
+    const storage = sessionStorage();
+    return !!storage && await storage.isSessionRevoked(sid);
 }
 
 /**
@@ -89,7 +110,7 @@ export async function generateAppAccessToken(
     ttlSeconds: number = APP_ACCESS_TTL_SECONDS,
 ): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
-    return new SignJWT({ typ: 'app-access', filename: payload.filename, ...(payload.viewer ? { viewer: payload.viewer } : {}) })
+    return new SignJWT({ typ: 'app-access', filename: payload.filename, ...(payload.viewer ? { viewer: payload.viewer } : {}), ...(payload.session ? { sid: payload.session } : {}) })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         // EdDSA signing is deterministic: without a nonce two grants minted in the same second for
         // the same app would be the same string, which makes one leaked address indistinguishable
@@ -117,7 +138,8 @@ export async function appAccessGranted(token: unknown, ownerBare: string, filena
         const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
         if (payload.typ !== 'app-access') return false;
         if (payload.filename !== filename) return false;
-        return bare(String(payload.sub ?? '')) === bare(ownerBare);
+        if (bare(String(payload.sub ?? '')) !== bare(ownerBare)) return false;
+        return !(await grantSessionEnded(payload.sid));
     } catch (err) {
         // Fails closed, and says so once: a grant that stopped verifying is the difference between
         // "this app is gone" and "your link expired", and only the log can tell them apart.
@@ -140,10 +162,10 @@ export function pageRefId(ref: PageRef): string {
  * app grant.
  */
 export async function generatePageAccessToken(
-    ref: PageRef, ttlSeconds: number = APP_ACCESS_TTL_SECONDS, viewer?: string,
+    ref: PageRef, ttlSeconds: number = APP_ACCESS_TTL_SECONDS, viewer?: string, session?: string,
 ): Promise<string> {
     const { privateKey } = getNodeCryptoKeys();
-    return new SignJWT({ typ: 'page-access', page: pageRefId(ref), ...(viewer ? { viewer } : {}) })
+    return new SignJWT({ typ: 'page-access', page: pageRefId(ref), ...(viewer ? { viewer } : {}), ...(session ? { sid: session } : {}) })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         .setJti(randomUUID())
         .setIssuedAt()
@@ -161,7 +183,8 @@ export async function pageAccessGranted(token: unknown, ref: PageRef): Promise<b
     try {
         const { publicKey } = getNodeCryptoKeys();
         const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
-        return payload.typ === 'page-access' && payload.page === pageRefId(ref);
+        if (payload.typ !== 'page-access' || payload.page !== pageRefId(ref)) return false;
+        return !(await grantSessionEnded(payload.sid));
     } catch (err) {
         logger.warn('page-access grant rejected → the page answers as unknown', { error: String(err) });
         return false;

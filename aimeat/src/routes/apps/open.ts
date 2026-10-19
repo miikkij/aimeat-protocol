@@ -18,6 +18,8 @@
  * @structure signInGateRefused() · registerAppOpenRoutes()
  * @usage registerAppOpenRoutes(router, config, storage, canonicalOwner)   // from appsRouter
  * @version-history
+ *   v1.2.0 — 2026-10-19 — The grant carries the sign-in session it came from, so it stops opening the
+ *     app when the person signs out (services/app-access-token.ts).
  *   v1.1.0 — 2026-10-18 — The grant carries `viewer`, the GHII of the signed-in person it was minted
  *     for; `sub` keeps naming the app owner (plan doc-mvcn6c7e4e5q, V2).
  *   v1.0.0 — 2026-10-17 — Initial.
@@ -105,7 +107,7 @@ export function registerAppOpenRoutes(router: Router, config: AimeatConfig, stor
       : `${config.baseUrl}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`;
     // `sub` stays the app owner, which the origin checks; `viewer` names the person the grant was
     // handed to. The app origin moves the grant from the address to a cookie (routes/origin-grant-cookie.ts).
-    const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename, viewer: resolveIdentity(req.auth!, config.nodeId) });
+    const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename, viewer: resolveIdentity(req.auth!, config.nodeId), session: req.auth!.sessionId });
     const sep = target.includes('?') ? '&' : '?';
     res.setHeader('Cache-Control', 'no-store');
     res.json(success(config.nodeId, { url: `${target}${sep}access=${encodeURIComponent(grant)}`, expires_in: 3600 }));
