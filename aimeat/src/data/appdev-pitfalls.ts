@@ -12,6 +12,12 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-19 — Eleven entries the 2026-10-17 round marked outdated are removed (Jouni, 2026-10-19):
+ *     unlabelled-ai-output, ai-provenance-dropped-on-save, biometric-inference-needs-your-own-notice,
+ *     pub-urls-for-cross-user-files, ui-component-shapes, presigned-over-inline,
+ *     iam-decide-at-framing, realtime-batch-per-tick, realtime-anchor-clock,
+ *     outbound-replay-is-not-a-send, one-file-past-a-megabyte. Nothing in the repository cites them.
+ *     handle-both-auth-paths stays, outdated, because app-declared-unused points at it.
  *   2026-10-18 — callext-path: AIMEAT.data.action, and a `public: true` action answers a visitor (Comicland v3 A-7).
  *   2026-10-17 — +team-data-in-personal-memory (plan V7, the data map step in both build interviews).
  *     The two types moved verbatim to appdev-pitfall-types.ts and are re-exported here.
@@ -229,28 +235,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'unlabelled-ai-output', status: 'outdated',
-    title: 'An app that generates content and never says so',
-    symptom: 'The app requests the `ai:use` scope, shows model-written text to a reader, and nothing on the page says a model wrote it. Publishing warns (`ai_hints`) and records a gap on the app; the catalogue card shows an "Unlabelled AI" marker to the owner.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this in its AI transparency section. Keep the `provenance` object AIMEAT.ai.complete()returns and render the label at first exposure: `AIMEAT.ai.disclose(r.provenance, { target: "#ai-label" })`. It draws the official EU label in the app\'s own theme, replaces whatever was in the target, and draws nothing when the node judges no label owed, so an origin line you want shown regardless is your own element beside it. Declare `<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">`, attach the record to anything stored with `AIMEAT.ai.declare(item, r.provenance)`, and open a chat with `AIMEAT.ai.chatNotice()`.',
-    appliesTo: ['app', 'publish'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
-    id: 'ai-provenance-dropped-on-save', status: 'outdated',
-    title: 'The label is on screen but the stored item forgot where it came from',
-    symptom: 'The app renders the AI label correctly, then saves the generated item with AIMEAT.data.set() and the stored record carries no provenance. Anything reading the data later (another app, an agent, the owner in six months) reads it as content of unknown origin.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat-ai library guide and the build specification state this. Wrap the value: `await AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance))`. declare() returns a copy carrying `aiProvenance` (the bare record) and `aiProvenanceUrl`, so an item read back has a different shape from the { record, recordUrl } object you rendered from: read `item.aiProvenance` when you disclose a stored item again.',
-    appliesTo: ['app', 'ai'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
     id: 'provenance-without-model',
     title: 'The AI label says who served the model and not which model',
     symptom: 'The app was published with an `ai_provenance` block that gives `level` (and often `provider`) but no `model`. The public "How this was made" page then shows "Served by openai" and no model row, and nobody can tell from the record which model wrote the app. The node cannot fill the gap: it did not watch the generation, and a publish with the owner\'s own token has no agent record to read a model from. Publishing warns (`app_hints`, pitfall `provenance-without-model`).',
@@ -259,17 +243,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-26',
-    ...CHECKED,
-  }),
-  E({
-    id: 'biometric-inference-needs-your-own-notice', status: 'outdated',
-    title: 'Emotion or attention inference is the app owner\'s own duty to declare',
-    symptom: 'The app reads a webcam, a microphone or interaction data to infer mood, emotion, attention or any other biometric category, and relies on the platform label to cover it. The platform label describes GENERATED content; it says nothing about inference performed on a person.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this duty in its AI transparency section. Tell the people exposed, in your own words, before the inference happens — `AIMEAT.ai.chatNotice({ target, title, body })` renders your wording. The duty sits with you as deployer, because only you know who is in front of the camera and why.',
-    appliesTo: ['app'],
-    severity: 'critical',
-    source: 'curated',
-    updatedAt: '2026-08-01',
     ...CHECKED,
   }),
   E({
@@ -284,34 +257,12 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'pub-urls-for-cross-user-files', status: 'outdated',
-    title: 'Cross-user images/files need public /v1/pub/ URLs',
-    symptom: 'Images or files embedded for OTHER users 404 or demand auth: the authed memory and file endpoints only serve the owner. Or a re-uploaded image keeps showing the old picture for a few minutes.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat-storage library guide states this (viewUrl, versioned_url). For anything another user or an anonymous visitormust see, store it public and reference /v1/pub/{gaii}/{key}. Public files are cached for five minutes, so after a re-upload use the `versioned_url` the upload answer returns. `AIMEAT.storage.viewUrl()` turns a stored reference, including the "gaii/key" form an agent\'s file write returns, into an address the browser can load.',
-    appliesTo: ['app'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
     id: 'body-background-seam',
     title: 'A background gradient on body draws a seam one screen down',
     symptom: 'A full-page gradient ends in a hard horizontal line at exactly one viewport height on any page taller than the window. `background-attachment: fixed` produces the same line by another route.',
     fix: 'The body background propagates to the canvas, so `background-size: 100% 100%` resolves against the root element, not the body. Put the background on an ordinary element that grows with the content: `#app { min-height: 100dvh; background: ... }`.',
     appliesTo: ['app', 'mobile'],
     severity: 'info',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
-    id: 'ui-component-shapes', status: 'outdated',
-    title: 'The AIMEAT.ui components take the shapes their own docs name, not the usual ones',
-    symptom: 'A tab strip never reacts, a table row click does nothing, or `input.value` is undefined, while nothing throws.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): each component\'s api_surface in the cortex library guide states these shapes. Read the component\'s api_surface (GET /v1/cortex/<pack>) instead of guessing from other libraries: `AIMEAT.ui.nav.Tabs({ target, tabs, active, onChange })` (onChange, not onSelect); DataTable has no row-click callback (use a list component\'s onItemClick, or a column that renders a button); Input and Select return `{ el, getValue(), setValue() }`, so read the value with getValue().',
-    appliesTo: ['app', 'cortex'],
-    severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
@@ -483,17 +434,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
 
   // ---- publishing over MCP ---------------------------------------------
   E({
-    id: 'presigned-over-inline', status: 'outdated',
-    title: 'Publish files >1 KB via presigned upload, never inline base64',
-    symptom: 'A large app inlined as base64 wastes enormous context and tokens and can hit size caps.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat_app_publish tool description and the appdev handbook state this. Call aimeat_app_publish (or storage upload) WITHOUT the content param, receive upload_url, and PUT the raw file in the same shell pipeline: curl -s -X PUT "<upload_url>" -H "Content-Type: text/html" --data-binary @app.html. Never retype or edit an upload URL: request a fresh one. Crew-defs, provenance and the spec token ride along. To change a live app without holding it in context, use the draft tools (see edit-published-app).',
-    appliesTo: ['publish'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
     id: 'edit-published-app',
     title: 'Editing a published app: seed a draft, change it, publish it under the same filename',
     symptom: 'Rebuilding an app from scratch, publishing under a new filename, or looking for the source in aimeat_app_get (which returns the manifest, not the HTML) loses version history and forks the audience.',
@@ -513,19 +453,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-
-  // ---- iam --------------------------------------------------------------
-  E({
-    id: 'iam-decide-at-framing', status: 'outdated',
-    title: 'Decide at framing time whether the app needs its OWN users (aimeat-iam)',
-    symptom: 'An app that needs member roles/levels ships with hand-rolled auth lists in memory keys; retrofitting real IAM later is painful and often forgotten entirely.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this in its own-users section. If the app has its own user community (members, roles, levels, moderation), decide it in the plan/frame phase: the node keeps the roster (AIMEAT.iam.init({ app, roles: { member: [\'use\'] } }), MemberAdmin is the owner\'s roster and approval panel, JoinPanel the applicant\'s form), and the server-side gate is an extension generated by aimeat_iam_define, installed and named in init({ app, ext }). Start from the usecase-app-iam template. Do not bolt it on after the data model exists. A role belongs to the PERSON, so the agents of a member inherit it.',
-    appliesTo: ['iam', 'app'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-10-01',
     ...CHECKED,
   }),
 
@@ -632,32 +559,10 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'realtime-batch-per-tick', status: 'outdated',
-    title: 'The realtime WS is rate-limited: batch per tick',
-    symptom: 'A sequencer or a burst of pointer events stops broadcasting after a moment: one frame per event trips the limit of 50 frames a second per peer (the node default), and each refused frame arrives only as an `error` event with code RATE_LIMITED.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the realtime library guide states this. Send ONE message per tick carrying everything forthat tick ({type:"notes-batch", notes:[...]}), throttle pointer streams to about 30 ms batches, and listen on rt.on("error") so a refusal is visible.',
-    appliesTo: ['realtime'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
     id: 'realtime-room-gc-recreate',
     title: 'Empty rooms are garbage-collected: reconnect must be able to RECREATE',
     symptom: '"Room not found" on reconnect after everyone left for a while; re-dialing the old socket object never recovers.',
     fix: 'A room with no peers is deleted after an hour idle (the node default). On WS close: try getRoom(id); if it is gone, createRoom again with the same name and tags; reconnect with a FRESH AimeatRealtime instance; back off exponentially and reset the delay on a successful joined.',
-    appliesTo: ['realtime'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
-    id: 'realtime-anchor-clock', status: 'outdated',
-    title: 'Sync a shared timeline off ONE broadcast anchor, not local clocks',
-    symptom: 'Timing drifts between browsers; late joiners are out of phase; tempo changes make the beat jump.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the realtime library guide states SharedClock and the leader and joiner flow. Use window.SharedClock from /lib/realtime.js: theleader broadcasts clock.start(), a joiner sends a sync-request and calls clock.adopt(payload), and a tempo change re-anchors instead of jumping. Hand-rolled, it is: broadcast t0 (unix ms of step 0) + bpm and compute step = floor((Date.now()-t0)/stepMs) % N on every client. Never derive shared timing from a local setInterval counter.',
     appliesTo: ['realtime'],
     severity: 'warn',
     source: 'curated',
@@ -678,17 +583,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
 
   // ---- sending and scheduling -------------------------------------------
   E({
-    id: 'outbound-replay-is-not-a-send', status: 'outdated',
-    title: 'replay: true means nothing was sent just now, and an empty link is not a link',
-    symptom: 'An app says "you already sent this" and prints a sentence ending in a colon, or links to nothing, for a post that never reached anyone.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the aimeat-connect library guide states how to read status and replay. Read attempt.status before telling a person something went out: replay: true only says this call published nothing. A provider can answer a successful share with an empty external reference, so test a link with `||`, never `??`, before rendering it.',
-    appliesTo: ['app', 'publish'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
     id: 'schedule-next-run-needs-the-year',
     title: 'A failed one-shot schedule moves its next run a year out and stays enabled',
     symptom: 'A post scheduled for "04.08. 21:00" failed, and the schedule still reads enabled with a next run of 04.08., which looks like this week and is next year.',
@@ -706,19 +600,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     fix: 'Show one-shots by lastRunAt, lastRunResult, lastRunError and runCount, which are in the same GET /v1/schedules response. A skipped run appears only in GET /v1/schedules/{id} runs[].',
     appliesTo: ['app'],
     severity: 'info',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-
-  // ---- the app that keeps growing ---------------------------------------
-  E({
-    id: 'one-file-past-a-megabyte', status: 'outdated',
-    title: 'A single-file app past a megabyte slows every edit',
-    symptom: 'Changes that used to take five minutes take thirty or forty, and it came on over a couple of days while the node answered normally. Measured on one real app: 3.18 MB, 43 213 lines, 1550 functions, 477 kB of it base64 images inlined into the source, and one line 294 490 characters long; a search that touches that line puts about 70 000 tokens into the conversation in one tool result. The publish answer reports the size (next_steps.size), but only when somebody reads it.',
-    fix: 'Outdated 2026-10-17 (node 4.0.3): the build specification states this. An AI edit costs what has to be READ to make it, so the file size IS the edit cost. Three moves, cheapest first: (1) get the assets out: upload each image once (visibility public) and reference https://<node>/v1/pub/<ghii>/<key>, never a data URI in the source; (2) split the sources on your own machine behind a build script that assembles the one HTML file the node serves, starting from GET /v1/app-templates/workstation-project, which ships the guards; (3) edit like the file is big: one change per round, name the function, read the region rather than the file. The skill is node:aimeat-app-workstation. next_steps.size carries the bytes, the share of the node ceiling, the growth per day and the date that rate meets the ceiling.',
-    appliesTo: ['app', 'publish'],
-    severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
