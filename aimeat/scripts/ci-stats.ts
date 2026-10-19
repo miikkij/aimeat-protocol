@@ -29,8 +29,11 @@
  *   - weeks(): per-week totals
  *   - main(): the table, or JSON with --json
  * @usage cd aimeat && pnpm ci:stats [--since 2026-09-01] [--json]
- *   (needs the GitHub CLI, signed in; from the repo root, pnpm ci:stats works the same)
+ *   (reads GitHub through the GitHub CLI when it is on PATH, else through the REST API with curl,
+ *   with GH_TOKEN or GITHUB_TOKEN when set; from the repo root, pnpm ci:stats works the same)
  * @version-history
+ *   2026-10-19 — Without the GitHub CLI the script reads the REST API with curl (repoFromRemote,
+ *     runFromRest, rest): the watch round of 2026-10-19 stopped at `spawnSync gh ENOENT`.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
 import { execFileSync } from 'node:child_process';
@@ -88,6 +91,56 @@ interface Week {
 const gh = (args: string[]): string =>
     execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
 
+/**
+ * Whether the GitHub CLI is on PATH. Without it the script reads the same data from GitHub's REST
+ * API with curl: a machine without `gh` stopped the watch round of 2026-10-19 at `spawnSync gh
+ * ENOENT`, and the round was then done by hand against the same API.
+ */
+const HAS_GH = ((): boolean => {
+    try { execFileSync('gh', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; }
+})();
+
+/** `owner/repo` from a GitHub remote URL (https or ssh form), or null for any other host. */
+export function repoFromRemote(url: string): string | null {
+    const m = /github\.com[:/]([^/\s]+)\/([^/\s]+?)(?:\.git)?\/?$/.exec(url.trim());
+    return m ? `${m[1]}/${m[2]}` : null;
+}
+
+/** The REST shape of one workflow run, as GET /repos/{repo}/actions/workflows/{id}/runs lists it. */
+export interface RestRun { id: number; conclusion: string | null; status: string; created_at: string; updated_at: string; head_sha: string }
+
+/** A REST workflow run in the shape `gh run list --json` gives, which the rest of the script reads. */
+export function runFromRest(r: RestRun): Run {
+    return { databaseId: r.id, conclusion: r.conclusion ?? '', status: r.status, createdAt: r.created_at, updatedAt: r.updated_at, headSha: r.head_sha };
+}
+
+let repoCache: string | null = null;
+function repo(): string {
+    if (repoCache) return repoCache;
+    const url = execFileSync('git', ['remote', 'get-url', 'origin'], { encoding: 'utf8' });
+    const found = repoFromRemote(url);
+    if (!found) throw new Error(`origin is not a GitHub repository: ${url.trim()}`);
+    repoCache = found;
+    return found;
+}
+
+/**
+ * One GET against api.github.com with curl. GH_TOKEN or GITHUB_TOKEN, when set, goes in on stdin
+ * (`-H @-`) so it never appears in the process list; without one GitHub allows 60 requests an hour,
+ * which a month of history can exceed, and the error then says so.
+ */
+function rest<T>(path: string): T {
+    const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN ?? '';
+    const args = ['-sS', '--fail-with-body', '-H', 'Accept: application/vnd.github+json', ...(token ? ['-H', '@-'] : []), `https://api.github.com/${path}`];
+    try {
+        const out = execFileSync('curl', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, input: token ? `Authorization: Bearer ${token}\n` : '' });
+        return JSON.parse(out) as T;
+    } catch (err) {
+        const detail = (err as { stdout?: string }).stdout ?? (err as Error).message;
+        throw new Error(`GitHub REST ${path} failed${token ? '' : ' (no GH_TOKEN or GITHUB_TOKEN: 60 requests an hour)'}: ${String(detail).slice(0, 300)}`);
+    }
+}
+
 const hours = (from: string, to: string): number => (Date.parse(to) - Date.parse(from)) / 3_600_000;
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
@@ -110,10 +163,19 @@ function listRuns(since: string): Run[] {
     for (let from = Date.parse(since); from < end; from += 7 * 86_400_000) {
         const a = new Date(from).toISOString().slice(0, 10);
         const b = new Date(from + 6 * 86_400_000).toISOString().slice(0, 10);
-        const raw = gh(['run', 'list', '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push',
-            '--created', `${a}..${b}`, '--limit', String(RUN_LIMIT),
-            '--json', 'databaseId,conclusion,status,createdAt,updatedAt,headSha']);
-        const week = JSON.parse(raw) as Run[];
+        let week: Run[] = [];
+        if (HAS_GH) {
+            const raw = gh(['run', 'list', '--workflow', WORKFLOW, '--branch', 'main', '--event', 'push',
+                '--created', `${a}..${b}`, '--limit', String(RUN_LIMIT),
+                '--json', 'databaseId,conclusion,status,createdAt,updatedAt,headSha']);
+            week = JSON.parse(raw) as Run[];
+        } else {
+            for (let page = 1; ; page++) {
+                const got = rest<{ workflow_runs: RestRun[] }>(`repos/${repo()}/actions/workflows/${WORKFLOW}/runs?branch=main&event=push&created=${a}..${b}&per_page=100&page=${page}`);
+                week.push(...got.workflow_runs.map(runFromRest));
+                if (got.workflow_runs.length < 100) break;
+            }
+        }
         if (week.length >= 1000) throw new Error(`${a}..${b} returned ${week.length} runs, GitHub's cap: shorten the window`);
         runs.push(...week);
     }
@@ -124,11 +186,13 @@ function listRuns(since: string): Run[] {
 
 /** The first failed job and step of one run. */
 function firstFailure(runId: number): { job: string; step: string } {
-    const raw = gh(['run', 'view', String(runId), '--json', 'jobs']);
-    const jobs = (JSON.parse(raw) as { jobs: { name: string; conclusion: string; steps: { name: string; conclusion: string }[] }[] }).jobs;
+    type Jobs = { jobs: { name: string; conclusion: string | null; steps?: { name: string; conclusion: string | null }[] }[] };
+    const jobs = HAS_GH
+        ? (JSON.parse(gh(['run', 'view', String(runId), '--json', 'jobs'])) as Jobs).jobs
+        : rest<Jobs>(`repos/${repo()}/actions/runs/${runId}/jobs?per_page=100`).jobs;
     const job = jobs.find(j => j.conclusion === 'failure');
     if (!job) return { job: '?', step: '?' };
-    return { job: job.name, step: job.steps.find(s => s.conclusion === 'failure')?.name ?? '?' };
+    return { job: job.name, step: (job.steps ?? []).find(s => s.conclusion === 'failure')?.name ?? '?' };
 }
 
 const commitCache = new Map<string, Commit>();
@@ -142,7 +206,9 @@ function commitInfo(sha: string): Commit {
         message = execFileSync('git', ['show', '-s', '--format=%B', sha], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
     } catch {
         // Not in this clone (a shallow or stale fetch): GitHub has every pushed commit.
-        message = gh(['api', `repos/{owner}/{repo}/commits/${sha}`, '--jq', '.commit.message']);
+        message = HAS_GH
+            ? gh(['api', `repos/{owner}/{repo}/commits/${sha}`, '--jq', '.commit.message'])
+            : rest<{ commit: { message: string } }>(`repos/${repo()}/commits/${sha}`).commit.message;
     }
     const session = /^Session:\s*(\S+)/m.exec(message)?.[1] ?? '';
     const info = { sha: sha.slice(0, 9), subject: message.split('\n')[0].trim(), session };
