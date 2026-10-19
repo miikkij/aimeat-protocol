@@ -8,6 +8,7 @@
  *   form. The headers serviceSummaryRequestHeaders builds follow the same choice, for this node's own
  *   version: the unsigned headers while the window is open, the signed ones for the same old peer after it.
  * @version-history
+ *   2026-10-19 — The window ends at 4.2.0, so the 4.1.x line carries it; 4.1.1 is inside it.
  *   2026-10-19 — The header test reads this node's own version: from 4.0.5 an old peer gets the signed form (node 4.1.0 turned it red).
  *   2026-10-16 — unsignedServiceSummaryAccepted: the receiving side of the window; and the signed form on request.
  *   2026-10-16 — Initial (decision 2026-10-16, the signed service summary compatibility window).
@@ -21,13 +22,13 @@ import { serviceSummaryRequestHeaders } from '../../src/services/federation.js';
 import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 import type { AimeatConfig } from '../../src/config.js';
 
-/** serviceSummaryRequestHeaders reads this node's own version, so its window is open only before 4.0.5. */
+/** serviceSummaryRequestHeaders reads this node's own version, so its window is open only before 4.2.0. */
 const windowOpen = !versionAtLeast(getSoftwareVersion(), UNSIGNED_SERVICE_SUMMARY_REMOVED_IN);
 
 describe('serviceSummaryForm', () => {
-    it('names the window: signed peers from 4.0.3, signed only from 4.0.5', () => {
+    it('names the window: signed peers from 4.0.3, signed only from 4.2.0', () => {
         expect(SIGNED_SERVICE_SUMMARY_PEER_FROM).toBe('4.0.3');
-        expect(UNSIGNED_SERVICE_SUMMARY_REMOVED_IN).toBe('4.0.5');
+        expect(UNSIGNED_SERVICE_SUMMARY_REMOVED_IN).toBe('4.2.0');
     });
 
     it('a node on 4.0.4 sends the unsigned form to a peer on 4.0.2 or older', () => {
@@ -48,8 +49,8 @@ describe('serviceSummaryForm', () => {
         }
     });
 
-    it('from 4.0.5 every peer gets the signed form, the old and the unknown too', () => {
-        for (const own of ['4.0.5', '4.1.0', '5.0.0']) {
+    it('from 4.2.0 every peer gets the signed form, the old and the unknown too', () => {
+        for (const own of ['4.2.0', '4.3.0', '5.0.0']) {
             for (const v of ['4.0.2', null, '4.0.4']) {
                 expect(serviceSummaryForm(v, own)).toEqual({ form: 'signed', reason: 'window-closed' });
             }
@@ -67,8 +68,8 @@ describe('unsignedServiceSummaryAccepted (the receiving side of the window)', ()
     it('a node on 4.0.4 refuses it from a peer whose version it has not heard', () => {
         for (const v of [null, undefined, '', 'unknown']) expect(unsignedServiceSummaryAccepted(v, '4.0.4')).toBe(false);
     });
-    it('from 4.0.5 the same old peer is refused: the window has closed', () => {
-        for (const own of ['4.0.5', '4.1.0']) expect(unsignedServiceSummaryAccepted('4.0.2', own)).toBe(false);
+    it('from 4.2.0 the same old peer is refused: the window has closed', () => {
+        for (const own of ['4.2.0', '4.3.0']) expect(unsignedServiceSummaryAccepted('4.0.2', own)).toBe(false);
     });
 });
 

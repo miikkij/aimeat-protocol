@@ -11,6 +11,7 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-19 — The service summary window's comment names 4.2.0, the release it now ends in.
  *   2026-10-16 — fetchServiceSummary: a peer of unknown version that refuses the unsigned service summary
  *     request with 401 is asked once more with the signed one, and from then on (until restart) gets the
  *     signed form, so two nodes on the new code lose no heartbeat round (decision 2026-10-16).
@@ -265,9 +266,9 @@ const HEARTBEAT_BASE_INTERVAL_MS = 5 * 60_000;
 /**
  * The headers of the service summary request to `peer`. Signed as this node for that peer
  * (signedGetHeaders) unless serviceSummaryForm says the peer gets the older form, `x-source-node`
- * alone: through node 4.0.4 a peer on 4.0.2 or older, or one whose version this node has not heard
- * in a signed heartbeat, gets that form; from UNSIGNED_SERVICE_SUMMARY_REMOVED_IN (4.0.5) no peer
- * does (decision 2026-10-16). `signed` asks for the signed form whatever the window says (the retry
+ * alone: before UNSIGNED_SERVICE_SUMMARY_REMOVED_IN (4.2.0) a peer on 4.0.2 or older, or one whose
+ * version this node has not heard in a signed heartbeat, gets that form; from it no peer does
+ * (decisions 2026-10-16 and 2026-10-19). `signed` asks for the signed form whatever the window says (the retry
  * and a peer known to take it). Throws when the signed form is due and this node has no key.
  */
 export async function serviceSummaryRequestHeaders(

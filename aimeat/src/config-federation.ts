@@ -29,6 +29,8 @@
  *   import { federationDefaults } from './config-federation.js';
  *   const config = { ...federationDefaults(), ... };
  * @version-history
+ *   2026-10-19 — UNSIGNED_SERVICE_SUMMARY_REMOVED_IN is 4.2.0, not 4.0.5: the window closed with no
+ *     release inside it when production went from 4.0.3 to 4.1.0 (Jouni, 2026-10-19).
  *   2026-10-16 — unsignedServiceSummaryAccepted: the receiving side of the same window, true through 4.0.4
  *     only for a peer whose signed heartbeat named 4.0.2 or older (decision 2026-10-16).
  *   2026-10-16 — serviceSummaryForm, SIGNED_SERVICE_SUMMARY_PEER_FROM (4.0.3) and
@@ -71,12 +73,14 @@ export const RELAY_CLAIM_OPTIONAL_REMOVED_IN = '4.0.0';
 export const SIGNED_SERVICE_SUMMARY_PEER_FROM = '4.0.3';
 /**
  * The release from which this node sends only the signed service summary request, to every peer.
- * One release (4.0.4) sends the older form to a peer on 4.0.2 or older and to a peer whose version
- * it does not know; the release after it (4.0.5) does not (decision 2026-10-16, Core 2026-11
- * Appendix B). The receiving side keeps the same window: through 4.0.4 it also answers the unsigned
- * form from a peer whose signed heartbeat named 4.0.2 or older (unsignedServiceSummaryAccepted).
+ * Until then the node sends the older form to a peer on 4.0.2 or older and to a peer whose version
+ * it does not know (decision 2026-10-16, Core 2026-11 Appendix B). The receiving side keeps the same
+ * window: before this release it also answers the unsigned form from a peer whose signed heartbeat
+ * named 4.0.2 or older (unsignedServiceSummaryAccepted). It was 4.0.5, meant as one release after
+ * 4.0.4; production went from 4.0.3 to 4.1.0, so the window closed with no release inside it, and
+ * Jouni moved it to 4.2.0 on 2026-10-19 so the 4.1.x line carries it.
  */
-export const UNSIGNED_SERVICE_SUMMARY_REMOVED_IN = '4.0.5';
+export const UNSIGNED_SERVICE_SUMMARY_REMOVED_IN = '4.2.0';
 
 /** Which service summary request this node sends a peer, and why. */
 export interface ServiceSummaryForm {
