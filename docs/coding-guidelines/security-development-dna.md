@@ -34,7 +34,7 @@ Every request runs as exactly one **principal**. Get the principal + its trust t
 
 ---
 
-## 2. The sixteen invariants (the DNA: every change must preserve these)
+## 2. The nineteen invariants (the DNA: every change must preserve these)
 
 ### 1. Authorize against the *resolved* identity, never a client-supplied id
 Ask the caller object. On a route, `callerOf(req, config.nodeId, storage)` (`src/middleware/caller.ts`)
@@ -407,6 +407,59 @@ third created a board post with no access check, no price, no hook and no proven
 *Check:* deprecating something names the flag, the default and the version it is removed in. A
 deprecation note with none of those is a comment, and the code keeps running.
 
+### 17. What was approved or requested is what runs, bound to principal, target and arguments
+
+A request or approval authorizes one action: the normalized operation, on the named resource, with
+the arguments the approver saw, for the principal who asked. A second surface that runs the same
+action must not let anything between the approval and the sink change who runs it, what it runs on,
+or with which arguments. The October 2026 audit produced this shape five times across the schedule,
+workflow, capability and app-tool paths: a scheduled or app-tool call that fires with an identity or
+a scope its maker never held (a fabricated `mcp:use`, a maker that is gone, an eco app managing
+another principal's schedule), a capability whose publisher chooses the tool and the arguments that
+run on the *caller's* own attached server under the *caller's* credential, and a "run as me" that
+starts a definition the owner was not shown.
+
+*Check:* at the last trusted step before the side effect, re-resolve the principal (its current
+existence and scopes, through `scheduleActor`/`withCurrentScopes`, never a value frozen at create
+time or fabricated), and compare the normalized tool name, the complete argument object and the
+target against what was approved or requested. A "confirm" token whose mint and verify both run as
+the same agent is not a human review step; bind it to the approver.
+
+### 18. Content one principal writes is not another principal's instruction or authority
+
+Memory records, workspace documents and rows, skills, package components, retrieved hits, tool
+descriptions, model output, DMs, mail, board posts and intake text are untrusted input, whatever
+their provenance. When such content later enters another principal's agent as an instruction, or is
+served to another member as workspace content, the write that put it there passes the SAME authority
+check as the door that normally writes that kind of content: the workspace contributor role for
+workspace content, the organism namespace rule for an `organism.*` key, the publish gate for a
+public record, `packages:install-code` for anything the owner's AI will load as a guide. The October
+2026 audit found six paths where a side door (a package memory component, a workspace import, a
+read-only viewer, a plain member in person, the skill registry) wrote content that another
+principal's agent then loaded, each skipping the write rule its twin door enforces. A guardrail
+prompt ("data, not instructions") is calibration, never the control.
+
+*Check:* for every write of durable content that another principal reads or acts on, name the write
+door that owns that key prefix or namespace and route the side door through the same gate. A reader
+that collapses per-owner copies to the freshest must not trust a copy a non-member or a viewer wrote.
+
+### 19. A revocation reaches every derived copy, token, grant and listing
+
+Deleting an agent, revoking a consent, removing an organism member, erasing an account, narrowing a
+board, ending a share: each is a lifecycle contract, and it is only as strong as the derived state it
+reaches. A removal that clears the primary record and leaves a usable copy has not revoked anything.
+The October 2026 audit found this seven times: a deleted agent's MCP token still writing until it
+expired, consent and organism grants surviving a delete and passing to the next agent of the same
+name, an erased account's bare-name memberships inherited by whoever registers the name next, a
+board subscription still delivering after the member was removed, a withdrawn directory listing still
+served, replicated public memory that no peer ever expires or retracts.
+
+*Check:* for every revocation, list the derived state it must reach (open sessions and tokens that
+carry no session id, grants that name the principal as GRANTEE not owner, memberships and listing
+arrays keyed by bare name, subscriptions, caches, issued share references, peer replicas) and reach
+each one, or re-check authority at use time. A GAII is rebuilt from a name, so a grant left behind
+rebinds to the next holder of that name.
+
 ## 3. Security posture: one codebase, localhost-flexible → public-strict
 
 AIMEAT must run wide-open on localhost (dev, personal node, cabin, IoT) **and** locked-down on the public
@@ -483,15 +536,20 @@ Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/s
 - [ ] **Config:** any security value that differs local↔public is in `.env.example` with a safe public default (Inv. 10).
 - [ ] **Provenance:** does this path produce or serve model output? If yes, does it mint or propagate provenance? Minting goes through `services/ai-provenance.ts`; serving carries it via `services/ai-provenance-marks.ts`. A new publishing container also goes in `PUBLICLY_LINKED_CONTAINERS` and both providers' predicates, or the labels it produces resolve to a 404 and read as "no provenance". `pnpm check:ai-disclosure` enforces the parts it can see.
 - [ ] **Spec + campsite:** `openapi.yaml` marks the route's auth; fixed any adjacent gaps you passed.
+- [ ] **Action binding:** a scheduled, queued, approved or second-surface action re-resolves its principal at the sink and runs only the approved operation, target and arguments (Inv. 17).
+- [ ] **Cross-principal content:** a side door that writes content another principal's agent loads passes the same write gate as the primary door for that key or namespace (Inv. 18).
+- [ ] **Revocation:** a delete, revoke, removal or erasure reaches every derived token, grant, membership, subscription, cache and replica, or re-checks authority at use time (Inv. 19).
 - [ ] Ran `/security-review` on the diff (or the branch security review) for anything non-trivial.
 
 ---
 
 ## 5. Where the live findings live
 
-The point-in-time vulnerability audit (2026-07-10) that motivated this DNA is tracked separately (it
-contains exploit detail; keep it out of the public repo). Fix order and status live with the developer.
-This document is the **forward-looking** contract: new code must not reintroduce any invariant above.
+The point-in-time vulnerability audits that motivated this DNA are tracked separately (they contain
+exploit detail; keep them out of the public repo): 2026-07-10 for invariants 1 to 10, the August and
+September 2026 audits for 11 to 16, and the October 2026 audit of the AI/agent and data-isolation
+scope for 17 to 19. Fix order and status live with the developer. This document is the
+**forward-looking** contract: new code must not reintroduce any invariant above.
 
 *Related:* [security.md](security.md) (reference values: crypto functions, headers, rate limits, sandbox limits) ·
 [identity-model.md](identity-model.md) (GHII/GAII/GEAI) ·

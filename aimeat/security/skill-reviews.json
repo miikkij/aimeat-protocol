@@ -507,6 +507,12 @@
         "aimeat/scripts/locale-merge.ts"
       ],
       "digest": "sha256:f9c33bd52c86fea462a6a4a9"
+    },
+    "project:security-audit": {
+      "reviewedOn": "2026-10-20",
+      "watches": [],
+      "digest": "",
+      "note": "Cloudflare's skill pinned at c1c8a8c (UPSTREAM.md); it describes an audit method, not code in this tree."
     }
   },
   "fileDigests": {
