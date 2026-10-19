@@ -10,6 +10,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-19 — The inline redirect to the app origin keeps the request's query, minus mode and the apex's
+ *     own credentials (helpers.ts withForwardedQuery; wish-the-apex-app-redirect-keeps-the-query-string).
  *   2026-10-18 — The inline live version carries the app-info mark (services/app-news.ts appInfoMarkFor).
  *   2026-10-17 — The app's access setting (anyone, signed-in, an organism) and the node's signed-in
  *     content access gate the apex read beside the code: a stranger's browser goes to /v1/app-open,
@@ -124,7 +126,7 @@ import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js
 import { currentAppRow } from '../../services/app-served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
-import { appOriginUrl, appTargetOr, type AppTargetFor, type CanonicalOwner } from './helpers.js';
+import { appOriginUrl, appTargetOr, withForwardedQuery, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { runnableAnswer, sendFrameHost, sandboxedCsp, withFrameShim, type RunnableAnswer } from './inline-frame.js';
 import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
@@ -633,7 +635,8 @@ export function registerReadRoutes(
         const here = runnable ? await appOfRequestOrigin(storage, req) : null;
         const foreignOrigin = !!here && (here.draft || here.target !== `${app.ownerName}/${app.filename}`);
         if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin)) {
-            const target = await appOriginUrl(config, storage, owner, filename);
+            // The app's own parameters travel; the apex's (mode, code, grants) do not (helpers.ts).
+            const target = withForwardedQuery(await appOriginUrl(config, storage, owner, filename), req.originalUrl);
             const gated = !!current.accessCode
                 || appIsPaced(config, current.manifest)
                 || appNeedsSignIn(config, current);

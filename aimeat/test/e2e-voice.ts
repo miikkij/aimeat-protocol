@@ -3,6 +3,9 @@
  * @description Real node, owner/app grants and local protocol peer: stream, speech, scope isolation,
  *   app attribution and concurrent accounting. No external provider calls or paid AI settings.
  * @version-history
+ *   2026-10-19 - An app session sends its bare file name as app_id to speak, stream and transcribe and is
+ *     answered 200; another app's file name, and the same file name under another owner, stay 403
+ *     APP_ID_MISMATCH (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
  *   v1.2.0 - 2026-10-12 - The owner aims the node at the peer with a provider of their own
  *     (PUT /v1/ai/providers/:id and PUT /v1/ai/routing) instead of PUT /v1/openrouter/settings, which
  *     node 4.0.0 removes (the 4.0.0 sweep). What the suite asserts is unchanged.
@@ -263,6 +266,21 @@ try {
       const result = await call(path, { ...body, app_id: 'other/app' }, appToken); assert(result.status === 403, result.text);
     }
     assert(providerCalls === before, 'spoofed app called provider');
+  });
+  await test('An app session names itself by its bare file name; another app\'s name is refused', async () => {
+    const bodyOf = (path: string) => path.includes('/speak') ? speech : path.includes('/stream') ? request : { audio_base64: 'AA==', model: 'stt' };
+    for (const path of ['/v1/ai/speak', '/v1/ai/stream?json=1', '/v1/ai/transcribe']) {
+      for (const own of ['voice.html', 'voice']) {
+        const result = await call(path, { ...bodyOf(path), app_id: own }, appToken);
+        assert(result.status === 200, `${path} app_id=${own}: ${result.status} ${result.text}`);
+      }
+      const before = providerCalls;
+      for (const foreign of ['other.html', `${bob.name}/voice.html`]) {
+        const result = await call(path, { ...bodyOf(path), app_id: foreign }, appToken);
+        assert(result.status === 403 && result.data?.error?.code === 'APP_ID_MISMATCH', `${path} app_id=${foreign}: ${result.status} ${result.text}`);
+      }
+      assert(providerCalls === before, 'another app\'s name reached the provider');
+    }
   });
   await test('Parallel STT, text and speech all remain in the shared usage counter', async () => {
     const before = await call('/v1/ai/usage', undefined, alice.token, 'GET');

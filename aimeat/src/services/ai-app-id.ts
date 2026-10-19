@@ -21,10 +21,12 @@
  *   OLD NAMES KEEP WORKING. Keys written before this rule (a cap saved under `owner/app.html`, today's
  *   spend under `app.html`) are read through the same function, so they count toward and limit the
  *   canonical app instead of being ignored.
- * @structure canonicalAiAppId · appSpentToday · appQuotaFor · appAllowlisted · mergePerApp
+ * @structure canonicalAiAppId · namesSignedApp · appSpentToday · appQuotaFor · appAllowlisted · mergePerApp
  * @usage
  *   const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
  * @version-history
+ *   2026-10-19 — namesSignedApp: does a body app_id name the app token's own app, under any of its
+ *     names (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
  *   v1.0.0 — 2026-09-19 — Initial.
  *   v1.0.1 — 2026-09-26 — The owner prefix of an app name, and the owner it is compared with, both come
  *     from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never
@@ -56,6 +58,19 @@ export function canonicalAiAppId(raw: unknown, ownerGhii?: string): string | und
 }
 
 type PerApp = Record<string, { cost_usd?: number } | undefined>;
+
+/**
+ * True when `requested` names the signed app `signed` (`owner/filename`, an app token's `app` claim)
+ * under any of its names: the bare file name with or without `.html`, or the full reference. The
+ * comparison is canonicalAiAppId relative to the APP's owner, not the caller's, so a person using
+ * another owner's app may send that app's bare file name. A name of any other app is false.
+ */
+export function namesSignedApp(requested: string, signed: string): boolean {
+  const slash = signed.indexOf('/');
+  const appOwner = slash > 0 ? signed.slice(0, slash) : undefined;
+  const want = canonicalAiAppId(signed, appOwner);
+  return want !== undefined && canonicalAiAppId(requested, appOwner) === want;
+}
 
 /** What this app has spent today, across every name it was recorded under. */
 export function appSpentToday(perApp: PerApp | undefined, appId: string, ownerGhii?: string): number {

@@ -6,6 +6,10 @@
  * @structure registerVoiceRoutes; voiceAppId binds app tokens to their signed identity
  * @usage registerVoiceRoutes(router, config, storage)
  * @version-history
+ *   2026-10-19 - voiceAppId accepts the signed app's own file name (with or without .html) and its full
+ *     owner/filename as app_id, as /v1/ai/complete and the aimeat-ai library send it; another app's id is
+ *     still 403 APP_ID_MISMATCH, now with what to send and both ids in details
+ *     (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
  *   v1.3.0 - 2026-10-08 - ?json=1 sends the record's AI-Disclosure and Link headers and meta.provenance, the
  *     stream sends the IETF `mode=` field instead of a bare `ai-generated`, the done frame and the
  *     result carry record_url, and an agent's call is the agent's (its key, its cap, its name on the record).
@@ -33,6 +37,7 @@ import { voiceReplySchema as reply, voiceSpeechSchema as speech } from '../model
 import { createVoiceResult } from '../services/ai-voice-result.js';
 import { aiCallerOf } from './ai-policy.js';
 import { aiPayerOf } from '../services/agent-ai-keys.js';
+import { namesSignedApp } from '../services/ai-app-id.js';
 import { setProvenanceHeaders, envelopeMeta, type ServedProvenance } from '../services/ai-provenance-marks.js';
 import { toIetfHeader } from '../services/ai-provenance-adapters.js';
 import { AI_PROVENANCE_SPEC_V1 } from '../models/ai-provenance-schemas.js';
@@ -55,12 +60,21 @@ function withRecordUrl(event: Record<string, unknown>): Record<string, unknown> 
   return url ? { ...event, record_url: url } : event;
 }
 
-/** App tokens may not charge another app's quota by changing a body field. */
+/**
+ * App tokens may not charge another app's quota by changing a body field. The body may name the
+ * signed app the way /v1/ai/complete and the aimeat-ai library do (its file name, with or without
+ * `.html`) or by its full `owner/filename` (services/ai-app-id.ts namesSignedApp); the call is
+ * attributed to the signed reference either way.
+ */
 export function voiceAppId(req: Request, requested?: string): string | undefined {
   if (req.auth?.roles.includes('app')) {
     const trusted = req.auth.app;
     if (!trusted) throw new AiCompletionError('APP_ID_REQUIRED', 403, 'The app token has no application identity.');
-    if (requested && requested !== trusted) throw new AiCompletionError('APP_ID_MISMATCH', 403, 'app_id must match the signed app identity.');
+    if (requested && !namesSignedApp(requested, trusted)) {
+      throw new AiCompletionError('APP_ID_MISMATCH', 403,
+        'app_id names a different app than the one this token was issued to. Send this app\'s own file name, or leave app_id out.',
+        { app_id: requested, signed_app: trusted });
+    }
     return trusted;
   }
   return requested;

@@ -21134,7 +21134,9 @@ paths:
       summary: Stream a metered conversation for an application
       description: >
         Requires ai:use (owners bypass scopes). Uses the caller's provider and shared AI budget.
-        An app token's signed app identity supplies app_id; a conflicting value is refused with 403.
+        An app token's signed app identity supplies app_id. The body may name the same app by its
+        file name (with or without `.html`) or by `owner/filename`; a different app's id is refused
+        with 403 APP_ID_MISMATCH (details: app_id, signed_app).
         Returns newline-delimited JSON start, text and done frames. The start frame carries model,
         keySource (kept for older clients) and key_source (agent | own | node, which pocket pays). The
         done frame carries model, finish_reason, truncated, usage, budget, cost_exact, key_source and
@@ -21163,7 +21165,7 @@ paths:
               additionalProperties: false
               required: [messages]
               properties:
-                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
+                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers. For an app grant, optional: the signed app''s file name (with or without .html) or its owner/filename; another app''s id is 403 APP_ID_MISMATCH.' }
                 model: { type: string, maxLength: 200 }
                 provider: { type: string, minLength: 1, maxLength: 200, description: 'One of the caller''s provider ids, or a type. No fallback then.' }
                 role:
@@ -21230,7 +21232,9 @@ paths:
       summary: Stream synthesized speech using the caller's provider
       description: >
         Requires ai:use. Uses the same daily and application AI budgets as completions.
-        App identity is bound to the signed grant. Returns NDJSON start, audio (base64 bytes),
+        App identity is bound to the signed grant: the body's app_id may be the app's file name (with
+        or without `.html`) or `owner/filename`, and a different app's id is 403 APP_ID_MISMATCH.
+        Returns NDJSON start, audio (base64 bytes),
         done or error frames. Start carries model, format, key_source, syntheticAudio and `audio`. Done
         carries bytes, model, `audio`, cost_usd, key_source, usage, budget, cost_exact, cost_known,
         provenance, syntheticAudio and route (who chose, who answered, every attempt). `audio` is
@@ -21270,7 +21274,7 @@ paths:
               additionalProperties: false
               required: [input]
               properties:
-                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers; signed owner/filename for app grants.' }
+                app_id: { type: string, minLength: 1, maxLength: 200, description: 'Required for owner/agent callers. For an app grant, optional: the signed app''s file name (with or without .html) or its owner/filename; another app''s id is 403 APP_ID_MISMATCH.' }
                 input: { type: string, minLength: 1, maxLength: 4000 }
                 model: { type: string, minLength: 1, maxLength: 200, description: 'Omit to use the speech model of the owner''s provider, the owner''s, or the node''s default (AIMEAT_MODEL_DEFAULT_TTS); none of them is 400 NO_TTS_MODEL.' }
                 voice: { type: string, minLength: 1, maxLength: 200, description: 'Omit to use the provider''s speech voice, the owner''s, or the node''s default (AIMEAT_TTS_VOICE_DEFAULT); none of them is 400 NO_TTS_VOICE.' }
@@ -21377,7 +21381,10 @@ paths:
                   description: Ask for segment timestamps (verbose_json).
                 app_id:
                   type: string
-                  description: Attribution for the per-app quota and the spend breakdown.
+                  description: >
+                    Attribution for the per-app quota and the spend breakdown. For an app grant the
+                    signed app wins: this may be its file name (with or without .html) or its
+                    owner/filename, and another app's id is 403 APP_ID_MISMATCH.
                 provider:
                   type: string
                   description: One of the caller's provider ids, or a type. No fallback then.
@@ -33615,6 +33622,11 @@ paths:
         the authenticated SPA. The raw download form is an attachment and is never executed, so it
         stays on the apex. `AIMEAT_APP_ORIGIN_ENABLED` decides, and since 2026-08-11 an unset value
         follows the node's security profile: on for a public node, off for a local or personal one.
+        Since 2026-10-19 the redirect carries the request's query parameters, as the path form on
+        the app host does, except the ones this route reads for itself: `mode`, `code` (the access
+        code, already checked here), `access` (a grant; a gated app's redirect carries a fresh one),
+        `unlock` (set by the gated redirect itself), `frame` and `preview` (grants minted for other
+        flows). `?mode=inline&level=3&utm_source=news` goes to `https://<sub>.apps.<apex>/?level=3&utm_source=news`.
 
         A **gated** app — one carrying an access code, or a price on a node with the marketplace
         enabled — is redirected too, which changed on 2026-08-11. It used to be carved out and served
