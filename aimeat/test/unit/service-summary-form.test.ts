@@ -5,8 +5,10 @@
  * @description Which service summary request this node sends a peer during the one-release window
  *   (decision 2026-10-16): node 4.0.4 sends the older unsigned form to a peer on 4.0.2 or older and to
  *   a peer of unknown version, the signed form to a newer peer; from 4.0.5 every peer gets the signed
- *   form. The headers serviceSummaryRequestHeaders builds follow the same choice.
+ *   form. The headers serviceSummaryRequestHeaders builds follow the same choice, for this node's own
+ *   version: the unsigned headers while the window is open, the signed ones for the same old peer after it.
  * @version-history
+ *   2026-10-19 — The header test reads this node's own version: from 4.0.5 an old peer gets the signed form (node 4.1.0 turned it red).
  *   2026-10-16 — unsignedServiceSummaryAccepted: the receiving side of the window; and the signed form on request.
  *   2026-10-16 — Initial (decision 2026-10-16, the signed service summary compatibility window).
  */
@@ -16,7 +18,11 @@ import {
     serviceSummaryForm, unsignedServiceSummaryAccepted, SIGNED_SERVICE_SUMMARY_PEER_FROM, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN,
 } from '../../src/config-federation.js';
 import { serviceSummaryRequestHeaders } from '../../src/services/federation.js';
+import { getSoftwareVersion, versionAtLeast } from '../../src/utils/version.js';
 import type { AimeatConfig } from '../../src/config.js';
+
+/** serviceSummaryRequestHeaders reads this node's own version, so its window is open only before 4.0.5. */
+const windowOpen = !versionAtLeast(getSoftwareVersion(), UNSIGNED_SERVICE_SUMMARY_REMOVED_IN);
 
 describe('serviceSummaryForm', () => {
     it('names the window: signed peers from 4.0.3, signed only from 4.0.5', () => {
@@ -69,9 +75,18 @@ describe('unsignedServiceSummaryAccepted (the receiving side of the window)', ()
 describe('serviceSummaryRequestHeaders', () => {
     const config = { nodeId: 'aimeat-unit-a' } as AimeatConfig;
 
-    it('the unsigned form is x-source-node alone, and needs no key', async () => {
+    it.runIf(windowOpen)('the unsigned form is x-source-node alone, and needs no key', async () => {
         const h = await serviceSummaryRequestHeaders(config, { nodeId: 'aimeat-old', softwareVersion: '4.0.2' }, null);
         expect(h).toEqual({ 'Accept': 'application/json', 'x-source-node': 'aimeat-unit-a' });
+    });
+
+    it.skipIf(windowOpen)('after the window a peer on 4.0.2 gets the signed form, and a node without a key cannot send one', async () => {
+        const key = await generateKeyPair();
+        const h = await serviceSummaryRequestHeaders(config, { nodeId: 'aimeat-old', softwareVersion: '4.0.2' }, key);
+        expect(typeof h['x-signature']).toBe('string');
+        expect(h['x-audience']).toBe('aimeat-old');
+        await expect(serviceSummaryRequestHeaders(config, { nodeId: 'aimeat-old', softwareVersion: '4.0.2' }, null))
+            .rejects.toThrow('This node has no signing key');
     });
 
     it('signed = true gives the signed form to a peer the window would send the unsigned one', async () => {
