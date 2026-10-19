@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-20: check:unit-ports, a unit test uses port 0 and never a fixed one (three red CI runs in the week from 2026-10-12).
  *  - 2026-10-18: check:atomic-writes, a read of a record followed by an unconditional write of the same key.
  *  - 2026-10-18: check:browser-libs, the two browser client libraries' route parameters as a shrink-only list.
  *  - 2026-10-18: check:python-shapes and check:python-daemon, the Python package against the node's schemas and the connector.
@@ -80,6 +81,7 @@ export const FAST_CHECKS = [
     // own access check could be removed with every suite green. The list may only shrink.
     { script: 'check:mcp-test-calls', label: 'Every MCP tool is called by an E2E suite, or listed with a reason; the list only shrinks' },
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
+    { script: 'check:unit-ports', label: 'No unit test listens on, connects to or names as dead a fixed port' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts
     // its url or key, each with the proof it relies on (security/peer-paths.json).

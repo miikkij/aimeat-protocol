@@ -33,12 +33,18 @@
  *   CI and a package's own tests still have to be green, and an unread answer from GitHub still
  *   refuses. Without a reason the check refuses as before.
  *
+ *   THE VERSION BUMP BEFORE IT is `pnpm release:bump <x.y.z>` (scripts/release-bump.ts): it writes
+ *   the version into every file that carries it, regenerates the notices and the capability map, and
+ *   runs the checks that read the version, so the commit this script is asked about is green. Four
+ *   red periods on main started at a bump made by hand.
+ *
  *   NO NETWORK, NO RELEASE. Where the read-only reporters (ci-state.mjs) degrade to "unknown", this
  *   refuses: a release must not pass on an answer it could not read.
  * @usage
  *   node scripts/release-ready.mjs [--sha=<commit>] [--require=ci.yml,e2e-full.yml] [--no-main-check]
  *   AIMEAT_RELEASE_RED_REASON="<why this release cannot wait for the nightly>" npm publish
  * @version-history
+ *   v1.1.1 -- 2026-10-20 -- The header names pnpm release:bump as the step before a release.
  *   v1.1.0 -- 2026-10-16 -- A named reason (a `Red-Nightly:` line in the tag message, or
  *     AIMEAT_RELEASE_RED_REASON) lets a release go out over a red, missing or running nightly sweep,
  *     with a loud line, the job summary and the step output `red_reason` (Jouni, decision 2026-10-16).
