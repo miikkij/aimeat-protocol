@@ -269,12 +269,13 @@ export async function publishCrewDef(
   // The revision is claimed by creating its history copy (expectedVersion 0), so two publishes at
   // the same moment cannot both take one number: the loser reads again and takes the next one. The
   // live key is then written on the version that was read, and a newer revision already live wins.
+  const readLive = () => storage.getMemory(agent.gaii, keys.base);
   let refs: Awaited<ReturnType<typeof listVersionRefs>> = [];
   let revision = 0;
   let envelope: CrewDefEnvelope | null = null;
   for (let attempt = 0; attempt < PUBLISH_ATTEMPTS && !envelope; attempt++) {
     refs = (await listVersionRefs(storage, keys.base)).filter(r => r.ownerGaii === agent.gaii);
-    const live = await storage.getMemory(agent.gaii, keys.base);
+    const live = await readLive();
     const liveRev = live ? (unwrapEnvelope(live.value, agent.name)?.revision ?? 0) : 0;
     revision = Math.max(liveRev, ...refs.map(r => r.n), 0) + 1;
     const candidate: CrewDefEnvelope = {
@@ -296,7 +297,7 @@ export async function publishCrewDef(
   if (!envelope) return { ok: false, status: 409, code: 'VERSION_CONFLICT', message: `${agent.name}'s crew definition was published by someone else at every attempt. Publish again.` };
   let liveWritten = false;
   for (let attempt = 0; attempt < PUBLISH_ATTEMPTS && !liveWritten; attempt++) {
-    const live = await storage.getMemory(agent.gaii, keys.base);
+    const live = await readLive();
     if ((live ? (unwrapEnvelope(live.value, agent.name)?.revision ?? 0) : 0) > revision) { liveWritten = true; break; }
     const written = await writeInto(deps, caller, agent, keys.base, envelope, ['crew-def'], live?.version ?? 0);
     if (!written.ok && written.code !== 'VERSION_CONFLICT') return written;

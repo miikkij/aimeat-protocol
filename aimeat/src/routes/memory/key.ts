@@ -564,7 +564,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
 
-    const record = await storage.getMemory(gaii, key);
+    // The one read of the record, again after a conflicting write below.
+    const readRecord = () => storage.getMemory(gaii, key);
+    const record = await readRecord();
     if (!record) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found`));
       return;
@@ -603,7 +605,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       landed = storage.setMemoryIfVersion
         ? !!(await storage.setMemoryIfVersion({ ...current, key: current.key }, current.version))
         : !!(await storage.setMemory(current));
-      if (!landed) current = await storage.getMemory(gaii, key);
+      if (!landed) current = await readRecord();
     }
     if (!current) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found`));
