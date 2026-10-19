@@ -16,9 +16,11 @@
  * @structure DIALECTS · detectDialect(nodeUrl, ext) · callCheck / callAdmin / callRequest / callVocabulary
  * @usage import { detectDialect, callCheck } from './dialect.js';
  * @version-history
+ *   v1.0.1 — 2026-10-19 — The extension read goes through _core/public-fetch.js (signed-in-only node).
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 1): op | command | level, detected from the
  *     installed extension rather than assumed, so the six live forks work unchanged.
  */
+import { publicFetch } from '../_core/public-fetch.js';
 
 /**
  * @typedef {'node'|'op'|'command'|'level'} Dialect
@@ -47,7 +49,7 @@ export const DIALECTS = {
  * @returns {Promise<{ dialect: Dialect, actions: string[], hasRequest: boolean }>}
  */
 export async function detectDialect(nodeUrl, ext) {
-  const res = await fetch(nodeUrl + '/v1/extensions/' + encodeURIComponent(ext));
+  const res = await publicFetch(nodeUrl + '/v1/extensions/' + encodeURIComponent(ext));
   if (!res.ok) {
     throw new Error('aimeat-iam: extension "' + ext + '" was not found on this node (' + res.status + ')');
   }

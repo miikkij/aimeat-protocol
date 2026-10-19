@@ -13,6 +13,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
+ *   v1.8.1 — 2026-10-19 — appConfig() and the public record read go through _core/public-fetch.js, so
+ *     they work for a signed-in person on a node that shows its content to its own accounts only.
  *   v1.8.0 — 2026-10-18 — action(ext, actionId, input): an extension action as the signed-in person,
  *     or with nobody signed in for an action the manifest marks public (Comicland v3 A-7).
  *     adultStatus(): verified adult yes or no, the method and the time (A-3).
@@ -50,6 +52,7 @@
  *     /v1/apps/:owner/:filename/config), found from the app's own #aimeat-app-ref block. Additive.
  */
 import { NODE_URL, NODE_ID, APEX_URL } from '../_core/config.js';
+import { publicFetch } from '../_core/public-fetch.js';
 import { appRef } from '../_core/app-ref.js';
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-data.js');
@@ -109,7 +112,7 @@ function refusal(res, fallback, fallbackCode) {
 async function appConfigView() {
   const ref = appRef();
   if (!ref) return null;
-  const r = await fetch((APEX_URL || '') + '/v1/apps/' + encodeURIComponent(ref.owner)
+  const r = await publicFetch((APEX_URL || '') + '/v1/apps/' + encodeURIComponent(ref.owner)
     + '/' + encodeURIComponent(ref.filename) + '/config');
   const body = await r.json();
   if (body && body.ok) return body.data || {};
@@ -120,7 +123,7 @@ async function appConfigView() {
 /** The public (unauthenticated) memory read, shared by getPublic + getPublicEntry. */
 async function publicEntryResponse(gaii, key) {
   const url = NODE_URL + '/v1/memory/' + encodeURIComponent(gaii) + '/' + encodeURIComponent(key) + '?soft=1';
-  const r = await fetch(url);
+  const r = await publicFetch(url);
   const res = await r.json();
   if (!res.ok) {
     if (res.error?.code === 'NOT_FOUND') return null;

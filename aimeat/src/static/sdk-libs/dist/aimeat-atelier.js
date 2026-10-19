@@ -13085,6 +13085,30 @@ Known schemas:
     };
   }
 
+  // src/static/sdk-libs/_core/public-fetch.js
+  var signedInOnly = false;
+  function sessionJwt() {
+    const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+    const s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+    return s && s.jwt || null;
+  }
+  function withSession(init, jwt) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", "Bearer " + jwt);
+    return { ...init, headers };
+  }
+  async function publicFetch(url, init = {}) {
+    const early = signedInOnly ? sessionJwt() : null;
+    const r = await fetch(url, early ? withSession(init, early) : init);
+    if (r.status !== 401 || early) return r;
+    if (!(r.headers.get("content-type") || "").includes("json")) return r;
+    const body = await r.clone().json();
+    if (!body || !body.error || body.error.code !== "SIGN_IN_REQUIRED") return r;
+    signedInOnly = true;
+    const jwt = sessionJwt();
+    return jwt ? fetch(url, withSession(init, jwt)) : r;
+  }
+
   // src/static/sdk-libs/_core/app-ref.js
   function appRef() {
     try {
@@ -13107,7 +13131,7 @@ Known schemas:
   async function loadLayout(owner, filename) {
     try {
       const base = APEX_URL || "";
-      const res = await fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui?catalogue=none");
+      const res = await publicFetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/ui?catalogue=none");
       if (!res.ok) return null;
       const body = await res.json();
       return body && body.data && body.data.layout || null;

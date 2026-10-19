@@ -51,6 +51,30 @@
     return ns;
   }
 
+  // src/static/sdk-libs/_core/public-fetch.js
+  var signedInOnly = false;
+  function sessionJwt() {
+    const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+    const s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+    return s && s.jwt || null;
+  }
+  function withSession(init, jwt) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", "Bearer " + jwt);
+    return { ...init, headers };
+  }
+  async function publicFetch(url, init = {}) {
+    const early = signedInOnly ? sessionJwt() : null;
+    const r = await fetch(url, early ? withSession(init, early) : init);
+    if (r.status !== 401 || early) return r;
+    if (!(r.headers.get("content-type") || "").includes("json")) return r;
+    const body = await r.clone().json();
+    if (!body || !body.error || body.error.code !== "SIGN_IN_REQUIRED") return r;
+    signedInOnly = true;
+    const jwt = sessionJwt();
+    return jwt ? fetch(url, withSession(init, jwt)) : r;
+  }
+
   // src/static/sdk-libs/iam/dialect.js
   var DIALECTS = {
     node: { gate: null, admin: null, key: null, state: "state", assign: "assign", revoke: "revoke" },
@@ -59,7 +83,7 @@
     level: { gate: "mylevel", admin: "admin", key: "op", state: "getState", assign: "assign", revoke: "revoke" }
   };
   async function detectDialect(nodeUrl, ext) {
-    const res = await fetch(nodeUrl + "/v1/extensions/" + encodeURIComponent(ext));
+    const res = await publicFetch(nodeUrl + "/v1/extensions/" + encodeURIComponent(ext));
     if (!res.ok) {
       throw new Error('aimeat-iam: extension "' + ext + '" was not found on this node (' + res.status + ")");
     }

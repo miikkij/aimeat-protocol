@@ -9,6 +9,7 @@
  * @structure appRef() · loadLayout(owner, filename) · labelOf(block) · applyViewerOverlay(layout, o)
  * @usage  import { appRef, loadLayout, labelOf, applyViewerOverlay } from './mosaic-layout.js';
  * @version-history
+ *   v0.53.5 — 2026-10-19 — The layout read goes through _core/public-fetch.js (signed-in-only node).
  *   v0.53.4 — 2026-09-28 — appRef() moved unchanged to _core/app-ref.js and is re-exported here, so
  *     aimeat-data reads the same identity for AIMEAT.data.appConfig().
  *   v0.53.3 — 2026-09-20 — loadLayout() asks for the layout alone (?catalogue=none).
@@ -20,6 +21,7 @@
  *     past the 800-line rule. No behaviour change.
  */
 import { APEX_URL } from '../_core/config.js';
+import { publicFetch } from '../_core/public-fetch.js';
 
 export { appRef } from '../_core/app-ref.js';
 
@@ -32,7 +34,7 @@ export { appRef } from '../_core/app-ref.js';
 export async function loadLayout(owner, filename) {
   try {
     const base = APEX_URL || '';
-    const res = await fetch(base + '/v1/apps/' + encodeURIComponent(owner)
+    const res = await publicFetch(base + '/v1/apps/' + encodeURIComponent(owner)
       // The layout alone: without the parameter the route sends its whole 89 kB catalogue too,
       // on every open of every app, and a page reads none of it.
       + '/' + encodeURIComponent(filename) + '/ui?catalogue=none');
