@@ -36,6 +36,8 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.6.1 — 2026-10-19 — POST /v1/provenance attaches the record id on the attached record's version
+ *     (setMemoryIfVersion) and reads again on a conflict (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.6.0 — 2026-10-18 — POST /v1/provenance/embed: the provenance written into an exported PNG, JPEG,
  *     PDF or CBZ, stored as a marked copy (services/provenance-embed/; Comicland v3 A-8).
  *   v1.5.0 — 2026-10-08 — The disclosure each read serves is decided for the record's content as it is
@@ -81,6 +83,9 @@ import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenanc
 import { detectLocale } from '../i18n.js';
 import { embedProvenance, EmbedError } from '../services/provenance-embed/index.js';
 import type { SurfaceContext } from '../services/ai-disclosure.js';
+
+/** How many times POST /v1/provenance reads the attached record again after another write of it. */
+const ATTACH_ATTEMPTS = 10;
 
 /**
  * What a principal may DECLARE about content it produced elsewhere. Note what is absent: `spec`,
@@ -385,11 +390,14 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         baseUrl: config.baseUrl,
       });
 
-      if (attachTo) {
+      // The attach is written on the version that was read, so a value written to the key meanwhile
+      // is read again and kept, and only the record id is added to it.
+      for (let attempt = 0; attachTo && attempt < ATTACH_ATTEMPTS; attempt++) {
         const existing = await storage.getMemory(principal, attachTo);
-        if (existing) {
-          await storage.setMemory({ ...existing, aiProvenanceId: row.id, updatedAt: new Date().toISOString() });
-        }
+        if (!existing) break;
+        const attached = { ...existing, key: attachTo, aiProvenanceId: row.id, updatedAt: new Date().toISOString() };
+        if (!storage.setMemoryIfVersion) { await storage.setMemory(attached); break; }
+        if (await storage.setMemoryIfVersion(attached, existing.version)) break;
       }
 
       res.status(201).json(success(config.nodeId, serve(row, true, surface.visibility === 'public'), [

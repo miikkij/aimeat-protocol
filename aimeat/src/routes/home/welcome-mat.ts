@@ -24,6 +24,8 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.4.1 — 2026-10-19 — The portfolio settings are merged on the record's version (updateRecord)
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.4.0 — 2026-10-11 — POST /v1/home/ai-client takes `meets_conditions`, the answer to the
  *     `conditions` question the Gemini app raises (region-dependent, Jouni's ruling 2026-10-11).
  *   v1.3.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -55,6 +57,7 @@ import {
 } from '../../services/onboarding-funnel.js';
 import { readHomeState } from '../../services/home-state.js';
 import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
+import { updateRecord } from '../../services/record-cas.js';
 import {
     portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, PORTFOLIO_CONFIG_KEY,
 } from '../portfolio.js';
@@ -117,26 +120,17 @@ async function storeMatAsPortfolio(
     const { storage, config } = ctx;
     const target = await portfolioWriteGaii(storage, owner, config.nodeId);
     const data = Buffer.from(html, 'utf-8');
-    const now = new Date().toISOString();
 
     await writePortfolioHtml(storage, target, data);
 
     // Enable the portfolio, preserving whatever settings are already there. The mat is meant to be
     // looked at the moment it lands — an accepted mat behind a disabled portfolio would be the
-    // "nothing happened" screen this whole step exists to avoid.
-    const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
-    const prev = (existing?.value ?? {}) as Record<string, unknown>;
-    await storage.setMemory({
-        key: PORTFOLIO_CONFIG_KEY,
-        ownerGaii: target,
-        value: { ...prev, enabled: true, source: 'welcome-mat', ...(title ? { title } : {}) },
-        visibility: 'owner',
-        tags: ['portfolio'],
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now,
-        updatedAt: now,
-    });
+    // "nothing happened" screen this whole step exists to avoid. Written on the settings record's
+    // version, so a settings save that lands meanwhile is merged rather than replaced.
+    await updateRecord(storage, target, PORTFOLIO_CONFIG_KEY,
+        (v) => ({ ...((v ?? {}) as Record<string, unknown>) }),
+        (prev) => ({ ...prev, enabled: true, source: 'welcome-mat', ...(title ? { title } : {}) }),
+        { tag: 'portfolio', visibility: 'owner' });
 }
 
 /** Record what we learned about the person's AI. Never carries the mat's content (05-mittaus.md). */

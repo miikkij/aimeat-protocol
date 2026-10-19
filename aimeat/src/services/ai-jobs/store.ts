@@ -21,10 +21,13 @@
  *   findInLogs · pruneLogs · readActiveIndex · addToActiveIndex · removeFromActiveIndex
  * @usage import { writeJob, foldIntoLog } from './store.js';
  * @version-history
+ *   v1.1.0 — 2026-10-19 — foldIntoLog appends to the day record on its version (updateRecord)
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-08-31 — Initial.
  */
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { updateRecord } from '../record-cas.js';
 import type { AiJobRecord, AiJobLogEntry } from './types.js';
 
 export const AI_JOB_KEY_PREFIX = 'ai.jobs.';
@@ -105,25 +108,30 @@ function summarise(job: AiJobRecord): AiJobLogEntry {
 export async function foldIntoLog(storage: Storage, job: AiJobRecord): Promise<void> {
     const day = dayOf(job.finished_at ?? new Date().toISOString());
     const key = logKeyFor(day);
-    const existing = await storage.getMemory(job.owner, key);
-    const entries = Array.isArray(existing?.value) ? (existing.value as AiJobLogEntry[]) : [];
+    const entry = summarise(job);
 
-    entries.push(summarise(job));
-
-    // Bound the day. Oldest first out, and SAID OUT LOUD: a cap nobody is told about reads as
-    // "everything is here".
+    // On the day record's version: a job another request or process folded in meanwhile stays.
     let dropped = 0;
-    while (entries.length > 1 && Buffer.byteLength(JSON.stringify(entries), 'utf8') > LOG_MAX_BYTES) {
-        entries.shift();
-        dropped++;
-    }
+    await updateRecord(storage, job.owner, key,
+        (v) => (Array.isArray(v) ? [...(v as AiJobLogEntry[])] : []),
+        (entries) => {
+            entries.push(entry);
+            // Bound the day. Oldest first out, and SAID OUT LOUD: a cap nobody is told about reads
+            // as "everything is here".
+            dropped = 0;
+            while (entries.length > 1 && Buffer.byteLength(JSON.stringify(entries), 'utf8') > LOG_MAX_BYTES) {
+                entries.shift();
+                dropped++;
+            }
+            return entries;
+        },
+        { tag: 'ai', tags: ['ai', 'ai-job-log'], visibility: 'private' });
     if (dropped > 0) {
         logger.warn(`[ai-jobs] ${key} is full: dropped ${dropped} of the oldest entries to stay under the per-value ceiling`, {
             owner: job.owner, day,
         });
     }
 
-    await upsert(storage, job.owner, key, entries, ['ai', 'ai-job-log']);
     await deleteJob(storage, job.owner, job.id);
 }
 

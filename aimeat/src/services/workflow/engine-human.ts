@@ -8,6 +8,9 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.4.1 — 2026-10-19 — The review stamp is attached on the reviewed record's version
+ *     (setMemoryIfVersion); a record changed after the read keeps its new value and no stamp
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.4.0 — 2026-10-08 — A review re-stamp keeps the prior record's level and method instead of
  *     forcing ai-generated (aiprov D16).
  *   v1.3.1 — 2026-09-27 — applyHumanAnswer throws on a step id that is not an own key of run.steps,
@@ -35,6 +38,7 @@ import { stampAutonomousOutput } from '../ai-provenance.js';
 import { template } from './engine-util.js';
 import { failDownstream } from './engine-readiness.js';
 import type { WorkflowRun, WorkflowStep, WorkflowHumanQuestion } from '../../models/workflow-schemas.js';
+import { logger } from '../../utils/logger.js';
 
 /** Default wait for a human-input step's answer — humans sleep; 24h, not the agent-step 60 min. */
 export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
@@ -140,9 +144,15 @@ export async function applyHumanAnswer(
         baseUrl: config.baseUrl,
         enabled: config.aiProvenance,
       });
-      if (provenanceId) {
-        await storage.setMemory({ ...reviewed, aiProvenanceId: provenanceId, updatedAt: now });
+      // Attached only on the version that was read: the record is about the bytes the person saw, so
+      // a write that changed them meanwhile is kept and is not stamped as reviewed.
+      const stamped = provenanceId && (storage.setMemoryIfVersion
+        ? await storage.setMemoryIfVersion({ ...reviewed, key: reviewedKey, aiProvenanceId: provenanceId, updatedAt: now }, reviewed.version)
+        : await storage.setMemory({ ...reviewed, key: reviewedKey, aiProvenanceId: provenanceId, updatedAt: now }));
+      if (stamped) {
         rs.writes = [...new Set([...rs.writes, reviewedKey])];
+      } else if (provenanceId) {
+        logger.warn('workflow: the reviewed record changed after it was read, so it is not stamped as reviewed', { run: run.runId, step: stepId, key: reviewedKey });
       }
     }
   }

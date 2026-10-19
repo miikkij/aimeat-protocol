@@ -24756,6 +24756,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
   # ── Memory Files ──────────────────────────────────────────
   /v1/memory/files:

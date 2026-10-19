@@ -16,9 +16,12 @@
  *   behaviourOnFor · BehaviourSettingsError · resetBehaviourSettingsCache (tests)
  * @usage if (await behaviourOnFor(storage, config, ownerGhii, filename)) html += behaviourSnippet(...);
  * @version-history
+ *   v1.0.1 — 2026-10-19 — setBehaviourSettings changes the record on its version (updateRecord)
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer D).
  */
-import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
+import { updateRecord } from '../record-cas.js';
 import type { AimeatConfig } from '../../config.js';
 import {
   BEHAVIOUR_SETTINGS_KEY, defaultBehaviourSettings, type BehaviourSettings,
@@ -74,21 +77,19 @@ export async function setBehaviourSettings(
   if (input.app !== undefined && !(await storage.getApp(ownerGhii, input.app))) {
     throw new BehaviourSettingsError('NOT_FOUND', `You have no app named ${input.app}.`);
   }
-  const row = await storage.getMemory(ownerGhii, BEHAVIOUR_SETTINGS_KEY);
-  const existing = normalize(row?.value as Partial<BehaviourSettings> | undefined);
-  let offApps = existing.offApps;
-  if (input.app !== undefined) {
-    offApps = offApps.filter((a) => a !== input.app);
-    if (input.appEnabled === false) offApps = [...offApps, input.app].slice(-MAX_OFF_APPS);
-  }
-  const now = new Date().toISOString();
-  const settings: BehaviourSettings = { offApps, fixer: input.fixer ?? existing.fixer, updatedAt: now };
-  await storage.setMemory({
-    key: BEHAVIOUR_SETTINGS_KEY, ownerGaii: ownerGhii,
-    value: settings as unknown as Record<string, unknown>,
-    visibility: 'owner', tags: ['signal-visibility'], ttlHours: null,
-    version: (row?.version ?? 0) + 1, createdAt: row?.createdAt ?? now, updatedAt: now,
-  } as MemoryRecord);
+  // Changed on the record's version (updateRecord): a change the web page or an agent tool wrote
+  // meanwhile is read again and kept.
+  const settings = await updateRecord(storage, ownerGhii, BEHAVIOUR_SETTINGS_KEY,
+    (v) => normalize(v as Partial<BehaviourSettings> | undefined),
+    (existing): BehaviourSettings => {
+      let offApps = existing.offApps;
+      if (input.app !== undefined) {
+        offApps = offApps.filter((a) => a !== input.app);
+        if (input.appEnabled === false) offApps = [...offApps, input.app].slice(-MAX_OFF_APPS);
+      }
+      return { offApps, fixer: input.fixer ?? existing.fixer, updatedAt: new Date().toISOString() };
+    },
+    { tag: 'signal-visibility', visibility: 'owner' });
   cache.set(ownerGhii, { settings, until: Date.now() + SETTINGS_TTL_MS });
   return settings;
 }

@@ -521,6 +521,9 @@ const ALL_SUITES = [
     // Two writes of one permission record at the same moment, on an own in-process node (40419):
     // the first operation is held after its read while the second runs (atomic-write round, G2).
     'test/e2e-atomic-access.ts',
+    // Two writers of one record at once on the workspace registry, the chat archive, the signing
+    // indexes, crews, settings and content records, on an own in-process node (40563).
+    'test/e2e-atomic-content-b.ts',
     // Starts a REAL OAuth provider on a fixed loopback port (agreed with the server env above) that
     // rotates its refresh token, so the concurrency assertions test the guard rather than a stub.
     'test/e2e-connections.ts',

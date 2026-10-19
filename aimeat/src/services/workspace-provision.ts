@@ -12,6 +12,9 @@
  *   - WorkspaceProvisionError: thrown for a malformed manifest (surfaces as 400/validation)
  * @usage const { ws } = await provisionWorkspace(storage, config, { orgId, ownerName, ownerGhii, name, manifest, schemas });
  * @version-history
+ *   v1.5.0 -- 2026-10-19 -- The registry entry is appended on the registry's version (updateRecord),
+ *     and a rollback takes out only this workspace's entry, on the version too, instead of writing
+ *     back the registry read before (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.4.1 -- 2026-10-19 -- The ws id's three random base-36 characters come from crypto.randomInt, not
  *     Math.random(): the id reaches access decisions as a workspace label key (CodeQL 1753, 1754).
  *   v1.4.0 -- 2026-10-18 -- A new workspace's name and summary meet the detection rules written for
@@ -38,6 +41,10 @@ import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } fr
 import { validateMemoryWrite } from './schema-validator.js';
 import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { workspaceTarget } from './classification/containers.js';
+import { updateRecord } from './record-cas.js';
+
+/** An organism's workspace registry record, as stored. */
+const registryOf = (v: unknown): { workspaces: unknown[] } => ({ workspaces: ((v as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [] });
 
 export class WorkspaceProvisionError extends Error {
   constructor(message: string) { super(message); this.name = 'WorkspaceProvisionError'; }
@@ -115,8 +122,8 @@ export async function provisionWorkspace(
   // a package component (the seven legal types are csm/extension/cortex/app/msm/memory/translation),
   // so it can never ride the installer's rollback and needs its own. → rollback() below.
   const done: Array<{ kind: 'schema'; keyPattern: string } | { kind: 'memory'; key: string }> = [];
-  /** The registry as it was before we touched it, so the append can be put back exactly. */
-  let registryBefore: { existed: boolean; value: unknown } | undefined;
+  /** Whether this workspace's entry landed in the registry, so a later failure takes it out again. */
+  let registryAppended = false;
 
   /** Undo in reverse. Returns what could NOT be undone, named, rather than claiming a clean undo. */
   async function rollback(): Promise<string[]> {
@@ -132,13 +139,15 @@ export async function provisionWorkspace(
         orphans.push(`${item.kind === 'schema' ? 'schema ' : ''}${item.kind === 'schema' ? item.keyPattern : item.key} (${String(err)})`);
       }
     }
-    // The registry is the one key that may have existed before, so it is RESTORED rather than
-    // deleted. Only reached if the append itself landed and something after it failed.
-    if (registryBefore) {
+    // The registry is the one key that may have existed before, and other workspaces may have been
+    // added to it since, so only this workspace's entry is taken out, on the registry's version.
+    // Only reached if the append itself landed and something after it failed.
+    if (registryAppended) {
       const regKey = `organism.${input.orgId}.meta.workspaces`;
       try {
-        if (registryBefore.existed) await setMeta(storage, regKey, registryBefore.value, input.ownerGhii, now);
-        else await storage.deleteMemory(input.ownerGhii, regKey);
+        await updateRecord(storage, input.ownerGhii, regKey, registryOf,
+          (reg) => ({ workspaces: reg.workspaces.filter((w) => (w as { id?: string } | null)?.id !== wsId) }),
+          { tag: 'workspaces', tags: (prev) => prev?.tags ?? [], visibility: (prev) => prev?.visibility ?? 'private' });
       } catch (err) {
         orphans.push(`${regKey} (${String(err)})`);
       }
@@ -168,14 +177,14 @@ export async function provisionWorkspace(
     const rkey = `${root}.meta.readme`;
     await setMeta(storage, rkey, input.readme || `# ${String(man.name || input.name)}\n\n${typeof summary === 'string' ? summary : ''}`, input.ownerGhii, now);
     done.push({ kind: 'memory', key: rkey });
-    // 4. Register in the organism's workspace registry.
+    // 4. Register in the organism's workspace registry, on the registry's version: a workspace
+    //    created in the same organism meanwhile stays in the list.
     const regKey = `organism.${input.orgId}.meta.workspaces`;
-    const regRec = await storage.getMemory(input.ownerGhii, regKey);
-    const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
-    registryBefore = { existed: !!regRec, value: regRec?.value };
-    await setMeta(storage, regKey, { workspaces: [...workspaces, { id: wsId, name: String(input.name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: input.ownerName }] }, input.ownerGhii, now);
-    // The append landed, so there is nothing left to put back.
-    registryBefore = undefined;
+    const entry = { id: wsId, name: String(input.name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: input.ownerName };
+    await updateRecord(storage, input.ownerGhii, regKey, registryOf,
+      (reg) => ({ workspaces: [...reg.workspaces, entry] }),
+      { tag: 'workspaces', tags: (prev) => prev?.tags ?? [], visibility: (prev) => prev?.visibility ?? 'private' });
+    registryAppended = true;
     // The detection rules written for workspaces read its name and summary (off the request path).
     classifyContainerAfterWrite({ storage, config: _config }, workspaceTarget(input.orgId, wsId),
       String(input.name || man.name || ''), typeof summary === 'string' ? summary : null);

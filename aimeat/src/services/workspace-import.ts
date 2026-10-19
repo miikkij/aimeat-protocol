@@ -10,6 +10,8 @@
  * @structure importWorkspace(storage, config, { orgId, importerGaii, importerOwner, zip }) -> result
  * @usage import { importWorkspace } from '../services/workspace-import.js';
  * @version-history
+ *   2026-10-19 -- The workspace registry entry is appended on the registry's version (updateRecord),
+ *     not written from the copy read before (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-15 -- The rows of the row spaces are restored (`rows` in the result), held to the
  *     workspace and organism row quotas before anything is written; a bundle made before then
  *     carries none (feature-list audit #68).
@@ -25,6 +27,10 @@ import { safeUnzip, BACKUP_ZIP_LIMITS } from './safe-zip.js';
 import { logger } from '../utils/logger.js';
 import { undeclaredSpaceRefusal, isPlatformWorkspaceNamespace, type WriteObjectType } from './workspace-write-items.js';
 import { prepareRowRestore, writeRestoredRows } from './workspace-transfer-rows.js';
+import { updateRecord } from './record-cas.js';
+
+/** An organism's workspace registry record, as stored. */
+const registryOf = (v: unknown): { workspaces: unknown[] } => ({ workspaces: ((v as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [] });
 
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
@@ -167,11 +173,12 @@ export async function restoreWorkspace(
   const rows = await writeRestoredRows(storage, rowPlan.records);
   skippedUndeclared.push(...rowPlan.skipped);
 
-  // 5) Register the new workspace under the importer.
+  // 5) Register the new workspace under the importer, on the registry's version: a workspace created
+  // or imported in the same organism meanwhile stays in the list.
   const regKey = `organism.${orgId}.meta.workspaces`;
-  const regRec = await storage.getMemory(importerGaii, regKey);
-  const list = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
-  await writeMem(regKey, { workspaces: [...list, { id: newWs, name: data.name || newWs, createdAt: now, createdBy: importerOwner }] });
+  const entry = { id: newWs, name: data.name || newWs, createdAt: now, createdBy: importerOwner };
+  await updateRecord(storage, importerGaii, regKey, registryOf,
+    (reg) => ({ workspaces: [...reg.workspaces, entry] }), { tag: 'workspaces', tags: [], visibility: 'private' });
 
   return {
     ws: newWs, objects, documents, rows, images: imagesCreated, images_deduped: imagesDeduped, schemas,

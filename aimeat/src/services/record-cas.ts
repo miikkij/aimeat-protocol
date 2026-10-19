@@ -13,6 +13,9 @@
  * @usage await updateRecord(storage, 'package-entitlements', key, parse, cur => ({ ...cur, n: 1 }), { tag: 'x' });
  *   await updateMemoryRecord(storage, owner, key, rec => rec ? { tags: [...rec.tags, 't'] } : UNCHANGED);
  * @version-history
+ *   v1.3.0 — 2026-10-19 — `opts.visibility` also takes a function of the stored record, for a caller
+ *     whose blind write kept the stored record's visibility (wish
+ *     wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j, G6).
  *   v1.2.0 — 2026-10-19 — updateMemoryRecord(): the same conditional write for a caller that sets the
  *     record's tags or visibility as well as its value, or keeps the stored ones (check:atomic-writes).
  *   v1.1.0 — 2026-10-18 — `opts.tags`: the whole tag list, or a function of the stored record, for a
@@ -36,7 +39,9 @@ export async function updateRecord<T>(
   storage: Storage, owner: string, key: string, parse: (v: unknown) => T,
   mutate: (cur: T) => T | typeof UNCHANGED | Promise<T | typeof UNCHANGED>,
   opts: {
-    tag: string; ttlHours?: number | null; visibility?: MemoryRecord['visibility'];
+    tag: string; ttlHours?: number | null;
+    /** The visibility to write (default private), or a function of the stored record (null when absent). */
+    visibility?: MemoryRecord['visibility'] | ((stored: MemoryRecord | null) => MemoryRecord['visibility']);
     /** The tags to write in place of `[tag]`, or a function of the stored record (null when absent). */
     tags?: string[] | ((stored: MemoryRecord | null) => string[]);
   },
@@ -48,8 +53,9 @@ export async function updateRecord<T>(
     if (next === UNCHANGED) return cur;
     const now = new Date().toISOString();
     const tags = typeof opts.tags === 'function' ? opts.tags(rec ?? null) : opts.tags ?? [opts.tag];
+    const visibility = typeof opts.visibility === 'function' ? opts.visibility(rec ?? null) : opts.visibility ?? 'private';
     const record: MemoryRecord = {
-      key, ownerGaii: owner, value: next, visibility: opts.visibility ?? 'private', tags, ttlHours: opts.ttlHours ?? null,
+      key, ownerGaii: owner, value: next, visibility, tags, ttlHours: opts.ttlHours ?? null,
       version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
     };
     if (!rec) {
