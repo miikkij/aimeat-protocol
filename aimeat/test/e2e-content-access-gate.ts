@@ -243,6 +243,30 @@ async function main() {
             assert(llms.status === 404, `origin llms.txt: ${llms.status}`);
         });
 
+        await test('a browser tab opening the apex app read (the store\'s Open, a feed link) goes to the open page, never a 401', async () => {
+            // A new tab carries no session: the SPA keeps it in localStorage. So a signed-in person's
+            // Open from the app store reaches the gate exactly as a stranger's does, and the gate must
+            // hand the browser to the open page, which holds the session (seen on innokas.aimeat.io
+            // 2026-10-19: raw 401 SIGN_IN_REQUIRED for every app).
+            const browser = { Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' };
+            const want = `/v1/app-open?app=${encodeURIComponent(`${owner}/${filename}`)}`;
+            for (const q of ['?mode=inline', '?version=1&mode=inline', '?mode=frame', '']) {
+                const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}${q}`, { redirect: 'manual', headers: browser });
+                const body = await res.text();
+                assert(res.status === 302 && res.headers.get('location') === want, `${q || '(no query)'}: ${res.status} ${res.headers.get('location')} ${body.slice(0, 120)}`);
+                assert(!body.includes(APP_TEXT), `${q}: the redirect carried the app`);
+                assert(res.headers.get('cache-control') === 'no-store', `${q}: cacheable redirect`);
+            }
+            // FAILURE: an API caller without a credential still gets the 401, and so does any other route
+            // under the app, a browser or not.
+            const apiCall = await json(`/v1/apps/${owner}/${filename}?mode=inline`, { headers: { Accept: 'application/json' } });
+            assert(apiCall.status === 401 && apiCall.body.error?.code === 'SIGN_IN_REQUIRED', `api caller: ${apiCall.status}`);
+            const sub = await fetch(`${BASE}/v1/apps/${owner}/${filename}/versions`, { redirect: 'manual', headers: browser });
+            assert(sub.status === 401, `a sub-route took the redirect: ${sub.status}`);
+            const post = await fetch(`${BASE}/v1/apps/${owner}/${filename}`, { method: 'POST', redirect: 'manual', headers: { ...browser, 'Content-Type': 'application/json' }, body: '{}' });
+            assert(post.status === 401, `a POST took the redirect: ${post.status}`);
+        });
+
         await test('an account opens the app: the open route hands an address with a grant, and the origin serves it', async () => {
             for (const tk of [token, otherToken]) {
                 const open = await json(`/v1/apps/${owner}/${filename}/open`, { method: 'POST', headers: { Authorization: `Bearer ${tk}` }, body: '{}' });

@@ -37,6 +37,9 @@
  * @structure OPEN_ROUTES · isOpenRoute() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.1.0 — 2026-10-19 — A browser navigation to the apex app read goes to /v1/app-open instead of
+ *     the 401: a new tab carries no session, so every app's Open answered a signed-in person 401
+ *     (seen on innokas.aimeat.io). API callers and the app's sub-routes keep the 401.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V1).
  */
 import type { RequestHandler } from 'express';
@@ -119,6 +122,28 @@ export function isOpenRoute(method: string, rawPath: string): boolean {
 /** The paths an app origin serves in this mode: the app page itself, which asks for a grant. */
 const APP_ORIGIN_PAGE = /^\/([^/]+\/[^/]+\.html?)?$/i;
 
+/**
+ * The apex app read, GET /v1/apps/:owner/:filename, with the characters an owner name and an app
+ * filename are made of, so the segments go into the query without decoding. `ui/catalogue` is a list
+ * route of the same shape.
+ */
+const APEX_APP_READ = /^\/v1\/apps\/([\w.@~-]+)\/([\w.~-]+)$/;
+
+/**
+ * A browser navigation to the apex app read goes to the open page, which holds the session the tab
+ * could not carry (routes/apps/open.ts appOpenPage). The store's Open, a feed or notification link and
+ * a version link all open a new tab on this address, and a new tab sends no credential even for a
+ * signed-in person, so a 401 here broke every app on a signed-in-only node. The redirect names only
+ * the address the browser asked for; the open page asks POST .../open with the session, which decides.
+ */
+function appOpenRedirect(method: string, path: string, accept: string | undefined): string | null {
+  if (method !== 'GET' && method !== 'HEAD') return null;
+  if (!(accept ?? '').includes('text/html')) return null;
+  const m = APEX_APP_READ.exec(path);
+  if (!m || (m[1] === 'ui' && m[2] === 'catalogue')) return null;
+  return `/v1/app-open?app=${encodeURIComponent(`${m[1]}/${m[2]}`)}`;
+}
+
 export function contentAccessGate(config: AimeatConfig): RequestHandler {
   return (req, res, next) => {
     if (!signedInOnly(config) || req.method === 'OPTIONS') return next();
@@ -134,6 +159,12 @@ export function contentAccessGate(config: AimeatConfig): RequestHandler {
       return;
     }
     if (isOpenRoute(req.method, req.path)) return next();
+    const openPage = appOpenRedirect(req.method, req.path, req.headers.accept);
+    if (openPage) {
+      res.setHeader('Cache-Control', 'no-store');
+      res.redirect(302, openPage);
+      return;
+    }
     res.status(401).json(error(config.nodeId, 'SIGN_IN_REQUIRED',
       'This node shows its content to its own signed-in accounts only. Sign in, or connect your AI to this node, and ask again.'));
   };
