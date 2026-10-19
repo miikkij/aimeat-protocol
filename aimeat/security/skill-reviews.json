@@ -57,13 +57,13 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:4e4c5ecd4d96b41e02204c9c",
+      "digest": "sha256:a88bfcdb1cb862bb31fbf646",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -351,7 +351,7 @@
       "digest": "sha256:91a1e3efff9dcdc505a63d01"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -362,7 +362,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:5d5912cae6148f4777ec01da",
+      "digest": "sha256:b3b848058b04b61666af2ae8",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -377,14 +377,14 @@
       "digest": "sha256:8142722277b692cec31bc6f3"
     },
     "node:aimeat-workflow-decisions": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/engine-human.ts",
         "aimeat/src/services/workflow/lifecycle.ts",
         "aimeat/src/mcp/workflows.ts"
       ],
-      "digest": "sha256:30db4fa9b91cb702b8fbb38a"
+      "digest": "sha256:e9a01b941d0d5e774602acd0"
     },
     "node:aimeat-bookkeeping": {
       "reviewedOn": "2026-10-18",
@@ -711,7 +711,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "bb659ae390279e59",
+      "aimeat/src/services/journey-state.ts": "526be4aac8503a41",
       "aimeat/public/views/home/journey-roads.js": "075d5b69523c143b",
       "aimeat/public/views/home/journey-prompts.js": "429f406334ba193e"
     },
@@ -739,7 +739,7 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "1d52ec1a99a97f7f",
-      "aimeat/src/routes/memory/key.ts": "9916b9c14e7a3846",
+      "aimeat/src/routes/memory/key.ts": "ee6eb5fd530c09d5",
       "aimeat/src/services/memory-bin.ts": "337c889faa2e6b75",
       "aimeat/src/routes/memory-hands.ts": "7c9bde91c26c70cc",
       "aimeat/src/routes/owners/export.ts": "86ef0669d00f4040",
@@ -756,7 +756,7 @@
     },
     "node:aimeat-workflow-decisions": {
       "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",
-      "aimeat/src/services/workflow/engine-human.ts": "cb667ffe9ef1cc65",
+      "aimeat/src/services/workflow/engine-human.ts": "7cece6da5f30e095",
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29",
       "aimeat/src/mcp/workflows.ts": "d63bb720ec5739ee"
     },

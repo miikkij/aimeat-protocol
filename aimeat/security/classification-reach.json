@@ -445,12 +445,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The UI-track settings record."
     },
-    "src/routes/home/welcome-mat.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The portfolio config, read to update it."
-    },
     "src/routes/knowledge/admin.ts": {
       "reads": {
         "listMemoryForOwners": 3,
@@ -657,12 +651,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Reads only visibility, existence and counts."
     },
-    "src/routes/portal-api.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The board record, read to append a message."
-    },
     "src/routes/portfolio.ts": {
       "reads": {
         "getMemory": 2,
@@ -830,7 +818,7 @@
     },
     "src/services/ai-jobs/store.ts": {
       "reads": {
-        "getMemory": 4,
+        "getMemory": 3,
         "listMemory": 4
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI job state records, day logs and the active index: the job state machine."
@@ -1114,7 +1102,7 @@
     },
     "src/services/chat-threads.ts": {
       "reads": {
-        "getMemory": 3,
+        "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Threads reach callers through showThread/showThreads; the other reads are append, archive roll-over and version reads."
@@ -1516,7 +1504,7 @@
     },
     "src/services/exchange-projection.ts": {
       "reads": {
-        "getMemory": 4,
+        "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: App tool manifests and offer declarations, read to project listings."
@@ -2354,7 +2342,7 @@
     },
     "src/services/visibility/behaviour-settings.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-10-08 (AI visibility, layer D), the node's own read: the owner's behaviour settings record (signals.behaviour.settings, reserved prefix): the apps switched off and the fixing agent's switch. No content."
     },
@@ -2385,7 +2373,7 @@
     },
     "src/services/visibility/visibility-settings.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "listMemoryKeysByPrefix": 1
       },
       "why": "Reviewed 2026-10-11 (AI visibility, layer B), the node's own read: the owner's visibility settings record (signals.visibility.settings, reserved prefix): the counting switch and the analytics tag ids; and the key listing of that one record across owners, to say on the privacy page whether any account holder uses an analytics service (a yes or no per service, no owner named). No content."
@@ -2483,7 +2471,7 @@
     },
     "src/services/workspace-import.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update, file dedupe existence and registry append."
@@ -2502,7 +2490,7 @@
     },
     "src/services/workspace-provision.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of meta records and the registry."
     },
