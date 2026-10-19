@@ -76060,6 +76060,7 @@ paths:
                               properties:
                                 name: { type: string }
                                 gaii: { type: string }
+                                display_name: { type: string, nullable: true, description: The name the agent is shown by, when one was given. }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

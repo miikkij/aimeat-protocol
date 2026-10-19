@@ -10,6 +10,7 @@
  * @structure OrgMemberManager; MemberAccessEditor (inline per-member workspace-role editor)
  * @usage import { OrgMemberManager } from '/views/profile/organisms/members.js';
  * @version-history
+ *   2026-10-19 — A member's agents are named by their shown name, in alphabetical order.
  *   2026-09-28 — The agents tooltip says when the organism admits only listed agents (the list then names only those).
  *   v2.14.1 -- 2026-09-26 -- The owner tag in the roster and the workspace creator in the access
  *     editor are green again, as main drew them (.badge-success: Mark tone="fine"; fix pass).
@@ -60,6 +61,7 @@ import { fmtDate, orgInitials, relTime } from '/views/profile/organisms/helpers.
 import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
 import { swallowed } from '/js/swallowed.js';
 import { getGhii } from '/js/services/auth.js';
+import { agentLabel, sortAgents } from '/js/services/agents.js';
 
 /** Inline per-member workspace-role editor: every manageable workspace with a
  *  none/viewer/contributor select. Changes apply immediately (grant replaces, none revokes). */
@@ -300,7 +302,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
           const agentsLine = (m.agents || []).length
             ? html`<span title=${agentAccess === 'listed'
               ? (t('organisms.memberAgentsHintListed') || "This member's agents that the organism admits. They act with the member's rights.")
-              : (t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism")}>${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${m.agents.map(a => a.name || a.gaii).join(', ')}</span>`
+              : (t('organisms.memberAgentsHint') || "This member's agents — they inherit the membership and can act in this organism")}>${'🤖 '}${t('organisms.memberAgents') || 'Agents'}: ${sortAgents(m.agents).map(agentLabel).join(', ')}</span>`
             : null;
           const accessOpen = canManage && accessEditFor === bare;
           return html`

@@ -12,6 +12,7 @@
  * @structure renderForm · basics · varsBlock · stepFold · offerWords · endFold
  * @usage import { renderForm } from './form.js';
  * @version-history
+ *   v1.13.2 — 2026-10-19 — A step's agent picker shows each agent's shown name (agentLabel), in alphabetical order.
  *   v1.13.1 — 2026-10-13 — A trigger the form does not draw (an app's event, rows added to a row space, a trigger with coalesce) is saved back as it was unless the person changes a trigger field. An app's event used to be saved back as "by hand".
  *   v1.13.0 — 2026-10-02 — The question marks that explain the workflow settings: schedule.cron, schedule.timezone (TextField help), workflow.step_timeout (Field group help), workflow.skip_done, workflow.fresh, workflow.parallel (yn() help argument), workflow.llm_checks (HelpTip beside its Choice); their grey hints moved into them (components/HelpTip.js).
  *   v1.12.0 —2026-09-26 — The form is the Field family (page group G5): the fields are TextField and Select with their row labels, the yes-and-no and the other one-of settings the Choice, "starts when" the Tabs where several are on at once, "wait for an answer" the Check, the timeout's own number the TextField beside its Choice; the rail's checks are plain lines (a failing one in coral), the crumb's way back is data. It writes no class.
@@ -55,6 +56,7 @@ import { Row, Stack } from '/components/Layout.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { Tinted } from '/components/Figure.js';
+import { agentLabel } from '/js/services/agents.js';
 
 /** The value of "starts at once" among the steps a step may wait for (never a step id: ids are a-z0-9-). */
 const AT_ONCE = ':at-once';
@@ -173,7 +175,7 @@ function stepFold(ctx, f, s, i) {
         ${s.action ? html`<${Field} label=${c('fStepKind')} hint=${c('actionStepHint')} group>${kindWords(s)}${s.action.kind === 'human-input' ? `: ${s.action.question?.prompt || ''}` : ''}<//>` : html`
         <${Fields} cols=${2}>
           <${Select} id=${'wp-s-agent-' + i} label=${c('fAgent')} value=${s.agent} placeholder=${c('pickAgent')}
-            options=${ctx.agents.map(a => [a.name, a.name])} onChange=${v => { setStep({ agent: v, offer: '' }); ctx.loadOffers(v); }} />
+            options=${ctx.agents.map(a => [a.name, agentLabel(a)])} onChange=${v => { setStep({ agent: v, offer: '' }); ctx.loadOffers(v); }} />
           <${Select} id=${'wp-s-offer-' + i} label=${c('fOffer')} value=${s.offer} disabled=${!s.agent} onChange=${v => setStep({ offer: v })}
             placeholder=${!s.agent ? c('pickAgentFirst') : offers === null ? t('common.loading') : offers.length ? c('pickOffer') : c('noCompatibleOffers')}
             options=${(offers || []).map(o => [o.id, `${o.id}${loc(o.title) ? ` · ${loc(o.title)}` : ''}`])}

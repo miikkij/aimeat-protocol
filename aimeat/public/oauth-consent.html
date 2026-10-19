@@ -8,6 +8,7 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.7.0 — 2026-10-19 — The agent picker lists the agents in alphabetical order of their shown name.
     v1.6.0 — 2026-10-12 — The approval relays code_challenge_method and every `resource` from the
         authorize redirect to /v1/mcp/authorize-consent, which requires PKCE and the resource from
         4.0.0 (src/mcp/oauth-binding.ts). Nothing on the page changes.
@@ -442,7 +443,11 @@
       });
       const d = await r.json();
       if (!d.ok) return [];
-      return d.data?.agents || d.data || [];
+      const list = d.data?.agents || d.data || [];
+      // Alphabetical by the name a person sees (the node returns creation order); the browser's own
+      // language decides the alphabet, as this page loads none of the SPA's format settings.
+      const shown = (a) => a.display_name || a.displayName || a.name || '';
+      return Array.isArray(list) ? list.slice().sort((a, b) => shown(a).localeCompare(shown(b))) : [];
     }
 
     async function createAgent(name, displayName, jwt, ownerName) {

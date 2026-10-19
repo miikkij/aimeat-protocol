@@ -10,6 +10,7 @@
  * @structure WorkflowsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'workflows', component: WorkflowsTab }.
  * @version-history
+ *   v2.3.1 -- 2026-10-19 -- The step pickers' agents come from listAgents as the array it returns, in alphabetical order.
  *   v2.3.0 -- 2026-10-16 -- The menu find opens one workflow here (useOpenItem, js/open-item.js).
  *   v2.2.0 -- 2026-10-16 -- A failed load is drawn as one (itemsFailed: the could-not-load note with
  *     Retry), never as "no workflows" (QA audit F6-05).
@@ -135,7 +136,7 @@ export default function WorkflowsTab({ showToast }) {
       const f = v.prefill || formOf(def);
       if (v.kind === 'create' && !v.prefill) f.steps = [blankStep()];
       setForm(f); setSaveErrors([]); setOpenStep(f.steps.length === 1 && !f.steps[0].id ? 0 : -1);
-      if (!agents.length) listAgents().then(r => setAgents(Array.isArray(r) ? r : (r?.data?.agents ?? r?.data ?? []))).catch(err => swallowed('workflows-tab: agents', err));
+      if (!agents.length) listAgents().then(r => setAgents(r)).catch(err => swallowed('workflows-tab: agents', err));
       f.steps.forEach(s => s.agent && loadOffers(s.agent));
     }
   }, [itemById, loadDetail, loadRun, agents.length]);   // eslint-disable-line react-hooks/exhaustive-deps -- loadOffers is declared below and stable in effect
