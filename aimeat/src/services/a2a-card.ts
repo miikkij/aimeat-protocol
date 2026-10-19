@@ -17,6 +17,8 @@
  * @structure a2aCardFor(config, agent, baseUrl, opts)
  * @usage const card = a2aCardFor(config, agent, 'https://node.example/v1/a2a/claude', { offerings });
  * @version-history
+ *   2026-10-19 — `iconUrl` on the card when the caller passes the agent's absolute avatar address
+ *     (services/agent-avatar.ts); absent otherwise.
  *   2026-10-15 — A for-hire skill carries the offering's input schema (taskSpec.inputSchema), so a
  *     stranger knows what to send (feature-list audit #83).
  *   v1.2.0 — 2026-10-11 — A skill's line names the money price or "free", then "pacing N morsels per
@@ -196,6 +198,8 @@ function offeringSkills(offerings: Offering[]): AgentCard['skills'] {
 export interface A2ACardOptions {
   /** LISTED agent-work offerings — what a stranger may buy. */
   offerings?: Offering[];
+  /** The absolute address of the agent's avatar (GET /v1/agents/:gaii/avatar.svg), when it has one. */
+  iconUrl?: string;
 }
 
 export function a2aCardFor(config: AimeatConfig, agent: AgentRecord, url: string, opts: A2ACardOptions = {}): AgentCard {
@@ -261,6 +265,7 @@ export function a2aCardFor(config: AimeatConfig, agent: AgentRecord, url: string
     defaultOutputModes: ['text/plain', 'application/json'],
     skills: [...skillsFor(agent), ...offeringSkills(offerings)],
     signatures: [],
+    ...(opts.iconUrl ? { iconUrl: opts.iconUrl } : {}),
   };
 }
 

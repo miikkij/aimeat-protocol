@@ -30,6 +30,8 @@
  *   box with the arrow out of it. `pick` on a group: the "select all" word while selecting.
  *   `openLabel` on a row: its tooltip, the whole name where the row cuts it short (an agent's threads).
  * @version-history
+ *   v1.3.0 — 2026-10-19 — An agent peer's own avatar (mark.avatar on a row, avatar on a group)
+ *     draws in place of the identicon (components/AgentAvatar.js).
  *   v1.2.0 — 2026-09-27 — A row's archive square no longer wears the chat's delete class, whose rule
  *     showed it on the open row: it shows under the pointer and on keyboard focus only, as on main.
  *   v1.1.0 — 2026-09-26 — ConversationRow `openLabel`: the row's tooltip (an agent's Messages tab
@@ -46,6 +48,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { Avatar } from '/components/Avatar.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { ThreadPerson } from '/components/ThreadList.js';
 import { Action } from '/components/Action.js';
@@ -135,13 +138,13 @@ export function ConversationSection({ kind, label, count, unread, open, onToggle
  * the picture, the name, the presence word and the two numbers, named; the square beside it archives
  * or brings back all of them, and while selecting the word beside it picks all of them.
  */
-export function ConversationGroup({ open, onToggle, picture, name, presence, countLabel, unreadLabel, pick, archive, children }) {
+export function ConversationGroup({ open, onToggle, picture, avatar, name, presence, countLabel, unreadLabel, pick, archive, children }) {
   return html`
     <div class="conversation-group">
       <div class="conversation-group-bar">
         <${ThreadPerson} expanded=${open} onClick=${onToggle}>
           <${Chevron} open=${open} />
-          <${Avatar} seed=${picture} size="small" />
+          ${avatarOf(avatar) ? html`<${AgentAvatar} avatar=${avatar} size="small" />` : html`<${Avatar} seed=${picture} size="small" />`}
           <span class="poster-thread-person-name">${name}</span>
           ${presence ? html`<${PresenceDot} ghii=${presence} label=${true} />` : null}
           <${Mark} kind="count" tone="tally">${countLabel}<//>
@@ -168,7 +171,8 @@ export function ConversationRow({
       <button type="button" class="conversation-row-open" title=${openLabel || undefined}
         aria-pressed=${selecting ? (selected ? 'true' : 'false') : undefined} onClick=${onOpen}>
         ${selecting ? html`<span class="conversation-check" aria-hidden="true">${selected ? '✓' : ''}</span>` : null}
-        ${mark?.picture ? html`<${Avatar} seed=${mark.picture} />`
+        ${avatarOf(mark?.avatar) ? html`<${AgentAvatar} avatar=${mark.avatar} />`
+          : mark?.picture ? html`<${Avatar} seed=${mark.picture} />`
           : mark?.word ? html`<span class="conversation-row-mark">${mark.word}</span>` : null}
         <span class="conversation-row-main">
           <span class="conversation-row-line">

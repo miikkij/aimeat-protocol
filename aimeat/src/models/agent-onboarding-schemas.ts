@@ -9,6 +9,8 @@
  *   - Step-specific confirmation schemas (IdentifyPlatformSchema, etc.)
  *   - createDefaultSteps() -- factory for fresh onboarding step list
  * @version-history
+ *   Avatar — 2026-10-19 — set_avatar, an optional step in every flow: the agent writes its own picture
+ *     at agent.avatar (services/agent-avatar.ts). The full flow has 17 steps, task-runner 8, workstation 5.
  *   Pacing — 2026-10-11 — The price_offer how-to example sets priceMoney and tollMorsels, not the
  *     deprecated price.morsels (a morsel is pacing, not a price).
  *   Text limits raised — 2026-07-30 — declared-service descriptions to 10 000.
@@ -56,6 +58,7 @@ export const ONBOARDING_STEP_IDS = [
   'declare_offerings',
   'make_workflow_compatible',
   'price_offer',
+  'set_avatar',
 ] as const;
 
 export type OnboardingStepId = typeof ONBOARDING_STEP_IDS[number];
@@ -88,6 +91,7 @@ const STEP_DESCRIPTIONS: Record<string, string> = {
   declare_offerings: 'agentOnboarding.stepDescriptions.declare_offerings',
   make_workflow_compatible: 'agentOnboarding.stepDescriptions.make_workflow_compatible',
   price_offer: 'agentOnboarding.stepDescriptions.price_offer',
+  set_avatar: 'agentOnboarding.stepDescriptions.set_avatar',
 };
 
 const STEP_DEFINITIONS: StepDefinition[] = [
@@ -110,6 +114,9 @@ const STEP_DEFINITIONS: StepDefinition[] = [
   { id: 'declare_offerings', order: 14, title: 'Declare Offerings', description: STEP_DESCRIPTIONS.declare_offerings, required: false, validationMethod: 'automatic' },
   { id: 'make_workflow_compatible', order: 15, title: 'Make an Offer Workflow-Compatible', description: STEP_DESCRIPTIONS.make_workflow_compatible, required: false, validationMethod: 'automatic' },
   { id: 'price_offer', order: 16, title: 'Price an Offer', description: STEP_DESCRIPTIONS.price_offer, required: false, validationMethod: 'automatic' },
+  // The agent's own picture at agent.avatar (services/agent-avatar.ts). Optional and in every flow,
+  // because a workstation Claude or Codex is exactly the agent a person most wants to recognise.
+  { id: 'set_avatar', order: 17, title: 'Set Your Avatar', description: STEP_DESCRIPTIONS.set_avatar, required: false, validationMethod: 'automatic' },
 ];
 
 export type StepActor = 'agent' | 'server';
@@ -151,7 +158,7 @@ export interface StepHowTo {
  * The frozen stepId -> howTo table. `gatesCompletion` and `validationMethod` MUST stay in
  * lockstep with STEP_DEFINITIONS (asserted by the contract-freeze test in
  * test/e2e-agent-onboarding.ts). Renaming any tool/step id is a contract break -- the same
- * test pins the 16 step ids and the 5 aimeat_onboarding_* tool names.
+ * test pins the 17 step ids and the 5 aimeat_onboarding_* tool names.
  */
 export const STEP_HOWTO: Readonly<Record<OnboardingStepId, StepHowTo>> = Object.freeze({
   authenticate: {
@@ -259,6 +266,14 @@ export const STEP_HOWTO: Readonly<Record<OnboardingStepId, StepHowTo>> = Object.
       visibility: 'public', callable: { action_id: 'example-action' },
     }] } },
   },
+  set_avatar: {
+    actor: 'agent', automatic: true, gatesCompletion: false, validationMethod: 'automatic',
+    tool: 'aimeat_memory_write',
+    restEndpoint: { method: 'POST', path: '/v1/memory' },
+    // An emoji is the one-line example; an SVG (at most 256 kB, animation allowed) goes in `svg`.
+    // The built-in skill agent-avatar has templates and the rules.
+    args: { key: 'agent.avatar', value: { emoji: '🦊' } },
+  },
 });
 
 export function getStepHowTo(stepId: string): StepHowTo | undefined {
@@ -285,6 +300,7 @@ const TASK_RUNNER_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
   'accept_test_task',
   'complete_test_task',
   'publish_config',
+  'set_avatar',
 ];
 
 /**
@@ -304,6 +320,7 @@ const WORKSTATION_STEP_IDS: ReadonlyArray<OnboardingStepId> = [
   'identify_platform',
   'report_capabilities',
   'read_directives',
+  'set_avatar',
 ];
 
 export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordinator' | 'workstation';
@@ -312,10 +329,10 @@ export type AgentMode = 'autonomous' | 'interactive' | 'task-runner' | 'coordina
  * Build the Hello Integration step list for a new onboarding record. The
  * `mode` parameter selects which subset of STEP_DEFINITIONS applies:
  *
- *   - 'task-runner'                       -> TASK_RUNNER_STEP_IDS (7 steps)
- *   - 'workstation'                       -> WORKSTATION_STEP_IDS (4 steps)
+ *   - 'task-runner'                       -> TASK_RUNNER_STEP_IDS (8 steps, 7 required)
+ *   - 'workstation'                       -> WORKSTATION_STEP_IDS (5 steps, 4 required)
  *   - 'autonomous' / 'interactive' /
- *     'coordinator' / undefined (default) -> full 13-step list
+ *     'coordinator' / undefined (default) -> the full 17-step list (12 required)
  *
  * Order numbers are preserved from STEP_DEFINITIONS so the UI keeps a stable
  * progression label even when steps are filtered out.

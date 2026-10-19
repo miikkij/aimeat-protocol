@@ -17,6 +17,8 @@
  * @usage
  *   import { buildAgentOnboardingInstruction } from '../services/hello-integration-prompt.js';
  * @version-history
+ *   v1.1.0 — 2026-10-19 — Step 13 gains one bullet: an agent without an avatar writes agent.avatar
+ *     (services/agent-avatar.ts). Additive; the rest of the text is unchanged.
  *   v1.0.0 — 2026-09-18 — Moved verbatim from src/cli/connect/onboarding-prompt.ts (its v1.2.0).
  */
 
@@ -71,6 +73,7 @@ Complete Hello Integration in this order:
   - Publish actual runtime/config artifacts under agents.config.*. If this runtime only uses aimeat connect serve, describe that connector accurately; do not invent a watchdog file.
   - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* for same-owner handoff notes, project state, queues, or team context. Write shared entries with visibility "owner" and tags ["<tag>"], and list them with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
   - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms-full.txt guidance, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* memory key as a substitute.
+  - If you have no avatar yet (aimeat_onboarding_status shows the set_avatar step pending), give yourself one: call aimeat_memory_write with key agent.avatar and value { "emoji": "<one emoji>" } or { "svg": "<svg ...>...</svg>" } (one SVG element, at most 256 kB, animation allowed, no scripts needed). It is your picture wherever your owner sees you, and it is public. The built-in skill agent-avatar (aimeat_skill_get) has templates to start from.
 
 If AIMEAT tools are not available in this runtime, tell me the MCP server is not attached yet.`;
 }

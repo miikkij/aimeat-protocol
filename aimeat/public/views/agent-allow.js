@@ -13,6 +13,7 @@
  * @structure default export AgentAllow() — signed out: sign in; gone; ready: the question; done
  * @usage routed at /v1/allow?agent=<name>&need=<words> by spa.html (and a spaRoute in routes/portal.ts)
  * @version-history
+ *   v1.1.0 — 2026-10-19 — The square beside the agent's name shows the agent's own picture (components/AgentAvatar.js leadProps) when it has set one; otherwise its first letter, as before.
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
 import { h } from 'preact';
@@ -29,6 +30,7 @@ import { Action, Loud } from '/components/Action.js';
 import { Box } from '/components/Box.js';
 import { Mark } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
+import { leadProps } from '/components/AgentAvatar.js';
 
 const html = htm.bind(h);
 
@@ -88,7 +90,9 @@ export default function AgentAllow() {
 
   const d = view.data;
   const name = d.agent?.display_name || d.agent?.name || agentName;
-  const who = { name, meta: d.agent?.gaii || '', text: (name[0] || 'A').toUpperCase() };
+  // AskPage's `who` takes `picture` (an <img>) or `text`; leadProps decides which from the agent's avatar.
+  const mark = leadProps(d.agent, (name[0] || 'A').toUpperCase());
+  const who = { name, meta: d.agent?.gaii || '', ...(mark.picture ? { picture: mark.picture } : { text: mark.text }) };
   const title = t('agentAllow.title', { agent: name });
   const open = (d.words || []).filter((w) => !w.held);
   const sentences = html`

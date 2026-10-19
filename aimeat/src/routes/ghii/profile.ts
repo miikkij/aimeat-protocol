@@ -6,6 +6,7 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-10-19 — The agent roster on GET /v1/ghii/:ghii carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
  *   v1.6.0 — 2026-10-18 — GET /v1/ghii/me/adult: verified adult yes or no, the method and the time (Comicland v3 A-3).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.4.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -47,6 +48,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { readAdult, NOT_VERIFIED } from '../../services/adult-assurance.js';
 import { callerOf } from '../../middleware/caller.js';
+import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerProfileRoutes(
     router: Router,
@@ -281,6 +284,7 @@ export function registerProfileRoutes(
         // operator:admin passes too. A profile read writes no operator trail; asked only when not owner.
         const includeAgents = isOwner || await isOperatorCaller(storage, req.auth);
         const agents = includeAgents ? await storage.getAgentsByOwner(record.ownerName) : [];
+        const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/ghii/:ghii');
 
         res.json(success(config.nodeId, {
             ghii: record.ghii,
@@ -292,7 +296,7 @@ export function registerProfileRoutes(
             semantic: record.semantic,
             created_at: record.createdAt,
             ...(includeAgents ? {
-                agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+                agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, avatar: avatars.get(a.gaii) ?? null, trust_score: a.trustScore })),
             } : {}),
         }));
     });

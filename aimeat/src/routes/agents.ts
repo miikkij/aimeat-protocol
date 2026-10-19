@@ -31,6 +31,8 @@
  *   v1.6.0 -- 2026-10-11 -- POST /v1/agents/:name/stop and /start (./agents/stop-start.ts).
  *   v1.7.0 -- 2026-10-17 -- GET/POST /v1/agents/:name/allow (./agents/permission-allow.ts).
  *   v1.8.0 -- 2026-10-18 -- PATCH /v1/agents/:name/clearance (./agents/clearance.ts, plan doc-mvdipuyqraas L2).
+ *   v1.9.0 -- 2026-10-19 -- GET /v1/agents/:gaii/avatar.svg, PUT and DELETE /v1/agents/:name/avatar
+ *     (./agents/avatar.ts), registered first so no wider pattern takes the picture's path.
  */
 import { Router } from 'express';
 import { dirname } from 'node:path';
@@ -48,12 +50,14 @@ import { registerPurchaseLimitRoutes } from './agents/purchase-limit.js';
 import { registerStopStartRoutes } from './agents/stop-start.js';
 import { registerPermissionAllowRoutes } from './agents/permission-allow.js';
 import { registerClearanceRoutes } from './agents/clearance.js';
+import { registerAvatarRoutes } from './agents/avatar.js';
 
 export function agentsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // Route groups are registered IN ORDER (Express matches top-to-bottom); the original
   // declaration order is preserved across the extracted sibling modules under ./agents/.
+  registerAvatarRoutes(router, config, storage);
   registerDeviceAuthRoutes(router, config, storage);
   registerRegistrationRoutes(router, config, storage, __dirname_agents);
   registerProfileMetadataRoutes(router, config, storage);

@@ -3980,7 +3980,8 @@
       "declare_services": "Ilmoita palvelut",
       "declare_offerings": "Ilmoita tarjoukset",
       "make_workflow_compatible": "Tee tarjouksesta työnkulkuyhteensopiva",
-      "price_offer": "Anna tarjoukselle hinta tai tahdistus"
+      "price_offer": "Anna tarjoukselle hinta tai tahdistus",
+      "set_avatar": "Aseta oma avatar"
     },
     "stepDescriptions": {
       "authenticate": "Agentti on tunnistautunut laitevarmennuksen kautta",
@@ -3998,7 +3999,8 @@
       "declare_services": "Agentti ilmoittaa tarjoamansa palvelut (valinnainen)",
       "declare_offerings": "Agentti julkaisee vähintään yhden tarjouksen (id + title + ask) avaimeen agents.{name}.offers, jotta omistaja löytää mitä se tekee (valinnainen)",
       "make_workflow_compatible": "Vähintään yksi tarjous määrittää success_signal + required_to_function + deliverable.location, jolloin se voi olla työnkulun vaihe (valinnainen)",
-      "price_offer": "Vähintään yhtä tarjousta voivat käyttää muut omistajat: rahahinta tai tahdistus, näkyvyys julkinen ja kutsuttava sidonta (valinnainen)"
+      "price_offer": "Vähintään yhtä tarjousta voivat käyttää muut omistajat: rahahinta tai tahdistus, näkyvyys julkinen ja kutsuttava sidonta (valinnainen)",
+      "set_avatar": "Agentti on tallentanut oman kuvansa avaimeen agent.avatar: emojin tai SVG-kuvan (valinnainen)"
     },
     "errors": {
       "accessDenied": "Pääsy estetty",

@@ -3980,7 +3980,8 @@
       "declare_services": "Declare Services",
       "declare_offerings": "Declare Offerings",
       "make_workflow_compatible": "Make an Offer Workflow-Compatible",
-      "price_offer": "Set a price or pacing for an offer"
+      "price_offer": "Set a price or pacing for an offer",
+      "set_avatar": "Set Your Avatar"
     },
     "stepDescriptions": {
       "authenticate": "Agent is authenticated via device auth",
@@ -3998,7 +3999,8 @@
       "declare_services": "Agent declares offered services (optional)",
       "declare_offerings": "Agent publishes at least one offer (id + title + ask) to agents.{name}.offers so the owner can find what it does (optional)",
       "make_workflow_compatible": "At least one offer declares success_signal + required_to_function + deliverable.location, so it can be a step in an Agent Workflow (optional)",
-      "price_offer": "At least one offer can be used by other owners: a money price or a pacing amount, visibility public, and a callable binding (optional)"
+      "price_offer": "At least one offer can be used by other owners: a money price or a pacing amount, visibility public, and a callable binding (optional)",
+      "set_avatar": "The agent has written its own picture to agent.avatar: an emoji or an SVG (optional)"
     },
     "errors": {
       "accessDenied": "Access denied",

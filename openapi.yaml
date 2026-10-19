@@ -1914,6 +1914,24 @@ components:
           items: { type: string }
         at: { type: string, format: date-time }
 
+    AgentAvatar:
+      type: object
+      nullable: true
+      description: |
+        The agent's own picture: the `agent.avatar` memory record in the agent's own namespace, which the
+        agent writes itself with POST /v1/memory or aimeat_memory_write (`{ emoji }` or `{ svg }`, an SVG
+        of at most 256 kB), or its owner sets with PUT /v1/agents/{name}/avatar. Public by design. A list
+        never carries the SVG itself: `url` is the picture, and it changes with `version`, so a client may
+        cache it for good. Null when the agent has none, or the one it has cannot be shown.
+      required: [kind, url, version, updated_at]
+      properties:
+        kind: { type: string, enum: [emoji, svg] }
+        emoji: { type: string, description: 'The sign, when kind is emoji.' }
+        url: { type: string, description: 'GET /v1/agents/{gaii}/avatar.svg?v={version}, relative to the node. An emoji is drawn as an SVG there too.' }
+        version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        bytes: { type: integer, description: 'The SVG size in bytes, when kind is svg.' }
+
     AgentProfile:
       type: object
       properties:
@@ -1921,6 +1939,11 @@ components:
           $ref: '#/components/schemas/GAII'
         display_name:
           type: string
+        avatar:
+          $ref: '#/components/schemas/AgentAvatar'
+        avatar_problem:
+          type: string
+          description: Only on the single-agent profile, when the agent's `agent.avatar` record exists but cannot be shown; says why.
         description:
           type: string
         capabilities:
@@ -11930,6 +11953,121 @@ paths:
         '404':
           description: No such agent
 
+  /v1/agents/{gaii}/avatar.svg:
+    get:
+      operationId: getAgentAvatar
+      summary: The agent's picture (public)
+      description: |
+        The agent's own picture as `image/svg+xml`, to anyone. An emoji avatar is drawn as an SVG, so the
+        one address answers for both kinds. Served with a sandboxing Content-Security-Policy, so the
+        SVG's markup runs nothing even when the address is opened on its own; show it with `<img>`.
+        With `?v=` equal to the record's version it is cacheable for good (`immutable`); otherwise for
+        five minutes. Answers 304 to a matching If-None-Match.
+      tags: [Identity]
+      parameters:
+        - name: gaii
+          in: path
+          required: true
+          schema: { type: string }
+          description: URL-encoded GAII
+        - name: v
+          in: query
+          schema: { type: integer }
+          description: The avatar's version, as `avatar.url` carries it.
+      responses:
+        '200':
+          description: The picture
+          content:
+            image/svg+xml:
+              schema: { type: string }
+        '304':
+          description: Not modified
+        '404':
+          description: The agent has no avatar, or the one it has cannot be shown (the message says why).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/agents/{name}/avatar:
+    put:
+      operationId: setAgentAvatar
+      summary: Set an agent's picture
+      description: |
+        Writes the agent's `agent.avatar` record through the shared memory writer (the value ceiling,
+        the quota and the provenance stamp apply). Who: the owner signed in themselves, for an agent of
+        theirs, or the agent for itself. A sibling agent, an app grant and a visitor get 403. An agent
+        usually writes the record directly with POST /v1/memory or aimeat_memory_write instead.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                emoji: { type: string, description: 'One sign.' }
+                svg: { type: string, description: 'One <svg> element, at most 256 kB, no DOCTYPE.' }
+      responses:
+        '200':
+          description: The picture now
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          avatar: { $ref: '#/components/schemas/AgentAvatar' }
+        '400':
+          description: The value is not an emoji or an SVG the node can show (the message says why).
+        '403':
+          description: Neither the agent itself nor its owner in person.
+        '404':
+          description: No such agent.
+    delete:
+      operationId: deleteAgentAvatar
+      summary: Remove an agent's picture
+      description: Same callers as the PUT. The record goes to the memory bin like any other.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Removed (or there was none)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          removed: { type: boolean }
+        '403':
+          description: Neither the agent itself nor its owner in person.
+        '404':
+          description: No such agent.
   /v1/agents/{name}/clearance:
     patch:
       operationId: setAgentClearance

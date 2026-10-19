@@ -11,6 +11,7 @@
  *   - PUT /v1/admin/agents/:gaii/cors: refuse a missing agent, then services/cors-overview.ts setCorsList
  *
  * @version-history
+ *   v1.5.0 — 2026-10-19 — GET /v1/admin/agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
  *   v1.4.0 — 2026-10-06 — GET /v1/admin/agents reads `limit`, as aimeat_admin_agents does on the
  *     node's MCP (secaudit 2026-10 follow-up, Part B).
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
@@ -36,6 +37,7 @@ import { setCorsList } from '../services/cors-overview.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
 /**
  * What the app behind a grant target declares TODAY, or null when it declares nothing.
@@ -75,12 +77,14 @@ export function adminAgentsRouter(
         // it, so the connector, which calls this route, could not (secaudit 2026-10 follow-up, Part B).
         const limit = Number.parseInt(String(req.query.limit ?? ''), 10);
         const shown = Number.isFinite(limit) && limit > 0 ? agents.slice(0, limit) : agents;
+        const avatars = await readAvatarsOrEmpty(storage, shown.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/admin/agents');
 
         res.json(success(config.nodeId, {
             agents: shown.map(a => ({
                 gaii: a.gaii,
                 owner: a.owner,
                 display_name: a.displayName,
+                avatar: avatars.get(a.gaii) ?? null,
                 trust_score: a.trustScore,
                 morsel_balance: a.morselBalance,
                 allowed_origins: a.allowedOrigins ?? null,

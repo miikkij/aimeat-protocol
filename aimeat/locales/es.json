@@ -2923,7 +2923,8 @@
       "declare_services": "Declarar los servicios",
       "declare_offerings": "Declarar las ofertas",
       "make_workflow_compatible": "Hacer una oferta compatible con los flujos de trabajo",
-      "price_offer": "Ponerle un precio o un ritmo a una oferta"
+      "price_offer": "Ponerle un precio o un ritmo a una oferta",
+      "set_avatar": "Elegir tu avatar"
     },
     "stepDescriptions": {
       "authenticate": "El agente se autentica por autorización de dispositivo",
@@ -2941,7 +2942,8 @@
       "declare_services": "El agente declara los servicios que ofrece (opcional)",
       "declare_offerings": "El agente publica al menos una oferta (id, título y qué pide) en agents.{name}.offers, para que su propietario vea qué sabe hacer (opcional)",
       "make_workflow_compatible": "Al menos una oferta declara success_signal, required_to_function y deliverable.location, para poder ser un paso de un flujo de trabajo (opcional)",
-      "price_offer": "Al menos una oferta la pueden usar otras personas: un precio en dinero o un ritmo, visibilidad pública y un enlace que se pueda llamar (opcional)"
+      "price_offer": "Al menos una oferta la pueden usar otras personas: un precio en dinero o un ritmo, visibilidad pública y un enlace que se pueda llamar (opcional)",
+      "set_avatar": "El agente ha guardado su propia imagen en agent.avatar: un emoji o un SVG (opcional)"
     },
     "errors": {
       "accessDenied": "Acceso denegado",

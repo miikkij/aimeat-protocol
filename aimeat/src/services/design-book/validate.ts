@@ -23,6 +23,8 @@
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.7.0 — 2026-10-19 — The AVATAR kind, the tenth (avatar.ts): one SVG an agent starts its own
+ *     picture from, benched by the reader its agent.avatar record is read with.
  *   v1.6.0 — 2026-09-28 — A motion recipe may carry the spring hand (--ak-spring-stiffness,
  *     -damping, -mass): the kit's live controls read it, so a recipe now says how things feel
  *     under the hand, not only how fast they enter.
@@ -59,12 +61,13 @@ import { EFFECT_IDS, effectById } from '../../data/atelier-effects.js';
 
 import { DesignBookError } from './errors.js';
 import { validateComponentBody } from './component.js';
+import { validateAvatarBody } from './avatar.js';
 import { isGrownGenreBody, validateGrownGenreBody } from './grown-genre.js';
 
 export { DesignBookError } from './errors.js';
 
 /** The kinds the node can PROVE. Growing this list means growing the bench first. */
-export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect', 'component'] as const;
+export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect', 'component', 'avatar'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /** Where an effect part lands: a moment on the hero band, a picture effect on one figure, or a
@@ -169,6 +172,10 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     // A COMPONENT is markup and a stylesheet, no script, every colour a page token (component.ts).
     if (kind === 'component') {
       return validateComponentBody(o) as unknown as Record<string, unknown>;
+    }
+    // An AVATAR is one SVG an agent starts its own picture from, read as agent.avatar is (avatar.ts).
+    if (kind === 'avatar') {
+      return validateAvatarBody(o) as unknown as Record<string, unknown>;
     }
     // A GENRE points at one of the registry's genre templates — a complete committed page.
     // The Book PROVES and SHOWS it; taking one home is a FORK of the template, never a merge,
@@ -284,6 +291,7 @@ function bodyShapeHint(kind: PartKind): string {
   if (kind === 'effect') {
     return `An effect part's body is { effect: one of ${EFFECT_IDS.join(', ')}, params?, on?: ${EFFECT_TARGETS.join(' | ')}, look?, tokens? } — a post-process filter, proven where it lands.`;
   }
+  if (kind === 'avatar') return 'An avatar part\'s body is { svg: "<svg…>…</svg>" }: one SVG element, at most 256 kB, no DOCTYPE.';
   if (kind === 'component') {
     return 'A component part\'s body is { prefix, html, css, use, judgement: { reach: "general" | "special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, no script.';
   }

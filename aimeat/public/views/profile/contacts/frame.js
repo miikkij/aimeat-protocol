@@ -10,6 +10,7 @@
  * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-19 -- An agent's row shows the agent's own avatar when it has one (leadProps); the initials stay its mark otherwise.
  *   v1.10.0 -- 2026-09-26 -- Every part is a kit component (List with its Lead, Name, Cell, Desc, Who, When and Doors; Mark; Action; SettingsPage with the crumb and the rail as data): the page passes data and writes no class. The people table's heading row is the List's head, as main drew it over the rows (page group G8).
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
  *   v1.8.0 -- 2026-09-26 -- The mark of a sender that is not a person is the avatar's agent tone (.poster-box--agent, css/poster.css), a unification: the look Contacts, Notifications, Email and MCP drew alike.
@@ -37,6 +38,7 @@ import { SettingsPage } from '/components/SettingsPage.js';
 import { List, Row, Lead, Name, Desc, Who, When, Cell, Doors } from '/components/List.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Action } from '/components/Action.js';
+import { leadProps } from '/components/AgentAvatar.js';
 
 export const c = (key, vars) => t('contacts.cover.' + key, vars);
 // The locale() helper here derived the FORMAT from the LANGUAGE. They are different settings:
@@ -131,7 +133,7 @@ export function agentRows(ctx, rows) {
       const open = r.owner === ctx.me ? () => ctx.openTab('agents') : owner ? () => ctx.openPerson(owner.contact_id) : null;
       return html`
       <${Row} key=${r.contact_id}>
-        <${Lead} text=${initials(r)} agent />
+        <${Lead} ...${leadProps(r, initials(r))} />
         <${Name} meta=${r.contact_id}>${nameOf(r)}<//>
         <${Who} sub=${kindWord(r.kind)}>${whose}<//>
         ${lastMsg(r)}

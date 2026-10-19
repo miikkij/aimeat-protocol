@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.31.0 -- 2026-10-19 -- The agent's own picture (components/AgentAvatar.js) stands before its name on the closed row and the open card's title, when the agent has set one; without one both look as before.
  *   v2.30.0 -- 2026-10-18 -- InvitesLine: the open card says when the agent may invite people (organism:invite).
  *   v2.29.0 -- 2026-10-18 -- "May read at most" (ClearanceLine): the highest classification the agent may read, while classification is on (plan doc-mvdipuyqraas, L2.4).
  *   v2.28.0 -- 2026-10-11 -- "Takes new work" (StoppedLine): stop the agent and start it again.
@@ -184,6 +185,7 @@ import { SubHeading } from '/components/SubHeading.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { TagInput } from '/components/TagInput.js';
 import { TextField } from '/components/TextField.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 
 const html = htm.bind(h);
 
@@ -343,12 +345,15 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     // sits between the rows, so each row carries its own grid of the same cut. A press anywhere on
     // the row opens the agent; its name turns coral under the pointer or when the agent is in trouble.
     const change = changeMark(changes);
+    // The agent's picture goes in the Name cell's `before` slot: the cut has no lead column, and an
+    // agent without a picture keeps the row exactly as it was.
+    const pic = avatarOf(agent) ? html`<${AgentAvatar} agent=${agent} />` : undefined;
     return html`
       <${List} cols="name-runs-access-last-doors" keepCols>
         <${Row} onToggle=${() => onToggle(agent.name)}
           draggable=${!!drag} grip=${drag?.grip} dragging=${drag?.dragging}
           onDragStart=${drag?.onDragStart} onDragOver=${drag?.onDragOver} onDrop=${drag?.onDrop} onDragEnd=${drag?.onDragEnd}>
-          <${Name} attention=${state === 'problem' || hasRefusals(agent)} dot=${change?.dot} dotTitle=${change?.title} meta=${agentGaii(agent)}
+          <${Name} attention=${state === 'problem' || hasRefusals(agent)} dot=${change?.dot} dotTitle=${change?.title} meta=${agentGaii(agent)} before=${pic}
             tag=${[
               hasRefusals(agent) ? html`<${Mark} kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null,
               agent.mode && agent.mode !== 'interactive' ? html`<${Mark} tone="dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}<//>` : null,
@@ -397,9 +402,12 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
   const seenTone = state === 'problem' ? 'danger' : (state === 'production' || state === 'idle') ? 'fine' : 'off';
 
   // The name is the card's slab, the full width, the way a section starts; the facts and the
-  // access sticker sit in the row under it, so nothing competes with the name for the line.
+  // access sticker sit in the row under it, so nothing competes with the name for the line. The
+  // agent's picture, when it has one, stands in the title before the name.
+  const cardName = agent.display_name || agent.name;
+  const cardTitle = avatarOf(agent) ? html`<${AgentAvatar} agent=${agent} />${cardName}` : cardName;
   return html`
-    <${OpenCard} title=${agent.display_name || agent.name} onClose=${handleCollapse}
+    <${OpenCard} title=${cardTitle} onClose=${handleCollapse}
       id=${html`<${GaiiChip} agent=${agent} />`}
       marks=${html`
         ${renderModeBadge(agent)}

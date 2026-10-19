@@ -7,6 +7,7 @@
  * @structure KIT_ENTRIES
  * @usage import { KIT_ENTRIES } from './entries-kit.js';
  * @version-history
+ *   v1.4.0 — 2026-10-19 — AgentAvatar: an agent's own picture in the Avatar square.
  *   v1.3.0 — 2026-10-18 — FigureStrip's `stacked` variant (og-strip--stacked).
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre (the setting-box entry names Box.js
  *     as its module now), Meter's tones and Result, a FigureStrip item's onClick and title.
@@ -262,6 +263,28 @@ export const KIT_ENTRIES: UiEntryWritten[] = [
         ],
         example: { text: 'HS' },
         note: 'The square and its agent tone are the Object box\'s avatar cut in css/poster.css (entry \'box-shape\'); avatar.css holds the named sizes. The List (components/List.js) and the conversation list have their own avatar cells.',
+    },
+    {
+        id: 'agent-avatar', name: 'AgentAvatar', kind: 'component', status: 'active',
+        summary: 'An agent\'s own picture in the Avatar square: the emoji or SVG the agent wrote at agent.avatar, shown through <img> from its picture address, in the plain frame; without one, the initials or sign the page passes, in the dashed agent frame as before.',
+        module: '/components/AgentAvatar.js', sheet: '/css/components/avatar.css',
+        data: {
+            shape: 'AgentAvatar({ agent, avatar, text, size, label }) · leadProps(agentOrAvatar, text) · avatarOf(x)',
+            fields: {
+                agent: 'an agent row from any response that lists agents; its `avatar` field is read',
+                avatar: 'the `avatar` field itself: null, { kind: "emoji", emoji, url } or { kind: "svg", url }',
+                text: 'what the square shows when the agent has no picture',
+                size: 'as Avatar', label: 'as Avatar',
+            },
+        },
+        useFor: ['In a list of agents, at the start of each row: the Agents page, Fleet, home, Messages, organisms, contacts, admin.', 'To view one agent: before its name in the open card and on its own page.'],
+        variants: [
+            { name: 'picture', prop: 'agent', when: 'the agent set a picture: an <img> of its address, never inlined' },
+            { name: 'stand-in', prop: 'text', when: 'no picture: the page\'s initials or sign in the dashed agent frame' },
+            { name: 'lead', prop: 'leadProps()', when: 'a row that draws its mark through List.js Lead' },
+        ],
+        example: { text: 'CC' },
+        note: 'The picture is the agent\'s choice (services/agent-avatar.ts), so it is not interface emoji. An SVG is never inlined: <img> runs none of its markup, and the address carries the version so the browser caches it.',
     },
     {
         id: 'roads', name: 'Roads', kind: 'component', status: 'active',

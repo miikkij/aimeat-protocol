@@ -26,6 +26,7 @@
  *     aimeat_onboarding_status; stop at summary.completable).
  *   v1.1.10 -- 2026-07-01 -- Telemetry-protocol example uses the vendor-neutral 'openrouter/free'
  *     instead of naming a specific vendor model.
+ *   v1.1.11 -- 2026-10-19 -- The step table names set_avatar (agent.avatar, skill agent-avatar).
  */
 
 import { createHash } from 'node:crypto';
@@ -224,6 +225,7 @@ accepted by \`aimeat connect call <name>\`):
 | publish_config | \`aimeat_memory_write\` → key \`agents.config.<your-name>.*\` |
 | configure_delivery | none — auto-passes once you are active/polling |
 | declare_offerings / make_workflow_compatible / price_offer | \`aimeat_memory_write\` → key \`agents.<your-name>.offers\` (optional) |
+| set_avatar | \`aimeat_memory_write\` → key \`agent.avatar\`, value \`{ "emoji": "…" }\` or \`{ "svg": "<svg…>" }\` (optional; skill \`agent-avatar\`) |
 
 Stop as soon as \`summary.completable\` is true (every required step passed); the optional offers-ladder steps never block completion.
 

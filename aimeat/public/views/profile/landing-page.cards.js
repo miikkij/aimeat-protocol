@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.26.0 -- 2026-10-19 -- The Agents card's rows show the agent's own picture (components/AgentAvatar.js) in place of the robot sign, when the agent has set one.
  *   v1.25.0 -- 2026-10-18 -- "What others can see" (the exposure tab) under Account, after Access, and in the basic menu: what of the person's own a stranger can read is a question a newcomer asks before anything goes in (plan doc-mvcn6c7e4e5q, V6.2).
  *   v1.24.0 -- 2026-10-11 -- The Commerce card totals money per currency and the pacing apart ("15,00 € · pacing 10 morsels"), from a checkout session's total / receipt and its pacing (receipt.pacing, pacingMorsels); a 3.x session in currency 'morsel' counts as pacing. A morsel is never a currency.
  *   v1.23.0 -- 2026-10-09 -- Visibility under Business, after Usage.
@@ -87,6 +88,7 @@ import { Folds, FoldRow } from '/components/Folds.js';
 import { Mark, Marks, Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Action, Icon } from '/components/Action.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { Row as Line, Split, Space } from '/components/Layout.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { STEP, openSteps, stepTitle, stepLine, stepHref } from '../home/journey-steps.js';
@@ -215,7 +217,7 @@ export function AgentsCard({ owner, initialAgents }) {
       note=${activeToday > 0 ? (t('profile.landing.activeTodayCount') || '{n} active today').replace('{n}', String(activeToday)) : null}>
       <${Folds}>
         ${agents.slice(0, 3).map(a => html`
-          <${FoldRow} key=${a.gaii || a.name} num=${'🤖'} name=${a.display_name || a.name} right=${seen(a)} onClick=${() => openAgent(a)} />`)}
+          <${FoldRow} key=${a.gaii || a.name} num=${avatarOf(a) ? html`<${AgentAvatar} agent=${a} size="small" />` : '🤖'} name=${a.display_name || a.name} right=${seen(a)} onClick=${() => openAgent(a)} />`)}
         ${nextJob ? html`
           <${FoldRow} key="nextjob" num="⏰" name=${nextJob.name || nextJob.id || ''}
             right=${(t('profile.landing.nextRunAt') || 'next run {time}').replace('{time}', fmtClock(nextJob.nextRunAt))}

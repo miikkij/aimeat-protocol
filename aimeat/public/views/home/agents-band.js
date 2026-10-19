@@ -21,6 +21,7 @@
  * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-19 — A worker's line starts with the agent's own picture when it has set one.
  *   2026-10-12 — whenWords says "When something new arrives in a workspace" for an agent whose
  *     definition names the workspace spaces it watches.
  *   2026-10-11 — A stopped agent's row says "stopped", and how many tasks wait for it.
@@ -36,6 +37,7 @@ import { ago } from '/js/format.js';
 import { Band, BandNote } from '/components/Band.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { LineList } from '/components/LineList.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { TextField } from '/components/TextField.js';
 import { Action, Loud } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
@@ -95,7 +97,12 @@ function workerLine(w) {
   const parts = [whenWords(w)];
   if (w.connector && w.has_key && w.connector.online) parts.push(machineName(w.connector));
   parts.push(stateWords(w));
-  return { id: w.name, name: w.display_name || w.name, text: parts.join(' · '), href: `/v1/home?agent=${encodeURIComponent(w.name)}` };
+  // The agent's own picture before its name, when it has set one (components/AgentAvatar.js).
+  const name = w.display_name || w.name;
+  return {
+    id: w.name, text: parts.join(' · '), href: `/v1/home?agent=${encodeURIComponent(w.name)}`,
+    name: avatarOf(w) ? html`<${AgentAvatar} agent=${w} size="small" />${name}` : name,
+  };
 }
 
 /** A principal id as the word a person recognises: 'claude#alice@node' reads 'claude'. */

@@ -10,6 +10,7 @@
  *   import { registerCatalogueTools } from './catalogue.js';
  *   registerCatalogueTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-19 — aimeat_catalogue_agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read per call.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools for agent directory, public boards, and people directory
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -24,6 +25,8 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { logger } from '../utils/logger.js';
 
 export function registerCatalogueTools(
     mcp: McpServer,
@@ -59,6 +62,8 @@ export function registerCatalogueTools(
                 }
                 return true;
             });
+            // The agent's picture is public like its description (services/agent-avatar.ts): one read for the list.
+            const avatars = await readAvatarsOrEmpty(storage, filtered.map(a => a.gaii), logger.warn.bind(logger), 'aimeat_catalogue_agents');
 
             return {
                 content: [{
@@ -66,6 +71,7 @@ export function registerCatalogueTools(
                     text: JSON.stringify(filtered.map(a => ({
                         gaii: a.gaii,
                         display_name: a.displayName ?? a.name,
+                        avatar: avatars.get(a.gaii) ?? null,
                         description: a.description,
                         capabilities: a.capabilities,
                         trust_score: a.trustScore,

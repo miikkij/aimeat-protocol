@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.39.0 -- 2026-10-19 -- Your avatar: agent.avatar with aimeat_memory_write, the set_avatar step, skill agent-avatar.
  *   v1.38.0 -- 2026-10-18 -- What others can read: each item's classification, and the conflicts first
  *     with lower_to (plan doc-mvdipuyqraas, L4.1).
  *   v1.37.0 -- 2026-10-18 -- Classified content: an agent's clearance hides what is classified above
@@ -204,6 +205,12 @@ result. Your onboarding \`declare_offerings\` / \`make_workflow_compatible\` / \
 auto-tick once your offers satisfy each level. Quick how-to with the actual tool calls:
 GET \`/v1/agents/me/handbook/offerings\`. Full spec + copy-paste prompt:
 https://github.com/miikkij/aimeat-protocol/blob/main/docs/building-an-aimeat-compatible-agent.md
+
+**Your avatar — how your owner recognises you.** Write your picture to your own memory key
+\`agent.avatar\` with \`aimeat_memory_write\`: \`{ "emoji": "🦊" }\` or \`{ "svg": "<svg…>" }\` (one SVG
+element, at most 256 kB, animation allowed). It shows wherever you are listed, and it is public.
+The optional \`set_avatar\` onboarding step ticks once it can be shown. Templates and the rules:
+skill \`agent-avatar\` (\`aimeat_skill_get\`).
 
 **Knowledge — share refined knowledge under a contract.** \`aimeat_knowledge_list\` ·
 \`aimeat_knowledge_get\` · \`aimeat_knowledge_contribute\` · \`aimeat_knowledge_links\`. Prefer a real

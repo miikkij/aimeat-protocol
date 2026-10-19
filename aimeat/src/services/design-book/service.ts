@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.12.0 — 2026-10-19 — The AVATAR kind (avatar.ts): adopt() answers the SVG and writes nothing,
+ *     as for a component. proposeChecksFor moved to propose-checks.ts (pure extraction, 800 lines).
  *   v1.11.0 — 2026-10-17 — A part in proposal is stored for signed-in members, published parts public (V0.4).
  *   v1.10.2 — 2026-10-08 — setStatus() keeps the part's provenance record when it rewrites the part
  *     with its new status. setMemory writes the column whole, so leaving it out erased the record of
@@ -100,6 +102,8 @@ import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
 import { componentAsRead, componentBench, componentSnippet, type ComponentBenchRead, type ComponentBody } from './component.js';
 import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
+import { proposeChecksFor } from './propose-checks.js';
+import { avatarPartSnippet, type AvatarBody } from './avatar.js';
 // Where a part is stored lives beside what a generic memory door answers for one (utils/own-door-keys.ts).
 import { DESIGN_BOOK_PART_PREFIX as PART_KEY_PREFIX } from '../../utils/own-door-keys.js';
 
@@ -115,36 +119,6 @@ export function partKey(id: string): string { return `${PART_KEY_PREFIX}${id}`; 
 function usageKey(id: string): string { return `${USAGE_KEY_PREFIX}${id}`; }
 export function noticeKey(id: string): string { return `${NOTICE_KEY_PREFIX}${id}`; }
 
-/** What the propose-time bench actually proved, named by kind — the record says which bench ran. */
-function proposeChecksFor(input: PartInput): string[] {
-  if (input.kind === 'layout' || input.kind === 'fill') return ['layout-valid'];
-  if (input.kind === 'illustration') return ['style-valid'];
-  // Markup against the allowlist, the stylesheet under its own prefix, every colour a token.
-  if (input.kind === 'component') return ['markup-allowlist', 'styles-scoped', 'colours-are-tokens', 'no-script', 'judgement-given'];
-  // A genre that grew out of an app is the proposer's own page; what earns it the shelf is its
-  // owner's word, answered in `publishing`, and no bench of this node runs a stranger's script.
-  if (input.kind === 'genre' && isGrownGenreBody(input.body)) return ['own-app', 'judgement-given'];
-  if (input.kind === 'ambient') {
-    // The ambient bench always runs the matrix: the preset is proven on the part's look.
-    const checks = ['ambient-valid', 'contrast-matrix'];
-    const tokens = (input.body as { tokens?: Record<string, string> }).tokens;
-    if (tokens && Object.keys(tokens).length > 0) checks.push('tokens-valid');
-    return checks;
-  }
-  if (input.kind === 'effect') {
-    // The effect bench proves the target and the knobs; no words sit under a hero band, a
-    // figure or the layer, so the matrix has nothing to measure until the effect lands on
-    // words in an arrangement, where the layout validator runs it.
-    const checks = ['effect-valid'];
-    const tokens = (input.body as { tokens?: Record<string, string> }).tokens;
-    if (tokens && Object.keys(tokens).length > 0) checks.push('tokens-valid');
-    return checks;
-  }
-  const checks = ['tokens-valid'];
-  const tokens = (input.body as { tokens?: Record<string, string> }).tokens ?? {};
-  if (tokens['--ak-accent']) checks.push('contrast-matrix');
-  return checks;
-}
 
 /** The stored record value — self-describing, per the memory-contracts rule. */
 export interface DesignBookPart {
@@ -502,6 +476,8 @@ export class DesignBookService {
     id: string; filename: string; version: number; replaced_version: number | null; kind: PartKind;
     /** A component only: the markup, the stylesheet and how to wire them. */
     snippet?: ReturnType<typeof componentSnippet>;
+    /** An avatar only: the SVG and how to make it the agent's own. */
+    avatar?: ReturnType<typeof avatarPartSnippet>;
   }> {
     const record = await this.findRecord(id);
     if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
@@ -521,6 +497,10 @@ export class DesignBookService {
         id, filename, version: record.version, replaced_version: null, kind: part.kind,
         snippet: componentSnippet(part.body as unknown as ComponentBody),
       };
+    }
+    // An AVATAR belongs to an agent, not to an app: taking one answers the SVG and writes nothing.
+    if (part.kind === 'avatar') {
+      return { id, filename, version: record.version, replaced_version: null, kind: part.kind, avatar: avatarPartSnippet(part.body as unknown as AvatarBody) };
     }
 
     const apps = new AppUiService(this.storage, this.config);

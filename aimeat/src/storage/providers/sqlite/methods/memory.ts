@@ -8,6 +8,7 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01); listAllMemory and
  *     listAllMemoryMeta filter expired rows in SQL and break order ties by owner (QA audit D4-05); key
  *     prefixes are literal, case-sensitive GLOB patterns (QA audit D4-07).
@@ -503,6 +504,30 @@ export const memoryMethods = {
     if (keys.length === 0) return [];
     const placeholders = keys.map(() => '?').join(',');
     const rows = this.db.prepare(`SELECT * FROM memory WHERE key IN (${placeholders})${NOT_DELETED_SQL}`).all(...keys) as Record<string, unknown>[];
+    const out: MemoryRecord[] = [];
+    for (const row of rows) {
+      const record = this.deserializeMemory(row);
+      if (this.isMemoryExpired(record)) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+        continue;
+      }
+      out.push(record);
+    }
+    return out;
+  },
+
+  // BULK PRIMITIVE — one key under many owners in ONE `ownerGaii IN (…)` query (an agent list's
+  // per-agent avatar record). Live rows only, TTL-expired rows pruned lazily as getMemoryByKeys does.
+  async getMemoryForOwners(this: SqliteStorage, ownerGaiis: string[], key: string): Promise<MemoryRecord[]> {
+    if (ownerGaiis.length === 0) return [];
+    // Chunked: SQLite caps the bound parameters of one statement, and a node-wide list (the
+    // catalogue, the admin owner list) can name every agent on the node.
+    const rows: Record<string, unknown>[] = [];
+    for (let i = 0; i < ownerGaiis.length; i += 500) {
+      const chunk = ownerGaiis.slice(i, i + 500);
+      const placeholders = chunk.map(() => '?').join(',');
+      rows.push(...this.db.prepare(`SELECT * FROM memory WHERE key = ? AND ownerGaii IN (${placeholders})${NOT_DELETED_SQL}`).all(key, ...chunk) as Record<string, unknown>[]);
+    }
     const out: MemoryRecord[] = [];
     for (const row of rows) {
       const record = this.deserializeMemory(row);

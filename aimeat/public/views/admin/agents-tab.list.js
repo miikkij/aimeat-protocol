@@ -14,6 +14,8 @@
  *   - trustCell / scopeCell: the two columns whose reading is not the raw value
  *
  * @version-history
+ *   v2.1.0 — 2026-10-19 — An agent that has its own avatar shows it before its name (AgentAvatar,
+ *     small); an agent without one keeps the row as it was.
  *   v2.0.0 — 2026-09-27 — Library components only: the List (one row per agent, its record in the
  *     row's panel), the filter Tabs with their counts, TextField, More, Mark, Tinted.
  *   v1.1.0 — 2026-09-13 — Compose the shared poster list heading.
@@ -32,6 +34,7 @@ import { Tinted } from '/components/Figure.js';
 import { TextField } from '/components/TextField.js';
 import { Tabs } from '/components/Tabs.js';
 import { Row as Line } from '/components/Layout.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { trustKind, trustText, isAwake } from './agents-tab.derive.js';
 import AgentRecord, { seenWords } from './agents-tab.record.js';
 
@@ -98,7 +101,8 @@ export default function AgentsList({
     const open = openGaii === a.gaii;
     return html`
           <${Item} key=${a.gaii} open=${open}>
-            <${Name} onOpen=${() => onToggle(a.gaii)} attention=${open} meta=${a.gaii} clip>
+            <${Name} onOpen=${() => onToggle(a.gaii)} attention=${open} meta=${a.gaii} clip
+              before=${avatarOf(a) ? html`<${AgentAvatar} agent=${a} size="small" />` : null}>
               ${a.display_name || a.gaii.split('#')[0]}
             <//>
             <${Cell} clip><${Action} small soft onClick=${() => onOwner(a.owner)}>${a.owner}<//><//>

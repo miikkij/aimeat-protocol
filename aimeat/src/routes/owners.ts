@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-19 — The agent roster on GET /v1/owners/:name carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
  *   2026-10-16 — POST /v1/owners takes `setupCode`: the first account on a node whose base URL is not
  *     loopback needs the one-time setup code (claimOperatorSetupCode) and is refused 403
  *     SETUP_CODE_REQUIRED / SETUP_CODE_INVALID without it (Jouni, 2026-10-16).
@@ -60,6 +61,7 @@ import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
 import { registerOwnerExportRoute } from './owners/export.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
 export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -242,6 +244,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // passes too. A read of the profile card writes no operator trail; asked only when not self.
     const privileged = isSelf || (local && await isOperatorCaller(storage, req.auth));
     const agents = privileged ? await storage.getAgentsByOwner(owner.name) : [];
+    const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/owners/:name');
 
     res.json(success(config.nodeId, {
       name: owner.name,
@@ -249,7 +252,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       created_at: owner.createdAt,
       ...(privileged ? {
         roles: owner.roles,
-        agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+        agents: agents.map(a => ({ gaii: a.gaii, display_name: a.displayName, avatar: avatars.get(a.gaii) ?? null, trust_score: a.trustScore })),
       } : {}),
     }));
   });

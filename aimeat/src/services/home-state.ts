@@ -19,6 +19,7 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.4.4 — 2026-10-19 — The card's agent carries `avatar` (services/agent-avatar.ts), null when it has none.
  *   v1.4.3 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts.
  *   v1.4.2 — 2026-10-11 — needsBetterApp passes the person's answer to the conditions question
  *     (`meets_conditions`): the Gemini app connects in the United States only.
@@ -54,6 +55,7 @@ import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
 
 /** The connection prerequisite; useful tasks and the optional webpage are available alongside it. */
 export const HOME_STEPS = ['first-agent'] as const;
@@ -104,6 +106,8 @@ export interface HomeState {
     agent: {
         name: string;
         gaii: string;
+        /** The agent's picture (services/agent-avatar.ts), null when it has none. */
+        avatar: AvatarView | null;
         connectedAt: string | null;
         health: AgentHealth;
         /** How many agents the owner has, so one card cannot imply there is only one. */
@@ -200,11 +204,15 @@ async function readHomeStateInScope(
         ? agents.reduce((best, a) =>
             healthByGaii[a.gaii].rank < healthByGaii[best.gaii].rank ? a : best, agents[0])
         : null;
+    const avatars = worst
+        ? await readAvatarsOrEmpty(storage, [worst.gaii], logger.warn.bind(logger), 'home-state')
+        : new Map<string, AvatarView>();
 
     const agent = worst
         ? {
             name: worst.name,
             gaii: worst.gaii,
+            avatar: avatars.get(worst.gaii) ?? null,
             connectedAt: str(firstAgent, 'at') ?? worst.createdAt ?? null,
             health: healthByGaii[worst.gaii],
             total: agents.length,

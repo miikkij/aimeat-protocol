@@ -1,6 +1,15 @@
 {
   "about": "When each skill was last read against the code it describes, and which files that code is. pnpm check:skill-reviews fails when a watched file changes after the review, so whoever changed the code re-reads the skill. Re-stamp after reading with: pnpm check:skill-reviews --record <name>. Reasoning: aimeat/scripts/check-skill-reviews.ts.",
   "skills": {
+    "node:agent-avatar": {
+      "reviewedOn": "2026-10-19",
+      "watches": [
+        "aimeat/src/services/agent-avatar.ts",
+        "aimeat/src/routes/agents/avatar.ts",
+        "aimeat/src/data/agent-avatar-templates.ts"
+      ],
+      "digest": "sha256:3191bf463992cd653fff6945"
+    },
     "node:aimeat-decide": {
       "reviewedOn": "2026-10-15",
       "watches": [
@@ -233,19 +242,19 @@
       "digest": "sha256:0f8ab65ca51570d1234f367b"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-10-15",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:dd9043a9af536df9721672a2"
+      "digest": "sha256:1fba33f35ff565b9f2e127e5"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:4959608a141cd8ba3f82306e"
+      "digest": "sha256:35a94360fe6f4305243c00f9"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -305,7 +314,7 @@
       "digest": "sha256:48b66899636de21b0b9278f8"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -314,7 +323,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:fe540a7b27a06212cb5b1457"
+      "digest": "sha256:97b3d679a7d8a96091b36f6c"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-18",
@@ -479,11 +488,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:c4bc89976e9f0d656a1ad7d2"
+      "digest": "sha256:0b6260f3762e8444a6297b6f"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -600,10 +609,10 @@
       "aimeat/src/services/ai-provenance.ts": "24021ea9d834c23b"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "a2a0d28e157ccf1c"
+      "aimeat/src/mcp/core-admin.ts": "0f6be25f234dc7ce"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "11a15a9c0a9e3362",
+      "aimeat/src/mcp/core.ts": "9fffe57fa59660e2",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "17a446c5b02e1805"
     },
     "node:manage-my-profile-data": {
@@ -663,7 +672,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "e5f75254a4adb99c"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -714,7 +723,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "dd78753590f50bd1",
       "aimeat/src/cli/connect/mcp/local-server.ts": "8843e486d97c7154",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "e5f75254a4adb99c",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
       "aimeat/src/services/agent-task-rules.ts": "b3fcbcce4708f37d"
@@ -772,6 +781,11 @@
       "aimeat/src/services/workspace-share.ts": "53f68ad666a816ba",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
       "aimeat/src/routes/page-host.ts": "fed8aae26b7b9e02"
+    },
+    "node:agent-avatar": {
+      "aimeat/src/services/agent-avatar.ts": "e723ba76d91fa56a",
+      "aimeat/src/routes/agents/avatar.ts": "412e3df74736e1bf",
+      "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
     }
   }
 }

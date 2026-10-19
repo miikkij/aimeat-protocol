@@ -18,6 +18,9 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.7.1 — 2026-10-19 — EVERY GET DOOR skips a door where the control visitor got 429: in the guard
+ *     tier the sweep (one more door since GET /v1/agents/{gaii}/avatar.svg) filled the limiter's window
+ *     and three late doors read as leaks, while the suite alone passed 35 of 35.
  *   v1.7.0 — 2026-10-17 — A workspace shared with access 'account' refuses the visitor (401
  *     SHARE_ACCOUNT_REQUIRED) and admits a local account. It failed before the fix: the visitor read
  *     the share with 200 (plan doc-mvcn6c7e4e5q, V0.5).
@@ -387,6 +390,10 @@ async function run() {
             asked++;
             const [visitor, own, stranger] = await Promise.all([get(path, fedToken), get(path, alice.token), get(path, strangerToken)]);
             if (visitor.status === 0 || visitor.status >= 300) continue;
+            // A rate limit on the control visitor says nothing about who asked: the sweep is over a
+            // hundred doors in a burst, and in the guard tier the limiter's window can fill before it
+            // ends. Such a door gives no comparison, so it is neither a pass nor a leak.
+            if (stranger.status === 429) continue;
             if (stranger.status >= 400) leaks.push(`GET ${route}: admitted the namesake's visitor (${visitor.status}) where a stranger gets ${stranger.status}`);
             else if (visitor.body === own.body && own.body !== stranger.body) leaks.push(`GET ${route}: answered the visitor with the namesake's own data`);
         }

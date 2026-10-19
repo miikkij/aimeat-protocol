@@ -9,6 +9,7 @@
  * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
+ *   2026-10-19 — GET /v1/catalogue/agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read per page.
  *   v1.1.0 — 2026-06-23 — Exclude `unlisted` agents from GET /v1/catalogue/agents (Secretary Phase 0).
  *   v1.2.0 — 2026-07-14 — Perf: GET /v1/catalogue/knowledge finds manifests via ONE listAllMemory key
  *     scan + cache, instead of a listMemory per owner AND per agent on every (uncached) request.
@@ -37,6 +38,8 @@ import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
 import { actionPricingFromRequest, presentActionPricing } from '../services/action-pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { logger } from '../utils/logger.js';
 
 /** Shape of a stored knowledge-package manifest value (memory record `value`). */
 interface KnowledgePackageManifest {
@@ -149,12 +152,15 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const agents = (await cachedAgents()).filter(a => !(a.tags ?? []).includes('unlisted'));
     const start = (page - 1) * perPage;
     const paged = agents.slice(start, start + perPage);
+    // The agent's picture is public like its description (services/agent-avatar.ts): one read for the page.
+    const avatars = await readAvatarsOrEmpty(storage, paged.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/catalogue/agents');
 
     res.json(success(config.nodeId, {
       '@context': DEFAULT_CONTEXT,
       agents: paged.map(a => ({
         gaii: a.gaii,
         display_name: a.displayName,
+        avatar: avatars.get(a.gaii) ?? null,
         description: a.description,
         trust_score: a.trustScore,
         capabilities: a.capabilities,

@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.24.0 -- 2026-10-19 -- GET …/workspace/participants gives each agent of this node its `avatar`
+ *     (services/agent-avatar.ts), one batched read; an agent of another node gets null.
  *   v1.23.0 -- 2026-10-18 -- A renamed workspace's name meets the detection rules written for
  *     workspaces (classifyContainerAfterWrite; plan doc-mvdipuyqraas, L1.6).
  *   v1.22.0 -- 2026-10-18 -- PUT …/workspace/share asks the publish gate: opening the share to anyone
@@ -77,7 +79,8 @@ import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
-import { resolveIdentity, parseGaiiLoose, isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { resolveIdentity, parseGaiiLoose, isSameOwner, localAccountName, buildGAII } from '../../utils/gaii.js';
+import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyPassword } from '../../services/password.js';
@@ -333,6 +336,9 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       list.push(agg);
       nodesMap.set(agg.node, list);
     }
+    // The pictures of this node's agents, in one read; an agent of another node has none here.
+    const local = (nodesMap.get(config.nodeId) ?? []).flatMap(o => [...o.agents.keys()].map(n => buildGAII(n, o.owner, config.nodeId)));
+    const avatars = await readAvatarsOrEmpty(storage, local, logger.warn.bind(logger), 'GET /v1/organisms/:id/workspace/participants');
     const nodes = [...nodesMap.entries()].map(([node, owners]) => ({
       id: node,
       isLocal: node === config.nodeId,
@@ -347,7 +353,10 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
           // Show every agent's identifier + what it has done (its trace count); `isOwn` only drives
           // the visual emphasis. A non-own agent's LIVE status / current task is never exposed here —
           // this endpoint only ever reports the historical trace, so others' agents stay greyed-out.
-          agents: [...o.agents.entries()].map(([name, count]) => ({ name, isOwn: isSelf, contributions: count })),
+          agents: [...o.agents.entries()].map(([name, count]) => ({
+            name, isOwn: isSelf, contributions: count,
+            avatar: node === config.nodeId ? avatars.get(buildGAII(name, o.owner, node)) ?? null : null,
+          })),
         };
       }),
     }));

@@ -35,6 +35,8 @@
  * @structure cardUri / jwksUri / nodeKeyUri · registerAgentCardRoutes(router, config, storage)
  * @usage registerAgentCardRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-19 — The public card (and /card/info's public half) carries `iconUrl`, the absolute
+ *     address of the agent's avatar, when it has one (services/agent-avatar.ts).
  *   v1.1.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-08-31 — The public/extended split (spec chapter 4). `/card` becomes the node-signed
  *     public projection and `/card/extended` carries the agent's own bytes; `/card/info` answers with
@@ -56,6 +58,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { getNodeCryptoKeys } from '../../auth/jwt.js';
 import type { AgentCard } from '../../models/agent-card.js';
 import { logger } from '../../utils/logger.js';
+import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
 
 /** Where this node serves an agent's card and key set. Used by the routes and by the enrolment offer. */
 export function cardUri(baseUrl: string, gaii: string): string {
@@ -111,8 +114,12 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
    * serving, so it goes out unsigned rather than 500-ing, and the caller can tell which it got
    * because one is a JWS and the other is JSON.
    */
-  async function projectionOf(card: AgentCard): Promise<{ projection: PublicAgentCard; jws: string | null }> {
-    const projection = publicCardProjection(card, nodeKeyUri(config.baseUrl));
+  async function projectionOf(card: AgentCard, gaii: string): Promise<{ projection: PublicAgentCard; jws: string | null }> {
+    // The avatar is public by design (services/agent-avatar.ts); a card answers for any reader, so
+    // its address is absolute.
+    const avatar = (await readAvatarsOrEmpty(storage, [gaii], logger.warn.bind(logger), 'GET /v1/agents/:gaii/card')).get(gaii);
+    const iconUrl = avatar ? `${config.baseUrl.replace(/\/+$/, '')}${avatar.url}` : undefined;
+    const projection = publicCardProjection(card, nodeKeyUri(config.baseUrl), iconUrl);
     try {
       const { privateKey } = getNodeCryptoKeys();
       const nodeKey = await storage.getNodeKey();
@@ -223,7 +230,7 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
   router.get('/v1/agents/:gaii/card', async (req, res) => {
     const found = await loadCarded(req, res);
     if (!found) return;
-    const { projection, jws } = await projectionOf(found.card);
+    const { projection, jws } = await projectionOf(found.card, found.agent.gaii);
     if (jws) { res.type('application/jose').send(jws); return; }
     res.json(projection);
   });
@@ -262,7 +269,7 @@ export function registerAgentCardRoutes(router: Router, config: AimeatConfig, st
     const found = await loadCarded(req, res);
     if (!found) return;
     const extended = isSameOwnerReader(req, found.agent);
-    const card = extended ? found.card : (await projectionOf(found.card)).projection;
+    const card = extended ? found.card : (await projectionOf(found.card, found.agent.gaii)).projection;
     if (extended) res.set('Cache-Control', 'no-store');
     res.json(success(config.nodeId, {
       extended,

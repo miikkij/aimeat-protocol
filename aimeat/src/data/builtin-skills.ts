@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-19 -- agent-avatar (public): how an agent makes and sets its own picture at agent.avatar
+ *     (builtin-skills.agent-avatar.ts). A new name, so seeding creates it on an existing node too.
  *   2026-10-18 -- use-app-bound-skills: on a node closed to strangers a public skill is saved at members, with a warning (plan V1.6).
  *   2026-10-18 -- aimeat-node-guide: a write with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 -- use-app-bound-skills: a public app guide may wait for the owner's approval (publish_request; plan doc-mvcn6c7e4e5q, V4).
@@ -213,6 +215,7 @@ import { MCP_SERVERS_SKILL_ENTRY } from './builtin-skills.mcp-servers.js';
 import { WORKFLOW_DECISIONS_SKILL_ENTRY } from './builtin-skills.workflow-decisions.js';
 import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
 import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
+import { AGENT_AVATAR_SKILL_ENTRY } from './builtin-skills.agent-avatar.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -224,6 +227,7 @@ export interface BuiltinSkill {
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
+  AGENT_AVATAR_SKILL_ENTRY,
   ...RECURRING_WORK_SKILL_ENTRIES,
   ...CONVERSATION_SKILL_ENTRIES,
   GUIDED_JOURNEY_SKILL_ENTRY,
