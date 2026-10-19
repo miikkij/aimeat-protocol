@@ -30,7 +30,14 @@
  * replaces the shell's fetch of /v1/build every 60 s (Jouni: live data is an event, never a poll). A
  * signed-out page holds a visitor stream for it (POST /v1/events/visitor-ticket), which carries the
  * build and nothing else, and a view that brings a session reopens the stream signed.
+ * Signed-in-only node (2026-10-19): there the gate refuses the visitor ticket, so a page without a
+ * session opens no stream, and the first view that brings one opens it signed. Before, the shell's
+ * build watch asked for a visitor ticket before the auth lib had loaded, got 401 on every page load
+ * of a signed-in person, and went without live updates for the ten seconds of the 401 retry.
  */
+
+/** This node shows its content to its own accounts only (routes/portal-spa.ts window.__SITE). */
+const closedNode = () => typeof window !== 'undefined' && /** @type {any} */ (window).__SITE?.contentAccess === 'signed-in';
 
 let es = null;
 let subscribers = [];                 // { domains: Set<string>|null, fn }  (null = all domains)
@@ -73,7 +80,9 @@ export async function connect(getJwt) {
   jwtGetter = getJwt;
   if (started) {
     // The build watch may hold a visitor stream; a view that has a session needs the signed one.
-    if (isLeader && es && !streamSigned && getJwt?.()) { es.close(); es = null; _open(); }
+    // On a signed-in-only node the page opened no stream without the session (_open), so the first
+    // view that has one opens it here.
+    if (isLeader && (es || closedNode()) && !streamSigned && getJwt?.()) { if (es) { es.close(); es = null; } _open(); }
     return;
   }
   started = true;
@@ -138,7 +147,7 @@ function relay(domains) {
 
 async function _open() {
   const jwt = jwtGetter?.();
-  if (!jwt && !visitorOk) return;
+  if (!jwt && (!visitorOk || closedNode())) return;
 
   try {
     streamSigned = !!jwt;

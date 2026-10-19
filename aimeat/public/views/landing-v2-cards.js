@@ -20,6 +20,7 @@
  * @structure PROMPTS · CARDS · PromptCards · AppCard · Wall2
  * @usage import { PromptCards, Wall2 } from './landing-v2-cards.js';
  * @version-history
+ *   v0.3.3 — 2026-10-19 — A card's screenshot loads through js/session-src.js (signed-in-only node).
  *   v0.3.2 — 2026-09-29 — The prompts name the node the visitor is on instead of aimeat.io.
  *   v0.3.1 — 2026-09-24 — The wall's screenshots carry an alt that names the app (Bing, 37 empty alts).
  *   v0.3.0 — 2026-09-15 — The four prompts were run and the cards carry the results: address,
@@ -37,6 +38,7 @@ import { openAppSandboxed } from '/js/app-sandbox.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { SessionImg } from '/js/session-src.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -191,7 +193,7 @@ function AppCard({ a }) {
   return html`
     <div class="ld-app-card" role="button" tabindex="0"
       onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
-      ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
+      ${a.screenshot_url ? html`<${SessionImg} class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
       <div class="ld-app-name">${m.icon ? m.icon + ' ' : ''}${m.name || a.filename}</div>
       ${desc && html`<div class="ld-app-desc">${desc}</div>`}
       <div class="ld-app-foot">

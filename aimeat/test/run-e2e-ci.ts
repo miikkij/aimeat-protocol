@@ -487,6 +487,8 @@ const ALL_SUITES = [
     'test/e2e-portfolio-origin.ts',
     // Self-spawns its own node set to signed-in content access, with both origins provisioned.
     'test/e2e-content-access-gate.ts',
+    // Self-spawns its own signed-in-only node: what a signed-in browser sends without a credential.
+    'test/e2e-content-access-browser.ts',
     // Self-spawns its own node with the app origin and strict new-app defaults.
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.

@@ -13,6 +13,7 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.4 -- 2026-10-19 -- A card's screenshot loads through js/session-src.js (signed-in-only node).
  *   v1.1.3 -- 2026-10-06 -- "Get your own" is a StoreDoor: "Opens soon" while the store does not take
  *     orders (site.store_status "soon").
  *   v1.1.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text itself, so an
@@ -30,6 +31,7 @@ import { openAppSandboxed } from '/js/app-sandbox.js';
 import { StoreDoor } from '/components/StoreDoor.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { SessionImg } from '/js/session-src.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -161,7 +163,7 @@ export function Gallery() {
               return html`
                 <div key=${a.owner + '/' + a.filename} class="ld-app-card" role="button" tabindex="0"
                   onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
-                  ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
+                  ${a.screenshot_url ? html`<${SessionImg} class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt=${shotAlt(m.name || a.filename)} />` : ''}
                   <div class="ld-app-name">${m.icon ? m.icon + ' ' : ''}${m.name || a.filename}</div>
                   ${desc && html`<div class="ld-app-desc">${desc}</div>`}
                   <div class="ld-app-foot">

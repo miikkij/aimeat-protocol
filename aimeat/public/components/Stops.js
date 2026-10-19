@@ -15,6 +15,7 @@
  *          { key: 'pub', label: x('wc.published'), value: 'v4', note: x('wc.visibleToOthers') }]}
  *          picture=${{ src: shot }} lead=${x('wc.explainSaved')} foot=${'Size: 2 KB'}><${Actions}>…<//><//>`
  * @version-history
+ *   v1.1.1 — 2026-10-19 — The picture loads through js/session-src.js, so it shows on a signed-in-only node.
  *   v1.1.0 — 2026-09-27 — appcat parity: `lead` and `foot` drawn by the component in the old band's
  *     values (.wc-explain, .wc-size); the children are the doors at the column's start, as the old
  *     band's button row stood; the rows as wide as the widest stop; the figures at normal leading.
@@ -25,14 +26,17 @@
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
+import { useSessionSrc } from '/js/session-src.js';
 
 const html = htm.bind(h);
 
 /** The picture; it goes away when it does not load. */
 function Picture({ src, alt = '' }) {
   const [failed, setFailed] = useState(false);
-  if (!src || failed) return null;
-  return html`<img class="stops-picture" src=${src} alt=${alt} loading="lazy" onError=${() => setFailed(true)} />`;
+  // On a signed-in-only node an <img> of the API carries no session, so it is fetched with one.
+  const pic = useSessionSrc(src);
+  if (!pic.src || failed) return null;
+  return html`<img class="stops-picture" src=${pic.src} alt=${alt} loading="lazy" onError=${() => setFailed(true)} />`;
 }
 
 /**

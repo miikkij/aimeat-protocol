@@ -44,6 +44,8 @@ declare global {
     __APP_ORIGIN_ENABLED?: boolean;
     /** The build the shell was served with (routes/portal-spa.ts); live-updates.js watchBuild compares the stream's hello with it. */
     __BUILD_ID?: string;
+    /** js/closed-node-fetch.js has put the session on same-origin requests (signed-in-only node). */
+    __aimeatSessionFetch?: boolean;
   }
 
   /**

@@ -40,6 +40,7 @@
  * @usage html`<${PageHead} title=${t('skills.tabLabel')} sub=${x('titleSub')} marks=${[{ label: '3 own', tone: 'sun' }]}
  *          desc=${x('desc')} actions=${html`<${Loud} …/><${Actions}>…<//>`} />`
  * @version-history
+ *   v1.5.1 — 2026-10-19 — The picture loads through js/session-src.js, so it shows on a signed-in-only node.
  *   v1.5.0 — 2026-10-03 — `help`: the question mark after the title words that explains the page's
  *     concept (guidance for normal people, part B); additive.
  *   v1.4.0 — 2026-09-27 — `thing` and `picture`: the app catalogue's app detail masthead (appcat
@@ -56,6 +57,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { Mark } from '/components/Mark.js';
 import { HelpTip } from '/components/HelpTip.js';
+import { useSessionSrc } from '/js/session-src.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -72,9 +74,11 @@ const markOf = (m, i) => (m && typeof m === 'object' && 'label' in m && !('type'
  */
 function Picture({ glyph, src, alt = '' }) {
   const [failed, setFailed] = useState(false);
-  const shot = !!src && !failed;
+  // On a signed-in-only node an <img> of the API carries no session, so it is fetched with one.
+  const pic = useSessionSrc(src);
+  const shot = !!pic.src && !failed && !pic.failed;
   return html`<div class=${cx('og-mast-picture', shot && 'og-mast-picture--shot')}>
-    ${shot ? html`<img src=${src} alt=${alt} loading="lazy" onError=${() => setFailed(true)} />` : html`<span class="og-mast-glyph">${glyph}</span>`}
+    ${shot ? html`<img src=${pic.src} alt=${alt} loading="lazy" onError=${() => setFailed(true)} />` : html`<span class="og-mast-glyph">${glyph}</span>`}
   </div>`;
 }
 
