@@ -24,7 +24,7 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
- *   v1.4.1 — 2026-10-19 — The portfolio settings are merged on the record's version (updateRecord)
+ *   v1.4.1 — 2026-10-19 — The portfolio settings are merged on the record's version (mergePortfolioConfig)
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.4.0 — 2026-10-11 — POST /v1/home/ai-client takes `meets_conditions`, the answer to the
  *     `conditions` question the Gemini app raises (region-dependent, Jouni's ruling 2026-10-11).
@@ -57,9 +57,9 @@ import {
 } from '../../services/onboarding-funnel.js';
 import { readHomeState } from '../../services/home-state.js';
 import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
-import { updateRecord } from '../../services/record-cas.js';
+import { mergePortfolioConfig } from '../../services/portfolio-config.js';
 import {
-    portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, PORTFOLIO_CONFIG_KEY,
+    portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml,
 } from '../portfolio.js';
 
 export interface HomeRouteCtx {
@@ -125,12 +125,9 @@ async function storeMatAsPortfolio(
 
     // Enable the portfolio, preserving whatever settings are already there. The mat is meant to be
     // looked at the moment it lands — an accepted mat behind a disabled portfolio would be the
-    // "nothing happened" screen this whole step exists to avoid. Written on the settings record's
-    // version, so a settings save that lands meanwhile is merged rather than replaced.
-    await updateRecord(storage, target, PORTFOLIO_CONFIG_KEY,
-        (v) => ({ ...((v ?? {}) as Record<string, unknown>) }),
-        (prev) => ({ ...prev, enabled: true, source: 'welcome-mat', ...(title ? { title } : {}) }),
-        { tag: 'portfolio', visibility: 'owner' });
+    // "nothing happened" screen this whole step exists to avoid. mergePortfolioConfig merges on the
+    // settings record's version, so a settings save that lands meanwhile is kept.
+    await mergePortfolioConfig(storage, target, { enabled: true, source: 'welcome-mat', ...(title ? { title } : {}) });
 }
 
 /** Record what we learned about the person's AI. Never carries the mat's content (05-mittaus.md). */
