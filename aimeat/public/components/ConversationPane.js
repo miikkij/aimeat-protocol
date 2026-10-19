@@ -12,8 +12,9 @@
  *   writes a class. The look is css/components/conversation-pane.css.
  *
  *   The heights are measured, not guessed: the page's hook publishes the distance from the panes'
- *   top edge to the window's bottom as --conversation-desk-avail, and on a phone the visible height
- *   as --conversation-avail (views/profile/inbox-tab/use-thread-ux.js).
+ *   top edge to the window's bottom as --conversation-desk-avail (views/profile/inbox-tab/
+ *   use-thread-ux.js), and on a phone the open pane is pinned to the visible area, --vv-top and
+ *   --vv-height (js/visual-viewport.js).
  * @structure Panes({ open, backLabel, onBack, side, head, label, framed, children }) · Pane({ empty, page, children }) ·
  *   PaneHead({ picture, name, nameTitle, presence, subject, via, address, before, children }) ·
  *   PaneDoor({ mark, label, title, pressed, onClick }) · PaneFields({ children }) ·

@@ -10,6 +10,10 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.11.0 — 2026-10-19 — The open phone pane is pinned to the visible area (js/visual-viewport.js,
+ *     --vv-top / --vv-height) instead of top 0 plus a measured --conversation-avail, which iOS left
+ *     behind the keyboard: a reply from a notification could not see its own input. The measurement
+ *     also runs when a field loses focus.
  *   v1.10.0 — 2026-09-26 — The panes are the ConversationPane component: the measurement reads
  *     .conversation-panes (open: --open) and publishes --conversation-desk-avail / --conversation-avail.
  *   v1.9.0 — 2026-09-26 — The composer is the Composer component (.poster-composer) and the thread the Thread
@@ -45,6 +49,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { resolveThreadAttachmentUrls } from './helpers.js';
 import { attachmentUrl } from '/js/services/messages.js';
+import { trackVisualViewport } from '/js/visual-viewport.js';
 
 const LINK_PREVIEWS_KEY = 'aimeat.inbox.linkPreviews';
 const BC_STORE = 'aimeat.inbox.broadcasts';
@@ -153,23 +158,22 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
   }, [thread, mode, activeConv]);
 }
 
-/** Mobile keyboard ergonomics — the reliable version. Rather than the fragile `dvh − keyboard` math (which
- *  double-counted on Android Chrome, where dvh ALSO shrinks for the keyboard → the messenger collapsed and
- *  left a big dead gap above the keyboard), we MEASURE the real space: from the top of `.inbox-body` down to
- *  the bottom of the visual viewport (which excludes the keyboard on every platform), and publish it as
- *  `--inbox-avail`. The ≤760px open-panel body height uses that, so the composer sits right on the keyboard
- *  with the thread filling the rest — no void, no page-scroll jump. We deliberately do NOT scrollIntoView the
- *  composer (that centered it and created the gap); instead we keep the message list pinned to the bottom.
- *  Only active on mobile with a thread/compose panel open; otherwise the var is cleared and CSS falls back. */
+/** Mobile keyboard ergonomics. The open pane on a phone is pinned to the visual viewport, the area a
+ *  person can actually see with the keyboard up (js/visual-viewport.js publishes its top and height, and
+ *  conversation-pane.css reads them), so the composer sits right on the keyboard on iOS as well as on
+ *  Android, with the thread filling the rest. We deliberately do NOT scrollIntoView the composer (that
+ *  centered it and created a gap); instead we keep the message list pinned to the bottom. This hook also
+ *  measures the closed and desktop panes (--conversation-desk-avail). */
 export function useMobileComposerKeyboard(mode) {
   const syncRef = useRef(() => {});
   useEffect(() => {
     const vv = window.visualViewport;
     const root = document.documentElement;
     const isNarrow = () => window.matchMedia('(max-width: 760px)').matches;
+    const viewport = trackVisualViewport();
     const sync = () => {
       const body = document.querySelector('.conversation-panes');
-      if (!body) { root.style.removeProperty('--conversation-avail'); root.style.removeProperty('--conversation-desk-avail'); return; }
+      if (!body) { root.style.removeProperty('--conversation-desk-avail'); return; }
 
       // DESKTOP: the messenger used to be `100vh - 300px`, a guess at how much shell sits above it.
       // Measured on a 1280x900 window it left 94px of dead space below the pane AND still scrolled the
@@ -188,16 +192,11 @@ export function useMobileComposerKeyboard(mode) {
       const pad = shell ? (parseFloat(getComputedStyle(shell).paddingBottom) || 0) : 20;
       const deskAvail = Math.max(isNarrow() ? 240 : 320, Math.round(bottom - top - pad - 8));
       root.style.setProperty('--conversation-desk-avail', `${deskAvail}px`);
-      if (!isNarrow()) { root.style.removeProperty('--conversation-avail'); return; }
-      if (!vv || !body.classList.contains('conversation-panes--open')) {
-        root.style.removeProperty('--conversation-avail');
-        return;
-      }
-      // Distance from the body's top edge to the top of the visible (keyboard-excluded) area, then the
-      // remaining height below it. Clamp so a mid-animation reading can't collapse the pane.
-      const vvTop = top - (vv.offsetTop || 0);
-      const avail = Math.max(220, Math.round(vv.height - vvTop));
-      root.style.setProperty('--conversation-avail', `${avail}px`);
+      // The OPEN pane on a phone is pinned to the visible area itself (--vv-top / --vv-height from
+      // js/visual-viewport.js, read by conversation-pane.css), which holds on iOS as well as on
+      // Android; it used to be top 0 plus a height measured here, which only Android kept above the
+      // keyboard (a reply from a notification, 2026-10-19).
+      viewport.sync();
     };
     syncRef.current = sync;
     const onFocusIn = (e) => {
@@ -208,15 +207,19 @@ export function useMobileComposerKeyboard(mode) {
       setTimeout(sync, 120); setTimeout(sync, 360);
       setTimeout(() => { const m = document.querySelector('.message-thread'); if (m) m.scrollTop = m.scrollHeight; }, 380);
     };
+    // When the keyboard goes away, the visible area grows back; read it once it has settled.
+    const onFocusOut = () => { if (isNarrow()) setTimeout(sync, 360); };
     if (vv) { vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); }
     window.addEventListener('resize', sync);
     window.addEventListener('focusin', onFocusIn);
+    window.addEventListener('focusout', onFocusOut);
     sync();
     return () => {
       if (vv) { vv.removeEventListener('resize', sync); vv.removeEventListener('scroll', sync); }
       window.removeEventListener('resize', sync);
       window.removeEventListener('focusin', onFocusIn);
-      root.style.removeProperty('--conversation-avail');
+      window.removeEventListener('focusout', onFocusOut);
+      viewport.stop();
     };
   }, []);
   // Re-measure when the panel opens/closes (mode change) — no viewport event fires on a pure route switch.

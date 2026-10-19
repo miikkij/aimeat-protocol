@@ -9,6 +9,8 @@
  *   never styles it from outside.
  * @usage Linked from public/spa.html in the component block.
  * @version-history
+ *   v1.2.0 — 2026-10-19 — The open phone pane is pinned to the visible area (--vv-top, --vv-height),
+ *     so its composer stays on the keyboard on iOS too; its scroll part does not chain to the page.
  *   v1.1.0 — 2026-09-27 — The framed panes (Panes framed): panes.css folded in under this sheet's names,
  *     with its values; nothing the messenger draws changed.
  *   v1.0.1 — 2026-09-26 — The reply bar's left edge reads var(--shape-frame-heavy) (3px in AIMEAT), not
@@ -126,8 +128,12 @@
   .conversation-panes-side { border-right: none; }
   .conversation-panes:not(.conversation-panes--open) > .conversation-pane { display: none; }
   .conversation-panes:not(.conversation-panes--open) > .conversation-panes-side { height: 100%; }
-  .conversation-panes--open { grid-template-rows: auto minmax(0, 1fr); position: fixed; inset: 0; z-index: 1000; margin: 0; border-top: 0;
-    height: var(--conversation-avail, 100dvh); background: var(--bg, var(--card-bg)); }
+  /* Pinned to the area the person can see (--vv-top, --vv-height: js/visual-viewport.js), not to the
+     page's top edge: iOS covers the page with the keyboard and scrolls the visible area down, and a
+     pane at top 0 left its composer behind the keyboard (2026-10-19). */
+  .conversation-panes--open { grid-template-rows: auto minmax(0, 1fr); position: fixed; inset: var(--vv-top, 0px) 0 auto 0; z-index: 1000; margin: 0; border-top: 0;
+    height: var(--vv-height, 100dvh); background: var(--bg, var(--card-bg)); }
+  .conversation-panes--open .conversation-pane-scroll { overscroll-behavior: contain; }
   .conversation-panes--open > .conversation-panes-side { display: none; }
   .conversation-panes--open > .conversation-panes-back { display: inline-flex; }
   body:has(.conversation-panes--open) { overflow: clip; }
