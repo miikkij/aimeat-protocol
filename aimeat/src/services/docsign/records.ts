@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-19 — addToIndex and removeFromIndex change the index on its version (updateRecord): withLock is per request and per process (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-15 — signRequest takes the credential origin: method "session" is refused for an owner-level personal access token, which is a program and not the person at the node's page (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Wallet signatures: the sealing step is shared (sealInto), a request keeps
@@ -58,6 +59,7 @@ import { removeStorageFile } from '../storage-file-write.js';
 import { readerFor } from '../classification/reader.js';
 import { fileTarget } from '../classification/labels.js';
 import { logger } from '../../utils/logger.js';
+import { updateRecord, UNCHANGED } from '../record-cas.js';
 import {
   canonicalJson, intentChallenge, keyMessage, evidenceHash, sealStatement, verifySeal, sha256Hex,
   type SignIntent, type SealedStatement, type Seal, type SignMethod, type Assurance,
@@ -158,11 +160,17 @@ async function writeJson(storage: Storage, key: string, value: unknown, tags: st
   });
 }
 
+/** An index record as stored: the request ids, newest first. */
+const indexOf = (v: unknown): { ids: string[] } => {
+  const ids = (v as { ids?: unknown } | null | undefined)?.ids;
+  return { ids: Array.isArray(ids) ? ids.filter((x): x is string => typeof x === 'string') : [] };
+};
+
+/** Add `id` to an index on the index's version, so an id another request added meanwhile stays. */
 async function addToIndex(storage: Storage, key: string, id: string): Promise<void> {
-  const idx = (await readJson<{ ids: string[] }>(storage, key)) ?? { ids: [] };
-  if (idx.ids.includes(id)) return;
-  idx.ids = [id, ...idx.ids].slice(0, MAX_INDEX);
-  await writeJson(storage, key, idx, ['docsign-index']);
+  await updateRecord(storage, NS, key, indexOf,
+    (idx) => idx.ids.includes(id) ? UNCHANGED : { ids: [id, ...idx.ids].slice(0, MAX_INDEX) },
+    { tag: 'docsign-index', visibility: 'private' });
 }
 
 const locks = new Map<string, Promise<void>>();
@@ -330,11 +338,11 @@ export async function cancelRequest(ctx: DocsignCtx, caller: CallerContext, id: 
   });
 }
 
+/** Take `id` out of an index on the index's version, so an id another request added meanwhile stays. */
 async function removeFromIndex(storage: Storage, key: string, id: string): Promise<void> {
-  const idx = await readJson<{ ids: string[] }>(storage, key);
-  if (!idx?.ids.includes(id)) return;
-  idx.ids = idx.ids.filter((x) => x !== id);
-  await writeJson(storage, key, idx, ['docsign-index']);
+  await updateRecord(storage, NS, key, indexOf,
+    (idx) => idx.ids.includes(id) ? { ids: idx.ids.filter((x) => x !== id) } : UNCHANGED,
+    { tag: 'docsign-index', visibility: 'private' });
 }
 
 /**

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-19 — PUT /cors/:key writes the origin list on the version it read (setMemoryIfVersion) and
+ *     reads again on a conflict, so a value written meanwhile stays (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-18 — PUT /:key asks the publish gate like POST: 202 with `publish_request` (plan
  *     doc-mvcn6c7e4e5q, V4.4).
  *   2026-10-16 — PUT /:key refuses a change of an agent's live crew definition's browser site list
@@ -92,6 +94,9 @@ import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
+
+/** How many times PUT /v1/memory/cors/:key reads the record again after another write of it. */
+const CORS_ATTEMPTS = 10;
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -587,9 +592,27 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
     }
 
-    record.allowedOrigins = allowed_origins === null ? undefined : allowed_origins;
-    record.updatedAt = new Date().toISOString();
-    await storage.setMemory(record);
+    // Written on the version that was read: a value written to the key meanwhile is read again and
+    // keeps its new value, and only the origin list changes.
+    const origins = allowed_origins === null ? undefined : allowed_origins as string[];
+    let current: typeof record | null = record;
+    let landed = false;
+    for (let attempt = 0; attempt < CORS_ATTEMPTS && current && !landed; attempt++) {
+      current.allowedOrigins = origins;
+      current.updatedAt = new Date().toISOString();
+      landed = storage.setMemoryIfVersion
+        ? !!(await storage.setMemoryIfVersion({ ...current, key: current.key }, current.version))
+        : !!(await storage.setMemory(current));
+      if (!landed) current = await storage.getMemory(gaii, key);
+    }
+    if (!current) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Memory key "${key}" not found`));
+      return;
+    }
+    if (!landed) {
+      res.status(409).json(error(config.nodeId, 'VERSION_CONFLICT', `Memory key "${key}" changed at every attempt. Try again.`));
+      return;
+    }
     recordMemoryTouch({ ownerGaii: record.ownerGaii, key: record.key, writerPrincipal: gaii, kind: 'write' });
 
     // C.3: Event-driven replication queue integration
@@ -603,9 +626,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.json(success(config.nodeId, {
       key: record.key,
-      allowed_origins: record.allowedOrigins ?? null,
+      allowed_origins: current.allowedOrigins ?? null,
     }));
-    emitRecordChange('memory', record.ownerGaii, record.visibility);
+    emitRecordChange('memory', record.ownerGaii, current.visibility);
   });
 
   // GET /v1/memory/:gaii/:key, the cross-owner read: routes/memory/public-read.ts (max-file-lines).

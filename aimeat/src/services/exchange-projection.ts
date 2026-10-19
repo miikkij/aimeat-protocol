@@ -39,6 +39,8 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.7.1 — 2026-10-19 — migrateLegacyOfferings sets the exchange flag on the source record's version
+ *     (updateRecord) (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.7.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). A free agent offer with a pacing amount lists again (its old price is
  *     folded into tollMorsels by the offers route, and it was being skipped as NOT_PRICED), and with a
@@ -77,6 +79,13 @@ import { mergeOdpsExtras, mergeProvenance, inheritAiProvenance, offeringOdpsOver
 import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, listingTerms } from './exchange-source-terms.js';
 import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
 import { logger } from '../utils/logger.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
+
+/** A stored source document as its schema reads it, or null when it is absent or does not validate. */
+const parsedOrNull = <T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, v: unknown): T | null => {
+  const p = schema.safeParse(v);
+  return p.success ? p.data : null;
+};
 import { ownerGhiiOf as ownerGhiiOfPrincipal, localAccountName } from '../utils/gaii.js';
 
 export type { ReconcileChange, ReconcileReport } from './exchange-projection-types.js';
@@ -703,22 +712,19 @@ export async function migrateLegacyOfferings(
   for (const o of legacy) {
     if (o.kind === 'app-tool' && o.surface?.kind === 'app-tool') {
       const { appId, tool: toolName } = o.surface;
-      const key = appToolsKey(appId);
-      const rec = await storage.getMemory(ownerGhii, key);
-      const parsed = rec ? AppToolsDocSchema.safeParse(rec.value) : null;
-      const tool = parsed?.success ? parsed.data.tools.find((t: AppTool) => t.name === toolName) : null;
-      if (!rec || !parsed?.success || !tool) { orphans.push(`${o.offeringId} (${o.ext}/${o.action})`); continue; }
-      if (tool.exchange === true) continue;
-      flagged.push(`${appId}/${tool.name}`);
-      if (!dryRun) {
+      // The flag is set on the manifest's version (updateRecord), so a tool list published meanwhile
+      // is read again and flagged rather than replaced; a dry run decides on the same read.
+      let seen: 'orphan' | 'listed' | 'flag' = 'orphan';
+      await updateRecord(storage, ownerGhii, appToolsKey(appId), (v) => parsedOrNull(AppToolsDocSchema, v), (doc) => {
+        const tool = doc?.tools.find((t: AppTool) => t.name === toolName);
+        seen = !doc || !tool ? 'orphan' : tool.exchange === true ? 'listed' : 'flag';
+        if (seen !== 'flag' || dryRun || !doc || !tool) return UNCHANGED;
         tool.exchange = true;
         if (!tool.usageTerms && o.usageTerms) tool.usageTerms = { ...o.usageTerms };
-        await storage.setMemory({
-          key, ownerGaii: ownerGhii, value: { ...parsed.data, updatedAt: new Date().toISOString() },
-          visibility: 'public', tags: ['app-tools'], ttlHours: null, version: 1,
-          createdAt: rec.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
-        });
-      }
+        return { ...doc, updatedAt: new Date().toISOString() };
+      }, { tag: 'app-tools', visibility: 'public' });
+      if (seen === 'orphan') orphans.push(`${o.offeringId} (${o.ext}/${o.action})`);
+      else if (seen === 'flag') flagged.push(`${appId}/${toolName}`);
       continue;
     }
     if (o.kind === 'ext-action') {
@@ -737,24 +743,21 @@ export async function migrateLegacyOfferings(
     if (o.kind === 'agent-work' && o.surface?.kind === 'agent-work') {
       const agentName = o.surface.agentName;
       const agent = (await storage.listAgents()).find(a => a.owner === ownerName && a.name === agentName);
-      const rec = agent ? await storage.getMemory(agent.gaii, `agents.${agentName}.offers`) : null;
-      const parsed = rec ? OffersDocSchema.safeParse(rec.value) : null;
-      const offer = parsed?.success ? parsed.data.offers.find((f: Offer) => f.id === o.action) : null;
-      if (!agent || !rec || !parsed?.success || !offer) { orphans.push(`${o.offeringId} (${o.ext}/${o.action})`); continue; }
-      if (offer.exchange === true) continue;
-      flagged.push(`${agentName}:${offer.id}`);
-      if (!dryRun) {
+      // As for an app tool list: the flag is set on the offers record's version.
+      let seen: 'orphan' | 'listed' | 'flag' = 'orphan';
+      if (agent) await updateRecord(storage, agent.gaii, `agents.${agentName}.offers`, (v) => parsedOrNull(OffersDocSchema, v), (doc) => {
+        const offer = doc?.offers.find((f: Offer) => f.id === o.action);
+        seen = !doc || !offer ? 'orphan' : offer.exchange === true ? 'listed' : 'flag';
+        if (seen !== 'flag' || dryRun || !doc || !offer) return UNCHANGED;
         offer.exchange = true;
         offer.visibility = 'public';
         if (!offer.inputSchema && o.taskSpec?.inputSchema) offer.inputSchema = o.taskSpec.inputSchema;
         if (!offer.outputSchema && o.taskSpec?.outputSchema) offer.outputSchema = o.taskSpec.outputSchema;
         if (!offer.usageTerms && o.usageTerms) offer.usageTerms = { ...o.usageTerms };
-        await storage.setMemory({
-          key: `agents.${agentName}.offers`, ownerGaii: agent.gaii, value: { ...parsed.data, updatedAt: new Date().toISOString() },
-          visibility: rec.visibility ?? 'owner', tags: ['offers'], ttlHours: null, version: 1,
-          createdAt: rec.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString(),
-        });
-      }
+        return { ...doc, updatedAt: new Date().toISOString() };
+      }, { tag: 'offers', visibility: (stored) => stored?.visibility ?? 'owner' });
+      if (seen === 'orphan') orphans.push(`${o.offeringId} (${o.ext}/${o.action})`);
+      else if (seen === 'flag') flagged.push(`${agentName}:${o.action}`);
       continue;
     }
     orphans.push(`${o.offeringId} (${o.ext}/${o.action})`);

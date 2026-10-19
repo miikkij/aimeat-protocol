@@ -16,11 +16,14 @@
  *   resetVisibilitySettingsCache (tests)
  * @usage const s = await cachedVisibilitySettings(storage, ownerGhii); if (s.enabled) …
  * @version-history
+ *   v1.1.1 — 2026-10-19 — setVisibilitySettings changes the record on its version (updateRecord)
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.1.0 — 2026-10-11 — tagsInUseOnNode: which analytics services any account holder uses, so the
  *     privacy page shows its paragraph about them only when one does.
  *   v1.0.0 — 2026-10-08 — Moved out of visibility-counter.ts, with the tag ids of layer B.
  */
-import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
+import { updateRecord } from '../record-cas.js';
 import { VISIBILITY_SETTINGS_KEY, type VisibilitySettings } from '../../models/visibility-schemas.js';
 import { logger } from '../../utils/logger.js';
 
@@ -81,21 +84,17 @@ export async function setVisibilitySettings(
   if (typeof ga4 === 'string' && ga4 !== '' && !GA4_ID_RE.test(ga4)) {
     throw new VisibilitySettingsError('INVALID_INPUT', 'ga4_measurement_id is the Measurement ID of a GA4 web data stream, such as G-ABC123XYZ9.');
   }
-  const existingRow = await storage.getMemory(ownerGhii, VISIBILITY_SETTINGS_KEY);
-  const existing = normalize(existingRow?.value as Partial<VisibilitySettings> | undefined);
-  const now = nowIso();
-  const settings: VisibilitySettings = {
-    enabled: input.enabled ?? existing.enabled,
-    clarityProjectId: clarity === undefined ? existing.clarityProjectId : (clarity || null),
-    ga4MeasurementId: ga4 === undefined ? existing.ga4MeasurementId : (ga4 || null),
-    updatedAt: now,
-  };
-  await storage.setMemory({
-    key: VISIBILITY_SETTINGS_KEY, ownerGaii: ownerGhii,
-    value: settings as unknown as Record<string, unknown>,
-    visibility: 'owner', tags: ['signal-visibility'], ttlHours: null,
-    version: (existingRow?.version ?? 0) + 1, createdAt: existingRow?.createdAt ?? now, updatedAt: now,
-  } as MemoryRecord);
+  // Changed on the record's version (updateRecord): a change the web page or an agent tool wrote
+  // meanwhile is read again and kept.
+  const settings = await updateRecord(storage, ownerGhii, VISIBILITY_SETTINGS_KEY,
+    (v) => normalize(v as Partial<VisibilitySettings> | undefined),
+    (existing): VisibilitySettings => ({
+      enabled: input.enabled ?? existing.enabled,
+      clarityProjectId: clarity === undefined ? existing.clarityProjectId : (clarity || null),
+      ga4MeasurementId: ga4 === undefined ? existing.ga4MeasurementId : (ga4 || null),
+      updatedAt: nowIso(),
+    }),
+    { tag: 'signal-visibility', visibility: 'owner' });
   cache.set(ownerGhii, { settings, until: Date.now() + SETTINGS_TTL_MS });
   // The privacy page says whether any account holder uses analytics tags; a change shows there at once.
   void refreshTagsInUse(storage);

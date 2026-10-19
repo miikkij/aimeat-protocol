@@ -29,6 +29,9 @@
  *   const state = await readCrewState(storage, agent);
  *   const out = await publishCrewDef({ storage, config }, caller, agent, doc);
  * @version-history
+ *   2026-10-19 — publishCrewDef claims its revision by creating the history copy (expectedVersion 0)
+ *     and writes the live key on the version it read, so two publishes at once take two revisions
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-16 — crewSitesWriteRefusal(): a memory write of the live definition that changes its
  *     browser site list is the owner's in person, as on the crew routes (QA audit F07b-02).
  *   v1.1.0 — 2026-08-28 — misdirectedCrewKey(): the one rule every memory door applies so a crews.*
@@ -50,6 +53,8 @@ export const CREW_RUNTIME_PREFIX = 'crews.runtime.';
 export const CREW_VERSION_WINDOW = 10;
 /** The envelope schema version crew_registry.py writes and unwraps. */
 const ENVELOPE_VERSION = 1;
+/** How many times a publish reads again after another publish took its revision or wrote the live key. */
+const PUBLISH_ATTEMPTS = 10;
 
 export interface CrewKeys { base: string; draft: string; runtime: string }
 
@@ -205,7 +210,8 @@ export async function readCrewState(storage: Storage, agent: AgentRecord): Promi
   };
 }
 
-function writeInto(deps: CrewWriteDeps, caller: CrewWriteCaller, agent: AgentRecord, key: string, value: unknown, tags: string[]): Promise<MemoryWriteResult> {
+/** `expectedVersion`: write only on that version of the key (0: only when the key is absent). */
+function writeInto(deps: CrewWriteDeps, caller: CrewWriteCaller, agent: AgentRecord, key: string, value: unknown, tags: string[], expectedVersion?: number): Promise<MemoryWriteResult> {
   return writeMemoryRecord(deps, {
     principal: caller.principal,
     targetGaii: agent.gaii,
@@ -221,6 +227,7 @@ function writeInto(deps: CrewWriteDeps, caller: CrewWriteCaller, agent: AgentRec
     pipeline: caller.pipeline,
     // The record lands in the agent's namespace by contract; there is no owner copy to shadow.
     ownerScoped: true,
+    ...(expectedVersion !== undefined ? { expectedVersion } : {}),
   });
 }
 
@@ -258,27 +265,44 @@ export async function publishCrewDef(
 ): Promise<CrewPublishResult> {
   const { storage } = deps;
   const keys = crewKeysFor(agent.name);
-  const refs = (await listVersionRefs(storage, keys.base)).filter(r => r.ownerGaii === agent.gaii);
-  const live = await storage.getMemory(agent.gaii, keys.base);
-  const liveRev = live ? (unwrapEnvelope(live.value, agent.name)?.revision ?? 0) : 0;
-  const revision = Math.max(liveRev, ...refs.map(r => r.n), 0) + 1;
   const publishedAt = new Date().toISOString();
-  const envelope: CrewDefEnvelope = {
-    version: ENVELOPE_VERSION,
-    revision,
-    publishedAt,
-    publishedBy: caller.principal,
-    agent_name: agent.name,
-    doc: { ...doc, agent_name: agent.name },
-    // Written only when a sibling validated. Omitted otherwise, so an ordinary publish produces
-    // exactly the envelope it always did.
-    ...(validatedBy ? { validatedBy } : {}),
-  };
-
-  const snapshot = await writeInto(deps, caller, agent, `${keys.base}.version.${revision}`, envelope, ['crew-def', 'version']);
-  if (!snapshot.ok) return snapshot;
-  const written = await writeInto(deps, caller, agent, keys.base, envelope, ['crew-def']);
-  if (!written.ok) return written;
+  // The revision is claimed by creating its history copy (expectedVersion 0), so two publishes at
+  // the same moment cannot both take one number: the loser reads again and takes the next one. The
+  // live key is then written on the version that was read, and a newer revision already live wins.
+  let refs: Awaited<ReturnType<typeof listVersionRefs>> = [];
+  let revision = 0;
+  let envelope: CrewDefEnvelope | null = null;
+  for (let attempt = 0; attempt < PUBLISH_ATTEMPTS && !envelope; attempt++) {
+    refs = (await listVersionRefs(storage, keys.base)).filter(r => r.ownerGaii === agent.gaii);
+    const live = await storage.getMemory(agent.gaii, keys.base);
+    const liveRev = live ? (unwrapEnvelope(live.value, agent.name)?.revision ?? 0) : 0;
+    revision = Math.max(liveRev, ...refs.map(r => r.n), 0) + 1;
+    const candidate: CrewDefEnvelope = {
+      version: ENVELOPE_VERSION,
+      revision,
+      publishedAt,
+      publishedBy: caller.principal,
+      agent_name: agent.name,
+      doc: { ...doc, agent_name: agent.name },
+      // Written only when a sibling validated. Omitted otherwise, so an ordinary publish produces
+      // exactly the envelope it always did.
+      ...(validatedBy ? { validatedBy } : {}),
+    };
+    const snapshot = await writeInto(deps, caller, agent, `${keys.base}.version.${revision}`, candidate, ['crew-def', 'version'], 0);
+    if (!snapshot.ok && snapshot.code === 'VERSION_CONFLICT') continue;
+    if (!snapshot.ok) return snapshot;
+    envelope = candidate;
+  }
+  if (!envelope) return { ok: false, status: 409, code: 'VERSION_CONFLICT', message: `${agent.name}'s crew definition was published by someone else at every attempt. Publish again.` };
+  let liveWritten = false;
+  for (let attempt = 0; attempt < PUBLISH_ATTEMPTS && !liveWritten; attempt++) {
+    const live = await storage.getMemory(agent.gaii, keys.base);
+    if ((live ? (unwrapEnvelope(live.value, agent.name)?.revision ?? 0) : 0) > revision) { liveWritten = true; break; }
+    const written = await writeInto(deps, caller, agent, keys.base, envelope, ['crew-def'], live?.version ?? 0);
+    if (!written.ok && written.code !== 'VERSION_CONFLICT') return written;
+    liveWritten = written.ok;
+  }
+  if (!liveWritten) return { ok: false, status: 409, code: 'VERSION_CONFLICT', message: `${agent.name}'s live crew definition changed at every attempt. Publish again.` };
 
   await storage.deleteMemory(agent.gaii, keys.draft);
 

@@ -11,6 +11,8 @@
  *   - POST /v1/portal/try-memory: validate text (<=280 chars) + boardKey, append message, cap at 20, write back
  *
  * @version-history
+ *   v1.1.0 — 2026-10-19 — The append is written on the board's version (updateRecord)
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -19,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { updateRecord } from '../services/record-cas.js';
 
 /**
  * Portal API — JSON endpoints extracted from the former SSR portal.
@@ -40,32 +43,18 @@ export function portalApiRouter(config: AimeatConfig, storage: Storage): Router 
       ? rawKey
       : 'board.public';
 
-    // Read existing board
-    const existing = await storage.getMemory(gaii, boardKey);
-    const val = existing?.value as Record<string, unknown> | undefined;
-    let messages: { msg: string; t: string }[] = [];
-    if (val?.messages && Array.isArray(val.messages)) {
-      messages = val.messages as { msg: string; t: string }[];
-    }
+    // Append the new message and keep the last 20, on the board's version: a message another post
+    // appended meanwhile stays.
+    const message = { msg: text, t: new Date().toISOString() };
+    const board = await updateRecord(storage, gaii, boardKey,
+      (v) => {
+        const messages = (v as Record<string, unknown> | undefined)?.messages;
+        return { messages: Array.isArray(messages) ? [...messages as { msg: string; t: string }[]] : [] };
+      },
+      (cur) => ({ messages: [...cur.messages, message].slice(-20) }),
+      { tag: 'board', visibility: 'public', ttlHours: 72 });
 
-    // Append new message, keep last 20
-    messages.push({ msg: text, t: new Date().toISOString() });
-    if (messages.length > 20) messages = messages.slice(-20);
-
-    // Write back
-    await storage.setMemory({
-      key: boardKey,
-      ownerGaii: gaii,
-      value: { messages },
-      visibility: 'public',
-      tags: ['board'],
-      ttlHours: 72,
-      version: (existing?.version ?? 0) + 1,
-      createdAt: existing?.createdAt ?? new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-
-    res.json(success(config.nodeId, { posted: true, count: messages.length }));
+    res.json(success(config.nodeId, { posted: true, count: board.messages.length }));
   });
 
   return router;

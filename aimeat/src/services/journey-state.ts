@@ -34,6 +34,8 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.2.1 — 2026-10-19 — mergeJourneyProfile() writes on the version it read (expectedVersion) and
+ *     merges again on a conflict (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.2.0 — 2026-10-03 — mergeJourneyProfile(): the welcome-mat paste (the copy-prompt road) writes
  *     the interview's answers into `journey.state` through writeMemoryRecord, cleaned the same way the
  *     record is read, merged over the stored record and never overwriting with an empty answer.
@@ -54,6 +56,8 @@ import { logger } from '../utils/logger.js';
 
 /** The one record the person's own words live in. */
 export const JOURNEY_KEY = 'journey.state';
+/** How many times mergeJourneyProfile reads again after another write of the record. */
+const MERGE_ATTEMPTS = 10;
 
 /**
  * In the order a newcomer meets them. The profile comes first: the interview runs in any AI through
@@ -317,30 +321,38 @@ export async function mergeJourneyProfile(
     if (!fresh.length) return { updated: [] };
 
     const ghii = `${owner}@${config.nodeId}`;
-    const existing = await getOwnerScopeMemory(storage, config.nodeId, owner, JOURNEY_KEY);
-    const base = existing?.value && typeof existing.value === 'object' && !Array.isArray(existing.value)
-        ? existing.value as Record<string, unknown> : {};
-    const updated = fresh.filter(f => base[f] !== cleaned[f]);
-    if (!updated.length) return { updated: [] };
+    // Written on the version of the owner's own record that was read (0: none yet), so the road or
+    // another field the home page wrote meanwhile is merged again rather than replaced.
+    for (let attempt = 0; attempt < MERGE_ATTEMPTS; attempt++) {
+        const existing = await getOwnerScopeMemory(storage, config.nodeId, owner, JOURNEY_KEY);
+        const base = existing?.value && typeof existing.value === 'object' && !Array.isArray(existing.value)
+            ? existing.value as Record<string, unknown> : {};
+        const updated = fresh.filter(f => base[f] !== cleaned[f]);
+        if (!updated.length) return { updated: [] };
 
-    const value: Record<string, unknown> = { ...base };
-    for (const f of updated) value[f] = cleaned[f];
-    const own = existing?.ownerGaii === ghii ? existing : null;
-    const written = await writeMemoryRecord({ storage, config }, {
-        principal: ghii, targetGaii: ghii, scopes: [], roles: ['owner'],
-    }, {
-        key: JOURNEY_KEY,
-        value,
-        visibility: own?.visibility ?? 'private',
-        tags: own?.tags ?? [],
-        pipeline,
-        ownerScoped: true,
-    });
-    if (!written.ok) {
-        logger.warn('journey-state: interview answers not written', { owner, code: written.code, message: written.message });
-        return { updated: [] };
+        const value: Record<string, unknown> = { ...base };
+        for (const f of updated) value[f] = cleaned[f];
+        const own = existing?.ownerGaii === ghii ? existing : null;
+        const written = await writeMemoryRecord({ storage, config }, {
+            principal: ghii, targetGaii: ghii, scopes: [], roles: ['owner'],
+        }, {
+            key: JOURNEY_KEY,
+            value,
+            visibility: own?.visibility ?? 'private',
+            tags: own?.tags ?? [],
+            pipeline,
+            ownerScoped: true,
+            expectedVersion: own?.version ?? 0,
+        });
+        if (!written.ok && written.code === 'VERSION_CONFLICT') continue;
+        if (!written.ok) {
+            logger.warn('journey-state: interview answers not written', { owner, code: written.code, message: written.message });
+            return { updated: [] };
+        }
+        return { updated };
     }
-    return { updated };
+    logger.warn('journey-state: interview answers not written, the record changed at every attempt', { owner });
+    return { updated: [] };
 }
 
 /** The section for an owner, or null on any trouble: a handbook never fails over it. */

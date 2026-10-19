@@ -22,6 +22,8 @@
  *   await appendTurn(storage, config, gaii, thread.id, { role: 'user', text: 'build me pong' });
  *   const shown = await showThreads(storage, readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.2.0 — 2026-10-19 — archiveOverflow appends to the month record on its version (updateRecord),
+ *     and a conversation already in it is not added again (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: showThread and showThreads, which pass the conversation
  *     records through the caller's ContentReader (presentMemories) before a turn or a title is
  *     returned. readThread and listThreads stay for the node's own read-to-update (appendTurn,
@@ -34,6 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, presentMemory } from './classification/present-memory.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 
 /** One thing said, by either side, with whatever the agent did while saying it. */
 export interface ChatTurn {
@@ -210,9 +213,12 @@ export async function archiveOverflow(
     for (const thread of overflow) {
         const month = monthOf(thread.updatedAt ?? thread.createdAt ?? new Date().toISOString());
         const key = archiveKey(month);
-        const existing = (await storage.getMemory(gaii, key))?.value as { threads?: ChatThread[] } | undefined;
-        const bundle = { threads: [...(existing?.threads ?? []), thread] };
-        await writeRecord(storage, gaii, key, bundle, ['chat', 'archive']);
+        // On the month record's version: a conversation another roll-over archived into the same
+        // month meanwhile stays, and one it already archived is not added twice.
+        await updateRecord(storage, gaii, key,
+            (v) => ({ threads: (v as { threads?: ChatThread[] } | undefined)?.threads ?? [] }),
+            (bundle) => bundle.threads.some((t) => t?.id === thread.id) ? UNCHANGED : { threads: [...bundle.threads, thread] },
+            { tag: 'chat', tags: ['chat', 'archive'], visibility: 'private' });
         await storage.deleteMemory(gaii, liveKey(thread.id));
         archived++;
     }

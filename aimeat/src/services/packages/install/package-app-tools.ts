@@ -24,6 +24,8 @@
  * @structure toolsForPackage(doc) · installPackageAppTools(deps, args)
  * @usage meta.app.tools = toolsForPackage(rec.value); await installPackageAppTools(...)
  * @version-history
+ *   v1.0.1 — 2026-10-19 — The carried list is written with createMemoryIfAbsent
+ *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import type { Storage } from '../../../storage/interface.js';
@@ -73,8 +75,12 @@ export async function installPackageAppTools(storage: Storage, args: {
     logger.warn('package-app-tools: the carried tool list does not validate and was left out', { app: args.filename, error: doc.error.message });
     return;
   }
-  await storage.setMemory({
-    key, ownerGaii: args.ownerGhii, value: doc.data as unknown as Record<string, unknown>, visibility: 'public',
+  // Created only when the key is still absent: a list the owner published after the check above
+  // stays theirs.
+  const record = {
+    key, ownerGaii: args.ownerGhii, value: doc.data as unknown as Record<string, unknown>, visibility: 'public' as const,
     tags: ['app-tools', 'package-installed'], ttlHours: null, version: 1, createdAt: args.now, updatedAt: args.now,
-  });
+  };
+  if (!storage.createMemoryIfAbsent) { await storage.setMemory(record); return; }
+  await storage.createMemoryIfAbsent(record);
 }
