@@ -10,6 +10,8 @@
  *   showGoogleSignupModal · maybeShowGoogleSignup.
  * @usage import { maybeShowGoogleSignup } from './signup.js';  (boot calls it on load)
  * @version-history
+ *   v1.2.0 — 2026-10-19 — The sign-up boot marks the username step in progress before its first
+ *     await (signup-state.js), so a sign-in dialog a page opens on load no longer replaces it.
  *   v1.1.0 — 2026-08-24 — Finalize path maps a colon provider id (saml:contoso) to its
  *     slash route (BR-04); OIDC ids pass through unchanged.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part3.ts (SDK-libs migration Phase 3).
@@ -19,6 +21,7 @@ import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n } from './i18n.js';
 import { NODE_URL } from './config.js';
 import { showLoginModal } from './modal.js';
+import { markSignupInProgress } from './signup-state.js';
 
 var USERNAME_RE = new RegExp('^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$');
 
@@ -169,7 +172,7 @@ function showGoogleSignupModal(pending, i) {
   input.addEventListener('input', evaluate);
   input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !createBtn.disabled) { e.preventDefault(); createBtn.click(); } });
 
-  function close() { if (checkTimer) clearTimeout(checkTimer); modal.remove(); cleanSignupParam(); }
+  function close() { if (checkTimer) clearTimeout(checkTimer); modal.remove(); cleanSignupParam(); markSignupInProgress(false); }
   cancelBtn.addEventListener('click', close);
 
   createBtn.addEventListener('click', async function () {
@@ -212,7 +215,11 @@ export function maybeShowGoogleSignup() {
   var params;
   try { params = new URLSearchParams(location.search); } catch { return; }
   if (params.get('aimeat_signup') !== '1') return;
+  // Before the first await: a page that opens the sign-in dialog on load must find this set.
+  markSignupInProgress(true);
   function showExpired() {
+    // The notice tells the person to sign in again, so the sign-in dialog may open after it.
+    markSignupInProgress(false);
     function open(i) {
       showSignupNoticeModal(i || {}, {
         title: (i && i.signupExpiredTitle) || 'Sign-in session expired',

@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.15.0 — 2026-10-19 — Opens nothing while a first-time provider sign-up is choosing its username
+ *     (signup-state.js): the app-open page's sign-in dialog replaced that step on load.
  *   v1.14.0 — 2026-10-09 — opts.secondFactorLink opens the dialog on the code view in link mode (secaudit 2026-10-09, S1).
  *   v1.13.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.13.0 — 2026-10-05 — A sign-up reaches the code step every time. The late dictionary load no
@@ -82,6 +84,7 @@ import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js'
 import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 import { showAuthErrorIn } from './auth-error.js';
+import { signupInProgress } from './signup-state.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
  *  does, so this separates the two without asking the person which one they typed. */
@@ -103,6 +106,10 @@ const RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="cu
   + '<svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
 
 export function showLoginModal(opts, renderBtn, onClosed) {
+  // A first-time provider sign-in is choosing its username in the same #aimeat-modal; opening the
+  // sign-in dialog now would replace that step and send the person round to the provider again
+  // (signup-state.js). The sign-up finishes by loading the page it started from, signed in.
+  if (signupInProgress()) return;
   var i = opts.i18n || {};
   var lang = currentModalLang();
   // Which of the two tabs is showing. One modal, two separate jobs: signing in needs an identifier
