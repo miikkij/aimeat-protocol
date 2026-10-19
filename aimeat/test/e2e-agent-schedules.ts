@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-10-19 — 11b: a one-shot (max_runs 1) whose run fails is turned off, keeps lastRunError and
+ *     shows no nextRunAt (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   2026-10-16 — 20b: a sibling without ai:use is refused editing and running another agent's ai
  *     schedule (403 SCOPE_DENIED), pausing it needs no word (QA audit F08a-02).
  *   2026-09-27 — Phase 11: a schedule's prompt is read with aimeat_schedule_list detail: true and changed with
@@ -377,6 +379,30 @@ await test('11. Triggering ai schedule without key records an error run', async 
     const { body } = await json(`/v1/schedules/${aiScheduleId}`, { headers: auth1 });
     assert(body.data.schedule.lastRunResult === 'error', `expected error result, got ${body.data.schedule.lastRunResult}`);
     assert(Array.isArray(body.data.runs) && body.data.runs.length > 0, 'has execution log entries');
+});
+
+await test('11b. A one-shot that fails is turned off, keeps the error and shows no next run a year out', async () => {
+    // A failed run does not count toward max_runs: before the fix this schedule stayed on with a
+    // nextRunAt of next year's 4 August, and the pause came only after five failures in a row.
+    const create = await json('/v1/schedules', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            kind: 'ai', cron: '0 21 4 8 *', display_name: 'One-shot translate',
+            prompt: 'Translate the input into Finnish.', input_keys: ['news.raw'],
+            constraints: [{ type: 'max_runs', enabled: true, params: { limit: 1 } }],
+        }),
+    });
+    assert(create.status === 201, `status ${create.status}: ${JSON.stringify(create.body)}`);
+    const id = create.body.data.schedule.id;
+    await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth1 });
+    const { body } = await json(`/v1/schedules/${id}`, { headers: auth1 });
+    const s = body.data.schedule;
+    assert(s.lastRunResult === 'error', `expected an error run (no AI key), got ${s.lastRunResult}`);
+    assert(typeof s.lastRunError === 'string' && s.lastRunError.length > 0, 'lastRunError kept');
+    assert(s.enabled === false, `a failed one-shot must not stay on, got enabled=${s.enabled} nextRunAt=${s.nextRunAt}`);
+    assert(!s.nextRunAt, `a schedule that is off has no next run, got ${s.nextRunAt}`);
+    assert((s.runCount ?? 0) === 0, `a failed run is not counted, got runCount=${s.runCount}`);
+    await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
 });
 
 console.log('\nPhase 6 -- Authorization');

@@ -10,6 +10,9 @@
  *   things mocked: what reached them and what storage was asked to write are the evidence.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-op.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-19 — A text job calls the completion service with `uncapped: true` and keeps
+ *     finish_reason and truncated on its record; the completion mock returns both, as the service
+ *     does (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.1.0 — 2026-09-28 — `role`: the rule refuses one that is not a string of 1 to 300 characters,
  *     and a job's role reaches the service call of every op.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
@@ -28,7 +31,12 @@ vi.mock('../../src/services/ai/completion.js', () => {
         AiCompletionError,
         completeForOwner: vi.fn(async (_s: unknown, _c: unknown, _o: unknown, input: unknown) => {
             calls.complete.push(input);
-            return { content: 'the answer', usage: { costUsd: 0.001, totalTokens: 5 } };
+            // A prompt that says CUT stands for an answer the provider stopped at a token limit.
+            const cut = String((input as { prompt?: string }).prompt ?? '').includes('CUT');
+            return {
+                content: 'the answer', finishReason: cut ? 'length' : 'stop', truncated: cut,
+                usage: { costUsd: 0.001, totalTokens: 5 },
+            };
         }),
     };
 });
@@ -221,6 +229,33 @@ describe('what each op lands at result_key', () => {
         await settle();
         expect(calls.complete[0]).toMatchObject({ prompt: 'Summarise.', provider: 'openrouter' });
         expect(w.writes.find(x => x.key === 'out.result')?.value).toBe('the answer');
+    });
+
+    it('a text job asks for an uncapped answer, so the owner\'s saved max_tokens does not cut it', async () => {
+        const w = watchedStorage();
+        await start(w, { prompt: 'Write the long report.' });
+        await settle();
+        expect(calls.complete[0]).toMatchObject({ uncapped: true });
+        expect(calls.complete[0]).not.toHaveProperty('maxTokens');
+    });
+
+    it('a text job keeps finish_reason and truncated on its record, cut or not', async () => {
+        const w = watchedStorage();
+        const cut = await start(w, { prompt: 'CUT: the long report.' });
+        const whole = await start(w, { prompt: 'A short note.' });
+        await settle();
+        const svc = new AiJobService(config, w.storage);
+        expect(await svc.getJob(OWNER, cut.job_id)).toMatchObject({ state: 'done', finish_reason: 'length', truncated: true });
+        expect(await svc.getJob(OWNER, whole.job_id)).toMatchObject({ state: 'done', finish_reason: 'stop', truncated: false });
+    });
+
+    it('an image job carries neither field: only a text answer can be cut', async () => {
+        const w = watchedStorage();
+        const started = await start(w, { op: 'image', prompt: 'a red bicycle' });
+        await settle();
+        const job = await new AiJobService(config, w.storage).getJob(OWNER, started.job_id);
+        expect(job).not.toHaveProperty('truncated');
+        expect(job).not.toHaveProperty('finish_reason');
     });
 
     it('a job\'s role reaches the service call of every op, and is kept on the record', async () => {

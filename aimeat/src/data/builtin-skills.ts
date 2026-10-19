@@ -21,6 +21,8 @@
  *   2026-10-16 -- aimeat-node-guide: the first account of a node others can reach needs the one-time setup code (Jouni, 2026-10-16).
  *   2026-10-16 -- aimeat-html-page (builtin-skills.html-page.ts): an HTML page in a workspace in three calls, and its rules.
  *   2026-10-16 -- use-app-bound-skills: GET /v1/agents/{name}/skills asks memory:read, except of the agent reading its own (QA audit W35, route-scope triage).
+ *   2026-10-19 -- diagnose-a-workflow: a failed one-shot schedule is turned off, keeps its error and has
+ *     no next run (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   v1.32.0 -- 2026-10-16 -- diagnose-a-workflow: a run past its time limit is an error and the next one
  *     runs, five failures in a row pause a schedule and tell its owner, a run missed while the node was
  *     down is logged as skipped with "Missed:" (QA audit E4-03, E4-04, E4-07).
@@ -589,7 +591,9 @@ metadata:
    agent created. Every user schedule logs each run; only the node's internal \`core\` ticks leave
    their successes out of the log. A run that does not end within its time limit is logged as an
    error and the next run goes ahead. A schedule that fails five times in a row is paused, and its
-   owner is told in the notifications. A run that fell while the node was down is logged as skipped
+   owner is told in the notifications. A one-shot (max_runs 1) that fails is turned off at once and
+   not retried: it keeps \`lastRunError\` and has no next run, and the owner turns it on again or runs
+   it now once the cause is fixed. A run that fell while the node was down is logged as skipped
    with a message starting \`Missed:\` and is not made up.
 4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
    connected and seen recently (\`last_seen\`, \`mode\`)? \`aimeat_agent_activity\` and

@@ -6322,7 +6322,11 @@ components:
 
     ScheduleConstraint:
       type: object
-      description: An opt-in budget/run guard on a schedule. type 'max_runs' or 'daily_limit' in v1.
+      description: >
+        An opt-in budget/run guard on a schedule. type 'max_runs' or 'daily_limit' in v1. max_runs
+        counts successful runs; with limit 1 the schedule is a one-shot, which is turned off after its
+        run whether the run succeeded or failed. A failed one-shot is not retried: it keeps
+        lastRunResult 'error' and lastRunError, has no nextRunAt, and its owner gets one notification.
       required: [type, enabled, params]
       properties:
         type: { type: string, example: max_runs }
@@ -6351,7 +6355,8 @@ components:
         input: { type: object, description: 'Kind-specific config (ai params, agent_task template, extension input, or eco-capability { app, capability_id, input }).' }
         lastRunAt: { type: string, format: date-time }
         lastRunResult: { type: string, enum: [success, error] }
-        nextRunAt: { type: string, format: date-time }
+        lastRunError: { type: string, description: The error of the last run when lastRunResult is error. }
+        nextRunAt: { type: string, format: date-time, description: 'The next fire. Absent on a schedule the scheduler turned off (a one-shot that ran, a max_runs reached, a pause after failures).' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -6406,7 +6411,8 @@ components:
 
             A one-shot ("publish on Tuesday at 09:00") is this kind plus
             `constraints: [{ type: max_runs, enabled: true, params: { limit: 1 } }]` — the scheduler
-            auto-disables the job after the fire. There is deliberately no separate publish queue:
+            auto-disables the job after the fire, and also after a failed fire, which is not retried
+            (ScheduleConstraint). There is deliberately no separate publish queue:
             the durable row, the DST-correct `timezone`, the run log and `/occurrences` are all this
             same machinery. The fire goes through the SAME idempotency gate an immediate
             `POST /v1/connections/publish` does, so a schedule racing an impatient human produces one
@@ -20007,6 +20013,13 @@ paths:
         details? }: the status and details a REST call would have answered (a provider's refusal is
         PROVIDER_REJECTED, status 422, with details.provider_status and provider_message), so a reader
         can tell a refusal that repeats from a failure worth trying again.
+
+
+        A text job (`op` "text", the default) runs with no token cap: the owner's saved answer-length
+        setting does not apply to it. Once the model answered, its record carries `finish_reason`
+        (string or null: why the provider stopped, such as "stop", "length" or "content_filter") and
+        `truncated` (boolean: true when the answer was cut at a token limit, finish_reason "length").
+        An image or a transcription job carries neither.
 
 
         Requires an owner session or a token carrying `ai:use`.

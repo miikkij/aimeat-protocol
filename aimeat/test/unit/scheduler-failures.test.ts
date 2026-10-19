@@ -15,6 +15,8 @@
  *   (message-send) and the bell (notify) are replaced by recorders.
  * @usage cd aimeat && pnpm exec vitest run test/unit/scheduler-failures.test.ts
  * @version-history
+ *   2026-10-19 — A one-shot schedule that fails is turned off at once, with no next run and one bell
+ *     entry; a larger max_runs keeps the ordinary handling (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-03).
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -132,6 +134,51 @@ describe('a user schedule that fails', () => {
         for (let i = 1; i < MAX_CONSECUTIVE_FAILURES; i++) await s.triggerNow(job.id);
         expect((await storage.getScheduledJob(job.id))?.enabled).toBe(true);
         expect(bell.map(b => b.type), 'a new run of failures is told once more').toEqual(['schedule_failed', 'schedule_failed']);
+    });
+});
+
+describe('a one-shot schedule that fails', () => {
+    // A failed run does not count toward max_runs. Before the fix the schedule stayed on, its
+    // nextRunAt became croner's next fire (a year later for this day-and-month cron), and the pause
+    // came only after MAX_CONSECUTIVE_FAILURES failures, five years for a yearly cron.
+    const oneShot = [{ type: 'max_runs' as const, enabled: true, params: { limit: 1 } }];
+
+    it('is turned off at once, keeps the error, shows no next run and tells its owner once', async () => {
+        const owner = `carol@${NODE}`;
+        const job = await stored({
+            type: 'refinery', ownerScope: owner, displayName: 'Publish on 4 August', cron: '0 21 4 8 *',
+            constraints: oneShot, input: { prefix: 'z' },
+        });
+        const s = new Scheduler({ nodeId: NODE } as never, storage);
+        s.registerKindExecutor('refinery', async () => { throw new Error('the provider refused the post'); });
+        s.addJob(job);
+        await vi.waitFor(async () => { expect((await storage.getScheduledJob(job.id))?.nextRunAt).toBeTruthy(); });
+
+        const out = await s.triggerNow(job.id);
+
+        expect(out.code).toBe('error');
+        const row = await storage.getScheduledJob(job.id);
+        expect(row?.enabled, 'a failed one-shot does not stay on').toBe(false);
+        expect(row?.nextRunAt, 'a schedule that is off has no next run').toBeUndefined();
+        expect(row?.lastRunResult).toBe('error');
+        expect(row?.lastRunError).toContain('the provider refused the post');
+        expect(row?.runCount ?? 0, 'a failed run is not counted').toBe(0);
+        expect(bell, 'one bell entry, not a failure and a pause').toEqual([{ to: owner, type: 'schedule_failed', title: 'Schedule "Publish on 4 August" failed' }]);
+        s.removeJob(job.id);
+    });
+
+    it('a schedule with a larger max_runs keeps its ordinary failure handling', async () => {
+        const owner = `dave@${NODE}`;
+        const job = await stored({
+            type: 'refinery', ownerScope: owner, cron: '0 21 * * *',
+            constraints: [{ type: 'max_runs', enabled: true, params: { limit: 3 } }], input: { prefix: 'w' },
+        });
+        const s = new Scheduler({ nodeId: NODE } as never, storage);
+        s.registerKindExecutor('refinery', async () => { throw new Error('flaky'); });
+
+        await s.triggerNow(job.id);
+        expect((await storage.getScheduledJob(job.id))?.enabled).toBe(true);
+        expect(bell.map(b => b.type)).toEqual(['schedule_failed']);
     });
 });
 

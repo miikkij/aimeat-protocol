@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.11.0 — 2026-10-19 — A text job's record carries `finish_reason` and `truncated` once the model
+ *     answered (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.10.1 — 2026-10-18 — The job record is stored once the answer is written, so result_version
  *     survives a restart during on_done and ctx.ai.result still reads the answer after it.
  *   v1.10.0 — 2026-10-18 — `readResult`, the service side of `ctx.ai.result(job_id)`: an extension
@@ -370,6 +372,9 @@ export class AiJobService implements AiJobStarter {
                 const more = outcome.warnings.filter(w => !had.some(h => h.key === w.key));
                 entry.job = { ...entry.job, classification_warnings: [...had, ...more] };
             }
+            // Why the provider stopped, and whether the text was cut at a token limit: on the record
+            // from here on, so every finish below (done, failed in on_done, cancelled) keeps it.
+            if (outcome.answer) entry.job = { ...entry.job, ...outcome.answer };
 
             if (entry.controller.signal.aborted) {
                 await this.finish(jobId, { state: 'cancelled', ...spend });
