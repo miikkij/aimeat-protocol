@@ -9,8 +9,11 @@
  *   - CanonicalOwner — authenticated-caller → owner resolver closure type
  *   - AppTargetFor / appTargetOr — whose bucket this act lands in, or the refusal to send
  *   - appOriginUrl() — WRITES: assigns a subdomain on first use, then builds the URL
+ *   - withForwardedQuery() — the request's query on the redirect target, minus the apex-only parameters
  *   - resolveAppUrls() — READ-ONLY, re-exported from services/app-urls.ts
  * @version-history
+ *   2026-10-19 — withForwardedQuery: the apex inline redirect keeps the app's own query parameters and
+ *     drops mode, code, access, unlock, frame and preview (wish-the-apex-app-redirect-keeps-the-query-string).
  *   v1.3.2 — 2026-10-05 — appOriginScheme and resolveAppUrls moved to services/app-urls.ts (re-exported
  *     here), so the roster service that sends an invitation reads the app's address; aimeat_app_manage
  *     calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
@@ -104,4 +107,33 @@ export async function appOriginUrl(config: AimeatConfig, storage: Storage, owner
         if (sub) return `${scheme}://${sub}.${config.appHost}${portSuffix}/`;
     } catch (err) { logger.warn('appOriginUrl: fall through to path form', { error: String(err) }); }
     return `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
+}
+
+/**
+ * The query parameters the apex route reads for itself and never forwards to the app origin:
+ * - `mode`: the apex's own switch (inline or frame); the app origin always serves the runnable app.
+ * - `code`: the access code. The apex has already checked it, and on the app origin it would sit in
+ *   the address bar, the history and the app's own `location.search`.
+ * - `access`: the app-access grant. A gated app's redirect carries one the apex has just minted; one
+ *   the caller sent (stale, or for another app) does not ride along beside it.
+ * - `unlock`: the single-bounce mark, which the gated redirect sets itself (subdomains.ts unlockRedirect).
+ * - `frame`, `preview`: the frame grant and the draft-preview token, each minted for its own flow and
+ *   never for this redirect (read.ts answers a request carrying `preview` in its draft branch before
+ *   this redirect; the entry keeps the list complete for any other caller).
+ * Every other parameter is the app's own (a deep link, a utm tag) and travels unchanged.
+ */
+const APEX_ONLY_QUERY = ['mode', 'code', 'access', 'unlock', 'frame', 'preview'];
+
+/**
+ * `target` (an app origin address from appOriginUrl, which carries no query) with the request's
+ * query appended, minus APEX_ONLY_QUERY. The path form on the app host already keeps the query
+ * (subdomains.ts), so a link opened through the apex now behaves the same way.
+ */
+export function withForwardedQuery(target: string, originalUrl: string): string {
+    const q = originalUrl.indexOf('?');
+    if (q < 0) return target;
+    const params = new URLSearchParams(originalUrl.slice(q + 1));
+    for (const name of APEX_ONLY_QUERY) params.delete(name);
+    const rest = params.toString();
+    return rest ? `${target}${target.includes('?') ? '&' : '?'}${rest}` : target;
 }

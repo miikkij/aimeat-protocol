@@ -4,11 +4,12 @@
  *   doors actually recorded on aimeat.io: `paatospaja`, `paatospaja.html` and
  *   `happydude500001/puhe.html`.
  * @version-history
+ *   2026-10-19 — namesSignedApp (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import {
-  canonicalAiAppId, appSpentToday, appQuotaFor, appAllowlisted, mergePerApp,
+  canonicalAiAppId, namesSignedApp, appSpentToday, appQuotaFor, appAllowlisted, mergePerApp,
 } from '../../src/services/ai-app-id.js';
 
 const OWNER = 'happydude500001@aimeat-finland-001-genesis';
@@ -45,5 +46,21 @@ describe('the budget reads every name an app was recorded under', () => {
   it('folds a day into one row per app', () => {
     const m = mergePerApp({ paatospaja: { cost_usd: 1, calls: 2 }, 'paatospaja.html': { cost_usd: 3, calls: 4 } }, OWNER);
     expect(m).toEqual({ paatospaja: { cost_usd: 4, calls: 6 } });
+  });
+});
+
+describe('namesSignedApp: a body app_id against the app token\'s own app', () => {
+  const SIGNED = 'happydude500001/puhe.html';
+  it('accepts the bare file name, with or without .html, and the full reference', () => {
+    expect(namesSignedApp('puhe.html', SIGNED)).toBe(true);
+    expect(namesSignedApp('puhe', SIGNED)).toBe(true);
+    expect(namesSignedApp('happydude500001/puhe.html', SIGNED)).toBe(true);
+    expect(namesSignedApp('happydude500001/puhe', SIGNED)).toBe(true);
+  });
+  it('refuses another app of the same owner, and the same file name of another owner', () => {
+    expect(namesSignedApp('other.html', SIGNED)).toBe(false);
+    expect(namesSignedApp('happydude500001/other.html', SIGNED)).toBe(false);
+    expect(namesSignedApp('someoneelse/puhe.html', SIGNED)).toBe(false);
+    expect(namesSignedApp('', SIGNED)).toBe(false);
   });
 });

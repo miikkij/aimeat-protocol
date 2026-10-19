@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-19 — Phases 1 and 7: the apex inline redirect, open and gated, keeps the app's own query
+ *     parameters and drops mode, code, access, unlock, frame and preview; the gated one carries exactly
+ *     one grant, the fresh one (wish-the-apex-app-redirect-keeps-the-query-string).
  *   2026-10-18 — Phase 7: the origin answers the first request with a grant by a 302 to the address
  *     without it and sets the grant cookie; the app serves on the cookie. The access-code round trip
  *     ends on `/?unlock=1`, and its grant carries no viewer (plan doc-mvcn6c7e4e5q, V2).
@@ -181,6 +184,15 @@ async function main() {
             const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}?mode=inline`, { redirect: 'manual' });
             assert(res.status === 301, `expected 301, got ${res.status}`);
             assert((res.headers.get('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.headers.get('location')}`);
+        });
+
+        await test('the apex redirect keeps the app\'s own query and drops mode and the apex\'s credentials', async () => {
+            // `preview` is not in the list: a request carrying it takes the draft-preview branch above the redirect.
+            const q = 'mode=inline&level=3&utm_source=news&name=J%C3%A4rvi+x&code=k1&access=stale&frame=f&unlock=1';
+            const res = await fetch(`${BASE}/v1/apps/${owner}/${filename}?${q}`, { redirect: 'manual' });
+            assert(res.status === 301, `expected 301, got ${res.status}`);
+            const loc = res.headers.get('location') ?? '';
+            assert(loc === `http://${SUB}.${APP_HOST}:${PORT}/?level=3&utm_source=news&name=J%C3%A4rvi+x`, `unexpected Location: ${loc}`);
         });
 
         await test('apex raw download (no mode) still serves on apex (attachment, not executed)', async () => {
@@ -769,6 +781,19 @@ async function main() {
             assert((res.headers.get('cache-control') ?? '').includes('no-store'), 'the gated redirect must not be cached');
             assert(!(await res.text()).includes('gated secret body'), 'the apex must not have served the app');
             grantQuery = loc.slice(loc.indexOf('?'));
+        });
+
+        await test('the gated redirect keeps the app\'s own query beside a fresh grant, without the code or a sent grant', async () => {
+            const res = await fetch(`${BASE}${gatedPath}?mode=inline&code=${CODE}&level=3&access=stale`, {
+                headers: { Accept: 'text/html' }, redirect: 'manual',
+            });
+            assert(res.status === 302, `expected 302, got ${res.status}`);
+            const loc = new URL(res.headers.get('location') ?? '');
+            assert(loc.origin === `http://${GATED_SUB}.${APP_HOST}:${PORT}` && loc.pathname === '/', `unexpected Location: ${loc}`);
+            assert(loc.searchParams.get('level') === '3', `the app's parameter was dropped: ${loc}`);
+            assert(!loc.searchParams.has('code') && !loc.searchParams.has('mode'), `the code or mode travelled: ${loc}`);
+            const grants = loc.searchParams.getAll('access');
+            assert(grants.length === 1 && grants[0] !== 'stale', `expected one fresh grant, got ${JSON.stringify(grants)}`);
         });
 
         await test('the app origin serves the gated app WITH the grant, moved from the address to a cookie', async () => {
