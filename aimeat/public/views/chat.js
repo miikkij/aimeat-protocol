@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-19: On a phone the chat is pinned to the visible area (js/visual-viewport.js), so the
+ *     composer stays on the keyboard on iOS too.
  *   2026-10-06: The cap box's "Get your own place" way says it opens soon and leads nowhere while the
  *     store does not take orders (site.store_status "soon").
  *   2026-10-03: The empty screen says what this chat does with the person's things here, not "Your
@@ -95,6 +97,7 @@ import {
 import { InstallCta } from '/components/InstallCta.js';
 import { storeHref, storeOpensSoon } from '/js/site.js';
 import { useJourney } from './home/journey-steps.js';
+import { trackVisualViewport } from '/js/visual-viewport.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -307,34 +310,12 @@ export default function ChatView() {
         bottomRef.current?.scrollIntoView({ block: 'end' });
     }, [thread?.turns?.length, live.text, live.tools.length, live.cards.length, pinned]);
 
-    // The on-screen keyboard, measured rather than calculated.
-    //
-    // `100dvh − keyboard` double-counts on Android Chrome, where dvh already shrinks for the
-    // keyboard, and the composer ends up floating above a dead gap. The visual viewport excludes the
-    // keyboard on every platform, so the distance from the top of the page to the bottom of it is
-    // the space there actually is. Same approach as the inbox, for the same reason.
-    useEffect(() => {
-        const vv = window.visualViewport;
-        const root = document.documentElement;
-        if (!vv) return undefined;
-        const sync = () => {
-            if (!window.matchMedia('(max-width: 760px)').matches) {
-                root.style.removeProperty('--chat-avail');
-                return;
-            }
-            root.style.setProperty('--chat-avail', `${Math.max(220, Math.round(vv.height))}px`);
-        };
-        sync();
-        vv.addEventListener('resize', sync);
-        vv.addEventListener('scroll', sync);
-        window.addEventListener('orientationchange', sync);
-        return () => {
-            vv.removeEventListener('resize', sync);
-            vv.removeEventListener('scroll', sync);
-            window.removeEventListener('orientationchange', sync);
-            root.style.removeProperty('--chat-avail');
-        };
-    }, []);
+    // The on-screen keyboard. On a phone the chat is pinned to the visual viewport, the area the
+    // person can see with the keyboard up (js/visual-viewport.js publishes its top and height,
+    // conversation-frame.css reads them). A height alone held only on Android Chrome, where the
+    // keyboard shrinks the page; iOS covers the page and scrolls the visible area instead, and the
+    // composer stayed behind the keyboard (2026-10-19). Same as the inbox, for the same reason.
+    useEffect(() => trackVisualViewport().stop, []);
 
     // A change to the agent's permissions is made elsewhere, so the status line refreshes with the
     // rest of the page rather than going stale until a reload.

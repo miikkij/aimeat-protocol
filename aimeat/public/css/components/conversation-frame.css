@@ -9,6 +9,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.3.0 — 2026-10-19 — The phone chat is pinned to the visible area (--vv-top, --vv-height), so its
+ *     composer stays on the keyboard on iOS too.
  *   v1.2.0 — 2026-09-24 — The rules, the headings' letter case and the phone's icons read the theme's
  *     shape values (a move).
  *   v1.1.0 — 2026-09-24 — The jump's look moved to poster.css as the jump tone.
@@ -122,13 +124,16 @@
 /* ── Phones ──
    One pane at a time. The page takes the whole viewport, the shell's sticky nav is hidden (it lives
    in a higher stacking context, so a z-index here cannot cover it), and the composer sits on the
-   keyboard: --chat-avail is the measured visual-viewport height, with 100dvh as the fallback the
-   viewport meta's interactive-widget=resizes-content already provides. Same pattern as the inbox,
+   keyboard: the page is pinned to the visual viewport (--vv-top, --vv-height), with 100dvh as the
+   fallback the viewport meta's interactive-widget=resizes-content already provides on Android. Same pattern as the inbox,
    which is the surface this one is modelled on. One row above the conversation, one row below. */
 @media (max-width: 760px) {
   .poster-conversation {
     position: fixed;
-    inset: 0;
+    /* Pinned to the area the person can see (--vv-top, --vv-height: js/visual-viewport.js), which
+       keeps the composer on the keyboard on iOS too, where the keyboard covers the page rather than
+       shrinking it (2026-10-19). */
+    inset: var(--vv-top, 0px) 0 auto 0;
     z-index: 1000;
     /* minmax(0, …), not a bare 1fr: a bare 1fr floors at the column's min-content width, and a
        long unbroken line in a turn then pushed the whole column to 752px on a 390px phone. */
@@ -136,7 +141,7 @@
     gap: 0;
     padding: 0;
     max-width: none;
-    height: var(--chat-avail, 100dvh);
+    height: var(--vv-height, 100dvh);
     background: var(--bg);
   }
 
