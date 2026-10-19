@@ -1,6 +1,6 @@
 # AIMEAT Feature List
 
-**What an AIMEAT node does today.** Node version 4.1.0, checked against the code on 2026-10-18.
+**What an AIMEAT node does today.** Node version 4.1.1, checked against the code on 2026-10-18.
 
 AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.
 
