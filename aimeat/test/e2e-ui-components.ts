@@ -12,6 +12,9 @@
  *   and a signed-in one must read the same thing.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ui-components
  * @version-history
+ *   v1.3.1 — 2026-10-19 — The build watch inside the boot script is the live stream's (46e6e52ee,
+ *     2026-10-18), not the /v1/build timer; the test reads the new script and that nothing polls.
+ *     Its setup no longer matched production: the nightly sweep went red on it.
  *   v1.3.0 — 2026-10-03 — The preview page's build watchdog returns early inside a frame.
  *   v1.2.0 -- 2026-09-27 -- The chip is active after its adoption. Check status filters against the
  *     complete catalogue, including a non-empty active result (September full-run UI finding).
@@ -146,10 +149,12 @@ await test("The design lab's preview page is served as the app", async () => {
     assert(res.status === 200, `preview page: ${res.status}`);
     // The server stamps a nonce on the tag, so the attribute order is not fixed.
     assert(/<script[^>]*type="importmap"/.test(body), 'it is the app shell');
-    // Only the top window polls /v1/build: the lab's overview held 254 of these frames, each
-    // polling, on a page that had already run out of connections (2026-10-03).
-    assert(/\(function\(\)\{if\(window\.self!==window\.top\)return;var c="[^"]+";function chk\(\)/.test(body),
-        'the build watchdog returns early inside a frame');
+    // Only the top window watches the build: the lab's overview held 254 of these frames, each
+    // polling, on a page that had already run out of connections (2026-10-03). Since 2026-10-18 the
+    // watch is the live stream's build event (live-updates.js watchBuild), never a timer on /v1/build.
+    assert(/\(function\(\)\{if\(window\.self!==window\.top\)return;window\.addEventListener\("load"/.test(body),
+        'the build watch returns early inside a frame');
+    assert(!/setInterval\(chk|fetch\("\/v1\/build"/.test(body), 'the build is not polled');
 });
 
 let mcpToken = '';
