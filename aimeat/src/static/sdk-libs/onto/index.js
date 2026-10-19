@@ -32,11 +32,13 @@
  *   const v = await AIMEAT.onto.vocab('hobbies');
  *   v.search('lintu', 'fi');   // → [{ id, prefLabel, … }]
  * @version-history
+ *   2026-10-19 — The public reads (a shared vocabulary, /v1/ns) go through _core/public-fetch.js (signed-in-only node).
  *   2026-10-15 — scheme() declares the `owl` prefix in its @context, because concept() writes
  *     `owl:deprecated` and the node refuses an undeclared prefix (feature-list audit #70).
  *   v1.0.0 — 2026-09-08 — Initial: types, the SKOS record shape, and reading a vocabulary.
  */
 import { NODE_URL } from '../_core/config.js';
+import { publicFetch } from '../_core/public-fetch.js';
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-onto.js');
 import { attach } from '../_core/namespace.js';
@@ -335,7 +337,7 @@ async function vocab(id, opts) {
   let env;
   if (o.owner) {
     // The public read: no session at all, so a signed-out visitor can render a shared vocabulary.
-    const res = await fetch(NODE_URL + '/v1/memory/' + encodeURIComponent(o.owner) + '/' + encodeURIComponent(key) + '?soft=1');
+    const res = await publicFetch(NODE_URL + '/v1/memory/' + encodeURIComponent(o.owner) + '/' + encodeURIComponent(key) + '?soft=1');
     env = await res.json();
   } else {
     env = await authFetch('/v1/memory/' + encodeURIComponent(key) + '?soft=1');
@@ -374,7 +376,7 @@ let _core = null;
  */
 async function core() {
   if (_core) return _core;
-  const res = await fetch(NODE_URL + '/v1/ns', { headers: { Accept: 'application/ld+json' } });
+  const res = await publicFetch(NODE_URL + '/v1/ns', { headers: { Accept: 'application/ld+json' } });
   if (!res.ok) throw new Error('Could not read the core ontology (' + res.status + ')');
   _core = await res.json();
   return _core;

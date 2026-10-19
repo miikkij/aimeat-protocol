@@ -13,6 +13,7 @@
  * @usage <script src="/v1/libs/aimeat-webmcp.js"></script>
  *   await AIMEAT.webmcp.exposeAppTools({ owner: 'alice', appId: 'shop.html' });
  * @version-history
+ *   v1.2.1 — 2026-10-19 — The listing and the product feed go through _core/public-fetch.js (signed-in-only node).
  *   v1.2.0 — 2026-10-11 — A tool's description tags its money price ([PAID], every currency) and its
  *     pacing ([PACING: N morsels per call], toll_morsels first, the old price.morsels after) apart:
  *     a morsel is never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -25,6 +26,7 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-webmcp.ts (SDK-libs migration Phase 2).
  */
 import { APEX_URL } from '../_core/config.js';
+import { publicFetch } from '../_core/public-fetch.js';
 import { attach } from '../_core/namespace.js';
 
 const NODE_URL = APEX_URL;
@@ -67,7 +69,7 @@ async function registerWith(tools) {
 
 /** Fetch an app's served WebMCP listing (public manifest view). */
 async function fetchListing(owner, appId) {
-  const r = await fetch(NODE_URL + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(appId) + '/webmcp');
+  const r = await publicFetch(NODE_URL + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(appId) + '/webmcp');
   const body = await r.json();
   if (!r.ok) throw new Error((body.error && body.error.message) || ('WebMCP listing failed: ' + r.status));
   return body;
@@ -208,7 +210,7 @@ const webmcp = {
         description: 'List everything for sale on this AIMEAT node: agent offers and priced app-tools (per-call functions of published apps), with money prices in micro-units.',
         inputSchema: { type: 'object', properties: {} },
         async execute() {
-          const r = await fetch(NODE_URL + '/v1/commerce/feed');
+          const r = await publicFetch(NODE_URL + '/v1/commerce/feed');
           return asContent(await r.json());
         },
       },

@@ -153,6 +153,22 @@ async function main() {
             assert(withSession.status === 200, `the same read with the session: ${withSession.status}`);
         });
 
+        await test('an app\'s libraries read its config and its tools with the session, which the node asks for', async () => {
+            // aimeat-data.js appConfig() and aimeat-webmcp.js read these with no credential; the node
+            // refuses that with SIGN_IN_REQUIRED, and _core/public-fetch.js sends the read again with the
+            // session (test/unit/sdk-public-fetch.test.ts holds the client half).
+            for (const path of [`/v1/apps/${owner}/browser-audit.html/config`, `/v1/apps/${owner}/browser-audit.html/webmcp`]) {
+                const anon = await browser(path, '*/*');
+                assert(refusedByGate(anon), `${path} without the session: ${anon.status}`);
+                const signed = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+                assert(signed.status === 200, `${path} with the session: ${signed.status}`);
+            }
+            for (const lib of ['aimeat-data', 'aimeat-webmcp', 'aimeat-commerce', 'aimeat-markdown', 'aimeat-onto', 'aimeat-iam', 'aimeat-atelier']) {
+                const src = (await browser(`/v1/libs/${lib}.js`, '*/*')).body;
+                assert(src.includes('SIGN_IN_REQUIRED'), `${lib}.js does not send a refused public read again with the session`);
+            }
+        });
+
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
     } finally {
         server.kill('SIGTERM');

@@ -13,6 +13,7 @@
  *   renderToString/renderRich; rich CDN loaders; live memory embeds; attach('md', …).
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  AIMEAT.md.render(md, '#out')
  * @version-history
+ *   v1.0.1 — 2026-10-19 — A live block's public read goes through _core/public-fetch.js (signed-in-only node).
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-markdown.ts (SDK-libs migration Phase 2).
  *   v1.1.0 — 2026-07-25 — Added AIMEAT.md.citations(text): pulls `Source:`/`Sources:` lines, inline
  *     lenticular 【url】 citations and bare URLs out of LLM prose into one source list (host +
@@ -20,6 +21,7 @@
  *     URL regexes kept including the closing 】 in the href.
  */
 import { NODE_URL } from '../_core/config.js';
+import { publicFetch } from '../_core/public-fetch.js';
 import { attach } from '../_core/namespace.js';
 
 var BT = String.fromCharCode(96); // backtick
@@ -401,7 +403,7 @@ function renderOneEmbed(preEl) {
     try {
       var envl;
       if (spec.owner) {
-        var r = await fetch(NODE_URL + '/v1/memory/' + encodeURIComponent(spec.owner) + '/' + encodeURIComponent(spec.key));
+        var r = await publicFetch(NODE_URL + '/v1/memory/' + encodeURIComponent(spec.owner) + '/' + encodeURIComponent(spec.key));
         envl = await r.json();
       } else {
         var auth = window.AIMEAT && window.AIMEAT.auth;

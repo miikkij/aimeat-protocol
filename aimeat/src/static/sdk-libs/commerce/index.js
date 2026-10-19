@@ -12,6 +12,7 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-commerce.js"></script>
  *   const s = await AIMEAT.commerce.buyOffer('vendor#alice@node', 'translate-doc');
  * @version-history
+ *   v1.4.1 — 2026-10-19 — feed() goes through _core/public-fetch.js (signed-in-only node).
  *   v1.4.0 — 2026-10-18 — payByCard(id) and finishCardPayment(): a person pays by card on Stripe's own
  *     page, on the seller's Stripe account, and the return page completes the checkout (Comicland v3 A-4).
  *     subscribe(ext, plan), subscriptions(), cancelSubscription(ext, plan) (A-5).
@@ -29,6 +30,7 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-commerce.ts (SDK-libs migration Phase 2).
  */
 import { APEX_URL } from '../_core/config.js';
+import { publicFetch } from '../_core/public-fetch.js';
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-commerce.js');
 import { attach } from '../_core/namespace.js';
@@ -162,7 +164,7 @@ const commerce = {
 
   /** Public product feed: every PUBLIC agent offer on the node with a money price (no login needed). */
   async feed() {
-    const r = await fetch(NODE_URL + '/v1/commerce/feed');
+    const r = await publicFetch(NODE_URL + '/v1/commerce/feed');
     const res = await r.json();
     if (res.error) throw commerceError(res, 'Failed to read the commerce feed');
     return res; // { products: [{ id: "offer:<agentGaii>:<offerId>", title, price, seller }], total }

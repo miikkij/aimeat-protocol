@@ -20,6 +20,30 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
+  // src/static/sdk-libs/_core/public-fetch.js
+  var signedInOnly = false;
+  function sessionJwt() {
+    const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+    const s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+    return s && s.jwt || null;
+  }
+  function withSession(init, jwt) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", "Bearer " + jwt);
+    return { ...init, headers };
+  }
+  async function publicFetch(url, init = {}) {
+    const early = signedInOnly ? sessionJwt() : null;
+    const r = await fetch(url, early ? withSession(init, early) : init);
+    if (r.status !== 401 || early) return r;
+    if (!(r.headers.get("content-type") || "").includes("json")) return r;
+    const body = await r.clone().json();
+    if (!body || !body.error || body.error.code !== "SIGN_IN_REQUIRED") return r;
+    signedInOnly = true;
+    const jwt = sessionJwt();
+    return jwt ? fetch(url, withSession(init, jwt)) : r;
+  }
+
   // src/static/sdk-libs/_core/app-ref.js
   function appRef() {
     try {
@@ -88,7 +112,7 @@
   async function appConfigView() {
     const ref = appRef();
     if (!ref) return null;
-    const r = await fetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
+    const r = await publicFetch((APEX_URL || "") + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/config");
     const body = await r.json();
     if (body && body.ok) return body.data || {};
     if (body && body.error && body.error.code === "NOT_FOUND") return null;
@@ -96,7 +120,7 @@
   }
   async function publicEntryResponse(gaii, key) {
     const url = NODE_URL + "/v1/memory/" + encodeURIComponent(gaii) + "/" + encodeURIComponent(key) + "?soft=1";
-    const r = await fetch(url);
+    const r = await publicFetch(url);
     const res = await r.json();
     if (!res.ok) {
       if (res.error?.code === "NOT_FOUND") return null;

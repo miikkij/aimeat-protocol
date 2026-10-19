@@ -20,6 +20,30 @@
   var NODE_ID = cfg().nodeId;
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
+  // src/static/sdk-libs/_core/public-fetch.js
+  var signedInOnly = false;
+  function sessionJwt() {
+    const auth = typeof window !== "undefined" && window.AIMEAT && window.AIMEAT.auth;
+    const s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+    return s && s.jwt || null;
+  }
+  function withSession(init, jwt) {
+    const headers = new Headers(init.headers);
+    headers.set("Authorization", "Bearer " + jwt);
+    return { ...init, headers };
+  }
+  async function publicFetch(url, init = {}) {
+    const early = signedInOnly ? sessionJwt() : null;
+    const r = await fetch(url, early ? withSession(init, early) : init);
+    if (r.status !== 401 || early) return r;
+    if (!(r.headers.get("content-type") || "").includes("json")) return r;
+    const body = await r.clone().json();
+    if (!body || !body.error || body.error.code !== "SIGN_IN_REQUIRED") return r;
+    signedInOnly = true;
+    const jwt = sessionJwt();
+    return jwt ? fetch(url, withSession(init, jwt)) : r;
+  }
+
   // src/static/sdk-libs/_core/session.js
   function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
@@ -260,7 +284,7 @@
     const o = opts || {};
     let env;
     if (o.owner) {
-      const res = await fetch(NODE_URL + "/v1/memory/" + encodeURIComponent(o.owner) + "/" + encodeURIComponent(key) + "?soft=1");
+      const res = await publicFetch(NODE_URL + "/v1/memory/" + encodeURIComponent(o.owner) + "/" + encodeURIComponent(key) + "?soft=1");
       env = await res.json();
     } else {
       env = await authFetch2("/v1/memory/" + encodeURIComponent(key) + "?soft=1");
@@ -284,7 +308,7 @@
   var _core = null;
   async function core() {
     if (_core) return _core;
-    const res = await fetch(NODE_URL + "/v1/ns", { headers: { Accept: "application/ld+json" } });
+    const res = await publicFetch(NODE_URL + "/v1/ns", { headers: { Accept: "application/ld+json" } });
     if (!res.ok) throw new Error("Could not read the core ontology (" + res.status + ")");
     _core = await res.json();
     return _core;
