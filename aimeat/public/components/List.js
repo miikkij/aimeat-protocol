@@ -22,7 +22,8 @@
  *     "Meta line"), `warn` turns that line coral; `desc` is a sentence (or several) under the name in
  *     the body's letters; `note` a short coral (or `noteTone="fine"`, green) typewriter line under
  *     that, for "why it fits" or what an answer did. `tag` (a word or a Mark, or a list of them) and
- *     `after` stand after the name, `dot` (a status: active, inactive…) before it, `end` at the far
+ *     `after` stand after the name, `dot` (a status: active, inactive…) before it, `flag` ('new' or
+ *     'error', `flagTitle` its words) a short line under the mark before the name, `end` at the far
  *     end of the cell (marks that line up down the list), `before` a control before the name (an
  *     eye that blurs it), `blurred` the name blurred for privacy. `onOpen` or `href`
  *     make the name the way into the thing. `asKey` sets a memory key (typewriter, breaks anywhere),
@@ -84,7 +85,7 @@
  *   Rows come as children, or as `rows` with `render(item, i)`.
  *
  *   Group: the group heading over the rows after it (`title`, `count`, `onFold` + `folded` +
- *   `foldLabel`, `wholeHead` to fold from a click anywhere on it, `doors`, `quiet`, and `onDragOver`
+ *   `foldLabel`, `wholeHead` to fold from a click anywhere on it, `doors`, `quiet`, `apart` for air over it, and `onDragOver`
  *   + `onDrop` to drop a row on it). Filters holds
  *   Filter tabs (`on`, `count`, `onClick`, `attention`, `end`); SearchLine (`value`, `onInput`,
  *   `onEnter`, `onClear`, `placeholder`, `label`, `note`, `text` for a plain text field); More
@@ -99,6 +100,10 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.18.0 — 2026-10-19 — Name `flag` ('new' | 'error', with `flagTitle`): a short line under the
+ *     mark before the name (or under the name), in place of the dot that pushed the row's start right;
+ *     Group `apart`: air over the heading; Lead `bare` passes to the Avatar. Additive, the Agents list
+ *     (Jouni, 2026-10-19).
  *   v1.17.0 — 2026-10-12 — Row `members`: a thing only the node's signed-in members see (appcat's
  *     Community listing), class is-members. Additive.
  *   v1.16.0 — 2026-09-27 — List tone 'checkpoints': the old detail's working-copy history rows
@@ -196,6 +201,7 @@ const given = (v) => v !== undefined && v !== null && v !== false && v !== '';
 const COLOURS = new Set(['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray']);
 const TICKS = { done: '✓', failed: '✗', active: '→', pending: '', off: '·', none: '' };
 const LINES = new Set([2, 3, 4]);
+const FLAGS = new Set(['new', 'error']);
 
 /**
  * The props every cell passes to its element: the drag a row asks for, a tooltip, and the row's
@@ -326,7 +332,7 @@ function nameMarks(marks) {
 }
 
 export function Name({ onOpen, href, newTab, openLabel, meta, warn, clip, desc, note, noteTone, tag, after, dot, dotTitle,
-  asKey, code, unread, attention, end, before, blurred, marks, title, id, nameRef, onFollow, children }) {
+  flag, flagTitle, asKey, code, unread, attention, end, before, blurred, marks, title, id, nameRef, onFollow, children }) {
   const row = useContext(RowContext);
   const cell = useCell(title, id);
   // onFollow (added by admin page group G9): with `href`, the link's own click before the browser
@@ -341,8 +347,12 @@ export function Name({ onOpen, href, newTab, openLabel, meta, warn, clip, desc, 
   else if (row.toggles) name = html`<button type="button" class=${nameCls} aria-expanded=${row.open ? 'true' : 'false'}>${words}</button>`;
   else name = asKey ? html`<span class="key-name">${words}</span>` : words;
   const descs = desc === undefined || desc === null || desc === '' ? [] : (Array.isArray(desc) ? desc : [desc]).filter((d) => d !== undefined && d !== null && d !== false && d !== '');
+  // flag (added 2026-10-19, the Agents list): a short line under the mark before the name, or under
+  // the name when there is no mark, in place of a dot that pushed the row's start to the right.
+  const flagCls = FLAGS.has(flag) ? `list-flag list-flag--${flag}` : null;
+  const flagged = flagCls && !given(before) ? html`<span class=${flagCls} title=${flagTitle}>${name}</span>` : name;
   return html`<div class=${cx('listing-name list-name', unread && 'is-unread', attention && 'is-attention', clip && (clip === 2 ? 'list-clip2' : 'list-clip'))} ref=${nameRef} ...${cell}>
-    ${row.grip ? html`<span class="list-grip" title=${row.grip} aria-hidden="true">⠿</span>` : null}${dot ? html`<i class=${`status-dot status-dot--${dot}`} title=${dotTitle} aria-hidden=${dotTitle ? undefined : 'true'}></i>` : null}${given(end) ? html`<span class="list-end">${end}</span>` : null}${given(before) ? html`<span class="list-before">${before}</span>` : null}${name}${tagsOf(tag)}${after}
+    ${row.grip ? html`<span class="list-grip" title=${row.grip} aria-hidden="true">⠿</span>` : null}${dot ? html`<i class=${`status-dot status-dot--${dot}`} title=${dotTitle} aria-hidden=${dotTitle ? undefined : 'true'}></i>` : null}${given(end) ? html`<span class="list-end">${end}</span>` : null}${given(before) ? html`<span class=${cx('list-before', flagCls)} title=${flagCls ? flagTitle : undefined}>${before}</span>` : null}${flagged}${tagsOf(tag)}${after}
     ${meta !== undefined && meta !== null && meta !== '' ? html`<small class=${warn ? 'is-warn' : undefined}>${meta}</small>` : null}
     ${descs.map((d, i) => html`<p class="list-desc" key=${'d' + i}>${d}</p>`)}
     ${note ? html`<span class=${cx('list-note', noteTone === 'fine' && 'list-note--fine')}>${note}</span>` : null}
@@ -427,9 +437,9 @@ export function Panel({ doors, text, id, title, mark, children }) {
  * (components/Avatar.js: `agent`, `size`, `label` pass through); a picture as `picture` goes into the
  * Avatar too; any other mark (a colour picker, a dot) comes as children.
  */
-export function Lead({ text, seed, agent, size, label, picture, title, children }) {
+export function Lead({ text, seed, agent, size, label, picture, bare, title, children }) {
   const avatar = given(text) || given(seed) || given(picture);
-  return html`<div ...${useCell(title)}>${avatar ? html`<${Avatar} text=${text} seed=${seed} agent=${agent} size=${size} label=${label}>${picture}<//>` : children}</div>`;
+  return html`<div ...${useCell(title)}>${avatar ? html`<${Avatar} text=${text} seed=${seed} agent=${agent} size=${size} label=${label} bare=${bare}>${picture}<//>` : children}</div>`;
 }
 
 export function Tick({ state = 'none', bare, glyph, title }) {
@@ -465,15 +475,17 @@ export function Stat({ icon, date, title, children }) {
  * `doors` stand after the count; `quiet` is the grey heading over a record; `onDragOver` + `onDrop`
  * make the heading a place to drop a row.
  */
-export function Group({ title, count, folded, onFold, foldLabel, doors, quiet, wholeHead, onDragOver, onDrop, children }) {
+export function Group({ title, count, folded, onFold, foldLabel, doors, quiet, wholeHead, apart, onDragOver, onDrop, children }) {
   const foldable = typeof onFold === 'function';
   // wholeHead (added by the fix pass): a click anywhere on the heading folds it, as main's memory
   // collection head (.mem-cart-head, cursor:pointer) did; a press on the ↓ or on a door does not
   // fold twice. The ↓ stays the keyboard's way in.
   const headFolds = foldable && wholeHead;
   const stop = headFolds ? (e) => e.stopPropagation() : undefined;
+  // apart (added 2026-10-19, the Agents list): air over the heading, so a group that follows
+  // another one reads as a list of its own and not as the last row of the one above.
   return html`<${Fragment}>
-    <div class=${cx('poster-day-title list-group-head', quiet && 'poster-day-title--quiet', headFolds && 'list-group-head--folds')}
+    <div class=${cx('poster-day-title list-group-head', quiet && 'poster-day-title--quiet', headFolds && 'list-group-head--folds', apart && 'list-group-head--apart')}
       onClick=${headFolds ? onFold : undefined} onDragOver=${onDragOver} onDrop=${onDrop}>
       ${foldable ? html`<button type="button" class="poster-icon poster-icon--small" title=${foldLabel} aria-label=${foldLabel}
         aria-expanded=${folded ? 'false' : 'true'} onClick=${headFolds ? (e) => { e.stopPropagation(); onFold(e); } : onFold}>${folded ? '→' : '↓'}</button>` : null}

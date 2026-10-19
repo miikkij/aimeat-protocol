@@ -18,10 +18,12 @@
  *     it the row size, 2.2rem.
  *   - `label`: the mark says something a screen reader should hear (a file's kind); without it the
  *     mark is hidden from a screen reader, because the row's name says the same.
- * @structure Avatar({ text, seed, agent, size, label, children })
+ *   - `bare`: no frame and no shadow, the picture alone (an agent's own picture, AgentAvatar.js).
+ * @structure Avatar({ text, seed, agent, size, label, bare, children })
  * @usage html`<${Avatar} text=${initials(name)} />` · html`<${Avatar} text="A" agent />` ·
  *        html`<${Avatar} seed=${ghii} />` · html`<${Avatar} size="large" label=${kind}>${img}<//>`
  * @version-history
+ *   v1.1.0 — 2026-10-19 — `bare`: the square without its frame or shadow (an agent's own picture; Jouni, 2026-10-19).
  *   v1.0.0 — 2026-09-26 — Initial: every initials and identicon square of Settings & Controls as one
  *     component with named sizes (component plan C3).
  */
@@ -36,11 +38,11 @@ const SIZES = new Set(['small', 'large']);
 /** How many signs a person sees (an emoji is one, although it is two UTF-16 units). */
 const signs = (s) => [...String(s)].length;
 
-export function Avatar({ text, seed, agent, size, label, children }) {
+export function Avatar({ text, seed, agent, size, label, bare, children }) {
     const svg = seed !== undefined && seed !== null ? minidenticon(typeof seed === 'string' && seed ? seed : 'user') : null;
     const words = svg || children ? null : (text ?? '');
     const cls = cx('poster-box', 'poster-box--avatar', words !== null && signs(words) > 1 && 'poster-box--small',
-        agent && 'poster-box--agent', 'avatar', SIZES.has(size) && `avatar--${size}`);
+        agent && 'poster-box--agent', 'avatar', SIZES.has(size) && `avatar--${size}`, bare && 'avatar--bare');
     const spoken = label ? { role: 'img', 'aria-label': label } : children ? {} : { 'aria-hidden': 'true' };
     if (svg) return html`<span class=${cls} ...${spoken} dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
     return html`<span class=${cls} ...${spoken}>${children || words}</span>`;

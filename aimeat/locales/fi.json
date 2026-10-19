@@ -16802,6 +16802,7 @@
         "basicMissingLine": "{n} vielä luomatta.",
         "shapeHint": "Määritys, jolla se pyörii ensimmäisestä päivästä. Muuta sitä myöhemmin Crew-välilehdellä.",
         "colAgent": "Agentti",
+        "colKind": "Tyyppi",
         "colRuns": "Ajotapa",
         "colPlatform": "Alusta",
         "colAccess": "Oikeudet",

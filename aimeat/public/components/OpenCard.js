@@ -34,6 +34,8 @@
  *          <${CardPanel}>${content}<//>
  *        <//>`
  * @version-history
+ *   v1.1.0 — 2026-10-19 — The card has a heavy line down its left edge, so a person sees where the
+ *     opened thing ends; a tab group's name is the thin dark band of the section title (Jouni, 2026-10-19).
  *   v1.0.0 — 2026-09-26 — Initial: the opened agent of the Agents page (agp-card, agp-mast, agp-runs,
  *     agp-nav, agp-panel in views/profile/agents/agent-card.js and css/views/agents-poster.css), as a
  *     component with its behaviour (page group G1a).
@@ -48,6 +50,7 @@ const stop = (e) => e.stopPropagation();
 
 export function OpenCard({ title, onClose, id, marks, more, side, children }) {
   const close = onClose || undefined;
+  // The heavy line down the card's left edge (open-card.css) shows how far the opened thing reaches.
   return html`
     <div class="open-card poster-row--thing">
       <h2 class=${cx('poster-section-title', 'open-card-title', close && 'open-card-title--closes')} onClick=${close}><span class="open-card-caret" aria-hidden="true">▼</span>${title}</h2>
@@ -76,11 +79,13 @@ const DOTS = { new: 'status-dot', failed: 'status-dot status-dot--error' };
 
 export function TabGroups({ groups, value, onSelect }) {
   const shown = (groups || []).filter((g) => g && (g.items || []).length > 0);
+  // A group's name is the thin dark band (the section title's small cut, as an agent's own page
+  // heads its sections), so the three groups read as three places (Jouni, 2026-10-19).
   return html`
     <div class="open-card-tabs">
       ${shown.map((g) => html`
         <div class="open-card-tab-group" key=${g.key}>
-          <span class="poster-label">${g.label}</span>
+          <span class="poster-section-title open-card-tab-band">${g.label}</span>
           <${Tabs} kind="view" label=${g.label} value=${value} onSelect=${onSelect}
             items=${g.items.map((it) => ({
               value: it.value, key: it.value,
