@@ -51,6 +51,8 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.4.1 — 2026-10-19 — Strip the nonblocking cookie banner's single marked script as well as
+ *     both older asset-and-script forms directly after the owner's tags.
  *   v1.4.0 — 2026-10-18 — The app-info mark (utils/app-info-badge.ts), `app-info`.
  *   v1.3.1 — 2026-10-11 — The cookie banner's start script carries the node's attribute now; a copy
  *     with either generation of it strips.
@@ -130,11 +132,11 @@ const FRAME_SUPPORT_OPEN = `<script ${FRAME_SUPPORT_MARK}>`;
 const OWNER_TAGS_OPEN = '<script data-aimeat-tags>';
 /**
  * The cookie banner the tags bring when the node shows one: a stylesheet, the library and its start
- * script. The start script carries the node's attribute since 2026-10-11 (middleware/cookie-consent.ts
+ * script, or the single nonblocking loader from 2026-10-19. The start script carries the node's attribute since 2026-10-11 (middleware/cookie-consent.ts
  * COOKIE_BANNER_MARK, spelled here for the same reason as the tag above); copies served from
  * 2026-10-08 to 2026-10-10 have the bare one, and both strip.
  */
-const OWNER_TAGS_BANNER = /<link rel="stylesheet" href="[^"<>]*\/cookieconsent\.css"><script src="[^"<>]*\/cookieconsent\.umd\.js"><\/script>(?:<script data-aimeat-cookie-banner>|<script>\(function\(\)\{function r\(\)\{CookieConsent\.run\()/y;
+const OWNER_TAGS_BANNER = /(?:<script data-aimeat-cookie-banner>|<link rel="stylesheet" href="[^"<>]*\/cookieconsent\.css"><script src="[^"<>]*\/cookieconsent\.umd\.js"><\/script>(?:<script data-aimeat-cookie-banner>|<script>\(function\(\)\{function r\(\)\{CookieConsent\.run\())/y;
 const BEHAVIOUR_OPEN = `<script ${BEHAVIOUR_MARK}>`;
 
 /** The order removals are reported in, so one upload always reads the same way. */
@@ -347,7 +349,7 @@ function findCuts(text: string): Cut[] {
   }
 
   // The owner's analytics tags: one inline script whose source holds no `</script>`, and, when the
-  // node shows a cookie banner, its three companions directly after it.
+  // node shows a cookie banner, its loader (or the three older companions) directly after it.
   for (const at of anchors(OWNER_TAGS_OPEN)) {
     let end = scriptEnd(at + OWNER_TAGS_OPEN.length);
     if (end < 0) continue;

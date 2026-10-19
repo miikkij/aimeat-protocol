@@ -25,6 +25,10 @@
  *   (reading 'appendChild')". The start script waits for the body, then picks the language: the
  *   `lang` parameter, the language the person chose on this service (`aimeat-lang`), the browser's,
  *   then the page's own `lang`.
+ *
+ *   THE BANNER DOES NOT HOLD THE PAGE'S FIRST PAINT. Its stylesheet and library load dynamically,
+ *   with the stylesheet inactive until loaded. The banner starts only after both assets and the
+ *   body are ready. An unavailable banner never grants analytics consent or stops the page.
  * @structure
  *   - consentCategories(config): the categories as clean words, `necessary` first
  *   - buildCookieConsentRunConfig(config, opts): the CookieConsent.run() config as JSON
@@ -32,6 +36,8 @@
  *   - cookieConsentMiddleware(config): adds the snippet to text/html string bodies before </body>
  *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
  * @version-history
+ *   v2.3.0 — 2026-10-19 — Load consent assets without blocking parsing, paint or DOMContentLoaded;
+ *     preserve saved consent, catch initialization failures, and let the cookie mark retry a failure.
  *   v2.2.1 — 2026-10-18 — The cookie mark sits after the app-info mark too (--aimeat-mark-info-w).
  *   v2.2.0 — 2026-10-11 — With no policy address set the banner links to the service's own privacy
  *     policy, with the service's address in front on an app's page (`assetBase`).
@@ -165,17 +171,18 @@ export function buildCookieConsentRunConfig(config: BannerConfig, opts: CookieBa
  * it does not say what the visitor reads: the service's own page carries a fixed `lang="en"` until
  * its scripts load, and the serve pass writes one on an app whose author gave none.
  */
-function startJs(runConfig: string, mark = false): string {
+function startJs(runConfig: string, mark = false, assetBase = ''): string {
   // THE WAY BACK TO THE CHOICES. Taking consent back has to be as easy as giving it, and after a
   // choice the banner is gone. The cookie mark stays on the page's row of marks and opens the
   // choices again (Jouni, 2026-10-11: a cookie beside the AI badge, where a newspaper has its
   // "cookie settings" link at the bottom of the page).
   const markJs = mark
-    ? `function mark(){try{var d=document;if(d.getElementById('aimeat-cookie-mark'))return;`
-      + `var L=${asciiJson(consentSettingsLabels())},t=L[c.language.default]||L.en,w=d.createElement('div');w.id='aimeat-cookie-mark';`
+    ? `function mark(failed){try{var d=document;if(d.getElementById('aimeat-cookie-mark'))return;`
+      + `var L=${asciiJson(consentSettingsLabels())},E=${asciiJson({ en: 'Cookie settings could not load. Press to reload the page and try again.', fi: 'Evästeasetuksia ei voitu ladata. Paina tästä, niin sivu latautuu uudelleen.', es: 'No se pudo cargar la configuración de cookies. Pulsa para recargar la página e intentarlo de nuevo.' })},`
+      + `t=failed?(E[c.language.default]||E.en):(L[c.language.default]||L.en),w=d.createElement('div');w.id='aimeat-cookie-mark';`
       + `w.innerHTML=${asciiJson(`<style>${COOKIE_MARK_CSS}</style><button type="button">${COOKIE_ICON}</button>`)};`
       + `var b=w.querySelector('button');b.setAttribute('aria-label',t);b.title=t;`
-      + `b.addEventListener('click',function(){window.CookieConsent.showPreferences();});d.body.appendChild(w);}catch(x){}}`
+      + `b.addEventListener('click',function(){if(failed){location.reload();}else{window.CookieConsent.showPreferences();}});d.body.appendChild(w);}catch(x){}}`
     : '';
   return `(function(){var c=${runConfig};${markJs}`
     + `function pick(){var a=[],d=document;`
@@ -191,12 +198,30 @@ function startJs(runConfig: string, mark = false): string {
     + `var s=q.modal.querySelectorAll('.pm__section--expandable');for(var i=0;i<s.length;i++){s[i].classList.add('is-expanded');`
     + `var b=s[i].querySelector('.pm__section-title');if(b)b.setAttribute('aria-expanded','true');`
     + `var k=s[i].querySelector('.pm__section-desc-wrapper');if(k)k.setAttribute('aria-hidden','false');}}catch(x){}});`
-    + `function run(){if(!document.body){setTimeout(run,30);return;}if(!window.CookieConsent)return;c.language.default=pick();CookieConsent.run(c);${mark ? 'mark();' : ''}}`
-    + `if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}})();`;
+    // Register asset handlers before inserting their elements: a warm cache must not lose readiness.
+    // No inline onload attribute: the node's nonce-based CSP does not allow event-handler attributes.
+    + `var d=document,n=d.currentScript&&d.currentScript.nonce,dom=d.readyState!=='loading',css=false,`
+    + `lib=!!(window.CookieConsent&&typeof window.CookieConsent.run==='function'),begun=false,failed=false,settled=false;`
+    + `function failure(reason){if(failed||settled)return;failed=true;clearTimeout(timer);`
+    + `console.warn('AIMEAT cookie consent could not start:',reason);run();}`
+    + `function run(){if(!dom||!d.body)return;c.language.default=pick();`
+    + `if(failed){${mark ? 'mark(true);' : ''}return;}if(begun||!css||!lib)return;begun=true;`
+    + `try{Promise.resolve(CookieConsent.run(c)).then(function(result){if(failed)return;`
+    + `if(result===false){failure('Consent initialization failed');return;}settled=true;clearTimeout(timer);${mark ? 'mark(false);' : ''}`
+    + `},function(error){failure(error);});}catch(error){failure(error);}}`
+    + `var timer=setTimeout(function(){failure('Consent assets or initialization timed out');},30000);`
+    + `if(!dom)d.addEventListener('DOMContentLoaded',function(){dom=true;run();},{once:true});`
+    + `try{var link=d.createElement('link');link.rel='stylesheet';link.media='print';link.href=${asciiJson(assetBase + '/cookieconsent.css')};`
+    + `link.onload=function(){if(failed)return;link.media='all';css=true;run();};link.onerror=function(){failure('Consent stylesheet could not load');};`
+    + `d.head.appendChild(link);if(!lib){var script=d.createElement('script');script.async=true;script.src=${asciiJson(assetBase + '/cookieconsent.umd.js')};`
+    + `if(n)script.nonce=n;script.onload=function(){lib=!!(window.CookieConsent&&typeof window.CookieConsent.run==='function');`
+    + `if(!lib){failure('Consent library did not initialize');return;}run();};script.onerror=function(){failure('Consent library could not load');};`
+    + `d.head.appendChild(script);}run();}catch(error){failure(error);}})();`;
 }
 
 /**
- * Everything one page needs for the banner: the stylesheet, the library and the start script.
+ * Everything one page needs for the banner: one marked script that loads the assets without
+ * blocking the page. The same marker lets a republished served copy shed this node-owned code.
  * `assetBase` is the service's own address for a page on another origin (an app); empty on its own
  * pages. `nonce` is the page's CSP nonce: the service's own pages allow an inline script only with
  * it, and without it the start script was blocked and the banner never showed there.
@@ -204,9 +229,7 @@ function startJs(runConfig: string, mark = false): string {
 export function cookieConsentSnippet(config: BannerConfig, opts: CookieBannerOptions & { nonce?: string } = {}): string {
   const base = (opts.assetBase ?? '').replace(/\/+$/, '');
   const nonce = opts.nonce && /^[A-Za-z0-9+/=_-]{8,200}$/.test(opts.nonce) ? ` nonce="${opts.nonce}"` : '';
-  return `<link rel="stylesheet" href="${base}/cookieconsent.css">`
-    + `<script src="${base}/cookieconsent.umd.js"${nonce}></script>`
-    + `<script ${COOKIE_BANNER_MARK}${nonce}>${startJs(buildCookieConsentRunConfig(config, opts), opts.mark === true)}</script>`;
+  return `<script ${COOKIE_BANNER_MARK}${nonce}>${startJs(buildCookieConsentRunConfig(config, opts), opts.mark === true, base)}</script>`;
 }
 
 /**
@@ -252,16 +275,5 @@ export function cookieConsentMiddleware(config: AimeatConfig): RequestHandler {
  * GET /v1/portal/cookie-consent.js
  */
 export function buildStandaloneSnippetJs(config: AimeatConfig): string {
-  const runConfig = buildCookieConsentRunConfig(config);
-
-  return `(function(){` +
-    `var link=document.createElement('link');` +
-    `link.rel='stylesheet';` +
-    `link.href='/cookieconsent.css';` +
-    `document.head.appendChild(link);` +
-    `var script=document.createElement('script');` +
-    `script.src='/cookieconsent.umd.js';` +
-    `script.onload=function(){${startJs(runConfig)}};` +
-    `document.head.appendChild(script);` +
-    `})();`;
+  return startJs(buildCookieConsentRunConfig(config));
 }
