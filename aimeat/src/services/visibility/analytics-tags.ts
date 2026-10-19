@@ -24,6 +24,8 @@
  * @structure visibilitySettingsView · nodeAllowsTags · tagsActive · ownerTagsSnippet · withOwnerTags · ownerTagsFor
  * @usage buf = withOwnerTags(buf, ownerTagsSnippet(config, settings));
  * @version-history
+ *   v1.3.1 — 2026-10-19 — Keep one consent banner when its assets are loaded by a marked,
+ *     nonblocking script instead of parser-inserted link and script elements.
  *   v1.3.0 — 2026-10-11 — The services' cookies stay on the page's own host: Clarity wrote `_clck` on
  *     `.aimeat.io` from an app, shared by every app (measured on production). A taken-back consent
  *     also removes the cookies on every parent domain.
@@ -178,7 +180,9 @@ export async function ownerTagsFor(storage: Storage, config: AimeatConfig, owner
  */
 export function ownerTagsIntoHtml(html: string, snippet: string): string {
   if (!snippet) return html;
-  const piece = html.includes('cookieconsent.umd.js') ? snippet.replace(/<link rel="stylesheet" href="[^"]*cookieconsent\.css">.*$/s, '') : snippet;
+  const piece = html.includes('cookieconsent.umd.js')
+    ? snippet.replace(/(?:<script data-aimeat-cookie-banner>|<link rel="stylesheet" href="[^"]*cookieconsent\.css">).*$/s, '')
+    : snippet;
   // Before </head>; in a document with no head, before <body>; else after the doctype and <html>.
   // Never in front of the doctype: a script before it puts the page in quirks mode.
   const head = html.search(/<\/head\s*>/i);

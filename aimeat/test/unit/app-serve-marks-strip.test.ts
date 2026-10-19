@@ -15,6 +15,7 @@
  *   silence: an app's own element that only looks like a mark is never touched.
  * @usage pnpm exec vitest run test/unit/app-serve-marks-strip.test.ts
  * @version-history
+ *   v1.4.0 - 2026-10-19 - Modern nonblocking cookie loader and both legacy banner shapes round-trip.
  *   2026-10-18 -- The app-info mark round-trips too, alone and with every other mark.
  *   v1.2.0 — 2026-10-09 — The "Use with your AI" mark round-trips alone and with every other mark.
  *   v1.1.0 — 2026-10-08 — The owner's analytics tags with their banner, and the behaviour script,
@@ -326,6 +327,25 @@ describe('stripServedMarks: the owner\'s analytics tags and the behaviour script
     const own = src.replace('</head>', '<script src="/my/cookieconsent.umd.js"></script></head>');
     const served = ownerTagsIntoHtml(own, ownerTagsSnippet({ ...config, cookieConsentEnabled: false } as AimeatConfig, settings));
     expect(strip(served).data.toString('utf-8')).toBe(own);
+  });
+
+  it.each([
+    '<script data-aimeat-cookie-banner>(function(){var c={};CookieConsent.run(c);})();</script>',
+    '<script>(function(){function r(){CookieConsent.run({});}r();})();</script>',
+  ])('still strips the legacy external assets and their adjacent banner: %s', banner => {
+    const legacy = '<script data-aimeat-tags>var owner="alice";</script>'
+      + '<link rel="stylesheet" href="https://aimeat.io/cookieconsent.css">'
+      + '<script src="https://aimeat.io/cookieconsent.umd.js"></script>' + banner;
+    const out = strip(src.replace('</head>', legacy + '</head>'));
+    expect(out.data.toString('utf-8')).toBe(src);
+    expect(out.removed.map(removal => removal.mark)).toEqual(['owner-tags']);
+  });
+
+  it('keeps an author cookie script when it is not directly adjacent to the owner tag', () => {
+    const own = '<!-- author boundary --><script data-aimeat-cookie-banner>window.authorCookieSetup=true;</script>';
+    const expected = src.replace('</head>', own + '</head>');
+    const served = src.replace('</head>', '<script data-aimeat-tags>var owner="alice";</script>' + own + '</head>');
+    expect(strip(served).data.toString('utf-8')).toBe(expected);
   });
 });
 

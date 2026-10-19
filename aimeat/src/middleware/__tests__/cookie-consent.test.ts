@@ -12,6 +12,7 @@
  *   - buildStandaloneSnippetJs suite + extractRunConfig: asserts IIFE shape and always-on "necessary" category
  *
  * @version-history
+ *   v1.2.0 - 2026-10-19 - Startup regression: injected assets no longer block parsing or paint.
  *   v1.1.1 — 2026-10-14 — The config fixture drops otkGraceMs, a setting that no longer exists.
  *   v1.1.0 — 2026-10-11 — The switch read per request, a page that already has the banner, the
  *     category list typed as text (one category per letter before the fix), the three languages, the
@@ -626,11 +627,13 @@ describe('buildCookieConsentRunConfig', () => {
 describe('cookieConsentSnippet', () => {
   it('starts the banner only when the page has a body, in the visitor\'s language', () => {
     const snippet = cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { assetBase: 'https://node.example/' });
-    expect(snippet).toContain('<link rel="stylesheet" href="https://node.example/cookieconsent.css">');
-    expect(snippet).toContain('<script src="https://node.example/cookieconsent.umd.js"></script>');
+    // The old fixture asserted the blocking tags that caused blank app startup.
+    expect(snippet).not.toMatch(/<link\b|<script\b[^>]*\bsrc=/);
+    expect(snippet).toContain('https://node.example/cookieconsent.css');
+    expect(snippet).toContain('https://node.example/cookieconsent.umd.js');
     expect(snippet).toContain('<script data-aimeat-cookie-banner>');
     // The library appends itself to document.body: started without one it throws.
-    expect(snippet).toContain('if(!document.body){setTimeout(run,30);return;}');
+    expect(snippet).toContain("d.addEventListener('DOMContentLoaded'");
     // Each category is opened when the choices dialog is built: closed, it read as an empty list.
     expect(snippet).toContain("window.addEventListener('cc:onModalReady'");
     expect(snippet).toContain("s[i].classList.add('is-expanded')");
@@ -639,7 +642,7 @@ describe('cookieConsentSnippet', () => {
     const order = ["localStorage.getItem('aimeat-lang')", 'a.push(navigator.language)', 'a.push(d.documentElement.lang)'].map((s) => snippet.indexOf(s));
     expect(order.every((n) => n > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(snippet.match(/<\/script>/g)).toHaveLength(2);
+    expect(snippet.match(/<\/script>/g)).toHaveLength(1);
   });
 
   it('with the mark, adds the cookie button that opens the choices again, on the row of marks', () => {
@@ -655,16 +658,17 @@ describe('cookieConsentSnippet', () => {
     expect(marked).toContain('"fi":"Ev\\u00e4steasetukset"');
     // eslint-disable-next-line no-control-regex -- the assertion is exactly that nothing outside ASCII is there
     expect(/[^\x00-\x7f]/.test(marked)).toBe(false);
-    expect(marked.match(/<\/script>/g)).toHaveLength(2);
+    expect(marked.match(/<\/script>/g)).toHaveLength(1);
   });
 
-  it('carries the page\'s CSP nonce on both scripts, and no nonce of a wrong shape', () => {
+  it('carries the page\'s CSP nonce on the bootstrap and propagates it to the dynamic library', () => {
     // The service's own pages allow an inline script only with the nonce: without it the browser
     // blocked the start script and the banner never showed there.
     const withNonce = cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { nonce: '5307c0b73180473689d7b7e3a842d83e' });
     expect(withNonce).toContain('<script data-aimeat-cookie-banner nonce="5307c0b73180473689d7b7e3a842d83e">');
-    expect(withNonce).toContain('<script src="/cookieconsent.umd.js" nonce="5307c0b73180473689d7b7e3a842d83e"></script>');
-    expect(cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { nonce: '"><script>x' })).not.toContain('nonce=');
+    expect(withNonce).toContain('d.currentScript.nonce');
+    expect(withNonce).toContain('script.nonce=n');
+    expect(cookieConsentSnippet(makeConfig({ cookieConsentEnabled: true }), { nonce: '"><script>x' })).not.toMatch(/<script[^>]*\bnonce=/);
   });
 });
 

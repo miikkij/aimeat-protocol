@@ -4,6 +4,7 @@
  *   what the snippet loads with the cookie banner off and on, the ids it accepts, where it lands in a
  *   document, and the warning an owner gets without a banner.
  * @version-history
+ *   v1.2.0 - 2026-10-19 - Nonblocking consent loader retains owner tags and deduplicates current markup.
  *   v1.1.0 — 2026-10-11 — The banner a page with tags gets names the service and clears its cookies
  *     on a taken-back consent; Google's cookie stays on the page's own host.
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer B).
@@ -12,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { ownerTagsSnippet, ownerTagsIntoHtml, visibilitySettingsView, tagsActive } from '../../src/services/visibility/analytics-tags.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { VisibilitySettings } from '../../src/models/visibility-schemas.js';
+import { cookieConsentSnippet } from '../../src/middleware/cookie-consent.js';
 
 const config = (over: Partial<AimeatConfig> = {}): AimeatConfig => ({
   baseUrl: 'https://place.example', analyticsTagsEnabled: true, aiVisibilityEnabled: true,
@@ -70,6 +72,18 @@ describe('ownerTagsSnippet', () => {
 });
 
 describe('ownerTagsIntoHtml', () => {
+  it('keeps one modern consent loader and the analytics prefix when an app already carries the banner', () => {
+    const own = cookieConsentSnippet(config({ cookieConsentEnabled: true }), { assetBase: 'https://place.example' });
+    const html = `<html><head>${own}</head><body><p>Author content</p></body></html>`;
+    const snippet = ownerTagsSnippet(config({ cookieConsentEnabled: true }), settings({ clarityProjectId: 'k7x2m9qp1a' }));
+    const out = ownerTagsIntoHtml(html, snippet);
+    expect(out.match(/<script data-aimeat-cookie-banner/g)).toHaveLength(1);
+    expect(out.match(/cookieconsent\.umd\.js/g)).toHaveLength(1);
+    expect(out).toContain('data-aimeat-tags');
+    expect(out).toContain(own);
+    expect(out).toContain('<p>Author content</p>');
+  });
+
   it('lands before </head>, and keeps one banner when the page already loads it', () => {
     const snippet = ownerTagsSnippet(config({ cookieConsentEnabled: true }), settings({ ga4MeasurementId: 'G-ABC123XYZ9' }));
     const out = ownerTagsIntoHtml('<html><head><title>x</title></head><body></body></html>', snippet);
