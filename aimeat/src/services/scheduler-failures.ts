@@ -16,10 +16,22 @@
  *   is told that too. The scheduler keeps the count per job in memory (reset by a success); after a
  *   start, the first failure reads it from the execution log, newest first, skipping the `skipped`
  *   rows (a skip is not a run), so it needs no new field on the job row.
+ *
+ *   A ONE-SHOT user schedule (an enabled max_runs constraint with limit 1: "publish on Tuesday at
+ *   09:00") that fails is turned off at once, and its owner gets one bell entry that gives the error
+ *   and says it will not run again by itself. The policy is no retry. A failed run does not count
+ *   toward max_runs, so without this the schedule stayed on and its next run became the cron's next
+ *   fire, which for a day-and-month cron is a year later, and the pause after
+ *   MAX_CONSECUTIVE_FAILURES would come after five years. The row keeps lastRunResult 'error' and
+ *   lastRunError, and the scheduler clears nextRunAt, as it does for every schedule it turns off. The
+ *   rule holds for a manual run as well: a one-shot has one attempt, as a successful manual run also
+ *   uses up its one run. The owner turns it on again, or runs it now, when the cause is fixed.
  * @structure MAX_CONSECUTIVE_FAILURES · failureStreak(storage, jobId) · onFailedRun(deps, job, error, streaks) ·
- *   noteSuccess(streaks, jobId) · tellScheduleOwner(storage, job, what, detail)
+ *   isOneShot(job) · oneShotFailedReason(error) · noteSuccess(streaks, jobId) · tellScheduleOwner(storage, job, what, detail)
  * @usage const { pauseReason } = await onFailedRun({ storage, config }, job, errorMessage, this.failureStreaks);
  * @version-history
+ *   2026-10-19 — isOneShot() and oneShotFailedReason(): a failed one-shot user schedule is turned off
+ *     at once, with no retry (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-03).
  */
 import type { AimeatConfig } from '../config.js';
@@ -72,6 +84,20 @@ export async function onFailedRun(
     logger.warn('scheduler: could not tell anybody about a failed run', { jobId: job.id, error: String(err) });
   }
   return {};
+}
+
+/**
+ * A user schedule that may run once: an enabled max_runs constraint with limit 1. A core job is never
+ * one (the node's own maintenance is not turned off here, see the file header).
+ */
+export function isOneShot(job: ScheduledJobRecord): boolean {
+  if (job.type === 'core') return false;
+  return (job.constraints ?? []).some(c => c.enabled && c.type === 'max_runs' && c.params?.limit === 1);
+}
+
+/** The bell text for a one-shot schedule that failed and was turned off. */
+export function oneShotFailedReason(error: string): string {
+  return `It was set to run once, and that run failed, so it was turned off and will not run again by itself. The error: ${error}. Fix the cause, then run it now or turn it on again.`;
 }
 
 /** A run of this job succeeded: its count of failures in a row starts again. */

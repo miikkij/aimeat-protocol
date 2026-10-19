@@ -15,10 +15,14 @@
  *       account cannot transcribe another's file.
  *
  *   NO TOKEN CAP on any branch (scripts/check-no-max-tokens.ts): a cap truncates a long generation
- *   in silence, and a long generation is the reason a background job exists.
+ *   in silence, and a long generation is the reason a background job exists. The text branch passes
+ *   `uncapped: true`, so the owner's saved max_tokens setting stays off it too, and hands back the
+ *   provider's finish_reason and truncated for the job record.
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.7.0 — 2026-10-19 — The text call passes `uncapped: true`, and the outcome carries `answer`
+ *     { finish_reason, truncated } (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     A job's run passes `limit: 'exempt'`: the job's start counted it.
  *   v1.5.0 — 2026-10-05 — The model call runs as the app or agent that started the job (starter.ts
@@ -64,6 +68,9 @@ export interface JobOpOutcome {
     spend: JobSpend;
     /** The warning-classified items this call read (the transcription's audio). Absent when none. */
     warnings?: AiJobClassificationWarnings;
+    /** A text answer only: why the provider stopped, and whether the answer was cut at a token limit.
+     *  service.ts puts both on the job record. */
+    answer?: { finish_reason: string | null; truncated: boolean };
 }
 
 const MB = 1024 * 1024;
@@ -161,10 +168,17 @@ export async function runJobOp(
         };
     }
 
+    // `uncapped`: the owner's saved answer-length setting (a role's, a provider's or the legacy
+    // max_tokens) does not apply to a job, as it does not to the workflow ai step. That setting is a
+    // length preference for interactive answers, not a spending control: its own help text says the
+    // limit costs nothing and only what the model writes is paid, and the owner's daily budget and
+    // the per-call price ceiling still apply here. The provider's own stop reason is kept on the job,
+    // so a reader can still tell a cut answer from a finished one.
     const r = await completeForOwner(storage, config, payer, {
         ...common,
         prompt,
         ...(job.system_prompt ? { systemPrompt: job.system_prompt } : {}),
+        uncapped: true,
     });
     return {
         value: r.content,
@@ -173,5 +187,6 @@ export async function runJobOp(
             cost_usd: r.usage.costUsd, tokens: r.usage.totalTokens,
             ...(r.provenance ? { provenance_id: r.provenance.id } : {}),
         },
+        answer: { finish_reason: r.finishReason, truncated: r.truncated },
     };
 }

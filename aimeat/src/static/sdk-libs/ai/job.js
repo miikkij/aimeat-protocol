@@ -16,6 +16,8 @@
  *   const { job_id } = await AIMEAT.ai.job.start({ prompt, result_key: 'report.latest' });
  *   const done = await AIMEAT.ai.job.waitFor(job_id);
  * @version-history
+ *   v1.2.1 — 2026-10-19 — get() and waitFor() document `finish_reason` and `truncated` on a text job's
+ *     record; the code passes the record through unchanged (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.2.0 — 2026-09-28 — start() sends `role`, the AI role the job's call runs as.
  *   v1.1.0 — 2026-09-28 — start() sends op (text | image | transcribe), provider, audio_key, language
  *     and size (System 2 plan, V5).
@@ -95,7 +97,11 @@ export const job = {
     return r.data;
   },
 
-  /** One job's record: state, cost, where the answer went, and why it failed if it did. */
+  /**
+   * One job's record: state, cost, where the answer went, and why it failed if it did. A text job
+   * that got an answer also carries `finish_reason` (why the provider stopped) and `truncated`
+   * (true when the answer was cut at a token limit): show such an answer as unfinished.
+   */
   async get(jobId) {
     if (!jobId) throw new Error('jobId required');
     const r = await authFetch('/v1/ai/jobs/' + encodeURIComponent(jobId));
@@ -123,7 +129,8 @@ export const job = {
   },
 
   /**
-   * Poll until the job is done, failed or cancelled, and hand back its record.
+   * Poll until the job is done, failed or cancelled, and hand back its record (the shape `get`
+   * returns, `finish_reason` and `truncated` included for a text job).
    *
    * A convenience over `get`, not a different mechanism: the tab may still close, and the job
    * carries on regardless. `onState` is called each time the state changes, which is what a progress

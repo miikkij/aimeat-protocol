@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-19 — no-max-tokens: a text job runs uncapped and its record says truncated (wish
+ *     ai-jobs-run-uncapped-and-report-a-cut-answer). schedule-next-run-needs-the-year: a failed
+ *     one-shot is turned off with no next run (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   2026-10-19 — Seven more removed whose facts reached production with 908d4fe6c (Jouni, 2026-10-19):
  *     isolated-frame-on-shared-nodes, app-grant-node-role-via-owners, app-grant-role-limits
  *     (the aimeat-auth and aimeat-organism aiDocs), realtime-room-gc-recreate,
@@ -386,11 +389,11 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'no-max-tokens',
     title: 'Do not cap an AI call\'s output, and read `truncated` on every answer',
     symptom: 'An answer that stops mid-sentence and reads like a model failure. A cap cuts it in silence, and so can a limit the owner saved in their AI settings.',
-    fix: 'Do not pass max_tokens to AIMEAT.ai.complete(). Every answer carries `finish_reason` and `truncated` (true when the provider cut it at a length limit): when truncated is true, show the answer as unfinished or ask again, never as the whole answer. A generation that needs minutes belongs in AIMEAT.ai.job; it passes no cap of its own, but a limit the owner saved still applies there.',
+    fix: 'Do not pass max_tokens to AIMEAT.ai.complete(). Every answer carries `finish_reason` and `truncated` (true when the provider cut it at a length limit): when truncated is true, show the answer as unfinished or ask again, never as the whole answer. A generation that needs minutes belongs in AIMEAT.ai.job: a text job runs with no cap, a limit the owner saved included, and the record from AIMEAT.ai.job.get() or waitFor() carries the same `finish_reason` and `truncated`.',
     appliesTo: ['ai'],
     severity: 'critical',
     source: 'curated',
-    updatedAt: '2026-10-17',
+    updatedAt: '2026-10-19',
     ...CHECKED,
   }),
   E({
@@ -524,13 +527,13 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   // ---- sending and scheduling -------------------------------------------
   E({
     id: 'schedule-next-run-needs-the-year',
-    title: 'A failed one-shot schedule moves its next run a year out and stays enabled',
-    symptom: 'A post scheduled for "04.08. 21:00" failed, and the schedule still reads enabled with a next run of 04.08., which looks like this week and is next year.',
-    fix: 'Print the year whenever you show a schedule\'s next-run time outside a month grid, and show lastRunResult and lastRunError beside it.',
+    title: 'A schedule\'s next-run time without the year reads as this week',
+    symptom: 'A schedule with a day-and-month cron shows a next run of "04.08. 21:00", which looks like this week and is next year. A failed one-shot (max_runs 1) no longer does this: the node turns it off and it has no next run.',
+    fix: 'Print the year whenever you show a schedule\'s next-run time outside a month grid, and show lastRunResult and lastRunError beside it. A schedule that is off has no nextRunAt: show it as finished or failed from lastRunResult, never as upcoming.',
     appliesTo: ['app'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-09-13',
+    updatedAt: '2026-10-19',
     ...CHECKED,
   }),
 

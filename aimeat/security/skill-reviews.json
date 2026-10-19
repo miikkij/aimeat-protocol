@@ -423,14 +423,14 @@
       "digest": "sha256:cec4c74bb67ae7d2b7990016"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-10-19",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:893dfc3af82931dfbaf895a0"
+      "digest": "sha256:d14a64f032be290c5511f092"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -643,7 +643,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "8bbafc624ca1d4e4",
       "aimeat/src/mcp/agent-schedules.ts": "323e1d07edc9f647",
-      "aimeat/src/services/scheduler.ts": "88debada422aa7eb",
+      "aimeat/src/services/scheduler.ts": "84b001e1e3d10217",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
     "node:aimeat-game-apps": {

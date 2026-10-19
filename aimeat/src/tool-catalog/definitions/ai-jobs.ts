@@ -14,6 +14,8 @@
  * @structure aiJobTools -- AimeatToolDefinition[]
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   2026-10-19 — aimeat_ai_job_get names `finish_reason` and `truncated` on a text job's record (wish
+ *     ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-28 — aimeat_ai_job_start takes `role`, the AI role the call runs as.
@@ -74,7 +76,7 @@ export const aiJobTools = [
     },
     {
         name: 'aimeat_ai_job_get',
-        description: 'Read one background AI job: its state, what it cost, where its answer went, and — when it failed — the code and message saying why. A job that ended `failed` with `chain_stopped` set is one whose on_done callback could not continue the chain, which is deliberately NOT reported as success. Only the owner\'s own jobs are reachable; anything else is simply not found.',
+        description: 'Read one background AI job: its state, what it cost, where its answer went, and — when it failed — the code and message saying why. A text job that got an answer carries `finish_reason` (why the provider stopped) and `truncated`: true means the answer was cut at a token limit, so treat it as unfinished and say so, or ask again. A job that ended `failed` with `chain_stopped` set is one whose on_done callback could not continue the chain, which is deliberately NOT reported as success. Only the owner\'s own jobs are reachable; anything else is simply not found.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get AI Job', readOnlyHint: true },

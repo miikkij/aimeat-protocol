@@ -20,6 +20,10 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.8.0 — 2026-10-19 — 1d and 1e: a job's record carries finish_reason and truncated, and the
+ *     owner's saved max_tokens reaches a synchronous completion and not a job. The stub keeps each
+ *     completion's max_tokens and answers finish_reason 'length' to a prompt holding CUT (wish
+ *     ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.7.0 — 2026-10-18 — 15b: a restart while on_done runs keeps the answer readable with
  *     ctx.ai.result, and the job's error does not say the answer was lost.
  *   v1.6.0 — 2026-10-18 — 7c and 7d: an on_done action gets the private answer in its input and reads
@@ -113,25 +117,34 @@ let holding = false;
 const held: ServerResponse[] = [];
 const callbackHeld: ServerResponse[] = [];
 let completionsSeen = 0;
+/** The `max_tokens` of each completion request, in arrival order (undefined when none was sent). */
+const maxTokensSeen: Array<number | undefined> = [];
 
-function answer(res: ServerResponse): void {
+/** A prompt holding CUT gets finish_reason 'length': an answer the provider stopped at a token limit. */
+function answer(res: ServerResponse, cut = false): void {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
         model: STUB_MODEL,
-        choices: [{ message: { content: STUB_CONTENT }, finish_reason: 'stop' }],
+        choices: [{ message: { content: STUB_CONTENT }, finish_reason: cut ? 'length' : 'stop' }],
         usage: { prompt_tokens: 11, completion_tokens: 19, total_tokens: 30, cost: 0.0002 },
     }));
 }
 
 async function startStub(): Promise<void> {
     stub = createServer((req, res) => {
-        // The body is read to its end and not kept: nothing here asserts on it.
-        req.resume();
+        // The body is kept for the completion route only: case 1d reads max_tokens and the prompt.
+        const chunks: Buffer[] = [];
+        req.on('data', (c: Buffer) => chunks.push(c));
         req.on('end', () => {
             if ((req.url ?? '').includes('/chat/completions')) {
                 completionsSeen++;
+                let body: any = {};
+                try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { /* not JSON: no fields */ }
+                const limit = body.max_tokens ?? body.max_completion_tokens;
+                maxTokensSeen.push(typeof limit === 'number' ? limit : undefined);
+                const cut = JSON.stringify(body.messages ?? '').includes('CUT');
                 if (holding) { held.push(res); return; }
-                answer(res);
+                answer(res, cut);
                 return;
             }
             // An on_done action's ctx.fetch lands here and is held, so the node can be killed while
@@ -388,6 +401,41 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         // And it is still readable by id through the door, which is what a handle means.
         const viaApi = await getJob(a, happyId);
         assert(viaApi.status === 200 && viaApi.body.data.state === 'done', 'a folded job is still readable by id');
+    });
+
+    await test('1d. A whole answer says finish_reason stop and truncated false on the job record', async () => {
+        const r = await getJob(a, happyId);
+        assert(r.body.data.finish_reason === 'stop', `finish_reason ${r.body.data.finish_reason}`);
+        assert(r.body.data.truncated === false, `truncated ${r.body.data.truncated}`);
+    });
+
+    await test('1e. The owner\'s saved max_tokens does not reach a job, and a cut answer says truncated', async () => {
+        // An owner whose AI settings hold an answer-length limit. A synchronous completion still
+        // sends it (the control: without it this case would pass on a node that never sends the
+        // setting); a job sends none, and the provider's 'length' stop lands on the record.
+        const c = await setupOwner('cap');
+        const s = await json('/v1/memory', {
+            method: 'POST', headers: auth(c.token),
+            body: JSON.stringify({
+                key: 'openrouter.settings', visibility: 'private',
+                value: { provider: 'custom', baseUrl: `${STUB_BASE}/v1`, model: STUB_MODEL, daily_budget_usd: 50, max_tokens: 50 },
+            }),
+        });
+        // A new owner's first write of the key: 201, created.
+        assert(s.status === 201, `settings ${s.status}: ${JSON.stringify(s.body?.error)}`);
+        const sync = await json('/v1/ai/complete', {
+            method: 'POST', headers: auth(c.token), body: JSON.stringify({ prompt: 'One line, please.', app_id: 'e2e-ai-jobs' }),
+        });
+        assert(sync.status === 200, `complete ${sync.status}: ${JSON.stringify(sync.body?.error)}`);
+        assert(maxTokensSeen[maxTokensSeen.length - 1] === 50, `the control: a synchronous call sends the owner's limit, saw ${maxTokensSeen[maxTokensSeen.length - 1]}`);
+
+        const started = await startJob(c, { prompt: 'CUT: write the whole long report.', result_key: 'aijob.cut', app_id: 'e2e-ai-jobs' });
+        assert(started.status === 202, `start ${started.status}: ${JSON.stringify(started.body?.error)}`);
+        const done = await waitForState(c, started.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        assert(maxTokensSeen[maxTokensSeen.length - 1] === undefined, `a job sent max_tokens ${maxTokensSeen[maxTokensSeen.length - 1]}`);
+        assert(done.finish_reason === 'length', `finish_reason ${done.finish_reason}`);
+        assert(done.truncated === true, `truncated ${done.truncated}`);
     });
 
     // ── 2. The response does not wait for the work ──

@@ -7,6 +7,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-10-19 — A one-shot user schedule (max_runs limit 1) that fails is turned off at once with one
+ *     bell entry, no retry; autoDisable() clears nextRunAt, so a schedule that is off shows no next
+ *     run (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   2026-10-18 — taskWake() passes the node's config, for the narrowing of a `*` agent a scheduled
  *     task's start decision may make (services/scope-auto-narrow.ts).
  *   2026-10-16 — A failed core job sends the operator the deduplicated fault message; a failed user
@@ -114,7 +117,7 @@ import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, ty
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { claimCronFire } from './scheduler-fire-claim.js';
 import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './scheduler-run-limit.js';
-import { onFailedRun, noteSuccess, tellScheduleOwner } from './scheduler-failures.js';
+import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './scheduler-failures.js';
 import { missedFire, missedMessage, type MissedFire } from './scheduler-catch-up.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -531,6 +534,13 @@ export class Scheduler {
 
     if (result === 'error') {
       logger.error(`Scheduler job failed: ${job.id} (${job.displayName || job.name})`, { error: errorMessage, durationMs, trigger });
+      // A one-shot that failed is turned off now, with one bell entry that carries the error: a
+      // failed run does not count toward max_runs, so it would otherwise stay on with its next run
+      // a year out (scheduler-failures.ts, isOneShot).
+      if (isOneShot(job)) {
+        await this.autoDisable(job, oneShotFailedReason(errorMessage ?? 'Unknown error'), 'failed');
+        return { code: 'error', detail: errorMessage };
+      }
       // The operator for a core job, the owner for a user schedule, and a pause after a run of
       // failures (scheduler-failures.ts).
       const { pauseReason } = await onFailedRun({ storage: this.storage, config: this.config }, job, errorMessage ?? 'Unknown error', this.failureStreaks);
@@ -578,13 +588,22 @@ export class Scheduler {
       logger.error('Failed to write execution log', { jobId: job.id, error: String(err) }));
   }
 
-  /** Disable a schedule (stop the cron, persist enabled:false) and notify the owner. */
-  private async autoDisable(job: ScheduledJobRecord, reason: string): Promise<void> {
+  /**
+   * Disable a schedule (stop the cron, persist enabled:false, clear nextRunAt) and notify the owner.
+   * A schedule that is off has no next run: the stored value was croner's next fire, which every
+   * list (Schedules page, aimeat_schedule_list, apps) showed as a run that would not happen. Turning
+   * it on again schedules it, which writes a fresh nextRunAt.
+   */
+  private async autoDisable(job: ScheduledJobRecord, reason: string, notice: 'failed' | 'paused' = 'paused'): Promise<void> {
     this.removeJob(job.id);
     job.enabled = false;
-    await this.storage.updateScheduledJob(job.id, { enabled: false, updatedAt: new Date().toISOString() }).catch(err => { logger.warn('error: continuing after a suppressed failure', { error: String(err) }); });
+    job.nextRunAt = undefined;
+    // null, not undefined: the PostgreSQL provider skips an undefined field, and both providers
+    // write null for a null one.
+    const cleared = { nextRunAt: null as unknown as string | undefined };
+    await this.storage.updateScheduledJob(job.id, { enabled: false, ...cleared, updatedAt: new Date().toISOString() }).catch(err => { logger.warn('error: continuing after a suppressed failure', { error: String(err) }); });
     emitChange('scheduler');
-    await tellScheduleOwner(this.storage, job, 'paused', reason)
+    await tellScheduleOwner(this.storage, job, notice, reason)
       .catch(err => { logger.warn('scheduler: the pause notification is best-effort', { error: String(err) }); });
     logger.info(`Scheduler auto-disabled job ${job.id}: ${reason}`);
   }

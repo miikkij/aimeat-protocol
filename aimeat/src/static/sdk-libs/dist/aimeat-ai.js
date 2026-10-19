@@ -1050,7 +1050,11 @@
       if (!r || !r.ok) throw jobError(r);
       return r.data;
     },
-    /** One job's record: state, cost, where the answer went, and why it failed if it did. */
+    /**
+     * One job's record: state, cost, where the answer went, and why it failed if it did. A text job
+     * that got an answer also carries `finish_reason` (why the provider stopped) and `truncated`
+     * (true when the answer was cut at a token limit): show such an answer as unfinished.
+     */
     async get(jobId) {
       if (!jobId) throw new Error("jobId required");
       const r = await authFetch2("/v1/ai/jobs/" + encodeURIComponent(jobId));
@@ -1075,7 +1079,8 @@
       return r.data;
     },
     /**
-     * Poll until the job is done, failed or cancelled, and hand back its record.
+     * Poll until the job is done, failed or cancelled, and hand back its record (the shape `get`
+     * returns, `finish_reason` and `truncated` included for a text job).
      *
      * A convenience over `get`, not a different mechanism: the tab may still close, and the job
      * carries on regardless. `onState` is called each time the state changes, which is what a progress

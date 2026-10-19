@@ -14,6 +14,8 @@
  *   AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.9.0 — 2026-10-19 — `finish_reason` and `truncated` on the record of a text job, so job get and
+ *     waitFor say when an answer was cut (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.8.0 — 2026-10-18 — `result_version` on the record and `readResult` on AiJobStarter, so an
  *     extension reads the answer of a job it started without the answer being public (ctx.ai.result).
  *   v1.7.0 — 2026-10-08 — AiJobRecord.error carries `status` and `details` (aiprov plan, A11).
@@ -105,6 +107,13 @@ export interface AiJobRecord {
     finished_at?: string;
     cost_usd?: number;
     tokens?: number;
+    /** For a `text` job, once the model answered: why the provider stopped ('stop', 'length',
+     *  'content_filter', …), or null when it did not say. Absent on the other ops and on a job that
+     *  never got an answer. */
+    finish_reason?: string | null;
+    /** For a `text` job, once the model answered: true when the answer was cut at a token limit
+     *  (finish_reason 'length'), which a reader cannot otherwise tell from a finished answer. */
+    truncated?: boolean;
     /** `status` and `details` are what the REST call would have answered (since 2026-10-08). */
     error?: { code: string; message: string; status?: number; details?: Record<string, unknown> };
     provenance_id?: string;

@@ -14,6 +14,8 @@
  * @structure aiJobTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { aiJobTools } from './tool-call-defs-ai-jobs.js';
  * @version-history
+ *   v1.2.1 -- 2026-10-19 -- aimeat_ai_job_get's description names finish_reason and truncated (wish
+ *     ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.2.0 -- 2026-09-28 -- aimeat_ai_job_start declares and forwards `role`, the AI role the call runs as.
  *   v1.1.0 -- 2026-09-28 -- System 2 plan, V5: aimeat_ai_job_start declares and forwards `op`,
  *     `provider`, `audio_key`, `language` and `size`.
@@ -104,7 +106,7 @@ export const aiJobTools: ConnectCliToolDefinition[] = [
     {
         // → GET /v1/ai/jobs/:id
         name: 'aimeat_ai_job_get',
-        description: 'Read one background AI job: its state, cost, where its answer went, and why it failed if it did.',
+        description: 'Read one background AI job: its state, cost, where its answer went, and why it failed if it did. A text job that got an answer carries finish_reason and truncated (true: the answer was cut at a token limit).',
         input: { job_id: { type: 'string', required: true, description: 'The job id.' } },
         handler: ({ client }, input) =>
             client.get(`/v1/ai/jobs/${encodeURIComponent(requiredString(input, 'job_id'))}`),
