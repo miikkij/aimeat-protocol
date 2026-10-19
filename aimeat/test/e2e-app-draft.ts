@@ -13,6 +13,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.4.0 — 2026-10-19 — Phase 7: PUT .../draft and POST .../publish-draft take `version`; the live app
+ *     carries it, a malformed or non-string one is refused with 400 before the slot is written, a refused
+ *     promotion keeps the draft, and another owner's draft save and promotion on the app answer 403
+ *     (wish-the-app-draft-tools-can-set-the-display-version).
  *   v1.3.1 — 2026-10-12 — Phase 6 publishes the paid app with toll_morsels instead of price_morsels,
  *     which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; the three tests after it had failed only
  *     because that publish never landed. The deprecated priceMorsels mirror is asserted on 3.x and its
@@ -363,6 +367,77 @@ await test('Promoting a draft records a public-activity event, like the other tw
     const items: any[] = body.data?.items ?? body.data?.events ?? [];
     assert(items.some(e => String(e.summary ?? '').includes(PAID) || String(e.link ?? '').includes(PAID)),
         'the draft publish reached the public feed');
+});
+
+// ── Phase 7: the draft states the display version ──
+// The draft copied the live app's manifest version and publish-draft published with it, so a builder
+// could raise the version only through POST /v1/apps, which skips the draft review.
+console.log('\nPhase 7: the draft sets the display version');
+
+const VER = 'version-draft-app.html';
+const versionsOf = async (filename: string) => {
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${filename}/versions`, aAuthed());
+    assert(status === 200, `versions status ${status}`);
+    const list = body.data?.versions as Array<{ version_number: number; version: string }>;
+    return list.reduce((a, b) => (b.version_number > a.version_number ? b : a));
+};
+
+await test('An app published at 1.0.0 gets a draft saved with version 1.4.0, and publish-draft carries it', async () => {
+    const pub = await json('/v1/apps', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({ filename: VER, content: b64('<!DOCTYPE html><html><body><h1>ver v1</h1></body></html>'), description: 'Display version test.', version: '1.0.0' }),
+    }));
+    assert(pub.status === 201, `publish status ${pub.status}: ${JSON.stringify(pub.body)}`);
+    const save = await json(`/v1/apps/${ownerAName}/${VER}/draft`, aAuthed({
+        method: 'PUT', body: JSON.stringify({ content: b64('<!DOCTYPE html><html><body><h1>ver v2</h1></body></html>'), version: '1.4.0' }),
+    }));
+    assert(save.status === 200 && save.body.data?.version === '1.4.0', `draft save answers the stated version: ${save.status} ${JSON.stringify(save.body.data)}`);
+    const promoted = await json(`/v1/apps/${ownerAName}/${VER}/publish-draft`, aAuthed({ method: 'POST' }));
+    assert(promoted.status === 201, `publish-draft status ${promoted.status}: ${JSON.stringify(promoted.body)}`);
+    assert(promoted.body.data?.manifest?.version === '1.4.0', `the promoted manifest carries 1.4.0, got ${promoted.body.data?.manifest?.version}`);
+    const live = await versionsOf(VER);
+    assert(live.version === '1.4.0', `the versions list shows 1.4.0, got ${JSON.stringify(live)}`);
+});
+
+await test('A draft saved with a malformed or non-string version is refused with 400 INVALID_INPUT, and the slot is not written', async () => {
+    for (const version of ['1.5 beta', '<script>', '', 'x'.repeat(41), 15]) {
+        const r = await json(`/v1/apps/${ownerAName}/${VER}/draft`, aAuthed({
+            method: 'PUT', body: JSON.stringify({ content: b64('<!DOCTYPE html><html><body><h1>bad</h1></body></html>'), version }),
+        }));
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `${JSON.stringify(version)} answered ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const slot = await json(`/v1/apps/${ownerAName}/${VER}/draft`, aAuthed());
+    assert(slot.status === 404, `no draft was written by a refused save: ${slot.status}`);
+});
+
+await test('publish-draft with a version overrides the draft; a malformed one is refused and the draft stays', async () => {
+    const save = await json(`/v1/apps/${ownerAName}/${VER}/draft`, aAuthed({
+        method: 'PUT', body: JSON.stringify({ content: b64('<!DOCTYPE html><html><body><h1>ver v3</h1></body></html>') }),
+    }));
+    assert(save.status === 200 && save.body.data?.version === '1.4.0', `an unstated version is the live app's: ${JSON.stringify(save.body.data)}`);
+    const bad = await json(`/v1/apps/${ownerAName}/${VER}/publish-draft`, aAuthed({ method: 'POST', body: JSON.stringify({ version: 'two words' }) }));
+    assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `a malformed version is refused: ${bad.status} ${JSON.stringify(bad.body.error)}`);
+    const still = await json(`/v1/apps/${ownerAName}/${VER}/draft`, aAuthed());
+    assert(still.status === 200, `the draft survives the refusal: ${still.status}`);
+    const ok = await json(`/v1/apps/${ownerAName}/${VER}/publish-draft`, aAuthed({ method: 'POST', body: JSON.stringify({ version: '2.0.0-rc.1' }) }));
+    assert(ok.status === 201 && ok.body.data?.manifest?.version === '2.0.0-rc.1', `the override is published: ${ok.status} ${JSON.stringify(ok.body.data?.manifest?.version)}`);
+    assert((await versionsOf(VER)).version === '2.0.0-rc.1', 'the versions list shows the override');
+});
+
+await test('Owner B cannot set the version on owner A\'s app: the draft save and the promotion answer 403, A\'s live version is unchanged', async () => {
+    const before = await versionsOf(VER);
+    // B holds no development right on A's apps, so naming A's catalogue is refused on both routes.
+    const r = await json(`/v1/apps/${ownerAName}/${VER}/draft`, bAuthed({
+        method: 'PUT', body: JSON.stringify({ content: b64('<!DOCTYPE html><html><body><h1>b</h1></body></html>'), version: '9.9.9' }),
+    }));
+    assert(r.status === 403 && r.body.error?.code === 'FORBIDDEN', `B's draft save on A's app: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const p = await json(`/v1/apps/${ownerAName}/${VER}/publish-draft`, bAuthed({ method: 'POST', body: JSON.stringify({ version: '9.9.9' }) }));
+    assert(p.status === 403 && p.body.error?.code === 'FORBIDDEN', `B's promotion on A's app: ${p.status} ${JSON.stringify(p.body.error)}`);
+    const after = await versionsOf(VER);
+    assert(after.version_number === before.version_number && after.version === '2.0.0-rc.1',
+        `A's live version is unchanged: ${JSON.stringify(after)}`);
+    const aDraft = await json(`/v1/apps/${ownerAName}/${VER}/draft`, aAuthed());
+    assert(aDraft.status === 404, `A has no draft from B's calls: ${aDraft.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

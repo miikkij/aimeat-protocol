@@ -6,6 +6,9 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.11.0 -- 2026-10-19 -- PUT .../draft and POST .../publish-draft take `version`, the display version
+ *     the promotion publishes with (services/app-display-version.ts judges it); PUT .../draft answers with
+ *     the draft's `version` (wish-the-app-draft-tools-can-set-the-display-version).
  *   v2.9.0 -- 2026-10-18 -- publish-draft passes the publish gate's answer (services/app-publish-gate.ts):
  *     a first publish the node's defaults make public, by a caller the owner is asked about, is stored
  *     unlisted and answers 202 with `publish_request`.
@@ -87,11 +90,28 @@ import { publishAskOf } from '../../services/publish-requests/ask.js';
 import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
 import { draftNoticeFrom } from '../../services/app-news.js';
 import type { AppDraftNotice } from '../../storage/interface.js';
+import { appDisplayVersionRefusal } from '../../services/app-display-version.js';
 
 /**
  * The body's `notice` (what the draft changes) as the record the slot keeps: undefined when not sent,
  * null to clear it. Answers 400 and returns false on a notice the service refuses.
  */
+/**
+ * The body's `version` (the display version) as the string the service judges: undefined when not
+ * sent. A value that is not a string is refused here with the shared rule's answer, because the
+ * service takes a string; answers 400 and returns false then.
+ */
+function versionFromBody(
+    config: AimeatConfig, req: import('express').Request, res: import('express').Response,
+): string | undefined | false {
+    const version: unknown = (req.body ?? {}).version;
+    if (version === undefined || version === null) return undefined;
+    if (typeof version === 'string') return version;
+    const bad = appDisplayVersionRefusal(version)!;
+    res.status(bad.status).json(error(config.nodeId, bad.code, bad.message, bad.status, bad.details));
+    return false;
+}
+
 function noticeFromBody(
     config: AimeatConfig, req: import('express').Request, res: import('express').Response,
 ): AppDraftNotice | null | undefined | false {
@@ -136,6 +156,8 @@ export function registerDraftRoutes(
         }
         const draftNotice = noticeFromBody(config, req, res);
         if (draftNotice === false) return;
+        const version = versionFromBody(config, req, res);
+        if (version === false) return;
 
         // The filename rule, the size cap and the manifest that inherits from the live app are
         // services/app-lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
@@ -153,6 +175,7 @@ export function registerDraftRoutes(
                 icon: typeof icon === 'string' ? icon : undefined,
                 usesCortex: Array.isArray(uses_cortex)
                     ? uses_cortex.filter((c: unknown): c is string => typeof c === 'string') : undefined,
+                version,
                 protection: sanitizeProtection(protection),
                 mimeType: typeof mime_type === 'string' ? mime_type : undefined,
                 draftNotice,
@@ -171,6 +194,8 @@ export function registerDraftRoutes(
             updated_at: staged.updatedAt,
             has_live_version: staged.hasLiveVersion,
             live_version_number: staged.liveVersionNumber,
+            // The display version publish-draft will use: the one stated here, or the live app's.
+            version: staged.manifest.version,
             note: 'Draft saved. The live app is unchanged. Mint a preview token to test it, then publish the draft when ready.',
             // Rendered when the draft slot reports serve marks it took out of a served copy. The
             // promotion takes them out regardless (publish-draft below), so nothing reaches the
@@ -507,6 +532,9 @@ export function registerDraftRoutes(
                 'Invalid ai_provenance declaration.', 400, { violations: declared.violations }));
             return;
         }
+        // A display version stated at the promotion overrides the draft's; publishApp judges it.
+        const version = versionFromBody(config, req, res);
+        if (version === false) return;
 
         // The promotion — the draft manifest mapped onto the publish input, publishApp, and the slot
         // cleared afterwards — is services/app-lifecycle.ts, shared with aimeat_app_draft_publish.
@@ -518,6 +546,7 @@ export function registerDraftRoutes(
             ownerGhii,
             callerGaii,
             roadmap: typeof req.body?.roadmap === 'string' ? req.body.roadmap : undefined,
+            version,
             filename,
             draft,
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,

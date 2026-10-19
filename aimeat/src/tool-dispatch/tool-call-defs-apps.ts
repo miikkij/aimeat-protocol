@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-10-19 -- aimeat_app_draft_save and aimeat_app_draft_publish forward `version`, the display version (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 -- aimeat_app_draft_save forwards `notice`, what the draft changes.
  *   2026-10-16 -- aimeat_app_get answers an app behind an access code only to its owner, as the node's MCP tool does (QA audit W15).
  *   v1.12.0 -- 2026-10-12 -- aimeat_app_delete says it deletes, as the code does; it said archive.
@@ -578,6 +579,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
             tags: { type: 'array', description: 'Tags (default: the live app\'s).' },
             icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
+            version: { type: 'string', description: 'Display version the draft publishes with, e.g. "1.4.0" (defaults to the live app\'s).' },
             notice: DRAFT_NOTICE_PARAM,
         },
         handler: ({ client, config }, input) => {
@@ -590,6 +592,7 @@ export const appTools: ConnectCliToolDefinition[] = [
             const category = optionalString(input, 'category'); if (category) body.category = category;
             const icon = optionalString(input, 'icon'); if (icon) body.icon = icon;
             const tags = optionalArray(input, 'tags'); if (tags) body.tags = tags;
+            const version = optionalString(input, 'version'); if (version !== undefined) body.version = version;
             draftNoticeBody(input, body);
             return client.put(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(filename)}/draft`, body);
         },
@@ -602,9 +605,10 @@ export const appTools: ConnectCliToolDefinition[] = [
             roadmap: { type: 'string', description: 'What this version changes. Required on shared apps.' },
             spec_token: { type: 'string', description: 'Current app build spec digest.' },
             spec_ack: { type: 'string', description: 'Owner-declared build spec acknowledgement.' },
+            version: { type: 'string', description: 'Display version to publish with, e.g. "1.4.0". Overrides the draft\'s.' },
         },
         handler: ({ client, config }, input) => client.post(`/v1/apps/${encodeURIComponent(optionalString(input, 'owner') ?? config.owner)}/${encodeURIComponent(requiredString(input, 'filename'))}/publish-draft`, {
-            roadmap: optionalString(input, 'roadmap'), spec_token: optionalString(input, 'spec_token'), spec_ack: optionalString(input, 'spec_ack'),
+            roadmap: optionalString(input, 'roadmap'), version: optionalString(input, 'version'), spec_token: optionalString(input, 'spec_token'), spec_ack: optionalString(input, 'spec_ack'),
             ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
             ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
         }),

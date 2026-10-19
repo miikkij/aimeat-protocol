@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version` (the display version
+ *     the draft publishes with) and pass it to the shared service; the draft save answers with the
+ *     draft's `version` (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 — aimeat_app_publish and aimeat_app_draft_publish pass the publish gate's answer for the
  *     session (upload mode puts it in the signed token): a new app the node's defaults make public, by an
  *     agent without publish:public, is published unlisted and answers with `publish_request`. `caller`
@@ -357,7 +360,7 @@ export function registerAppsTools(
         // content_base64, the name this tool used, or as content, the name the other surfaces use.
         zodShapeFor('aimeat_app_draft_save'),
         annotationsFor('aimeat_app_draft_save'),
-        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon, notice }) => {
+        async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon, version, notice }) => {
             const content_base64 = givenBase64 ?? content;
             if (!content_base64) return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: give the draft\'s base64-encoded HTML as content_base64 (or content).' }], isError: true };
             const agentGaii = getAgentGaii();
@@ -377,7 +380,7 @@ export function registerAppsTools(
                     ownerGhii: scope.ownerGhii,
                     filename,
                     data,
-                    requested: { name, description, category, tags, icon, draftNotice },
+                    requested: { name, description, category, tags, icon, version, draftNotice },
                 });
                 if ('refusal' in staged) {
                     return { content: [{ type: 'text' as const, text: refusalText(staged.refusal) }], isError: true };
@@ -398,6 +401,7 @@ export function registerAppsTools(
                             saved: true,
                             has_live_version: staged.hasLiveVersion,
                             live_version_number: staged.liveVersionNumber,
+                            version: staged.manifest.version,
                             preview_url: preview.preview_url,
                             preview_expires_in_seconds: preview.expires_in_seconds,
                             note: 'Draft saved — the LIVE app is unchanged. Open preview_url in a browser to test this next version on a real origin (mic/camera prompts work). When it is good, call aimeat_app_draft_publish to make it live; to throw it away call aimeat_app_draft_discard. To ship straight to live without staging, use aimeat_app_publish instead.',
@@ -417,7 +421,7 @@ export function registerAppsTools(
         descriptionFor('aimeat_app_draft_publish'),
         zodShapeFor('aimeat_app_draft_publish'),
         annotationsFor('aimeat_app_draft_publish'),
-        async ({ filename, owner, roadmap, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
+        async ({ filename, owner, roadmap, version, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
             const scope = await resolveAppTargetScope(storage, config,
                 { principal: agentGaii, owner, filename, act: 'publish' });
@@ -450,6 +454,7 @@ export function registerAppsTools(
                     specToken: spec_token,
                     specAck: spec_ack,
                     roadmap,
+                    version,
                     publishGate: publishAskOf({ storage, config }, caller()),
                 });
                 if ('refusal' in out) {

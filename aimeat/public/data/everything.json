@@ -2009,10 +2009,10 @@
      "slug": "g-10-staging-preview",
      "cells": [
       "<strong>Staging preview</strong>",
-      "Open a saved draft on its staging origin through a preview token and try it before publishing.",
-      "App Catalog &gt; staging preview, <code>aimeat_app_draft_*</code>"
+      "Open a saved draft on its staging origin through a preview token and try it before publishing. The draft can carry the version number people see (for example 1.4.0), given when you save it or when you publish it; without one it keeps the live app's.",
+      "App Catalog &gt; staging preview, <code>aimeat_app_draft_*</code> (<code>version</code> on <code>aimeat_app_draft_save</code> and <code>aimeat_app_draft_publish</code>), <code>PUT /v1/apps/{owner}/{filename}/draft</code>, <code>POST /v1/apps/{owner}/{filename}/publish-draft</code>"
      ],
-     "plain": "Staging preview Open a saved draft on its staging origin through a preview token and try it before publishing. App Catalog > staging preview, aimeat_app_draft_*"
+     "plain": "Staging preview Open a saved draft on its staging origin through a preview token and try it before publishing. The draft can carry the version number people see (for example 1.4.0), given when you save it or when you publish it; without one it keeps the live app's. App Catalog > staging preview, aimeat_app_draft_* (version on aimeat_app_draft_save and aimeat_app_draft_publish), PUT /v1/apps/{owner}/{filename}/draft, POST /v1/apps/{owner}/{filename}/publish-draft"
     },
     {
      "slug": "g-10-published-versions-and-restore",
@@ -3719,10 +3719,10 @@
      "slug": "g-21-mcp",
      "cells": [
       "<strong>MCP</strong>",
-      "The main road for AIs. The node declares the handshake version it has tested, 2025-06-18 on its Server Card; the SDK it runs accepts versions up to 2025-11-25, and the card moves when a newer one is tested.",
+      "The main road for AIs. The node's Server Card states the handshake version the node negotiates, 2025-11-25, the newest the SDK it runs speaks; a client asking for an older version (back to 2024-10-07) gets that one, and a client asking for 2026-07-28 gets 2025-11-25.",
       "<code>/v1/mcp</code>, <code>/v2/mcp/*</code>"
      ],
-     "plain": "MCP The main road for AIs. The node declares the handshake version it has tested, 2025-06-18 on its Server Card; the SDK it runs accepts versions up to 2025-11-25, and the card moves when a newer one is tested. /v1/mcp, /v2/mcp/*"
+     "plain": "MCP The main road for AIs. The node's Server Card states the handshake version the node negotiates, 2025-11-25, the newest the SDK it runs speaks; a client asking for an older version (back to 2024-10-07) gets that one, and a client asking for 2026-07-28 gets 2025-11-25. /v1/mcp, /v2/mcp/*"
     },
     {
      "slug": "g-21-oauth-2-0-with-pkce-rfc-8707-resource-indicators-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents",

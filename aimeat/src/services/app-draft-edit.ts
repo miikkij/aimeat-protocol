@@ -29,6 +29,8 @@
  *   });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.2.0 — 2026-10-19 — A write and a replace carry the draft's display version forward, so a version
+ *     stated with aimeat_app_draft_save survives the edits after it (wish-the-app-draft-tools-can-set-the-display-version).
  *   v1.1.0 — 2026-10-18 — A write and a replace carry the draft's notice (what it is changing) forward,
  *     and a seed may state a new one.
  *   v1.0.0 — 2026-08-16 — Initial implementation. Four operations so a hosted agent can build an app
@@ -169,6 +171,7 @@ function carryManifest(
     tags: requested?.tags ?? base?.tags,
     icon: requested?.icon ?? base?.icon,
     usesCortex: requested?.usesCortex ?? base?.usesCortex,
+    version: requested?.version ?? base?.version,
     protection: requested?.protection ?? base?.protection,
     mimeType: requested?.mimeType ?? draft?.mimeType,
     draftNotice: requested?.draftNotice !== undefined ? requested.draftNotice : (base?.draftNotice ?? null),
