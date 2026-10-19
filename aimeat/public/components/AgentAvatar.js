@@ -21,6 +21,7 @@
  *   html`<${AgentAvatar} agent=${a} text=${initials(a.name)} />`
  *   html`<${Lead} ...${leadProps(a, initials(a.name))} />`
  * @version-history
+ *   v1.1.1 — 2026-10-19 — The <img> carries width and height 40, its size before the stylesheet arrives.
  *   v1.1.0 — 2026-10-19 — A picture (an SVG, or an emoji through its address) gets the plain frame and
  *     fills the square; the dashed agent frame stays for the stand-in initials.
  *   v1.0.0 — 2026-10-19 — Initial (wish-agenteille-oma-avatar-jonka-agentti-asettaa-itse).
@@ -42,9 +43,12 @@ export function avatarOf(x) {
     return null;
 }
 
-/** The picture an SVG avatar is drawn with: an <img>, lazily loaded, with no text of its own. */
+/** The picture an SVG avatar is drawn with: an <img>, lazily loaded, with no text of its own. The
+ *  width and height attributes are the size it takes before avatar.css arrives (the sheet sets the
+ *  square's own size over them): a picture drawn before the styles, on a page whose sheets were slow,
+ *  filled the whole width. */
 function picture(a) {
-    return html`<img src=${a.url} alt="" loading="lazy" decoding="async" draggable="false" />`;
+    return html`<img src=${a.url} alt="" width="40" height="40" loading="lazy" decoding="async" draggable="false" />`;
 }
 
 export function AgentAvatar({ agent, avatar, text, size, label }) {
