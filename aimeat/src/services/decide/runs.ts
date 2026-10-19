@@ -29,6 +29,8 @@
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  * @version-history
+ *   v1.6.1 — 2026-10-20 — stopDecideRun reads the run under the owner before it sets the stop flag
+ *     (test/unit/decide-run-stop-owner.test.ts).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     A run counts once at its start and once at a resume; its items pass `limit: 'exempt'`.
  *   v1.5.0 — 2026-09-30 — One classification reader per run, and the warning-classified records it
@@ -410,9 +412,15 @@ export async function resumeDecideRun(
   return run;
 }
 
-/** Stop a run after the requests already open finish. What was decided stays decided and recorded. */
+/**
+ * Stop a run after the requests already open finish. What was decided stays decided and recorded.
+ * The run is read under the owner FIRST: `active` is keyed by run id alone, so the flag is set only
+ * on a run this owner has.
+ */
 export async function stopDecideRun(storage: Storage, owner: string, id: string): Promise<DecideRun | null> {
+  const run = await getDecideRun(storage, owner, id);
+  if (!run) return null;
   const flag = active.get(id);
   if (flag) flag.stop = true;
-  return getDecideRun(storage, owner, id);
+  return run;
 }
