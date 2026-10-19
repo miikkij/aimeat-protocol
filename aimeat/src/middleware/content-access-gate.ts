@@ -29,14 +29,21 @@
  *   - The node's own description for machines: health, build, llms.txt, the API contract, the
  *     served libraries' code. None of it names a person, an organism or an app.
  *
- *   THE OTHER ORIGINS. An app origin serves only the app page itself, and the app gate asks for a
- *   sign-in grant from the apex before it does (routes/subdomains.ts, appIsRestricted); its per-app
- *   documents answer 404 here. A portfolio or company origin holds no session at all, so in this
- *   mode it answers 404. The page host serves only what a frame token names, and a token is minted
- *   only after the page's own gate, which in this mode admits accounts only.
+ *   THE OTHER ORIGINS. An app origin serves the app page itself, and the app gate asks for a
+ *   sign-in grant from the apex before it does (routes/subdomains.ts, appIsRestricted); a welcome
+ *   page or company origin serves its page `/` the same way, on a page grant (routes/page-open.ts).
+ *   Each of them also passes the open routes under /v1/ (the served libraries, the sign-in steps),
+ *   which hold no content; everything else there, the per-app documents included, answers 404. The
+ *   page host serves only what a frame token names, and a token is minted only after the page's own
+ *   gate, which in this mode admits accounts only.
  * @structure OPEN_ROUTES · isOpenRoute() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.2.0 — 2026-10-19 — An app, welcome-page or company origin passes the served libraries and the
+ *     sign-in steps (open routes under /v1/), and a welcome-page or company origin passes its page to
+ *     the route that checks the page grant. The app origin answered /v1/libs/* 404, so every app that
+ *     loads aimeat-auth.js or aimeat-data.js lost its person; the page origins answered 404 even to a
+ *     person holding a page grant (seen on innokas.aimeat.io).
  *   v1.1.0 — 2026-10-19 — A browser navigation to the apex app read goes to /v1/app-open instead of
  *     the 401: a new tab carries no session, so every app's Open answered a signed-in person 401
  *     (seen on innokas.aimeat.io). API callers and the app's sub-routes keep the 401.
@@ -149,12 +156,16 @@ export function contentAccessGate(config: AimeatConfig): RequestHandler {
     if (!signedInOnly(config) || req.method === 'OPTIONS') return next();
     if (isNodeAccount(req.auth)) return next();
     if (req.pageOrigin) return next();   // the page host: a frame token names what it serves
-    if (req.appOrigin) {
-      if (req.method === 'GET' && APP_ORIGIN_PAGE.test(req.path)) return next();
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found'));
-      return;
-    }
-    if (req.portfolioOrigin || req.coOrigin) {
+    if (req.appOrigin || req.portfolioOrigin || req.coOrigin) {
+      // The page itself goes to its route, which serves it only on a grant and sends a browser
+      // without one to the open page (routes/subdomains.ts, routes/page-open.ts). A welcome page or
+      // a company page has only `/`.
+      const page = req.appOrigin ? APP_ORIGIN_PAGE.test(req.path) : req.path === '/';
+      if (req.method === 'GET' && page) return next();
+      // The page loads the served libraries and signs in from its own origin. Those routes hold no
+      // content and are open on the apex too; the origin's own documents (llms.txt, AGENTS.md, the
+      // legal pages) are outside /v1/ and stay closed.
+      if (req.path.startsWith('/v1/') && isOpenRoute(req.method, req.path)) return next();
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found'));
       return;
     }

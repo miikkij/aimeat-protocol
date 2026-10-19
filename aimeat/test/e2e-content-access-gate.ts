@@ -243,6 +243,27 @@ async function main() {
             assert(llms.status === 404, `origin llms.txt: ${llms.status}`);
         });
 
+        await test('an app origin serves the app its libraries and the sign-in steps, and still none of its documents', async () => {
+            // The app page loads /v1/libs/aimeat-auth.js and aimeat-data.js from its own origin and signs
+            // in there. They hold no content and are open on the apex; on the app origin they answered
+            // 404 from 2026-10-18 11:29, so every app that uses them stopped knowing its person (seen on
+            // innokas.aimeat.io 2026-10-19).
+            const sub = 'gate-demo';
+            const host = `${sub}.${APP_HOST}:${PORT}`;
+            const originHeaders = { 'x-app-origin': '1', 'x-subdomain': sub };
+            for (const lib of ['/v1/libs/aimeat-auth.js', '/v1/libs/aimeat-data.js']) {
+                const res = await hostRequest(BASE, lib, host, { headers: { ...originHeaders, Accept: '*/*' } });
+                assert(res.status === 200 && /javascript/.test(res.header('content-type') ?? ''), `${lib} on the app origin: ${res.status} ${res.header('content-type')}`);
+            }
+            const step = await hostRequest(BASE, '/v1/auth/providers', host, { headers: originHeaders });
+            assert(step.status !== 404, `a sign-in step on the app origin: ${step.status}`);
+            // FAILURE: content routes and the origin's own documents stay closed to a stranger there.
+            for (const p of ['/v1/apps', `/v1/apps/${owner}/${filename}`, '/llms.txt', '/AGENTS.md']) {
+                const res = await hostRequest(BASE, p, host, { headers: originHeaders });
+                assert((res.status === 404 || res.status === 401) && !res.body.includes(APP_TEXT), `${p} on the app origin: ${res.status}`);
+            }
+        });
+
         await test('a browser tab opening the apex app read (the store\'s Open, a feed link) goes to the open page, never a 401', async () => {
             // A new tab carries no session: the SPA keeps it in localStorage. So a signed-in person's
             // Open from the app store reaches the gate exactly as a stranger's does, and the gate must
@@ -296,6 +317,34 @@ async function main() {
         await test('a portfolio origin answers a stranger 404', async () => {
             const p = await hostRequest(BASE, '/', `${owner}.${PORTFOLIO_HOST}:${PORT}`, { headers: { 'x-portfolio-origin': '1', 'x-subdomain': owner } });
             assert(p.status === 404, `portfolio origin ${p.status}`);
+        });
+
+        await test('a welcome page on its origin: a browser goes to the open page, an account opens it with a grant, and the page loads its libraries', async () => {
+            // On a signed-in-only node every welcome page needs a sign-in. The gate answered 404 to the
+            // page origin even with a page grant, so a person who opened someone's page got nothing.
+            const PAGE_TEXT = 'GATE WELCOME PAGE';
+            const up = await json('/v1/portfolio/upload', { method: 'PUT', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ html: `<!DOCTYPE html><html><head><title>W</title></head><body><h1>${PAGE_TEXT}</h1></body></html>`, enable: true }) });
+            assert(up.status === 200, `upload ${up.status} ${JSON.stringify(up.body.error)}`);
+            const host = `${owner}.${PORTFOLIO_HOST}:${PORT}`;
+            const originHeaders = { 'x-portfolio-origin': '1', 'x-subdomain': owner };
+            const browser = await hostRequest(BASE, '/', host, { headers: { ...originHeaders, Accept: 'text/html' } });
+            assert(browser.status === 302 && (browser.header('location') ?? '').endsWith(`/v1/app-open?portfolio=${owner}`), `stranger's browser: ${browser.status} ${browser.header('location')}`);
+            assert(!browser.body.includes(PAGE_TEXT), 'the redirect carried the page');
+            const api = await hostRequest(BASE, '/', host, { headers: { ...originHeaders, Accept: 'application/json' } });
+            assert(api.status === 404 && !api.body.includes(PAGE_TEXT), `stranger without a browser: ${api.status}`);
+            const open = await json(`/v1/portfolio/${owner}/open`, { method: 'POST', headers: { Authorization: `Bearer ${otherToken}` }, body: '{}' });
+            assert(open.status === 200 && typeof open.body.data?.url === 'string', `open ${open.status} ${JSON.stringify(open.body.error)}`);
+            const u = new URL(open.body.data.url);
+            const hop = await hostRequest(BASE, `${u.pathname}${u.search}`, host, { headers: { ...originHeaders, Accept: 'text/html' } });
+            const cookie = (hop.header('set-cookie') ?? '').split(';')[0];
+            assert(hop.status === 302 && cookie.startsWith('aimeat_page_access='), `the grant hop: ${hop.status}`);
+            const page = await hostRequest(BASE, hop.header('location')!, host, { headers: { ...originHeaders, Accept: 'text/html', Cookie: cookie } });
+            assert(page.status === 200 && page.body.includes(PAGE_TEXT), `the granted page: ${page.status}`);
+            const lib = await hostRequest(BASE, '/v1/libs/aimeat-auth.js', host, { headers: { ...originHeaders, Accept: '*/*' } });
+            assert(lib.status === 200, `a library on the page origin: ${lib.status}`);
+            const content = await hostRequest(BASE, `/v1/portfolio/data/${owner}`, host, { headers: originHeaders });
+            assert(content.status === 404 && !content.body.includes(PAGE_TEXT), `a content route on the page origin: ${content.status}`);
         });
 
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
