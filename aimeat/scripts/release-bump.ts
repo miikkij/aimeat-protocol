@@ -27,7 +27,7 @@
  *   A test that follows the release (a `*_REMOVED_IN` constant the new version reaches) fails in step
  *   4 by design: the removal it names is due, and doing it is part of the release, not of this script.
  * @structure setPackageVersion · setOpenapiVersion · setServerVersion · isNewer · VERSION_READERS ·
- *   versionReaders(files) · main()
+ *   versionReaders(files) · porcelainPaths(out) · main()
  * @usage
  *   pnpm release:bump 4.1.2              # from the repository root or aimeat/
  *   pnpm release:bump 4.2.0 --all-units
@@ -111,9 +111,20 @@ function unitTestFiles(): { path: string; text: string }[] {
 }
 
 function run(label: string, cmd: string, args: string[]): boolean {
-    console.log(`\n▶ ${label}: ${cmd} ${args.join(' ')}`);
-    const r = spawnSync(cmd, args, { cwd: AIMEAT, stdio: 'inherit', shell: process.platform === 'win32' });
+    const line = [cmd, ...args].join(' ');
+    console.log(`\n▶ ${label}: ${line}`);
+    // Windows finds pnpm only through a shell, and a shell takes one command line (an argument list
+    // beside shell: true is deprecated, DEP0190). Every argument here is a script name or a tracked
+    // file path, none with a space or a shell character.
+    const r = process.platform === 'win32'
+        ? spawnSync(line, { cwd: AIMEAT, stdio: 'inherit', shell: true })
+        : spawnSync(cmd, args, { cwd: AIMEAT, stdio: 'inherit' });
     return r.status === 0;
+}
+
+/** The paths `git status --porcelain` names, each line's two status columns and space removed. */
+export function porcelainPaths(out: string): string[] {
+    return out.split('\n').map(l => l.trimEnd()).filter(Boolean).map(l => l.slice(3));
 }
 
 function fail(lines: string[]): never {
@@ -161,8 +172,7 @@ function main(): void {
         ]);
     }
 
-    const changed = execFileSync('git', ['status', '--porcelain', '--', ...CARRIERS, ...GENERATED], { cwd: REPO, encoding: 'utf-8' })
-        .trim().split('\n').filter(Boolean).map(l => l.slice(3));
+    const changed = porcelainPaths(execFileSync('git', ['status', '--porcelain', '--', ...CARRIERS, ...GENERATED], { cwd: REPO, encoding: 'utf-8' }));
     console.log(`\n✓ node ${version}: the version files, the notices and the capability map agree, and the checks that read the version are green.`);
     console.log('  Commit these files together, then run pnpm gate before the push:');
     for (const f of changed) console.log(`    ${f}`);
