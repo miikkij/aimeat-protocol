@@ -14,6 +14,8 @@
  *   database from this process, and the node's real job, fired through the operator's door, folds
  *   the fourteen-month one and leaves the twelve-month one and a call of another kind alone.
  * @version-history
+ *   2026-10-20 — Phase 5's fourteen-month visitor is an account seen only then, not B, whose recent
+ *     opens now carry B's GHII.
  *   2026-09-27 — Tests 16-19 call aimeat_app_manage (actions visitors, visitors_measure).
  *   v1.1.0 — 2026-09-25 — Phase 5: core:usage-visit-retention on the runner's backend.
  *   v1.0.0 — 2026-09-18 — Initial.
@@ -456,7 +458,10 @@ async function fireJob(jobId: string): Promise<void> {
 {
   let storage!: Storage;
   const stamp = Date.now().toString(36).slice(-6);
-  const visitorOld = B.ghii;
+  // A visitor seen only fourteen months ago. Not B: B opened the app signed in above, and since
+  // 2026-10-20 those opens are filed under B's GHII (they were under the bare account name, which made
+  // B two people), so folding B's old visit would split one person into B and a nameless visitor.
+  const visitorOld = `vis14m${stamp}@${NODE_ID}`;
   const visitorNew = `vis12m${stamp}@${NODE_ID}`;
   const oldOpenId = `e2e-visit-14m-${stamp}`;
   const newOpenId = `e2e-visit-12m-${stamp}`;

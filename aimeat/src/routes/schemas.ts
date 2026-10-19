@@ -11,6 +11,9 @@
  *   - PUT /v1/memory/:key/schema: validate the schema, enforce lock ownership, persist + cache-bust
  *
  * @version-history
+ *   2026-10-20 — PUT and DELETE take a lock as the caller's own when it names the token's `sub` or the
+ *     resolved identity (isCallersLock): an owner was refused on a lock their own package installed
+ *     under the GHII.
  *   2026-10-16 — PUT asks services/schema-lock-rule.ts who may lock which pattern (a node-wide or
  *     another organism's pattern, a lock beside or under another account's lock are refused), and
  *     DELETE removes one row, (key, apply_to), with ?apply_to= to name it; it removed every row of
@@ -23,7 +26,7 @@
  *     and pointed at nothing.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
@@ -36,6 +39,18 @@ import { isOperatorCaller, operatorOverride } from '../services/operator-overrid
 import { schemaLockRefusal } from '../services/schema-lock-rule.js';
 import { callerOf } from '../middleware/caller.js';
 import { logger } from '../utils/logger.js';
+import { resolveIdentity } from '../utils/gaii.js';
+
+/**
+ * Whether the caller is the principal that set a lock. A lock set on this route stores the token's
+ * `sub`, which is the bare account name for an owner in person; a lock a package installed in the
+ * owner's name stores the GHII (services/component-registrar.ts). Both spellings are the same
+ * person, so both are the caller's own. An agent's `sub` and resolved identity are the same GAII, so
+ * an agent still matches only its own locks (DATA-15: the exact principal that set it).
+ */
+function isCallersLock(lockedBy: string, auth: NonNullable<Request['auth']>, nodeId: string): boolean {
+  return lockedBy === auth.sub || lockedBy === resolveIdentity(auth, nodeId);
+}
 
 export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -95,7 +110,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
 
     const existing = await storage.getSchema(key, apply_to);
 
-    if (existing && existing.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
+    if (existing && !isCallersLock(existing.lockedBy, req.auth!, config.nodeId) && !(await operatorOverride(storage, config, req.auth,
       { ownerOf: existing.lockedBy, area: 'schema', action: 'update', subject: key }))) {
       res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `This structure is locked by ${existing.lockedBy}. Ask them to unlock it, or make your own copy.`));
       return;
@@ -181,7 +196,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    if (record.lockedBy !== req.auth!.sub && !(await operatorOverride(storage, config, req.auth,
+    if (!isCallersLock(record.lockedBy, req.auth!, config.nodeId) && !(await operatorOverride(storage, config, req.auth,
       { ownerOf: record.lockedBy, area: 'schema', action: 'delete', subject: key }))) {
       res.status(403).json(error(config.nodeId, 'NOT_SCHEMA_OWNER', 'Only whoever set this structure, or whoever runs the node, can remove it. Ask one of them.'));
       return;

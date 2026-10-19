@@ -10,6 +10,9 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-20 — An app open is recorded, and a watermark names, the resolved caller (resolveIdentity):
+ *     an owner session's `sub` is the bare account name, which filed the owner's own opens outside
+ *     their per-owner usage rows.
  *   2026-10-19 — The inline redirect to the app origin keeps the request's query, minus mode and the apex's
  *     own credentials (helpers.ts withForwardedQuery; wish-the-apex-app-redirect-keeps-the-query-string).
  *   2026-10-18 — The inline live version carries the app-info mark (services/app-news.ts appInfoMarkFor).
@@ -109,7 +112,7 @@ import { listAppVersionsView } from '../../services/app-versions.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { setStoredImageHeaders } from '../../utils/file-download-headers.js';
-import { ownerCoordinate, localAccountName } from '../../utils/gaii.js';
+import { ownerCoordinate, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
@@ -745,7 +748,7 @@ export function registerReadRoutes(
             body = applyAppProtection(body, {
                 protection,
                 config,
-                viewer: req.auth?.sub ?? 'anon',
+                viewer: req.auth ? resolveIdentity(req.auth, config.nodeId) : 'anon',
                 appOwner: app.ownerName,
                 appFilename: filename,
                 version: app.versionNumber,
@@ -775,7 +778,7 @@ export function registerReadRoutes(
 
         storage.incrementAppDownloads(app.ownerGaii, filename).catch(err => { logger.warn('body: continuing after a suppressed failure', { error: String(err) }); });
         // The lifetime counter above answers "how many"; this answers when, and by whom.
-        recordAppOpen({ appOwnerGaii: app.ownerGaii, filename, viewer: req.auth?.sub, anonymous: !!req.auth?.anonymous });
+        recordAppOpen({ appOwnerGaii: app.ownerGaii, filename, viewer: req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined, anonymous: !!req.auth?.anonymous });
         // And this answers WHAT KIND of visitor, which the other two cannot: an AI crawler runs no
         // script and loads no image, so a page fetch is the only place it is visible. No-op unless
         // the owner opted this page in by creating its stream. Never awaited.

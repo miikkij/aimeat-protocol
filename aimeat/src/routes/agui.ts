@@ -22,6 +22,7 @@
  * @structure aguiRouter(config, storage)
  * @usage app.use(aguiRouter(config, storage));
  * @version-history
+ *   v1.1.1 — 2026-10-20 — The GET comment no longer says "No scope" above a route that asks task:read.
  *   v1.1.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:read on GET /v1/agui/:owner/:agent/:taskId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6d).
  */
@@ -142,8 +143,9 @@ export function aguiRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET — watch work that already exists ──
   //
-  // A browser that reloaded, or a second screen. No scope: it is a read, and the task reads beside
-  // it on /v1/agents/v2/tasks are ungated for the same reason — the owner is not a parameter.
+  // A browser that reloaded, or a second screen. A read, so the word is task:read
+  // (requireRestScope); the agent must belong to the caller's own account, and the task is read
+  // under that account.
   router.get('/v1/agui/:owner/:agent/:taskId', requireAuth(), requireRestScope('task:read'), async (req, res) => {
     const agent = await findAgent(req);
     if (!agent) {

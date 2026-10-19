@@ -21,6 +21,7 @@
  *   9 the idle reaper.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-realtime-rooms
  * @version-history
+ *   v1.2.2 — 2026-10-20 — A room's created_by is the owner's GHII, not the bare account name.
  *   v1.2.1 — 2026-10-13 — queryTokenUses throws again when GET /v1/stats has no ws_query_token family
  *     (it read 0 since 2026-10-12, so a dropped counter passed); the counted-use test makes one use
  *     before it reads. On 4.0.0 the "a refused query token is not counted" check compares the
@@ -304,7 +305,8 @@ await test('POST /v1/realtime/rooms — creates a room and hands back its socket
     publicRoomId = body.data.id;
     assert(typeof publicRoomId === 'string' && publicRoomId.length > 0, 'room id');
     assert(body.data.app_type === 'whiteboard', `app_type: ${body.data.app_type}`);
-    assert(body.data.created_by === ownerA.name, `created_by should be the owner's sub: ${body.data.created_by}`);
+    // The resolved caller, the GHII: the room's snapshots are memory records filed under it.
+    assert(body.data.created_by === `${ownerA.name}@${NODE_ID}`, `created_by should be the owner's GHII: ${body.data.created_by}`);
     assert(body.data.is_public === true, 'public by default');
     assert(body.data.peer_count === 0, `peer_count: ${body.data.peer_count}`);
     assert(body.data.max_peers === 20, `max_peers falls back to the node ceiling: ${body.data.max_peers}`);
