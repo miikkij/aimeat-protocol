@@ -1926,6 +1926,15 @@
     });
   }
 
+  // src/static/sdk-libs/auth/signup-state.js
+  var inProgress = false;
+  function markSignupInProgress(on2) {
+    inProgress = !!on2;
+  }
+  function signupInProgress() {
+    return inProgress;
+  }
+
   // src/static/sdk-libs/auth/modal.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -1939,6 +1948,7 @@
   var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
   var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
   function showLoginModal(opts, renderBtn, onClosed) {
+    if (signupInProgress()) return;
     var i = opts.i18n || {};
     var lang = currentModalLang();
     var tab = opts.tab === "register" ? "register" : "signin";
@@ -3453,6 +3463,7 @@
       if (checkTimer) clearTimeout(checkTimer);
       modal.remove();
       cleanSignupParam();
+      markSignupInProgress(false);
     }
     cancelBtn.addEventListener("click", close);
     createBtn.addEventListener("click", async function() {
@@ -3497,7 +3508,9 @@
       return;
     }
     if (params.get("aimeat_signup") !== "1") return;
+    markSignupInProgress(true);
     function showExpired() {
+      markSignupInProgress(false);
       function open(i) {
         showSignupNoticeModal(i || {}, {
           title: i && i.signupExpiredTitle || "Sign-in session expired",
