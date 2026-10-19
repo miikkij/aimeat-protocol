@@ -12,6 +12,12 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-19 — Seven more removed whose facts reached production with 908d4fe6c (Jouni, 2026-10-19):
+ *     isolated-frame-on-shared-nodes, app-grant-node-role-via-owners, app-grant-role-limits
+ *     (the aimeat-auth and aimeat-organism aiDocs), realtime-room-gc-recreate,
+ *     an-ai-co-player-is-an-agent (the realtime aiDoc), overflow-clip-hides-scrollwidth (the build
+ *     specification's mobile check; grid-track-blowout and auth-pill-overflow point there now) and
+ *     schedule-list-hides-what-fired (the aimeat-agents aiDoc).
  *   2026-10-19 — Eleven entries the 2026-10-17 round marked outdated are removed (Jouni, 2026-10-19):
  *     unlabelled-ai-output, ai-provenance-dropped-on-save, biometric-inference-needs-your-own-notice,
  *     pub-urls-for-cross-user-files, ui-component-shapes, presigned-over-inline,
@@ -307,17 +313,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
-    id: 'isolated-frame-on-shared-nodes',
-    title: 'On a node with no app addresses, the app runs in an isolated frame when several people share the node or a package installed it',
-    symptom: 'The app opens at its usual /v1/apps/<owner>/<file>?mode=inline address, but inside a frame whose origin is opaque. Code that took the node\'s own sign-in directly (the stored aimeat_session, POST /v1/auth/refresh, a fetch with credentials: "include") gets nothing, IndexedDB and a service worker are refused, and push notifications, installing the app and Web Locks are not there. Since 2026-10-04 this also holds on a node one person uses (a sold place) for an app a package installed: every app you ship in a package meets the frame wherever the node has no app addresses. aimeat.io and every node that gives apps an address of their own are not affected.',
-    fix: 'Sign in only through aimeat-auth: AIMEAT.auth.login() on start, AIMEAT.auth.signIn() from a click, and session.fetch() or the SDK libraries for every call. They take the app\'s own grant from the page around the frame and need no change. localStorage, sessionStorage and document.cookie work (the node keeps localStorage for each app); keep what must last in memory or files through the node (AIMEAT.data, AIMEAT.storage), never in IndexedDB. AIMEAT.auth.isAppOrigin() is true in the frame.',
-    appliesTo: ['auth', 'app'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-25',
-    ...CHECKED,
-  }),
-  E({
     id: 'apps-localhost-cross-site',
     title: '*.apps.localhost is cross-site with localhost — silent SSO fails locally',
     symptom: 'App-origin auto-login fails on local dev (no apex cookie reaches the SSO iframe) while the same app logs in fine on prod (*.apps.aimeat.io is same-site with aimeat.io).',
@@ -326,28 +321,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'info',
     source: 'curated',
     updatedAt: '2026-07-19',
-    ...CHECKED,
-  }),
-  E({
-    id: 'app-grant-role-limits',
-    title: 'App tokens are role "app": organism structure and agent role gates refuse them',
-    symptom: 'An app-grant token gets 403 ACCESS_DENIED (Role "agent" required), whatever scopes it holds, when it replaces a workspace\'s whole structure (PUT /v1/organisms/:id/workspace, which also carries add_object_types), edits, deletes, joins or leaves an organism, accepts an invitation, or uses the organism member routes (/members, /admins, /owners, /agents, /invitations, /transfer). An app holding organism:write can still create an organism or a workspace and add a space to a workspace (POST /v1/organisms/:id/workspace/spaces?ws=<id>). The workspace access and email invitation routes that AIMEAT.organism\'s grant, revoke, decide and inviteByEmail call need organism:invite.',
-    fix: 'Keep the data model inside what an app grant can do, and put server-side rules in an extension (ext: namespace + action checks). An app that finds a space missing adds it with POST /v1/organisms/:id/workspace/spaces?ws=<id> and reads `status`: `applied` when the person manages the workspace, `pending_approval` (a suggestion its creator approves) when they contribute to it. Replacing the whole structure is a job for the owner or the owner\'s agent.',
-    appliesTo: ['auth', 'ext'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-10-17',
-    ...CHECKED,
-  }),
-  E({
-    id: 'app-grant-node-role-via-owners',
-    title: 'App tokens carry roles:["app"] — read the owner\'s NODE role via GET /v1/owners/:name',
-    symptom: 'The app cannot tell whether the signed-in user is a node operator/admin — session.roles on an app origin is just ["app"], so a node-role check is always false.',
-    fix: 'The app-grant token identifies the owner (session.owner) but NOT their node roles. To check a node-level role (e.g. operator), fetch GET /v1/owners/{session.owner} with the session jwt — it returns the roles array to the owner themselves (anonymous callers get name/display_name only, so nothing leaks). Probe it after every sign-in AND every restored session (a restore does not call onLogin), and re-render when it resolves.',
-    appliesTo: ['auth', 'app'],
-    severity: 'info',
-    source: 'curated',
-    updatedAt: '2026-09-13',
     ...CHECKED,
   }),
 
@@ -483,19 +456,8 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'grid-track-blowout',
     title: 'One wide child inflates a 1fr grid track and the whole page overflows',
     symptom: 'ONE view overflows horizontally on mobile while sibling views are fine — a non-wrapping table/<pre>/long code inside an overflow-x:auto wrapper still pushes the page wide, because the grid track grew to its min-content.',
-    fix: 'Use grid-template-columns: ... minmax(0,1fr) and/or min-width:0 on the grid/flex children so the track can shrink and the inner overflow-x:auto actually scrolls. Verify per element at 390px (see overflow-clip-hides-scrollwidth): under the shells\' body{overflow-x:clip} a scrollWidth check passes while the track is still too wide.',
+    fix: 'Use grid-template-columns: ... minmax(0,1fr) and/or min-width:0 on the grid/flex children so the track can shrink and the inner overflow-x:auto actually scrolls. Verify per element at 390px with the measure the build specification gives in its mobile section: under the shells\' body{overflow-x:clip} a scrollWidth check passes while the track is still too wide.',
     appliesTo: ['mobile'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
-    id: 'overflow-clip-hides-scrollwidth',
-    title: 'overflow-x: clip hides overflow from scrollWidth, so the usual width check proves nothing',
-    symptom: 'scrollWidth === clientWidth at 390 px and the page still has something wider than the screen, cut off at the edge. The shells set body{overflow-x:clip}, so the standard check always passes.',
-    fix: 'Measure per element instead: `[...document.querySelectorAll("#app *")].filter(e => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5)`. The outermost element in that list is the one to fix.',
-    appliesTo: ['mobile', 'app'],
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-09-13',
@@ -505,7 +467,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'auth-pill-overflow',
     title: 'The login pill next to other header widgets overflows a portrait phone',
     symptom: 'On a ~390px phone the page zooms out and every font renders tiny: an un-shrinkable header row (the pill beside a brand and extra toggles) forces shrink-to-fit.',
-    fix: 'mountLoginButton renders compact on every origin by default: signed in, an account button with a popover; signed out, Sign In and one settings trigger. So: use the shell (or copy its head), put no other fixed-width widgets in the header row (the pill already carries language and theme), let flex children shrink (min-width:0), and keep body{overflow-x:clip} (clip, NOT hidden, which breaks position:sticky). Verify per element (see overflow-clip-hides-scrollwidth) at 390px and phone landscape.',
+    fix: 'mountLoginButton renders compact on every origin by default: signed in, an account button with a popover; signed out, Sign In and one settings trigger. So: use the shell (or copy its head), put no other fixed-width widgets in the header row (the pill already carries language and theme), let flex children shrink (min-width:0), and keep body{overflow-x:clip} (clip, NOT hidden, which breaks position:sticky). Verify per element at 390px and phone landscape, with the measure the build specification gives in its mobile section.',
     appliesTo: ['mobile', 'auth'],
     severity: 'warn',
     source: 'curated',
@@ -558,28 +520,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     updatedAt: '2026-09-13',
     ...CHECKED,
   }),
-  E({
-    id: 'realtime-room-gc-recreate',
-    title: 'Empty rooms are garbage-collected: reconnect must be able to RECREATE',
-    symptom: '"Room not found" on reconnect after everyone left for a while; re-dialing the old socket object never recovers.',
-    fix: 'A room with no peers is deleted after an hour idle (the node default). On WS close: try getRoom(id); if it is gone, createRoom again with the same name and tags; reconnect with a FRESH AimeatRealtime instance; back off exponentially and reset the delay on a successful joined.',
-    appliesTo: ['realtime'],
-    severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
-    id: 'an-ai-co-player-is-an-agent',
-    title: 'An AI in a multiplayer app is an agent on the same socket, not a server feature',
-    symptom: 'A plan for "let an AI join the jam" grows a special server path, a bot endpoint or a second protocol.',
-    fix: 'Any signed-in principal holding social:write can create or join a room and broadcast, an agent included: it opens the same WebSocket with its own token and sends the payloads a browser sends. Design the room messages as a clean public protocol, carry the author inside the payload (there is no trusted sender field), and the AI player needs nothing else.',
-    appliesTo: ['realtime', 'ai'],
-    severity: 'info',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
 
   // ---- sending and scheduling -------------------------------------------
   E({
@@ -589,17 +529,6 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     fix: 'Print the year whenever you show a schedule\'s next-run time outside a month grid, and show lastRunResult and lastRunError beside it.',
     appliesTo: ['app'],
     severity: 'warn',
-    source: 'curated',
-    updatedAt: '2026-09-13',
-    ...CHECKED,
-  }),
-  E({
-    id: 'schedule-list-hides-what-fired',
-    title: 'Filtering a schedule list on enabled deletes your own history',
-    symptom: 'A post that was sent looks like an untouched draft: the one-shot schedule disabled itself the moment it fired, and the list filtered it away.',
-    fix: 'Show one-shots by lastRunAt, lastRunResult, lastRunError and runCount, which are in the same GET /v1/schedules response. A skipped run appears only in GET /v1/schedules/{id} runs[].',
-    appliesTo: ['app'],
-    severity: 'info',
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
