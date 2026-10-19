@@ -173,6 +173,22 @@ async function main() {
             assert(/auth\.on\(["']login["']/.test(webmcp), 'aimeat-webmcp.js does not list the app tools again at the sign-in');
         });
 
+        await test('FAILURE: carrying the session gets a person past the gate, never past the route: another account is refused an app opened to one organism', async () => {
+            // closed-node-fetch.js and public-fetch.js put the session on reads that went without one.
+            // What the session may read is still the route's decision.
+            const other = (await registerOwner(BASE, `brwother${Date.now() % 100000}`)).token;
+            const o = await fetch(`${BASE}/v1/organisms`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ name: 'Browser Audit Team', type: 'team', visibility: 'private' }) });
+            const orgId = ((await o.json()) as any)?.data?.organism?.id;
+            assert(o.status === 201 && !!orgId, `organism ${o.status}`);
+            const set = await fetch(`${BASE}/v1/apps/browser-audit.html`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ open_to: `organism:${orgId}` }) });
+            assert(set.status === 200, `open_to ${set.status}`);
+            const open = await fetch(`${BASE}/v1/apps/${owner}/browser-audit.html/open`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${other}` }, body: '{}' });
+            const code = ((await open.json()) as any)?.error?.code;
+            assert(open.status === 403 && code === 'ACCESS_DENIED', `another account opened it: ${open.status} ${code}`);
+        });
+
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
     } finally {
         server.kill('SIGTERM');
