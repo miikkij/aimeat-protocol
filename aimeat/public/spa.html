@@ -543,6 +543,8 @@
       "/js/swallowed.js": "/js/swallowed.js",
       "/js/desktop-download.js": "/js/desktop-download.js",
       "/js/site.js": "/js/site.js",
+      "/js/closed-node-fetch.js": "/js/closed-node-fetch.js",
+      "/js/session-src.js": "/js/session-src.js",
       "/js/margin-pattern.js": "/js/margin-pattern.js",
       "/js/theme-choice.js": "/js/theme-choice.js",
       "/js/dialog.js": "/js/dialog.js",
@@ -1042,6 +1044,9 @@
     // Side-effect import, and EARLY on purpose: the browser fires `beforeinstallprompt` once,
     // shortly after load, and the module must be listening before views lazy-load.
     import '/js/install-prompt.js';
+    // Side-effect import, before any view: on a signed-in-only node every same-origin request
+    // carries the session, or the gate refuses the plain reads of what is public elsewhere.
+    import '/js/closed-node-fetch.js';
     import { LOCALES } from '/js/utils.js';
     // Side-effect call below, not an await: the reader's own date format and clock arrive one
     // fetch after the first paint, and until they do every formatter follows the browser — which

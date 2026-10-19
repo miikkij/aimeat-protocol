@@ -20,6 +20,8 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-10-19 — The open list names the node's own documents, the live stream and the connection
+ *     callback (signed-in browser audit; the cases are in e2e-content-access-browser.ts).
  *   v1.1.0 — 2026-10-18 — A stranger's browser gets the shell with the sign-in page at every page
  *     address, the open page and the other steps of signing in included (plan doc-mvcn6c7e4e5q, V1.5).
  *   v1.0.1 — 2026-10-18 — The granted origin answers the grant with a 302 and the grant cookie, and
@@ -104,6 +106,11 @@ const OPEN_CODE_ROUTES = new Set<string>([
     // The node describing itself to machines.
     'GET /v1/health', 'GET /v1/build', 'GET /v1/spec', 'GET /llms.txt', 'GET /llms-full.txt', 'GET /AGENTS.md', 'GET /agents.txt', 'GET /auth.md', 'GET /skill.md', 'GET /openapi.json',
     'GET /v1/libs', 'GET /v1/libs/aimeat-auth.js', 'GET /v1/libs/aimeat-{}.js', 'GET /v1/libs/portfolio-standalone.js', 'GET /v1/libs/test-harness',
+    // The node's own documents a signed-in person's new tab opens, and what a browser sends with no
+    // session by necessity: the live stream (its ticket) and a provider's redirect (state + cookie).
+    // test/e2e-content-access-browser.ts holds the cases.
+    'GET /sitemap.md', 'GET /.md', 'GET /v1/glossary.json', 'GET /v1/glossary.md', 'GET /v1/ai-transparency', 'GET /v1/ai-transparency.md', 'GET /v1/docs',
+    'GET /v1/events', 'GET /v1/connections/callback',
 ]);
 
 function codeRoutes(): Array<{ method: string; path: string }> {

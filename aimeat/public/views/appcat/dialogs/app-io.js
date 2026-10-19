@@ -17,12 +17,14 @@
  *   durUnits() · durationLabel(ms) · gapMs(a, b) · versionSinceText(versions, i) · versionSpanText(versions)
  * @usage import { fetchAppText, restoreVersion } from '/views/appcat/dialogs/app-io.js';
  * @version-history
+ *   v1.0.1 — 2026-10-19 — anonymousToken() asks for no anonymous token on a signed-in-only node, which refuses it.
  *   v1.0.0 — 2026-09-27 — Initial (appcat, dialogs builder 2): carried over from the old catalogue's
  *     detail.js, server-io.js, cortex.js and util.js, with the same routes and bodies.
  */
 import { api, apiPost, apiPut } from '/js/api.js';
 import { getSession, authHeaders, showLoginModal, onAuthChange } from '/js/services/auth.js';
 import { date } from '/js/format.js';
+import { signedInOnly } from '/js/site.js';
 import { x } from '/views/appcat/i18n.js';
 
 /** The signed-in person's bare owner name, or null. */
@@ -149,6 +151,8 @@ let anon = null;
 /** An anonymous token, minted once per page (F244): the extension popup reads with it, as before. */
 export async function anonymousToken() {
   if (anon) return anon;
+  // A signed-in-only node refuses the shared anonymous identity (middleware/content-access-gate.ts).
+  if (signedInOnly()) return null;
   try {
     const resp = await fetch('/v1/auth/anonymous', { method: 'POST' });
     const json = await resp.json();

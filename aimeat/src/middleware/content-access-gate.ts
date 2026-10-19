@@ -39,6 +39,11 @@
  * @structure OPEN_ROUTES · isOpenRoute() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.3.0 — 2026-10-19 — Open: the node's own documents the showroom pages link to (site map, page
+ *     mirrors, glossary, AI transparency statement, provenance schema, API reference page), the
+ *     outbound connection callback and the live stream (its ticket is its credential). A signed-in
+ *     person's new tab, an EventSource or the provider's redirect carries no session, so each
+ *     answered 401 (signed-in browser audit, scripts/check-signed-in-browser.mjs).
  *   v1.2.0 — 2026-10-19 — An app, welcome-page or company origin passes the served libraries and the
  *     sign-in steps (open routes under /v1/), and a welcome-page or company origin passes its page to
  *     the route that checks the page grant. The app origin answered /v1/libs/* 404, so every app that
@@ -53,6 +58,7 @@ import type { RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { signedInOnly } from '../config-visibility.js';
 import { isNodeAccount } from '../services/audience.js';
+import { mirroredPages } from '../data/public-pages.js';
 import { error } from './envelope.js';
 
 /** `method` null matches every method. A path is matched whole, after its trailing slashes go. */
@@ -118,7 +124,29 @@ export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; w
   { method: 'GET', path: /^\/(llms|llms-full)\.txt$/, why: 'the node\'s own agent guide' },
   { method: 'GET', path: /^\/(auth\.md|skill\.md|agents\.txt|openapi\.json|AGENTS\.md)$/, why: 'the node\'s own agent documents' },
   { method: 'GET', path: /^\/v1\/libs(\/.*)?$/, why: 'served library code' },
+  // The node's own documents the showroom pages link to (a signed-in person's new tab carries no
+  // session, so these answered a raw 401): the site map, the markdown mirrors of the authored pages
+  // (data/public-pages.ts), the glossary, the AI transparency statement and the provenance schema.
+  // Each is built from the code or the operator's config; none names a person, an organism or an app.
+  { method: 'GET', path: /^\/sitemap\.md$/, why: 'the node\'s site map (a fixed list of its pages)' },
+  { method: 'GET', path: pageMirrors(), why: 'markdown mirrors of the authored pages' },
+  { method: 'GET', path: /^\/v1\/glossary\.(md|json)$/, why: 'the glossary (fixed terms)' },
+  { method: 'GET', path: /^\/v1\/ai-transparency(\.md)?$/, why: 'the AI transparency statement (from config)' },
+  { method: 'GET', path: /^\/v1\/schemas\/ai-provenance\/v1\.json$/, why: 'the provenance record schema' },
+  // The provider sends the browser back here at the end of connecting a mail account; the browser
+  // carries no session, and the route's own gates are the single-use state and the round cookie.
+  { method: 'GET', path: /^\/v1\/connections\/callback$/, why: 'outbound connection callback (single-use state and round cookie)' },
+  // An EventSource sends no Authorization header: the stream's credential is the single-use ticket in
+  // the address, which POST /v1/events/ticket mints for a signed-in caller behind this gate.
+  { method: 'GET', path: /^\/v1\/events$/, why: 'the live stream (single-use ticket from a gated route)' },
+  { method: 'GET', path: /^\/v1\/docs$/, why: 'the API reference page (reads the contract, no content)' },
 ];
+
+/** The markdown mirror paths, exactly as routes/markdown-mirrors.ts registers them. */
+function pageMirrors(): RegExp {
+  const paths = ['/.md', ...mirroredPages().map(p => (p.path === '/' ? '/index.md' : `${p.path}.md`))];
+  return new RegExp(`^(${paths.map(p => p.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})$`);
+}
 
 export function isOpenRoute(method: string, rawPath: string): boolean {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
