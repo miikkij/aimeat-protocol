@@ -21,6 +21,7 @@
  *   html`<${AgentAvatar} agent=${a} text=${initials(a.name)} />`
  *   html`<${Lead} ...${leadProps(a, initials(a.name))} />`
  * @version-history
+ *   v1.2.0 — 2026-10-19 — A picture stands alone, without the square's frame (Avatar `bare`; Jouni, 2026-10-19).
  *   v1.1.1 — 2026-10-19 — The <img> carries width and height 40, its size before the stylesheet arrives.
  *   v1.1.0 — 2026-10-19 — A picture (an SVG, or an emoji through its address) gets the plain frame and
  *     fills the square; the dashed agent frame stays for the stand-in initials.
@@ -57,7 +58,7 @@ export function AgentAvatar({ agent, avatar, text, size, label }) {
     // stays for the initials and signs that stand in when there is no picture. An emoji is drawn
     // through its picture address too (the node draws it as an SVG), so it fills the square as a
     // picture does instead of standing at the body text size; without an address it is the sign.
-    if (a?.url) return html`<${Avatar} size=${size} label=${label}>${picture(a)}<//>`;
+    if (a?.url) return html`<${Avatar} bare size=${size} label=${label}>${picture(a)}<//>`;
     if (a?.kind === 'emoji') return html`<${Avatar} agent text=${a.emoji} size=${size} label=${label} />`;
     return html`<${Avatar} agent text=${text ?? ''} size=${size} label=${label} />`;
 }
@@ -65,7 +66,7 @@ export function AgentAvatar({ agent, avatar, text, size, label }) {
 /** Props for List.js Lead: the agent's picture when it has one, `text` otherwise. */
 export function leadProps(agentOrAvatar, text) {
     const a = avatarOf(agentOrAvatar);
-    if (a?.url) return { agent: false, picture: picture(a) };
+    if (a?.url) return { agent: false, bare: true, picture: picture(a) };
     if (a?.kind === 'emoji') return { agent: true, text: a.emoji };
     return { agent: true, text: text ?? '' };
 }

@@ -16803,6 +16803,7 @@
         "basicMissingLine": "{n} still to create.",
         "shapeHint": "A crew definition it can run from the first day. Change it later on the Crew tab.",
         "colAgent": "Agent",
+        "colKind": "Kind",
         "colRuns": "Runs",
         "colPlatform": "Platform",
         "colAccess": "Access",

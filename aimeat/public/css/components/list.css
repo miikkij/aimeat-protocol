@@ -15,6 +15,8 @@
  *   thumbnail's second bar, a found word) are poster.css's .poster-chip--sun in the markup.
  *   NOTE: this file must be linked in spa.html, after listing.css.
  * @version-history
+ *   v1.15.0 — 2026-10-19 — .list-flag (Name `flag`): a short line under the mark before the name, in
+ *     place of the dot; .list-group-head--apart (Group `apart`): air over a group's heading.
  *   v1.14.0 — 2026-10-12 — The index row .is-members: its mark's edge is double (4px), apart from the
  *     faded row's dashed one (Jouni's choice for appcat's Community listing).
  *   v1.13.1 — 2026-09-27 — The index: the state's capitals read var(--shape-case-label), and the open
@@ -100,6 +102,12 @@
 
 /* A control before the name (the task's eye) and the name blurred for privacy (agent tasks). */
 .list-name > .list-before { display: inline-flex; vertical-align: middle; margin-right: .55rem; }
+/* Name `flag`: a 3px line under the mark before the name (or under the name itself), grey for
+   something new, coral for a failure. It takes no width, so the row's start stays where it was. */
+.list-flag { position: relative; }
+.list-flag::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 3px; background: var(--text-dim); }
+.list-flag--error::after { background: var(--danger); }
+span.list-flag:not(.list-before) { display: inline-block; }
 .list-blur { filter: blur(6px); user-select: none; }
 /* Marks at the far end of the name cell, in one line down the list (memory's visibility chips). */
 .list-name > .list-end { float: right; margin-left: .6rem; }
@@ -227,6 +235,8 @@
 .list-group-head > .poster-count { margin-left: auto; }
 .list-group-doors { display: inline-flex; align-items: center; gap: .6rem; }
 .list-group-head--folds { cursor: pointer; }
+/* Group `apart`: a heading that starts a list of its own after another group, with air over it. */
+.list-group-head.list-group-head--apart { margin-top: 2.6rem; padding-top: .9rem; }
 
 /* ── The filters over a list (the row is Tabs' filter row, tab-row.css): the one that stands
    apart at the row's end (Data wallet's "people" and "events only"). ── */

@@ -6,6 +6,7 @@
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.19.0 -- 2026-10-19 -- The table has the Kind column (the mode and platform tags); each closed row gets what its agent works on now (`doing`, from the active tasks); every group heading stands apart from the group above it (Group `apart`). The rows come in alphabetical order (listAgents) (Jouni, 2026-10-19).
  *   v2.18.0 -- 2026-09-26 -- Every part is a component that takes data (page group G1a): the search
  *     is the List's SearchLine, the tag filters are Filters with Filter, the group-by is the Select,
  *     the table head is the List's head, the headings over a group of agents are the List's Group (its
@@ -89,8 +90,14 @@ export function AgentSearch({ query, setQuery, shown, total }) {
 /** The head of the agents table: the six columns every closed row (agent-card.js) fills. */
 function tableHead() {
   const p = (k) => t('profile.agents.page.' + k);
-  return html`<${List} key="agp-head" cols="name-runs-access-last-doors" keepCols
-    head=${[p('colAgent'), p('colRuns'), p('colAccess'), p('colSeen'), '']} />`;
+  return html`<${List} key="agp-head" cols="name-kind-runs-access-last-doors" keepCols
+    head=${[p('colAgent'), p('colKind'), p('colRuns'), p('colAccess'), p('colSeen'), '']} />`;
+}
+
+/** The title of the task the agent works on now, or null while it is idle. */
+function doingOf(activeTasksMap, name) {
+  const task = (activeTasksMap?.[name] || [])[0];
+  return task ? (task.title || t('profile.agents.active.untitled')) : null;
 }
 
 function collectTags(agents) {
@@ -197,7 +204,7 @@ export function ActiveTasksPanel({ activeTasksMap, agents, onOpen }) {
   `;
 }
 
-export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardings, taskStatsMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink, agentGroups, collapsedGroups, editingGroup, setEditingGroup, addGroup, renameGroup, removeGroup, toggleGroupCollapsed, groupDnd }) {
+export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardings, taskStatsMap, activeTasksMap, changesMap, onTabSeen, expandedAgent, toggleAgent, session, showToast, setScopesModal, handleDeleteAgent, toggleFederate, onPopOut, dnd, agentOrder, deepLink, agentGroups, collapsedGroups, editingGroup, setEditingGroup, addGroup, renameGroup, removeGroup, toggleGroupCollapsed, groupDnd }) {
   // Search narrows first, then the tag filter: agent must have ALL selected tags (intersection).
   // `agents` itself stays whole — it is handed to every open card as `allAgents`, which is what the
   // schedules picker and the tag-peer list read, and neither of those is about what is on screen.
@@ -231,6 +238,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       openTaskId=${deepLink?.agent === a.name ? deepLink.taskId : null}
       openTaskNonce=${deepLink?.agent === a.name ? deepLink.nonce : 0}
       drag=${drag}
+      doing=${doingOf(activeTasksMap, a.name)}
     />
   `;
 
@@ -267,7 +275,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     return [
       tableHead(),
       ...rest.map(row),
-      html`<${Group} key="ws-header" title=${t('profile.agents.startedByYou')} count=${tools.length} />`,
+      html`<${Group} key="ws-header" apart title=${t('profile.agents.startedByYou')} count=${tools.length} />`,
       ...tools.map(row),
     ];
   }
@@ -301,7 +309,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
         : html`<${Action} small soft onClick=${() => setEditingGroup(g.id)} title=${t('profile.agents.groups.rename')}>${g.name || t('profile.agents.groups.unnamed')}<//>`;
       return html`
         <div key=${'cg-' + g.id}>
-          <${Group} title=${name} count=${members.length}
+          <${Group} apart title=${name} count=${members.length}
             onFold=${() => toggleGroupCollapsed(g.id)} folded=${collapsed} foldLabel=${foldLabel}
             doors=${html`<${Icon} small label=${t('profile.agents.groups.remove')} onClick=${() => removeGroup(g.id)}>✗<//>`}
             onDragOver=${groupDnd.onDragOver} onDrop=${dropOn(g.id)}>
@@ -326,7 +334,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
       <//>
       ${groupSections}
       <div key="cg-ungrouped">
-        <${Group} title=${t('profile.agents.groups.ungrouped')} count=${ungrouped.length}
+        <${Group} apart title=${t('profile.agents.groups.ungrouped')} count=${ungrouped.length}
           onFold=${() => toggleGroupCollapsed(UNGROUPED_ID)} folded=${ungCollapsed} foldLabel=${foldLabel}
           onDragOver=${groupDnd.onDragOver} onDrop=${dropOn(UNGROUPED_ID)}>
           ${ungrouped.map(draggableCard)}
@@ -345,7 +353,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
     const order = AGENT_MODES.filter(m => byMode.has(m));
     return order.map(mode => html`
       <div key=${'mode-' + mode}>
-        <${Group} title=${t('profile.agents.mode.' + mode) || mode} count=${byMode.get(mode).length}>
+        <${Group} apart title=${t('profile.agents.mode.' + mode) || mode} count=${byMode.get(mode).length}>
           ${byMode.get(mode).map(a => renderCard(a))}
         <//>
       </div>
@@ -369,7 +377,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
   const sortedTags = [...byTag.keys()].sort();
   const sections = sortedTags.map(tag => html`
     <div key=${'tag-' + tag}>
-      <${Group} title=${html`<${Mark}>${tag}<//>`} count=${byTag.get(tag).length}>
+      <${Group} apart title=${html`<${Mark}>${tag}<//>`} count=${byTag.get(tag).length}>
         ${byTag.get(tag).map(a => renderCard(a))}
       <//>
     </div>
@@ -377,7 +385,7 @@ export function renderAgentGroups({ agents, tagFilter, query, groupBy, onboardin
   if (untagged.length > 0) {
     sections.push(html`
       <div key="tag-untagged">
-        <${Group} title=${t('profile.agents.filter.untagged')} count=${untagged.length}>
+        <${Group} apart title=${t('profile.agents.filter.untagged')} count=${untagged.length}>
           ${untagged.map(a => renderCard(a))}
         <//>
       </div>

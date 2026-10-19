@@ -15051,6 +15051,7 @@
         "basicMissingLine": "{n} por crear todavía.",
         "shapeHint": "Una definición con la que puede trabajar desde el primer día. Cámbiala después en la pestaña Crew.",
         "colAgent": "Agente",
+        "colKind": "Tipo",
         "colRuns": "Ejecución",
         "colPlatform": "Plataforma",
         "colAccess": "Acceso",

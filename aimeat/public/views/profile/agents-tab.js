@@ -722,6 +722,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
                   groupBy,
                   onboardings,
                   taskStatsMap,
+                  activeTasksMap,
                   changesMap,
                   onTabSeen: handleTabSeen,
                   expandedAgent,

@@ -10,13 +10,21 @@
  *   the panel its .poster-panel, composed in the markup; this sheet carries only the layout.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-10-19 — The heavy ink line down the card's left edge, and a tab group's name as the
+ *     section title's thin band (Jouni, 2026-10-19).
  *   v1.0.0 — 2026-09-26 — Moved out of css/views/agents-poster.css (agp-card, agp-title, agp-caret,
  *     agp-mast, agp-words, agp-id, agp-chips, agp-caps, agp-side, agp-runs, agp-nav, agp-nav-group,
  *     agp-tabs, agp-panel) with their values; the ink rule at the card's foot reads the frame token
  *     (page group G1a).
  */
 
-.open-card { padding: 1.1rem 0 1.5rem; border-bottom: var(--shape-frame) solid var(--shape-rule-colour); margin-bottom: .6rem; }
+/* The heavy ink line down the left edge: everything right of it belongs to the opened thing, from
+   its name to the end of its tab's content (the tab content keeps its own sun edge inside it). */
+.open-card {
+  padding: 1.1rem 0 1.5rem 1.2rem; margin: 1.2rem 0 1.6rem;
+  border-bottom: var(--shape-frame) solid var(--shape-rule-colour);
+  border-left: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+}
 .open-card-title { overflow-wrap: anywhere; margin-bottom: 1rem; }
 .open-card-title--closes, .open-card-mast--closes { cursor: pointer; }
 .open-card-caret { font-family: var(--font-showroom-body); font-size: .8rem; color: var(--sun); margin-right: .6rem; vertical-align: middle; }
@@ -41,6 +49,9 @@
 /* The tabs in three groups; the chosen one on the sun. */
 .open-card-tabs { display: flex; gap: 0 2rem; flex-wrap: wrap; margin-top: 1rem; padding-bottom: .2rem; }
 .open-card-tab-group { display: flex; flex-direction: column; gap: .5rem; padding: .4rem 0 .6rem; }
+/* A group's name is the section title's thin band, the size an agent's own page heads its sections
+   with (page-section.css .og-sec--group, .95rem). */
+.open-card-tab-group > .open-card-tab-band { --poster-section-size: .95rem; margin: 0 0 .2rem; }
 .open-card-tab-group .status-dot { margin-left: .35rem; vertical-align: middle; }
 .open-card-panel { padding-block: .4rem .6rem; margin-top: .4rem; }
 

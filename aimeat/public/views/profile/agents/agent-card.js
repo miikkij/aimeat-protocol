@@ -5,6 +5,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v2.32.0 -- 2026-10-19 -- The closed row (Jouni, 2026-10-19): the mode, platform and federation tags stand in their own column before how it runs; what the agent works on now stands in brackets after its name (`doing`, the title of its active task), nothing while it is idle; something unseen is a short line under the picture (Name `flag`) in place of the dot before it.
  *   v2.31.0 -- 2026-10-19 -- The agent's own picture (components/AgentAvatar.js) stands before its name on the closed row and the open card's title, when the agent has set one; without one both look as before.
  *   v2.30.0 -- 2026-10-18 -- InvitesLine: the open card says when the agent may invite people (organism:invite).
  *   v2.29.0 -- 2026-10-18 -- "May read at most" (ClearanceLine): the highest classification the agent may read, while classification is on (plan doc-mvdipuyqraas, L2.4).
@@ -175,7 +176,7 @@ import TabCrew from './tab-crew.js';
 import { swallowed } from '/js/swallowed.js';
 import { num } from '/js/format.js';
 import { Switch } from '/components/Switch.js';
-import { List, Row, Name, Who, When, Doors } from '/components/List.js';
+import { List, Row, Name, Cell, Who, When, Doors } from '/components/List.js';
 import { OpenCard, CardLine, TabGroups, CardPanel } from '/components/OpenCard.js';
 import { Action, Actions } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
@@ -253,7 +254,7 @@ function totalChanges(changes) {
  * `drag`: the closed row can be dragged ({ grip, dragging, onDragStart, onDragOver, onDrop, onDragEnd },
  * from groups-render.js); the open card never is, so its inner controls stay usable.
  */
-export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false, preSelectedTab = null, openTaskId = null, openTaskNonce = 0, drag = null }) {
+export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false, preSelectedTab = null, openTaskId = null, openTaskNonce = 0, drag = null, doing = null }) {
   const state = agentState(agent);
   const [activeTab, setActiveTab] = useState(null);
   // The run-mode switch stands behind the sentence that says the current state; open on request.
@@ -346,20 +347,24 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
     // the row opens the agent; its name turns coral under the pointer or when the agent is in trouble.
     const change = changeMark(changes);
     // The agent's picture goes in the Name cell's `before` slot: the cut has no lead column, and an
-    // agent without a picture keeps the row exactly as it was.
+    // agent without a picture keeps the row exactly as it was. Something unseen is a short line under
+    // the picture (Name `flag`), never a dot before it that pushed the picture to the right.
     const pic = avatarOf(agent) ? html`<${AgentAvatar} agent=${agent} />` : undefined;
+    // What the agent is working on now, in brackets after its name; nothing while it is idle.
+    const working = doing ? html` <${Note} kind="meta" inline>(${doing})<//>` : null;
     return html`
-      <${List} cols="name-runs-access-last-doors" keepCols>
+      <${List} cols="name-kind-runs-access-last-doors" keepCols>
         <${Row} onToggle=${() => onToggle(agent.name)}
           draggable=${!!drag} grip=${drag?.grip} dragging=${drag?.dragging}
           onDragStart=${drag?.onDragStart} onDragOver=${drag?.onDragOver} onDrop=${drag?.onDrop} onDragEnd=${drag?.onDragEnd}>
-          <${Name} attention=${state === 'problem' || hasRefusals(agent)} dot=${change?.dot} dotTitle=${change?.title} meta=${agentGaii(agent)} before=${pic}
-            tag=${[
-              hasRefusals(agent) ? html`<${Mark} kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null,
-              agent.mode && agent.mode !== 'interactive' ? html`<${Mark} tone="dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}<//>` : null,
-              platform ? html`<${Mark} tone="dim">${platform}<//>` : null,
-              agent.federate ? html`<${Mark} tone="dim">${t('profile.federated')}<//>` : null,
-            ]}>${agent.display_name || agent.name}<//>
+          <${Name} attention=${state === 'problem' || hasRefusals(agent)} flag=${change?.flag} flagTitle=${change?.title} meta=${agentGaii(agent)} before=${pic}
+            tag=${hasRefusals(agent) ? html`<${Mark} kind="status" tone="danger">${t('profile.agents.refusals.mark')}<//>` : null}
+            after=${working}>${agent.display_name || agent.name}<//>
+          <${Cell} line>
+            ${agent.mode && agent.mode !== 'interactive' ? html`<${Mark} tone="dim">${t(`profile.agents.mode.${agent.mode}`) || agent.mode}<//>` : null}
+            ${platform ? html`<${Mark} tone="dim">${platform}<//>` : null}
+            ${agent.federate ? html`<${Mark} tone="dim">${t('profile.federated')}<//>` : null}
+          <//>
           <${Who}>${runsWord}<//>
           <${Who}>${accessLabel}<//>
           <${When}>${agent.last_seen ? timeAgo(agent.last_seen) : t('profile.agents.page.neverSeen')}<//>
@@ -519,7 +524,7 @@ function renderHostConsole(agent) {
 // so the owner can spot at a glance which agent has something new. Hidden when
 // nothing changed; naturally absent from the expanded view (which does not
 // render the collapsed bar). The title spells out the per-tab breakdown.
-// It is the name's status dot (List Name `dot`): neutral, or red ONLY for unseen FAILED tasks.
+// It is the line under the agent's picture (List Name `flag`): grey, or red ONLY for unseen FAILED tasks.
 function changeMark(changes) {
   const total = totalChanges(changes);
   if (total <= 0) return null;
@@ -528,7 +533,7 @@ function changeMark(changes) {
   if (changes.messages) parts.push(t('profile.agents.detail.tabs.messages'));
   const title = `${t('profile.agents.detail.changes.title')} — ${parts.join(', ')}`;
   const failed = (changes.tasksFailed || 0) > 0;
-  return { dot: failed ? 'error' : 'new', title };
+  return { flag: failed ? 'error' : 'new', title };
 }
 
 /** The first line of a notice: its title, and after it what comes next. */
