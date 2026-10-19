@@ -17,6 +17,7 @@
  *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.29.3 -- 2026-10-19 -- "Whose memory" shows each agent's shown name (agentLabel), in alphabetical order.
  *   v1.29.2 -- 2026-10-18 -- A key space's "{n} public" and "{n} for members" tags in the plural form too ("1 julkinen", "1 pública").
  *   v1.29.1 -- 2026-10-18 -- A count of keys is said in the language's plural form (i18n.js tn): "1 key", not "1 keys".
  *   v1.29.0 -- 2026-10-18 -- Who can read a key or a file is the AudienceBadge (Private, "<organism> members", Signed-in, Public), on the key lists, the search, the record page and each file's row, where it was the stored word (plan doc-mvcn6c7e4e5q, V6.4).
@@ -102,6 +103,7 @@ import { MemoryForm, FileUploadForm, CartTray } from './components.js';
 import { renderEntries } from './entries-view.js';
 import { renderBrowsePanel } from './browse-view.js';
 import { LoadFailed } from '/js/load-state.js';
+import { agentLabel } from '/js/services/agents.js';
 
 /* Key spaces the node and the agents write for their own use. Theirs to own, rarely theirs to read. */
 export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents', 'generator', 'org', 'gate', 'usage']);
@@ -304,7 +306,7 @@ function renderCover(ctx) {
     // Several agents: the drop-down that chooses whose memory is read. One: its name, dim (it chooses nothing).
     agents.length > 1
       ? html`<${Select} key="agent" fit value=${selectedAgent} onChange=${(v) => setSelectedAgent(v)} ariaLabel=${t('profile.memory.agent') || 'Agent'}
-          placeholder=${t('profile.memory.defaultAgent') || 'Default agent'} options=${agents.map(a => [a.gaii, a.name || a.gaii])} />`
+          placeholder=${t('profile.memory.defaultAgent') || 'Default agent'} options=${agents.map(a => [a.gaii, agentLabel(a)])} />`
       : { label: agentName, tone: 'dim' },
   ];
   const actions = html`

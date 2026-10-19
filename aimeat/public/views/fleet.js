@@ -30,6 +30,7 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.4.0 -- 2026-10-19 -- Inside each group the agents stand in alphabetical order of their shown name (sortAgents).
  *   v2.3.0 -- 2026-10-19 -- A row's name starts with the agent's own picture when it has set one.
  *   v2.2.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of the "no
  *     agents" empty state and its starter (QA audit F6-05, E7-04).
@@ -98,6 +99,7 @@ import { List, Row, Name, Doors, Group } from '/components/List.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
+import { sortAgents } from '/js/services/agents.js';
 import { WeekBlock } from './fleet-week.js';
 
 /** The states that mean a person has something to do. The heading counts these. */
@@ -260,7 +262,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
   async function load() {
     try {
       const resp = await apiGet('/v1/agents?include=stats,credentials');
-      setAgents(resp?.data?.agents ?? []);
+      setAgents(sortAgents(resp?.data?.agents ?? []));
       fleetLoad.ok();
     } catch (err) {
       // Never an empty list: "no agents" with the starter over a fleet that only failed to load.

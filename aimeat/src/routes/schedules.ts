@@ -31,6 +31,7 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-19 — GET /v1/scheduler/tab returns each agent's display_name, so the create-schedule picker shows the name a person sees.
  *   2026-10-15 — The write caller says when it is an app, so PATCH, DELETE and trigger refuse an app any
  *     schedule but its own (feature-list audit #85).
  *   2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): task:write on POST /v1/schedules, POST /v1/schedules/:id/trigger, POST /v1/agents/:name/schedules; workflow:write on PATCH /v1/schedules/:id; memory:write on DELETE /v1/schedules/:id. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
@@ -227,7 +228,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       const { schedules, agents } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
       res.json(success(config.nodeId, {
         schedules,
-        agents: agents.map(a => ({ name: a.name, gaii: a.gaii })),
+        agents: agents.map(a => ({ name: a.name, gaii: a.gaii, display_name: a.displayName ?? null })),
       }));
     } catch (err) {
       logger.error('Failed to load scheduler tab', { error: (err as Error).message });

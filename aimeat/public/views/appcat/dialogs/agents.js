@@ -16,6 +16,7 @@
  * @usage openDialog('agents', { owner, filename })  — props: owner, filename; agents (optional: the
  *   manifest's crew definitions, manifest.cortex.agents; without it the store's listing row is read).
  * @version-history
+ *   v1.3.0 — 2026-10-19 — The runner picker shows each agent's shown name, in alphabetical order inside each mode.
  *   v1.2.0 — 2026-10-11 — An offer's line is its money price (or Free) and its pacing amount, read
  *     from tollMorsels with price.morsels as the 3.x fallback; no morsel amount is shown as a price.
  *   v1.1.0 — 2026-09-27 — Parity: "owner/filename" after the title in the typewriter face (titleRef).
@@ -35,6 +36,7 @@ import { apiGet, apiPost } from '/js/api.js';
 import { t } from '/js/i18n.js';
 import { priceAndPacing, moneyPriceOf } from '/js/format.js';
 import { authHeaders, getSession } from '/js/services/auth.js';
+import { agentLabel, byAgentLabel } from '/js/services/agents.js';
 import { useCatalog, notice } from '/views/appcat/store.js';
 import { x } from '/views/appcat/i18n.js';
 import { Dialog } from '/views/appcat/dialogs/host.js';
@@ -124,7 +126,7 @@ function Definition({ def, owner, filename, runners, organisms }) {
   const runnerOptions = runners === null
     ? [['', x('agents.loading')]]
     : runners.length
-      ? runners.map((a) => [a.name, a.name + (a.mode ? ' · ' + a.mode : '')])
+      ? runners.map((a) => [a.name, agentLabel(a) + (a.mode ? ' · ' + a.mode : '')])
       : [['', x('agents.noRunnerOption')]];
 
   return html`<${Split} gap="small" heavy>
@@ -171,7 +173,7 @@ export default function AgentsDialog({ owner, filename, agents, close }) {
     const rank = (m) => (m === 'task-runner' ? 0 : m === 'autonomous' ? 1 : 2);
     apiGet('/v1/agents').then((json) => {
       if (!live) return;
-      const list = ((json.data && json.data.agents) || []).slice().sort((a, b) => rank(a.mode) - rank(b.mode));
+      const list = ((json.data && json.data.agents) || []).slice().sort((a, b) => rank(a.mode) - rank(b.mode) || byAgentLabel(a, b));
       setRunners(list);
     }).catch((e) => console.warn('[appcat] runner agents not read; the picker keeps its loading line', e));
     if (session.owner) {

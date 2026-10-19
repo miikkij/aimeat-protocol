@@ -7,6 +7,7 @@
  *   one-click contract adoption tasks.
  *
  * @structure
+ *   - agentLabel / byAgentLabel / sortAgents: the name a person sees, and the alphabetical order by it
  *   - listAgents / deleteAgent / updateAgentScopes / setMaxConcurrentTasks: agent CRUD + config
  *   - getAgentCors / setAgentCors: per-agent CORS origins
  *   - offersWorkspaceContract / contractNamesOf / adoptContractTask / getAgentEngagements: workspace-contract tags
@@ -16,6 +17,9 @@
  *   - isOwnerStartedAgent / listChatSessions / listChatInstances / deleteChatInstance: chat/MCP session management
  *
  * @version-history
+ *   v1.3.0 — 2026-10-19 — listAgents returns the agents in alphabetical order of the name a person
+ *     sees (sortAgents, byAgentLabel, agentLabel), so every agent list and picker that reads it is
+ *     in that order (wish-agenttilistat-aakkosj-rjestykseen).
  *   v1.2.0 — 2026-10-16 — getAgentGroupsStrict beside the forgiving read, for the page that saves the
  *     whole group record (QA audit F6-04).
  *   v1.1.0 — 2026-08-31 — listChatSessions selects on `mode === 'workstation'` (the field the node
@@ -27,6 +31,7 @@
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { compare } from '/js/format.js';
 
 /**
  * List agents owned by the given owner. Returns array.
@@ -39,8 +44,21 @@ export async function listAgents(owner, opts = {}) {
   const qs = opts.include ? `?include=${encodeURIComponent(opts.include)}` : '';
   const data = await apiGet(`/v1/agents${qs}`);
   const list = data?.data?.agents || data?.data || [];
-  return owner ? list.filter(a => a.owner === owner) : list;
+  return sortAgents(owner ? list.filter(a => a.owner === owner) : list);
 }
+
+/** The name a person sees for an agent: the display name it was given, else its name, else its GAII. */
+export const agentLabel = (a) => a?.display_name || a?.name || a?.gaii || '';
+
+/** Compares two agents by the name a person sees, in the reader's alphabet (format.js compare). */
+export const byAgentLabel = (a, b) => compare(agentLabel(a), agentLabel(b));
+
+/**
+ * The agents in alphabetical order of the name a person sees. GET /v1/agents returns creation order;
+ * the order is set here because the alphabet depends on the reader's chosen format. A copy, never
+ * the caller's array. A view whose order means something else (newest first, last seen) sorts again.
+ */
+export const sortAgents = (list) => (Array.isArray(list) ? [...list].sort(byAgentLabel) : []);
 
 /** Workspace-contract advertising via agent tags (this convention is dot-based so 'contract.<name>'
  *  parses by prefix; the server tag pattern is [a-z0-9._:-], colons allowed, no '@'): the tag

@@ -282,6 +282,8 @@ await test('6b. GET /v1/scheduler/tab folds schedule aggregate + agent names', a
     // agents = the owner's agent names (create-schedule dropdown)
     assert(Array.isArray(d.agents) && d.agents.some((a: any) => a.name === o1.agentName), 'agent list includes the test agent');
     assert(d.agents.every((a: any) => typeof a.name === 'string'), 'agents carry names');
+    // The picker shows the name a person sees, so every row says its display name (null when none).
+    assert(d.agents.every((a: any) => 'display_name' in a && (a.display_name === null || typeof a.display_name === 'string')), 'agents carry display_name');
 });
 
 console.log('\nPhase 3 -- Trigger + agent_task materialization');

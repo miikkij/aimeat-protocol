@@ -13,6 +13,7 @@
  *   - SchedulerTab (default) — state, the two loads, the action handlers, the ctx bag, render
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v2.4.1 -- 2026-10-19 -- The fallback agent list reads listAgents' array; it read `.data.agents` and was always empty.
  *   v2.4.0 -- 2026-10-16 -- The menu find opens one schedule here (useOpenItem, js/open-item.js).
  *   v2.3.0 -- 2026-10-11 -- "Run now" on a stopped agent's schedule says the agent is stopped.
  *   v2.2.0 -- 2026-09-26 -- The loading line is the Note's loading kind; the page writes no class (page group G5).
@@ -77,7 +78,8 @@ export default function SchedulerTab({ showToast }) {
       } else {
         const [schedRes, agentsRes] = await Promise.all([listAllSchedules(), listAgents().catch(err => { swallowed('scheduler-tab: SchedulerTab', err); return null; })]);
         setData(schedRes?.data || { managed: [], extensions: [], agentInternal: [] });
-        setAgents(agentsRes?.data?.agents || []);
+        // listAgents returns the array itself; the old `.data.agents` read made this list always empty.
+        setAgents(Array.isArray(agentsRes) ? agentsRes : []);
       }
       setError(null);
       setReloadTick((n) => n + 1);

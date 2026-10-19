@@ -9,6 +9,7 @@
  * @structure OrgAgentsPanel
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
+ *   2026-10-19 — The picker (listAgents) and the attached agents stand in alphabetical order of the name shown.
  *   2026-10-19 — An attached agent of the viewer's own shows its own avatar in place of the 🤖 mark (leadProps); the others keep 🤖.
  *   2026-09-28 — The description says when the organism admits only the agents listed here (agentAccess).
  *   v1.10.1 — 2026-09-26 — An agent's contract tag is green again, as main drew it (.badge-success:
@@ -55,6 +56,7 @@ import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/services/agents.js';
 import { relTime } from '/views/profile/organisms/helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { compare } from '/js/format.js';
 
 /**
  * Agents tab — attached agents listed first; "+ Attach agent" opens a picker of the user's OWN
@@ -113,6 +115,8 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
   const pickable = (mine || []).filter(a => a.gaii && !attachedSet.has(a.gaii));
   const parseGaii = (g) => { const m = /^([^#]+)#([^@]+)@(.+)$/.exec(g) || []; return { name: m[1] || g, owner: m[2] || '', node: m[3] || '' }; };
   const ownByGaii = new Map((mine || []).map(a => [a.gaii, a]));
+  // The attached agents stand in alphabetical order of the name the row shows.
+  const shownName = (g) => ownByGaii.get(g)?.display_name || parseGaii(g).name;
 
   return html`
     <${Split}>
@@ -145,7 +149,7 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
         <//>` : null}
 
       <${List} cols="mark-name-doors" keepCols empty=${t('organisms.noAgents') || 'No agents attached.'}>
-        ${attached.map(g => {
+        ${[...attached].sort((a, b) => compare(shownName(a), shownName(b))).map(g => {
           const p = parseGaii(g);
           const own = ownByGaii.get(g);
           const act = acted[p.name];

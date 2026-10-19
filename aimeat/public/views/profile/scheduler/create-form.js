@@ -10,6 +10,7 @@
  * @structure CRON_PRESETS · CreateForm
  * @usage <${CreateForm} agents=${agents} showToast=${showToast} onCreated=${reload} lockedAgent=${name} />
  * @version-history
+ *   v2.15.1 -- 2026-10-19 -- The agent picker shows each agent's shown name, in alphabetical order (sortAgents).
  *   v2.15.0 -- 2026-10-02 -- The daily AI spend limit shows, and goes into the request, only for the AI kind: the server checks it on no other kind (src/services/schedule-constraints.ts).
  *   v2.14.0 -- 2026-10-02 -- The question marks that explain the schedule and its limits: schedule.cron, schedule.timezone on their TextFields, schedule.max_runs, schedule.daily_limit on their Checks (components/HelpTip.js).
  *   v2.13.0 --2026-09-26 -- The form is the Field family (page group G5): who does it is the boxed Choice, the cadences the Choice's filter tone, each field a TextField, TextArea or Select with its row label over it (the label beside the field, .sc-form-k, becomes the label over it, as on every other form), the limits the Check with its number field, the foot FormActions; it writes no class. The agent picker keeps its first "choose" line (Select placeholder).
@@ -51,6 +52,7 @@ import { Choice } from '/components/Choice.js';
 import { Row, Stack, Split } from '/components/Layout.js';
 import { Action, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
+import { agentLabel, sortAgents } from '/js/services/agents.js';
 
 const html = htm.bind(h);
 
@@ -161,7 +163,7 @@ export function CreateForm({ agents = [], showToast, onCreated, onCancel = null,
         ${lockedAgent
           ? html`<${TextField} label=${t('profile.scheduler.field.agent')} value=${lockedAgent} disabled />`
           : html`<${Select} label=${t('profile.scheduler.field.agent')} value=${form.agent_name} onChange=${v => set('agent_name', v)}
-              placeholder=${t('profile.scheduler.ph.agent')} options=${agents.map(a => [a.name, a.name])} />`}
+              placeholder=${t('profile.scheduler.ph.agent')} options=${sortAgents(agents).map(a => [a.name, agentLabel(a)])} />`}
         <${TextField} label=${t('profile.scheduler.field.taskTitle')} value=${form.task_title} onInput=${v => set('task_title', v)} />
         <${TextArea} label=${t('profile.scheduler.field.taskDescription')} rows=${4} value=${form.task_description} onInput=${v => set('task_description', v)} />`}
 

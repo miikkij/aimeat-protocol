@@ -7,6 +7,7 @@
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).
  *   Extracted from ecosystem-tab.js to satisfy max-file-lines.
  * @version-history
+ *   2026-10-19 -- The agent checkboxes show each agent's shown name, in alphabetical order (listAgents).
  *   v1.24.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the flow card, its numbered steps, the status timeline and the run log are components/EcoAutomation.js; a part of the card is the heavy-ruled Split under its Sub-heading (Jouni's decision "Sub-heading": the coral section title goes); the choices are the Check, the Select and the TextField, a recommended agent a row box around its Check, an advisory a row box with its tags and doors, the states and tags the Mark, the lines the Note. It writes no class.
  *   v1.23.0 -- 2026-09-26 -- An advisory's dates and source are the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
  *   v1.22.0 -- 2026-09-26 -- The recipe's agents, schedule, delivery and e-mail choices are the Check line (css/components/check-line.css), a unification: Jouni's decision "Check line".
@@ -56,7 +57,7 @@ import { LoadingLine } from './shared.js';
 import { getAutomationRecipe, getAutomationOverview, putAutomationRecipe, listPendingAdvisories, approveAdvisory, rejectAdvisory } from '/js/services/ecosystem.js';
 import { formatUntil } from './schedule-item.js';
 import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, triggerSchedule, getScheduleDetail, setScheduleCron } from '/js/services/schedules.js';
-import { listAgents } from '/js/services/agents.js';
+import { listAgents, agentLabel as agentName } from '/js/services/agents.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { CADENCES, CRON_TO_CADENCE, defaultTriggerGlob, primarySchedulable, allowedCadencesFor, recommendationFor } from './ecosystem-tab.helpers.js';
 import { swallowed } from '/js/swallowed.js';
@@ -167,7 +168,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
     else rest.push(a);
   }
 
-  const agentLabel = (a) => html`<${Check} key=${a.name} inline checked=${selAgents.includes(a.name)} onChange=${() => onToggle(a.name)}>${a.name}<//>`;
+  const agentLabel = (a) => html`<${Check} key=${a.name} inline checked=${selAgents.includes(a.name)} onChange=${() => onToggle(a.name)}>${agentName(a)}<//>`;
 
   return html`
     <${Stack}>
@@ -176,7 +177,7 @@ function EcoAgentPicker({ app, agents, selAgents, onToggle }) {
           ${recommended.map(({ agent, why }) => html`
             <${Box} key=${agent.name} tone="row" packed>
               <${Check} checked=${selAgents.includes(agent.name)} onChange=${() => onToggle(agent.name)} hint=${why || null}>
-                ${agent.name} <${Mark} tone="coral">${t('profile.ecosystem.recommendedChip')}<//>
+                ${agentName(agent)} <${Mark} tone="coral">${t('profile.ecosystem.recommendedChip')}<//>
               <//>
             <//>`)}
         <//>`}

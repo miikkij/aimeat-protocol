@@ -12,6 +12,7 @@
  * @structure SkillsTab() — state (library, apps, orgs, details, filters, editor, picker) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'skills'
  * @version-history
+ *   v2.1.1 — 2026-10-19 — The attach picker holds [name, shown name] pairs, in alphabetical order of the shown name.
  *   v2.1.0 — 2026-10-16 — The menu find opens one of your skills here (useOpenItem, js/open-item.js).
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Taidot-sivu", direction A with the
  *     Kenelle column): three shelves with facets and search instead of three bare lists; the app
@@ -29,7 +30,7 @@ import { swallowed } from '/js/swallowed.js';
 import { useOpenItem } from '/js/open-item.js';
 import * as skillsService from '/js/services/skills.js';
 import { listApps } from '/js/services/apps.js';
-import { listAgents } from '/js/services/agents.js';
+import { listAgents, agentLabel } from '/js/services/agents.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { renderPage } from './skills/page.js';
 import { x, splitSkillMd, bindingFile } from './skills/frame.js';
@@ -133,7 +134,7 @@ export default function SkillsTab({ session, showToast }) {
     try {
       const agents = (await listAgents(ownerName)) || [];
       const holding = new Set((s.linkedBy || []).map((l) => l.agent));
-      setPicker({ ref: s.ref, agents: agents.map((a) => a.name).filter((n) => !holding.has(n)), selected: '', pin: false });
+      setPicker({ ref: s.ref, agents: agents.filter((a) => !holding.has(a.name)).map((a) => [a.name, agentLabel(a)]), selected: '', pin: false });
     } catch (e) { fail(e); }
   };
   const pickAgent = (selected) => setPicker((p) => (p ? { ...p, selected } : p));

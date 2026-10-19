@@ -7,6 +7,7 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-10-19 — A recipient suggestion for your own agent shows its shown name (agentLabel).
  *   v1.8.0 — 2026-09-26 — The Toast UI loader, the big editor's height and the attachment rule moved
  *     into the components that use them (components/MessageComposer.js, MessageFile.js); attachKind
  *     is re-exported from there. trackStatusClass became trackStatusTone: the page gives the tone as
@@ -35,6 +36,7 @@ import { date as fmtDate, time as fmtTime, dateTime as fmtDateTime, sameDay, day
 import { swallowed } from '/js/swallowed.js';
 import { parkMessageToNotebook } from '/js/services/notebook.js';
 import { firstLine } from '../notebook-helpers.js';
+import { agentLabel } from '/js/services/agents.js';
 
 /** 📓 on a message: copy it straight into the notebook for later processing (no AI step), keeping the
  *  source link + reply intent so it can be replied to or filed from there. */
@@ -86,7 +88,7 @@ export function sendFailure(err) {
 export function buildContactOptions(myAgents, conversations) {
   const map = new Map();
   for (const a of myAgents) {
-    if (a?.gaii) map.set(a.gaii, `${a.name || a.gaii} ${t('inbox.contactAgentSuffix')}`);
+    if (a?.gaii) map.set(a.gaii, `${agentLabel(a)} ${t('inbox.contactAgentSuffix')}`);
   }
   for (const c of conversations) {
     if (c?.peerGhii && !map.has(c.peerGhii)) map.set(c.peerGhii, peerName(c.peerGhii));

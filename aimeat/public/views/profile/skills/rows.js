@@ -11,6 +11,7 @@
  * @structure skillRow · skillOpen · loadingRow
  * @usage import { skillRow } from './rows.js';
  * @version-history
+ *   v1.19.1 -- 2026-10-19 -- The agent picker takes the [name, shown name] pairs skills-tab.js builds.
  *   v1.19.0 -- 2026-10-18 -- Who can read a skill is the AudienceBadge beside its name (Private, Signed-in, "<organism> members", Public); the word left the line under the name (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.18.0 -- 2026-09-26 -- On the component kit (page group G7): the opened panel's facts are the Facts (the copies and the links inside a value are the Action's link tone, main's coral crumb link), the agent picker is the Select, the Check and the Action, who may see it the Tabs, the SKILL.md the Box's folded tone with its "show all", the loading lines the Note and the List. The file writes no class.
  *   v1.17.0 -- 2026-09-26 -- A skill's row, its opened panel with the doors at its foot, and the file list are the List component (components/List.js: Row, Name, Desc, Who, Doors, Panel, List); the doors are the Action, the copy door its copy (component plan C1).
@@ -107,7 +108,7 @@ function skillOpen(ctx, s, who) {
     ${who.agents.length ? html`${who.agents.length === 1 ? x('who.agentLong') : x('who.agentsLong', { n: who.agents.length })}:${who.agents.map((a, i) => html`<span key=${a.agent}>${i ? ', ' : ''}<${Action} tone="link" onClick=${() => openTab('agents')}>${a.agent}<//>${a.pin ? ` (@${a.pin})` : ''}${own || s.scope !== 'user' ? html` <${Action} tone="text" onClick=${detach(a)}>${x('detach')}<//>` : null}</span>`)}` : x('who.noAgents')}`;
   const pickerDoors = picker ? html`
     <${Select} fit value=${picker.selected} onChange=${(v) => ctx.pickAgent(v)} ariaLabel=${x('pickAgent')}
-      placeholder=${x('pickAgent')} options=${picker.agents.map((a) => [a, a])} />
+      placeholder=${x('pickAgent')} options=${picker.agents} />
     <${Check} inline checked=${picker.pin} onChange=${(on) => ctx.pickPin(on)}>${x('pinToVersion', { v: s.version })}<//>
     <${Action} small disabled=${!picker.selected || ctx.busy} onClick=${() => ctx.link(s)}>${x('attachDo')}<//>` : null;
   const visDoors = own ? html`
