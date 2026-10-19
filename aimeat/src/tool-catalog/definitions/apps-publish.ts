@@ -8,6 +8,8 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version`, the display version the
+ *     draft publishes with (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 — aimeat_image_generate takes reference_images and mask (Comicland v3 A-1, A-2).
  *   2026-10-18 — aimeat_app_publish, aimeat_app_draft_publish and aimeat_app_fork say they answer with
  *     publish_request when the node asks the owner first (plan doc-mvcn6c7e4e5q, V4).
@@ -170,6 +172,7 @@ export const appPublishTools = [
             category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
             tags: { type: 'array', description: 'Tags (default: the live app\'s).', zod: z.array(z.string()) },
             icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
+            version: { type: 'string', description: 'Display version the draft publishes with, e.g. "1.4.0" (defaults to the live app\'s). Letters, digits, dots, hyphens, plus signs and underscores, at most 40.' },
             ...DRAFT_NOTICE_INPUT,
         },
     },
@@ -187,6 +190,7 @@ export const appPublishTools = [
             ...SPEC_GATE_INPUT,
             ...aiProvenanceCatalogInput,
             filename: { type: 'string', required: true, description: 'App filename whose draft to publish.' },
+            version: { type: 'string', description: 'Display version to publish with, e.g. "1.4.0". Overrides the one the draft carries (set by aimeat_app_draft_save, else the live app\'s).' },
         },
     },
     {

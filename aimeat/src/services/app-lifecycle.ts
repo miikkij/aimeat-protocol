@@ -40,6 +40,9 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.9.0 — 2026-10-19 — The draft states its display version: stageAppDraft takes `version` (judged by
+ *     services/app-display-version.ts when it differs from the live app's) and publishAppDraft takes a
+ *     `version` that overrides the draft's (wish-the-app-draft-tools-can-set-the-display-version).
  *   v1.8.0 — 2026-10-18 — A fork's default exposure is narrowed to its label's audience cap before the
  *     publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
  *   v1.7.0 — 2026-10-18 — A fork is announced on the public feed only when the new app is really public
@@ -91,6 +94,7 @@ import { publishApp, type PublishAppRefusal, type PublishAppResult } from './app
 import { mintProvenance, type DeclaredProvenance } from './ai-provenance.js';
 import { refreshAppDependencies, forgetDependencies, appRef as depAppRef } from './dependency-map.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
+import { appDisplayVersionRefusal } from './app-display-version.js';
 
 /**
  * What a catalogue filename may look like. One spelling, because four doors used to carry their own
@@ -153,6 +157,11 @@ export interface DraftManifestRequest {
   tags?: string[];
   icon?: string;
   usesCortex?: string[];
+  /**
+   * The display version the draft will publish with. Unstated, the draft takes the live app's.
+   * A stated value that differs from the live one is judged by services/app-display-version.ts.
+   */
+  version?: string;
   /** Already through sanitizeProtection() at the door. */
   protection?: AppProtection;
   /** Overrides the live app's mime type; the doors that cannot express one leave it undefined. */
@@ -216,10 +225,13 @@ export async function stageAppDraft(
   // description, category and icon.
   const live = await storage.getApp(ownerGhii, filename);
   const base = live?.manifest;
+  // A stated display version is judged by the rule the publish applies; the live app's own is not.
+  const badVersion = requested.version !== base?.version ? appDisplayVersionRefusal(requested.version) : null;
+  if (badVersion) return { refusal: badVersion };
   const manifest: AppManifest = {
     name: requested.name ?? base?.name ?? filename.replace(/\.html?$/i, ''),
     description: requested.description ?? base?.description ?? '',
-    version: base?.version ?? '1.0.0',
+    version: requested.version ?? base?.version ?? '1.0.0',
     // 'utility' is what publishApp and the HTTP door both default to. The MCP door said 'tool', so
     // an app first staged by an agent was filed under a category the catalogue's own filters do not
     // offer, and the difference survived every later publish because category carries forward.
@@ -289,6 +301,8 @@ export function emitDraftChange(ownerGhii: string, filename: string): void {
 
 export interface PublishAppDraftInput {
   roadmap?: string;
+  /** The display version to publish with, overriding the draft's; judged by publishApp. */
+  version?: string;
   ownerName: string;
   ownerGhii: string;
   /** WHO pressed publish, resolved server-side. Audit + provenance principal. */
@@ -327,7 +341,8 @@ export async function publishAppDraft(
     requested: {
       name: draft.manifest.name,
       description: draft.manifest.description,
-      version: draft.manifest.version || undefined,
+      // Stated at the promotion, or the one the draft carries (stated at the save, or the live app's).
+      version: input.version ?? (draft.manifest.version || undefined),
       category: draft.manifest.category,
       tags: draft.manifest.tags,
       icon: draft.manifest.icon,

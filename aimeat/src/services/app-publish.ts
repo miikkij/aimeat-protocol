@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-19 — A display version the caller states is refused when it breaks the one rule (services/app-display-version.ts); a carried one is not re-judged (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 — The data-map stamp is checked against the scopes the version declares, so an app asking for organism:invite whose map does not say it invites people is stamped with DATAMAP_INVITES_UNSTATED (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-18 — A first publish's default exposure is narrowed to the app's label's audience cap
  *     before the publish gate (capFirstPublishExposure; plan doc-mvdipuyqraas, L3.5).
@@ -144,6 +145,7 @@ import { handRolledFindings } from './app-hand-rolled.js';
 import { levelFindings } from './app-build-level.js';
 import { recordBookParts } from './app-book-parts.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
+import { appDisplayVersionRefusal } from './app-display-version.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { stampFor } from './data-map/data-map-check.js';
 import { parseAppScopes } from './protected-resource.js';
@@ -396,6 +398,9 @@ export async function publishApp(
 
   const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
   const prev = live?.manifest;
+  // A display version the caller states is judged; one carried from the live app, or a package's own, is not.
+  const badVersion = input.source !== 'package-install' && requested.version !== prev?.version ? appDisplayVersionRefusal(requested.version) : null;
+  if (badVersion) return { refusal: badVersion };
   // AN APP A MANAGED INSTALL OWNS changes only through its package (services/packages/install/package-managed.ts).
   // The package's own update registers through here with source `package-install`, which is the one
   // publish the lock lets through. Above the dry run, so a dry run answers what the publish would.

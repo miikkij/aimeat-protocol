@@ -16,9 +16,10 @@
  *   THREE THINGS IT ASKS, and only the first two can fail a commit:
  *
  *     1. DOES THE LEDGER STILL DESCRIBE THE CODE. `weDeclare` is checked against every place the
- *        version is actually written. MCP's revision string appears in TWO files, and this repo has
- *        spent the week paying for facts written down twice, so both are checked and both must
- *        agree. Bumping a version without the ledger, or the other way round, fails here.
+ *        version is actually written. MCP's revision string appeared in TWO files until 2026-10-19,
+ *        and an entry may still name several sites, all of which are checked and must agree; MCP's
+ *        is now one constant both server cards import. Bumping a version without the ledger, or the
+ *        other way round, fails here.
  *
  *     2. HAS ANYBODY LOOKED LATELY. A triaged entry goes stale after `maxAgeDays`. This is the
  *        whole point: the failure arrives on a schedule rather than when an outsider notices.
@@ -34,6 +35,7 @@
  *   a drift or a stale entry.
  * @usage pnpm check:protocol-versions   (pre-commit hook and CI)
  * @version-history
+ *   v1.0.1 — 2026-10-19 — Comment only: MCP's revision is one declaration site now (src/mcp/protocol-version.ts).
  *   v1.0.0 — 2026-09-04 — Initial: two verified entries, fourteen untriaged, a 90-day clock.
  */
 import { readFileSync } from 'node:fs';

@@ -32617,7 +32617,10 @@ paths:
                 mime_type: { type: string, default: text/html }
                 name: { type: string }
                 description: { type: string, description: Required for a NEW app }
-                version: { type: string }
+                version:
+                  type: string
+                  pattern: '^[0-9A-Za-z][0-9A-Za-z.+_-]{0,39}$'
+                  description: The display version, for example 1.4.0. Omitted, the live app's is kept (a new app gets 1.0.N). A value other than the live app's that breaks the pattern is refused with 400 INVALID_INPUT (on the presigned path, at the upload).
                 category: { type: string }
                 tags: { type: array, items: { type: string } }
                 icon: { type: string }
@@ -35481,6 +35484,10 @@ paths:
                 tags: { type: array, items: { type: string } }
                 icon: { type: string }
                 uses_cortex: { type: array, items: { type: string } }
+                version:
+                  type: string
+                  pattern: '^[0-9A-Za-z][0-9A-Za-z.+_-]{0,39}$'
+                  description: The display version publish-draft publishes with, for example 1.4.0. Omitted, the draft takes the live app's. A value other than the live app's that breaks the pattern is refused with 400 INVALID_INPUT, the rule POST /v1/apps applies to its `version`.
                 protection:
                   type: object
                   properties:
@@ -35510,6 +35517,7 @@ paths:
                           updated_at: { type: string }
                           has_live_version: { type: boolean }
                           live_version_number: { type: integer }
+                          version: { type: string, description: The display version publish-draft will publish with, the one stated in this request or else the live app's. }
                           note: { type: string }
                           served_marks_removed:
                             type: array
@@ -35984,6 +35992,10 @@ paths:
               type: object
               properties:
                 roadmap: { type: string, minLength: 3, maxLength: 600, description: What this version changes. Required for shared apps. }
+                version:
+                  type: string
+                  pattern: '^[0-9A-Za-z][0-9A-Za-z.+_-]{0,39}$'
+                  description: The display version to publish with, for example 1.4.0. Overrides the one the draft carries (stated on PUT .../draft, else the live app's). A value other than the live app's that breaks the pattern is refused with 400 INVALID_INPUT and the draft stays.
                 spec_token: { type: string }
                 spec_ack: { type: string, enum: [skipped-by-owner] }
                 ai_provenance:

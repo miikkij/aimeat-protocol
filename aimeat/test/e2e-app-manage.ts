@@ -17,6 +17,8 @@
  *   - Phase 4: grants, backup, cost, bundled agents, subdomains, cortex source
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-manage
  * @version-history
+ *   2026-10-19 — 24: aimeat_app_draft_save and aimeat_app_draft_publish set the display version that
+ *     aimeat_app_manage versions shows, and refuse a bad one (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-16 — 5b, 6 and 6b: aimeat_app_get answers an unlisted or coded app only to the owner's and
  *     the operator's agents, a community-listed app also to another member's agent, a listed app to
  *     anyone (QA audit W15).
@@ -459,6 +461,35 @@ await test('22. aimeat_invoke with an old name gives the same answer', async () 
     const r = await callTool(s, 'aimeat_invoke', { capability: 'aimeat_app_seo_set', input: { filename: APP } });
     // aimeat_invoke answers a refusal as JSON: { code, message }.
     assert(r.isError && r.data.code === 'TOOL_MOVED' && String(r.data.message).includes('aimeat_app_manage with action "seo"'), `invoke: ${r.text.slice(0, 300)}`);
+});
+
+await test('24. The draft tools set the display version: draft_save states it, draft_publish publishes it or overrides it, versions shows it, a bad one is refused', async () => {
+    const VAPP = `am${STAMP}-ver.html`;
+    const html = (n: number) => Buffer.from(`<!doctype html><title>Version</title><h1>display version ${n}</h1>`).toString('base64');
+    const lastVersion = async () => {
+        const v = await manage(s, { action: 'versions', filename: VAPP });
+        assert(!v.isError, `versions: ${v.text.slice(0, 300)}`);
+        const list = v.data.versions as Array<{ version_number: number; version: string }>;
+        return list.reduce((a, b) => (b.version_number > a.version_number ? b : a));
+    };
+    const saved = await callTool(s, 'aimeat_app_draft_save', { filename: VAPP, content_base64: html(1), description: 'An app whose display version the draft sets.', version: '2.0.0' });
+    assert(!saved.isError && saved.data.version === '2.0.0', `draft_save keeps the stated version: ${saved.text.slice(0, 300)}`);
+    const first = await callTool(s, 'aimeat_app_draft_publish', { filename: VAPP });
+    assert(!first.isError, `draft_publish: ${first.text.slice(0, 300)}`);
+    const v1 = await lastVersion();
+    assert(v1.version === '2.0.0', `the live app carries the draft's version: ${JSON.stringify(v1)}`);
+
+    const bad = await callTool(s, 'aimeat_app_draft_save', { filename: VAPP, content_base64: html(2), version: 'two point oh' });
+    assert(bad.isError && bad.text.startsWith('This display version cannot be used'), `a version with spaces is refused: ${bad.text.slice(0, 300)}`);
+
+    const again = await callTool(s, 'aimeat_app_draft_save', { filename: VAPP, content_base64: html(2) });
+    assert(!again.isError && again.data.version === '2.0.0', `an unstated version is the live app's: ${again.text.slice(0, 300)}`);
+    const refused = await callTool(s, 'aimeat_app_draft_publish', { filename: VAPP, version: '<b>3</b>' });
+    assert(refused.isError && refused.text.startsWith('This display version cannot be used'), `draft_publish refuses a bad version: ${refused.text.slice(0, 300)}`);
+    const override = await callTool(s, 'aimeat_app_draft_publish', { filename: VAPP, version: '2.1.0' });
+    assert(!override.isError, `the draft survived the refusal and publishes with the override: ${override.text.slice(0, 300)}`);
+    const v2 = await lastVersion();
+    assert(v2.version_number === v1.version_number + 1 && v2.version === '2.1.0', `the override is the live version: ${JSON.stringify(v2)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

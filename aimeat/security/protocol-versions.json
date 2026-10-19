@@ -13,15 +13,14 @@
       "id": "mcp",
       "name": "Model Context Protocol",
       "spec": "https://modelcontextprotocol.io/specification/versioning",
-      "weDeclare": "2025-06-18",
+      "weDeclare": "2025-11-25",
       "declaredIn": [
-        { "file": "src/routes/wellknown.ts", "template": "protocolVersion: '{version}'" },
-        { "file": "src/routes/subdomain-origin-docs.ts", "template": "protocolVersion: '{version}'" }
+        { "file": "src/mcp/protocol-version.ts", "template": "export const MCP_PROTOCOL_VERSION = '{version}'" }
       ],
       "current": "2026-07-28",
-      "verifiedOn": "2026-09-04",
+      "verifiedOn": "2026-10-19",
       "verdict": "watch",
-      "note": "Two revisions behind, and the newer one is a rework rather than an increment: sessions and the initialize handshake are gone, `server/discover` is mandatory, `subscriptions/listen` replaces resources/subscribe, and Roots, Sampling and Logging are deprecated. Measured on branch mcp-v2-prototype against the real catalogue: all 306 published tools register on @modelcontextprotocol/server 2.0.0 unchanged, server/discover answers, a stateless request works, and a client on 2025-06-18 is still served by the same handler. So the move is viable and not urgent. What would change the answer: the SDK settling (maintainers are limiting PRs while v2 beds in), or a client we care about requiring the newer revision. NOTE the two declaration sites — this version is written out twice, and the gate checks both because one of them has been forgotten before."
+      "note": "Rechecked 2026-10-19 by the research round (brief doc-mvfnbm32inrv): 2026-07-28 is still the current revision; Claude Code requests it by default for claude.ai connectors since 2.1.295 and for cloud sessions since 2.1.299; the TypeScript SDK's main line is v2 (2.3.x), whose 2.3.0 serves only part of 2026-07-28 (tasks/get, tasks/cancel); a 2026-07-28 request to this node is answered with 2025-11-25 and works (checked with the claude.ai connector). We declare 2025-11-25 since 2026-10-19, the revision @modelcontextprotocol/sdk 1.31.0 answers in initialize (LATEST_PROTOCOL_VERSION; it also serves 2025-06-18, 2025-03-26, 2024-11-05 and 2024-10-07 to a client asking for one); the cards had said 2025-06-18 while the server negotiated 2025-11-25. That leaves us one revision behind 2026-07-28, and the newer one is a rework rather than an increment: sessions and the initialize handshake are gone, `server/discover` is mandatory, `subscriptions/listen` replaces resources/subscribe, and Roots, Sampling and Logging are deprecated. Measured on branch mcp-v2-prototype against the real catalogue: all 306 published tools register on @modelcontextprotocol/server 2.0.0 unchanged, server/discover answers, a stateless request works, and a client on 2025-06-18 is still served by the same handler. So the move is viable and not urgent. What would change the answer: SDK v2 announcing full 2026-07-28 support, or a client we care about requiring the newer revision. The version was written out twice, in both server cards, until 2026-10-19; it is now written once, in src/mcp/protocol-version.ts, which both cards import, and test/unit/mcp-protocol-version.test.ts holds that literal to the SDK's LATEST_PROTOCOL_VERSION, so an SDK upgrade that moves the revision fails on the day of the upgrade. The SDK v2 / 2026-07-28 move itself stays a plan."
     },
     {
       "id": "a2a",
