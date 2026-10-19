@@ -5,6 +5,9 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.13.6 — 2026-10-19 — Atelier's boundary names six calls: the layout read goes through
+ *     _core/public-fetch.js (f1296fe43), a plain read and, only on SIGN_IN_REQUIRED, the same read
+ *     with the person's session.
  *   v1.13.5 — 2026-10-17 — The kirjapaino look's block is among the presets the served looks.css must carry.
  *   2026-10-15 — wallet.request: a second ask the same day is refused with ALREADY_GRANTED_TODAY; the two
  *     tests that asked repeatedly up to the cap pinned the defect (feature-list audit 135).
@@ -1173,10 +1176,14 @@ await test('GET /v1/libs/aimeat-atelier.js — one named network call, and no ha
     // are fine now". Since 2026-10-03 (0.65.1, the font manager) the kit also LINKS one
     // stylesheet, not a fetch: /v1/themes/fonts.css of the app's own origin, and only when the
     // look names a face the operator added (atelier/added-faces.js). It is the one other node
-    // path the bundle may name.
+    // path the bundle may name. Since 2026-10-19 (f1296fe43) the layout read goes through
+    // _core/public-fetch.js, which is two calls of the same read: the plain one, and, only when a
+    // signed-in-only node answers SIGN_IN_REQUIRED, the same read with the session the auth library
+    // holds. So six matched calls, and the second layout call is bound to that refusal.
     const fetches = code.match(/\bfetch\s*\(/g) || [];
-    assert(fetches.length === 5,
-        `exactly five matched calls — layout, atlas geometry, legal surface, session relay, card submit — found ${fetches.length}`);
+    assert(fetches.length === 6,
+        `exactly six matched calls — layout and its signed-in retry, atlas geometry, legal surface, session relay, card submit — found ${fetches.length}`);
+    assert(code.includes('SIGN_IN_REQUIRED'), 'the layout read retries with the session only on SIGN_IN_REQUIRED');
     assert(/credentials:\s*["']omit["']/.test(code), 'the card submit sends no session and no cookie');
     assert(code.includes('/lib/aimeat-atlas@1.json'), 'one call targets the vendored atlas geometry');
     assert(code.includes('/legal'), 'one call targets the app\'s own public legal surface');
