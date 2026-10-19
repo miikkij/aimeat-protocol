@@ -13,7 +13,8 @@
  * @usage <script src="/v1/libs/aimeat-webmcp.js"></script>
  *   await AIMEAT.webmcp.exposeAppTools({ owner: 'alice', appId: 'shop.html' });
  * @version-history
- *   v1.2.1 — 2026-10-19 — The listing and the product feed go through _core/public-fetch.js (signed-in-only node).
+ *   v1.2.1 — 2026-10-19 — The listing and the product feed go through _core/public-fetch.js (signed-in-only node),
+ *     and `?expose=app` lists the app's tools again when the page signs in after a refused first try.
  *   v1.2.0 — 2026-10-11 — A tool's description tags its money price ([PAID], every currency) and its
  *     pacing ([PACING: N morsels per call], toll_morsels first, the old price.morsels after) apart:
  *     a morsel is never a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -261,6 +262,18 @@ try {
     const ref = appRefFromPage(el);
     // Same deferral as above, and the same silence on failure: an app whose tools cannot be listed
     // must still render. The page keeps working with no tools registered.
-    if (ref) setTimeout(function () { webmcp.exposeAppTools(ref).catch(function () {}); }, 0);
+    // On a node that shows its content to its own accounts only the listing answers a signed-in
+    // caller only, and this runs before the app has signed in, so it is asked again at the sign-in.
+    if (ref) setTimeout(function () {
+      webmcp.exposeAppTools(ref).catch(function () {
+        const auth = /** @type {any} */ (window).AIMEAT && /** @type {any} */ (window).AIMEAT.auth;
+        if (!auth || typeof auth.on !== 'function') return;
+        const again = function () {
+          if (typeof auth.off === 'function') auth.off('login', again);
+          webmcp.exposeAppTools(ref).catch(function (err) { console.warn('[aimeat-webmcp] the app tools could not be listed after the sign-in:', err && err.message); });
+        };
+        auth.on('login', again);
+      });
+    }, 0);
   }
 } catch { /* auto-activation is best-effort; explicit calls always work */ }

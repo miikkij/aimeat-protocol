@@ -262,6 +262,19 @@
       const ref = appRefFromPage(el);
       if (ref) setTimeout(function() {
         webmcp.exposeAppTools(ref).catch(function() {
+          const auth = (
+            /** @type {any} */
+            window.AIMEAT && /** @type {any} */
+            window.AIMEAT.auth
+          );
+          if (!auth || typeof auth.on !== "function") return;
+          const again = function() {
+            if (typeof auth.off === "function") auth.off("login", again);
+            webmcp.exposeAppTools(ref).catch(function(err) {
+              console.warn("[aimeat-webmcp] the app tools could not be listed after the sign-in:", err && err.message);
+            });
+          };
+          auth.on("login", again);
         });
       }, 0);
     }

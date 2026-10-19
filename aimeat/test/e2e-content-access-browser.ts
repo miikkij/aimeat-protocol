@@ -167,6 +167,10 @@ async function main() {
                 const src = (await browser(`/v1/libs/${lib}.js`, '*/*')).body;
                 assert(src.includes('SIGN_IN_REQUIRED'), `${lib}.js does not send a refused public read again with the session`);
             }
+            // The node's own WebMCP script lists the app's tools before the app has signed in, so on this
+            // node it asks again at the sign-in.
+            const webmcp = (await browser('/v1/libs/aimeat-webmcp.js', '*/*')).body;
+            assert(/auth\.on\(["']login["']/.test(webmcp), 'aimeat-webmcp.js does not list the app tools again at the sign-in');
         });
 
         console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
