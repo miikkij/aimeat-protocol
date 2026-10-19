@@ -550,8 +550,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [type-check](https://github.com/gkz/type-check) | 0.3.2 | MIT |
 | [type-is](https://github.com/jshttp/type-is#readme) | 2.1.0 | MIT |
 | [undici-types](https://undici.nodejs.org) | 7.24.6 | MIT |
-| [undici](https://undici.nodejs.org) | 6.29.0 | MIT |
-| [undici](https://undici.nodejs.org) | 7.30.0 | MIT |
+| [undici](https://undici.nodejs.org) | 6.29.1 | MIT |
+| [undici](https://undici.nodejs.org) | 7.30.1 | MIT |
 | [unicode-properties](https://github.com/devongovett/unicode-properties) | 1.4.1 | MIT |
 | [unicode-trie](https://github.com/devongovett/unicode-trie) | 2.0.0 | MIT |
 | [unpdf](https://github.com/unjs/unpdf#readme) | 1.8.1 | MIT |
@@ -12342,7 +12342,7 @@ If the Work includes a "NOTICE" text file as part of its distribution, then any 
 END OF TERMS AND CONDITIONS
 ```
 
-### undici-types 7.24.6, undici 6.29.0, undici 7.30.0
+### undici-types 7.24.6, undici 6.29.1, undici 7.30.1
 
 ```text
 MIT License
