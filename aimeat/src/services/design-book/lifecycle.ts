@@ -24,6 +24,7 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.6.0 — 2026-10-19 — The nine avatar templates are seeded published (data/agent-avatar-templates.ts).
  *   v1.5.0 — 2026-09-28 — The three spring hands (snappy, soft, heavy) are seeded published as
  *     `motion` parts from src/data/atelier-motions.ts.
  *   v1.4.0 — 2026-09-26 — The aging round reads the components that no longer pass the bench too, which
@@ -50,6 +51,7 @@ import { UI_LAYOUT_PRESETS } from '../app-ui/layouts.js';
 import { AMBIENTS, type AtelierAmbient } from '../../data/atelier-ambients.js';
 import { EFFECTS, type AtelierEffect } from '../../data/atelier-effects.js';
 import { MOTION_RECIPES } from '../../data/atelier-motions.js';
+import { AVATAR_TEMPLATES } from '../../data/agent-avatar-templates.js';
 import { defaultEffectTarget } from './validate.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
 import { DesignBookError, validatePartInput, type PartKind } from './validate.js';
@@ -85,6 +87,10 @@ export async function seedDesignBook(storage: Storage, config: AimeatConfig): Pr
   await seedParts(book, system, MOTION_RECIPES.map((m) => ({
     id: m.id, kind: 'motion', title: m.title, summary: m.summary,
     body: { tokens: { ...m.tokens } }, tags: ['motion', 'spring', 'seed'],
+  })));
+  // The avatar templates an agent starts its own picture from (data/agent-avatar-templates.ts).
+  await seedParts(book, system, AVATAR_TEMPLATES.map((a) => ({
+    id: a.id, kind: 'avatar', title: a.title, summary: a.summary, body: { svg: a.svg }, tags: [...a.tags],
   })));
 }
 

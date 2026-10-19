@@ -30,6 +30,7 @@
  * @usage routed at /v1/fleet by spa.html and routes/portal.ts, and embedded as the "Your agents"
  *   section of Settings & Controls via views/profile/fleet-tab.js, which passes `embedded`.
  * @version-history
+ *   v2.3.0 -- 2026-10-19 -- A row's name starts with the agent's own picture when it has set one.
  *   v2.2.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of the "no
  *     agents" empty state and its starter (QA audit F6-05, E7-04).
  *   v2.1.0 -- 2026-10-01 -- What the agents did in the last 7 days comes before their sign-in health
@@ -94,6 +95,7 @@ import { SubHeading } from '/components/SubHeading.js';
 import { Tab } from '/components/Tabs.js';
 import { Row as Line, Stack, Space } from '/components/Layout.js';
 import { List, Row, Name, Doors, Group } from '/components/List.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { WeekBlock } from './fleet-week.js';
@@ -513,6 +515,7 @@ export default function FleetView({ embedded = false, starter = null } = {}) {
                           nothing and just puts a second grey block after every name. It is the
                           default, so only a departure from it is worth a badge. */''}
                     <${Name} title=${a.gaii}
+                      before=${avatarOf(a) ? html`<${AgentAvatar} agent=${a} size="small" />` : undefined}
                       href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(a.name)}`}
                       onFollow=${(e) => openAgent(e, a.name, embedded)}
                       after=${html`

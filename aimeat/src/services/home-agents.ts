@@ -25,6 +25,8 @@
  * @structure HomeWorker · WatchedSpace · HomeAgentsView · readHomeAgents(deps, owner, limit, only?)
  * @usage const view = await readHomeAgents({ config, storage }, owner, 5);
  * @version-history
+ *   v1.5.0 — 2026-10-19 — `avatar` on a worker (services/agent-avatar.ts), one batched read for the
+ *     listed workers. Proposals carry none: they are not agents yet.
  *   v1.4.0 — 2026-10-12 — `when` can be `records`, and a worker carries `watches`: the workspace
  *     spaces its definition names in `record_spaces`
  *     (wish-sopimuspohjainen-agentti-kodista-luonnos-ehdottaa-sit-ja-koh).
@@ -42,6 +44,8 @@ import { readCrewState } from './crew-def-store.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { nodeTimeZone } from './display-prefs.js';
 import { readAgentTies, type AgentApp, type AgentWorkplace } from './agent-ties.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
+import { logger } from '../utils/logger.js';
 
 export type WorksWhen = 'ask' | 'clock' | 'talk' | 'always' | 'records';
 
@@ -51,6 +55,8 @@ export interface WatchedSpace { organism_id: string; ws: string; space: string }
 export interface HomeWorker {
   name: string;
   display_name: string;
+  /** The agent's picture (services/agent-avatar.ts), null when it has none. */
+  avatar: AvatarView | null;
   description: string;
   when: WorksWhen;
   /**
@@ -160,6 +166,7 @@ export async function readHomeAgents(
   const shown = only
     ? all.filter(a => a.name === only)
     : [...all].sort((x, y) => Number(waits(y)) - Number(waits(x)) || stamp(y) - stamp(x)).slice(0, limit);
+  const avatars = await readAvatarsOrEmpty(storage, shown.map(a => a.gaii), logger.warn.bind(logger), 'readHomeAgents');
 
   const zone = nodeTimeZone();
   const workers: HomeWorker[] = [];
@@ -183,6 +190,7 @@ export async function readHomeAgents(
     workers.push({
       name: a.name,
       display_name: a.displayName ?? a.name,
+      avatar: avatars.get(a.gaii) ?? null,
       description: a.description ?? '',
       when,
       watches,

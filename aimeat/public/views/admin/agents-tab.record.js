@@ -15,6 +15,8 @@
  *   - Trust — the score and the breakdown behind it
  *
  * @version-history
+ *   v2.1.0 — 2026-10-19 — An agent that has its own avatar shows it beside its GAII under the record's
+ *     title (AgentAvatar); an agent without one keeps the heading as it was.
  *   v2.0.0 — 2026-09-27 — Library components only: the List's Panel with its title and close door,
  *     Marks, Facts (a field's value, its line and its door), Beside, Box, Figure, Readings, Loud.
  *   2026-09-13 -- Compose shared numeral cuts; normalize extra sizes under brief 10.7.
@@ -34,6 +36,7 @@ import { Facts } from '/components/Facts.js';
 import { Figure } from '/components/Figure.js';
 import { Readings } from '/components/Readings.js';
 import { Beside, Split, Stack, Row as Line } from '/components/Layout.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { kindOf, freshness, isAwake, daysSince, trustText } from './agents-tab.derive.js';
 import { shortDate } from './shared.js';
 
@@ -100,7 +103,9 @@ export default function AgentRecord({ agent, detail, loading, now, onClose, onOw
     <${Panel} title=${agent.display_name || agent.gaii.split('#')[0]}
       mark=${html`<${Action} small soft onClick=${onClose}>${A('close')} ↩<//>`}>
       <${Stack} gap="medium" below="medium">
-        <${Note} kind="meta" mono>${agent.gaii}<//>
+        ${avatarOf(agent)
+    ? html`<${Line} gap="medium"><${AgentAvatar} agent=${agent} /><${Note} kind="meta" mono>${agent.gaii}<//><//>`
+    : html`<${Note} kind="meta" mono>${agent.gaii}<//>`}
         <${Marks}>
           <${Mark} tone=${isAwake(agent, now) ? 'fine' : undefined}>${A('chipSeen', { when: seenWords(agent.last_seen, now) })}<//>
           <${Mark}>${A('kind' + kind.charAt(0).toUpperCase() + kind.slice(1))}<//>

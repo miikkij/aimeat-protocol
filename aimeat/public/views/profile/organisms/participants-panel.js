@@ -8,6 +8,7 @@
  * @structure ParticipantsPanel
  * @usage import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
  * @version-history
+ *   v1.16.0 — 2026-10-19 — A participant agent's chip starts with the agent's own avatar when it has one (its emoji, or its picture through AgentAvatar), 🤖 otherwise.
  *   v1.15.1 — 2026-09-26 — The creator and a contributor's role are green again, as main drew them
  *     (.badge-success: Mark tone="fine"; fix pass).
  *   v1.15.0 — 2026-09-26 — Every part is a kit component (page group G2a): the panel and the contract agents are the Box, the persons and their agents the People component (components/People.js, its own sheet), the access manager a Split with the List, the Select and the Loud action; the tags keep main's meanings as tones (creator and a contributor ink, where main drew them green). The page writes no class.
@@ -62,6 +63,14 @@ import { SubHeading, HeadDesc } from '/components/SubHeading.js';
 import { Row, Split } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
+
+/** The sign before an agent's name in its chip: its own avatar when it has one, 🤖 otherwise. */
+function agentSign(a) {
+  const av = avatarOf(a);
+  if (av?.kind === 'svg') return html`<${AgentAvatar} avatar=${av} size="small" />`;
+  return `${av?.kind === 'emoji' ? av.emoji : '🤖'} `;
+}
 
 /* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
  * listing. Built from the records' identity traces (humans + their agents) + organism membership.
@@ -241,7 +250,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
             ${(o.agents || []).map((a, j) => html`
               <${AgentChip} key=${j} own=${a.isOwn} ghost=${!a.isOwn} count=${a.contributions}
                 title=${a.isOwn ? '' : (t('organisms.otherAgentHint') || 'Another owner’s agent — you see what it has done here, not its live status')}>
-                ${'🤖 '}${(a.name)}
+                ${agentSign(a)}${(a.name)}
               <//>`)}
           <//>`)}
         <//>

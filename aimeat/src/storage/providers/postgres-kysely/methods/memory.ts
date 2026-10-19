@@ -9,6 +9,7 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory: the TTL sweep as one DELETE (QA audit D4-01, E4-01). listAllMemory
  *     and listAllMemoryMeta take the TTL test, the order, the limit and the offset in SQL and the total
  *     from a COUNT (QA audit D4-05). Every key and owner prefix is a literal, case-sensitive prefix
@@ -294,6 +295,19 @@ export const memoryMethods = {
     if (keys.length === 0) return [];
     const rows = await this.db.selectFrom('Memory').selectAll().where('key', 'in', keys).execute();
     return rows.filter(isVisible).map(rowToRecord);
+  },
+
+  // BULK PRIMITIVE — one key under many owners in ONE `ownerGaii IN (…)` query (an agent list's
+  // per-agent avatar record). Live rows only.
+  async getMemoryForOwners(this: PostgresKyselyStorage, ownerGaiis: string[], key: string): Promise<MemoryRecord[]> {
+    if (ownerGaiis.length === 0) return [];
+    // Chunked like the SQLite side, so a node-wide list stays well inside the bind limit.
+    const out: MemoryRecord[] = [];
+    for (let i = 0; i < ownerGaiis.length; i += 1000) {
+      const rows = await this.db.selectFrom('Memory').selectAll().where('key', '=', key).where('ownerGaii', 'in', ownerGaiis.slice(i, i + 1000)).execute();
+      out.push(...rows.filter(isVisible).map(rowToRecord));
+    }
+    return out;
   },
 
   async bulkSetMemory(this: PostgresKyselyStorage, records: MemoryRecord[]): Promise<MemoryRecord[]> {

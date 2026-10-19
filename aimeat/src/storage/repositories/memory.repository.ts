@@ -14,6 +14,7 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-10-19 — getMemoryForOwners: one key under many owners in one read (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01). A prefix in every filter
  *     is a literal, case-sensitive string on both backends (QA audit D4-07).
  *   2026-10-15 — searchText states the one match rule for both backends; searchMemory is one owner's searchText (feature-list audit #52).
@@ -134,6 +135,13 @@ export interface MemoryRepository {
    * dedupes, e.g. by freshest). Optional — a backend without it falls back to a per-key any-owner loop.
    */
   getMemoryByKeysAnyOwner?(keys: string[]): Promise<MemoryRecord[]>;
+  /**
+   * BULK PRIMITIVE — read ONE key under MANY owners in a single `ownerGaii IN (…)` query. Backs a
+   * per-principal record a listing shows on every row (an agent's `agent.avatar`), so a list of N
+   * agents is one read instead of N point reads. Live rows only; order is not guaranteed — the caller
+   * indexes by ownerGaii. Optional: a backend without it falls back to one getMemory per owner.
+   */
+  getMemoryForOwners?(ownerGaiis: string[], key: string): Promise<MemoryRecord[]>;
   /**
    * BULK PRIMITIVE — upsert MANY rows as ONE unit (Phase 1). Same per-row semantics as
    * {@link setMemory} (version bump, trackable-history archive, byteSize), but committed together

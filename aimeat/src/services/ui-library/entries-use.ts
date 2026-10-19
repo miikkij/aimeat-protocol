@@ -10,6 +10,7 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.78.0 — 2026-10-19 — AgentAvatar: view, list.
  *   v1.77.0 — 2026-10-18 — ClassificationBadge: status, explain.
  *   v1.76.0 — 2026-10-18 — AudienceBadge: status, explain.
  *   v1.75.0 — 2026-10-16 — HtmlPageFrame: view, open.
@@ -171,7 +172,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     // The kit of Settings & Controls on components (2026-09-27): one block per family, each filled by its own hand.
     // KIT (Action, Mark, Note, Box, Avatar, Roads, Figure)
     'action-component': ['act', 'navigate', 'copy'], mark: ['status', 'explain', 'count'],
-    note: ['explain', 'status', 'wait', 'notify'], box: ['view', 'layout', 'confirm'], avatar: ['view'],
+    note: ['explain', 'status', 'wait', 'notify'], box: ['view', 'layout', 'confirm'], avatar: ['view'], 'agent-avatar': ['view', 'list'],
     roads: ['pick', 'act', 'copy'], figure: ['count', 'status'],
     // FIELDS (Field, TextField, Choice)
     field: ['edit', 'layout'], 'text-field': ['edit', 'search'], choice: ['pick', 'edit'],

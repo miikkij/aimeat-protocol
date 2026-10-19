@@ -22,6 +22,8 @@
  *   import { describeBasicAgents } from '../services/basic-agents.js';
  *   const view = await describeBasicAgents(config, storage, req.auth!.owner);
  * @version-history
+ *   v1.5.0 — 2026-10-19 — Each basic agent that is an agent record carries its `avatar`
+ *     (services/agent-avatar.ts), so the route and aimeat_agent_basics_get answer the same.
  *   v1.4.0 — 2026-10-12 — A connected daemon carries what its connector said the crew runtime
  *     honours beyond its tools (`features`).
  *   v1.3.0 — 2026-10-10 — A connected daemon carries the name its connector reported, and
@@ -37,6 +39,8 @@ import type { Storage } from '../storage/interface.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { addItem, listItems } from './open-items.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
+import { logger } from '../utils/logger.js';
 
 /** Where the owner presses. A deep link into their own profile, not an API address. */
 export function basicAgentsApprovalUrl(baseUrl: string): string {
@@ -57,6 +61,8 @@ export interface BasicAgentsView {
     run_mode: string;
     exists: boolean;
     enrolled: boolean;
+    /** Its picture (services/agent-avatar.ts), only for one that is an agent record already. */
+    avatar: AvatarView | null;
   }>;
   /** The page the owner opens to press the button. */
   approval_url: string;
@@ -185,6 +191,8 @@ export async function describeBasicAgents(
   const connected = daemonPrincipals(owner);
   const existing = await storage.getAgentsByOwner(owner);
   const byName = new Map(existing.map(a => [a.name, a]));
+  const basicGaiis = BASIC_AGENTS.map(t => byName.get(t.name)?.gaii).filter((g): g is string => !!g);
+  const avatars = await readAvatarsOrEmpty(storage, basicGaiis, logger.warn.bind(logger), 'describeBasicAgents');
 
   const agents = BASIC_AGENTS.map(t => {
     const have = byName.get(t.name);
@@ -198,6 +206,7 @@ export async function describeBasicAgents(
       run_mode: t.runMode as string,
       exists: !!have,
       enrolled: !!have?.enrolledAt,
+      avatar: have ? avatars.get(have.gaii) ?? null : null,
     };
   });
 

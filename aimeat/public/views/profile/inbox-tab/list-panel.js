@@ -12,6 +12,8 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.9.0 — 2026-10-19 — A row's mark and a group's heading carry the agent peer's own avatar (`peerAvatar`):
+ *     `mark.avatar` and ConversationGroup `avatar`, null for a person or an agent without one.
  *   v1.8.0 — 2026-10-17 — The preview names the agent: "Your agent X:" when one of yours sent the last
  *     message in your name, "X (their agent):" when the other side's agent did.
  *   v1.7.0 — 2026-09-26 — The list is the ConversationList component (components/ConversationList.js):
@@ -51,7 +53,9 @@ export function rowIds(c) {
   return [c.conversationId, ...(c.folded || []).map(f => f.conversationId)];
 }
 
-export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation, openFolds = {}, toggleFold, org }) {
+export function ListPanel({ requests, conversations, activeConv, peerDisplay, peerAvatar, accept, block, openConversation, openFolds = {}, toggleFold, org }) {
+  /** An agent peer's own avatar or null (inbox-tab.js peerAvatar); ConversationList draws it in the identicon's place. */
+  const avatarFor = (id) => (peerAvatar ? peerAvatar(id) : null);
   const selecting = !!org?.selecting;
   const selected = org?.selected || new Set();
   const isSelected = (c) => rowIds(c).every(id => selected.has(id));
@@ -100,7 +104,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     return html`<${ConversationRow} key=${c.conversationId}
       title=${label}
       presence=${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? c.peerGhii : null}
-      mark=${nested ? { word } : { picture: labelPeer ? foldedWho(c) : whoOf(c) }}
+      mark=${nested ? { word } : { picture: labelPeer ? foldedWho(c) : whoOf(c), avatar: avatarFor(labelPeer ? foldedWho(c) : whoOf(c)) }}
       date=${c.updatedAt ? stampShort(c.updatedAt) : ''} dateTitle=${c.updatedAt ? stampFull(c.updatedAt) : ''}
       chips=${[
         !nested && via ? `${t('inbox.viaAgent')} ${via}` : null,
@@ -149,7 +153,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     const inArchive = rows[0]?.section === 'archive';
     const word = t(inArchive ? 'inbox.org.restoreGroup' : 'inbox.org.archiveGroup', { count: String(ids.length) });
     return html`<${ConversationGroup} key=${key} open=${open} onToggle=${() => org.toggleCollapsed(key)}
-      picture=${seed} name=${name} presence=${presenceId}
+      picture=${seed} avatar=${avatarFor(seed)} name=${name} presence=${presenceId}
       countLabel=${t('inbox.org.foldCount', { count: String(countOf(rows)) })}
       unreadLabel=${unread > 0 ? t('inbox.org.unreadCount', { count: String(unread) }) : null}
       pick=${selecting ? { label: t('inbox.org.selectAll'), onClick: () => org.toggleSelected(ids) } : null}

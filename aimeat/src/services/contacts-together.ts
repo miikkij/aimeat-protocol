@@ -12,6 +12,7 @@
  * @usage const t = await contactTogether(storage, config, ownerGhii, contactGhii, conversations);
  * @version-history
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Kontaktien sivu", direction A).
+ *   v1.1.0 — 2026-10-19 — Each of the contact's agents carries `avatar` (services/agent-avatar.ts), one batched read.
  *   v1.0.1 — 2026-09-26 — bare() takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import type { AimeatConfig } from '../config.js';
@@ -21,13 +22,14 @@ import type { ConversationSummary } from '../storage/repositories/direct-message
 import { canReadWorkspace } from './workspace-access.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName } from '../utils/gaii.js';
+import { readAvatarsOrEmpty, type AvatarView } from './agent-avatar.js';
 
 /** An organism both are active members of, with the CONTACT's role in it. */
 export interface SharedOrganism { id: string; name: string; role: OrganismMembershipRecord['role']; }
 /** A workspace in a shared organism that both may read. */
 export interface SharedWorkspace { organism_id: string; organism_name: string; ws: string; name: string; }
 /** One of the contact's agents, with the last message it exchanged with the owner. */
-export interface ContactAgent { gaii: string; display_name: string | null; last_seen: string | null; last_message_at: string | null; message_count: number; }
+export interface ContactAgent { gaii: string; display_name: string | null; avatar: AvatarView | null; last_seen: string | null; last_message_at: string | null; message_count: number; }
 export interface ContactTogether { organisms: SharedOrganism[]; workspaces: SharedWorkspace[]; agents: ContactAgent[]; }
 
 /**
@@ -124,11 +126,12 @@ export async function contactTogether(
   const convs = conversations ?? await storage.listConversations(ownerGhii);
   const byPeer = new Map(convs.map(c => [c.peerGhii, c]));
   const owner = bare(contactGhii);
-  const agents: ContactAgent[] = (await storage.listAgents())
-    .filter(a => a.owner === owner && a.gaii.endsWith(`@${config.nodeId}`))
+  const theirs = (await storage.listAgents()).filter(a => a.owner === owner && a.gaii.endsWith(`@${config.nodeId}`));
+  const avatars = await readAvatarsOrEmpty(storage, theirs.map(a => a.gaii), logger.warn.bind(logger), 'contactTogether');
+  const agents: ContactAgent[] = theirs
     .map(a => {
       const conv = byPeer.get(a.gaii);
-      return { gaii: a.gaii, display_name: a.displayName ?? null, last_seen: a.lastSeen ?? null, last_message_at: conv?.updatedAt ?? null, message_count: conv?.messageCount ?? 0 };
+      return { gaii: a.gaii, display_name: a.displayName ?? null, avatar: avatars.get(a.gaii) ?? null, last_seen: a.lastSeen ?? null, last_message_at: conv?.updatedAt ?? null, message_count: conv?.messageCount ?? 0 };
     })
     .sort((x, y) => (y.last_message_at ?? '').localeCompare(x.last_message_at ?? ''));
   return { organisms, workspaces, agents };

@@ -1,6 +1,18 @@
 {
   "about": "Every file under src/ that calls a storage method loading content (memory, files, workspace rows), how many calls of each, and why. The reads either pass the classification reader (services/classification/, TARGET-082) or are the node's own. pnpm check:classification-reach fails on a new file, a count that grew, and a line that is stale; --shrink lowers the counts that fell. Reasoning: aimeat/scripts/check-classification-reach.ts.",
   "files": {
+    "src/routes/agents/avatar.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-19, the node's own read: the agent's agent.avatar record, read before the owner's DELETE to tell the change stream what visibility it had. Nothing is shown from it."
+    },
+    "src/services/agent-avatar.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
+    },
     "src/commerce/agent-order-intake.ts": {
       "reads": {
         "getMemory": 2

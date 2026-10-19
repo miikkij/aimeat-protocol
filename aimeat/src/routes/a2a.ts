@@ -43,6 +43,9 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   2026-10-19 — Every A2A card this router builds carries `iconUrl`, the absolute address of the
+ *     agent's avatar, when it has one (services/agent-avatar.ts). The directory rows have no picture
+ *     field and stay as they are.
  *   2026-10-15 — The header and the directory comment say the agent's identifier is public (derivable
  *     from the card's address); they said a stranger never learns a GAII (feature-list audit #83).
  *   v1.4.0 — 2026-10-06 — The account road builds its caller with callerOf (middleware/caller.ts), so
@@ -74,6 +77,8 @@ import type { A2ACaller } from '../services/a2a-handler.js';
 import { ForeignA2AHandler } from '../services/a2a-foreign-handler.js';
 import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a-foreign.js';
 import { offeringsForAgent, publishedAgentOfferings } from '../services/a2a-offering.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { logger } from '../utils/logger.js';
 
 /** The address this node publishes for one agent's A2A interface. */
 function interfaceUrl(config: AimeatConfig, owner: string, agentName: string): string {
@@ -90,6 +95,12 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
     const name = req.params.agent as string;
     if (!owner || !name) return null;
     return storage.getAgent(buildGAII(name, owner, config.nodeId));
+  }
+
+  /** The absolute address of the agent's avatar for the card's `iconUrl`, or undefined when it has none. */
+  async function iconUrlFor(agent: AgentRecord): Promise<string | undefined> {
+    const avatar = (await readAvatarsOrEmpty(storage, [agent.gaii], logger.warn.bind(logger), 'A2A agent card')).get(agent.gaii);
+    return avatar ? `${config.baseUrl.replace(/\/+$/, '')}${avatar.url}` : undefined;
   }
 
   // ── The card. Public, like the AIMEAT card it is a second view of. ──
@@ -175,7 +186,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const offerings = await offeringsForAgent(storage, agent);
-    const card = a2aCardFor(config, agent, interfaceUrl(config, agent.owner, agent.name), { offerings });
+    const card = a2aCardFor(config, agent, interfaceUrl(config, agent.owner, agent.name), { offerings, iconUrl: await iconUrlFor(agent) });
     // The SDK's handler owns the ETag, Cache-Control and 304, which is the part of serving a card
     // that is easy to get subtly wrong.
     return agentCardHandler({ agentCardProvider: async () => card })(req, res, next);
@@ -249,7 +260,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
         // method behind it. The handler asks the same question requireScope asks, method by method.
         const caller: A2ACaller = who.auth;
         const offerings = await offeringsForAgent(storage, agent);
-        const card = a2aCardFor(config, agent, url, { offerings });
+        const card = a2aCardFor(config, agent, url, { offerings, iconUrl: await iconUrlFor(agent) });
         return serveRpc(new AimeatA2ARequestHandler(storage, config, agent, caller, card), req.auth!.sub)(req, res, next);
       });
     }
@@ -269,7 +280,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const offerings = await offeringsForAgent(storage, agent);
-    const card = a2aCardFor(config, agent, url, { offerings });
+    const card = a2aCardFor(config, agent, url, { offerings, iconUrl: await iconUrlFor(agent) });
     const handler = new ForeignA2AHandler(storage, config, agent, who.peer, card, {
       header: req.header('X-PAYMENT') ?? undefined,
     });

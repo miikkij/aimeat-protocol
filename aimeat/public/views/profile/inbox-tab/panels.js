@@ -7,6 +7,7 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.18.0 — 2026-10-19 — The thread head shows an agent peer's own avatar in the identicon's place when it has one (`peerAvatar`, AgentAvatar).
  *   v2.17.0 — 2026-10-17 — A message's side follows who sent it: mine (myself, or my agent in my name) on
  *     the right, my agent's own message on the left under its name. A conversation my agent takes part
  *     in is answerable: the head says the agent takes part, and the composer, Reply with AI, quoting and
@@ -96,6 +97,7 @@ import { Meter, Tinted } from '/components/Figure.js';
 import { KebabMenu } from '../shared.js';
 import { MessageBubble, CommandBar, CommandFill, SchedulePanel, PollBuilder } from './components.js';
 import { ThreadReadAloud } from './read-aloud.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, dayKey, dayLabel, trackStateLabel, trackStatusTone, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
 
 export function ThreadPanel({
@@ -104,9 +106,11 @@ export function ThreadPanel({
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, onDeleteMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
-  threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds, archiveItem,
+  threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds, archiveItem, peerAvatar,
 }) {
   let lastDay = '';
+  // An agent peer with its own avatar: the head shows it in the identicon's place (PaneHead `before`).
+  const peerAv = avatarOf(peerAvatar?.(activeConv.peerGhii));
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
   // outside the page just renders without a quote). The sender label distinguishes you vs the peer.
   const msgById = {};
@@ -142,7 +146,7 @@ export function ThreadPanel({
     ? ` · ${t('inbox.groupParticipants', { count: String(activeConv.participants.length) })}` : ''}`;
   return html`
     <${Pane}>
-      <${PaneHead} picture=${activeConv.peerGhii} name=${peerDisplay(activeConv.peerGhii)} nameTitle=${activeConv.peerGhii}
+      <${PaneHead} picture=${peerAv ? null : activeConv.peerGhii} before=${peerAv ? html`<${AgentAvatar} avatar=${peerAv} />` : null} name=${peerDisplay(activeConv.peerGhii)} nameTitle=${activeConv.peerGhii}
         presence=${activeConv.groupAlias ? null : activeConv.peerGhii}
         subject=${activeConv.subject || null}
         via=${viaAgentName ? t('inbox.agentTakesPart', { agent: viaAgentName }) : null}

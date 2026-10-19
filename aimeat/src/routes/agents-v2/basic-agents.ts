@@ -36,6 +36,7 @@
  * @structure registerBasicAgentsRoutes(router, config, storage)
  * @usage registerBasicAgentsRoutes(router, config, storage);
  * @version-history
+ *   2026-10-19 — The GET gives each basic agent that exists as an agent record its `avatar`, null otherwise, read in services/basic-agents.ts so aimeat_agent_basics_get answers it too.
  *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — A basic agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-15 — Each basic agent runs pre_agent_registration (a refused one is skipped and named) and post_agent_registration (feature-list audit 89).
@@ -98,6 +99,7 @@ export function registerBasicAgentsRoutes(router: Router, config: AimeatConfig, 
         'This is for the account holder and their own agents. An app cannot read how your agents are set up.'));
       return;
     }
+    // Each agent's `avatar` comes from the service, so aimeat_agent_basics_get answers it too.
     const view = await describeBasicAgents(config, storage, req.auth!.owner);
     res.json(success(config.nodeId, view, [
       { description: 'The owner presses this on their Agents page', method: 'GET', url: '/v1/profile?tab=agents' },

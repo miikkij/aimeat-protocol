@@ -15,6 +15,7 @@
  *                            agents.config.{name}.* memory keys).
  *   v1.2.0 -- 2026-10-11 -- price_offer passes on a money price or a pacing amount (tollMorsels), not
  *                            only the old morsel `price` (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
+ *   v1.3.0 -- 2026-10-19 -- set_avatar (optional, automatic): passes when agent.avatar can be shown.
  */
 
 import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
@@ -23,6 +24,7 @@ import { STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { bufferedTelemetryCount } from './telemetry-buffer.js';
+import { AVATAR_KEY, readAvatar } from './agent-avatar.js';
 
 export interface StepValidationResult {
   passed: boolean;
@@ -70,6 +72,8 @@ export async function validateStep(
       return validateMakeWorkflowCompatible(agentGaii, storage);
     case 'price_offer':
       return validatePriceOffer(agentGaii, storage);
+    case 'set_avatar':
+      return validateSetAvatar(agentGaii, storage);
     default:
       return { passed: false, validationMethod: 'automatic', failureReason: `Unknown step: ${stepId}` };
   }
@@ -363,6 +367,25 @@ async function validatePriceOffer(agentGaii: string, storage: Storage): Promise<
   };
 }
 
+/**
+ * set_avatar (optional) — passes when the agent's own `agent.avatar` record holds an emoji or an SVG
+ * the node can show (services/agent-avatar.ts). A record that is there and cannot be shown fails with
+ * the reason, so the agent learns what to fix rather than that it is missing.
+ */
+async function validateSetAvatar(agentGaii: string, storage: Storage): Promise<StepValidationResult> {
+  const { record, parsed } = await readAvatar(storage, agentGaii);
+  const ok = !!parsed && parsed.ok;
+  return {
+    passed: ok,
+    validationMethod: 'automatic',
+    details: { key: AVATAR_KEY, kind: parsed && parsed.ok ? parsed.kind : null, version: record?.version ?? null },
+    failureReason: ok ? undefined
+      : parsed && !parsed.ok
+        ? `${AVATAR_KEY} cannot be shown: ${parsed.problem}`
+        : `Write your picture to ${AVATAR_KEY}: { "emoji": "🦊" } or { "svg": "<svg…>" } (at most 256 kB, animation allowed). Optional — the built-in skill agent-avatar has templates.`,
+  };
+}
+
 function validateDeclareServices(body?: Record<string, unknown>): StepValidationResult {
   const schema = STEP_SCHEMAS.declare_services!;
   const result = schema.safeParse(body ?? { services: [] });
@@ -388,6 +411,8 @@ export async function checkAutoSteps(
     // Offers ladder — auto-tick the moment the agent publishes a matching offer (so just writing
     // agents.{name}.offers ticks the step; no separate confirm call needed). Optional → never blocks.
     'declare_offerings', 'make_workflow_compatible', 'price_offer',
+    // The agent's picture: ticks the moment agent.avatar holds something that can be shown.
+    'set_avatar',
   ];
 
   const updatedSteps = [...onboarding.steps];

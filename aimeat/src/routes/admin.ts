@@ -11,6 +11,7 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-19 — GET /v1/admin/owners gives every listed agent its `avatar` (services/agent-avatar.ts), one batched read for all owners' agents.
  *   2026-10-16 — The dashboard's checkout counts, money volume and platform-fee receivable read every
  *     record under their prefix (storage/memory-pages.ts), not the first 2000 in key order (QA audit S8-10).
  *   2026-10-16 — Setup's owner row, profile row and welcome bonus are written in one transaction, and
@@ -86,6 +87,7 @@ import { isOperatorAccount } from '../utils/operator-account.js';
 import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../services/admin-setup-secret.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { listAllMemoryPages } from '../storage/memory-pages.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -588,6 +590,7 @@ export function adminRouter(
     router.get('/v1/admin/owners', requireAuth(), requireOperator(storage), async (_req, res) => {
         const owners = await storage.listOwners();
         const agentsByOwner = await storage.getAgentsByOwners(owners.map(o => o.name));
+        const avatars = await readAvatarsOrEmpty(storage, Object.values(agentsByOwner).flat().map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/admin/owners');
         const result = owners.map(o => ({
             name: o.name,
             // `?? null` like disabled_at and managed_by below: without it the key vanishes from the
@@ -595,7 +598,7 @@ export function adminRouter(
             // row and cannot tell "no display name" from "this node does not serve the field".
             display_name: o.displayName ?? null,
             roles: o.roles,
-            agents: (agentsByOwner[o.name] ?? []).map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
+            agents: (agentsByOwner[o.name] ?? []).map(a => ({ gaii: a.gaii, display_name: a.displayName, avatar: avatars.get(a.gaii) ?? null, trust_score: a.trustScore })),
             created_at: o.createdAt,
             disabled_at: o.disabledAt ?? null,
             disabled_by: o.disabledBy ?? null,

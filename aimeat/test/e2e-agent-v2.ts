@@ -19,6 +19,7 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   2026-10-19 — The public card's field list allows `avatar` and `avatar_problem`: the agent's picture is public by design.
  *   2026-10-15 — The approval's llm_choice carries the policy warning for a pinned model the owner's
  *     policy leaves out (feature-list audit #82).
  *   v1.5.0 — 2026-10-08 — Section 12: an agent approved with no connector connected waits, a
@@ -1912,7 +1913,9 @@ async function run() {
                 const theirs = `concierge#${two.owner}@${NODE_ID}`;
                 const r = await json(`/v1/agents/${encodeURIComponent(theirs)}`, { headers: auth1 });
                 assert(r.status === 200, `the public card should be readable, got ${r.status}`);
-                const allowed = new Set(['gaii', 'display_name', 'description', 'capabilities', 'trust',
+                // `avatar` (and `avatar_problem`) joined on 2026-10-19: the agent's picture is directory
+                // material by design, public like the description (services/agent-avatar.ts).
+                const allowed = new Set(['gaii', 'display_name', 'avatar', 'avatar_problem', 'description', 'capabilities', 'trust',
                     'actions_published', 'tags', 'federate', 'home_node', 'created_at', 'last_seen']);
                 const extra = Object.keys(r.body.data).filter(k => !allowed.has(k));
                 assert(extra.length === 0, `the public card grew a field: ${JSON.stringify(extra)}`);

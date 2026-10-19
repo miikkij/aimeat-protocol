@@ -23,6 +23,7 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.7.0 — 2026-10-19 — The page's title shows the agent's own picture (components/AgentAvatar.js) before its name, when the agent has set one.
  *   v1.6.0 — 2026-10-18 — "What it reaches" says, under the areas, when the agent may invite people
  *     and an invitation can create an account (organism:invite; wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   v1.5.1 — 2026-10-11 — The page opens the live stream itself (lib/live-updates.js
@@ -68,6 +69,7 @@ import { Action, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { PageSection } from '/components/PageSection.js';
 import { LineList } from '/components/LineList.js';
+import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { listTasks, createTask } from '/js/services/agent-tasks.js';
 import { readHomeAgents, moveAgent, setAgentStopped } from '/js/services/agent-draft.js';
 import { machineName, whenWords, stateWords } from '/views/home/agents-band.js';
@@ -226,11 +228,13 @@ export default function AgentView({ navigate }) {
         ${worker.connector.online ? tr('home.agents.connected', 'Connected') : p('notConnected', 'Not connected')}
       <//>`
     : p('noMachineYet', 'No computer has taken it on yet.');
+  // The agent's picture for the title: /v1/home/agents carries it, GET /v1/agents as well.
+  const pic = avatarOf(worker) ?? avatarOf(record);
 
   return html`
     <${PageFrame} width="narrow">
       ${back}
-      <${PageIntro} title=${worker.display_name || name} sub=${worker.description || ''} />
+      <${PageIntro} title=${pic ? html`<${AgentAvatar} avatar=${pic} />${worker.display_name || name}` : (worker.display_name || name)} sub=${worker.description || ''} />
 
       ${startedNote && html`<${Note} kind="message">${startedNote}<//>`}
       ${startedAs && startedAs !== 'made' && html`<${Note} kind="quiet">${p('firstRun', 'It does its work once now, so you see that it works. The result comes to Latest work.')}<//>`}

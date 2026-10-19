@@ -9,6 +9,7 @@
  * @structure KIT_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { KIT_DEMOS } from './demos-kit.js';
  * @version-history
+ *   v1.4.0 — 2026-10-19 — The AgentAvatar demos, their own entry: a picture (an SVG as a data: URL) at both sizes, an emoji without its address, and the stand-in.
  *   v1.3.0 — 2026-10-18 — The figure strip's stacked cut.
  *   v1.2.0 — 2026-09-27 — What the admin pages added: Loud quiet, SettingBox pre, Meter's tones, Result and a
  *     FigureStrip of buttons; the operator pages' parts in the operator's frame.
@@ -25,6 +26,7 @@ import { Mark, Marks, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Box, SettingBox, SettingRow, SettingConfirm, BoxList, BoxLine } from '/components/Box.js';
 import { Avatar } from '/components/Avatar.js';
+import { AgentAvatar } from '/components/AgentAvatar.js';
 import { Roads, Road } from '/components/Roads.js';
 import { Figure, Result, Sticker, Meter, Tinted } from '/components/Figure.js';
 import { Card, CardGrid } from '/components/Card.js';
@@ -40,6 +42,10 @@ const root = (children) => html`<${SettingsRoot}>${children}<//>`;
 const op = (title, part) => html`<${OperatorFrame} title=${title}>${part}<//>`;
 const PASTE = 'I run an AIMEAT node and I am its operator.\nRead its usage for the last 30 days.\nTell me which agent costs the most, and why.';
 const LONG = 'A name long enough to wrap onto a second line on a narrow phone screen, as Nordic Ferries\' names do';
+/** A sample SVG avatar, a circle face, as the `{ kind: 'svg', url }` an agent row carries. */
+const FACE = { kind: 'svg', url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+  + '<circle cx="16" cy="16" r="14" fill="#f2c94c" stroke="#222" stroke-width="2"/><circle cx="11" cy="13" r="2" fill="#222"/>'
+  + '<circle cx="21" cy="13" r="2" fill="#222"/><path d="M10 20q6 5 12 0" fill="none" stroke="#222" stroke-width="2"/></svg>') };
 const REQUEST = 'Read the skill aimeat-writing with aimeat_skill_get, then rewrite the About text of Lumo Bakery in plain words.';
 
 export const KIT_DEMOS = {
@@ -176,6 +182,11 @@ export const KIT_DEMOS = {
     { name: 'identicon', render: () => root(html`<p><${Avatar} seed="sandbox@aimeat-local-001-dev" /> <${Avatar} seed="bot#sandbox@aimeat-local-001-dev" size="small" /></p>`) },
     { name: 'sizes', render: () => root(html`<p><${Avatar} text="HS" size="small" /> <${Avatar} text="HS" /> <${Avatar} text="PDF" size="large" label="PDF" /></p>`) },
     { name: 'empty', render: () => root(html`<p><${Avatar} text="" /></p>`) },
+  ] },
+  'agent-avatar': { variants: [
+    { name: 'picture', render: () => root(html`<p><${AgentAvatar} avatar=${FACE} text="B" /> <${AgentAvatar} avatar=${FACE} text="B" size="small" /></p>`) },
+    { name: 'emoji without its address', render: () => root(html`<p><${AgentAvatar} avatar=${{ kind: 'emoji', emoji: '🦊' }} text="B" /></p>`) },
+    { name: 'stand-in', render: () => root(html`<p><${AgentAvatar} avatar=${null} text="B" /></p>`) },
   ] },
   roads: { variants: [
     { name: 'two, wide, lead', render: () => root(html`<${Roads} wide>

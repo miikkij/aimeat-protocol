@@ -13,6 +13,7 @@
  *   A picture or an identicon fills the square.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-10-19 — An agent's picture stands on the line in a heading, and fits a participant chip.
  *   v1.0.0 — 2026-09-26 — Initial (component plan C3).
  */
 
@@ -20,3 +21,11 @@
 .avatar--small { width: 24px; height: 24px; }
 .avatar--large { width: 2.4rem; height: 2.4rem; }
 .avatar svg, .avatar img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* An agent's own picture before a heading's words (components/AgentAvatar.js): the open agent card,
+   the agent's home page and a record panel's title stand it on the same line as the name. */
+.open-card-title > .avatar, .poster-intro-title > .avatar, .poster-record-title > .avatar, .poster-line-name > .avatar {
+  display: inline-flex; vertical-align: middle; margin-right: .55rem;
+}
+/* In a participant chip the picture is the chip's text height, so the chip keeps its own. */
+.agent-chip > .avatar { width: 1rem; height: 1rem; }

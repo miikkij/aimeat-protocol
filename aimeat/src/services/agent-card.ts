@@ -30,6 +30,8 @@
  *   const read = readCardJws(jws);
  *   const ok = await verifyCardJws(jws, read.card.publicKey);
  * @version-history
+ *   v1.2.0 — 2026-10-19 — The public projection carries `iconUrl`, the absolute address of the agent's
+ *     avatar, when the caller passes one (services/agent-avatar.ts; the avatar is public by design).
  *   v1.1.0 — 2026-08-31 — The public projection and its signer. Two documents, two authors: the
  *     agent signs the full card, the node signs the public subset, and the two `kid`s are different
  *     keys saying different things on purpose.
@@ -163,6 +165,12 @@ export interface PublicAgentCard {
   cardUri: string;
   /** Where the key that signed THIS document is published, so the projection verifies on its own. */
   nodeKeyUri: string;
+  /**
+   * The absolute address of the agent's avatar (GET /v1/agents/:gaii/avatar.svg), absent when it has
+   * none. Not part of the agent's own signed card: the node reads it from the `agent.avatar` record,
+   * which is public by design (services/agent-avatar.ts), as the A2A card's field of the same name.
+   */
+  iconUrl?: string;
   issuedAt: string;
 }
 
@@ -175,7 +183,7 @@ export interface PublicAgentCard {
  * so every skill an agent declares is public; when that mechanism exists, this is the line it
  * changes and nothing else has to move.
  */
-export function publicCardProjection(card: AgentCard, nodeKeyUri: string): PublicAgentCard {
+export function publicCardProjection(card: AgentCard, nodeKeyUri: string, iconUrl?: string): PublicAgentCard {
   return {
     spec: AGENT_CARD_PUBLIC_SPEC,
     gaii: card.gaii,
@@ -191,6 +199,7 @@ export function publicCardProjection(card: AgentCard, nodeKeyUri: string): Publi
     jwksUri: card.jwksUri,
     cardUri: card.cardUri,
     nodeKeyUri,
+    ...(iconUrl ? { iconUrl } : {}),
     issuedAt: card.issuedAt,
   };
 }

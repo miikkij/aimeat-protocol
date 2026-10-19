@@ -19,6 +19,7 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.7.0 — 2026-10-19 — An avatar part previews as its picture at three sizes (avatar.ts).
  *   v1.6.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.6.0 — 2026-10-01 — A part with a block that draws markdown (doc, aiTask) loads
  *     aimeat-markdown.js before the kit, so its sample renders as it does in an app instead of
@@ -55,6 +56,7 @@ import { effectById } from '../../data/atelier-effects.js';
 import { LOOKS } from '../../data/atelier-looks.js';
 import type { DesignBookPart } from './service.js';
 import { componentPreviewHtml, type ComponentBody } from './component.js';
+import { avatarPreviewHtml } from './avatar.js';
 import { lookStage, layerStage, wornStage, lookForShape } from './preview-stages.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 
@@ -350,6 +352,8 @@ function illustrationPageHtml(part: DesignBookPart): string {
  */
 export function partPreviewHtml(part: DesignBookPart, opts: { theme?: 'light' | 'dark' } = {}): string | null {
   if (part.kind === 'illustration') return illustrationPageHtml(part);
+  // An avatar is shown as the node shows avatars: an <img> at three sizes (avatar.ts).
+  if (part.kind === 'avatar') return avatarPreviewHtml(part);
   // A component wears the page it lands in, so its preview is asked for in the reader's theme.
   // The bench keeps measuring the light page (renderableBodyFor), which is what its stamp says.
   if (part.kind === 'component' && opts.theme) return componentPreviewHtml(part.body as unknown as ComponentBody, opts.theme);

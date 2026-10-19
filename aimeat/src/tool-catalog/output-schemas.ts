@@ -11,6 +11,8 @@
  *   import { memoryEntryOutput } from './output-schemas.js';
  *   mcp.registerTool('aimeat_memory_read', { description, inputSchema, outputSchema: memoryEntryOutput, annotations }, handler)
  * @version-history
+ *   v1.3.0 -- 2026-10-19 -- agentProfileOutput declares `avatar` (nullable, loose) and `avatar_problem`
+ *     (services/agent-avatar.ts), or the schema would strip them. agentsListOutput rows are loose already.
  *   v1.2.0 -- 2026-09-29 -- memoryEntryOutput declares classification_warning (TARGET-082 V4), or the
  *     schema would strip it.
  *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 4: aiProvenanceOutput, declared here because an
@@ -87,6 +89,10 @@ export const agentsListOutput = {
 export const agentProfileOutput = {
     gaii: z.string(),
     display_name: z.string().optional(),
+    /** The agent's picture (services/agent-avatar.ts AvatarView), null when it has none. Loose on purpose. */
+    avatar: looseRecord.nullable().optional(),
+    /** Why a stored `agent.avatar` record cannot be shown; absent when there is none or it is fine. */
+    avatar_problem: z.string().optional(),
     description: z.string().optional(),
     capabilities: z.array(z.string()).optional(),
     trust_score: z.number().optional(),

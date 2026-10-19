@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-19 — `avatar` on GET /v1/agents and GET /v1/agents/:gaii (services/agent-avatar.ts), and
+ *     `avatar_problem` on the profile when the agent's record cannot be shown.
  *   2026-10-18 — GET /v1/agents answers `invites_people` per agent: true when its permissions cover organism:invite (services/agent-invites.ts; wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-18 — GET /v1/agents carries each agent's `clearance` (plan doc-mvdipuyqraas L2).
  *   2026-10-15 — GET /v1/agents answers `refusals: null` and `refusals_unreadable: true` on every row
@@ -91,6 +93,7 @@ import { portRedirectFor } from '../../services/agent-port-redirect.js';
 import { agentInstalls } from '../../services/connector-registry.js';
 import { stoppedView } from '../../services/agent-stop-rules.js';
 import { invitesPeople } from '../../services/agent-invites.js';
+import { avatarView, readAvatar, readAvatarsOrEmpty } from '../../services/agent-avatar.js';
 
 /** HTTP status for a refusal from services/agent-profile-write.ts. */
 function agentWriteStatus(code: AgentWriteRefusal['code']): number {
@@ -134,9 +137,15 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     // Update cached trust score
     await storage.updateAgent(gaii, { trustScore: trust.score });
 
+    // The agent's picture (services/agent-avatar.ts). A record that is there and cannot be shown says
+    // why, so an agent that wrote its own avatar can read back what went wrong.
+    const avatar = await readAvatar(storage, gaii);
+
     res.json(success(config.nodeId, {
       gaii: agent.gaii,
       display_name: agent.displayName,
+      avatar: avatarView(gaii, avatar.record),
+      ...(avatar.parsed && !avatar.parsed.ok ? { avatar_problem: avatar.parsed.problem } : {}),
       description: agent.description,
       capabilities: agent.capabilities,
       trust: {
@@ -267,12 +276,16 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     }
 
     const useOf = await scopeUseLookup(storage, agents);
+    // Every agent's picture in one read; the list carries the emoji or the picture's address, never
+    // the SVG itself (services/agent-avatar.ts).
+    const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/agents');
     res.json(success(config.nodeId, {
       agents: agents.map(a => ({
         gaii: a.gaii,
         name: a.name,
         owner: a.owner,
         display_name: a.displayName,
+        avatar: avatars.get(a.gaii) ?? null,
         description: a.description,
         capabilities: a.capabilities,
         technical_capabilities: a.technicalCapabilities,

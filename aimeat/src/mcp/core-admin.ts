@@ -13,6 +13,7 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-19 — aimeat_admin_agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read, as GET /v1/admin/agents does.
  *   2026-10-15 — aimeat_admin_stats counts morsels in circulation with morselsInCirculation(), the function the admin dashboard uses: every account holder, with or without an agent (feature-list audit #169).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-29 — aimeat_admin_config reports the classification switch (classification_mode)
@@ -48,6 +49,7 @@ import { resolveOperatorAgentName, OPERATOR_AGENT_REFUSAL } from '../services/ow
 import { OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -126,8 +128,10 @@ export function registerCoreAdminTools(
                     ownerBalances.set(a.owner, ghii?.morselBalance ?? 0);
                 }
             }
+            const avatars = await readAvatarsOrEmpty(storage, subset.map(a => a.gaii), logger.warn.bind(logger), 'aimeat_admin_agents');
             const result = subset.map(a => ({
                 gaii: a.gaii, owner: a.owner, display_name: a.displayName,
+                avatar: avatars.get(a.gaii) ?? null,
                 trust_score: a.trustScore, morsel_balance: ownerBalances.get(a.owner) ?? 0,
                 last_seen: a.lastSeen, created_at: a.createdAt,
             }));

@@ -7,6 +7,7 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-19 — Each member's agents on GET /v1/organisms/:id/members carry `avatar` (services/agent-avatar.ts), one batched read for every listed agent.
  *   2026-10-15 — POST /:id/invitations/accept accepts only for the person in person (isOwnerPrincipal),
  *     as the emailed link does (feature-list audit #57). POST /:id/agents on an organism that admits only
  *     listed agents is the owner's or an admin's alone; a member no longer lists their own agent
@@ -55,6 +56,8 @@ import {
 import { agentAccessOf, agentBarred } from '../../services/organism-agent-access.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/members — List members ── */
@@ -101,11 +104,11 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerNames)]);
       // Where the organism admits only listed agents, the others have no access, so they are not
       // listed: the roster names who can act here, and a customer invited in reads it.
+      const admitted = ownerNames.map(o => (agentsByOwner[o] || []).filter(a => !agentBarred(organism, a.gaii)));
+      const avatars = await readAvatarsOrEmpty(storage, admitted.flat().map(a => a.gaii), logger.warn.bind(logger), 'GET /v1/organisms/:id/members');
       const enriched = members.map((m, i) => ({
         ...m,
-        agents: (agentsByOwner[ownerNames[i]] || [])
-          .filter(a => !agentBarred(organism, a.gaii))
-          .map(a => ({ gaii: a.gaii, name: a.name })),
+        agents: admitted[i].map(a => ({ gaii: a.gaii, name: a.name, avatar: avatars.get(a.gaii) ?? null })),
       }));
       res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true, agent_access: agentAccessOf(organism) }));
       return;

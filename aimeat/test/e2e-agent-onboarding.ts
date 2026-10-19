@@ -7,6 +7,8 @@
  *   progress tracking, DELETE cancellation, role enforcement, full 11-step
  *   completion flow, readiness score verification, and auto-check on GET.
  * @version-history
+ *   v1.4.0 -- 2026-10-19 -- set_avatar, an optional step in every flow: 17 steps in the full flow,
+ *                            8 for a task-runner, 5 for a workstation; optional_total 5.
  *   v1.3.1 -- 2026-10-13 -- The offer written through POST /v1/memory carries tollMorsels: from 4.0.0
  *                            that route refuses price.morsels on an offers document.
  *   v1.3.0 -- 2026-09-16 -- 47b: two starts at once. The nightly sweep on Postgres answered
@@ -151,7 +153,7 @@ console.log('\nPhase 2 -- Start Onboarding');
 
 let testTaskId = '';
 
-await test('2. POST start returns in_progress with 16 steps', async () => {
+await test('2. POST start returns in_progress with 17 steps', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -159,7 +161,7 @@ await test('2. POST start returns in_progress with 16 steps', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
     assert(ob.status === 'in_progress', `expected in_progress, got ${ob.status}`);
-    assert(ob.steps.length === 16, `expected 16 steps, got ${ob.steps.length}`);
+    assert(ob.steps.length === 17, `expected 17 steps, got ${ob.steps.length}`);
 
     // First step (authenticate) should already be passed
     const authStep = ob.steps[0];
@@ -278,7 +280,7 @@ await test('3b. GET enriches steps with descriptionText + howTo and returns step
 
     // summary reachability: gates only on the 12 required steps.
     assert(data.summary.required_total === 12, `required_total ${data.summary.required_total} != 12`);
-    assert(data.summary.optional_total === 4, `optional_total ${data.summary.optional_total} != 4`);
+    assert(data.summary.optional_total === 5, `optional_total ${data.summary.optional_total} != 5`);
     assert(data.summary.completable === false, 'should not be completable yet (required steps pending)');
     assert(typeof data.summary.next_required_step === 'string', 'next_required_step should be a not-passed required id');
     assert(data.hints.next_step === data.summary.next_required_step, 'hints.next_step should mirror summary.next_required_step');
@@ -510,7 +512,7 @@ await test('14. POST start to get a fresh onboarding with test task', async () =
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const ob = body.data.onboarding;
     assert(ob.status === 'in_progress', `expected in_progress, got ${ob.status}`);
-    assert(ob.steps.length === 16, `expected 16 steps, got ${ob.steps.length}`);
+    assert(ob.steps.length === 17, `expected 17 steps, got ${ob.steps.length}`);
 
     // Extract the test task ID from step 9 (accept_test_task)
     const taskStep = ob.steps.find((s: any) => s.id === 'accept_test_task');
@@ -812,8 +814,9 @@ await test('26. GET onboarding shows completed status after all steps', async ()
     const ob = body.data.onboarding;
     assert(ob.status === 'completed', `expected completed, got ${ob.status}`);
 
-    // All 16 steps should be passed: 12 required + optional declare_services (test 24) + the three
-    // offers-ladder steps (test 7b published a level-3 offer for this agent, which persists).
+    // 16 of the 17 steps should be passed: 12 required + optional declare_services (test 24) + the
+    // three offers-ladder steps (test 7b published a level-3 offer for this agent, which persists).
+    // The optional set_avatar step was never done here, so it is skipped at completion.
     const passedSteps = ob.steps.filter((s: any) => s.status === 'passed');
     assert(passedSteps.length === 16, `expected 16 passed steps, got ${passedSteps.length}`);
 
@@ -1249,16 +1252,16 @@ await test('39. Task-runner mode is persisted across reads', async () => {
     assert(runner.mode === 'task-runner', `expected mode=task-runner, got ${runner.mode}`);
 });
 
-await test('40. Task-runner onboarding has exactly 7 steps (reduced flow with test-task pair)', async () => {
+await test('40. Task-runner onboarding has exactly 8 steps (reduced flow with test-task pair, and the optional avatar)', async () => {
     const { status, body } = await json(`/v1/agents/${runnerName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const steps = body.data.onboarding.steps;
-    assert(steps.length === 7, `expected 7 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
+    assert(steps.length === 8, `expected 8 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
 
-    const expectedIds = ['authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'accept_test_task', 'complete_test_task', 'publish_config'];
+    const expectedIds = ['authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'accept_test_task', 'complete_test_task', 'publish_config', 'set_avatar'];
     for (const id of expectedIds) {
         assert(steps.find((s: any) => s.id === id), `missing expected step: ${id}`);
     }
@@ -1464,16 +1467,16 @@ await test('43. Workstation mode is persisted across reads', async () => {
     assert(ws.mode === 'workstation', `expected mode=workstation, got ${ws.mode}`);
 });
 
-await test('44. Workstation onboarding has exactly 4 steps (node-resident steps omitted)', async () => {
+await test('44. Workstation onboarding has exactly 5 steps (node-resident steps omitted, the avatar optional)', async () => {
     const { status, body } = await json(`/v1/agents/${wsName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     const steps = body.data.onboarding.steps;
-    assert(steps.length === 4, `expected 4 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
+    assert(steps.length === 5, `expected 5 steps, got ${steps.length} (${steps.map((s: any) => s.id).join(',')})`);
 
-    const expectedIds = ['authenticate', 'identify_platform', 'report_capabilities', 'read_directives'];
+    const expectedIds = ['authenticate', 'identify_platform', 'report_capabilities', 'read_directives', 'set_avatar'];
     for (const id of expectedIds) {
         assert(steps.find((s: any) => s.id === id), `missing expected step: ${id}`);
     }
@@ -1506,7 +1509,7 @@ await test('45. Workstation onboarding stays in_progress until capabilities repo
     assert(capStep?.status === 'pending', `report_capabilities should be pending, got ${capStep?.status}`);
 });
 
-await test('46. Workstation onboarding completes once all 4 steps pass (happy path)', async () => {
+await test('46. Workstation onboarding completes once all 4 required steps pass (happy path)', async () => {
     // report_capabilities auto-validates once capabilities exist.
     const { status: capStatus } = await json(`/v1/agents/${wsName}/capabilities`, {
         method: 'PUT',
@@ -1588,7 +1591,7 @@ await test('48. Reporting a workstation platform switches the mode and drops the
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.mode_set_to === 'workstation', `expected mode_set_to=workstation, got ${body.data.mode_set_to}`);
-    assert(body.data.total === 4, `expected the 4-step workstation flow, got total=${body.data.total}`);
+    assert(body.data.total === 5, `expected the 5-step workstation flow, got total=${body.data.total}`);
     assert(typeof body.data.mode_note === 'string' && body.data.mode_note.length > 0,
         'a mode change must be explained, not just applied');
 
@@ -1702,13 +1705,14 @@ await test('Self-tag rejects an invalid tag (failure mode)', async () => {
 // aimeat_onboarding_* tool names. These guards fail CI if a rename drifts the contract.
 console.log('\nPhase 11 -- Contract Freeze');
 
-await test('CF1. ONBOARDING_STEP_IDS is the frozen 16-id list in order', async () => {
+await test('CF1. ONBOARDING_STEP_IDS is the frozen 17-id list in order', async () => {
     const expected = [
         'authenticate', 'identify_platform', 'install_skill', 'report_capabilities', 'read_directives',
         'send_test_message', 'configure_delivery', 'report_telemetry', 'accept_test_task', 'complete_test_task',
         'publish_commands', 'publish_config', 'declare_services', 'declare_offerings', 'make_workflow_compatible', 'price_offer',
+        'set_avatar',
     ];
-    assert(ONBOARDING_STEP_IDS.length === 16, `expected 16 step ids, got ${ONBOARDING_STEP_IDS.length}`);
+    assert(ONBOARDING_STEP_IDS.length === 17, `expected 17 step ids, got ${ONBOARDING_STEP_IDS.length}`);
     expected.forEach((id, i) => assert(ONBOARDING_STEP_IDS[i] === id, `step id drift at ${i}: expected ${id}, got ${ONBOARDING_STEP_IDS[i]}`));
 });
 

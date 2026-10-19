@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-19 — manage-my-agents: an agent's picture (`avatar` on aimeat_agents_list and
+ *     aimeat_agent_profile, agent.avatar, the owner's PUT/DELETE .../avatar).
  *   2026-10-18 — manage-my-agents: the node narrows an agent holding all permissions by itself after two
  *     weeks of record, instead of holding its tasks, and the owner hears of every new refusal in the
  *     bell and by email (services/scope-auto-narrow.ts, services/permission-ask-notice.ts).
@@ -267,6 +269,9 @@ flowchart LR
   sentence what you asked to make public and give them the \`approve_url\` from the answer;
   \`aimeat_publish_requests\` lists the requests and their state.
 - **Inspect one:** \`aimeat_agent_profile\` — capabilities, trust, linked skills; pass the agent's GAII.
+- **An agent's picture:** both tools answer \`avatar\` (its emoji, or the address of its SVG picture),
+  null when it has none. An agent sets its own with \`aimeat_memory_write\` at \`agent.avatar\` (skill
+  \`agent-avatar\`); the owner may set or remove one with PUT and DELETE \`/v1/agents/<name>/avatar\`.
 - **Onboarding state:** \`aimeat_onboarding_status\` — which Hello-Integration steps remain. It
   reports the calling agent's own onboarding only.
 - **Give an agent expertise:** browse \`aimeat_skill_list\` (view "library"), then

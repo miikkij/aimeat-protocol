@@ -11,6 +11,7 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-19 -- e2e-agent-avatar.ts joins the list (not the guard tier): an agent's own picture at agent.avatar.
  *   2026-10-18 -- e2e-exposure-conflicts.ts joins the list (not the guard tier): the conflicts in what others can see (plan doc-mvdipuyqraas, L4.1).
  *   2026-10-18 -- e2e-classification-defaults.ts joins the list (not the guard tier): the default audience caps a new node takes and a running node is offered (plan doc-mvdipuyqraas, L5). Its own node on 40492.
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
@@ -876,6 +877,9 @@ const ALL_SUITES = [
     'test/e2e-classification-containers.ts',
     // An agent's clearance: what ranks above it is hidden on every read, and who may set it (plan doc-mvdipuyqraas, L2).
     'test/e2e-classification-clearance.ts',
+    // An agent's own picture at agent.avatar: the list and profile field, the picture address, what is
+    // refused, who may set it, the onboarding step and the Design Book templates.
+    'test/e2e-agent-avatar.ts',
     // A label's audience cap: the refusal at every kind of place that sets who may read, the owner's
     // override with a reason, the publish request held to it again, a rise that lowers (plan doc-mvdipuyqraas, L3).
     'test/e2e-classification-audience-cap.ts',

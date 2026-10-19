@@ -15,6 +15,7 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.12.0 -- 2026-10-19 -- peerAvatar(id): an agent peer's own avatar, from the owner's agents and the profile reads the name lookup already makes (no extra request), passed to the list and the thread.
  *   v2.11.0 -- 2026-10-17 -- A conversation my agent takes part in is marked read like any other: it is mine to answer.
  *   v2.10.0 -- 2026-10-08 -- A suggested reply sent as it stands carries the draft's provenance record (aiprov D17).
  *   v2.9.1 -- 2026-09-26 -- The head's ways on are the action link's Settings family, as main's og-door and og-door--quiet (Jouni's decision "Action link in Settings"): Broadcast small; Tracked responses (small until one waits), Results and List rules small soft.
@@ -223,6 +224,7 @@ export default function InboxTab({ showToast }) {
   const [nbConv, setNbConv] = useState(null);             // { title, promptText, runServerSummary, parkConversation } — Conversation → Notebook popover
   const [peerNames, setPeerNames] = useState({});         // id (GHII/GAII or owner@node) → resolved display name
   const peerNamesRef = useRef({});                        // dedup bookkeeping: an id present here was already looked up
+  const [peerAvatars, setPeerAvatars] = useState({});     // agent GAII → its `avatar` from a profile read (agents only)
   const [composeSubject, setComposeSubject] = useState(''); // optional subject → opens a new topic thread
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
@@ -296,6 +298,7 @@ export default function InboxTab({ showToast }) {
       peerNamesRef.current = { ...d.peerNames, ...peerNamesRef.current };
       setPeerNames({ ...peerNamesRef.current });
     }
+    if (d.peerAvatars && typeof d.peerAvatars === 'object') setPeerAvatars(p => ({ ...d.peerAvatars, ...p }));
     setRequests(d.requests || []);
     setConversations(d.conversations || []);
     setImportant(new Set(d.important || []));
@@ -520,7 +523,12 @@ export default function InboxTab({ showToast }) {
       const r = await apiGet(path).catch(err => { swallowed('inbox-tab: openConversation', err); return null; });
       const dn = String(r?.data?.display_name || '').trim();
       if (dn) peerNamesRef.current[id] = dn;
-    })).then(() => setPeerNames({ ...peerNamesRef.current }));
+      return r?.data?.avatar ? [id, r.data.avatar] : null;
+    })).then((found) => {
+      setPeerNames({ ...peerNamesRef.current });
+      const avatars = Object.fromEntries(found.filter(Boolean));
+      if (Object.keys(avatars).length) setPeerAvatars(p => ({ ...p, ...avatars }));
+    });
   }, []);
   // Resolve names for every peer currently on screen (conversation peers + their owners + requests + open thread).
   useEffect(() => {
@@ -536,6 +544,9 @@ export default function InboxTab({ showToast }) {
   }, [conversations, requests, activeConv, resolvePeerNames]);
   // "Display name (handle)" for an id, falling back to the bare handle when we have no display name.
   const peerDisplay = (id) => peerLabel(id, peerNames[id]);
+  // An agent peer's own avatar, or null (a person, or an agent without one): the owner's own agents
+  // carry it in their list, another owner's agent in the profile read above.
+  const peerAvatar = (id) => (String(id || '').includes('#') ? (peerAvatars[id] || myAgents.find(a => a.gaii === id)?.avatar || null) : null);
 
   // Thread-head AI actions — Reply with AI (TARGET-031) and Conversation → Notebook (summarize the whole
   // thread + images, park it for filing/enrichment). Config assembly lives in ./inbox-tab/ai-actions.js.
@@ -754,7 +765,7 @@ export default function InboxTab({ showToast }) {
         ${mode === 'organize' ? html`<${OrganizePage} org=${org} showToast=${showToast} />` : null}` : html`
       <${Panes} open=${mode !== 'idle'} backLabel=${t('inbox.back')} onBack=${goIdle}
         side=${html`<${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
-          peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation}
+          peerDisplay=${peerDisplay} peerAvatar=${peerAvatar} accept=${accept} block=${block} openConversation=${openConversation}
           openFolds=${openFolds} toggleFold=${toggleFold} org=${org} />`}>
         ${mode === 'compose' ? html`
           <${Pane}>
@@ -772,7 +783,7 @@ export default function InboxTab({ showToast }) {
           activeConv=${activeConv} thread=${thread} urlMap=${urlMap} important=${important} trackedByMsg=${trackedByMsg}
           awaitingForConv=${awaitingForConv} awaitingDrafts=${awaitingDrafts} schedOpen=${schedOpen} setSchedOpen=${setSchedOpen}
           cmdFill=${cmdFill} agentCommands=${agentCommands} sending=${sending} draftPrefill=${draftPrefill} prefillNonce=${prefillNonce}
-          msgsRef=${msgsRef} peerDisplay=${peerDisplay} showToast=${showToast} toggleImportant=${toggleImportant}
+          msgsRef=${msgsRef} peerDisplay=${peerDisplay} peerAvatar=${peerAvatar} showToast=${showToast} toggleImportant=${toggleImportant}
           replyQuote=${replyQuote} setReplyQuote=${setReplyQuote} onQuoteReply=${startQuoteReply} composerFocus=${composerFocus}
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} onDeleteMsg=${onDeleteMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}

@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-19 — aimeat_agent_profile and aimeat_agents_list carry `avatar` (and the profile `avatar_problem`), as GET /v1/agents/:gaii and GET /v1/agents do (services/agent-avatar.ts).
  *   2026-10-18 — aimeat_agents_list answers `invites_people` per agent, as GET /v1/agents does (services/agent-invites.ts).
  *   2026-10-18 — aimeat_memory_write without a visibility takes visibility.memory_default (plan V5.1).
  *   2026-10-18 — aimeat_memory_write asks the publish gate: a public write without publish:public is
@@ -201,6 +202,7 @@ import { presentWorkCost } from '../services/morsel.js';
 import { presentActionPricing } from '../services/action-pacing.js';
 import { memoryVisibilityDefault } from '../services/content-defaults.js';
 import { invitesPeople } from '../services/agent-invites.js';
+import { avatarView, readAvatar, readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -356,9 +358,12 @@ export function registerCoreTools(
                 const links = await getAgentSkillLinks(storage, config, agent.owner, agent.name);
                 skills = links.map(l => ({ ref: l.ref, name: l.name, description: l.description }));
             }
+            const avatar = await readAvatar(storage, agent.gaii);
             return structuredResult('aimeat_agent_profile', undefined, {
                 gaii: agent.gaii,
                 display_name: agent.displayName,
+                avatar: avatarView(agent.gaii, avatar.record),
+                ...(avatar.parsed && !avatar.parsed.ok ? { avatar_problem: avatar.parsed.problem } : {}),
                 description: agent.description,
                 capabilities: agent.capabilities,
                 trust_score: agent.trustScore,
@@ -384,12 +389,14 @@ export function registerCoreTools(
             // The same two fields GET /v1/agents gives the owner and the owner's agents.
             const access = await readOwnerAgentAccessOrMarker(storage, ownerGhiiOf(agentGaii), 'aimeat_agents_list');
             const useOf = await scopeUseLookup(storage, agents);
+            const avatars = await readAvatarsOrEmpty(storage, agents.map(a => a.gaii), logger.warn.bind(logger), 'aimeat_agents_list');
             return structuredResult('aimeat_agents_list', undefined, {
                 agents: agents.map(a => ({
                     gaii: a.gaii,
                     name: a.name,
                     owner: a.owner,
                     display_name: a.displayName,
+                    avatar: avatars.get(a.gaii) ?? null,
                     description: a.description,
                     capabilities: a.capabilities,
                     technical_capabilities: a.technicalCapabilities,

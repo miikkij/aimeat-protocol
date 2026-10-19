@@ -28,6 +28,7 @@
  * @structure registerPermissionAllowRoutes(router, config, storage)
  * @usage registerPermissionAllowRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-19 — The `agent` object carries the agent's `avatar` (services/agent-avatar.ts), null when it has none.
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
 import type { Router, Request, Response } from 'express';
@@ -41,6 +42,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { isOneClickWord, agentPageUrl } from '../../services/permission-ask.js';
 import { announceScopes } from './announce-scopes.js';
+import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
+import { logger } from '../../utils/logger.js';
 
 const IN_PERSON = 'Only you, signed in yourself, can allow what your agents may do.';
 const MAX_WORDS = 20;
@@ -69,10 +72,11 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     return agent;
   }
 
-  const view = (agent: AgentRecord, words: string[]) => {
+  const view = async (agent: AgentRecord, words: string[]) => {
     const held = agent.defaultScopes ?? [];
+    const avatars = await readAvatarsOrEmpty(storage, [agent.gaii], logger.warn.bind(logger), 'GET /v1/agents/:name/allow');
     return {
-      agent: { name: agent.name, gaii: agent.gaii, display_name: agent.displayName || agent.name },
+      agent: { name: agent.name, gaii: agent.gaii, display_name: agent.displayName || agent.name, avatar: avatars.get(agent.gaii) ?? null },
       words: words.map((w) => ({ scope: w, held: scopeIsCovered(held, w), one_press: isOneClickWord(w) })),
       agent_page: agentPageUrl(config.baseUrl, agent.name),
     };
@@ -88,7 +92,7 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     }
     const agent = await ownAgent(req, res);
     if (!agent) return;
-    res.json(success(config.nodeId, view(agent, words)));
+    res.json(success(config.nodeId, await view(agent, words)));
   });
 
   // POST /v1/agents/:name/allow { scopes } — give these to the agent, adding to what it holds.
@@ -116,7 +120,7 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     const held = agent.defaultScopes ?? [];
     const added = words.filter((w) => !scopeIsCovered(held, w));
     if (added.length === 0) {
-      res.json(success(config.nodeId, { ...view(agent, words), added: [] }));
+      res.json(success(config.nodeId, { ...(await view(agent, words)), added: [] }));
       return;
     }
     const updated = await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...added] });
@@ -126,6 +130,6 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     }
     announceScopes(updated.gaii);
     emitChange('agents');
-    res.json(success(config.nodeId, { ...view(updated, words), added }));
+    res.json(success(config.nodeId, { ...(await view(updated, words)), added }));
   });
 }

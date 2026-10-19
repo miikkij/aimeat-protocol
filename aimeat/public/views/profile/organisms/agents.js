@@ -9,6 +9,7 @@
  * @structure OrgAgentsPanel
  * @usage import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
  * @version-history
+ *   2026-10-19 — An attached agent of the viewer's own shows its own avatar in place of the 🤖 mark (leadProps); the others keep 🤖.
  *   2026-09-28 — The description says when the organism admits only the agents listed here (agentAccess).
  *   v1.10.1 — 2026-09-26 — An agent's contract tag is green again, as main drew it (.badge-success:
  *     Mark tone="fine"; fix pass).
@@ -49,6 +50,7 @@ import { Select } from '/components/Select.js';
 import { TextField } from '/components/TextField.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Row, Stack, Split } from '/components/Layout.js';
+import { leadProps } from '/components/AgentAvatar.js';
 import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/services/agents.js';
 import { relTime } from '/views/profile/organisms/helpers.js';
@@ -149,7 +151,7 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
           const act = acted[p.name];
           return html`
             <${ListRow} key=${'ag-' + g}>
-              <${Lead} text=${'🤖'} />
+              <${Lead} ...${{ ...leadProps(own, '🤖'), agent: false }} />
               <${Name} title=${g}
                 tag=${[
                   p.node ? html`<${Mark} key="node">${(p.node)}<//>` : null,
