@@ -13,27 +13,21 @@
  * @structure answerMovedTools
  * @usage answerMovedTools(mcp); // after the last tool is registered
  * @version-history
+ *   v1.0.1 — 2026-10-20 — The tools/call handler is wrapped through mcp/sdk-seams.ts.
  *   v1.0.0 — 2026-09-27 — Initial.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { movedToolMessage } from '../tool-catalog/moved-tools.js';
 import { logger } from '../utils/logger.js';
-
-type RequestHandler = (request: { method: string; params?: { name?: unknown } }, extra: unknown) => Promise<unknown>;
+import { wrapToolsCall } from './sdk-seams.js';
 
 export function answerMovedTools(mcp: McpServer): void {
-    // The SDK keeps its handlers in a map on the protocol object; setRequestHandler() would re-parse
-    // and cannot hand back the handler it replaces, so the map is read directly.
-    const handlers = (mcp.server as unknown as { _requestHandlers?: Map<string, RequestHandler> })._requestHandlers;
-    const original = handlers?.get('tools/call');
-    if (!handlers || !original) {
-        logger.warn('moved-tools: the MCP server has no tools/call handler to wrap; old tool names answer "not found"');
-        return;
-    }
-    handlers.set('tools/call', async (request, extra) => {
+    // The SDK has no public way to wrap tools/call; mcp/sdk-seams.ts reaches its handler map.
+    const wrapped = wrapToolsCall(mcp, (original) => async (request, extra) => {
         const name = typeof request.params?.name === 'string' ? request.params.name : '';
         const moved = movedToolMessage(name);
         if (moved) return { content: [{ type: 'text', text: `TOOL_MOVED: ${moved}` }], isError: true };
         return original(request, extra);
     });
+    if (!wrapped) logger.warn('moved-tools: the MCP server has no tools/call handler to wrap; old tool names answer "not found"');
 }
