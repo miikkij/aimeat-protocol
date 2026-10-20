@@ -10,6 +10,7 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.6.8 — 2026-09-26 — The propose contract says that beside a <ul> or <ol> of the markup every
  *     counter-reset also names list-item, and "all" takes only revert or revert-layer.
@@ -78,11 +79,13 @@ export function registerDesignbookTools(
         }
     };
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_designbook_search',
-        descriptionFor('aimeat_designbook_search'),
-        zodShapeFor('aimeat_designbook_search'),
-        annotationsFor('aimeat_designbook_search'),
+        {
+            description: descriptionFor('aimeat_designbook_search'),
+            inputSchema: zodShapeFor('aimeat_designbook_search'),
+            annotations: annotationsFor('aimeat_designbook_search'),
+        },
         async ({ kind, status, q, limit, view }) => {
             // What builders wrote down about the Book, as what it should become next (reasons.ts).
             if (view === 'reasons') {
@@ -106,29 +109,35 @@ export function registerDesignbookTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_designbook_get',
-        descriptionFor('aimeat_designbook_get'),
-        zodShapeFor('aimeat_designbook_get'),
-        annotationsFor('aimeat_designbook_get'),
+        {
+            description: descriptionFor('aimeat_designbook_get'),
+            inputSchema: zodShapeFor('aimeat_designbook_get'),
+            annotations: annotationsFor('aimeat_designbook_get'),
+        },
         // The reader is named: a component that no longer passes the bench shows its markup and
         // stylesheet only to its proposer, or an agent acting for them (service.ts get).
         async ({ id }) => answer(() => book.get(id, getAgentGaii())),
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_designbook_keep',
-        descriptionFor('aimeat_designbook_keep'),
-        zodShapeFor('aimeat_designbook_keep'),
-        annotationsFor('aimeat_designbook_keep'),
+        {
+            description: descriptionFor('aimeat_designbook_keep'),
+            inputSchema: zodShapeFor('aimeat_designbook_keep'),
+            annotations: annotationsFor('aimeat_designbook_keep'),
+        },
         async ({ filename, kept }) => answer(() => book.keep(getAgentGaii(), filename, kept !== false)),
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_designbook_propose',
-        descriptionFor('aimeat_designbook_propose'),
-        zodShapeFor('aimeat_designbook_propose'),
-        annotationsFor('aimeat_designbook_propose'),
+        {
+            description: descriptionFor('aimeat_designbook_propose'),
+            inputSchema: zodShapeFor('aimeat_designbook_propose'),
+            annotations: annotationsFor('aimeat_designbook_propose'),
+        },
         async ({ part, ai_provenance, ai_provenance_id }) => answer(async () => {
             const out = await book.propose(getAgentGaii(), part, {
                 principal: getAgentGaii(),
@@ -145,11 +154,13 @@ export function registerDesignbookTools(
         }),
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_designbook_adopt',
-        descriptionFor('aimeat_designbook_adopt'),
-        zodShapeFor('aimeat_designbook_adopt'),
-        annotationsFor('aimeat_designbook_adopt'),
+        {
+            description: descriptionFor('aimeat_designbook_adopt'),
+            inputSchema: zodShapeFor('aimeat_designbook_adopt'),
+            annotations: annotationsFor('aimeat_designbook_adopt'),
+        },
         async ({ id, filename, ai_provenance, ai_provenance_id }) => answer(async () => {
             const out = await book.adopt(getAgentGaii(), id, filename, {
                 principal: getAgentGaii(),

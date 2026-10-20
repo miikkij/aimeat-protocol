@@ -20,6 +20,7 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — aimeat_commerce_invoice_set sets the owner's invoice credit for items delivered at
  *     once through commerce/psp-record.ts, the function PUT /v1/commerce/payout/invoice calls.
  *   2026-10-16 — aimeat_commerce_beneficiary_earnings totals every entry and returns the newest `limit`,
@@ -223,11 +224,13 @@ export function registerCommerceTools(
 
     // ── Seller: PSP credentials (secret in, masked status out — NEVER the secret) ──
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_psp_set',
-        descriptionFor('aimeat_commerce_psp_set'),
-        zodShapeFor('aimeat_commerce_psp_set'),
-        annotationsFor('aimeat_commerce_psp_set'),
+        {
+            description: descriptionFor('aimeat_commerce_psp_set'),
+            inputSchema: zodShapeFor('aimeat_commerce_psp_set'),
+            annotations: annotationsFor('aimeat_commerce_psp_set'),
+        },
         async () => {
             // SCREEN ONLY (decision D5 of the user-journey review, 2026-10-01). A session here is
             // always an agent record, and PUT /v1/commerce/payout/stripe, which the connector and CLI
@@ -238,11 +241,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_psp_status',
-        descriptionFor('aimeat_commerce_psp_status'),
-        zodShapeFor('aimeat_commerce_psp_status'),
-        annotationsFor('aimeat_commerce_psp_status'),
+        {
+            description: descriptionFor('aimeat_commerce_psp_status'),
+            inputSchema: zodShapeFor('aimeat_commerce_psp_status'),
+            annotations: annotationsFor('aimeat_commerce_psp_status'),
+        },
         async () => {
             const rec = await storage.getMemory(ownerGhii, PSP_KEY);
             const v = (rec?.value ?? {}) as { provider?: string; secretKey?: unknown; invoiceImmediate?: unknown };
@@ -257,11 +262,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_invoice_set',
-        descriptionFor('aimeat_commerce_invoice_set'),
-        zodShapeFor('aimeat_commerce_invoice_set'),
-        annotationsFor('aimeat_commerce_invoice_set'),
+        {
+            description: descriptionFor('aimeat_commerce_invoice_set'),
+            inputSchema: zodShapeFor('aimeat_commerce_invoice_set'),
+            annotations: annotationsFor('aimeat_commerce_invoice_set'),
+        },
         async ({ accept_immediate }) => {
             // The function PUT /v1/commerce/payout/invoice calls (commerce/psp-record.ts): the owner's
             // record, merged, so the card and stablecoin settings survive. The scope check is the
@@ -271,11 +278,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_psp_delete',
-        descriptionFor('aimeat_commerce_psp_delete'),
-        zodShapeFor('aimeat_commerce_psp_delete'),
-        annotationsFor('aimeat_commerce_psp_delete'),
+        {
+            description: descriptionFor('aimeat_commerce_psp_delete'),
+            inputSchema: zodShapeFor('aimeat_commerce_psp_delete'),
+            annotations: annotationsFor('aimeat_commerce_psp_delete'),
+        },
         async () => {
             // SCREEN ONLY, as psp_set above (decision D5). A session here is always an agent record,
             // and DELETE /v1/commerce/payout/stripe, which the connector and CLI tools call, refuses
@@ -289,12 +298,14 @@ export function registerCommerceTools(
 
     // ── Seller: app-tool manifest (apps.{appId}.tools — the record the resolver + feed read) ──
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_tools_publish',
-        descriptionFor('aimeat_app_tools_publish'),
-        // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
-        zodShapeFor('aimeat_app_tools_publish'),
-        annotationsFor('aimeat_app_tools_publish'),
+        {
+            description: descriptionFor('aimeat_app_tools_publish'),
+            // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
+            inputSchema: zodShapeFor('aimeat_app_tools_publish'),
+            annotations: annotationsFor('aimeat_app_tools_publish'),
+        },
         async ({ app_id: named, tools, odps, provenance }) => {
             const parsed = AppToolsDocSchema.safeParse({ tools, ...(odps ? { odps } : {}), ...(provenance ? { provenance } : {}) });
             if (!parsed.success) return fail(`INVALID_TOOL_MANIFEST: ${parsed.error.message}`);
@@ -335,11 +346,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_tools_get',
-        descriptionFor('aimeat_app_tools_get'),
-        zodShapeFor('aimeat_app_tools_get'),
-        annotationsFor('aimeat_app_tools_get'),
+        {
+            description: descriptionFor('aimeat_app_tools_get'),
+            inputSchema: zodShapeFor('aimeat_app_tools_get'),
+            annotations: annotationsFor('aimeat_app_tools_get'),
+        },
         async ({ app_id, owner: ownerArg }) => {
             const targetOwner = localAccountName(ownerArg ?? owner);
             const rec = await storage.getMemory(`${targetOwner}@${config.nodeId}`, appToolsKey(app_id));
@@ -363,12 +376,14 @@ export function registerCommerceTools(
 
     // ── Seller: offer money pricing (agents.{name}.offers — same contract as PUT /v1/agents/:name/offers) ──
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_offer_price_set',
-        descriptionFor('aimeat_offer_price_set'),
-        // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
-        zodShapeFor('aimeat_offer_price_set'),
-        annotationsFor('aimeat_offer_price_set'),
+        {
+            description: descriptionFor('aimeat_offer_price_set'),
+            // The catalog's schema, which carries the bounds this tool wrote by hand (secaudit 2026-10 follow-up, Part B).
+            inputSchema: zodShapeFor('aimeat_offer_price_set'),
+            annotations: annotationsFor('aimeat_offer_price_set'),
+        },
         async ({ agent_name, offer_id, toll_morsels, price_morsels, money_amount_micros, money_currency, clear_toll, clear_morsels, clear_money, visibility }) => {
             // The 3.x morsel-price names are read as the pacing amount until MORSEL_PRICE_FIELDS_REMOVED_IN,
             // and refused after it (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -430,11 +445,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_checkout_open',
-        descriptionFor('aimeat_checkout_open'),
-        zodShapeFor('aimeat_checkout_open'),
-        annotationsFor('aimeat_checkout_open'),
+        {
+            description: descriptionFor('aimeat_checkout_open'),
+            inputSchema: zodShapeFor('aimeat_checkout_open'),
+            annotations: annotationsFor('aimeat_checkout_open'),
+        },
         async ({ items, note, currency }) => {
             if (!config.commerceEnabled) return fail('FEATURE_DISABLED: commerce is disabled on this node');
             try {
@@ -447,11 +464,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_checkout_complete',
-        descriptionFor('aimeat_checkout_complete'),
-        zodShapeFor('aimeat_checkout_complete'),
-        annotationsFor('aimeat_checkout_complete'),
+        {
+            description: descriptionFor('aimeat_checkout_complete'),
+            inputSchema: zodShapeFor('aimeat_checkout_complete'),
+            annotations: annotationsFor('aimeat_checkout_complete'),
+        },
         async ({ session_id, handler }) => {
             if (!config.commerceEnabled) return fail('FEATURE_DISABLED: commerce is disabled on this node');
             try {
@@ -486,11 +505,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_checkout_list',
-        descriptionFor('aimeat_checkout_list'),
-        zodShapeFor('aimeat_checkout_list'),
-        annotationsFor('aimeat_checkout_list'),
+        {
+            description: descriptionFor('aimeat_checkout_list'),
+            inputSchema: zodShapeFor('aimeat_checkout_list'),
+            annotations: annotationsFor('aimeat_checkout_list'),
+        },
         async ({ limit, response_format }) => {
             const sessions = await listSessions(storage, ownerGhii, limit ?? 20);
             return ok(shapeResponse('aimeat_checkout_list', response_format, sessions));
@@ -504,11 +525,13 @@ export function registerCommerceTools(
     // never accepts a provider id from the argument list: the revenue being given away has to be
     // the giver's, and that is the whole cross-owner question here.
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_beneficiary_split_set',
-        descriptionFor('aimeat_commerce_beneficiary_split_set'),
-        zodShapeFor('aimeat_commerce_beneficiary_split_set'),
-        annotationsFor('aimeat_commerce_beneficiary_split_set'),
+        {
+            description: descriptionFor('aimeat_commerce_beneficiary_split_set'),
+            inputSchema: zodShapeFor('aimeat_commerce_beneficiary_split_set'),
+            annotations: annotationsFor('aimeat_commerce_beneficiary_split_set'),
+        },
         async ({ ext, action, mode, pool_percent, roles, beneficiaries, dynamic, capability, state }) => {
             // The validation, the author and the write POST /v1/commerce/beneficiary-splits uses
             // (commerce/beneficiary-split-declare.ts). The author is this session's agent; the split
@@ -526,11 +549,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_beneficiary_splits',
-        descriptionFor('aimeat_commerce_beneficiary_splits'),
-        zodShapeFor('aimeat_commerce_beneficiary_splits'),
-        annotationsFor('aimeat_commerce_beneficiary_splits'),
+        {
+            description: descriptionFor('aimeat_commerce_beneficiary_splits'),
+            inputSchema: zodShapeFor('aimeat_commerce_beneficiary_splits'),
+            annotations: annotationsFor('aimeat_commerce_beneficiary_splits'),
+        },
         async ({ remove_ext, remove_action }) => {
             if (remove_ext || remove_action) {
                 if (!remove_ext || !remove_action) return fail('INVALID_INPUT: withdrawing needs both remove_ext and remove_action');
@@ -546,11 +571,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_beneficiary_earnings',
-        descriptionFor('aimeat_commerce_beneficiary_earnings'),
-        zodShapeFor('aimeat_commerce_beneficiary_earnings'),
-        annotationsFor('aimeat_commerce_beneficiary_earnings'),
+        {
+            description: descriptionFor('aimeat_commerce_beneficiary_earnings'),
+            inputSchema: zodShapeFor('aimeat_commerce_beneficiary_earnings'),
+            annotations: annotationsFor('aimeat_commerce_beneficiary_earnings'),
+        },
         async ({ role, status, limit }) => {
             const max = limit ?? 200;
             // Totals over every entry, the list capped at the newest `max` (QA audit S8-10).
@@ -573,11 +600,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_beneficiary_release',
-        descriptionFor('aimeat_commerce_beneficiary_release'),
-        zodShapeFor('aimeat_commerce_beneficiary_release'),
-        annotationsFor('aimeat_commerce_beneficiary_release'),
+        {
+            description: descriptionFor('aimeat_commerce_beneficiary_release'),
+            inputSchema: zodShapeFor('aimeat_commerce_beneficiary_release'),
+            annotations: annotationsFor('aimeat_commerce_beneficiary_release'),
+        },
         async ({ tracking_code, beneficiary }) => {
             const r = await releaseBeneficiaryShare(storage, config, {
                 providerGhii: ownerGhii, beneficiaryGhii: beneficiary, trackingCode: tracking_code,
@@ -592,11 +621,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_beneficiary_approve',
-        descriptionFor('aimeat_commerce_beneficiary_approve'),
-        zodShapeFor('aimeat_commerce_beneficiary_approve'),
-        annotationsFor('aimeat_commerce_beneficiary_approve'),
+        {
+            description: descriptionFor('aimeat_commerce_beneficiary_approve'),
+            inputSchema: zodShapeFor('aimeat_commerce_beneficiary_approve'),
+            annotations: annotationsFor('aimeat_commerce_beneficiary_approve'),
+        },
         async ({ ghii, state, method, subject, evidence }) => {
             // The question the admin tools ask (services/operator-principal.ts): an operator
             // account's agent holding operator:admin. The owner record alone handed both branches
@@ -631,11 +662,13 @@ export function registerCommerceTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_commerce_beneficiary_payout',
-        descriptionFor('aimeat_commerce_beneficiary_payout'),
-        zodShapeFor('aimeat_commerce_beneficiary_payout'),
-        annotationsFor('aimeat_commerce_beneficiary_payout'),
+        {
+            description: descriptionFor('aimeat_commerce_beneficiary_payout'),
+            inputSchema: zodShapeFor('aimeat_commerce_beneficiary_payout'),
+            annotations: annotationsFor('aimeat_commerce_beneficiary_payout'),
+        },
         async ({ beneficiary, currency, payment }) => {
             // No signature yet -> QUOTE. The agent hands these requirements to whatever holds the
             // wallet; the node never sees a key.

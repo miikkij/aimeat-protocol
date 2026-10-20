@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — `reference_images` and `mask`, read with readImageInputs as on POST /v1/ai/image; the
  *     result says reference_count and mask_mode (Comicland v3 A-1, A-2).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -50,11 +51,13 @@ export function registerAiImageTool(
     config: AimeatConfig,
     getAgentGaii: () => string,
 ): void {
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_image_generate',
-        descriptionFor('aimeat_image_generate'),
-        zodShapeFor('aimeat_image_generate'),
-        annotationsFor('aimeat_image_generate'),
+        {
+            description: descriptionFor('aimeat_image_generate'),
+            inputSchema: zodShapeFor('aimeat_image_generate'),
+            annotations: annotationsFor('aimeat_image_generate'),
+        },
         async ({ prompt, size, storage_key, public: isPublic, model, app_id, provider, fallback, role, reference_images, mask }) => {
             // The OWNER's identity, not the agent's. The API key, the daily budget and the spend
             // record all live under the owner — an agent has no key of its own and its balance is

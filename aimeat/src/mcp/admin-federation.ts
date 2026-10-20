@@ -22,6 +22,7 @@
  * @structure registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii, scopes) — one read, one write.
  * @usage registerAdminFederationTools(mcp, storage, config, peers, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: remove a peer, or free a node id held
  *     under another key, through the same service DELETE /v1/federation/peers/:nodeId calls.
@@ -59,17 +60,17 @@ export function registerAdminFederationTools(
 ): void {
   const agentGaii = getAgentGaii();
 
-  mcp.tool('aimeat_admin_federation', descriptionFor('aimeat_admin_federation'),
-    zodShapeFor('aimeat_admin_federation'),
-    annotationsFor('aimeat_admin_federation'),
+  mcp.registerTool('aimeat_admin_federation', { description: descriptionFor('aimeat_admin_federation'),
+    inputSchema: zodShapeFor('aimeat_admin_federation'),
+    annotations: annotationsFor('aimeat_admin_federation') },
     async () => {
       if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return refuse(OPERATOR_AGENT_REFUSAL);
       return text(await buildFederationOverview(config, storage, peers));
     });
 
-  mcp.tool('aimeat_admin_federation_relay_claim_set', descriptionFor('aimeat_admin_federation_relay_claim_set'),
-    zodShapeFor('aimeat_admin_federation_relay_claim_set'),
-    annotationsFor('aimeat_admin_federation_relay_claim_set'),
+  mcp.registerTool('aimeat_admin_federation_relay_claim_set', { description: descriptionFor('aimeat_admin_federation_relay_claim_set'),
+    inputSchema: zodShapeFor('aimeat_admin_federation_relay_claim_set'),
+    annotations: annotationsFor('aimeat_admin_federation_relay_claim_set') },
     async ({ node_id, relay_claim }) => {
       if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return refuse(OPERATOR_AGENT_REFUSAL);
       const out = await setPeerRelayClaim(storage, peers, node_id, relay_claim);
@@ -78,9 +79,9 @@ export function registerAdminFederationTools(
       return text({ node_id: out.peer.nodeId, relay_claim: peerRelayClaimView(config, out.peer) });
     });
 
-  mcp.tool('aimeat_admin_federation_peer_remove', descriptionFor('aimeat_admin_federation_peer_remove'),
-    zodShapeFor('aimeat_admin_federation_peer_remove'),
-    annotationsFor('aimeat_admin_federation_peer_remove'),
+  mcp.registerTool('aimeat_admin_federation_peer_remove', { description: descriptionFor('aimeat_admin_federation_peer_remove'),
+    inputSchema: zodShapeFor('aimeat_admin_federation_peer_remove'),
+    annotations: annotationsFor('aimeat_admin_federation_peer_remove') },
     async ({ node_id, emergency, reason }) => {
       if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return refuse(OPERATOR_AGENT_REFUSAL);
       const out = await removePeer({ config, storage, peers }, node_id, { emergency: emergency === true, ...(reason ? { reason } : {}) });

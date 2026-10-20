@@ -10,6 +10,7 @@
  *   is connected: the AI shows the owner the change, then calls again with the token.
  * @structure registerAiPolicyTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-28 — Initial.
  */
@@ -32,11 +33,13 @@ export function registerAiPolicyTools(
 ): void {
   const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_ai_policy_set',
-    descriptionFor('aimeat_ai_policy_set'),
-    zodShapeFor('aimeat_ai_policy_set'),
-    annotationsFor('aimeat_ai_policy_set'),
+    {
+        description: descriptionFor('aimeat_ai_policy_set'),
+        inputSchema: zodShapeFor('aimeat_ai_policy_set'),
+        annotations: annotationsFor('aimeat_ai_policy_set'),
+    },
     async ({ policy, confirm_token }) => {
       const principal = getAgentGaii();
       const { payer } = aiPayerOf(principal);

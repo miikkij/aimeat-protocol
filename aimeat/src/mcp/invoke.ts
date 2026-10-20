@@ -16,6 +16,7 @@
  * @structure registerInvokeTool(mcp, config, getToken, getAgentGaii)
  * @usage registerInvokeTool(mcp, config, getToken, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V2: discover + invoke).
  */
@@ -33,11 +34,13 @@ export function registerInvokeTool(
     getToken: () => string | undefined,
     getAgentGaii: () => string,
 ): void {
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_invoke',
-        descriptionFor('aimeat_invoke'),
-        zodShapeFor('aimeat_invoke'),
-        annotationsFor('aimeat_invoke'),
+        {
+            description: descriptionFor('aimeat_invoke'),
+            inputSchema: zodShapeFor('aimeat_invoke'),
+            annotations: annotationsFor('aimeat_invoke'),
+        },
         async ({ capability, input }) => {
             const agentGaii = getAgentGaii();
             const out = await invokeNodeCapability(config, {

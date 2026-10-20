@@ -16,6 +16,7 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The upload-mode answer carries the shared mint's `warnings` (PUBLIC_IS_SIGNED_IN_HERE:
  *     a closed node lands a public file at 'members'; plan V1.6).
  *   2026-10-18 — aimeat_storage_upload asks the publish gate through the shared write and the mint
@@ -87,11 +88,13 @@ export function registerCoreStorageTools(
     const agentGaii = getAgentGaii();
 
     // ── Tool 13: aimeat_storage_upload ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_storage_upload',
-        descriptionFor('aimeat_storage_upload'),
-        zodShapeFor('aimeat_storage_upload'),
-        annotationsFor('aimeat_storage_upload'),
+        {
+            description: descriptionFor('aimeat_storage_upload'),
+            inputSchema: zodShapeFor('aimeat_storage_upload'),
+            annotations: annotationsFor('aimeat_storage_upload'),
+        },
         async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
             // The same binding POST /v1/storage takes; the shared write refuses a workspace file
@@ -195,11 +198,13 @@ export function registerCoreStorageTools(
     // tool used to look only in the calling agent's namespace — so a PDF its OWNER uploaded, or a file
     // arriving as a DM/task attachment, answered "File not found" no matter what the access rules said.
     // A foreign read goes through the same authorizeRead() guard as GET /v1/pub and ctx.files.read.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_storage_download',
-        descriptionFor('aimeat_storage_download'),
-        zodShapeFor('aimeat_storage_download'),
-        annotationsFor('aimeat_storage_download'),
+        {
+            description: descriptionFor('aimeat_storage_download'),
+            inputSchema: zodShapeFor('aimeat_storage_download'),
+            annotations: annotationsFor('aimeat_storage_download'),
+        },
         async ({ key, owner, inline }) => {
             const ref = owner ? `${owner}/${key}` : key;
             const resolved = await resolveFileRef(storage, config, ref, {
@@ -259,11 +264,13 @@ export function registerCoreStorageTools(
     // legitimately reads its owner's uploads; nothing makes the same argument for deleting them, and
     // a delete that could reach across owners on a permission meant for reading is the shape of an
     // accident nobody can undo. The gates live in removeStorageFile().
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_storage_delete',
-        descriptionFor('aimeat_storage_delete'),
-        zodShapeFor('aimeat_storage_delete'),
-        annotationsFor('aimeat_storage_delete'),
+        {
+            description: descriptionFor('aimeat_storage_delete'),
+            inputSchema: zodShapeFor('aimeat_storage_delete'),
+            annotations: annotationsFor('aimeat_storage_delete'),
+        },
         async ({ key }) => {
             const removed = await removeStorageFile(
                 { storage, config, emitResourceUpdated, emitResourceListChanged }, agentGaii, key,

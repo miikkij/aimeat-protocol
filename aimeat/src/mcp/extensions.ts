@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v2.10.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read with nobody
  *     present. READ ONLY, because the write is the person's own decision and takes
  *     requireOwnerPrincipal; the answer carries where they make it (Jouni, 2026-10-20).
@@ -194,11 +195,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 1: aimeat_extension_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_list',
-        descriptionFor('aimeat_extension_list'),
-        zodShapeFor('aimeat_extension_list'),
-        annotationsFor('aimeat_extension_list'),
+        {
+            description: descriptionFor('aimeat_extension_list'),
+            inputSchema: zodShapeFor('aimeat_extension_list'),
+            annotations: annotationsFor('aimeat_extension_list'),
+        },
         async () => {
             const extensions = await storage.listExtensions();
             const active = extensions.filter(e => e.status === 'active');
@@ -231,11 +234,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool: aimeat_iam_define (P5 — validate + design an app's IAM level schema + command manifest) ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_iam_define',
-        descriptionFor('aimeat_iam_define'),
-        zodShapeFor('aimeat_iam_define'),
-        annotationsFor('aimeat_iam_define'),
+        {
+            description: descriptionFor('aimeat_iam_define'),
+            inputSchema: zodShapeFor('aimeat_iam_define'),
+            annotations: annotationsFor('aimeat_iam_define'),
+        },
         async ({ app_id, levels, commands, default_role, version, author, ext_name }) => {
             const result = defineAppIam({
                 appId: app_id, levels, commands, defaultRole: default_role, version, author, extName: ext_name,
@@ -250,11 +255,13 @@ export function registerExtensionsTools(
     // the call duration and count, the accrual and the redacted failure text. This tool renders the
     // answer as text. Cross-owner invocation is intended (an extension is a sellable capability), and
     // the paywall inside the sequence is what makes it safe.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_invoke',
-        descriptionFor('aimeat_extension_invoke'),
-        zodShapeFor('aimeat_extension_invoke'),
-        annotationsFor('aimeat_extension_invoke'),
+        {
+            description: descriptionFor('aimeat_extension_invoke'),
+            inputSchema: zodShapeFor('aimeat_extension_invoke'),
+            annotations: annotationsFor('aimeat_extension_invoke'),
+        },
         async ({ extension_name, action_id, input, instance_id }) => {
             const session = caller();
             // A paywall refusal is recorded, not sent, and rendered below in the tool's own words.
@@ -285,11 +292,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 3: aimeat_extension_install ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_install',
-        descriptionFor('aimeat_extension_install'),
-        zodShapeFor('aimeat_extension_install'),
-        annotationsFor('aimeat_extension_install'),
+        {
+            description: descriptionFor('aimeat_extension_install'),
+            inputSchema: zodShapeFor('aimeat_extension_install'),
+            annotations: annotationsFor('aimeat_extension_install'),
+        },
         async ({ manifest: manifestYaml, scripts, update, activate }) => {
             // A caller who sent scripts plainly meant to install inline. Falling through to upload
             // mode here handed them an upload_url instead, dropped the scripts on the floor and said
@@ -443,11 +452,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 4: aimeat_extension_activate ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_activate',
-        descriptionFor('aimeat_extension_activate'),
-        zodShapeFor('aimeat_extension_activate'),
-        annotationsFor('aimeat_extension_activate'),
+        {
+            description: descriptionFor('aimeat_extension_activate'),
+            inputSchema: zodShapeFor('aimeat_extension_activate'),
+            annotations: annotationsFor('aimeat_extension_activate'),
+        },
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
@@ -497,11 +508,13 @@ export function registerExtensionsTools(
     );
 
     // ── aimeat_extension_config_set: PATCH /v1/extensions/:name/config, one service ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_config_set',
-        descriptionFor('aimeat_extension_config_set'),
-        zodShapeFor('aimeat_extension_config_set'),
-        annotationsFor('aimeat_extension_config_set'),
+        {
+            description: descriptionFor('aimeat_extension_config_set'),
+            inputSchema: zodShapeFor('aimeat_extension_config_set'),
+            annotations: annotationsFor('aimeat_extension_config_set'),
+        },
         async ({ name, config: values }) => {
             const ext = await storage.getExtension(name);
             if (!ext || !(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'update', subject: name }))) {
@@ -523,11 +536,13 @@ export function registerExtensionsTools(
     // decision about their own data and takes requireOwnerPrincipal, which no MCP session holds.
     // The answer carries where they change it, so the agent can hand that to them in chat
     // (routes/extensions/unattended-reader.ts says why read and write take different gates).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_unattended_reader',
-        descriptionFor('aimeat_extension_unattended_reader'),
-        zodShapeFor('aimeat_extension_unattended_reader'),
-        annotationsFor('aimeat_extension_unattended_reader'),
+        {
+            description: descriptionFor('aimeat_extension_unattended_reader'),
+            inputSchema: zodShapeFor('aimeat_extension_unattended_reader'),
+            annotations: annotationsFor('aimeat_extension_unattended_reader'),
+        },
         async ({ name }) => {
             // readAuthorityOf, not storage.getExtension: the service owns this question on both
             // surfaces, so neither reads the record for itself (pnpm check:shared-impl).
@@ -541,11 +556,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 5: aimeat_extension_deactivate ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_deactivate',
-        descriptionFor('aimeat_extension_deactivate'),
-        zodShapeFor('aimeat_extension_deactivate'),
-        annotationsFor('aimeat_extension_deactivate'),
+        {
+            description: descriptionFor('aimeat_extension_deactivate'),
+            inputSchema: zodShapeFor('aimeat_extension_deactivate'),
+            annotations: annotationsFor('aimeat_extension_deactivate'),
+        },
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
@@ -582,11 +599,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 6: aimeat_extension_delete ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_delete',
-        descriptionFor('aimeat_extension_delete'),
-        zodShapeFor('aimeat_extension_delete'),
-        annotationsFor('aimeat_extension_delete'),
+        {
+            description: descriptionFor('aimeat_extension_delete'),
+            inputSchema: zodShapeFor('aimeat_extension_delete'),
+            annotations: annotationsFor('aimeat_extension_delete'),
+        },
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
@@ -625,11 +644,13 @@ export function registerExtensionsTools(
     );
 
     // ── Tool 7: aimeat_extension_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_extension_get',
-        descriptionFor('aimeat_extension_get'),
-        zodShapeFor('aimeat_extension_get'),
-        annotationsFor('aimeat_extension_get'),
+        {
+            description: descriptionFor('aimeat_extension_get'),
+            inputSchema: zodShapeFor('aimeat_extension_get'),
+            annotations: annotationsFor('aimeat_extension_get'),
+        },
         async ({ name, include_source }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {

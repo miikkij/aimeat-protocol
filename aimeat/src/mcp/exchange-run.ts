@@ -21,6 +21,7 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — aimeat_app_tool_invoke refuses an `action_id` whose capability the app's owner does
  *     not own (CAPABILITY_NOT_OWNED_BY_APP), as its REST twin now does: the manifest names a bare id
  *     in a node-wide registry, so another owner's capability ran here with the manifest's
@@ -162,11 +163,13 @@ export function registerExchangeRunTools(
     const view = (w: AgentWork) => workView(storage, config, w);
 
     // ── aimeat_app_tool_invoke — call an app's offered tool through your metered contract ──────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_tool_invoke',
-        descriptionFor('aimeat_app_tool_invoke'),
-        zodShapeFor('aimeat_app_tool_invoke'),
-        annotationsFor('aimeat_app_tool_invoke'),
+        {
+            description: descriptionFor('aimeat_app_tool_invoke'),
+            inputSchema: zodShapeFor('aimeat_app_tool_invoke'),
+            annotations: annotationsFor('aimeat_app_tool_invoke'),
+        },
         async ({ owner: appOwner, app, tool, input }) => {
             const ownerName = localAccountName(appOwner);
             const manifestRec = await storage.getMemory(`${ownerName}@${config.nodeId}`, appToolsKey(app));
@@ -286,11 +289,13 @@ export function registerExchangeRunTools(
     );
 
     // ── aimeat_exchange_work — start a task under an agent-work contract (consumer) ────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_work',
-        descriptionFor('aimeat_exchange_work'),
-        zodShapeFor('aimeat_exchange_work'),
-        annotationsFor('aimeat_exchange_work'),
+        {
+            description: descriptionFor('aimeat_exchange_work'),
+            inputSchema: zodShapeFor('aimeat_exchange_work'),
+            annotations: annotationsFor('aimeat_exchange_work'),
+        },
         async ({ offering_id, input, note }) => {
             const o = await getOffering(storage, offering_id);
             if (!o || o.state !== 'listed' || o.kind !== 'agent-work' || !o.surface || o.surface.kind !== 'agent-work') {
@@ -324,11 +329,13 @@ export function registerExchangeRunTools(
     );
 
     // ── aimeat_exchange_work_deliver — provider delivers → settle on delivery ──────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_work_deliver',
-        descriptionFor('aimeat_exchange_work_deliver'),
-        zodShapeFor('aimeat_exchange_work_deliver'),
-        annotationsFor('aimeat_exchange_work_deliver'),
+        {
+            description: descriptionFor('aimeat_exchange_work_deliver'),
+            inputSchema: zodShapeFor('aimeat_exchange_work_deliver'),
+            annotations: annotationsFor('aimeat_exchange_work_deliver'),
+        },
         async ({ work_id, output, note, ai_provenance, ai_provenance_id }) => {
             const w = await getWork(storage, work_id);
             if (!w || w.providerOwner !== owner) return fail('NOT_FOUND: no such work of yours to deliver');
@@ -395,11 +402,13 @@ export function registerExchangeRunTools(
     );
 
     // ── aimeat_exchange_work_list — your agent-work items (consumer default, or provider) ──────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_work_list',
-        descriptionFor('aimeat_exchange_work_list'),
-        zodShapeFor('aimeat_exchange_work_list'),
-        annotationsFor('aimeat_exchange_work_list'),
+        {
+            description: descriptionFor('aimeat_exchange_work_list'),
+            inputSchema: zodShapeFor('aimeat_exchange_work_list'),
+            annotations: annotationsFor('aimeat_exchange_work_list'),
+        },
         async ({ role }) => {
             const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);
             return ok({ work: await workViews(storage, config, items), count: items.length, role: role ?? 'consumer' });
@@ -407,11 +416,13 @@ export function registerExchangeRunTools(
     );
 
     // ── aimeat_exchange_proposals — renegotiation proposals you are party to ───────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_proposals',
-        descriptionFor('aimeat_exchange_proposals'),
-        zodShapeFor('aimeat_exchange_proposals'),
-        annotationsFor('aimeat_exchange_proposals'),
+        {
+            description: descriptionFor('aimeat_exchange_proposals'),
+            inputSchema: zodShapeFor('aimeat_exchange_proposals'),
+            annotations: annotationsFor('aimeat_exchange_proposals'),
+        },
         async () => {
             const list = await listProposalsForOwner(storage, owner);
             const view = list.map(p => ({
@@ -426,11 +437,13 @@ export function registerExchangeRunTools(
     );
 
     // ── aimeat_exchange_proposal_decide — accept (supersede) / decline / withdraw a proposal ───────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_proposal_decide',
-        descriptionFor('aimeat_exchange_proposal_decide'),
-        zodShapeFor('aimeat_exchange_proposal_decide'),
-        annotationsFor('aimeat_exchange_proposal_decide'),
+        {
+            description: descriptionFor('aimeat_exchange_proposal_decide'),
+            inputSchema: zodShapeFor('aimeat_exchange_proposal_decide'),
+            annotations: annotationsFor('aimeat_exchange_proposal_decide'),
+        },
         async ({ proposal_id, decision }) => {
             const p = await getProposal(storage, proposal_id);
             if (!p || p.status !== 'pending') return fail('NOT_FOUND: no such pending proposal');

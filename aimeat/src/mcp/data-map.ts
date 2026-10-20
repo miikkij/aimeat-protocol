@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — The data map caller says whether it is a member of this node and carries its session for the operator question, so aimeat_datamap_get applies the app's own visibility as GET /v1/datamap/apps/:owner/:filename does (QA audit list review).
  *   2026-10-11 — aimeat_app_agent_tie and aimeat_app_agent_untie: one row of an app's map that names
  *     an agent, added or removed.
@@ -69,11 +70,13 @@ export function registerDataMapTools(
     };
   };
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_datamap_get',
-    descriptionFor('aimeat_datamap_get'),
-    zodShapeFor('aimeat_datamap_get'),
-    annotationsFor('aimeat_datamap_get'),
+    {
+        description: descriptionFor('aimeat_datamap_get'),
+        inputSchema: zodShapeFor('aimeat_datamap_get'),
+        annotations: annotationsFor('aimeat_datamap_get'),
+    },
     async ({ app }) => {
       const out = await readProgramMap(storage, config, mapCaller(), app, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
@@ -83,11 +86,13 @@ export function registerDataMapTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_datamap_set',
-    descriptionFor('aimeat_datamap_set'),
-    zodShapeFor('aimeat_datamap_set'),
-    annotationsFor('aimeat_datamap_set'),
+    {
+        description: descriptionFor('aimeat_datamap_set'),
+        inputSchema: zodShapeFor('aimeat_datamap_set'),
+        annotations: annotationsFor('aimeat_datamap_set'),
+    },
     async ({ app, data_map }) => {
       const out = await stateProgramMap(storage, config, mapCaller(), app,
         data_map as Partial<DataMap>, new Date().toISOString());
@@ -98,11 +103,13 @@ export function registerDataMapTools(
 
   // One row of an app's map that names an agent, added or removed. Same implementation as
   // PUT and DELETE /v1/datamap/apps/:owner/:filename/agents/:agent (data-map-agent-tie.ts).
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_app_agent_tie',
-    descriptionFor('aimeat_app_agent_tie'),
-    zodShapeFor('aimeat_app_agent_tie'),
-    annotationsFor('aimeat_app_agent_tie'),
+    {
+        description: descriptionFor('aimeat_app_agent_tie'),
+        inputSchema: zodShapeFor('aimeat_app_agent_tie'),
+        annotations: annotationsFor('aimeat_app_agent_tie'),
+    },
     async ({ app, target_agent_name, made_for, holds }) => {
       const out = await tieAgent(storage, config, mapCaller(), app, target_agent_name,
         { madeFor: made_for === true, holds }, new Date().toISOString());
@@ -111,11 +118,13 @@ export function registerDataMapTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_app_agent_untie',
-    descriptionFor('aimeat_app_agent_untie'),
-    zodShapeFor('aimeat_app_agent_untie'),
-    annotationsFor('aimeat_app_agent_untie'),
+    {
+        description: descriptionFor('aimeat_app_agent_untie'),
+        inputSchema: zodShapeFor('aimeat_app_agent_untie'),
+        annotations: annotationsFor('aimeat_app_agent_untie'),
+    },
     async ({ app, target_agent_name }) => {
       const out = await untieAgent(storage, config, mapCaller(), app, target_agent_name, new Date().toISOString());
       if ('refusal' in out) return toolError(out.refusal.code, out.refusal.message);
@@ -123,11 +132,13 @@ export function registerDataMapTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_memory_hands',
-    descriptionFor('aimeat_memory_hands'),
-    zodShapeFor('aimeat_memory_hands'),
-    annotationsFor('aimeat_memory_hands'),
+    {
+        description: descriptionFor('aimeat_memory_hands'),
+        inputSchema: zodShapeFor('aimeat_memory_hands'),
+        annotations: annotationsFor('aimeat_memory_hands'),
+    },
     async ({ key }) => {
       const out = await handsOnKey(storage, config, mapCaller(), key);
       return text({ key: out.key, hands: out.hands, not_covered: out.notCovered });

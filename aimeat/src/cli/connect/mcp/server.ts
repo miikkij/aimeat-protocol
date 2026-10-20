@@ -25,6 +25,7 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-10-20 -- Only registerTool is patched; a tool() call throws while the surface registers (MCP SDK v2 migration, step 3).
  *   2026-10-04 -- A null for an optional field that refuses null reads as the field left out.
  *   2026-09-27 -- A call to a tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call.
  *   v1.9.4 -- 2026-05-28 -- Update connector guidance and fail missing credentials without a stack trace
@@ -65,14 +66,16 @@ export function buildMcpServer(role: SurfaceRole | 'all', registry: AgentRegistr
   if (role === 'all') {
     registerAllTools(mcp, registry);
   } else {
-    // Filter registration to the surface allowlist by patching tool/registerTool for the duration.
+    // Filter registration to the surface allowlist by patching registerTool for the duration. Every
+    // tool registers through registerTool (the MCP SDK v2 form); a tool() call would skip the
+    // allowlist, so it throws instead of registering.
     const allow = toolsForSurface(role);
     type ToolFn = (...args: unknown[]) => unknown;
     const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
-    const origTool = patchable.tool.bind(mcp) as ToolFn;
+    const origTool = patchable.tool;
     const origRegister = patchable.registerTool.bind(mcp) as ToolFn;
     const gate = (name: string) => allow.has(name);
-    patchable.tool = (...a: unknown[]) => gate(a[0] as string) ? origTool(...a) : undefined;
+    patchable.tool = (...a: unknown[]) => { throw new Error(`the tool() form is not used here (${String(a[0])}): register with registerTool`); };
     patchable.registerTool = (...a: unknown[]) => gate(a[0] as string) ? origRegister(...a) : undefined;
     registerAllTools(mcp, registry);
     patchable.tool = origTool;

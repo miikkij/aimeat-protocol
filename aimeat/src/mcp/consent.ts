@@ -11,6 +11,7 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — consentCaller() files and checks a consent under the session's principal, as POST
  *     /v1/consent does: an agent's consent covers the agent's own records, and an agent revokes only
  *     its own rows. It used the owner's account GHII, so the tool reached the owner's whole namespace
@@ -139,11 +140,13 @@ export function registerConsentTools(
     );
 
     // ── Tool 1: aimeat_consent_grant ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_consent_grant',
-        descriptionFor('aimeat_consent_grant'),
-        zodShapeFor('aimeat_consent_grant'),
-        annotationsFor('aimeat_consent_grant'),
+        {
+            description: descriptionFor('aimeat_consent_grant'),
+            inputSchema: zodShapeFor('aimeat_consent_grant'),
+            annotations: annotationsFor('aimeat_consent_grant'),
+        },
         async ({ target_gaii, scope, data_pattern, purpose, ttl_hours }) => {
             // ONE implementation (services/consent-write.ts). This tool used to build the record
             // itself, which is why it accepted a recipient no access check will ever match, wrote no
@@ -181,11 +184,13 @@ export function registerConsentTools(
     );
 
     // ── Tool 2: aimeat_consent_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_consent_list',
-        descriptionFor('aimeat_consent_list'),
-        zodShapeFor('aimeat_consent_list'),
-        annotationsFor('aimeat_consent_list'),
+        {
+            description: descriptionFor('aimeat_consent_list'),
+            inputSchema: zodShapeFor('aimeat_consent_list'),
+            annotations: annotationsFor('aimeat_consent_list'),
+        },
         async () => {
             const ghii = ownerGhii();
             const consents = await listAccountConsents(storage, ghii);
@@ -210,11 +215,13 @@ export function registerConsentTools(
     );
 
     // ── Tool 3: aimeat_consent_revoke ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_consent_revoke',
-        descriptionFor('aimeat_consent_revoke'),
-        zodShapeFor('aimeat_consent_revoke'),
-        annotationsFor('aimeat_consent_revoke'),
+        {
+            description: descriptionFor('aimeat_consent_revoke'),
+            inputSchema: zodShapeFor('aimeat_consent_revoke'),
+            annotations: annotationsFor('aimeat_consent_revoke'),
+        },
         async ({ consent_id }) => {
             // Same function the REST door calls: it owns the ownership check, the audit entry and
             // the directory refresh, so this door cannot be the one that forgets one of them.

@@ -14,6 +14,7 @@
  * @structure registerAgentV2TaskTools(mcp, storage, config, getAgentGaii, getOwner, caller?)
  * @usage registerAgentV2TaskTools(mcp, storage, config, () => agentGaii, () => owner, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — aimeat_v2_task_list takes response_format and gives the catalog's concise view
  *     (secaudit 2026-10, M3).
@@ -53,22 +54,26 @@ export function registerAgentV2TaskTools(
 ): void {
   const principal = (): Principal => caller().auth;
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_task_create',
-    descriptionFor('aimeat_v2_task_create'),
-    zodShapeFor('aimeat_v2_task_create'),
-    annotationsFor('aimeat_v2_task_create'),
+    {
+        description: descriptionFor('aimeat_v2_task_create'),
+        inputSchema: zodShapeFor('aimeat_v2_task_create'),
+        annotations: annotationsFor('aimeat_v2_task_create'),
+    },
     async (args) => reply(
       await createTask(storage, config, principal(), args),
       (task) => ({ task: publicTask(task) }),
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_task_list',
-    descriptionFor('aimeat_v2_task_list'),
-    zodShapeFor('aimeat_v2_task_list'),
-    annotationsFor('aimeat_v2_task_list'),
+    {
+        description: descriptionFor('aimeat_v2_task_list'),
+        inputSchema: zodShapeFor('aimeat_v2_task_list'),
+        annotations: annotationsFor('aimeat_v2_task_list'),
+    },
     async ({ response_format, ...args }) => reply(
       await listTasks(storage, principal(), args),
       // The catalog's concise view: each task's id, status, who it is for and who asked, and when it moved.
@@ -76,33 +81,39 @@ export function registerAgentV2TaskTools(
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_task_get',
-    descriptionFor('aimeat_v2_task_get'),
-    zodShapeFor('aimeat_v2_task_get'),
-    annotationsFor('aimeat_v2_task_get'),
+    {
+        description: descriptionFor('aimeat_v2_task_get'),
+        inputSchema: zodShapeFor('aimeat_v2_task_get'),
+        annotations: annotationsFor('aimeat_v2_task_get'),
+    },
     async (args) => reply(
       await getTask(storage, principal(), args.task_id),
       (task) => ({ task: publicTask(task) }),
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_task_status',
-    descriptionFor('aimeat_v2_task_status'),
-    zodShapeFor('aimeat_v2_task_status'),
-    annotationsFor('aimeat_v2_task_status'),
+    {
+        description: descriptionFor('aimeat_v2_task_status'),
+        inputSchema: zodShapeFor('aimeat_v2_task_status'),
+        annotations: annotationsFor('aimeat_v2_task_status'),
+    },
     async (args) => reply(
       await setTaskStatus(storage, config, principal(), args.task_id, args),
       (task) => ({ task: publicTask(task) }),
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_task_cancel',
-    descriptionFor('aimeat_v2_task_cancel'),
-    zodShapeFor('aimeat_v2_task_cancel'),
-    annotationsFor('aimeat_v2_task_cancel'),
+    {
+        description: descriptionFor('aimeat_v2_task_cancel'),
+        inputSchema: zodShapeFor('aimeat_v2_task_cancel'),
+        annotations: annotationsFor('aimeat_v2_task_cancel'),
+    },
     async (args) => reply(
       await cancelTask(storage, config, principal(), args.task_id, args.reason),
       (task) => ({ task: publicTask(task) }),

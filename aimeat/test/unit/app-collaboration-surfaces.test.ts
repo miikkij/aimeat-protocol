@@ -2,6 +2,7 @@
  * @file app-collaboration-surfaces.test.ts
  * @description Invoke connector handlers and inspect what reaches the REST boundary.
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.1.1 - 2026-10-05 - The handlers come from the whole connector (registerAllTools): aimeat_app_draft_publish
  *     runs its CLI dispatch definition now (secaudit 2026-10, M3).
  *   v1.1.0 - 2026-09-27 - The screenshot is action "screenshot" of aimeat_app_manage.
@@ -15,7 +16,7 @@ describe('shared app connector requests', () => {
   it('forwards a draft publication to the invited owner with its complete note', async () => {
     const handlers = new Map<string, (input: Record<string, unknown>) => Promise<unknown>>();
     const requests: unknown[][] = [];
-    const mcp = { tool: (name: string, ...args: unknown[]) => handlers.set(name, args.at(-1) as (input: Record<string, unknown>) => Promise<unknown>) } as unknown as McpServer;
+    const mcp = { registerTool: (name: string, ...args: unknown[]) => handlers.set(name, args.at(-1) as (input: Record<string, unknown>) => Promise<unknown>) } as unknown as McpServer;
     const agent = { owner: 'builder', agent: 'probe', config: { node_url: 'http://node.test' }, client: {
       post: async (...args: unknown[]) => { requests.push(args); return { ok: false, error: { message: 'Captured at the boundary' } }; },
     } };

@@ -11,6 +11,7 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_organism_create and aimeat_organism_update ask the publish gate with the
  *     session's caller and render `publish_request` (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -215,11 +216,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool 1: aimeat_organism_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_list',
-        descriptionFor('aimeat_organism_list'),
-        zodShapeFor('aimeat_organism_list'),
-        annotationsFor('aimeat_organism_list'),
+        {
+            description: descriptionFor('aimeat_organism_list'),
+            inputSchema: zodShapeFor('aimeat_organism_list'),
+            annotations: annotationsFor('aimeat_organism_list'),
+        },
         async () => {
             const ownerName = getOwnerName();
             // Get public organisms (archived ones are read-only/hidden from AI operations — excluded)
@@ -257,11 +260,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool 2: aimeat_organism_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_get',
-        descriptionFor('aimeat_organism_get'),
-        zodShapeFor('aimeat_organism_get'),
-        annotationsFor('aimeat_organism_get'),
+        {
+            description: descriptionFor('aimeat_organism_get'),
+            inputSchema: zodShapeFor('aimeat_organism_get'),
+            annotations: annotationsFor('aimeat_organism_get'),
+        },
         async ({ organism_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -309,11 +314,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool 3: aimeat_organism_join ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_join',
-        descriptionFor('aimeat_organism_join'),
-        zodShapeFor('aimeat_organism_join'),
-        annotationsFor('aimeat_organism_join'),
+        {
+            description: descriptionFor('aimeat_organism_join'),
+            inputSchema: zodShapeFor('aimeat_organism_join'),
+            annotations: annotationsFor('aimeat_organism_join'),
+        },
         async ({ organism_id, message }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -344,11 +351,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool 4: aimeat_organism_leave ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_leave',
-        descriptionFor('aimeat_organism_leave'),
-        zodShapeFor('aimeat_organism_leave'),
-        annotationsFor('aimeat_organism_leave'),
+        {
+            description: descriptionFor('aimeat_organism_leave'),
+            inputSchema: zodShapeFor('aimeat_organism_leave'),
+            annotations: annotationsFor('aimeat_organism_leave'),
+        },
         async ({ organism_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -364,11 +373,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool 5: aimeat_organism_members ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_members',
-        descriptionFor('aimeat_organism_members'),
-        zodShapeFor('aimeat_organism_members'),
-        annotationsFor('aimeat_organism_members'),
+        {
+            description: descriptionFor('aimeat_organism_members'),
+            inputSchema: zodShapeFor('aimeat_organism_members'),
+            annotations: annotationsFor('aimeat_organism_members'),
+        },
         async ({ organism_id, role, status }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -431,11 +442,13 @@ export function registerOrganismsTools(
     registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
 
     // ── Tool: aimeat_organism_search ── (content search across readable workspaces)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_search',
-        descriptionFor('aimeat_organism_search'),
-        zodShapeFor('aimeat_organism_search'),
-        annotationsFor('aimeat_organism_search'),
+        {
+            description: descriptionFor('aimeat_organism_search'),
+            inputSchema: zodShapeFor('aimeat_organism_search'),
+            annotations: annotationsFor('aimeat_organism_search'),
+        },
         async ({ organism_id, q, ws, archived }) => {
             const query = (q ?? '').trim();
             if (query.length < 2) return { content: [{ type: 'text' as const, text: 'Query must be at least 2 characters' }], isError: true };
@@ -461,11 +474,13 @@ export function registerOrganismsTools(
     // creator or admin by archiveRoleOf (an ATTACHED organism agent is a member there, and refused,
     // whoever its owner is), the target check, the fenced-space rule, the archive, the change event
     // and the organism timeline entry. This tool renders the answer as text.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_archive',
-        descriptionFor('aimeat_organism_archive'),
-        zodShapeFor('aimeat_organism_archive'),
-        annotationsFor('aimeat_organism_archive'),
+        {
+            description: descriptionFor('aimeat_organism_archive'),
+            inputSchema: zodShapeFor('aimeat_organism_archive'),
+            annotations: annotationsFor('aimeat_organism_archive'),
+        },
         async ({ organism_id, action, level, ws, namespace, key }) => {
             const session = caller();
             const out = await organismArchiveOp({ storage, config },
@@ -477,11 +492,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool: aimeat_workspace_comment ── (add a comment/thread reply to a record or document)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_workspace_comment',
-        descriptionFor('aimeat_workspace_comment'),
-        zodShapeFor('aimeat_workspace_comment'),
-        annotationsFor('aimeat_workspace_comment'),
+        {
+            description: descriptionFor('aimeat_workspace_comment'),
+            inputSchema: zodShapeFor('aimeat_workspace_comment'),
+            annotations: annotationsFor('aimeat_workspace_comment'),
+        },
         async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
             if (typeof body !== 'string' || !body.trim()) return { content: [{ type: 'text' as const, text: 'A non-empty body is required' }], isError: true };
             const organism = await storage.getOrganism(organism_id);
@@ -515,11 +532,13 @@ export function registerOrganismsTools(
     );
 
     // ── Tool: aimeat_workspace_comments ── (list a target's thread)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_workspace_comments',
-        descriptionFor('aimeat_workspace_comments'),
-        zodShapeFor('aimeat_workspace_comments'),
-        annotationsFor('aimeat_workspace_comments'),
+        {
+            description: descriptionFor('aimeat_workspace_comments'),
+            inputSchema: zodShapeFor('aimeat_workspace_comments'),
+            annotations: annotationsFor('aimeat_workspace_comments'),
+        },
         async ({ organism_id, ws, space, instance_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -534,11 +553,13 @@ export function registerOrganismsTools(
 
     // ── Tool: aimeat_workspace_comment_delete ── (author or creator/admin removes one comment)
     // Mirrors DELETE /v1/organisms/:id/comments/:commentId; both call deleteComment().
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_workspace_comment_delete',
-        descriptionFor('aimeat_workspace_comment_delete'),
-        zodShapeFor('aimeat_workspace_comment_delete'),
-        annotationsFor('aimeat_workspace_comment_delete'),
+        {
+            description: descriptionFor('aimeat_workspace_comment_delete'),
+            inputSchema: zodShapeFor('aimeat_workspace_comment_delete'),
+            annotations: annotationsFor('aimeat_workspace_comment_delete'),
+        },
         async ({ organism_id, ws, space, instance_id, comment_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { ...toolError('NOT_FOUND', 'Organism not found') };
@@ -554,11 +575,13 @@ export function registerOrganismsTools(
     // ── Tool 6: aimeat_organism_create ──
     // Mirrors POST /v1/organisms. Membership is keyed by the BARE owner name (the canonical
     // convention used by the route + the workspace tools' membership gate) — NOT the full GHII.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_create',
-        descriptionFor('aimeat_organism_create'),
-        zodShapeFor('aimeat_organism_create'),
-        annotationsFor('aimeat_organism_create'),
+        {
+            description: descriptionFor('aimeat_organism_create'),
+            inputSchema: zodShapeFor('aimeat_organism_create'),
+            annotations: annotationsFor('aimeat_organism_create'),
+        },
         async ({ name, description, type, join_policy, visibility, shape, lang }) => {
             // Validation, the board, the record, the creator membership, the shape's workspaces and
             // the feed/timeline side effects are the shared writer's (services/organism-lifecycle.ts,
@@ -593,11 +616,13 @@ export function registerOrganismsTools(
     // (a markdown body stored as organism.{id}.meta.readme, shown at the top of the organism home).
     // The README is the primary agent-fill target — distinct from the short description and the
     // deterministic structure overview/mindmap.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_update',
-        descriptionFor('aimeat_organism_update'),
-        zodShapeFor('aimeat_organism_update'),
-        annotationsFor('aimeat_organism_update'),
+        {
+            description: descriptionFor('aimeat_organism_update'),
+            inputSchema: zodShapeFor('aimeat_organism_update'),
+            annotations: annotationsFor('aimeat_organism_update'),
+        },
         async ({ organism_id, name, description, readme, interests, join_policy, visibility, agent_access }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -626,9 +651,9 @@ export function registerOrganismsTools(
     );
 
     // ── Tool 7: aimeat_organism_export ──
-    mcp.tool('aimeat_organism_export', descriptionFor('aimeat_organism_export'),
-        zodShapeFor('aimeat_organism_export'),
-        annotationsFor('aimeat_organism_export'),
+    mcp.registerTool('aimeat_organism_export', { description: descriptionFor('aimeat_organism_export'),
+        inputSchema: zodShapeFor('aimeat_organism_export'),
+        annotations: annotationsFor('aimeat_organism_export') },
         async ({ organism_id }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -649,9 +674,9 @@ export function registerOrganismsTools(
         });
 
     // ── Tool 8: aimeat_organism_import ──
-    mcp.tool('aimeat_organism_import', descriptionFor('aimeat_organism_import'),
-        zodShapeFor('aimeat_organism_import'),
-        annotationsFor('aimeat_organism_import'),
+    mcp.registerTool('aimeat_organism_import', { description: descriptionFor('aimeat_organism_import'),
+        inputSchema: zodShapeFor('aimeat_organism_import'),
+        annotations: annotationsFor('aimeat_organism_import') },
         async ({ zip_base64 }) => {
             const ownerName = ownerOf();
             const buf = Buffer.from(zip_base64, 'base64');

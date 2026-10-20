@@ -9,6 +9,7 @@
  *   (own and shared learned entries), the MCP pitfall list and knowledge get/list tools, the
  *   operator's overview, the Knowledge tab service, and the REST get, export and clone routes.
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so each test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V4. Initial.
@@ -49,7 +50,7 @@ function mem(ownerGaii: string, key: string, value: unknown, visibility: MemoryR
 function fakeMcp() {
   const tools = new Map<string, (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }>; isError?: boolean }>>();
   const mcp = {
-    tool: (...args: unknown[]) => { tools.set(args[0] as string, args[args.length - 1] as never); },
+    registerTool: (...args: unknown[]) => { tools.set(args[0] as string, args[args.length - 1] as never); },
     registerResource: () => undefined,
   } as unknown as McpServer;
   return { mcp, call: async (name: string, a: Record<string, unknown> = {}) => tools.get(name)!(a) };

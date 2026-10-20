@@ -10,6 +10,7 @@
  *   import { registerCortexTools } from './cortex.js';
  *   registerCortexTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_cortex_install (install, and update:true under a new name) asks the publish
  *     gate with the session's caller when the manifest asks for `public`, and renders the cortex's
  *     `visibility` and `publish_request` (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
@@ -136,11 +137,13 @@ export function registerCortexTools(
             : `${refusal.code}: ${refusal.message}`;
 
     // ── Tool 1: aimeat_cortex_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_cortex_list',
-        descriptionFor('aimeat_cortex_list'),
-        zodShapeFor('aimeat_cortex_list'),
-        annotationsFor('aimeat_cortex_list'),
+        {
+            description: descriptionFor('aimeat_cortex_list'),
+            inputSchema: zodShapeFor('aimeat_cortex_list'),
+            annotations: annotationsFor('aimeat_cortex_list'),
+        },
         async ({ name, include_source }) => {
             // One cortex: the same reads GET /v1/cortex/:name and its /export make (services/cortex-read.ts).
             if (name) {
@@ -183,11 +186,13 @@ export function registerCortexTools(
     );
 
     // ── Tool 2: aimeat_cortex_install ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_cortex_install',
-        descriptionFor('aimeat_cortex_install'),
-        zodShapeFor('aimeat_cortex_install'),
-        annotationsFor('aimeat_cortex_install'),
+        {
+            description: descriptionFor('aimeat_cortex_install'),
+            inputSchema: zodShapeFor('aimeat_cortex_install'),
+            annotations: annotationsFor('aimeat_cortex_install'),
+        },
         async ({ manifest, libs, update }) => {
             const agentGaii = getAgentGaii();
 
@@ -285,11 +290,13 @@ export function registerCortexTools(
     );
 
     // ── Tool 3: aimeat_cortex_activate ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_cortex_activate',
-        descriptionFor('aimeat_cortex_activate'),
-        zodShapeFor('aimeat_cortex_activate'),
-        annotationsFor('aimeat_cortex_activate'),
+        {
+            description: descriptionFor('aimeat_cortex_activate'),
+            inputSchema: zodShapeFor('aimeat_cortex_activate'),
+            annotations: annotationsFor('aimeat_cortex_activate'),
+        },
         async ({ name }) => {
             const agentGaii = getAgentGaii();
             const out = await activateCortex({ storage, config }, agentCaller(), name);
@@ -328,11 +335,13 @@ export function registerCortexTools(
     );
 
     // ── Tool 4: aimeat_cortex_deactivate ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_cortex_deactivate',
-        descriptionFor('aimeat_cortex_deactivate'),
-        zodShapeFor('aimeat_cortex_deactivate'),
-        annotationsFor('aimeat_cortex_deactivate'),
+        {
+            description: descriptionFor('aimeat_cortex_deactivate'),
+            inputSchema: zodShapeFor('aimeat_cortex_deactivate'),
+            annotations: annotationsFor('aimeat_cortex_deactivate'),
+        },
         async ({ name }) => {
             const agentGaii = getAgentGaii();
             const out = await deactivateCortex({ storage, config }, agentCaller(), name);
@@ -369,11 +378,13 @@ export function registerCortexTools(
     );
 
     // ── Tool 5: aimeat_cortex_delete ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_cortex_delete',
-        descriptionFor('aimeat_cortex_delete'),
-        zodShapeFor('aimeat_cortex_delete'),
-        annotationsFor('aimeat_cortex_delete'),
+        {
+            description: descriptionFor('aimeat_cortex_delete'),
+            inputSchema: zodShapeFor('aimeat_cortex_delete'),
+            annotations: annotationsFor('aimeat_cortex_delete'),
+        },
         async ({ name }) => {
             const agentGaii = getAgentGaii();
             const out = await deleteCortex({ storage, config }, agentCaller(), name);

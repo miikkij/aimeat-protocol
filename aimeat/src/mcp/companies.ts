@@ -14,6 +14,7 @@
  *   aimeat_company_list, _create, _update, _front_page, _portfolio_publish.
  * @usage import { registerCompanyTools } from './companies.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_company_front_page takes `access` (who may open the front page; `kind` may be left
  *     out to change only that), and a company answers `front_page_access` (V3.10).
  *   2026-10-18 — aimeat_company_front_page and aimeat_company_portfolio_publish pass the publish gate
@@ -117,11 +118,13 @@ export function registerCompanyTools(
     });
 
     // ── aimeat_company_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_company_list',
-        descriptionFor('aimeat_company_list'),
-        zodShapeFor('aimeat_company_list'),
-        annotationsFor('aimeat_company_list'),
+        {
+            description: descriptionFor('aimeat_company_list'),
+            inputSchema: zodShapeFor('aimeat_company_list'),
+            annotations: annotationsFor('aimeat_company_list'),
+        },
         async ({ page, per_page }) => {
             const p = Math.max(1, page ?? 1);
             const pp = Math.min(100, Math.max(1, per_page ?? 50));
@@ -135,11 +138,13 @@ export function registerCompanyTools(
     );
 
     // ── aimeat_company_create ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_company_create',
-        descriptionFor('aimeat_company_create'),
-        zodShapeFor('aimeat_company_create'),
-        annotationsFor('aimeat_company_create'),
+        {
+            description: descriptionFor('aimeat_company_create'),
+            inputSchema: zodShapeFor('aimeat_company_create'),
+            annotations: annotationsFor('aimeat_company_create'),
+        },
         async ({ name, slug, ai_provenance, ai_provenance_id, ...identity }) => {
             try {
                 // routes/companies.ts emits on every mutation, and the companies tab re-fetches
@@ -155,11 +160,13 @@ export function registerCompanyTools(
     );
 
     // ── aimeat_company_update ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_company_update',
-        descriptionFor('aimeat_company_update'),
-        zodShapeFor('aimeat_company_update'),
-        annotationsFor('aimeat_company_update'),
+        {
+            description: descriptionFor('aimeat_company_update'),
+            inputSchema: zodShapeFor('aimeat_company_update'),
+            annotations: annotationsFor('aimeat_company_update'),
+        },
         async ({ company_id, name, ai_provenance, ai_provenance_id, ...identity }) => {
             try {
                 // Merge onto the CURRENT record so unmentioned fields keep their value: an update
@@ -190,11 +197,13 @@ export function registerCompanyTools(
     );
 
     // ── aimeat_company_front_page ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_company_front_page',
-        descriptionFor('aimeat_company_front_page'),
-        zodShapeFor('aimeat_company_front_page'),
-        annotationsFor('aimeat_company_front_page'),
+        {
+            description: descriptionFor('aimeat_company_front_page'),
+            inputSchema: zodShapeFor('aimeat_company_front_page'),
+            annotations: annotationsFor('aimeat_company_front_page'),
+        },
         async ({ company_id, kind, target, access: accessIn }) => {
             try {
                 if (kind === undefined && accessIn === undefined) return toolError('INVALID_FRONT_PAGE', 'Send kind, access, or both.');
@@ -210,11 +219,13 @@ export function registerCompanyTools(
     );
 
     // ── aimeat_company_portfolio_publish ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_company_portfolio_publish',
-        descriptionFor('aimeat_company_portfolio_publish'),
-        zodShapeFor('aimeat_company_portfolio_publish'),
-        annotationsFor('aimeat_company_portfolio_publish'),
+        {
+            description: descriptionFor('aimeat_company_portfolio_publish'),
+            inputSchema: zodShapeFor('aimeat_company_portfolio_publish'),
+            annotations: annotationsFor('aimeat_company_portfolio_publish'),
+        },
         async ({ company_id, html }) => {
             try {
                 const { company, status, asked } = await publishCompanyPortfolioGated({ storage, config }, { caller: caller() },

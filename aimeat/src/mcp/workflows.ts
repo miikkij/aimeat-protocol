@@ -11,6 +11,7 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — aimeat_workflow_save clears the workflow's open trigger refusal, as PUT
  *     /v1/workflows/:id does: the refusal pins the definition it refused, and "Run as me" on it
  *     answers DEFINITION_CHANGED once the definition is replaced (secaudit 2026-10,
@@ -91,12 +92,14 @@ export function registerWorkflowTools(
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
 
   // ── aimeat_workflow_save ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_workflow_save',
-    descriptionFor('aimeat_workflow_save'),
-    // The catalog's schema, which carries the definition text this tool wrote (secaudit 2026-10 follow-up, Part B).
-    zodShapeFor('aimeat_workflow_save'),
-    annotationsFor('aimeat_workflow_save'),
+    {
+        description: descriptionFor('aimeat_workflow_save'),
+        // The catalog's schema, which carries the definition text this tool wrote (secaudit 2026-10 follow-up, Part B).
+        inputSchema: zodShapeFor('aimeat_workflow_save'),
+        annotations: annotationsFor('aimeat_workflow_save'),
+    },
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
 
@@ -154,11 +157,13 @@ export function registerWorkflowTools(
   );
 
   // ── aimeat_workflow_get ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_workflow_get',
-    descriptionFor('aimeat_workflow_get'),
-    zodShapeFor('aimeat_workflow_get'),
-    annotationsFor('aimeat_workflow_get'),
+    {
+        description: descriptionFor('aimeat_workflow_get'),
+        inputSchema: zodShapeFor('aimeat_workflow_get'),
+        annotations: annotationsFor('aimeat_workflow_get'),
+    },
     async (a) => {
       if (!a.id) {
         const defs = await listWorkflows(storage, ownerGhii);
@@ -177,11 +182,13 @@ export function registerWorkflowTools(
   );
 
   // ── aimeat_workflow_run ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_workflow_run',
-    descriptionFor('aimeat_workflow_run'),
-    zodShapeFor('aimeat_workflow_run'),
-    annotationsFor('aimeat_workflow_run'),
+    {
+        description: descriptionFor('aimeat_workflow_run'),
+        inputSchema: zodShapeFor('aimeat_workflow_run'),
+        annotations: annotationsFor('aimeat_workflow_run'),
+    },
     async (a) => {
       const engine = getActiveWorkflowEngine();
       if (!engine) return err('Workflow engine not started');
@@ -216,11 +223,13 @@ export function registerWorkflowTools(
   );
 
   // ── aimeat_workflow_pending_inputs ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_workflow_pending_inputs',
-    descriptionFor('aimeat_workflow_pending_inputs'),
-    zodShapeFor('aimeat_workflow_pending_inputs'),
-    annotationsFor('aimeat_workflow_pending_inputs'),
+    {
+        description: descriptionFor('aimeat_workflow_pending_inputs'),
+        inputSchema: zodShapeFor('aimeat_workflow_pending_inputs'),
+        annotations: annotationsFor('aimeat_workflow_pending_inputs'),
+    },
     async () => {
       // The walk and the deadline arithmetic are services/workflow/lifecycle.ts. A deadline
       // computed two ways is a deadline: an agent told one time and the dashboard showing another
@@ -235,11 +244,13 @@ export function registerWorkflowTools(
   );
 
   // ── aimeat_workflow_answer ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_workflow_answer',
-    descriptionFor('aimeat_workflow_answer'),
-    zodShapeFor('aimeat_workflow_answer'),
-    annotationsFor('aimeat_workflow_answer'),
+    {
+        description: descriptionFor('aimeat_workflow_answer'),
+        inputSchema: zodShapeFor('aimeat_workflow_answer'),
+        annotations: annotationsFor('aimeat_workflow_answer'),
+    },
     async (a) => {
       const engine = getActiveWorkflowEngine();
       if (!engine) return err('Workflow engine not started');

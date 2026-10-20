@@ -15,6 +15,7 @@
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-16 — The node tool takes the `mail:<record id>` aimeat_contact_add returns, and refuses
  *     another owner's contact by either id (QA audit F12b-01).
  *   2026-10-15 — The node tool reads the owner's address book, so the contact and the log are the owner's (feature-list audit 129).
@@ -48,7 +49,7 @@ type Handler = (args: Record<string, unknown>) => Promise<ToolResult>;
 function capturingMcp(): { mcp: McpServer; handlers: Map<string, Handler> } {
     const handlers = new Map<string, Handler>();
     const mcp = {
-        tool: (name: string, ...rest: unknown[]) => { handlers.set(name, rest[rest.length - 1] as Handler); },
+        registerTool: (name: string, ...rest: unknown[]) => { handlers.set(name, rest[rest.length - 1] as Handler); },
     } as unknown as McpServer;
     return { mcp, handlers };
 }

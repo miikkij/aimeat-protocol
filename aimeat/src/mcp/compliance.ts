@@ -25,6 +25,7 @@
  *   import { registerComplianceTools } from './compliance.js';
  *   registerComplianceTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_compliance_report with scope "mine" asks wallet:read, as the REST route does;
  *     it asked nothing (feature-list audit 159).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -77,11 +78,13 @@ export function registerComplianceTools(
    */
   const gate = (scope: string) => complianceRefusal(storage, { gaii: agentGaii, scopes: sessionScopes }, scope);
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_compliance_report',
-    descriptionFor('aimeat_compliance_report'),
-    zodShapeFor('aimeat_compliance_report'),
-    annotationsFor('aimeat_compliance_report'),
+    {
+        description: descriptionFor('aimeat_compliance_report'),
+        inputSchema: zodShapeFor('aimeat_compliance_report'),
+        annotations: annotationsFor('aimeat_compliance_report'),
+    },
     async ({ scope, since_days, month }) => {
       if (month && !MONTH_RE.test(month)) {
         return refuse('The month has to look like 2026-08. Leave it out to get a rolling window instead.');
@@ -104,11 +107,13 @@ export function registerComplianceTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_compliance_register_read',
-    descriptionFor('aimeat_compliance_register_read'),
-    zodShapeFor('aimeat_compliance_register_read'),
-    annotationsFor('aimeat_compliance_register_read'),
+    {
+        description: descriptionFor('aimeat_compliance_register_read'),
+        inputSchema: zodShapeFor('aimeat_compliance_register_read'),
+        annotations: annotationsFor('aimeat_compliance_register_read'),
+    },
     async ({ part, since_days }) => {
       const denied = await gate(COMPLIANCE_READ_SCOPE);
       if (denied) return refuse(denied);
@@ -123,11 +128,13 @@ export function registerComplianceTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_compliance_register_write',
-    descriptionFor('aimeat_compliance_register_write'),
-    zodShapeFor('aimeat_compliance_register_write'),
-    annotationsFor('aimeat_compliance_register_write'),
+    {
+        description: descriptionFor('aimeat_compliance_register_write'),
+        inputSchema: zodShapeFor('aimeat_compliance_register_write'),
+        annotations: annotationsFor('aimeat_compliance_register_write'),
+    },
     async ({ part, value, dry_run }) => {
       const denied = await gate(COMPLIANCE_WRITE_SCOPE);
       if (denied) return refuse(denied);
@@ -176,11 +183,13 @@ export function registerComplianceTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_compliance_snapshot',
-    descriptionFor('aimeat_compliance_snapshot'),
-    zodShapeFor('aimeat_compliance_snapshot'),
-    annotationsFor('aimeat_compliance_snapshot'),
+    {
+        description: descriptionFor('aimeat_compliance_snapshot'),
+        inputSchema: zodShapeFor('aimeat_compliance_snapshot'),
+        annotations: annotationsFor('aimeat_compliance_snapshot'),
+    },
     async ({ action, id, since_days }) => {
       // Saving adds a node-wide document to what the installation keeps, so it asks for the write
       // word. Reading the shelf asks for the read one. Same split as the register.

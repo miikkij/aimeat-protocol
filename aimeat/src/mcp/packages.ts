@@ -23,6 +23,7 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_package_compose and aimeat_package_compose_set ask the publish gate as their
  *     REST routes do: a new group asked public by an agent without publish:public is created private
  *     and the answer carries `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -136,7 +137,7 @@ function registerPackageSaleTools(
 ): void {
     const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
-    mcp.tool('aimeat_package_offer', descriptionFor('aimeat_package_offer'), zodShapeFor('aimeat_package_offer'), annotationsFor('aimeat_package_offer'), async ({ group_id, action, terms, state }) => {
+    mcp.registerTool('aimeat_package_offer', { description: descriptionFor('aimeat_package_offer'), inputSchema: zodShapeFor('aimeat_package_offer'), annotations: annotationsFor('aimeat_package_offer') }, async ({ group_id, action, terms, state }) => {
         if (action === 'get') {
             // The author's own read, as on GET /v1/packages/:groupId/offer: anyone else learns nothing.
             const offer = await readOffer(storage, group_id);
@@ -147,7 +148,7 @@ function registerPackageSaleTools(
         return text({ ...publicOffer(out.offer), all_terms: out.offer.terms });
     });
 
-    mcp.tool('aimeat_package_buy', descriptionFor('aimeat_package_buy'), zodShapeFor('aimeat_package_buy'), annotationsFor('aimeat_package_buy'), async (input) => {
+    mcp.registerTool('aimeat_package_buy', { description: descriptionFor('aimeat_package_buy'), inputSchema: zodShapeFor('aimeat_package_buy'), annotations: annotationsFor('aimeat_package_buy') }, async (input) => {
         const deps = { storage, config, peers };
         const owner = ownerOf();
         const repository = input.repository ?? '';
@@ -212,7 +213,7 @@ export function registerPackageTools(
         return { roles: [...session.roles], scopes: [...session.scopes] };
     };
 
-    mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), zodShapeFor('aimeat_package_list'), annotationsFor('aimeat_package_list'), async ({ search, author, status }) => {
+    mcp.registerTool('aimeat_package_list', { description: descriptionFor('aimeat_package_list'), inputSchema: zodShapeFor('aimeat_package_list'), annotations: annotationsFor('aimeat_package_list') }, async ({ search, author, status }) => {
         const result = await listPackagesFor(storage, ownerOf(), { search, author, status });
         return {
             content: [{
@@ -225,7 +226,7 @@ export function registerPackageTools(
         };
     });
 
-    mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), zodShapeFor('aimeat_package_get'), annotationsFor('aimeat_package_get'), async ({ group_id }) => {
+    mcp.registerTool('aimeat_package_get', { description: descriptionFor('aimeat_package_get'), inputSchema: zodShapeFor('aimeat_package_get'), annotations: annotationsFor('aimeat_package_get') }, async ({ group_id }) => {
         // The session's own auth, so audience.ts sees the agent (an organism that admits only listed
         // agents refuses the rest) for a 'members' or 'organism:<id>' package (plan V3.7).
         const pkg = await getPackageFor(storage, group_id, caller().auth);
@@ -239,7 +240,7 @@ export function registerPackageTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config) }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_package_compose', descriptionFor('aimeat_package_compose'), zodShapeFor('aimeat_package_compose'), annotationsFor('aimeat_package_compose'), async (args) => {
+    mcp.registerTool('aimeat_package_compose', { description: descriptionFor('aimeat_package_compose'), inputSchema: zodShapeFor('aimeat_package_compose'), annotations: annotationsFor('aimeat_package_compose') }, async (args) => {
         const owner = ownerOf();
         // Behind the publish gate, as POST /v1/packages/compose (services/packages/compose/package-publish-ask.ts).
         const out = await composeWithPublishGate({ storage, config }, caller(), undefined,
@@ -272,7 +273,7 @@ export function registerPackageTools(
     });
 
     // A set to sell: the same service POST /v1/packages/compose-set calls.
-    mcp.tool('aimeat_package_compose_set', descriptionFor('aimeat_package_compose_set'), zodShapeFor('aimeat_package_compose_set'), annotationsFor('aimeat_package_compose_set'), async (args) => {
+    mcp.registerTool('aimeat_package_compose_set', { description: descriptionFor('aimeat_package_compose_set'), inputSchema: zodShapeFor('aimeat_package_compose_set'), annotations: annotationsFor('aimeat_package_compose_set') }, async (args) => {
         const owner = ownerOf();
         const out = await composeSetWithPublishGate({ storage, config }, caller(), undefined, { owner, ownerGhii: await resolveGhii(storage, owner, config) }, {
             name: args.name, apps: args.apps, title: args.title, organism: args.organism, defaults: args.defaults,
@@ -286,7 +287,7 @@ export function registerPackageTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify({ ...answer, ...asked }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_package_pull', descriptionFor('aimeat_package_pull'), zodShapeFor('aimeat_package_pull'), annotationsFor('aimeat_package_pull'), async (args) => {
+    mcp.registerTool('aimeat_package_pull', { description: descriptionFor('aimeat_package_pull'), inputSchema: zodShapeFor('aimeat_package_pull'), annotations: annotationsFor('aimeat_package_pull') }, async (args) => {
         const out = await pullPackage({ storage, config, peers }, {
             owner: ownerOf(),
             // An agent acts within its own grant; the operator branch of a pull is a person's
@@ -321,7 +322,7 @@ export function registerPackageTools(
         };
     });
 
-    mcp.tool('aimeat_package_update', descriptionFor('aimeat_package_update'), zodShapeFor('aimeat_package_update'), annotationsFor('aimeat_package_update'), async ({ instance_id, dry_run: dryRun }) => {
+    mcp.registerTool('aimeat_package_update', { description: descriptionFor('aimeat_package_update'), inputSchema: zodShapeFor('aimeat_package_update'), annotations: annotationsFor('aimeat_package_update') }, async ({ instance_id, dry_run: dryRun }) => {
         const owner = ownerOf();
         const gaii = getAgentGaii();
         const out = await updateOrRequest({ storage, config },
@@ -339,13 +340,13 @@ export function registerPackageTools(
     });
 
     // Taking a bad version back: the same service POST /v1/packages/:groupId/versions/:version/withdraw calls.
-    mcp.tool('aimeat_package_withdraw', descriptionFor('aimeat_package_withdraw'), zodShapeFor('aimeat_package_withdraw'), annotationsFor('aimeat_package_withdraw'), async ({ group_id, version, reason }) => {
+    mcp.registerTool('aimeat_package_withdraw', { description: descriptionFor('aimeat_package_withdraw'), inputSchema: zodShapeFor('aimeat_package_withdraw'), annotations: annotationsFor('aimeat_package_withdraw') }, async ({ group_id, version, reason }) => {
         const out = await withdrawVersion({ storage, config, scheduler: getActiveScheduler() }, { owner: ownerOf(), isOperator: false }, { groupId: group_id, version, reason });
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ withdrawal: out.withdrawal, copies_here: out.copies_here, next_step: 'Publish a fixed version; managed copies receive it as an update.' }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_package_status_set', descriptionFor('aimeat_package_status_set'), zodShapeFor('aimeat_package_status_set'), annotationsFor('aimeat_package_status_set'), async ({ group_id, version, status }) => {
+    mcp.registerTool('aimeat_package_status_set', { description: descriptionFor('aimeat_package_status_set'), inputSchema: zodShapeFor('aimeat_package_status_set'), annotations: annotationsFor('aimeat_package_status_set') }, async ({ group_id, version, status }) => {
         const owner = ownerOf();
         const out = await setPackageVersionStatus({ storage, config },
             { owner }, { groupId: group_id, version, status });
@@ -357,7 +358,7 @@ export function registerPackageTools(
         }
         return { content: [{ type: 'text' as const, text: JSON.stringify(packageSummary(out.package), null, 2) }] };
     });
-    mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), zodShapeFor('aimeat_package_install'), annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps }) => {
+    mcp.registerTool('aimeat_package_install', { description: descriptionFor('aimeat_package_install'), inputSchema: zodShapeFor('aimeat_package_install'), annotations: annotationsFor('aimeat_package_install') }, async ({ group_id, label, version, dry_run: dryRun, mode, config: installConfig, organism_names: organismNames, grant_apps: grantApps }) => {
         // Packages install under the OWNER, so resolve the agent's owner and never a supplied id.
         const gaii = getAgentGaii();
         const owner = localAccountName(gaii);
@@ -424,7 +425,7 @@ export function registerPackageTools(
 
     // The installed copies. aimeat_package_update and aimeat_package_fork both take an instance id,
     // and without this list a conversation could not name one.
-    mcp.tool('aimeat_package_instances', descriptionFor('aimeat_package_instances'), zodShapeFor('aimeat_package_instances'), annotationsFor('aimeat_package_instances'), async ({ group_id, status }) => {
+    mcp.registerTool('aimeat_package_instances', { description: descriptionFor('aimeat_package_instances'), inputSchema: zodShapeFor('aimeat_package_instances'), annotations: annotationsFor('aimeat_package_instances') }, async ({ group_id, status }) => {
         const result = await listInstancesFor(storage, ownerOf(), { packageGroupId: group_id, status, limit: 200 });
         return {
             content: [{
@@ -450,7 +451,7 @@ export function registerPackageTools(
     });
 
     // The owner's own choices about an install: its label, and whether the daily check updates it.
-    mcp.tool('aimeat_package_instance_set', descriptionFor('aimeat_package_instance_set'), zodShapeFor('aimeat_package_instance_set'), annotationsFor('aimeat_package_instance_set'), async ({ instance_id, label, auto_update }) => {
+    mcp.registerTool('aimeat_package_instance_set', { description: descriptionFor('aimeat_package_instance_set'), inputSchema: zodShapeFor('aimeat_package_instance_set'), annotations: annotationsFor('aimeat_package_instance_set') }, async ({ instance_id, label, auto_update }) => {
         // A session is always an agent: auto-update on takes packages:install-code (PKG-12).
         const out = await setPackageInstance(storage, { owner: ownerOf(), mayInstallCode: scopeIsCovered(sessionScopes, INSTALL_CODE_SCOPE) }, instance_id, { label, autoUpdate: auto_update });
         if (!out.ok) return { ...toolError(out.code, out.message) };
@@ -458,8 +459,8 @@ export function registerPackageTools(
     });
 
     // What POST /v1/instances/check-updates does, for this owner's installs.
-    mcp.tool('aimeat_package_check_updates', descriptionFor('aimeat_package_check_updates'), zodShapeFor('aimeat_package_check_updates'),
-        annotationsFor('aimeat_package_check_updates'), async () => {
+    mcp.registerTool('aimeat_package_check_updates', { description: descriptionFor('aimeat_package_check_updates'), inputSchema: zodShapeFor('aimeat_package_check_updates'),
+        annotations: annotationsFor('aimeat_package_check_updates') }, async () => {
             // With federation off, the repository an install set named is still a source (install-set-trust.ts).
             if (!config.packageFederationEnabled && (await installSetRepositories(storage)).size === 0) {
                 return { ...toolError('PACKAGE_FEDERATION_DISABLED', 'This node does not exchange packages with other nodes, so there is no source to check.') };
@@ -469,14 +470,14 @@ export function registerPackageTools(
         });
 
     // What a repository peer serves this node, before pulling one of them.
-    mcp.tool('aimeat_package_repository', descriptionFor('aimeat_package_repository'), zodShapeFor('aimeat_package_repository'), annotationsFor('aimeat_package_repository'), async ({ node_id }) => {
+    mcp.registerTool('aimeat_package_repository', { description: descriptionFor('aimeat_package_repository'), inputSchema: zodShapeFor('aimeat_package_repository'), annotations: annotationsFor('aimeat_package_repository') }, async ({ node_id }) => {
         const out = await listRepositoryPackages({ storage, config, peers }, node_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return { content: [{ type: 'text' as const, text: JSON.stringify({ node: out.node, packages: out.packages }, null, 2) }] };
     });
 
     // On a repository: which nodes a private package is served to, and up to when.
-    mcp.tool('aimeat_package_entitlements', descriptionFor('aimeat_package_entitlements'), zodShapeFor('aimeat_package_entitlements'), annotationsFor('aimeat_package_entitlements'), async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
+    mcp.registerTool('aimeat_package_entitlements', { description: descriptionFor('aimeat_package_entitlements'), inputSchema: zodShapeFor('aimeat_package_entitlements'), annotations: annotationsFor('aimeat_package_entitlements') }, async ({ group_id, action, node_id, updates_until, channel, note, node }) => {
         const caller = { owner: ownerOf(), isOperator: false };
         if (action === 'list') {
             const out = await listEntitlements(storage, caller, group_id);
@@ -495,7 +496,7 @@ export function registerPackageTools(
     });
 
     // The nodes that sell this author's packages with no token: the same service /v1/package-sellers calls.
-    mcp.tool('aimeat_package_sellers', descriptionFor('aimeat_package_sellers'), zodShapeFor('aimeat_package_sellers'), annotationsFor('aimeat_package_sellers'), async ({ action, node_id, node, note }) => {
+    mcp.registerTool('aimeat_package_sellers', { description: descriptionFor('aimeat_package_sellers'), inputSchema: zodShapeFor('aimeat_package_sellers'), annotations: annotationsFor('aimeat_package_sellers') }, async ({ action, node_id, node, note }) => {
         const owner = ownerOf();
         const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
         if (action === 'list') return text({ sellers: await listSellers(storage, owner), repository_role: config.packageRepository });
@@ -511,7 +512,7 @@ export function registerPackageTools(
     });
 
     // The questions a shop asks before payment: the same service GET /v1/packages/:groupId/config-needs calls.
-    mcp.tool('aimeat_package_config_needs', descriptionFor('aimeat_package_config_needs'), zodShapeFor('aimeat_package_config_needs'), annotationsFor('aimeat_package_config_needs'), async ({ group_id }) => {
+    mcp.registerTool('aimeat_package_config_needs', { description: descriptionFor('aimeat_package_config_needs'), inputSchema: zodShapeFor('aimeat_package_config_needs'), annotations: annotationsFor('aimeat_package_config_needs') }, async ({ group_id }) => {
         const out = await packageConfigNeeds(storage, config, { owner: ownerOf(), isOperator: false }, group_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         const { group_id: g, version, bundle, name, questions, defaults, problems } = out;
@@ -519,7 +520,7 @@ export function registerPackageTools(
     });
 
     // Releasing a managed install: the same service POST /v1/instances/:id/fork calls.
-    mcp.tool('aimeat_package_fork', descriptionFor('aimeat_package_fork'), zodShapeFor('aimeat_package_fork'), annotationsFor('aimeat_package_fork'), async ({ instance_id }) => {
+    mcp.registerTool('aimeat_package_fork', { description: descriptionFor('aimeat_package_fork'), inputSchema: zodShapeFor('aimeat_package_fork'), annotations: annotationsFor('aimeat_package_fork') }, async ({ instance_id }) => {
         const out = await forkPackageInstance(storage, { owner: ownerOf() }, instance_id);
         if (!out.ok) return { ...toolError(out.code, out.message) };
         return {

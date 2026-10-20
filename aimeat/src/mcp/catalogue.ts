@@ -10,6 +10,7 @@
  *   import { registerCatalogueTools } from './catalogue.js';
  *   registerCatalogueTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — SECURITY: aimeat_catalogue_directory answers from the node's DirectoryService, so it
  *     lists only people holding an active federation consent, as GET /v1/catalogue/directory does;
  *     aimeat_catalogue_agents drops `unlisted` agents, as GET /v1/catalogue/agents does
@@ -44,11 +45,13 @@ export function registerCatalogueTools(
 ): void {
 
     // ── Tool 1: aimeat_catalogue_agents ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_catalogue_agents',
-        descriptionFor('aimeat_catalogue_agents'),
-        zodShapeFor('aimeat_catalogue_agents'),
-        annotationsFor('aimeat_catalogue_agents'),
+        {
+            description: descriptionFor('aimeat_catalogue_agents'),
+            inputSchema: zodShapeFor('aimeat_catalogue_agents'),
+            annotations: annotationsFor('aimeat_catalogue_agents'),
+        },
         async ({ search, category }) => {
             // An agent tagged `unlisted` (the per-owner Secretary, for one) is out of the public
             // directory, as it is on GET /v1/catalogue/agents. This door had not applied the rule,
@@ -92,11 +95,13 @@ export function registerCatalogueTools(
     );
 
     // ── Tool 2: aimeat_catalogue_boards ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_catalogue_boards',
-        descriptionFor('aimeat_catalogue_boards'),
-        zodShapeFor('aimeat_catalogue_boards'),
-        annotationsFor('aimeat_catalogue_boards'),
+        {
+            description: descriptionFor('aimeat_catalogue_boards'),
+            inputSchema: zodShapeFor('aimeat_catalogue_boards'),
+            annotations: annotationsFor('aimeat_catalogue_boards'),
+        },
         async () => {
             const boards = await storage.listBoards();
             const publicBoards = boards.filter(b => b.visibility === 'public');
@@ -116,11 +121,13 @@ export function registerCatalogueTools(
     );
 
     // ── Tool 3: aimeat_catalogue_directory ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_catalogue_directory',
-        descriptionFor('aimeat_catalogue_directory'),
-        zodShapeFor('aimeat_catalogue_directory'),
-        annotationsFor('aimeat_catalogue_directory'),
+        {
+            description: descriptionFor('aimeat_catalogue_directory'),
+            inputSchema: zodShapeFor('aimeat_catalogue_directory'),
+            annotations: annotationsFor('aimeat_catalogue_directory'),
+        },
         async ({ city, interest }) => {
             // ONE LISTING, ONE OPT-IN. GET /v1/catalogue/directory answers from the DirectoryService,
             // which indexes a person only while they hold an active `federation` consent and reads

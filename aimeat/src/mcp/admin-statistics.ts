@@ -26,6 +26,7 @@
  * @structure registerAdminStatisticsTools(mcp, storage, config, getAgentGaii, scopes) — two reads.
  * @usage registerAdminStatisticsTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
@@ -60,9 +61,9 @@ export function registerAdminStatisticsTools(
   const agentGaii = getAgentGaii();
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
-  mcp.tool('aimeat_admin_statistics', descriptionFor('aimeat_admin_statistics'),
-    zodShapeFor('aimeat_admin_statistics'),
-    annotationsFor('aimeat_admin_statistics'),
+  mcp.registerTool('aimeat_admin_statistics', { description: descriptionFor('aimeat_admin_statistics'),
+    inputSchema: zodShapeFor('aimeat_admin_statistics'),
+    annotations: annotationsFor('aimeat_admin_statistics') },
     async ({ from, to }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       if (!config.statsEnabled) return refuse('Statistics are switched off on this node.');
@@ -86,9 +87,9 @@ export function registerAdminStatisticsTools(
       return text(await buildStatsSnapshot(config, storage, stats, range));
     });
 
-  mcp.tool('aimeat_admin_usage', descriptionFor('aimeat_admin_usage'),
-    zodShapeFor('aimeat_admin_usage'),
-    annotationsFor('aimeat_admin_usage'),
+  mcp.registerTool('aimeat_admin_usage', { description: descriptionFor('aimeat_admin_usage'),
+    inputSchema: zodShapeFor('aimeat_admin_usage'),
+    annotations: annotationsFor('aimeat_admin_usage') },
     async ({ from, to, ask_provider }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
 

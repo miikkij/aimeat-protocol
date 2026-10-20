@@ -18,6 +18,7 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.6.1 — 2026-10-13 — aimeat_exchange_offering_get states an ext action's toll through
  *     extActionDeclaredToll, as the REST detail does.
  *   v1.6.0 — 2026-10-12 — aimeat_exchange_accept prices an extension action with resolveExtActionPricing,
@@ -119,11 +120,13 @@ export function registerExchangeTools(
     const fail = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true as const });
 
     // ── Browse offerings (supply) ──────────────────────────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_offerings',
-        descriptionFor('aimeat_exchange_offerings'),
-        zodShapeFor('aimeat_exchange_offerings'),
-        annotationsFor('aimeat_exchange_offerings'),
+        {
+            description: descriptionFor('aimeat_exchange_offerings'),
+            inputSchema: zodShapeFor('aimeat_exchange_offerings'),
+            annotations: annotationsFor('aimeat_exchange_offerings'),
+        },
         async ({ q, ext, action, stats }) => {
             const offerings = (ext && action) || q
                 ? await filterOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
@@ -137,11 +140,13 @@ export function registerExchangeTools(
     );
 
     // ── One offering in full (detail + I/O schema + call-recipe + stats) ────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_offering_get',
-        descriptionFor('aimeat_exchange_offering_get'),
-        zodShapeFor('aimeat_exchange_offering_get'),
-        annotationsFor('aimeat_exchange_offering_get'),
+        {
+            description: descriptionFor('aimeat_exchange_offering_get'),
+            inputSchema: zodShapeFor('aimeat_exchange_offering_get'),
+            annotations: annotationsFor('aimeat_exchange_offering_get'),
+        },
         async ({ offering_id }) => {
             const found = await getOfferingWithMeta(storage, offering_id);
             if (!found) return fail(`NOT_FOUND: no such offering "${offering_id}"`);
@@ -198,12 +203,14 @@ export function registerExchangeTools(
     );
 
     // ── Accept a contract → mint a metered entitlement for the caller ───────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_accept',
-        descriptionFor('aimeat_exchange_accept'),
-        // The catalog's schema, which now carries offering_id and these bounds (secaudit 2026-10 follow-up, Part B).
-        zodShapeFor('aimeat_exchange_accept'),
-        annotationsFor('aimeat_exchange_accept'),
+        {
+            description: descriptionFor('aimeat_exchange_accept'),
+            // The catalog's schema, which now carries offering_id and these bounds (secaudit 2026-10 follow-up, Part B).
+            inputSchema: zodShapeFor('aimeat_exchange_accept'),
+            annotations: annotationsFor('aimeat_exchange_accept'),
+        },
         async ({ offering_id, ext, action, contract_ref, cap_units, plan_id, app_id }) => {
             const capUnits = cap_units !== undefined ? Math.floor(cap_units) : null;
 
@@ -258,11 +265,13 @@ export function registerExchangeTools(
     );
 
     // ── List the caller's own contracts (consumer side) ────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_contracts',
-        descriptionFor('aimeat_exchange_contracts'),
-        zodShapeFor('aimeat_exchange_contracts'),
-        annotationsFor('aimeat_exchange_contracts'),
+        {
+            description: descriptionFor('aimeat_exchange_contracts'),
+            inputSchema: zodShapeFor('aimeat_exchange_contracts'),
+            annotations: annotationsFor('aimeat_exchange_contracts'),
+        },
         async () => {
             const mine = await listEntitlementsByConsumer(storage, consumerGaii);
             return ok({ entitlements: mine.map(e => entitlementView(config, e)), count: mine.length });
@@ -270,11 +279,13 @@ export function registerExchangeTools(
     );
 
     // ── Pause / revoke one of the caller's own contracts ───────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_contract_off',
-        descriptionFor('aimeat_exchange_contract_off'),
-        zodShapeFor('aimeat_exchange_contract_off'),
-        annotationsFor('aimeat_exchange_contract_off'),
+        {
+            description: descriptionFor('aimeat_exchange_contract_off'),
+            inputSchema: zodShapeFor('aimeat_exchange_contract_off'),
+            annotations: annotationsFor('aimeat_exchange_contract_off'),
+        },
         async ({ ext, action, mode }) => {
             const ent = await readContractForCall(storage, consumerGaii, ext, action);
             if (!ent || ownerOf(ent.consumerGaii) !== owner) {
@@ -288,11 +299,13 @@ export function registerExchangeTools(
     );
 
     // ── Browse needs (demand) ──────────────────────────────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_needs',
-        descriptionFor('aimeat_exchange_needs'),
-        zodShapeFor('aimeat_exchange_needs'),
-        annotationsFor('aimeat_exchange_needs'),
+        {
+            description: descriptionFor('aimeat_exchange_needs'),
+            inputSchema: zodShapeFor('aimeat_exchange_needs'),
+            annotations: annotationsFor('aimeat_exchange_needs'),
+        },
         async ({ open, mine }) => {
             const needs = await enrichNeeds(storage, await listNeeds(storage, { openOnly: !!open, owner: mine ? owner : undefined }));
             return ok({ needs, count: needs.length });
@@ -300,12 +313,14 @@ export function registerExchangeTools(
     );
 
     // ── Post a need ────────────────────────────────────────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_need_post',
-        descriptionFor('aimeat_exchange_need_post'),
-        // The catalog's schema, which now carries usage_intent and these bounds (secaudit 2026-10 follow-up, Part B).
-        zodShapeFor('aimeat_exchange_need_post'),
-        annotationsFor('aimeat_exchange_need_post'),
+        {
+            description: descriptionFor('aimeat_exchange_need_post'),
+            // The catalog's schema, which now carries usage_intent and these bounds (secaudit 2026-10 follow-up, Part B).
+            inputSchema: zodShapeFor('aimeat_exchange_need_post'),
+            annotations: annotationsFor('aimeat_exchange_need_post'),
+        },
         async ({ description, app_id, ext, action, spec, usage_intent, budget_unit, budget_cap, autonomy }) => {
             // The refusal POST /v1/exchange/needs answers: a morsel budget is a 3.x unit name, removed in
             // MORSEL_PRICE_FIELDS_REMOVED_IN. This tool stored it on 4.0.0 while the route refused it.
@@ -334,11 +349,13 @@ export function registerExchangeTools(
     );
 
     // ── Bid on a need (provider) ───────────────────────────────────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_bid',
-        descriptionFor('aimeat_exchange_bid'),
-        zodShapeFor('aimeat_exchange_bid'),
-        annotationsFor('aimeat_exchange_bid'),
+        {
+            description: descriptionFor('aimeat_exchange_bid'),
+            inputSchema: zodShapeFor('aimeat_exchange_bid'),
+            annotations: annotationsFor('aimeat_exchange_bid'),
+        },
         async ({ need_id, ext, action, plan_id, note, offering_id }) => {
             const n = await getNeed(storage, need_id);
             if (!n) return fail(`NOT_FOUND: no such need "${need_id}"`);
@@ -359,11 +376,13 @@ export function registerExchangeTools(
     );
 
     // ── Accept a bid → mint the entitlement (requester side) ───────────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_bid_accept',
-        descriptionFor('aimeat_exchange_bid_accept'),
-        zodShapeFor('aimeat_exchange_bid_accept'),
-        annotationsFor('aimeat_exchange_bid_accept'),
+        {
+            description: descriptionFor('aimeat_exchange_bid_accept'),
+            inputSchema: zodShapeFor('aimeat_exchange_bid_accept'),
+            annotations: annotationsFor('aimeat_exchange_bid_accept'),
+        },
         async ({ need_id, bid_id, cap_units }) => {
             const n = await getNeed(storage, need_id);
             if (!n || n.requesterOwner !== owner) return fail('NOT_FOUND: no such need of yours');
@@ -385,11 +404,13 @@ export function registerExchangeTools(
     );
 
     // ── Provider lineage: who holds contracts against my offering ──────────────
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_exchange_consumers',
-        descriptionFor('aimeat_exchange_consumers'),
-        zodShapeFor('aimeat_exchange_consumers'),
-        annotationsFor('aimeat_exchange_consumers'),
+        {
+            description: descriptionFor('aimeat_exchange_consumers'),
+            inputSchema: zodShapeFor('aimeat_exchange_consumers'),
+            annotations: annotationsFor('aimeat_exchange_consumers'),
+        },
         async ({ offering_id }) => {
             const o: Offering | null = await getOffering(storage, offering_id);
             if (!o || o.providerOwner !== owner) return fail('NOT_FOUND: no such offering of yours');

@@ -10,6 +10,7 @@
  * @structure registerWorkspaceCreateTool(mcp, storage, config, deps)
  * @usage import { registerWorkspaceCreateTool } from './workspace-create.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8. The four writes this tool made itself (the
@@ -54,9 +55,9 @@ export function registerWorkspaceCreateTool(
     const { ownerName, ownerGhii, writerGaii, ok, fail, denyReason, parseObj } = deps;
 
     // ── aimeat_workspace_create ──
-    mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
-        zodShapeFor('aimeat_workspace_create'),
-        annotationsFor('aimeat_workspace_create'),
+    mcp.registerTool('aimeat_workspace_create', { description: descriptionFor('aimeat_workspace_create'),
+        inputSchema: zodShapeFor('aimeat_workspace_create'),
+        annotations: annotationsFor('aimeat_workspace_create') },
         async ({ organism_id, name, manifest, schemas, readme }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             // A workspace with no name is listed as 'Workspace' and carries a blank manifest name,

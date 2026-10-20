@@ -12,6 +12,7 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-06 — The list is services/appdev-kb.ts pitfallIndex(), which GET /v1/appdev/pitfalls/index
  *     answers with too, and takes the catalog's schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -69,11 +70,13 @@ export function registerAppdevPitfallTools(
     const agentGaii = getAgentGaii();
 
     // ── aimeat_appdev_pitfall_report — upsert one learned pitfall ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_appdev_pitfall_report',
-        descriptionFor('aimeat_appdev_pitfall_report'),
-        zodShapeFor('aimeat_appdev_pitfall_report'),
-        annotationsFor('aimeat_appdev_pitfall_report'),
+        {
+            description: descriptionFor('aimeat_appdev_pitfall_report'),
+            inputSchema: zodShapeFor('aimeat_appdev_pitfall_report'),
+            annotations: annotationsFor('aimeat_appdev_pitfall_report'),
+        },
         async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
             // The whole report is services/appdev-kb.ts reportLearnedPitfall(), the same function
             // POST /v1/appdev/pitfalls/learned calls and both connector doors reach through it. The
@@ -104,11 +107,13 @@ export function registerAppdevPitfallTools(
     );
 
     // ── aimeat_appdev_pitfall_list — merged, paginated, faceted ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_appdev_pitfall_list',
-        descriptionFor('aimeat_appdev_pitfall_list'),
-        zodShapeFor('aimeat_appdev_pitfall_list'),
-        annotationsFor('aimeat_appdev_pitfall_list'),
+        {
+            description: descriptionFor('aimeat_appdev_pitfall_list'),
+            inputSchema: zodShapeFor('aimeat_appdev_pitfall_list'),
+            annotations: annotationsFor('aimeat_appdev_pitfall_list'),
+        },
         async (query) => {
             // The merge, filter and page is services/appdev-kb.ts pitfallIndex(), which
             // GET /v1/appdev/pitfalls/index answers with too. Learned entries are user-written memory
@@ -119,11 +124,13 @@ export function registerAppdevPitfallTools(
     );
 
     // ── aimeat_appdev_pitfall_delete — remove one learned entry (+manifest ref) ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_appdev_pitfall_delete',
-        descriptionFor('aimeat_appdev_pitfall_delete'),
-        zodShapeFor('aimeat_appdev_pitfall_delete'),
-        annotationsFor('aimeat_appdev_pitfall_delete'),
+        {
+            description: descriptionFor('aimeat_appdev_pitfall_delete'),
+            inputSchema: zodShapeFor('aimeat_appdev_pitfall_delete'),
+            annotations: annotationsFor('aimeat_appdev_pitfall_delete'),
+        },
         async ({ category, slug }) => {
             // The delete itself (record + manifest ref + live update) is deletePitfallEntry, the
             // same function DELETE /v1/appdev/pitfalls/learned/:category/:slug calls. This tool had

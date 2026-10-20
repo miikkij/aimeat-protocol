@@ -10,6 +10,7 @@
  *   catalog entries).
  * @structure registerAccountRightsTools(mcp, storage, config, caller)
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-3, A-5, A-8).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -27,23 +28,23 @@ import { embedProvenance, EmbedError } from '../services/provenance-embed/index.
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 
 export function registerAccountRightsTools(mcp: McpServer, storage: Storage, config: AimeatConfig, caller: () => CallerContext): void {
-  mcp.tool('aimeat_adult_status', descriptionFor('aimeat_adult_status'), zodShapeFor('aimeat_adult_status'), annotationsFor('aimeat_adult_status'),
+  mcp.registerTool('aimeat_adult_status', { description: descriptionFor('aimeat_adult_status'), inputSchema: zodShapeFor('aimeat_adult_status'), annotations: annotationsFor('aimeat_adult_status') },
     async () => {
       const c = caller();
       const s = c.visitor ? NOT_VERIFIED : await readAdult(storage, c.ownerGhii);
       return text({ verified: s.verified, method: s.method, verified_at: s.at });
     });
 
-  mcp.tool('aimeat_subscription_list', descriptionFor('aimeat_subscription_list'), zodShapeFor('aimeat_subscription_list'), annotationsFor('aimeat_subscription_list'),
+  mcp.registerTool('aimeat_subscription_list', { description: descriptionFor('aimeat_subscription_list'), inputSchema: zodShapeFor('aimeat_subscription_list'), annotations: annotationsFor('aimeat_subscription_list') },
     async () => text({ subscriptions: await listSubscriptions(storage, caller().ownerGhii) }));
 
-  mcp.tool('aimeat_subscription_cancel', descriptionFor('aimeat_subscription_cancel'), zodShapeFor('aimeat_subscription_cancel'), annotationsFor('aimeat_subscription_cancel'),
+  mcp.registerTool('aimeat_subscription_cancel', { description: descriptionFor('aimeat_subscription_cancel'), inputSchema: zodShapeFor('aimeat_subscription_cancel'), annotations: annotationsFor('aimeat_subscription_cancel') },
     async ({ ext, plan }) => {
       const out = await cancelSubscription(storage, caller().ownerGhii, ext, plan);
       return out ? text({ subscription: out }) : toolError('NOT_FOUND', 'Your owner has no such subscription.');
     });
 
-  mcp.tool('aimeat_provenance_embed', descriptionFor('aimeat_provenance_embed'), zodShapeFor('aimeat_provenance_embed'), annotationsFor('aimeat_provenance_embed'),
+  mcp.registerTool('aimeat_provenance_embed', { description: descriptionFor('aimeat_provenance_embed'), inputSchema: zodShapeFor('aimeat_provenance_embed'), annotations: annotationsFor('aimeat_provenance_embed') },
     async ({ storage_key, provenance_ids, output_key, composite }) => {
       try {
         const r = await embedProvenance({ storage, config }, {

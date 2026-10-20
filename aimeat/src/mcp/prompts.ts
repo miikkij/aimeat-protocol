@@ -10,6 +10,7 @@
  *   import { registerPromptsTools } from './prompts.js';
  *   registerPromptsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.12.0 -- 2026-10-14 -- tier "places" and "places/admin": where things are on this node's own
  *     pages, with links (services/places.ts), for "where do I find X".
  *   v1.11.0 -- 2026-10-11 -- tier "build-app/agent/<name>": the build instructions' section about
@@ -91,14 +92,16 @@ export function registerPromptsTools(
 ): void {
 
     // ── Tool 1: aimeat_handbook_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_handbook_get',
-        descriptionFor('aimeat_handbook_get'),
         {
-            tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "places" says where each page of Settings & Controls is, with the sections inside it and a link to each, and "places/admin" does the same for the admin pages: read it when the person asks where to find something on the pages of this AIMEAT. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
-            surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
+            description: descriptionFor('aimeat_handbook_get'),
+            inputSchema: {
+                tier: z.string().optional().describe('A REST-style tier handbook or a managed prompt by id (e.g. "tier1", "tier2", or a custom prompt ID), for an agent that works over HTTP. Leave it out over MCP: the handbook for your own surface comes back. Two values are for every builder. "build-app-atelier" returns the first part of the ATELIER build specification, the track an app is built on unless there is a reason not to, and "build-app-atelier/<id>" one of the parts it lists. "build-app" and "build-app/<id>" do the same for the Classic specification. "features" lists what this node can do, by area, and "features/<id>" is one area: read it once you know what the person needs, to offer the one thing that fits. "places" says where each page of Settings & Controls is, with the sections inside it and a link to each, and "places/admin" does the same for the admin pages: read it when the person asks where to find something on the pages of this AIMEAT. "settings" lists, first, the words this system uses (organism, agent, morsel and others), each in plain language, then the settings the pages explain behind a question mark, by area. "settings/<term>" is one of them in English, Finnish and Spanish. "settings/concept.<id>" is a word, for example "settings/concept.organism": read it before you use the word with the person or when they ask what it is, and give the word that meaning, which every page and tool uses too. Any other term is a setting: read it when the person asks what it means or which value to pick.'),
+                surface: z.enum(V2_ROLES as unknown as [SurfaceRole, ...SurfaceRole[]]).optional().describe('Read another interface\'s handbook than your own. Leave it out to get the one for the interface you are connected to.'),
+            },
+            annotations: annotationsFor('aimeat_handbook_get'),
         },
-        annotationsFor('aimeat_handbook_get'),
         async ({ tier, surface }) => {
             // The handbook an MCP agent gets when it asks for "the handbook", which is what the
             // server instructions tell it to do first: the one for the surface it is on, and the

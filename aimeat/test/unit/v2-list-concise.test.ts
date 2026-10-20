@@ -6,6 +6,7 @@
  *   promise was in the catalog only; both register zodShapeFor(name) now (secaudit 2026-10, M3).
  * @usage pnpm exec vitest run test/unit/v2-list-concise.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
  */
 import { describe, it, expect } from 'vitest';
@@ -21,7 +22,7 @@ type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ tex
 /** A fake MCP server that keeps each tool's handler. */
 function fakeMcp(): { mcp: never; handlers: Map<string, Handler> } {
     const handlers = new Map<string, Handler>();
-    const mcp = { tool: (...args: unknown[]) => { handlers.set(args[0] as string, args[args.length - 1] as Handler); } };
+    const mcp = { registerTool: (...args: unknown[]) => { handlers.set(args[0] as string, args[args.length - 1] as Handler); } };
     return { mcp: mcp as never, handlers };
 }
 
