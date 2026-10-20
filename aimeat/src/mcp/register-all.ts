@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-21 — ServerToolDeps.stateless reaches the chat surface's finder, which answers a
+ *     2026-07-28 request without promising a list change it cannot keep.
  *   2026-10-21 — registerContentTools (aimeat_content_facts, _inspect, _correct, _scan, _classes,
  *     _settings; wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -190,6 +192,8 @@ export interface ServerToolDeps {
     emitResourceListChanged: (agentGaii: string) => void;
     /** The v2 surface this session is on, 'all' on /v1/mcp. The handbook tool answers by it. */
     role?: SurfaceRole | 'all';
+    /** A 2026-07-28 request: the server lives for one request, so nothing a tool switches on lasts. */
+    stateless?: boolean;
 }
 
 /**
@@ -249,7 +253,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerInvokeTool(mcp, config, getToken, agentGaii);
     // The chat surface's way to the tools it registers switched off (mcp/tool-loader.ts). Only there:
     // on every other surface everything registered is already on.
-    if (deps.role === 'chat') registerToolLoader(mcp);
+    if (deps.role === 'chat') registerToolLoader(mcp, { stateless: deps.stateless === true });
     registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
