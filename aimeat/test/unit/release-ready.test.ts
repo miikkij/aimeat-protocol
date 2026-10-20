@@ -11,6 +11,7 @@
  *   3. A named reason releases over a nightly sweep that is red, missing or running, and over nothing
  *      else; without one the check refuses as before (Jouni, decision 2026-10-16).
  * @version-history
+ *   v1.2.0 -- 2026-10-20 -- A green nightly of an earlier commit on main counts for 24 hours.
  *   v1.1.0 -- 2026-10-16 -- The named reason for releasing over a red nightly: the environment, the
  *     tag message, the loud line, the job summary and step output, and the two workflows that pass it.
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W08).
@@ -88,6 +89,42 @@ describe('release-ready decides on the runs of the exact commit', () => {
         });
         expect(r.status).toBe(1);
         expect(r.stderr).toContain('is not on origin/main');
+    });
+});
+
+describe('a green nightly of an earlier commit on main counts for 24 hours', () => {
+    // A commit on top of SHA in a repository of its own, so the other tests keep SHA as HEAD.
+    const child = mkdtempSync(join(tmpdir(), 'aimeat-release-ready-child-'));
+    afterAll(() => rmSync(child, { recursive: true, force: true }));
+    const cgit = (...a: string[]) => execFileSync('git', a, { cwd: child, encoding: 'utf8' }).trim();
+    cgit('clone', '-q', scratch, '.');
+    cgit('-c', 'user.name=T', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', 'commit', '--allow-empty', '-qm', 'test: a suite after the bump');
+    const HEAD = cgit('rev-parse', 'HEAD');
+    const at = (msAgo: number) => new Date(Date.now() - msAgo).toISOString();
+
+    function checkChild(name: string, nightlyCreatedAt: string) {
+        const file = join(child, `${name}.json`);
+        writeFileSync(file, JSON.stringify({
+            [`/repos/${SLUG}/actions/workflows/ci.yml/runs`]: { workflow_runs: [run(1, 'CI', 'success', HEAD)] },
+            [`/repos/${SLUG}/actions/workflows/e2e-full.yml/runs`]: { workflow_runs: [{ ...run(7, 'E2E full sweep', 'success', SHA), created_at: nightlyCreatedAt }] },
+        }));
+        return spawnSync(process.execPath, [SCRIPT, '--no-main-check', '--require=ci.yml,e2e-full.yml'], {
+            cwd: child, encoding: 'utf8',
+            env: { ...process.env, GITHUB_ACTIONS: '', GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '', AIMEAT_RELEASE_RED_REASON: '', AIMEAT_CI_API_FIXTURE: file, AIMEAT_CI_REPO: SLUG },
+        });
+    }
+
+    it('passes when CI is green on the commit and the nightly was green on its parent 8 hours ago, and lists the commits since', () => {
+        const r = checkChild('ancestor-fresh', at(8 * 3600_000));
+        expect(r.status, r.stderr).toBe(0);
+        expect(r.stdout).toContain(`green on the earlier commit ${SHA.slice(0, 9)}`);
+        expect(r.stdout).toContain('test: a suite after the bump');
+    });
+
+    it('refuses when that nightly is more than 24 hours old', () => {
+        const r = checkChild('ancestor-old', at(25 * 3600_000));
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain('e2e-full.yml: no run of this commit exists');
     });
 });
 
