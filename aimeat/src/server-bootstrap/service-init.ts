@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-20 — keepStorageReadForAppsOnce(), chained after the third scope step: the published apps
+ *     that read /v1/pub keep storage:read (services/app-storage-read-keep-migration.ts).
  *   2026-10-20 — registerDirectoryNotifier(): the member-directory refresh is reachable from the
  *     services and jobs that change who belongs in it (secaudit 2026-10,
  *     consent-write:revoke-directory-refresh-optional).
@@ -122,6 +124,7 @@ import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-mi
 import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
 import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../services/rest-scope-gates-migration.js';
 import { migrateRestScopeKeepWorkingOnce } from '../services/rest-scope-keep-working-migration.js';
+import { keepStorageReadForAppsOnce } from '../services/app-storage-read-keep-migration.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -383,6 +386,9 @@ export async function initializeServices(
     // agents and ecosystem apps that existed before, so what worked on 3.x keeps working (ruling
     // decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
     .then(() => migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: scopeStepsBegan }))
+    // storage:read for the published apps that read /v1/pub, on a node that ran the third step before
+    // S3-03 gated that route (services/app-storage-read-keep-migration.ts).
+    .then(() => keepStorageReadForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
     .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.

@@ -6,7 +6,8 @@
  *   migration.ts; ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san): an
  *   agent or ecosystem app that worked on 3.x keeps working on 4.0.x without its owner reviewing it.
  *
- *   - THE WORD LIST IS THE CODE'S. Every word a requireRestScope gate names under src/routes/ and every
+ *   - THE WORD LIST IS THE CODE'S. Every word a requireRestScope gate names under src/routes/, every
+ *     word a route there refuses inline with denyScope403 (less INLINE_NOT_KEPT), and every
  *     word an MCP tool's catalog entry starts enforcing at REST_SCOPE_GATES_ENFORCED_IN is in this
  *     step's list or in one of the two earlier steps' lists, and nothing else is. The alternative word
  *     that passes every gate of a word (`passedBy`) and the words only an agent can reach
@@ -20,6 +21,8 @@
  *   - The owner gets one line on the activity feed, the operator one incident on the Security page.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-keep-working.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-20 — The list test also reads the words a route refuses inline with denyScope403
+ *     (S3-03's storage:read on GET /v1/pub was missed because only requireRestScope was read).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -85,6 +88,38 @@ function restGateUses(): GateUse[] {
     return uses;
 }
 
+/**
+ * Words a route refuses inline with denyScope403 that a principal never reached without the word, so
+ * the keep-working step does not give them. Each says why. A constant in the call is named here too.
+ */
+const INLINE_NOT_KEPT: Record<string, string> = {
+    // routes/connections-read-through.ts, READ_THROUGH_SCOPE: a route made on 2026-10-05 with the check in place.
+    'connections:read-through': 'the read-through route asked it from its first day',
+};
+const INLINE_CONSTANTS: Record<string, string> = { READ_THROUGH_SCOPE: 'connections:read-through' };
+
+/**
+ * Every word a route under src/routes/ refuses inline with denyScope403(req, res, [...]): a check
+ * written in a handler rather than as requireRestScope. S3-03 (2026-10-16) put storage:read on
+ * GET /v1/pub that way, the scan above did not read it, and no app kept the word. A constant the map
+ * does not name comes back as `?NAME`, which fails the list test until someone names it.
+ */
+function inlineGateWords(): Map<string, string[]> {
+    const root = resolve(__dirname, '../../src/routes');
+    const byWord = new Map<string, string[]>();
+    for (const file of routeFiles(root)) {
+        const text = readFileSync(file, 'utf-8');
+        for (const m of text.matchAll(/denyScope403\(\s*req\s*,\s*res\s*,\s*\[([^\]]*)\]/g)) {
+            for (const item of m[1].split(',').map(s => s.trim()).filter(Boolean)) {
+                const literal = /^'([^']+)'$/.exec(item)?.[1];
+                const word = literal ?? INLINE_CONSTANTS[item] ?? `?${item}`;
+                byWord.set(word, [...(byWord.get(word) ?? []), file.slice(root.length + 1)]);
+            }
+        }
+    }
+    return byWord;
+}
+
 /** Every word an MCP tool's catalog entry defers on 3.x and enforces from REST_SCOPE_GATES_ENFORCED_IN. */
 function mcpGateWords(): Map<string, string[]> {
     const byWord = new Map<string, string[]>();
@@ -101,16 +136,20 @@ function mcpGateWords(): Map<string, string[]> {
 describe('the word list of the third step', () => {
     const uses = restGateUses();
     const mcp = mcpGateWords();
+    const inline = inlineGateWords();
     const earlier = [...REST_SCOPE_NEW_WORDS, ...AGENT_READ_WORDS].map(w => w.word);
 
     it('reads the gates (sanity: the scan finds the gates it must)', () => {
         expect(uses.length).toBeGreaterThan(60);
         expect(uses.some(u => u.word === 'ext:invoke' && u.file.includes('actions.ts'))).toBe(true);
         expect(mcp.get('ext:invoke')).toContain('aimeat_app_tool_invoke');
+        expect(inline.get('storage:read')).toContain('storage-files.ts');
+        expect(inline.get('connections:read-through')).toContain('connections-read-through.ts');
     });
 
-    it('holds every word a 4.0.0 gate newly asks on REST or MCP, the two earlier steps\' words included, and nothing else', () => {
-        const fromCode = new Set([...uses.map(u => u.word), ...mcp.keys()]);
+    it('holds every word a 4.0.0 gate newly asks on REST or MCP or inline, the two earlier steps\' words included, and nothing else', () => {
+        const inlineKept = [...inline.keys()].filter(w => !(w in INLINE_NOT_KEPT));
+        const fromCode = new Set([...uses.map(u => u.word), ...mcp.keys(), ...inlineKept]);
         // The earlier steps' words are in it too: an agent made on 3.x after those steps ran, or one
         // whose owner unticked the word there, still reached their routes on 3.x.
         for (const w of earlier) expect(fromCode.has(w)).toBe(true);
