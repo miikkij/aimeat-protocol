@@ -34,6 +34,7 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-12 -- `GET /local/departed` (./local-departed.ts): who left on the node's word, and why. An identity the node refuses is not counted as carried.
  *   2026-10-11 -- An agent the node says was DELETED is removed from this home too (key, token and
  *     config), on the same word from the node as a moved one. It stayed listed, with its key on disk.
@@ -142,8 +143,8 @@ import type { Server } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { existsSync, unlinkSync } from 'node:fs';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
 import { TunnelHub, statusOfIdentity, principalRow, rehome } from './tunnel-hub.js';
 import { resolveToken, forgetCachedToken } from '../agent-key.js';
@@ -443,7 +444,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const app = express();
   app.use(admitLoopbackCaller(secret));
   app.use(express.json({ limit: '25mb' }));
-  const transports = new Map<string, StreamableHTTPServerTransport>();
+  const transports = new Map<string, NodeStreamableHTTPServerTransport>();
   registerLocalStats(app, stats, { startedAt, agents: () => registry.list(), channel: g => channels.get(g), mcpSessions: () => transports.size });
 
   /**
@@ -502,7 +503,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       });
       return;
     }
-    const transport = new StreamableHTTPServerTransport({
+    const transport = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: () => `local-${randomBytes(16).toString('hex')}`,
     });
     // One identity, so `resolve()` inside every tool module has exactly one answer and cannot

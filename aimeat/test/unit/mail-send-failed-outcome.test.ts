@@ -15,6 +15,7 @@
  *   Each door is exercised with a sent outcome as well, so "everything is an error now" cannot pass.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mail-send-failed-outcome.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-16 — The node tool takes the `mail:<record id>` aimeat_contact_add returns, and refuses
  *     another owner's contact by either id (QA audit F12b-01).
@@ -29,7 +30,7 @@
  *   v1.0.0 — 2026-09-13 — Initial.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerConnectionTools as registerNodeConnectionTools } from '../../src/mcp/connections.js';
 import { registerAllTools as registerConnectorTools } from '../../src/cli/connect/mcp/tools/index.js';
 import { connectionCliTools } from '../../src/tool-dispatch/tool-call-defs-connections.js';

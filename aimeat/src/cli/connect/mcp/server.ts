@@ -25,6 +25,7 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 -- Only registerTool is patched; a tool() call throws while the surface registers (MCP SDK v2 migration, step 3).
  *   2026-10-04 -- A null for an optional field that refuses null reads as the field left out.
  *   2026-09-27 -- A call to a tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call.
@@ -37,8 +38,8 @@
  *   v2.3.0 -- 2026-09-26 -- The daemon warns once at start when other accounts on the computer can
  *     read the connector home (../home-access.ts). It changes no permission (secaudit 2026-09, N7).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { McpServer } from '@modelcontextprotocol/server';
 import { loadAllAgents, getConfigDir } from '../config.js';
 import { checkConnectorHome } from '../home-access.js';
 import { buildRegistry, type AgentRegistry } from '../agent-registry.js';

@@ -10,6 +10,7 @@
  *   to decide what it registers was tried on 2026-08-16 and was wrong in both directions inside an
  *   hour.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-09-24 — A flattened tool calls with the server row as it is at call time: a
  *     server switched off or detached mid-session is honoured (secaudit 2026-09 a49e32ddeb4e).
  *   v1.0.0 — 2026-09-16 — Phase 3 of the MCP proxy.
@@ -23,7 +24,7 @@ import { putMcpGrant } from '../../src/services/mcp-client/grants.js';
 import {
   registerRemoteTools, remoteToolName, splitRemoteToolName,
 } from '../../src/mcp/remote-tools.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../../src/config.js';
 
 const OWNER = 'alice@test-node-001';

@@ -11,6 +11,7 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The three work tools moved to mcp/core-work.ts (pure extraction, max-file-lines).
  *   2026-10-19 — aimeat_agent_profile and aimeat_agents_list carry `avatar` (and the profile `avatar_problem`), as GET /v1/agents/:gaii and GET /v1/agents do (services/agent-avatar.ts).
@@ -151,7 +152,7 @@
  *     a person editing the same record. Optional. Reasoning: mcp/memory-version-lock.ts.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { registerMemoryBinTools } from './core-memory-bin.js';
 import { registerCoreBoardTools } from './core-boards.js';
 import { registerCoreWorkTools } from './core-work.js';

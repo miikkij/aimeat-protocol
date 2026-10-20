@@ -16,9 +16,10 @@
  * @structure RESOURCE_READ_TOOL · withResourceGate(register, opts)
  * @usage patchable.registerResource = withResourceGate(originalRegisterResource, { allows, agentGaii, storage });
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AUTH-2).
  */
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import type { Storage } from '../storage/interface.js';
 import { barredAgentFor, agentBarredMessage } from '../services/organism-agent-access.js';
 

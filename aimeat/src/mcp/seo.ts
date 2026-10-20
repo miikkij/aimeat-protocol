@@ -21,6 +21,7 @@
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-10-05 — A comment names requireOperator, the REST route's check since secaudit 2026-10, C2.
@@ -34,7 +35,7 @@
  *   v1.0.1 — 2026-08-29 — The header's gap note names the marks door that now exists (app-marks.ts).
  *   v1.0.0 — 2026-08-25 — Initial.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';

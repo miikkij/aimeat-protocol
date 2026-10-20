@@ -22,6 +22,7 @@
  * @structure answerScopeDeniedTools(mcp, opts)
  * @usage answerScopeDeniedTools(mcp, { missingWords: (name) => [...], principal: () => agentGaii });
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The tools/call handler is wrapped through mcp/sdk-seams.ts.
  *   2026-10-17 — The answer tells the AI what it may not do in plain words and hands it the address
  *     where the person allows it with one press (services/permission-ask.ts). The permission word
@@ -29,7 +30,7 @@
  *     person (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  *   2026-10-16 — Initial (QA audit E5-04).
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { noteMcpScopeRefusal } from './tool-usage-wrap.js';
 import { toolError } from './tool-error.js';
 import { permissionAskText } from '../services/permission-ask.js';

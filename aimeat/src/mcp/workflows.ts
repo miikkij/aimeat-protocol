@@ -11,6 +11,7 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — aimeat_workflow_save clears the workflow's open trigger refusal, as PUT
  *     /v1/workflows/:id does: the refusal pins the definition it refused, and "Run as me" on it
@@ -48,7 +49,7 @@
  *     diff + single-use payload-bound confirm_token; plain saves unchanged). Server MCP only.
  *   v1.0.0 — 2026-06-13 — Phase 8: tight MCP surface (save/get/run) for agent-authored workflows.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { pendingHumanInputs } from '../services/workflow/lifecycle.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

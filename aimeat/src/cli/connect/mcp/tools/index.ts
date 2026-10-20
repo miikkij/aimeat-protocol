@@ -8,6 +8,7 @@
  *   client to use. Single-agent installs are unchanged in UX (agent_name is
  *   optional and defaults to the only loaded agent).
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-12 — contacts.ts, companies.ts, portfolio.ts, commerce.ts, exchange.ts, organisms.ts,
  *     dm-messages.ts and agent-telemetry.ts are gone: their 30 tools got a CLI dispatch definition
  *     and run it, so /local/call serves them too. knowledge.ts is the one module left with a handler
@@ -33,7 +34,7 @@
  *   v2.4.0 -- 2026-09-27 -- aimeat_app_manage (app-manage.ts) replaces the app-ui pair and, in apps.ts,
  *     the screenshot, versions, seo, marks, visitors, legal and audit tools.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AgentRegistry } from '../../agent-registry.js';
 
 import { registerKnowledgeTools } from './knowledge.js';

@@ -13,10 +13,11 @@
  * @structure answerMovedTools
  * @usage answerMovedTools(mcp); // after the last tool is registered
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.1 — 2026-10-20 — The tools/call handler is wrapped through mcp/sdk-seams.ts.
  *   v1.0.0 — 2026-09-27 — Initial.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { movedToolMessage } from '../tool-catalog/moved-tools.js';
 import { logger } from '../utils/logger.js';
 import { wrapToolsCall } from './sdk-seams.js';

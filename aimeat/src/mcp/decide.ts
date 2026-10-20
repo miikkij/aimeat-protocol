@@ -16,6 +16,7 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — aimeat_decide_rule_propose refuses an ecosystem app, as the REST route does
@@ -31,7 +32,7 @@
  *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose (creates nothing).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

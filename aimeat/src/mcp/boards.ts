@@ -11,6 +11,7 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The aimeat://boards/{id} resource passes the posts through the session's
  *     classification reader with the board's classification (plan doc-mvdipuyqraas, L1.3).
@@ -55,7 +56,7 @@
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';

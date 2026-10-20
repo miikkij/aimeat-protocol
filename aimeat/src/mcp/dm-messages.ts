@@ -12,6 +12,7 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — aimeat_dm_send_as_owner calls services/message-send-as-owner.ts, the implementation
  *     POST /v1/messages/as-owner calls too: the message names the agent that sent it, and a group
@@ -74,7 +75,7 @@
  *     been sent. `ref` feeds aimeat_storage_download directly.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';

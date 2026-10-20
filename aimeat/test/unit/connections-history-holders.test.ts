@@ -8,11 +8,12 @@
  *   through the node MCP tools, which call the same service functions as the REST routes.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connections-history-holders.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerConnectionTools } from '../../src/mcp/connections.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';

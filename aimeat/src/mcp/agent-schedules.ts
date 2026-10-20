@@ -18,6 +18,7 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The write caller names the session's kind and roles, as the REST door does, so
  *     canManageSchedule can tell an agent from an ecosystem app (secaudit 2026-10).
@@ -42,7 +43,7 @@
  *     where HTTP validates it, and a target agent that does not exist was caught for agent_task only.
  *   v1.0.0 — 2026-06-03 — Initial: agent-created recurring schedules + internal mirror
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

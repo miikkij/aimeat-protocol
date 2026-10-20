@@ -2,6 +2,7 @@
  * @file app-collaboration-surfaces.test.ts
  * @description Invoke connector handlers and inspect what reaches the REST boundary.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.1.1 - 2026-10-05 - The handlers come from the whole connector (registerAllTools): aimeat_app_draft_publish
  *     runs its CLI dispatch definition now (secaudit 2026-10, M3).
@@ -9,7 +10,7 @@
  *   v1.0.0 - 2026-09-08 - Retain the target, roadmap and provenance on draft publication.
  */
 import { describe, expect, it } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';
 
 describe('shared app connector requests', () => {

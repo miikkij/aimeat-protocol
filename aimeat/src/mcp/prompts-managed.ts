@@ -14,6 +14,7 @@
  *   import { registerManagedPrompts } from './prompts-managed.js';
  *   await registerManagedPrompts(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-09-05 — The `cortex_extensions` variable lists only the cortexes this caller may
@@ -23,7 +24,7 @@
  *   v1.0.0 — 2026-08-09 — Initial. The prompts primitive had never been used on this node: mcp.prompt
  *     appeared nowhere in src/mcp/, so the server declared tools and resources only.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SystemPromptRecord } from '../storage/interface.js';

@@ -11,6 +11,7 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — SECURITY: aimeat_knowledge_links asks the package read first (readPackage), as the
  *     REST route does; it answered any package's links to any agent.
@@ -48,7 +49,7 @@
  *     listed and then answered "Package not found".
  */
 
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { listOwnerScopeShown } from '../services/appdev-kb.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { classificationWarningOf } from '../services/classification/present-memory.js';

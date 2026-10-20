@@ -19,10 +19,11 @@
  * @usage
  *   wrapToolsCall(mcp, (original) => async (request, extra) => original(request, extra));
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-20 — Initial: moved out of moved-tools-answer.ts, scope-denied-answer.ts,
  *     tool-loader.ts and null-as-absent.ts unchanged in behaviour.
  */
-import type { McpServer, RegisteredTool } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer, RegisteredTool } from '@modelcontextprotocol/server';
 
 /** A `tools/call` request as the SDK hands it to its handler. */
 export interface ToolsCallRequest { method: string; params?: { name?: unknown; arguments?: Record<string, unknown> } & Record<string, unknown> }
