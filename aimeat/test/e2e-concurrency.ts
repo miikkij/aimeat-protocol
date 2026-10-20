@@ -8,7 +8,10 @@
  * @version-history
  *   v1.0.4 — 2026-10-20 — The three work agents are registered with the scopes they use (work,
  *     wallet, boards), so the suite runs on the production-settings lane, where an agent approved
- *     with no list gets the shipped default (QA audit S10-10).
+ *     with no list gets the shipped default. Tests 12 to 14 (a 429 from the auth tier, its
+ *     Retry-After, the window reset) are removed: the runner pins the auth limit at 1000, so they
+ *     skipped on every run, and e2e-auth-tarpit proves the refusal on its own node. Test 11 reads the
+ *     auth tier's limit headers (QA audit S10-10).
  *   v1.0.3 — 2026-10-16 — 12 to 14 skip with a reason under the runner's high auth limit, and the
  *     result line counts them, where an early return had counted them as passed (QA audit P1-04).
  *   v1.0.2 — 2026-10-14 — 32: the connectivity-key mint is removed (feature-list audit row 202), so
@@ -22,7 +25,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { registerOwner } from './helpers/owner-login.js';
-import { isSkip, skip } from './helpers/skip.js';
+import { isSkip } from './helpers/skip.js';
 
 /**
  * What the work agents use: publishing, requesting, accepting and reading work, the wallet, and a
@@ -347,88 +350,23 @@ await test('10. Note rate limit headers from initial request', async () => {
     console.log(`    Rate limit: ${limit}, remaining: ${remaining}`);
 });
 
-// Probe the auth rate limit to decide how to test 429 behaviour.
-// With high test limits (e.g. 1000), skip the exhaustion test — just verify headers.
-let rateLimitResults: { status: number; headers: Headers }[] = [];
-let authLimit = 0;
-
-await test('11. Fire burst of auth requests exceeding limit', async () => {
+// The auth tier answers with its limit headers. Whether it then refuses with 429 and a Retry-After
+// is not measurable here: the runner pins AIMEAT_RL_AUTH at 1000 for every suite, on the production
+// lane too, because every request of a run comes from one loopback address. Tests 12 to 14 tried
+// and skipped on every run (QA audit 2026-10-16, P1-04), which also kept this suite out of the guard
+// tier. The refusal and its Retry-After are proven by e2e-auth-tarpit, a guard suite on a node of its
+// own with a low limit (its test 6).
+await test('11. The auth tier answers with its limit headers', async () => {
     const probe = await jsonNoRetry('/v1/auth/token', {
         method: 'POST',
         body: JSON.stringify({ gaii: 'fake', timestamp: new Date().toISOString(), signature: 'bad' }),
     });
-    authLimit = parseInt(probe.headers.get('x-ratelimit-limit') ?? '20', 10);
-    const remaining = parseInt(probe.headers.get('x-ratelimit-remaining') ?? '19', 10);
-    console.log(`    Auth limit: ${authLimit}, remaining: ${remaining}`);
-    if (authLimit <= 50) {
-        // Small enough to exhaust — fire remaining + 5 in parallel
-        const toFire = remaining + 5;
-        const fire = () => jsonNoRetry('/v1/auth/token', {
-            method: 'POST',
-            body: JSON.stringify({ gaii: 'fake', timestamp: new Date().toISOString(), signature: 'bad' }),
-        });
-        const batch = await Promise.all(Array.from({ length: toFire }, () => fire()));
-        rateLimitResults = batch.map(r => ({ status: r.status, headers: r.headers }));
-    }
-    // With high limits, rateLimitResults stays empty — tests 12-14 adapt
+    const limit = probe.headers.get('x-ratelimit-limit');
+    const remaining = probe.headers.get('x-ratelimit-remaining');
+    assert(limit !== null && Number(limit) > 0, `X-RateLimit-Limit on the auth tier: ${limit}`);
+    assert(remaining !== null && Number(remaining) < Number(limit), `X-RateLimit-Remaining counts down: ${remaining} of ${limit}`);
+    console.log(`    Auth limit: ${limit}, remaining: ${remaining}`);
 });
-
-// Under the runner the auth limit is pinned at 1000 (run-e2e-server.ts), so 12 to 14 cannot reach a
-// 429 here; they say so as skips (QA audit 2026-10-16, P1-04). The headers are test 10's; the 429 and
-// its Retry-After are proven by the suites that boot a node with a low limit (e2e-auth-tarpit).
-const HIGH_LIMIT = 'the runner pins AIMEAT_RL_AUTH high, so no 429 can be reached without 1000+ requests';
-
-await test('12. At least one 429 response', async () => {
-    if (authLimit > 50) skip(HIGH_LIMIT);
-    const limited = rateLimitResults.filter(r => r.status === 429);
-    assert(limited.length >= 1, `expected at least one 429, got ${limited.map(r => r.status).join(',')}`);
-});
-
-await test('13. 429 includes Retry-After', async () => {
-    if (authLimit > 50) skip(HIGH_LIMIT);
-    const limited = rateLimitResults.find(r => r.status === 429);
-    assert(limited !== undefined, 'no 429 found');
-    const retryAfter = limited!.headers.get('retry-after');
-    assert(retryAfter !== null, 'Retry-After header missing');
-    assert(Number(retryAfter) > 0, `Retry-After: ${retryAfter}`);
-});
-
-// Test 14: Wait for rate limit window reset (only meaningful with low limits)
-{
-    const timeout14 = 90_000;
-    try {
-        const fn14 = async () => {
-            if (authLimit > 50) skip(HIGH_LIMIT);
-            const limitedRes = rateLimitResults.find(r => r.status === 429);
-            const retryAfter = Number(limitedRes?.headers.get('retry-after') || '60');
-            console.log(`    Waiting ${retryAfter}s for rate limit reset...`);
-            await sleep(retryAfter * 1000 + 1000);
-
-            // After reset, a request should succeed (not 429)
-            const { status } = await jsonNoRetry('/v1/auth/token', {
-                method: 'POST',
-                body: JSON.stringify({ gaii: 'fake', timestamp: new Date().toISOString(), signature: 'bad' }),
-            });
-            assert(status !== 429, `still rate limited: ${status}`);
-        };
-        const t14 = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`TIMEOUT after ${timeout14 / 1000}s`)), timeout14));
-        await Promise.race([fn14(), t14]);
-        passed++;
-        results.push('PASS: 14. Wait for window reset → requests succeed');
-        console.log('  ✅ 14. Wait for window reset → requests succeed');
-    } catch (err: any) {
-        if (isSkip(err)) {
-            skipped++;
-            results.push(`SKIP: 14. Wait for window reset → requests succeed: ${err.message}`);
-            console.log(`  ⏭ 14. Wait for window reset → requests succeed: ${err.message}`);
-        } else {
-        failed++;
-        results.push(`FAIL: 14. Wait for window reset → requests succeed: ${err.message}`);
-        console.error(`  ❌ 14. Wait for window reset → requests succeed: ${err.message}`);
-        }
-    }
-}
 
 // ─── Phase 4: Parallel Agent Registration ───
 console.log('\nPhase 4 — Parallel Agent Registration');
