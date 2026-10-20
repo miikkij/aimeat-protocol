@@ -10,7 +10,9 @@
 //   - Realtime delivery: a task queued on the node surfaces via the loopback
 //     long-poll (push over the tunnel, not an upstream poll).
 //   - Local MCP: the Streamable-HTTP /v1/mcp endpoint serves the connector
-//     tool surface.
+//     tool surface, to a 2025 client in a session and to an MCP 2026-07-28
+//     client per request; stdio serve answers both eras as well (2026-10-20,
+//     MCP SDK v2 migration step 10).
 //   - Single-socket: the node reports one active tunnel connection.
 //   - Degraded fallback: against a node with AIMEAT_CONNECT_TUNNEL_ENABLED=false
 //     the daemon still works via direct transport (no crash).
@@ -51,6 +53,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node
 import { join, resolve } from 'node:path';
 import { stringify as yamlStringify } from 'yaml';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
@@ -814,6 +817,46 @@ await test('MCP initialize + tools/list works on the loopback /v1/mcp', async ()
   }
 });
 
+await test('an MCP 2026-07-28 client is served on the same loopback /v1/mcp, with no session', async () => {
+  const client = new Client({ name: 'loopback-e2e-modern', version: '1.0.0' }, { versionNegotiation: { mode: 'auto' } });
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
+    requestInit: { headers: daemonAuth(loopbackBase) },
+  });
+  await client.connect(transport);
+  try {
+    assert(client.getNegotiatedProtocolVersion() === '2026-07-28', `negotiated ${client.getNegotiatedProtocolVersion()}`);
+    assert(transport.sessionId === undefined, `a 2026-07-28 connection holds no session id, got ${transport.sessionId}`);
+    const names = (await client.listTools()).tools.map(t => t.name);
+    assert(names.includes('aimeat_memory_read'), `core tool missing from the modern surface: ${names.slice(0, 5).join(', ')}...`);
+    const r = await client.callTool({ name: 'aimeat_memory_list', arguments: { limit: 1 } }) as { isError?: boolean };
+    assert(r.isError !== true, `a tool call on 2026-07-28 runs: ${JSON.stringify(r).slice(0, 200)}`);
+  } finally {
+    await client.close();
+  }
+});
+
+// Stdio mode (the default of `aimeat connect serve`) decides the era from the client's opening
+// message (serveStdio): a 2025 client gets initialize, a 2026-07-28 client gets server/discover. The
+// same home as the daemon, so the same agent; the child is killed when the client closes.
+for (const [label, opts] of [['a 2025 client', {}], ['an MCP 2026-07-28 client', { versionNegotiation: { mode: 'auto' as const } }]] as const) {
+  await test(`stdio serve answers ${label}, with the connector tool surface`, async () => {
+    const client = new Client({ name: 'stdio-e2e', version: '1.0.0' }, opts);
+    const transport = new StdioClientTransport({
+      command: 'node', args: [...nodeEntryArgs(), 'connect', 'serve'], cwd: process.cwd(),
+      env: { ...process.env, AIMEAT_HOME: home1 } as Record<string, string>, stderr: 'ignore',
+    });
+    await client.connect(transport);
+    try {
+      const want = 'versionNegotiation' in opts ? '2026-07-28' : '2025-11-25';
+      assert(client.getNegotiatedProtocolVersion() === want, `negotiated ${client.getNegotiatedProtocolVersion()}, expected ${want}`);
+      const names = (await client.listTools()).tools.map(t => t.name);
+      assert(names.includes('aimeat_memory_read'), `core tool missing on stdio: ${names.slice(0, 5).join(', ')}...`);
+    } finally {
+      await client.close();
+    }
+  });
+}
+
 await test('a tool that moved into aimeat_app_manage answers TOOL_MOVED with the new call, on the connector MCP and on /local/call', async () => {
   const client = new Client({ name: 'loopback-e2e', version: '1.0.0' });
   const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`), {
@@ -1362,6 +1405,28 @@ await test('An MCP session that names its agent works on a two-owner daemon', as
   } finally {
     await client.close();
   }
+});
+
+await test('on 2026-07-28 every request names its agent on a two-owner daemon, and one that names none is refused', async () => {
+  const gaiiA = `concierge#${acc3a!.ownerName}@${NODE_ID}`;
+  const client = new Client({ name: 'two-owner-e2e-modern', version: '1.0.0' }, { versionNegotiation: { mode: 'auto' } });
+  const transport = new StreamableHTTPClientTransport(new URL(`${lb3}/v1/mcp`), {
+    requestInit: { headers: { ...daemonAuth(lb3), 'X-Aimeat-Agent': gaiiA } },
+  });
+  await client.connect(transport);
+  try {
+    assert(client.getNegotiatedProtocolVersion() === '2026-07-28', `negotiated ${client.getNegotiatedProtocolVersion()}`);
+    assert((await client.listTools()).tools.map(t => t.name).includes('aimeat_memory_read'), 'a named request gets the tool surface');
+  } finally {
+    await client.close();
+  }
+  const anon = await fetch(`${lb3}/v1/mcp`, {
+    method: 'POST',
+    headers: { ...daemonAuth(lb3), 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/list' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} } } }),
+  });
+  const anonBody = await anon.json() as { error?: { message?: string } };
+  assert(anon.status === 400 && /more than one account/i.test(anonBody.error?.message ?? ''), `naming none: ${anon.status} ${JSON.stringify(anonBody).slice(0, 200)}`);
 });
 
 await test('naming none is refused cleanly, and the daemon is still there afterwards', async () => {

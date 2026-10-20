@@ -22,16 +22,20 @@
  *   CLOSE, NEVER EXIT. Measured 2026-09-16: calling process.exit under a live SSE stream aborts on
  *   Windows with a libuv assertion, while ten open/list/close cycles run clean in 88 ms. Shutdown
  *   closes every entry and waits.
- * @structure McpClientPool — acquire · invalidate · closeAll · size
+ * @structure McpClientPool — acquire · invalidate · eraOf · closeAll · size
  * @usage const client = await pool.acquire(server, credential, identity);
  * @version-history
+ *   v1.3.0 — 2026-10-20 — A Streamable HTTP server (kind http or aimeat) is connected with version
+ *     negotiation: 2026-07-28 when it serves it, the 2025 handshake when not; the era it answered is
+ *     kept per server and identity for an hour, so a reconnect skips the probe. stdio and SSE keep
+ *     the 2025 handshake (SDK v2 migration step 9).
  *   2026-10-20 — The MCP client is the SDK v2 client package (@modelcontextprotocol/client), with the 2025 handshake it keeps by default (SDK v2 migration step 4a).
  *   v1.2.0 — 2026-10-09 — The transport's sealed env and headers are opened at the connect and
  *     nowhere else (transport-secrets.ts; secrets audit 2026-10-09, chapter 2).
  *   v1.1.0 — 2026-09-17 — The node id reaches the transport, for the loop-brake header.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
-import { Client } from '@modelcontextprotocol/client';
+import { Client, type PriorDiscovery } from '@modelcontextprotocol/client';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
 import type { AimeatConfig } from '../../config.js';
 import { buildTransport, MCP_CONNECT_TIMEOUT_MS } from './transport.js';
@@ -42,6 +46,10 @@ import { logger } from '../../utils/logger.js';
 const IDLE_MS = 5 * 60_000;
 /** How often the sweeper looks. */
 const SWEEP_MS = 30_000;
+/** How long the era a server answered is trusted before the next connect asks again. */
+const PRIOR_TTL_MS = 60 * 60_000;
+/** The transports that negotiate the MCP revision: Streamable HTTP, to any server or to a peer node. */
+const NEGOTIATING_KINDS = new Set<McpServerRecord['transport']['kind']>(['http', 'aimeat']);
 
 interface Entry {
   client: Client;
@@ -52,6 +60,7 @@ interface Entry {
 
 export class McpClientPool {
   private readonly entries = new Map<string, Entry>();
+  private readonly priors = new Map<string, { at: number; prior: PriorDiscovery }>();
   private sweeper: NodeJS.Timeout | null = null;
 
   /**
@@ -84,16 +93,30 @@ export class McpClientPool {
       return existing.client;
     }
 
+    const negotiates = NEGOTIATING_KINDS.has(server.transport.kind);
     const client = new Client(
       { name: 'aimeat', version: '1.0.0' },
-      { capabilities: {} },
+      // A Streamable HTTP server is asked whether it speaks 2026-07-28 (server/discover) and the
+      // handshake falls back to initialize when it does not. stdio and the old SSE transport keep the
+      // plain 2025 handshake (decision 2026-10-20, MCP migration plan step 9).
+      { capabilities: {}, ...(negotiates ? { versionNegotiation: { mode: 'auto' as const } } : {}) },
     );
     const connecting = (async () => {
       // The transport's env and headers are sealed at rest (transport-secrets.ts) and opened only
       // here, for the connect. Without a config there is no key, and a sealed value is left out.
       const opened = { ...server, transport: openTransportSecrets(server.transport, config ?? { encryptionKey: null, totpSecretEncryptionKey: null }, server.id) };
       const transport = buildTransport(opened, credential, config);
-      await client.connect(transport, { timeout: MCP_CONNECT_TIMEOUT_MS });
+      const known = negotiates ? this.priors.get(key) : undefined;
+      const prior = known && Date.now() - known.at < PRIOR_TTL_MS ? known.prior : undefined;
+      try {
+        await client.connect(transport, { timeout: MCP_CONNECT_TIMEOUT_MS, ...(prior ? { prior } : {}) });
+      } catch (err) {
+        // A verdict that no longer holds (the server changed revision) must not fail every later
+        // connect: forget it, and the next connect asks again.
+        this.priors.delete(key);
+        throw err;
+      }
+      if (negotiates) this.rememberEra(key, client);
       const entry = this.entries.get(key);
       if (entry) entry.connecting = null;
       return client;
@@ -118,12 +141,31 @@ export class McpClientPool {
    * already rejected.
    */
   async invalidate(serverId: string): Promise<void> {
+    // An edited record or a replaced credential may reach a different server: ask its era again.
+    for (const key of this.priors.keys()) if (key.startsWith(`${serverId}::`)) this.priors.delete(key);
     for (const [key, entry] of this.entries) {
       if (!key.startsWith(`${serverId}::`)) continue;
       this.entries.delete(key);
       // eslint-disable-next-line aimeat/no-silent-catch -- A close that fails is a socket the far side already dropped, which is the state we were asking for. The entry is out of the map before this runs, so there is nothing left to fix and nothing an operator could act on.
       await entry.client.close().catch(() => {});
     }
+  }
+
+  /**
+   * Keep the era a server answered, per (server, identity), so a reconnect after the idle sweep
+   * skips the server/discover probe: the SDK adopts a modern verdict with zero round trips and runs
+   * initialize directly on a legacy one. Per identity because the SDK says a verdict is reused only
+   * within one authorization context.
+   */
+  private rememberEra(key: string, client: Client): void {
+    const discover = client.getDiscoverResult();
+    const prior: PriorDiscovery = client.getProtocolEra() === 'modern' && discover ? { kind: 'modern', discover } : { kind: 'legacy' };
+    this.priors.set(key, { at: Date.now(), prior });
+  }
+
+  /** The era a server answered, for the tests. */
+  eraOf(serverId: string, identity: string): PriorDiscovery['kind'] | undefined {
+    return this.priors.get(this.key(serverId, identity))?.prior.kind;
   }
 
   private startSweeper(): void {

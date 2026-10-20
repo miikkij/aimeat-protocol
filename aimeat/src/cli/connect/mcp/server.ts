@@ -20,11 +20,13 @@
  *   2. Build AgentRegistry with one AimeatClient per agent
  *   3. `buildMcpServer()` — McpServer with tools (surface-filtered) + resources
  *   4. Daemon mode → runServeDaemon (tunnel transport, push, no upstream poll)
- *      Stdio mode → per-agent pollers + StdioServerTransport (unchanged)
+ *      Stdio mode → per-agent pollers + serveStdio (both MCP eras)
  *
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-10-20 -- Stdio mode serves through serveStdio: a 2025 client keeps the initialize handshake,
+ *     a 2026-07-28 client is served statelessly (MCP SDK v2 migration step 10).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 -- Only registerTool is patched; a tool() call throws while the surface registers (MCP SDK v2 migration, step 3).
  *   2026-10-04 -- A null for an optional field that refuses null reads as the field left out.
@@ -38,7 +40,7 @@
  *   v2.3.0 -- 2026-09-26 -- The daemon warns once at start when other accounts on the computer can
  *     read the connector home (../home-access.ts). It changes no permission (secaudit 2026-09, N7).
  */
-import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
+import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { McpServer } from '@modelcontextprotocol/server';
 import { loadAllAgents, getConfigDir } from '../config.js';
 import { checkConnectorHome } from '../home-access.js';
@@ -125,14 +127,16 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
   }
 
   // ── Stdio mode (default — preserved for CI/serverless) ──
-  const mcp = buildMcpServer(role, registry);
-
   for (const entry of registry.list()) {
     startPollerForAgent(entry);
   }
 
-  const transport = new StdioServerTransport();
-  await mcp.connect(transport);
+  // serveStdio decides the era from the client's opening message and pins one server from the
+  // factory for the connection: a 2025 client gets the initialize handshake exactly as before, a
+  // 2026-07-28 client gets server/discover and stateless requests (MCP SDK v2 migration step 10).
+  serveStdio(() => buildMcpServer(role, registry), {
+    onerror: (err) => console.error(`MCP stdio: ${err.message}`),
+  });
 
   const summary = registry.list().map(a => {
     // A LOCAL label, derived locally on purpose. The node holds AgentRecord.mode and is
