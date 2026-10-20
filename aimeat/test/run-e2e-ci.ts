@@ -24,6 +24,8 @@
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
  *   2026-10-18 -- e2e-classification-audience-cap.ts joins the list (not the guard tier): a label's audience cap (plan doc-mvdipuyqraas, L3).
  *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
+ *   2026-10-20 -- e2e-secret-canary-sweep.ts and e2e-concurrency.ts join GUARD_SUITES (143 → 145),
+ *     measured alone three times on each backend in the production-settings lane (QA audit S10-10).
  *   2026-10-18 -- e2e-ext-hardening.ts and e2e-exchange-projection.ts join GUARD_SUITES (141 → 143),
  *     measured alone three times on SQLite in the production-settings lane, and on Postgres by the
  *     nightly sweep (no Postgres on the promoting machine). Both were red in the nightly sweep since
@@ -1664,6 +1666,14 @@ const GUARD_SUITES = [
     // wish-y-ajon-maksun-ohitus-oikea-vika-vai-vanhentunut-testi).
     'test/e2e-ext-hardening.ts',            // a pass minted for one product excuses neither price nor pacing on another
     'test/e2e-exchange-projection.ts',      // the raw extension route onto a sold capability is the same product, at its price
+    // QA audit S10-10, earned 2026-10-20 the way the rule says: each alone, on a freshly deleted
+    // database, in the production-settings lane, three consecutive identical green runs on BOTH
+    // backends (canary sweep 9/9 x6, concurrency 35/35 with the same 3 reasoned skips x6). Both were
+    // red on that lane first: the concurrency suite's agents held no scope list and so got the
+    // shipped default, and the canary sweep met the production rate limiter, whose 429 bodies had
+    // been passing its leak check unread. The suites now name their agents' scopes and wait out a 429.
+    'test/e2e-secret-canary-sweep.ts',      // no read route or read-only MCP tool hands a planted secret to anyone
+    'test/e2e-concurrency.ts',              // parallel spending, work and posting never double-spend or lose a write
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

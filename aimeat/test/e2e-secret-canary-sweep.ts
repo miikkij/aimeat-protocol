@@ -31,6 +31,10 @@
  *   counted, and the count is printed, so a shrinking sweep is visible.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-secret-canary-sweep
  * @version-history
+ *   v1.2.0 -- 2026-10-20 -- Every request waits out a 429 (fetchPast429), and a route or tool the
+ *     limiter still refuses fails the test as not read: on production limits a 429 body would have
+ *     passed the leak check without the route being read. The MCP initialize names its answer when
+ *     it fails. Runs on the production-settings lane (QA audit S10-10).
  *   v1.1.0 -- 2026-10-12 -- The owner's AI key is planted through PUT /v1/ai/providers/:id/key, the
  *     route node 4.0.0 keeps; on 3.x a second key is planted through PUT /v1/openrouter/settings as
  *     well, since an upgraded node still holds that record (the 4.0.0 sweep).
@@ -83,7 +87,7 @@ async function test(name: string, fn: () => Promise<void>) {
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
 async function json(path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
+    const res = await fetchPast429(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
     const ct = res.headers.get('content-type') ?? '';
     const body = ct.includes('json') ? await res.json() as any : { _raw: await res.text() };
     return { status: res.status, body };
@@ -161,11 +165,30 @@ function contractGets(fill: Record<string, string>): { declared: string; path: s
     return out;
 }
 
+/**
+ * A fetch that waits out the rate limiter. On a node with production limits (the guard tier's lane)
+ * the sweep's hundreds of requests meet 429, and a 429 body carries no planted secret, so a route
+ * answered that way would pass without being read. The wait is the time the refusal names
+ * ("Try again at …", or Retry-After), at most five tries; a route still refused after them is
+ * reported by the caller as not read.
+ */
+async function fetchPast429(url: string, init: RequestInit): Promise<Response> {
+    for (let attempt = 0; ; attempt++) {
+        const res = await fetch(url, init);
+        if (res.status !== 429 || attempt >= 4) return res;
+        const text = await res.text();
+        const at = /Try again at (\S+?)\.?"/.exec(text)?.[1];
+        const retryAfter = Number(res.headers.get('retry-after'));
+        const waitMs = at ? Date.parse(at) - Date.now() : Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1000;
+        await new Promise(r => setTimeout(r, Math.min(Math.max(waitMs, 50), 5000) + 50));
+    }
+}
+
 async function getText(path: string, token: string | null): Promise<{ status: number; text: string }> {
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 10_000);
+    const timer = setTimeout(() => ctl.abort(), 30_000);
     try {
-        const res = await fetch(`${BASE}${path}`, { headers: token ? auth(token) : {}, signal: ctl.signal, redirect: 'manual' });
+        const res = await fetchPast429(`${BASE}${path}`, { headers: token ? auth(token) : {}, signal: ctl.signal, redirect: 'manual' });
         const ct = res.headers.get('content-type') ?? '';
         if (ct.includes('event-stream') || ct.startsWith('image/') || ct.includes('octet-stream') || ct.includes('zip')) {
             res.body?.cancel().catch(() => undefined);
@@ -199,7 +222,7 @@ async function mcpSession(token: string) {
     let id = 0;
     async function rpc(method: string, params: Record<string, unknown>) {
         const rid = ++id;
-        const res = await fetch(`${BASE}/v1/mcp`, {
+        const res = await fetchPast429(`${BASE}/v1/mcp`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`,
@@ -212,8 +235,8 @@ async function mcpSession(token: string) {
         return { status: res.status, text: await res.text() };
     }
     const init = await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'sweep-e2e', version: '1.0.0' } });
-    if (init.status !== 200) return null;
-    await fetch(`${BASE}/v1/mcp`, {
+    if (init.status !== 200) throw new Error(`an MCP session opens with the agent token: initialize answered ${init.status} ${init.text.slice(0, 300)}`);
+    await fetchPast429(`${BASE}/v1/mcp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`, 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' },
         body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
@@ -297,12 +320,15 @@ async function main() {
     for (const [who, tok] of principals) {
         await test(`every contract GET route carries no planted secret to: ${who}`, async () => {
             const leaks: string[] = [];
+            const unread: string[] = [];
             for (const { declared, path } of contractGets({ ...fill, gaii: wide.gaii })) {
                 const r = await getText(path, tok());
+                if (r.status === 429) { unread.push(declared); continue; }
                 if (!r.text) continue;
                 const hits = found(r.text).filter(h => !(INTENDED[`${who} GET ${declared}`]?.canaries ?? []).includes(h));
                 if (hits.length) leaks.push(`${declared} (${r.status}): ${hits.join(', ')}`);
             }
+            assert(unread.length === 0, `the rate limiter still refused ${unread.length} route(s) after waiting, so they were not read: ${unread.slice(0, 5).join(', ')}`);
             assert(leaks.length === 0, `\n      ${leaks.join('\n      ')}`);
         });
     }
@@ -317,11 +343,14 @@ async function main() {
         console.log(`    MCP: ${tools.length} tools listed, ${readOnly.length} read-only with no required argument called`);
         assert(readOnly.length > 10, `expected a real read surface, got ${readOnly.length}`);
         const leaks: string[] = [];
+        const unread: string[] = [];
         for (const t of readOnly) {
             const r = await rpc!('tools/call', { name: t.name, arguments: {} });
+            if (r.status === 429) { unread.push(t.name); continue; }
             const hits = found(r.text).filter(h => !(INTENDED[`agentWide MCP ${t.name}`]?.canaries ?? []).includes(h));
             if (hits.length) leaks.push(`${t.name}: ${hits.join(', ')}`);
         }
+        assert(unread.length === 0, `the rate limiter still refused ${unread.length} tool call(s) after waiting, so they were not read: ${unread.slice(0, 5).join(', ')}`);
         assert(leaks.length === 0, `\n      ${leaks.join('\n      ')}`);
     });
 
