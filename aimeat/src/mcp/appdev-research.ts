@@ -10,6 +10,8 @@
  * @structure registerAppdevResearchTools() — aimeat_appdev_overview
  * @usage registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.2 — 2026-09-29 — TARGET-082 V4: the overview is built with the session's classification
  *     reader (readerForAgent), so a record this agent may not see is left out.
@@ -17,7 +19,7 @@
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -34,11 +36,13 @@ export function registerAppdevResearchTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_appdev_overview',
-        descriptionFor('aimeat_appdev_overview'),
-        zodShapeFor('aimeat_appdev_overview'),
-        annotationsFor('aimeat_appdev_overview'),
+        {
+            description: descriptionFor('aimeat_appdev_overview'),
+            inputSchema: zodShapeFor('aimeat_appdev_overview'),
+            annotations: annotationsFor('aimeat_appdev_overview'),
+        },
         async ({ model, sections }) => {
             const overview = await buildAppdevOverview(storage, config, readerForAgent({ storage, config }, agentGaii), { model, sections });
             return { content: [{ type: 'text' as const, text: JSON.stringify(overview, null, 2) }] };

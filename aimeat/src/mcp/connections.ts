@@ -26,6 +26,8 @@
  * @structure registerConnectionTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — aimeat_mail_send has no guard of its own: the registration gate decides from its
  *     catalog words, so a person can allow it with one press (mcp/permission-ask-gate.ts).
  *   2026-10-16 — The READ_AS_OWNER_REQUIRED refusal is readAsOwnerRefusal (services/connections/access.ts),
@@ -61,7 +63,7 @@
  *     It used to return a success result with a "Not sent" note, which an agent reported as sent.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -134,9 +136,9 @@ export function registerConnectionTools(
 
     // ── Discovery ───────────────────────────────────────────────────────────────────────────────
 
-    mcp.tool('aimeat_connection_providers', descriptionFor('aimeat_connection_providers'),
-        zodShapeFor('aimeat_connection_providers'),
-        annotationsFor('aimeat_connection_providers'),
+    mcp.registerTool('aimeat_connection_providers', { description: descriptionFor('aimeat_connection_providers'),
+        inputSchema: zodShapeFor('aimeat_connection_providers'),
+        annotations: annotationsFor('aimeat_connection_providers') },
         async (): Promise<TextResult> => {
             const off = capabilityOff();
             if (off) return fail(off);
@@ -145,9 +147,9 @@ export function registerConnectionTools(
             return ok({ providers: listProviderMeta(providers) });
         });
 
-    mcp.tool('aimeat_connection_list', descriptionFor('aimeat_connection_list'),
-        zodShapeFor('aimeat_connection_list'),
-        annotationsFor('aimeat_connection_list'),
+    mcp.registerTool('aimeat_connection_list', { description: descriptionFor('aimeat_connection_list'),
+        inputSchema: zodShapeFor('aimeat_connection_list'),
+        annotations: annotationsFor('aimeat_connection_list') },
         async (): Promise<TextResult> => {
             const off = capabilityOff();
             if (off) return fail(off);
@@ -157,9 +159,9 @@ export function registerConnectionTools(
 
     // ── Connecting ──────────────────────────────────────────────────────────────────────────────
 
-    mcp.tool('aimeat_connection_start', descriptionFor('aimeat_connection_start'),
-        zodShapeFor('aimeat_connection_start'),
-        annotationsFor('aimeat_connection_start'),
+    mcp.registerTool('aimeat_connection_start', { description: descriptionFor('aimeat_connection_start'),
+        inputSchema: zodShapeFor('aimeat_connection_start'),
+        annotations: annotationsFor('aimeat_connection_start') },
         async ({ provider, instance, return_url, account }): Promise<TextResult> => {
             const off = capabilityOff();
             if (off) return fail(off);
@@ -198,17 +200,17 @@ export function registerConnectionTools(
     // interface: an item of somebody else's answers NOT_FOUND like one that never existed. The
     // owner's items are read on connections:read-as-owner, as the mail tools read the owner's mail.
 
-    mcp.tool('aimeat_connection_history', descriptionFor('aimeat_connection_history'),
-        zodShapeFor('aimeat_connection_history'),
-        annotationsFor('aimeat_connection_history'),
+    mcp.registerTool('aimeat_connection_history', { description: descriptionFor('aimeat_connection_history'),
+        inputSchema: zodShapeFor('aimeat_connection_history'),
+        annotations: annotationsFor('aimeat_connection_history') },
         async ({ limit }): Promise<TextResult> => {
             if (!config.connectionsEnabled) return toolError('CONNECTIONS_DISABLED', connectionsOffReason);
             return ok({ attempts: await listPublishHistory(storage, holders('read'), limit ?? 50) });
         });
 
-    mcp.tool('aimeat_connection_replies', descriptionFor('aimeat_connection_replies'),
-        zodShapeFor('aimeat_connection_replies'),
-        annotationsFor('aimeat_connection_replies'),
+    mcp.registerTool('aimeat_connection_replies', { description: descriptionFor('aimeat_connection_replies'),
+        inputSchema: zodShapeFor('aimeat_connection_replies'),
+        annotations: annotationsFor('aimeat_connection_replies') },
         async ({ attempt_id, limit }): Promise<TextResult> => {
             if (!config.connectionsEnabled) return toolError('CONNECTIONS_DISABLED', connectionsOffReason);
             const c = ctx();
@@ -263,9 +265,9 @@ export function registerConnectionTools(
         return ok({ provider: out.provider, resource: 'attachment', stored: { key: out.key, filename: out.filename, mime_type: out.mime_type, size: out.size } });
     };
 
-    mcp.tool('aimeat_mail_search', descriptionFor('aimeat_mail_search'),
-        zodShapeFor('aimeat_mail_search'),
-        annotationsFor('aimeat_mail_search'),
+    mcp.registerTool('aimeat_mail_search', { description: descriptionFor('aimeat_mail_search'),
+        inputSchema: zodShapeFor('aimeat_mail_search'),
+        annotations: annotationsFor('aimeat_mail_search') },
         async ({ connection_id, query, limit, page_token }): Promise<TextResult> => readVia(
             connection_id, 'messages',
             {
@@ -275,9 +277,9 @@ export function registerConnectionTools(
             },
         ));
 
-    mcp.tool('aimeat_mail_read', descriptionFor('aimeat_mail_read'),
-        zodShapeFor('aimeat_mail_read'),
-        annotationsFor('aimeat_mail_read'),
+    mcp.registerTool('aimeat_mail_read', { description: descriptionFor('aimeat_mail_read'),
+        inputSchema: zodShapeFor('aimeat_mail_read'),
+        annotations: annotationsFor('aimeat_mail_read') },
         async ({ connection_id, message_id, attachment_id, store, filename, mime_type, key }): Promise<TextResult> => {
             if (attachment_id && store === true) return storeVia(connection_id, { message_id, attachment_id, filename, mime_type, key });
             return attachment_id
@@ -287,9 +289,9 @@ export function registerConnectionTools(
                 : readVia(connection_id, 'message', { id: message_id });
         });
 
-    mcp.tool('aimeat_mail_aliases', descriptionFor('aimeat_mail_aliases'),
-        zodShapeFor('aimeat_mail_aliases'),
-        annotationsFor('aimeat_mail_aliases'),
+    mcp.registerTool('aimeat_mail_aliases', { description: descriptionFor('aimeat_mail_aliases'),
+        inputSchema: zodShapeFor('aimeat_mail_aliases'),
+        annotations: annotationsFor('aimeat_mail_aliases') },
         async ({ connection_id }): Promise<TextResult> => {
             const off = capabilityOff();
             if (off) return fail(off);
@@ -312,9 +314,9 @@ export function registerConnectionTools(
     // mcp/permission-ask-gate.ts), or absent. Until 2026-10-17 this tool had its own guard here and
     // stayed absent while the person could have allowed it with one press.
     {
-        mcp.tool('aimeat_mail_send', descriptionFor('aimeat_mail_send'),
-            zodShapeFor('aimeat_mail_send'),
-            annotationsFor('aimeat_mail_send'),
+        mcp.registerTool('aimeat_mail_send', { description: descriptionFor('aimeat_mail_send'),
+            inputSchema: zodShapeFor('aimeat_mail_send'),
+            annotations: annotationsFor('aimeat_mail_send') },
             async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, ai_provenance_id, theme, locale, image_url, image_alt }): Promise<TextResult> => {
                 try {
                     // THE OUTBOUND DOOR, NOT AROUND IT. Saved contact, suppression, opt-out, the

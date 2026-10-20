@@ -16,13 +16,15 @@
  * @structure registerAgentV2MessagingTools(mcp, storage, config, getAgentGaii, getOwner, caller?)
  * @usage registerAgentV2MessagingTools(mcp, storage, config, () => agentGaii, () => owner, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — aimeat_v2_message_list takes response_format and gives the catalog's concise view
  *     (secaudit 2026-10, M3).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V4).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -57,11 +59,13 @@ export function registerAgentV2MessagingTools(
 ): void {
   const principal = (): Principal => caller().auth;
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_message_send',
-    descriptionFor('aimeat_v2_message_send'),
-    zodShapeFor('aimeat_v2_message_send'),
-    annotationsFor('aimeat_v2_message_send'),
+    {
+        description: descriptionFor('aimeat_v2_message_send'),
+        inputSchema: zodShapeFor('aimeat_v2_message_send'),
+        annotations: annotationsFor('aimeat_v2_message_send'),
+    },
     async (args) => reply(
       await sendTurn(storage, config, principal(), {
         to: args.to, parts: args.parts, role: args.role,
@@ -71,11 +75,13 @@ export function registerAgentV2MessagingTools(
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_message_list',
-    descriptionFor('aimeat_v2_message_list'),
-    zodShapeFor('aimeat_v2_message_list'),
-    annotationsFor('aimeat_v2_message_list'),
+    {
+        description: descriptionFor('aimeat_v2_message_list'),
+        inputSchema: zodShapeFor('aimeat_v2_message_list'),
+        annotations: annotationsFor('aimeat_v2_message_list'),
+    },
     async ({ response_format, ...args }) => reply(
       await listTurns(storage, principal(), args),
       // The catalog's concise view: each turn's id, role, from, to and time.
@@ -83,33 +89,39 @@ export function registerAgentV2MessagingTools(
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_push_set',
-    descriptionFor('aimeat_v2_push_set'),
-    zodShapeFor('aimeat_v2_push_set'),
-    annotationsFor('aimeat_v2_push_set'),
+    {
+        description: descriptionFor('aimeat_v2_push_set'),
+        inputSchema: zodShapeFor('aimeat_v2_push_set'),
+        annotations: annotationsFor('aimeat_v2_push_set'),
+    },
     async (args) => reply(
       await setPushTarget(storage, config, principal(), args),
       (value) => ({ push_config: value.config, created: value.created }),
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_push_list',
-    descriptionFor('aimeat_v2_push_list'),
-    zodShapeFor('aimeat_v2_push_list'),
-    annotationsFor('aimeat_v2_push_list'),
+    {
+        description: descriptionFor('aimeat_v2_push_list'),
+        inputSchema: zodShapeFor('aimeat_v2_push_list'),
+        annotations: annotationsFor('aimeat_v2_push_list'),
+    },
     async (args) => reply(
       await listPushTargets(storage, config, principal(), args.principal),
       (configs) => ({ push_configs: configs, count: configs.length }),
     ),
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_v2_push_delete',
-    descriptionFor('aimeat_v2_push_delete'),
-    zodShapeFor('aimeat_v2_push_delete'),
-    annotationsFor('aimeat_v2_push_delete'),
+    {
+        description: descriptionFor('aimeat_v2_push_delete'),
+        inputSchema: zodShapeFor('aimeat_v2_push_delete'),
+        annotations: annotationsFor('aimeat_v2_push_delete'),
+    },
     async (args) => reply(
       await deletePushTarget(storage, config, principal(), args.id),
       (id) => ({ deleted: id }),

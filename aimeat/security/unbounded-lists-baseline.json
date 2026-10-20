@@ -76,9 +76,6 @@
     "src/mcp/core-admin.ts": {
       "listAgents": 2
     },
-    "src/mcp/index.ts": {
-      "listFederationPeers": 1
-    },
     "src/routes/admin-agent-integration.ts": {
       "listAgents": 2
     },
@@ -278,6 +275,9 @@
     },
     "src/services/marketplace-fee.ts": {
       "listOwners": 1
+    },
+    "src/services/mcp-build-inputs.ts": {
+      "listFederationPeers": 1
     },
     "src/services/mcp-client/transport.ts": {
       "listFederationPeers": 1

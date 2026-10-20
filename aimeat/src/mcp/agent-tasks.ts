@@ -9,6 +9,8 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-11 — aimeat_agent_workplace_set (services/agent-workplace.ts); aimeat_task_get's outcome
  *     says which workspaces the result is shared with.
  *   2026-10-11 — aimeat_agent_stop and aimeat_agent_start (services/agent-stop.ts).
@@ -81,7 +83,7 @@
  *     vanished, so delegating file-shaped work looked like it worked and did not.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
@@ -148,11 +150,13 @@ export function registerAgentTaskTools(
     // Lets the calling agent create a task for ANY same-owner agent. Used by
     // Claude Desktop and other orchestrator agents to delegate work to crew-style
     // agents (e.g. demo-crew). The target agent must belong to the same owner.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_create',
-        descriptionFor('aimeat_task_create'),
-        zodShapeFor('aimeat_task_create'),
-        annotationsFor('aimeat_task_create'),
+        {
+            description: descriptionFor('aimeat_task_create'),
+            inputSchema: zodShapeFor('aimeat_task_create'),
+            annotations: annotationsFor('aimeat_task_create'),
+        },
         async ({ target_agent, title, description, status, files, scope, start }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
@@ -226,11 +230,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 1: aimeat_task_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_list',
-        descriptionFor('aimeat_task_list'),
-        zodShapeFor('aimeat_task_list'),
-        annotationsFor('aimeat_task_list'),
+        {
+            description: descriptionFor('aimeat_task_list'),
+            inputSchema: zodShapeFor('aimeat_task_list'),
+            annotations: annotationsFor('aimeat_task_list'),
+        },
         async ({ status, page, per_page }) => {
             const pageNum = Math.max(1, page ?? 1);
             const perPage = Math.min(100, Math.max(1, per_page ?? 20));
@@ -272,11 +278,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 2: aimeat_task_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_get',
-        descriptionFor('aimeat_task_get'),
-        zodShapeFor('aimeat_task_get'),
-        annotationsFor('aimeat_task_get'),
+        {
+            description: descriptionFor('aimeat_task_get'),
+            inputSchema: zodShapeFor('aimeat_task_get'),
+            annotations: annotationsFor('aimeat_task_get'),
+        },
         async ({ task_id }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -334,11 +342,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 3: aimeat_task_propose_todos ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_propose_todos',
-        descriptionFor('aimeat_task_propose_todos'),
-        zodShapeFor('aimeat_task_propose_todos'),
-        annotationsFor('aimeat_task_propose_todos'),
+        {
+            description: descriptionFor('aimeat_task_propose_todos'),
+            inputSchema: zodShapeFor('aimeat_task_propose_todos'),
+            annotations: annotationsFor('aimeat_task_propose_todos'),
+        },
         async ({ task_id, todos }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -397,11 +407,13 @@ export function registerAgentTaskTools(
     // The owner's own AI starting a task that waits for their OK, on their word. The same rule as
     // POST /v1/agents/:name/tasks/:id/start for an agent caller: never your own task, never one the
     // permission floor or a declared effect holds. services/task-start-op.ts is the one implementation.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_start',
-        descriptionFor('aimeat_task_start'),
-        zodShapeFor('aimeat_task_start'),
-        annotationsFor('aimeat_task_start'),
+        {
+            description: descriptionFor('aimeat_task_start'),
+            inputSchema: zodShapeFor('aimeat_task_start'),
+            annotations: annotationsFor('aimeat_task_start'),
+        },
         async ({ task_id }) => {
             const out = await startWaitingTask({ storage, config }, startCaller, localAccountName(agentGaii), task_id);
             if (!out.ok) return { ...toolError(out.code, out.message) };
@@ -413,11 +425,13 @@ export function registerAgentTaskTools(
     // ── Tool 3b: aimeat_agent_task_start_set ──
     // The agent's standing answer, set from the chat ("let the concierge start its tasks by itself").
     // Same implementation as PATCH /v1/agents/:name/task-start; never the calling agent's own.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_task_start_set',
-        descriptionFor('aimeat_agent_task_start_set'),
-        zodShapeFor('aimeat_agent_task_start_set'),
-        annotationsFor('aimeat_agent_task_start_set'),
+        {
+            description: descriptionFor('aimeat_agent_task_start_set'),
+            inputSchema: zodShapeFor('aimeat_agent_task_start_set'),
+            annotations: annotationsFor('aimeat_agent_task_start_set'),
+        },
         async ({ target_agent_name, task_start }) => {
             const out = await setAgentTaskStart({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, task_start);
             if (!out.ok) return { ...toolError(out.code, out.message) };
@@ -430,11 +444,13 @@ export function registerAgentTaskTools(
     // implementation as POST /v1/agents/:name/stop and /start (services/agent-stop.ts); never the
     // calling agent's own state.
     for (const [tool, stop] of [['aimeat_agent_stop', true], ['aimeat_agent_start', false]] as const) {
-        mcp.tool(
+        mcp.registerTool(
             tool,
-            descriptionFor(tool),
-            zodShapeFor(tool),
-            annotationsFor(tool),
+            {
+                description: descriptionFor(tool),
+                inputSchema: zodShapeFor(tool),
+                annotations: annotationsFor(tool),
+            },
             async ({ target_agent_name }) => {
                 const out = await setAgentStopped({ storage, config }, localAccountName(agentGaii), agentGaii, target_agent_name, stop);
                 if (!out.ok) return { ...toolError(out.code, out.message) };
@@ -449,11 +465,13 @@ export function registerAgentTaskTools(
     // Where the finished work of one of the owner's agents goes: a workspace, or with no ids the
     // agent's own memory. Same implementation as PUT and DELETE /v1/agents/:name/workplace
     // (services/agent-workplace.ts).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_workplace_set',
-        descriptionFor('aimeat_agent_workplace_set'),
-        zodShapeFor('aimeat_agent_workplace_set'),
-        annotationsFor('aimeat_agent_workplace_set'),
+        {
+            description: descriptionFor('aimeat_agent_workplace_set'),
+            inputSchema: zodShapeFor('aimeat_agent_workplace_set'),
+            annotations: annotationsFor('aimeat_agent_workplace_set'),
+        },
         async ({ target_agent_name, organism_id, workspace_id }) => {
             // Who is asking is the session's caller (services/caller-context.ts), in the service's terms.
             const session = caller?.();
@@ -472,11 +490,13 @@ export function registerAgentTaskTools(
     // ── Tool 3c: aimeat_agent_scope_narrow ──
     // The owner's AI accepting, on the person's word, the narrowing of a `*` agent to the permissions
     // it used. Same implementation as POST /v1/agents/:name/scope-narrowing (services/scope-use.ts).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_scope_narrow',
-        descriptionFor('aimeat_agent_scope_narrow'),
-        zodShapeFor('aimeat_agent_scope_narrow'),
-        annotationsFor('aimeat_agent_scope_narrow'),
+        {
+            description: descriptionFor('aimeat_agent_scope_narrow'),
+            inputSchema: zodShapeFor('aimeat_agent_scope_narrow'),
+            annotations: annotationsFor('aimeat_agent_scope_narrow'),
+        },
         async ({ target_agent_name }) => {
             const owner = localAccountName(agentGaii);
             const agent = (await storage.getAgentsByOwner(owner)).find(a => a.name === target_agent_name) ?? null;
@@ -487,11 +507,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 4: aimeat_task_event ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_event',
-        descriptionFor('aimeat_task_event'),
-        zodShapeFor('aimeat_task_event'),
-        annotationsFor('aimeat_task_event'),
+        {
+            description: descriptionFor('aimeat_task_event'),
+            inputSchema: zodShapeFor('aimeat_task_event'),
+            annotations: annotationsFor('aimeat_task_event'),
+        },
         async ({ task_id, type, message, details }) => {
             // The readiness bar POST /v1/agent-tasks/:id/events applies. It was middleware, so this
             // door had none: an agent below the standard level was refused over HTTP and wrote the
@@ -532,11 +554,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 5: aimeat_task_todo ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_todo',
-        descriptionFor('aimeat_task_todo'),
-        zodShapeFor('aimeat_task_todo'),
-        annotationsFor('aimeat_task_todo'),
+        {
+            description: descriptionFor('aimeat_task_todo'),
+            inputSchema: zodShapeFor('aimeat_task_todo'),
+            annotations: annotationsFor('aimeat_task_todo'),
+        },
         async ({ task_id, todo_id, status }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -571,11 +595,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 7: aimeat_task_complete ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_complete',
-        descriptionFor('aimeat_task_complete'),
-        zodShapeFor('aimeat_task_complete'),
-        annotationsFor('aimeat_task_complete'),
+        {
+            description: descriptionFor('aimeat_task_complete'),
+            inputSchema: zodShapeFor('aimeat_task_complete'),
+            annotations: annotationsFor('aimeat_task_complete'),
+        },
         async ({ task_id, message, deliverable_key, ai_provenance, ai_provenance_id }) => {
             // The same readiness bar the event path answers to. requireReadiness('standard') sits on
             // the REST completion route, and this tool had nothing: an agent that may not report
@@ -629,11 +655,13 @@ export function registerAgentTaskTools(
     );
 
     // ── Tool 8: aimeat_task_fail ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_fail',
-        descriptionFor('aimeat_task_fail'),
-        zodShapeFor('aimeat_task_fail'),
-        annotationsFor('aimeat_task_fail'),
+        {
+            description: descriptionFor('aimeat_task_fail'),
+            inputSchema: zodShapeFor('aimeat_task_fail'),
+            annotations: annotationsFor('aimeat_task_fail'),
+        },
         async ({ task_id, reason }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
@@ -672,11 +700,13 @@ export function registerAgentTaskTools(
     // ── Tool 9: aimeat_task_decline ──
     // A refusal with a reason is a correct answer, so it ends the task as 'declined' and moves no
     // failure counter (services/agent-task-fanout.ts declineTask, which POST …/decline calls too).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_task_decline',
-        descriptionFor('aimeat_task_decline'),
-        zodShapeFor('aimeat_task_decline'),
-        annotationsFor('aimeat_task_decline'),
+        {
+            description: descriptionFor('aimeat_task_decline'),
+            inputSchema: zodShapeFor('aimeat_task_decline'),
+            annotations: annotationsFor('aimeat_task_decline'),
+        },
         async ({ task_id, reason }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { ...toolError('NOT_FOUND', 'Task not found') };

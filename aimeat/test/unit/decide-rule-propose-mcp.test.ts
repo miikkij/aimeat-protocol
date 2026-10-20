@@ -7,6 +7,7 @@
  *   whose principal is an ecosystem app, and on one whose principal is an agent.
  * @usage cd aimeat && pnpm exec vitest run test/unit/decide-rule-propose-mcp.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.0 — 2026-10-15 — Initial (feature-list audit 95).
  */
 import { describe, it, expect } from 'vitest';
@@ -19,7 +20,7 @@ type Handler = (args: Record<string, unknown>) => Promise<{ isError?: boolean; c
 
 function toolsFor(principal: string): Map<string, Handler> {
     const tools = new Map<string, Handler>();
-    const mcp = { tool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as Handler); } };
+    const mcp = { registerTool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as Handler); } };
     const config = { ...loadConfig().config, nodeId: 'aimeat-unit-decide-001' } as AimeatConfig;
     const storage = new SqliteStorage(':memory:') as unknown as Storage;
     registerDecideTools(mcp as never, storage, config, () => principal);

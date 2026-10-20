@@ -11,6 +11,8 @@
  *   import { registerAgentTelemetryTools } from './agent-telemetry.js';
  *   registerAgentTelemetryTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-28 -- Add public MCP telemetry reporting tool
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -29,7 +31,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { recordTelemetryUsage } from '../services/usage-metering.js';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
@@ -49,7 +51,7 @@ export function registerAgentTelemetryTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool('aimeat_agent_telemetry_report', descriptionFor('aimeat_agent_telemetry_report'), zodShapeFor('aimeat_agent_telemetry_report'), annotationsFor('aimeat_agent_telemetry_report'), async ({ type, data, session_id, task_id }) => {
+    mcp.registerTool('aimeat_agent_telemetry_report', { description: descriptionFor('aimeat_agent_telemetry_report'), inputSchema: zodShapeFor('aimeat_agent_telemetry_report'), annotations: annotationsFor('aimeat_agent_telemetry_report') }, async ({ type, data, session_id, task_id }) => {
         const agent = await storage.getAgent(agentGaii);
         if (!agent) {
             return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
@@ -86,7 +88,7 @@ export function registerAgentTelemetryTools(
     // the report resolution and the freshness stamp happen once, where they were written. A tool
     // that queried storage itself would be a second implementation of the scoping rule, which is
     // exactly the shape that made one defect in aimeat_memory_write need fixing three times.
-    mcp.tool('aimeat_usage_report', descriptionFor('aimeat_usage_report'), zodShapeFor('aimeat_usage_report'), annotationsFor('aimeat_usage_report'), async ({ report, from, to, grain, limit }) => {
+    mcp.registerTool('aimeat_usage_report', { description: descriptionFor('aimeat_usage_report'), inputSchema: zodShapeFor('aimeat_usage_report'), annotations: annotationsFor('aimeat_usage_report') }, async ({ report, from, to, grain, limit }) => {
         // The human behind this session, whichever principal is speaking. An agent asking about
         // usage is asking about its owner's account, which is the only account it has.
         const ownerGhii = ownerGhiiOf(agentGaii);

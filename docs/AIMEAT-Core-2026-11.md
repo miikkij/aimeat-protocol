@@ -860,7 +860,7 @@ AI clients reach a node through the Model Context Protocol. The tools a node off
 
 - **MCP-01** A node MUST serve MCP over the Streamable HTTP transport at `/v1/mcp`, with every tool the principal may use.
 - **MCP-02** A node MAY serve named subsets of the tools, called surfaces, at `/v2/mcp/<surface>`. A request to a surface the node does not have MUST be refused with status 400. A node MUST list its surfaces in discovery.
-- **MCP-03** An MCP session MUST belong to the principal that opened it. A request on that session by any other principal MUST be refused.
+- **MCP-03** Where the negotiated MCP revision has sessions, an MCP session MUST belong to the principal that opened it, and a request on that session by any other principal MUST be refused. On MCP 2026-07-28, which has no sessions, every request is authenticated on its own. ([Erratum E1](AIMEAT-Core-2026-11-errata.md))
 - **MCP-04** A client without a credential MAY list the public tools. Any other call without a credential MUST answer 401 with a `WWW-Authenticate` header that names the protected resource metadata.
 
 **Authorization.**
@@ -1099,7 +1099,7 @@ One line per requirement. The profile column says which profile the line belongs
 | HTTP-08 | 11.5 | Base | A removed feature is refused whatever the configuration says |
 | MCP-01 | 11.4 | MCP | Streamable HTTP at `/v1/mcp` with every permitted tool |
 | MCP-02 | 11.4 | MCP | Surfaces at `/v2/mcp/<surface>`; unknown is 400; listed in discovery |
-| MCP-03 | 11.4 | MCP | An MCP session belongs to the principal that opened it |
+| MCP-03 | 11.4 | MCP | Where the revision has sessions, a session belongs to the principal that opened it; on 2026-07-28 every request is authenticated on its own (erratum E1) |
 | MCP-04 | 11.4 | MCP | Unauthenticated calls other than the public list answer 401 with resource metadata |
 | MCP-05 | 11.4 | MCP | RFC 8414 and RFC 9728 metadata |
 | MCP-06 | 11.4 | MCP | PKCE with S256 required |

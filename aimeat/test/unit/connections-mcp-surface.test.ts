@@ -15,6 +15,8 @@
  *   concludes the product is broken.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connections-mcp-surface.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-17 — aimeat_mail_send has no condition of its own any more: the generic gate applies both
  *     catalog words, and an agent's person can allow it with one press. Asserted on the catalog and
  *     scopeAllowsTool instead of on this function's registrations.
@@ -24,7 +26,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerConnectionTools } from '../../src/mcp/connections.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
@@ -35,7 +37,7 @@ import { requiredScopesForTool, scopeAllowsTool } from '../../src/tool-catalog/s
 function recordingMcp(): { mcp: McpServer; names: string[] } {
     const names: string[] = [];
     const mcp = {
-        tool: (name: string) => { names.push(name); },
+        registerTool: (name: string) => { names.push(name); },
     } as unknown as McpServer;
     return { mcp, names };
 }

@@ -23,6 +23,7 @@
  *   bogus level · spoofed principal · attach-by-id · non-carrying tool · shell path · scope gate
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-connector
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-10-08 — Phase 5 flips: POST /v1/boards/:id/posts records a declaration (aiprov D5),
  *     so aimeat_board_post through the connector stores the crew's level and human involvement
  *     instead of answering recorded:false. The case had asserted the gap this change closes.
@@ -37,8 +38,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { stringify as yamlStringify } from 'yaml';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());

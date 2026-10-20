@@ -9,6 +9,8 @@
  * @structure registerNotifyTools(mcp, storage, config, getAgentGaii, caller)
  * @usage import { registerNotifyTools } from './notify.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -19,7 +21,7 @@
  *     answered without an error. Held by test/unit/node-mcp-error-flag.test.ts.
  *   v1.0.0 — 2026-08-30 — Initial (design canvas "AIMEAT Ilmoitusten sivu", direction A).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -33,11 +35,13 @@ export function registerNotifyTools(
     /** The session's caller (services/caller-context.ts): the agent that tells its owner. */
     caller: () => CallerContext,
 ): void {
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_notify',
-        descriptionFor('aimeat_notify'),
-        zodShapeFor('aimeat_notify'),
-        annotationsFor('aimeat_notify'),
+        {
+            description: descriptionFor('aimeat_notify'),
+            inputSchema: zodShapeFor('aimeat_notify'),
+            annotations: annotationsFor('aimeat_notify'),
+        },
         async ({ title, body, link, type }) => {
             try {
                 const r = await createPrincipalNotification(storage, config, caller().auth, { title, body, link, type });

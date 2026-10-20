@@ -13,6 +13,8 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-19 — aimeat_admin_agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read, as GET /v1/admin/agents does.
  *   2026-10-15 — aimeat_admin_stats counts morsels in circulation with morselsInCirculation(), the function the admin dashboard uses: every account holder, with or without an agent (feature-list audit #169).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -37,7 +39,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/mcp/core.ts (max-file-lines); no behavior change
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -77,11 +79,13 @@ export function registerCoreAdminTools(
     };
 
     // ── Tool 15: aimeat_admin_stats ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_admin_stats',
-        descriptionFor('aimeat_admin_stats'),
-        zodShapeFor('aimeat_admin_stats'),
-        annotationsFor('aimeat_admin_stats'),
+        {
+            description: descriptionFor('aimeat_admin_stats'),
+            inputSchema: zodShapeFor('aimeat_admin_stats'),
+            annotations: annotationsFor('aimeat_admin_stats'),
+        },
         async () => {
             if (!(await isOperator())) return notOperator;
             const agents = await storage.listAgents();
@@ -112,11 +116,13 @@ export function registerCoreAdminTools(
     );
 
     // ── Tool 16: aimeat_admin_agents ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_admin_agents',
-        descriptionFor('aimeat_admin_agents'),
-        zodShapeFor('aimeat_admin_agents'),
-        annotationsFor('aimeat_admin_agents'),
+        {
+            description: descriptionFor('aimeat_admin_agents'),
+            inputSchema: zodShapeFor('aimeat_admin_agents'),
+            annotations: annotationsFor('aimeat_admin_agents'),
+        },
         async ({ limit }) => {
             if (!(await isOperator())) return notOperator;
             const agents = await storage.listAgents();
@@ -140,11 +146,13 @@ export function registerCoreAdminTools(
     );
 
     // ── Tool 17: aimeat_admin_config ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_admin_config',
-        descriptionFor('aimeat_admin_config'),
-        zodShapeFor('aimeat_admin_config'),
-        annotationsFor('aimeat_admin_config'),
+        {
+            description: descriptionFor('aimeat_admin_config'),
+            inputSchema: zodShapeFor('aimeat_admin_config'),
+            annotations: annotationsFor('aimeat_admin_config'),
+        },
         async () => {
             if (!(await isOperator())) return notOperator;
             return {
@@ -185,11 +193,13 @@ export function registerCoreAdminTools(
     );
 
     // ── Tool 18: aimeat_admin_mint ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_admin_mint',
-        descriptionFor('aimeat_admin_mint'),
-        zodShapeFor('aimeat_admin_mint'),
-        annotationsFor('aimeat_admin_mint'),
+        {
+            description: descriptionFor('aimeat_admin_mint'),
+            inputSchema: zodShapeFor('aimeat_admin_mint'),
+            annotations: annotationsFor('aimeat_admin_mint'),
+        },
         async ({ gaii, amount }) => {
             if (!(await isOperator())) return notOperator;
             // ONE implementation (services/morsel.ts mintMorsels). This tool carried its own copy of
@@ -205,11 +215,13 @@ export function registerCoreAdminTools(
     );
 
     // ── Tool 19: aimeat_admin_organism_ownership ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_admin_organism_ownership',
-        descriptionFor('aimeat_admin_organism_ownership'),
-        zodShapeFor('aimeat_admin_organism_ownership'),
-        annotationsFor('aimeat_admin_organism_ownership'),
+        {
+            description: descriptionFor('aimeat_admin_organism_ownership'),
+            inputSchema: zodShapeFor('aimeat_admin_organism_ownership'),
+            annotations: annotationsFor('aimeat_admin_organism_ownership'),
+        },
         async ({ organism_id }) => {
             if (!(await isOperator(OPERATOR_ORGANISM_REPAIR_SCOPE))) return notRepairer;
             const organism = await storage.getOrganism(organism_id);
@@ -233,11 +245,13 @@ export function registerCoreAdminTools(
     // The break-glass. ONE implementation (services/organism-ownership.ts handOverOwnership), the
     // same function POST /v1/admin/organisms/:id/ownership calls, so the membership rules, the
     // notifications and the three-writes-together transaction cannot differ between the surfaces.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_admin_organism_owner_add',
-        descriptionFor('aimeat_admin_organism_owner_add'),
-        zodShapeFor('aimeat_admin_organism_owner_add'),
-        annotationsFor('aimeat_admin_organism_owner_add'),
+        {
+            description: descriptionFor('aimeat_admin_organism_owner_add'),
+            inputSchema: zodShapeFor('aimeat_admin_organism_owner_add'),
+            annotations: annotationsFor('aimeat_admin_organism_owner_add'),
+        },
         async ({ organism_id, ghii }) => {
             if (!(await isOperator(OPERATOR_ORGANISM_REPAIR_SCOPE))) return notRepairer;
             const organism = await storage.getOrganism(organism_id);

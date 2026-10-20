@@ -11,8 +11,10 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
- *   2026-10-20 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
+ *   2026-10-21 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
  *     own node on 40451, against the sandbox's decision and completion stand-ins.
+ *   2026-10-20 -- e2e-mcp-modern.ts joins the list (not the guard tier): MCP 2026-07-28 on the
+ *     shared node (MCP SDK v2 migration step 5).
  *   2026-10-20 -- e2e-workspace-transfer-gates.ts joins the list (not the guard tier): a workspace
  *     backup is not a way round the write rules on a restore, the ecosystem read data-areas on an
  *     export, or the credential mask, on its own node with the publish gate on, port 40496
@@ -962,6 +964,9 @@ const ALL_SUITES = [
     // route its aimeat-scopes does not name keeps the word, and a new app gets a publish warning.
     'test/e2e-app-scope-allowance.ts',
     'test/e2e-mcp-v2.ts',
+    // MCP 2026-07-28 beside the 2025 sessions on the same URLs: stateless requests, the header and
+    // envelope refusals, and the listen stream's change notifications.
+    'test/e2e-mcp-modern.ts',
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.
     'test/e2e-mcp-orientation.ts',

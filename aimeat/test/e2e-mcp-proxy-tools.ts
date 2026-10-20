@@ -28,6 +28,7 @@
  *   - Phase 5: clean-up (detach through REST)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-proxy-tools
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-10-17 — 2b, 3b, 4b: aimeat_mcp_list, aimeat_mcp_call and aimeat_mcp_grant_list miss
  *     only a one-press word (mcp:read, mcp:use), so they are listed (permission ask) and a call is
  *     refused SCOPE_DENIED with the allow address. 1b and 4d keep "not offered": mcp:manage is outside
@@ -38,8 +39,8 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, toolNames, type McpSession } from './helpers/mcp-session.js';
 
@@ -72,7 +73,7 @@ async function json(path: string, token: string, opts: RequestInit = {}): Promis
 // away from the +120 and +220 that e2e-mcp-proxy takes.
 const UPSTREAM_PORT = Number(new URL(BASE).port || '40251') + 150;
 const UPSTREAM_URL = `http://127.0.0.1:${UPSTREAM_PORT}/mcp`;
-const upstreamTransports = new Map<string, StreamableHTTPServerTransport>();
+const upstreamTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 const upstream = http.createServer(async (req, res) => {
     const sid = req.headers['mcp-session-id'] as string | undefined;
     if (sid && !upstreamTransports.has(sid)) {
@@ -83,9 +84,8 @@ const upstream = http.createServer(async (req, res) => {
     let transport = sid ? upstreamTransports.get(sid) : undefined;
     if (!transport) {
         const srv = new McpServer({ name: 'e2e-proxy-tools-upstream', version: '1.0.0' });
-        srv.tool('echo', 'Repeats its input.', { text: z.string() }, { readOnlyHint: true },
-            async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
-        const created = new StreamableHTTPServerTransport({
+        srv.registerTool('echo', { description: 'Repeats its input.', inputSchema: z.object({ text: z.string() }), annotations: { readOnlyHint: true } }, async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
+        const created = new NodeStreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (id: string) => upstreamTransports.set(id, created),
         });

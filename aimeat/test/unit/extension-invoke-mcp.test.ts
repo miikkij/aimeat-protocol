@@ -7,10 +7,11 @@
  *   cannot see: a delivered call records its duration under the provider, the failure text is redacted
  *   of credential-shaped text, and a version pin resolves.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-16 — Initial (QA audit D2-05).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerExtensionsTools } from '../../src/mcp/extensions.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';

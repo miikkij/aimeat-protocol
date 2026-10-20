@@ -11,6 +11,8 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The aimeat://boards/{id} resource passes the posts through the session's
  *     classification reader with the board's classification (plan doc-mvdipuyqraas, L1.3).
  *   2026-10-18 — aimeat_board_create asks the publish gate with the session's caller and renders
@@ -54,7 +56,7 @@
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -205,11 +207,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 1: aimeat_board_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_list',
-        descriptionFor('aimeat_board_list'),
-        zodShapeFor('aimeat_board_list'),
-        annotationsFor('aimeat_board_list'),
+        {
+            description: descriptionFor('aimeat_board_list'),
+            inputSchema: zodShapeFor('aimeat_board_list'),
+            annotations: annotationsFor('aimeat_board_list'),
+        },
         async () => {
             const visible = await seenBoards(await storage.listBoards());
             return {
@@ -230,11 +234,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 2: aimeat_board_create ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_create',
-        descriptionFor('aimeat_board_create'),
-        zodShapeFor('aimeat_board_create'),
-        annotationsFor('aimeat_board_create'),
+        {
+            description: descriptionFor('aimeat_board_create'),
+            inputSchema: zodShapeFor('aimeat_board_create'),
+            annotations: annotationsFor('aimeat_board_create'),
+        },
         async ({ name, visibility, description, allowed_gaiis, rules }) => {
             // services/board-write.ts — the same create POST /v1/boards performs. The operator rule
             // lived here as "public requires operator" while the route reserves system boards too,
@@ -272,11 +278,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool: aimeat_board_rules_set ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_rules_set',
-        descriptionFor('aimeat_board_rules_set'),
-        zodShapeFor('aimeat_board_rules_set'),
-        annotationsFor('aimeat_board_rules_set'),
+        {
+            description: descriptionFor('aimeat_board_rules_set'),
+            inputSchema: zodShapeFor('aimeat_board_rules_set'),
+            annotations: annotationsFor('aimeat_board_rules_set'),
+        },
         async ({ board_id, rules }) => {
             const board = await storage.getBoard(board_id);
             if (!board) return { content: [{ type: 'text' as const, text: `NOT_FOUND: Board not found: ${board_id}` }], isError: true };
@@ -312,11 +320,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 3: aimeat_board_subscribe ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_subscribe',
-        descriptionFor('aimeat_board_subscribe'),
-        zodShapeFor('aimeat_board_subscribe'),
-        annotationsFor('aimeat_board_subscribe'),
+        {
+            description: descriptionFor('aimeat_board_subscribe'),
+            inputSchema: zodShapeFor('aimeat_board_subscribe'),
+            annotations: annotationsFor('aimeat_board_subscribe'),
+        },
         async ({ board_id, callback_url, filters }) => {
             // services/board-write.ts — the same subscription POST /v1/boards/:id/subscribe writes,
             // with the same visibility rule, the same duplicate refusal and the same change event.
@@ -339,11 +349,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 4: aimeat_board_react ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_react',
-        descriptionFor('aimeat_board_react'),
-        zodShapeFor('aimeat_board_react'),
-        annotationsFor('aimeat_board_react'),
+        {
+            description: descriptionFor('aimeat_board_react'),
+            inputSchema: zodShapeFor('aimeat_board_react'),
+            annotations: annotationsFor('aimeat_board_react'),
+        },
         async ({ board_id, post_id, emoji, remove }) => {
             // services/board-write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes,
             // and with remove the same withdrawal its DELETE makes. The route runs
@@ -367,11 +379,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 5: aimeat_board_reply ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_reply',
-        descriptionFor('aimeat_board_reply'),
-        zodShapeFor('aimeat_board_reply'),
-        annotationsFor('aimeat_board_reply'),
+        {
+            description: descriptionFor('aimeat_board_reply'),
+            inputSchema: zodShapeFor('aimeat_board_reply'),
+            annotations: annotationsFor('aimeat_board_reply'),
+        },
         async ({ board_id, post_id, body, ai_provenance, ai_provenance_id }) => {
             // The whole reply is services/board-post.ts: the board's ACCESS rule (which neither door
             // applied to a reply — both checked only that the parent post existed), the body bound,
@@ -407,11 +421,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 6: aimeat_board_members ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_members',
-        descriptionFor('aimeat_board_members'),
-        zodShapeFor('aimeat_board_members'),
-        annotationsFor('aimeat_board_members'),
+        {
+            description: descriptionFor('aimeat_board_members'),
+            inputSchema: zodShapeFor('aimeat_board_members'),
+            annotations: annotationsFor('aimeat_board_members'),
+        },
         async ({ board_id, add, remove }) => {
             const board = await storage.getBoard(board_id);
             if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
@@ -444,11 +460,13 @@ export function registerBoardsTools(
     );
 
     // ── Tool 7: aimeat_board_delete ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_board_delete',
-        descriptionFor('aimeat_board_delete'),
-        zodShapeFor('aimeat_board_delete'),
-        annotationsFor('aimeat_board_delete'),
+        {
+            description: descriptionFor('aimeat_board_delete'),
+            inputSchema: zodShapeFor('aimeat_board_delete'),
+            annotations: annotationsFor('aimeat_board_delete'),
+        },
         async ({ board_id }) => {
             // services/board-write.ts — the same delete DELETE /v1/boards/:id performs, with the
             // same owner-or-operator rule and the same change event.

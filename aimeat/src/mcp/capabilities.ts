@@ -10,6 +10,8 @@
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
  *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 - 2026-05-02 - Add create, update, delete, vouch tools
@@ -33,7 +35,7 @@
  *     the agent through services/operator-principal.ts, so they take operator:admin. They were read
  *     off the owner record, so every agent of an operator holding capability:write carried them.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
@@ -79,11 +81,13 @@ export function registerCapabilitiesTools(
         return { gaii, isOperator: (await resolveOperatorAgentName(storage, gaii, scopes)) !== null };
     }
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_list',
-        descriptionFor('aimeat_capabilities_list'),
-        zodShapeFor('aimeat_capabilities_list'),
-        annotationsFor('aimeat_capabilities_list'),
+        {
+            description: descriptionFor('aimeat_capabilities_list'),
+            inputSchema: zodShapeFor('aimeat_capabilities_list'),
+            annotations: annotationsFor('aimeat_capabilities_list'),
+        },
         async (args) => {
             const result = await storage.listCapabilities({
                 ...args,
@@ -100,11 +104,13 @@ export function registerCapabilitiesTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_get',
-        descriptionFor('aimeat_capabilities_get'),
-        zodShapeFor('aimeat_capabilities_get'),
-        annotationsFor('aimeat_capabilities_get'),
+        {
+            description: descriptionFor('aimeat_capabilities_get'),
+            inputSchema: zodShapeFor('aimeat_capabilities_get'),
+            annotations: annotationsFor('aimeat_capabilities_get'),
+        },
         async ({ id }) => {
             const cap = await storage.getCapability(id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
@@ -112,11 +118,13 @@ export function registerCapabilitiesTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_invoke',
-        descriptionFor('aimeat_capabilities_invoke'),
-        zodShapeFor('aimeat_capabilities_invoke'),
-        annotationsFor('aimeat_capabilities_invoke'),
+        {
+            description: descriptionFor('aimeat_capabilities_invoke'),
+            inputSchema: zodShapeFor('aimeat_capabilities_invoke'),
+            annotations: annotationsFor('aimeat_capabilities_invoke'),
+        },
         async (args) => {
             const cap = await storage.getCapability(args.id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
@@ -164,11 +172,13 @@ export function registerCapabilitiesTools(
 
     // ── CRUD Tools ──
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_create',
-        descriptionFor('aimeat_capabilities_create'),
-        zodShapeFor('aimeat_capabilities_create'),
-        annotationsFor('aimeat_capabilities_create'),
+        {
+            description: descriptionFor('aimeat_capabilities_create'),
+            inputSchema: zodShapeFor('aimeat_capabilities_create'),
+            annotations: annotationsFor('aimeat_capabilities_create'),
+        },
         async (args) => {
             try {
                 // The node's publishing policy, the moderation rule and the record shape all live in
@@ -191,11 +201,13 @@ export function registerCapabilitiesTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_update',
-        descriptionFor('aimeat_capabilities_update'),
-        zodShapeFor('aimeat_capabilities_update'),
-        annotationsFor('aimeat_capabilities_update'),
+        {
+            description: descriptionFor('aimeat_capabilities_update'),
+            inputSchema: zodShapeFor('aimeat_capabilities_update'),
+            annotations: annotationsFor('aimeat_capabilities_update'),
+        },
         async (args) => {
             // Which fields this tool accepts is the catalog's declaration. What happens to them —
             // ownership, the moderation rule on a status change, the updatedAt stamp — is shared.
@@ -217,11 +229,13 @@ export function registerCapabilitiesTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_delete',
-        descriptionFor('aimeat_capabilities_delete'),
-        zodShapeFor('aimeat_capabilities_delete'),
-        annotationsFor('aimeat_capabilities_delete'),
+        {
+            description: descriptionFor('aimeat_capabilities_delete'),
+            inputSchema: zodShapeFor('aimeat_capabilities_delete'),
+            annotations: annotationsFor('aimeat_capabilities_delete'),
+        },
         async ({ id }) => {
             const removed = await deleteCapability({ storage, config }, await caller(), id);
             if (!removed.ok) {
@@ -231,11 +245,13 @@ export function registerCapabilitiesTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_capabilities_vouch',
-        descriptionFor('aimeat_capabilities_vouch'),
-        zodShapeFor('aimeat_capabilities_vouch'),
-        annotationsFor('aimeat_capabilities_vouch'),
+        {
+            description: descriptionFor('aimeat_capabilities_vouch'),
+            inputSchema: zodShapeFor('aimeat_capabilities_vouch'),
+            annotations: annotationsFor('aimeat_capabilities_vouch'),
+        },
         // The comment LANDS now: a vouch is a row per voucher (the audit's dead-counter finding,
         // fixed 2026-08-28), and the text is stored beside it.
         async ({ id, comment }) => {

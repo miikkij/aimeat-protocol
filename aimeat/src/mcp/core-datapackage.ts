@@ -25,6 +25,8 @@
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, a publish that would make
  *     the package public lands at 'members' and the answer carries `warnings` PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   2026-10-18 — aimeat_datapackage_publish asks the publish gate as POST /v1/datapackages does: a
@@ -37,7 +39,7 @@
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B3).
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
@@ -92,11 +94,13 @@ export function registerCoreDataPackageTools(
     const reader = { sub: agentGaii, owner: localAccountName(agentGaii) };
 
     // ── aimeat_datapackage_publish ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_datapackage_publish',
-        descriptionFor('aimeat_datapackage_publish'),
-        zodShapeFor('aimeat_datapackage_publish'),
-        annotationsFor('aimeat_datapackage_publish'),
+        {
+            description: descriptionFor('aimeat_datapackage_publish'),
+            inputSchema: zodShapeFor('aimeat_datapackage_publish'),
+            annotations: annotationsFor('aimeat_datapackage_publish'),
+        },
         async ({ name, changes, resources, title, description, license, sources, legal_basis, ai_provenance, ai_provenance_id, visibility }) => {
             const bytes = Buffer.byteLength(JSON.stringify(resources ?? []), 'utf8');
             if (bytes > MAX_ROWS_BYTES) {
@@ -175,11 +179,13 @@ export function registerCoreDataPackageTools(
     );
 
     // ── aimeat_datapackage_export ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_datapackage_export',
-        descriptionFor('aimeat_datapackage_export'),
-        zodShapeFor('aimeat_datapackage_export'),
-        annotationsFor('aimeat_datapackage_export'),
+        {
+            description: descriptionFor('aimeat_datapackage_export'),
+            inputSchema: zodShapeFor('aimeat_datapackage_export'),
+            annotations: annotationsFor('aimeat_datapackage_export'),
+        },
         async ({ ref, resource, format, limit, offset, select }) => {
             const opened = await openPackage(store, ref, config.nodeId, reader);
             if (!opened) return errContent({ code: 'NOT_FOUND', message: `No such data package: ${ref}` });

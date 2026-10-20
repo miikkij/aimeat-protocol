@@ -11,10 +11,12 @@
  * @structure registerExposureTools(mcp, storage, config, caller)
  * @usage import { registerExposureTools } from './exposure.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.0.1 — 2026-10-18 — A report no source could be read for is an error (STORAGE_UNAVAILABLE), as on REST.
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.3).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -34,11 +36,13 @@ export function registerExposureTools(
   config: AimeatConfig,
   caller: () => CallerContext,
 ): void {
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_exposure_report',
-    descriptionFor('aimeat_exposure_report'),
-    zodShapeFor('aimeat_exposure_report'),
-    annotationsFor('aimeat_exposure_report'),
+    {
+        description: descriptionFor('aimeat_exposure_report'),
+        inputSchema: zodShapeFor('aimeat_exposure_report'),
+        annotations: annotationsFor('aimeat_exposure_report'),
+    },
     async () => {
       const c = caller();
       // Same refusals as the route: a visitor from another node has no account here.

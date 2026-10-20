@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version` (the display version
  *     the draft publishes with) and pass it to the shared service; the draft save answers with the
  *     draft's `version` (wish-the-app-draft-tools-can-set-the-display-version).
@@ -116,7 +118,7 @@
  *     update + draft save when omitted.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -177,14 +179,16 @@ export function registerAppsTools(
     }
 
     // ── Tool 1: aimeat_app_publish ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_publish',
-        descriptionFor('aimeat_app_publish'),
-        // The catalog's schema, the one the connector and the shell take too (secaudit 2026-10
-        // follow-up, Part B): `content` is plain HTML this tool encodes, `content_base64` the same
-        // already encoded, as on the other two surfaces.
-        zodShapeFor('aimeat_app_publish'),
-        annotationsFor('aimeat_app_publish'),
+        {
+            description: descriptionFor('aimeat_app_publish'),
+            // The catalog's schema, the one the connector and the shell take too (secaudit 2026-10
+            // follow-up, Part B): `content` is plain HTML this tool encodes, `content_base64` the same
+            // already encoded, as on the other two surfaces.
+            inputSchema: zodShapeFor('aimeat_app_publish'),
+            annotations: annotationsFor('aimeat_app_publish'),
+        },
         async ({ filename, owner, roadmap, content, content_base64: givenBase64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const content_base64 = givenBase64 ?? (content !== undefined ? Buffer.from(content, 'utf-8').toString('base64') : undefined);
             const agentGaii = getAgentGaii();
@@ -353,13 +357,15 @@ export function registerAppsTools(
     // ── Tool: aimeat_app_draft_save ──
     // Staging: save the NEXT version as a draft WITHOUT touching the live app, and get a
     // preview URL to test it on a real origin (mic/camera work) before deciding to publish.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_draft_save',
-        descriptionFor('aimeat_app_draft_save'),
-        // The catalog's schema (secaudit 2026-10 follow-up, Part B): the draft's base64 HTML as
-        // content_base64, the name this tool used, or as content, the name the other surfaces use.
-        zodShapeFor('aimeat_app_draft_save'),
-        annotationsFor('aimeat_app_draft_save'),
+        {
+            description: descriptionFor('aimeat_app_draft_save'),
+            // The catalog's schema (secaudit 2026-10 follow-up, Part B): the draft's base64 HTML as
+            // content_base64, the name this tool used, or as content, the name the other surfaces use.
+            inputSchema: zodShapeFor('aimeat_app_draft_save'),
+            annotations: annotationsFor('aimeat_app_draft_save'),
+        },
         async ({ filename, owner, content, content_base64: givenBase64, name, description, category, tags, icon, version, notice }) => {
             const content_base64 = givenBase64 ?? content;
             if (!content_base64) return { content: [{ type: 'text' as const, text: 'INVALID_INPUT: give the draft\'s base64-encoded HTML as content_base64 (or content).' }], isError: true };
@@ -416,11 +422,13 @@ export function registerAppsTools(
     );
 
     // ── Tool: aimeat_app_draft_publish ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_draft_publish',
-        descriptionFor('aimeat_app_draft_publish'),
-        zodShapeFor('aimeat_app_draft_publish'),
-        annotationsFor('aimeat_app_draft_publish'),
+        {
+            description: descriptionFor('aimeat_app_draft_publish'),
+            inputSchema: zodShapeFor('aimeat_app_draft_publish'),
+            annotations: annotationsFor('aimeat_app_draft_publish'),
+        },
         async ({ filename, owner, roadmap, version, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
             const scope = await resolveAppTargetScope(storage, config,
@@ -492,11 +500,13 @@ export function registerAppsTools(
     );
 
     // ── Tool: aimeat_app_draft_discard ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_draft_discard',
-        descriptionFor('aimeat_app_draft_discard'),
-        zodShapeFor('aimeat_app_draft_discard'),
-        annotationsFor('aimeat_app_draft_discard'),
+        {
+            description: descriptionFor('aimeat_app_draft_discard'),
+            inputSchema: zodShapeFor('aimeat_app_draft_discard'),
+            annotations: annotationsFor('aimeat_app_draft_discard'),
+        },
         async ({ filename, owner }) => {
             const agentGaii = getAgentGaii();
             const scope = await resolveAppTargetScope(storage, config,
@@ -623,11 +633,13 @@ export function registerAppsTools(
     );
 
     // ── Tool 3: aimeat_app_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_get',
-        descriptionFor('aimeat_app_get'),
-        zodShapeFor('aimeat_app_get'),
-        annotationsFor('aimeat_app_get'),
+        {
+            description: descriptionFor('aimeat_app_get'),
+            inputSchema: zodShapeFor('aimeat_app_get'),
+            annotations: annotationsFor('aimeat_app_get'),
+        },
         async ({ owner, filename }) => {
             const app = await storage.getAppByOwnerName(owner, filename);
             // An app the caller may not see (hidden, behind an access code, unlisted, or listed to this
@@ -691,11 +703,13 @@ export function registerAppsTools(
     );
 
     // ── Tool 4: aimeat_app_delete ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_delete',
-        descriptionFor('aimeat_app_delete'),
-        zodShapeFor('aimeat_app_delete'),
-        annotationsFor('aimeat_app_delete'),
+        {
+            description: descriptionFor('aimeat_app_delete'),
+            inputSchema: zodShapeFor('aimeat_app_delete'),
+            annotations: annotationsFor('aimeat_app_delete'),
+        },
         async ({ filename, version }) => {
             const agentGaii = getAgentGaii();
             const scope = await resolveAppOwnerScope(storage, config, agentGaii);

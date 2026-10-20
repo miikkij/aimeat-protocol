@@ -18,13 +18,15 @@
  * @structure registerPackageInstallRequestTools(mcp, storage, config, getAgentGaii, sessionScopes, caller)
  * @usage registerPackageInstallRequestTools(mcp, storage, config, agentGaii, scopes, caller);  // register-all.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-25 — Initial: package installs by agents become requests.
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -44,7 +46,7 @@ export function registerPackageInstallRequestTools(
     /** The session's caller (services/caller-context.ts). */
     caller: () => CallerContext,
 ): void {
-    mcp.tool('aimeat_package_install_requests', descriptionFor('aimeat_package_install_requests'), zodShapeFor('aimeat_package_install_requests'), annotationsFor('aimeat_package_install_requests'), async ({ request_id, decision }) => {
+    mcp.registerTool('aimeat_package_install_requests', { description: descriptionFor('aimeat_package_install_requests'), inputSchema: zodShapeFor('aimeat_package_install_requests'), annotations: annotationsFor('aimeat_package_install_requests') }, async ({ request_id, decision }) => {
         // Every MCP session is an agent's. The owner it acts for comes from its identity, never input:
         // the session caller.
         const who = caller().auth;

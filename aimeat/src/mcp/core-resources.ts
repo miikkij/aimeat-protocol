@@ -10,10 +10,11 @@
  * @structure registerCoreResources(mcp, storage, config, agentGaii)
  * @usage registerCoreResources(mcp, storage, config, agentGaii);  // from registerCoreTools
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-09-29 — Moved from mcp/core.ts (max-file-lines), with the classification reader.
  */
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { presentMemory } from '../services/classification/present-memory.js';

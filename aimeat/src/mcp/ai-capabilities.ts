@@ -11,6 +11,8 @@
  *   storage and the call is paid by the owner, in the agent's name, as the REST route does.
  * @structure registerAiCapabilityTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-08 — aimeat_ai_transcribe names the transcript's provenance record: provenance_id and record_url.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-30 — aimeat_ai_transcribe answers `classification_warnings` when the audio is
@@ -20,7 +22,7 @@
  *   v1.1.0 — 2026-09-28 — aimeat_ai_transcribe and aimeat_ai_embed take `role`, the AI role the call runs as.
  *   v1.0.0 — 2026-09-28 — Initial (System 2 plan, V5).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -55,7 +57,7 @@ export function registerAiCapabilityTools(
     return { payer, ...(agent ? { agent } : {}), caller: (agent ? 'agent' : 'owner') as 'agent' | 'owner' };
   };
 
-  mcp.tool('aimeat_ai_capabilities', descriptionFor('aimeat_ai_capabilities'), zodShapeFor('aimeat_ai_capabilities'), annotationsFor('aimeat_ai_capabilities'), async ({ app_id }) => {
+  mcp.registerTool('aimeat_ai_capabilities', { description: descriptionFor('aimeat_ai_capabilities'), inputSchema: zodShapeFor('aimeat_ai_capabilities'), annotations: annotationsFor('aimeat_ai_capabilities') }, async ({ app_id }) => {
     const w = who();
     try {
       return text(await aiCapabilitiesView(storage, config, w.payer, {
@@ -64,7 +66,7 @@ export function registerAiCapabilityTools(
     } catch (e) { return refusal(e); }
   });
 
-  mcp.tool('aimeat_ai_models', descriptionFor('aimeat_ai_models'), zodShapeFor('aimeat_ai_models'), annotationsFor('aimeat_ai_models'), async ({ capability, type, status, allowed }) => {
+  mcp.registerTool('aimeat_ai_models', { description: descriptionFor('aimeat_ai_models'), inputSchema: zodShapeFor('aimeat_ai_models'), annotations: annotationsFor('aimeat_ai_models') }, async ({ capability, type, status, allowed }) => {
     try {
       return text(await queryModels(storage, config, who(), {
         ...(capability ? { capability } : {}), ...(type ? { type } : {}), ...(status ? { status } : {}), allowed: allowed === true,
@@ -72,7 +74,7 @@ export function registerAiCapabilityTools(
     } catch (e) { return refusal(e); }
   });
 
-  mcp.tool('aimeat_ai_transcribe', descriptionFor('aimeat_ai_transcribe'), zodShapeFor('aimeat_ai_transcribe'), annotationsFor('aimeat_ai_transcribe'), async ({ storage_key, filename, language, model, provider, app_id, role }) => {
+  mcp.registerTool('aimeat_ai_transcribe', { description: descriptionFor('aimeat_ai_transcribe'), inputSchema: zodShapeFor('aimeat_ai_transcribe'), annotations: annotationsFor('aimeat_ai_transcribe') }, async ({ storage_key, filename, language, model, provider, app_id, role }) => {
     const w = who();
     try {
       // The caller's own storage, never another namespace: the lookup /v1/ai/transcribe makes.
@@ -95,7 +97,7 @@ export function registerAiCapabilityTools(
     } catch (e) { return refusal(e); }
   });
 
-  mcp.tool('aimeat_ai_embed', descriptionFor('aimeat_ai_embed'), zodShapeFor('aimeat_ai_embed'), annotationsFor('aimeat_ai_embed'), async ({ input, model, provider, app_id, role }) => {
+  mcp.registerTool('aimeat_ai_embed', { description: descriptionFor('aimeat_ai_embed'), inputSchema: zodShapeFor('aimeat_ai_embed'), annotations: annotationsFor('aimeat_ai_embed') }, async ({ input, model, provider, app_id, role }) => {
     const w = who();
     try {
       const r = await embedForOwner(storage, config, w.payer, {

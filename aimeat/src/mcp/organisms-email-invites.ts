@@ -9,6 +9,8 @@
  *   aimeat_organism_invitations_email, aimeat_organism_invitation_email_cancel.
  * @usage registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-09-30 — aimeat_organism_invite_email takes `locale` for the email's language and
  *     answers `email_locale`, as the REST route does.
@@ -21,7 +23,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from mcp/organisms.ts (max-file-lines)
  */
 
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -51,11 +53,13 @@ export function registerOrganismEmailInviteTools(
     // ── Tool: aimeat_organism_invite_email ── (invite an external email into an organism + workspaces)
     // Mirrors POST /v1/organisms/:id/invitations/email. Creator/admin only. The org-admin gate implies
     // the right to grant any of the organism's workspaces, so grants pass straight to the shared core.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invite_email',
-        descriptionFor('aimeat_organism_invite_email'),
-        zodShapeFor('aimeat_organism_invite_email'),
-        annotationsFor('aimeat_organism_invite_email'),
+        {
+            description: descriptionFor('aimeat_organism_invite_email'),
+            inputSchema: zodShapeFor('aimeat_organism_invite_email'),
+            annotations: annotationsFor('aimeat_organism_invite_email'),
+        },
         async ({ organism_id, email, org_role, workspaces, message, expires_in_days, return_url, locale }) => {
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
@@ -83,11 +87,13 @@ export function registerOrganismEmailInviteTools(
     );
 
     // ── Tool: aimeat_organism_invitations_email ── (list pending email invitations for an organism)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invitations_email',
-        descriptionFor('aimeat_organism_invitations_email'),
-        zodShapeFor('aimeat_organism_invitations_email'),
-        annotationsFor('aimeat_organism_invitations_email'),
+        {
+            description: descriptionFor('aimeat_organism_invitations_email'),
+            inputSchema: zodShapeFor('aimeat_organism_invitations_email'),
+            annotations: annotationsFor('aimeat_organism_invitations_email'),
+        },
         async ({ organism_id }) => {
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
@@ -97,11 +103,13 @@ export function registerOrganismEmailInviteTools(
     );
 
     // ── Tool: aimeat_organism_invitation_email_cancel ── (cancel a pending email invitation)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invitation_email_cancel',
-        descriptionFor('aimeat_organism_invitation_email_cancel'),
-        zodShapeFor('aimeat_organism_invitation_email_cancel'),
-        annotationsFor('aimeat_organism_invitation_email_cancel'),
+        {
+            description: descriptionFor('aimeat_organism_invitation_email_cancel'),
+            inputSchema: zodShapeFor('aimeat_organism_invitation_email_cancel'),
+            annotations: annotationsFor('aimeat_organism_invitation_email_cancel'),
+        },
         async ({ organism_id, invitation_id }) => {
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };

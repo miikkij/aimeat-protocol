@@ -15,8 +15,7 @@
  *   v0.1.0 -- 2026-06-05 -- Initial REST + MCP drivers (task 2)
  */
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import type { AimeatClient, Creds } from './client.js';
 import type { TransportKind } from './config.js';
 

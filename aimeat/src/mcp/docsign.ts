@@ -15,6 +15,8 @@
  * @structure registerDocsignTools(mcp, storage, config, caller)
  * @usage registerDocsignTools(mcp, storage, config, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — aimeat_docsign_wallet_start and _wallet_status (services/docsign/eudi.ts):
@@ -24,7 +26,7 @@
  *     already holds for the request.
  *   v1.2.1 — 2026-10-10 — DOCUMENT_NEEDED says why in plain words, as the REST route does.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -57,8 +59,8 @@ export function registerDocsignTools(
   const off = () => (config.docsignEnabled ? null : toolError('FEATURE_DISABLED', 'Document signing is switched off on this node.'));
   const appLink = (id: string) => (config.docsignAppUrl ? `${config.docsignAppUrl}/?request=${encodeURIComponent(id)}` : null);
 
-  mcp.tool('aimeat_docsign_validate', descriptionFor('aimeat_docsign_validate'), zodShapeFor('aimeat_docsign_validate'),
-    annotationsFor('aimeat_docsign_validate'),
+  mcp.registerTool('aimeat_docsign_validate', { description: descriptionFor('aimeat_docsign_validate'), inputSchema: zodShapeFor('aimeat_docsign_validate'),
+    annotations: annotationsFor('aimeat_docsign_validate') },
     async ({ storage_key, document_storage_key, content_base64, online }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -70,8 +72,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_lookup', descriptionFor('aimeat_docsign_lookup'), zodShapeFor('aimeat_docsign_lookup'),
-    annotationsFor('aimeat_docsign_lookup'),
+  mcp.registerTool('aimeat_docsign_lookup', { description: descriptionFor('aimeat_docsign_lookup'), inputSchema: zodShapeFor('aimeat_docsign_lookup'),
+    annotations: annotationsFor('aimeat_docsign_lookup') },
     async ({ sha256 }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -79,8 +81,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_request_create', descriptionFor('aimeat_docsign_request_create'), zodShapeFor('aimeat_docsign_request_create'),
-    annotationsFor('aimeat_docsign_request_create'),
+  mcp.registerTool('aimeat_docsign_request_create', { description: descriptionFor('aimeat_docsign_request_create'), inputSchema: zodShapeFor('aimeat_docsign_request_create'),
+    annotations: annotationsFor('aimeat_docsign_request_create') },
     async ({ title, message, storage_key, document: doc, parties }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -97,8 +99,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_requests', descriptionFor('aimeat_docsign_requests'), zodShapeFor('aimeat_docsign_requests'),
-    annotationsFor('aimeat_docsign_requests'),
+  mcp.registerTool('aimeat_docsign_requests', { description: descriptionFor('aimeat_docsign_requests'), inputSchema: zodShapeFor('aimeat_docsign_requests'),
+    annotations: annotationsFor('aimeat_docsign_requests') },
     async ({ state }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -106,8 +108,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_request_get', descriptionFor('aimeat_docsign_request_get'), zodShapeFor('aimeat_docsign_request_get'),
-    annotationsFor('aimeat_docsign_request_get'),
+  mcp.registerTool('aimeat_docsign_request_get', { description: descriptionFor('aimeat_docsign_request_get'), inputSchema: zodShapeFor('aimeat_docsign_request_get'),
+    annotations: annotationsFor('aimeat_docsign_request_get') },
     async ({ id }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -116,8 +118,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_sign', descriptionFor('aimeat_docsign_sign'), zodShapeFor('aimeat_docsign_sign'),
-    annotationsFor('aimeat_docsign_sign'),
+  mcp.registerTool('aimeat_docsign_sign', { description: descriptionFor('aimeat_docsign_sign'), inputSchema: zodShapeFor('aimeat_docsign_sign'),
+    annotations: annotationsFor('aimeat_docsign_sign') },
     async ({ id, method, signature }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -132,8 +134,8 @@ export function registerDocsignTools(
       }
     });
 
-  mcp.tool('aimeat_docsign_cancel', descriptionFor('aimeat_docsign_cancel'), zodShapeFor('aimeat_docsign_cancel'),
-    annotationsFor('aimeat_docsign_cancel'),
+  mcp.registerTool('aimeat_docsign_cancel', { description: descriptionFor('aimeat_docsign_cancel'), inputSchema: zodShapeFor('aimeat_docsign_cancel'),
+    annotations: annotationsFor('aimeat_docsign_cancel') },
     async ({ id }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -141,8 +143,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_delete', descriptionFor('aimeat_docsign_delete'), zodShapeFor('aimeat_docsign_delete'),
-    annotationsFor('aimeat_docsign_delete'),
+  mcp.registerTool('aimeat_docsign_delete', { description: descriptionFor('aimeat_docsign_delete'), inputSchema: zodShapeFor('aimeat_docsign_delete'),
+    annotations: annotationsFor('aimeat_docsign_delete') },
     async ({ id }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -150,8 +152,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_wallet_start', descriptionFor('aimeat_docsign_wallet_start'), zodShapeFor('aimeat_docsign_wallet_start'),
-    annotationsFor('aimeat_docsign_wallet_start'),
+  mcp.registerTool('aimeat_docsign_wallet_start', { description: descriptionFor('aimeat_docsign_wallet_start'), inputSchema: zodShapeFor('aimeat_docsign_wallet_start'),
+    annotations: annotationsFor('aimeat_docsign_wallet_start') },
     async ({ id, storage_key }) => {
       const disabled = off(); if (disabled) return disabled;
       try {
@@ -172,8 +174,8 @@ export function registerDocsignTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_docsign_wallet_status', descriptionFor('aimeat_docsign_wallet_status'), zodShapeFor('aimeat_docsign_wallet_status'),
-    annotationsFor('aimeat_docsign_wallet_status'),
+  mcp.registerTool('aimeat_docsign_wallet_status', { description: descriptionFor('aimeat_docsign_wallet_status'), inputSchema: zodShapeFor('aimeat_docsign_wallet_status'),
+    annotations: annotationsFor('aimeat_docsign_wallet_status') },
     async ({ id, session_id }) => {
       const disabled = off(); if (disabled) return disabled;
       try {

@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_workspace_revert_to_draft takes a space by its name as well as its namespace
  *     (resolveSpaceNamespace), as _write does and as POST /v1/organisms/:id/revert now does; _publish
  *     does it in publishWorkspaceOp. A name used to answer "declares no space" beside a list that
@@ -177,7 +179,7 @@
  *     documented only the memory shape ({ name, namespace, mode }), and the server filled memory
  *     defaults to match, so a row space added here died on a `versioned: true` nobody had asked for.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
@@ -369,9 +371,9 @@ export function registerWorkspaceTools(
     };
 
     // ── aimeat_workspace_list ──
-    mcp.tool('aimeat_workspace_list', descriptionFor('aimeat_workspace_list'),
-        zodShapeFor('aimeat_workspace_list'),
-        annotationsFor('aimeat_workspace_list'),
+    mcp.registerTool('aimeat_workspace_list', { description: descriptionFor('aimeat_workspace_list'),
+        inputSchema: zodShapeFor('aimeat_workspace_list'),
+        annotations: annotationsFor('aimeat_workspace_list') },
         async ({ organism_id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             // Each workspace is registered under its CREATOR's own GHII registry record — aggregate
@@ -387,9 +389,9 @@ export function registerWorkspaceTools(
     // in one blob" grew to 100s of KB — too big for an MCP round-trip). BATCH-OPEN (`ids` given) →
     // the FULL value of only the requested instances. So the flow is: read the index → pick the ids
     // that likely hold what you need → read those ids. Both calls are size-bounded.
-    mcp.tool('aimeat_workspace_read', descriptionFor('aimeat_workspace_read'),
-        zodShapeFor('aimeat_workspace_read'),
-        annotationsFor('aimeat_workspace_read'),
+    mcp.registerTool('aimeat_workspace_read', { description: descriptionFor('aimeat_workspace_read'),
+        inputSchema: zodShapeFor('aimeat_workspace_read'),
+        annotations: annotationsFor('aimeat_workspace_read') },
         async ({ organism_id, ws, ids, space, include_archived }): Promise<TextResult> => {
             // The work is services/workspace-tool-ops.ts, which the extension sandbox's
             // ctx.workspace calls as well: a workspace is SHARED, authorization is at the workspace
@@ -403,9 +405,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
-    mcp.tool('aimeat_organism_overview', descriptionFor('aimeat_organism_overview'),
-        zodShapeFor('aimeat_organism_overview'),
-        annotationsFor('aimeat_organism_overview'),
+    mcp.registerTool('aimeat_organism_overview', { description: descriptionFor('aimeat_organism_overview'),
+        inputSchema: zodShapeFor('aimeat_organism_overview'),
+        annotations: annotationsFor('aimeat_organism_overview') },
         async ({ organism_id, include_archived }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const { markdown } = await buildOrganismOverview(storage, config, { orgId: organism_id, viewerGaii: ownerGhii, includeArchived: include_archived, reader: readerForAgent({ storage, config }, agentGaii) });
@@ -413,9 +415,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_overview ── (OKF-style structure map of ONE workspace)
-    mcp.tool('aimeat_workspace_overview', descriptionFor('aimeat_workspace_overview'),
-        zodShapeFor('aimeat_workspace_overview'),
-        annotationsFor('aimeat_workspace_overview'),
+    mcp.registerTool('aimeat_workspace_overview', { description: descriptionFor('aimeat_workspace_overview'),
+        inputSchema: zodShapeFor('aimeat_workspace_overview'),
+        annotations: annotationsFor('aimeat_workspace_overview') },
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const { markdown } = await buildWorkspaceOverview(storage, config, { orgId: organism_id, ws, viewerGaii: ownerGhii, reader: readerForAgent({ storage, config }, agentGaii) });
@@ -423,9 +425,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_write_draft ──
-    mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
-        zodShapeFor('aimeat_workspace_write'),
-        annotationsFor('aimeat_workspace_write'),
+    mcp.registerTool('aimeat_workspace_write', { description: descriptionFor('aimeat_workspace_write'),
+        inputSchema: zodShapeFor('aimeat_workspace_write'),
+        annotations: annotationsFor('aimeat_workspace_write') },
         async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
             // services/workspace-tool-ops.ts: membership, the organism namespace rule, every item
             // resolved and schema-validated before any is written, the archive flags, the memory
@@ -440,9 +442,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_publish ──
-    mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),
-        zodShapeFor('aimeat_workspace_publish'),
-        annotationsFor('aimeat_workspace_publish'),
+    mcp.registerTool('aimeat_workspace_publish', { description: descriptionFor('aimeat_workspace_publish'),
+        inputSchema: zodShapeFor('aimeat_workspace_publish'),
+        annotations: annotationsFor('aimeat_workspace_publish') },
         async ({ organism_id, ws, namespace, id, expected_version }): Promise<TextResult> => {
             // services/workspace-tool-ops.ts: membership, the meta.* role, the archive flag, the
             // publish gate (read across every owner), then the same publishDraft POST
@@ -452,9 +454,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_share ──
-    mcp.tool('aimeat_workspace_share', descriptionFor('aimeat_workspace_share'),
-        zodShapeFor('aimeat_workspace_share'),
-        annotationsFor('aimeat_workspace_share'),
+    mcp.registerTool('aimeat_workspace_share', { description: descriptionFor('aimeat_workspace_share'),
+        inputSchema: zodShapeFor('aimeat_workspace_share'),
+        annotations: annotationsFor('aimeat_workspace_share') },
         async ({ organism_id, ws, space, id, shared, access, password, until }): Promise<TextResult> => {
             // services/workspace-share.ts: membership, the creator-or-admin rule, the merge, the end
             // dates and the HTML page default, the same code PUT /v1/organisms/:id/workspace/share runs.
@@ -468,9 +470,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_revert_to_draft ──
-    mcp.tool('aimeat_workspace_revert_to_draft', descriptionFor('aimeat_workspace_revert_to_draft'),
-        zodShapeFor('aimeat_workspace_revert_to_draft'),
-        annotationsFor('aimeat_workspace_revert_to_draft'),
+    mcp.registerTool('aimeat_workspace_revert_to_draft', { description: descriptionFor('aimeat_workspace_revert_to_draft'),
+        inputSchema: zodShapeFor('aimeat_workspace_revert_to_draft'),
+        annotations: annotationsFor('aimeat_workspace_revert_to_draft') },
         async ({ organism_id, ws, namespace: given, id }): Promise<TextResult> => {
             // A space's name is taken as well as its namespace, before the role check and the fence read it.
             const namespace = await resolveSpaceNamespace(storage, organism_id, ws, given);
@@ -508,9 +510,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_update ──
-    mcp.tool('aimeat_workspace_update', descriptionFor('aimeat_workspace_update'),
-        zodShapeFor('aimeat_workspace_update'),
-        annotationsFor('aimeat_workspace_update'),
+    mcp.registerTool('aimeat_workspace_update', { description: descriptionFor('aimeat_workspace_update'),
+        inputSchema: zodShapeFor('aimeat_workspace_update'),
+        annotations: annotationsFor('aimeat_workspace_update') },
         async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps, member_changes }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
@@ -561,9 +563,9 @@ export function registerWorkspaceTools(
     // the REST routes call: services/workspace-doc-edit.ts.
     registerWorkspaceDocumentTools(mcp, { storage, config }, caller);
 
-    mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
-        zodShapeFor('aimeat_workspace_object_delete'),
-        annotationsFor('aimeat_workspace_object_delete'),
+    mcp.registerTool('aimeat_workspace_object_delete', { description: descriptionFor('aimeat_workspace_object_delete'),
+        inputSchema: zodShapeFor('aimeat_workspace_object_delete'),
+        annotations: annotationsFor('aimeat_workspace_object_delete') },
         async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const root = wsRoot(organism_id, ws);

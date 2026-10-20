@@ -14,6 +14,8 @@
  * @structure registerMemoryBinTools(mcp, deps, caller)
  * @usage registerMemoryBinTools(mcp, { storage, config }, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-12 — Both tools hand the service the session's scopes, which decide whether owner_scope
  *     reaches a record under the owner's own identity (memory:write-as-owner).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -24,7 +26,7 @@
  *     does, now that restore asks the organism namespace rule too (A6-12).
  *   v1.0.0 — 2026-09-03 — Extracted from core.ts (max-file-lines), with the tools it holds.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -49,11 +51,13 @@ const binCaller = () => {
 // These call services/memory-bin.ts, the same one behind DELETE /v1/memory/:key, because who may
 // remove what is a rule and not a parameter. The other two surfaces are HTTP proxies onto that
 // route; this one runs inside the node and reaches the service directly. Three doors, one answer.
-mcp.tool(
+mcp.registerTool(
     'aimeat_memory_delete',
-    descriptionFor('aimeat_memory_delete'),
-    zodShapeFor('aimeat_memory_delete'),
-    annotationsFor('aimeat_memory_delete'),
+    {
+        description: descriptionFor('aimeat_memory_delete'),
+        inputSchema: zodShapeFor('aimeat_memory_delete'),
+        annotations: annotationsFor('aimeat_memory_delete'),
+    },
     async ({ key, owner_scope }) => {
         const out = await deleteMemoryRecord({ storage, config }, {
             // An agent session, never an operator one: this surface is minted per agent, so the
@@ -71,11 +75,13 @@ mcp.tool(
     },
 );
 
-mcp.tool(
+mcp.registerTool(
     'aimeat_memory_restore',
-    descriptionFor('aimeat_memory_restore'),
-    zodShapeFor('aimeat_memory_restore'),
-    annotationsFor('aimeat_memory_restore'),
+    {
+        description: descriptionFor('aimeat_memory_restore'),
+        inputSchema: zodShapeFor('aimeat_memory_restore'),
+        annotations: annotationsFor('aimeat_memory_restore'),
+    },
     async ({ key, owner_scope }) => {
         const out = await restoreMemoryRecord({ storage, config }, {
             // As the delete above: an agent session, so the organism namespace check and the

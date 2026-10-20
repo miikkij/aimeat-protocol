@@ -13,6 +13,8 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -44,7 +46,7 @@
  *     contact IS stays in services/contacts.ts rather than being made once per surface.
  *   v1.0.0 — 2026-07-16 — Initial: list/add/remove/resolve_email over the shared contacts core.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -90,11 +92,13 @@ export function registerContactTools(
     // route asks, and the session's scopes are the live ones. Calling listContactsMerged() here once
     // handed every agent on messages:read the owner's last messages; the tool then reached the route
     // over loopback HTTP until 2026-10-05 (secaudit 2026-10, M6).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_contact_list',
-        descriptionFor('aimeat_contact_list'),
-        zodShapeFor('aimeat_contact_list'),
-        annotationsFor('aimeat_contact_list'),
+        {
+            description: descriptionFor('aimeat_contact_list'),
+            inputSchema: zodShapeFor('aimeat_contact_list'),
+            annotations: annotationsFor('aimeat_contact_list'),
+        },
         async ({ q, state, include }) => {
             const answer = await listContactsFor(storage, config.nodeId, session(), { q, state, include });
             return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
@@ -102,11 +106,13 @@ export function registerContactTools(
     );
 
     // ── aimeat_contact_invite — invite a person to join this AIMEAT, no organism behind it ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_contact_invite',
-        descriptionFor('aimeat_contact_invite'),
-        zodShapeFor('aimeat_contact_invite'),
-        annotationsFor('aimeat_contact_invite'),
+        {
+            description: descriptionFor('aimeat_contact_invite'),
+            inputSchema: zodShapeFor('aimeat_contact_invite'),
+            annotations: annotationsFor('aimeat_contact_invite'),
+        },
         async ({ email, message }) => {
             try {
                 const inviterName = localAccountName(getAgentGaii());
@@ -122,11 +128,13 @@ export function registerContactTools(
     );
 
     // ── aimeat_contact_add — save an identity, or a person with no account here ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_contact_add',
-        descriptionFor('aimeat_contact_add'),
-        zodShapeFor('aimeat_contact_add'),
-        annotationsFor('aimeat_contact_add'),
+        {
+            description: descriptionFor('aimeat_contact_add'),
+            inputSchema: zodShapeFor('aimeat_contact_add'),
+            annotations: annotationsFor('aimeat_contact_add'),
+        },
         async ({ contact_id, name, email, note, tags, links, relation }) => {
             // Which of the two shapes the caller meant is decided ONCE, in the service, so the MCP
             // answer and the REST answer cannot disagree about what a contact is.
@@ -154,11 +162,13 @@ export function registerContactTools(
     );
 
     // ── aimeat_contact_remove — remove from the address book (never resets the DM gate) ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_contact_remove',
-        descriptionFor('aimeat_contact_remove'),
-        zodShapeFor('aimeat_contact_remove'),
-        annotationsFor('aimeat_contact_remove'),
+        {
+            description: descriptionFor('aimeat_contact_remove'),
+            inputSchema: zodShapeFor('aimeat_contact_remove'),
+            annotations: annotationsFor('aimeat_contact_remove'),
+        },
         async ({ contact_id }) => {
             try {
                 await removeContact(storage, ownerGhii(), contact_id);
@@ -178,11 +188,13 @@ export function registerContactTools(
     // agents together, a save by email included. The limit lived on the route until 2026-09-24
     // (security audit A5-2), and this tool asked the route over loopback HTTP until 2026-10-05; both
     // now call the service (secaudit 2026-10, M6).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_contact_resolve_email',
-        descriptionFor('aimeat_contact_resolve_email'),
-        zodShapeFor('aimeat_contact_resolve_email'),
-        annotationsFor('aimeat_contact_resolve_email'),
+        {
+            description: descriptionFor('aimeat_contact_resolve_email'),
+            inputSchema: zodShapeFor('aimeat_contact_resolve_email'),
+            annotations: annotationsFor('aimeat_contact_resolve_email'),
+        },
         async ({ email }) => {
             try {
                 const result = await resolveContactEmail(storage, getAgentGaii(), String(email ?? ''));

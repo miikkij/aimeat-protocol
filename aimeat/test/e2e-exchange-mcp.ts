@@ -15,6 +15,7 @@
  *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.4.2 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
  *     agent-work listing states `toll_morsels: 5` and the app tool `tollMorsels: 3`, which 3.x accepts too.
  *   v1.4.1 — 2026-10-11 — The no-contract case prices its tool in money: a morsel figure is pacing
@@ -39,7 +40,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Server } from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
@@ -89,7 +90,7 @@ async function balance(token: string): Promise<number> {
 /** A capture-only mock McpServer: records each registered handler by tool name so the test can invoke it. */
 function captureTools(gaii: string, token: string, scopes: string[] = []): Record<string, (a: any) => Promise<any>> {
     const handlers: Record<string, (a: any) => Promise<any>> = {};
-    const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, handler: (a: any) => Promise<any>) => { handlers[name] = handler; } } as unknown as McpServer;
+    const mock = { registerTool: (name: string, _config: unknown, handler: (a: any) => Promise<any>) => { handlers[name] = handler; } } as unknown as McpServer;
     registerExchangeRunTools(mock, storage, config, () => gaii, () => token, scopes);
     return handlers;
 }

@@ -9,10 +9,12 @@
  *   connections:use, reads them only on connections:read-as-owner, and sends from the owner's book.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connections-owner-holder.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.0 — 2026-10-15 — Initial (feature-list audit 128-130).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerConnectionTools } from '../../src/mcp/connections.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
@@ -31,7 +33,7 @@ type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: str
 
 function toolsFor(scopes: string[]): Record<string, Handler> {
   const tools: Record<string, Handler> = {};
-  const mcp = { tool: (name: string, ...rest: unknown[]) => { tools[name] = rest[rest.length - 1] as Handler; } } as unknown as McpServer;
+  const mcp = { registerTool: (name: string, ...rest: unknown[]) => { tools[name] = rest[rest.length - 1] as Handler; } } as unknown as McpServer;
   const config = {
     nodeId: NODE, connectionsEnabled: true, connectGoogleClientId: 'g', connectGoogleClientSecret: 's',
     connectRedirectUri: '', connectFakeBaseUrl: '', outboundDailyLimit: 100,

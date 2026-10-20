@@ -33,6 +33,10 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-10-20 — On the MCP SDK v2 client (@modelcontextprotocol/client): the provider keeps the
+ *     discovery state with the round, declares application_type 'web', round-trips the issuer stamp
+ *     on the tokens and the client registration, and the callback's `iss` reaches auth() (RFC 9207,
+ *     SEP-2352, SEP-837; SDK v2 migration step 4a).
  *   2026-10-15 — A failed token renewal parks the server in needs_reauth at once and refreshMcpOAuth
  *     answers 'renewal-failed', instead of logging and carrying on with the old token until the far
  *     side answered 401 (feature-list audit #9).
@@ -43,10 +47,11 @@
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy, the OAuth credential path.
  */
 import { randomUUID, randomBytes } from 'node:crypto';
-import { auth, type OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
+import { auth } from '@modelcontextprotocol/client';
 import type {
-  OAuthClientMetadata, OAuthClientInformation, OAuthTokens,
-} from '@modelcontextprotocol/sdk/shared/auth.js';
+  OAuthClientProvider, OAuthClientMetadata, StoredOAuthClientInformation as OAuthClientInformation,
+  StoredOAuthTokens as OAuthTokens, OAuthDiscoveryState,
+} from '@modelcontextprotocol/client';
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
@@ -78,6 +83,11 @@ interface RoundPayload {
   authorizeUrl?: string;
   /** Who started the round: the owner in person, or an agent acting for them. */
   startedBy?: string;
+  /**
+   * The authorization server the round's redirect targeted, as the SDK discovered it. Handed back
+   * on the callback, so the SDK verifies it exchanges the code at the same server (SEP-2352).
+   */
+  discovery?: OAuthDiscoveryState;
 }
 
 /** The contexts a waiting round's two secrets are sealed to. */
@@ -103,6 +113,7 @@ class McpOAuthProvider implements OAuthClientProvider {
     codeVerifier?: string;
     clientInformation?: OAuthClientInformation;
     tokens?: OAuthTokens;
+    discoveryState?: OAuthDiscoveryState;
   } = {};
 
   constructor(
@@ -112,6 +123,7 @@ class McpOAuthProvider implements OAuthClientProvider {
       codeVerifier?: string;
       clientInformation?: OAuthClientInformation;
       tokens?: OAuthTokens;
+      discoveryState?: OAuthDiscoveryState;
     },
   ) {}
 
@@ -127,7 +139,18 @@ class McpOAuthProvider implements OAuthClientProvider {
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
       token_endpoint_auth_method: 'client_secret_post',
+      // A server-side client with an https redirect (SEP-837); said rather than left to the heuristic.
+      application_type: 'web',
     };
+  }
+
+  /** Where the round's redirect pointed, kept with the round between the two HTTP requests. */
+  discoveryState(): OAuthDiscoveryState | undefined {
+    return this.captured.discoveryState ?? this.seed.discoveryState;
+  }
+
+  saveDiscoveryState(state: OAuthDiscoveryState): void {
+    this.captured.discoveryState = state;
   }
 
   /** Ours, not the SDK's: it is the key the pending round is stored under. */
@@ -256,6 +279,7 @@ export async function startMcpOAuth(input: {
     authorizeUrl: provider.captured.authorizationUrl,
     ...(input.startedBy ? { startedBy: input.startedBy } : {}),
     ...(bind ? { bind } : {}),
+    ...(provider.captured.discoveryState ? { discovery: provider.captured.discoveryState } : {}),
   };
 
   await storage.createVerificationNonce({
@@ -291,6 +315,11 @@ export async function finishMcpOAuth(input: {
   config: AimeatConfig;
   state: string;
   code: string;
+  /**
+   * The callback's `iss` (RFC 9207), '' when it carried none. The SDK compares it with the issuer
+   * the round was started against before the code is exchanged.
+   */
+  iss?: string;
   /** The round cookie the callback request carried ('' when it carried none). */
   binding: string;
 }): Promise<OAuthFinish> {
@@ -347,11 +376,13 @@ export async function finishMcpOAuth(input: {
     state: input.state,
     codeVerifier: verifier,
     ...(clientInformation ? { clientInformation } : {}),
+    ...(payload.discovery ? { discoveryState: payload.discovery } : {}),
   });
 
   try {
     await auth(provider, {
       serverUrl: endpoint, authorizationCode: input.code, fetchFn: guardedFetch,
+      ...(input.iss ? { iss: input.iss } : {}),
     });
   } catch (err) {
     logger.warn('mcp-client: the OAuth exchange failed', {
@@ -393,6 +424,8 @@ async function sealAndStore(
     shape: 'oauth2',
     accessToken: tokens.access_token,
     ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
+    // The SDK's stamp of the authorization server that issued the tokens (SEP-2352), kept verbatim.
+    ...(tokens.issuer ? { oauthIssuer: tokens.issuer } : {}),
   };
   const client = provider.clientInformation();
   // Carried in the credential rather than a column: it is as secret as the token beside it, and a
@@ -401,6 +434,7 @@ async function sealAndStore(
     credential.oauthClient = {
       client_id: client.client_id,
       ...(client.client_secret ? { client_secret: client.client_secret } : {}),
+      ...(client.issuer ? { issuer: client.issuer } : {}),
     };
   }
 
@@ -465,13 +499,19 @@ export async function refreshMcpOAuth(
         access_token: opened.accessToken,
         token_type: 'Bearer',
         ...(opened.refreshToken ? { refresh_token: opened.refreshToken } : {}),
+        ...(opened.oauthIssuer ? { issuer: opened.oauthIssuer } : {}),
       },
     });
 
     await auth(provider, { serverUrl: endpoint, fetchFn: guardedFetch });
-    // No captured tokens means the SDK could not renew and fell through to a new authorization
-    // round ('REDIRECT'): the refresh token was missing, refused, or the token endpoint failed.
-    if (!provider.captured.tokens) return await markRenewalFailed(storage, server, 'no new token was issued');
+    // No new access token means the SDK could not renew and fell through to a new authorization
+    // round ('REDIRECT'): the refresh token was missing, refused, or the token endpoint failed. The
+    // SDK v2 also saves the OLD token back once, stamped with the issuer it now knows (SEP-2352), so
+    // a captured token is a renewal only when it is a different one.
+    const renewed = provider.captured.tokens;
+    if (!renewed || renewed.access_token === opened.accessToken) {
+      return await markRenewalFailed(storage, server, 'no new token was issued');
+    }
     return await sealAndStore(storage, config, server, provider);
   } catch (err) {
     // The authorization server refused the refresh token (invalid_grant and the other OAuth errors

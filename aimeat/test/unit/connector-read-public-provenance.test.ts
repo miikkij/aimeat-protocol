@@ -7,6 +7,7 @@
  *   hands on the provenance record the public read serves on the envelope (meta.provenance), as
  *   aimeat_memory_read does. The plain unwrap kept the id in the body and dropped the statement.
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.1 — 2026-10-05 — The tool is taken from the whole connector (registerAllTools): the connector
  *     serves it over the CLI dispatch definition now (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-30 — TARGET-082 review. Initial.
@@ -20,7 +21,7 @@ type Handler = (args: Record<string, unknown>) => Promise<{ content: Array<{ tex
 function capture(resp: unknown): { handler: Handler; asked: string[] } {
   const asked: string[] = [];
   const handlers = new Map<string, Handler>();
-  const mcp = { tool: (...args: unknown[]) => { handlers.set(args[0] as string, args[args.length - 1] as Handler); } };
+  const mcp = { registerTool: (...args: unknown[]) => { handlers.set(args[0] as string, args[args.length - 1] as Handler); } };
   const client = { get: async (path: string) => { asked.push(path); return resp; } };
   const agent = { client, agent: 'probe', owner: 'alice', gaii: 'probe#alice@test-node', config: { node_url: 'http://node.test' } };
   const registry = { resolve: () => agent, list: () => [agent], size: () => 1 } as unknown as AgentRegistry;

@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, aimeat_skill_publish and
  *     aimeat_skill_update store a user skill asked as public at 'members', with `warnings`
  *     PUBLIC_IS_SIGNED_IN_HERE in the answer (closedSkillLevel, plan V1.6).
@@ -42,7 +44,7 @@
  *     PATCH /v1/skills/:name.
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry tools (node + user scopes).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -105,11 +107,13 @@ export function registerSkillsTools(
     const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
     // ── aimeat_skill_publish ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_skill_publish',
-        descriptionFor('aimeat_skill_publish'),
-        zodShapeFor('aimeat_skill_publish'),
-        annotationsFor('aimeat_skill_publish'),
+        {
+            description: descriptionFor('aimeat_skill_publish'),
+            inputSchema: zodShapeFor('aimeat_skill_publish'),
+            annotations: annotationsFor('aimeat_skill_publish'),
+        },
         async ({ skill_md, files, scope, visibility, organism_id, workspace_id, ai_provenance, ai_provenance_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();
@@ -192,11 +196,13 @@ export function registerSkillsTools(
     );
 
     // ── aimeat_skill_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_skill_list',
-        descriptionFor('aimeat_skill_list'),
-        zodShapeFor('aimeat_skill_list'),
-        annotationsFor('aimeat_skill_list'),
+        {
+            description: descriptionFor('aimeat_skill_list'),
+            inputSchema: zodShapeFor('aimeat_skill_list'),
+            annotations: annotationsFor('aimeat_skill_list'),
+        },
         async ({ view, agent_name, organism_id, workspace_id, binding }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();
@@ -228,11 +234,13 @@ export function registerSkillsTools(
     );
 
     // ── aimeat_skill_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_skill_get',
-        descriptionFor('aimeat_skill_get'),
-        zodShapeFor('aimeat_skill_get'),
-        annotationsFor('aimeat_skill_get'),
+        {
+            description: descriptionFor('aimeat_skill_get'),
+            inputSchema: zodShapeFor('aimeat_skill_get'),
+            annotations: annotationsFor('aimeat_skill_get'),
+        },
         async ({ ref, name, manifest_only }) => {
             const acc = await accessor();
             const candidates: string[] = [];
@@ -257,11 +265,13 @@ export function registerSkillsTools(
     );
 
     // ── aimeat_skill_link ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_skill_link',
-        descriptionFor('aimeat_skill_link'),
-        zodShapeFor('aimeat_skill_link'),
-        annotationsFor('aimeat_skill_link'),
+        {
+            description: descriptionFor('aimeat_skill_link'),
+            inputSchema: zodShapeFor('aimeat_skill_link'),
+            annotations: annotationsFor('aimeat_skill_link'),
+        },
         async ({ ref, agent_name }) => {
             if (!ownerName || !parsed) return err('Could not resolve the calling agent\'s owner');
             const agentName = agent_name ?? parsed.agent;
@@ -280,11 +290,13 @@ export function registerSkillsTools(
     );
 
     // ── aimeat_skill_unlink ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_skill_unlink',
-        descriptionFor('aimeat_skill_unlink'),
-        zodShapeFor('aimeat_skill_unlink'),
-        annotationsFor('aimeat_skill_unlink'),
+        {
+            description: descriptionFor('aimeat_skill_unlink'),
+            inputSchema: zodShapeFor('aimeat_skill_unlink'),
+            annotations: annotationsFor('aimeat_skill_unlink'),
+        },
         async ({ ref, agent_name }) => {
             if (!ownerName || !parsed) return err('Could not resolve the calling agent\'s owner');
             const agentName = agent_name ?? parsed.agent;
@@ -296,11 +308,13 @@ export function registerSkillsTools(
     );
 
     // ── aimeat_skill_update: visibility without a republish (the same door as PATCH /v1/skills/:name) ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_skill_update',
-        descriptionFor('aimeat_skill_update'),
-        zodShapeFor('aimeat_skill_update'),
-        annotationsFor('aimeat_skill_update'),
+        {
+            description: descriptionFor('aimeat_skill_update'),
+            inputSchema: zodShapeFor('aimeat_skill_update'),
+            annotations: annotationsFor('aimeat_skill_update'),
+        },
         async ({ name, visibility, scope }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             const acc = await accessor();

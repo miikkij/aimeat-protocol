@@ -102,7 +102,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 496 npm packages that travel inside the `aimeat` package. Build and test
+The 493 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -142,8 +142,11 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@jitl/quickjs-wasmfile-release-sync](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [@js-temporal/polyfill](https://github.com/js-temporal/temporal-polyfill#readme) | 0.5.1 | ISC |
 | [@levischuck/tiny-cbor](https://github.com/levischuck/tiny-cbor#readme) | 0.2.11 | MIT |
-| [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 1.7.5 | MIT |
-| [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.31.0 | MIT |
+| [@modelcontextprotocol/client](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
+| [@modelcontextprotocol/core](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
+| [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 2.0.3 | MIT |
+| [@modelcontextprotocol/node](https://modelcontextprotocol.io) | 2.1.1 | Apache-2.0 |
+| [@modelcontextprotocol/server](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
 | [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0 | MIT |
@@ -272,7 +275,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [cookie-signature](https://github.com/visionmedia/node-cookie-signature#readme) | 1.2.2 | MIT |
 | [cookie](https://github.com/jshttp/cookie#readme) | 0.7.2 | MIT |
 | [core-util-is](https://github.com/isaacs/core-util-is#readme) | 1.0.3 | MIT |
-| [cors](https://github.com/expressjs/cors#readme) | 2.8.6 | MIT |
 | [crc-32](https://sheetjs.com/) | 1.2.2 | Apache-2.0 |
 | [crc32-stream](https://github.com/archiverjs/node-crc32-stream) | 7.0.1 | MIT |
 | [croner](https://croner.56k.guru) | 10.0.1 | MIT |
@@ -320,7 +322,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [execa](https://github.com/sindresorhus/execa#readme) | 5.1.1 | MIT |
 | [exifr](https://mutiny.cz/exifr/) | 7.1.3 | MIT |
 | [expand-template](https://github.com/ralphtheninja/expand-template) | 2.0.3 | (MIT OR WTFPL) |
-| [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | 8.7.0 | MIT |
 | [express](https://expressjs.com/) | 5.2.1 | MIT |
 | [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal#readme) | 3.1.3 | MIT |
 | [fast-fifo](https://github.com/mafintosh/fast-fifo) | 1.3.2 | MIT |
@@ -363,7 +364,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [ini](https://github.com/npm/ini#readme) | 1.3.8 | ISC |
 | [ini](https://github.com/npm/ini#readme) | 7.0.0 | ISC |
 | [inversify](https://inversify.io) | 7.11.0 | MIT |
-| [ip-address](https://github.com/beaugunderson/ip-address#readme) | 10.7.3 | MIT |
 | [ipaddr.js](https://github.com/whitequark/ipaddr.js#readme) | 1.9.1 | MIT |
 | [is-arguments](https://github.com/inspect-js/is-arguments) | 1.2.0 | MIT |
 | [is-buffer](https://github.com/feross/is-buffer#readme) | 1.1.6 | MIT |
@@ -388,7 +388,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [js-string-escape](https://github.com/joliss/js-string-escape#readme) | 1.0.1 | MIT |
 | [jsbi](https://github.com/GoogleChromeLabs/jsbi#readme) | 4.3.2 | Apache-2.0 |
 | [json-schema-traverse](https://github.com/epoberezkin/json-schema-traverse#readme) | 1.0.0 | MIT |
-| [json-schema-typed](https://github.com/RemyRylan/json-schema-typed/tree/main/dist/node) | 8.0.2 | BSD-2-Clause |
 | [json-schema](https://github.com/kriszyp/json-schema#readme) | 0.4.0 | (AFL-2.1 OR BSD-3-Clause) |
 | [jwa](https://github.com/brianloveswords/node-jwa#readme) | 2.0.1 | MIT |
 | [jws](https://github.com/brianloveswords/node-jws#readme) | 4.0.1 | MIT |
@@ -428,7 +427,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
 | [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.8 | MIT |
-| [object-assign](https://github.com/sindresorhus/object-assign#readme) | 4.1.1 | MIT |
 | [object-inspect](https://github.com/inspect-js/object-inspect) | 1.13.4 | MIT |
 | [object-is](https://github.com/es-shims/object-is) | 1.1.6 | MIT |
 | [object-keys](https://github.com/ljharb/object-keys#readme) | 1.1.1 | MIT |
@@ -600,7 +598,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [yargs](https://yargs.js.org/) | 15.4.1 | MIT |
 | [yauzl](https://github.com/thejoshwolfe/yauzl) | 3.4.0 | MIT |
 | [zip-stream](https://github.com/archiverjs/node-zip-stream) | 7.0.5 | MIT |
-| [zod-to-json-schema](https://github.com/StefanTerdell/zod-to-json-schema#readme) | 3.25.2 | ISC |
 | [zod](https://zod.dev) | 4.1.11 | MIT |
 | [zod](https://zod.dev) | 4.6.5 | MIT |
 
@@ -1168,7 +1165,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @modelcontextprotocol/ext-apps 1.7.5
+### @modelcontextprotocol/client 2.3.1, @modelcontextprotocol/core 2.3.1, @modelcontextprotocol/ext-apps 2.0.3, @modelcontextprotocol/node 2.1.1, @modelcontextprotocol/server 2.3.1
 
 ```text
 The MCP project is undergoing a licensing transition from the MIT License to the Apache License, Version 2.0 ("Apache-2.0"). All new code and specification contributions to the project are licensed under Apache-2.0. Documentation contributions (excluding specifications) are licensed under CC-BY-4.0.
@@ -1387,32 +1384,6 @@ Creative Commons Attribution 4.0 International (CC-BY-4.0)
 Documentation in this project (excluding specifications) is licensed under
 CC-BY-4.0. See https://creativecommons.org/licenses/by/4.0/legalcode for
 the full license text.
-```
-
-### @modelcontextprotocol/sdk 1.31.0
-
-```text
-MIT License
-
-Copyright (c) 2024 Anthropic, PBC
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ### @noble/ciphers 1.3.0
@@ -4408,33 +4379,6 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 IN THE SOFTWARE.
 ```
 
-### cors 2.8.6
-
-```text
-(The MIT License)
-
-Copyright (c) 2013 Troy Goode <troygoode@gmail.com>
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-```
-
 ### crc-32 1.2.2
 
 ```text
@@ -4808,7 +4752,7 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### decamelize 1.2.0, object-assign 4.1.1, strip-json-comments 2.0.1
+### decamelize 1.2.0, strip-json-comments 2.0.1
 
 ```text
 The MIT License (MIT)
@@ -6072,32 +6016,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
-```
-
-### express-rate-limit 8.7.0
-
-```text
-MIT License
-
-Copyright 2023 Nathan Friedly, Vedant K
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 ```
 
 ### express 5.2.1
@@ -7716,30 +7634,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### ip-address 10.7.3
-
-```text
-Copyright (C) 2011 by Beau Gunderson
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-```
-
 ### ipaddr.js 1.9.1
 
 ```text
@@ -8121,68 +8015,6 @@ Apache License
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
-```
-
-### json-schema-typed 8.0.2
-
-```text
-BSD 2-Clause License
-
-Original source code is copyright (c) 2019-2025 Remy Rylan
-<https://github.com/RemyRylan>
-
-All JSON Schema documentation and descriptions are copyright (c):
-
-2009 [draft-0] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
-and SitePen (USA) <https://www.sitepen.com/>.
-
-2009 [draft-1] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
-and SitePen (USA) <https://www.sitepen.com/>.
-
-2010 [draft-2] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
-and SitePen (USA) <https://www.sitepen.com/>.
-
-2010 [draft-3] IETF Trust <https://www.ietf.org/>, Kris Zyp <kris@sitepen.com>,
-Gary Court <gary.court@gmail.com>, and SitePen (USA) <https://www.sitepen.com/>.
-
-2013 [draft-4] IETF Trust <https://www.ietf.org/>), Francis Galiegue
-<fgaliegue@gmail.com>, Kris Zyp <kris@sitepen.com>, Gary Court
-<gary.court@gmail.com>, and SitePen (USA) <https://www.sitepen.com/>.
-
-2018 [draft-7] IETF Trust <https://www.ietf.org/>, Austin Wright <aaa@bzfx.net>,
-Henry Andrews <henry@cloudflare.com>, Geraint Luff <luffgd@gmail.com>, and
-Cloudflare, Inc. <https://www.cloudflare.com/>.
-
-2019 [draft-2019-09] IETF Trust <https://www.ietf.org/>, Austin Wright
-<aaa@bzfx.net>, Henry Andrews <andrews_henry@yahoo.com>, Ben Hutton
-<bh7@sanger.ac.uk>, and Greg Dennis <gregsdennis@yahoo.com>.
-
-2020 [draft-2020-12] IETF Trust <https://www.ietf.org/>, Austin Wright
-<aaa@bzfx.net>, Henry Andrews <andrews_henry@yahoo.com>, Ben Hutton
-<ben@jsonschema.dev>, and Greg Dennis <gregsdennis@yahoo.com>.
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without modification,
-are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ### json-schema 0.4.0
@@ -13099,26 +12931,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-### zod-to-json-schema 3.25.2
-
-```text
-ISC License
-
-Copyright (c) 2020, Stefan Terdell
-
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
 ### zod 4.1.11, zod 4.6.5

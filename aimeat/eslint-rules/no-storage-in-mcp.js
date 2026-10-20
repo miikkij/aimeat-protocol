@@ -41,6 +41,9 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.1.2 — 2026-10-20 — src/mcp/index.ts leaves EXEMPT: its storage reads moved to
+ *     services/mcp-agent-admission.ts and services/mcp-build-inputs.ts (MCP SDK v2 migration step 5).
+ *   v1.1.1 — 2026-10-20 — src/mcp/core-work.ts inherits core.ts's line (pure extraction).
  *   v1.1.0 — 2026-10-16 — A member receiver (`deps.storage.x()`) counts as a direct call, as the bare
  *     identifier does; appdev-pitfalls.ts left EXEMPT, it calls storage no more; check:shared-impl
  *     now holds each exempt file to a per-file ceiling (QA audit P3-09).
@@ -52,9 +55,9 @@
  * Files that talked to storage before this rule existed. Delete a line when its tools move onto a
  * shared service; never add one.
  *
- * Three of these are not tool surfaces and stay: oauth.ts is the OAuth server, index.ts is the
- * session and transport layer, and prompts-managed.ts serves stored prompt text. They implement the
- * protocol rather than a capability.
+ * Two of these are not tool surfaces and stay: oauth.ts is the OAuth server, and prompts-managed.ts
+ * serves stored prompt text. They implement the protocol rather than a capability. index.ts, the
+ * transport layer, was the third, until its reads moved to services on 2026-10-20.
  *
  * A file that is a PURE EXTRACTION out of one already on this list inherits its line rather than
  * counting as a new offender — the code did not change and the backlog did not grow. Say which file
@@ -78,6 +81,7 @@ const EXEMPT = new Set([
   'src/mcp/companies.ts',
   'src/mcp/consent.ts',
   'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
+  'src/mcp/core-work.ts',              // pure extraction out of core.ts (max-file-lines, 2026-10-20), same backlog
   'src/mcp/core-admin.ts',
   'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',
@@ -85,7 +89,6 @@ const EXEMPT = new Set([
   'src/mcp/exchange-run.ts',
   'src/mcp/exchange.ts',
   'src/mcp/extensions.ts',
-  'src/mcp/index.ts',
   'src/mcp/knowledge.ts',
   'src/mcp/memory-extended.ts',
   'src/mcp/oauth.ts',

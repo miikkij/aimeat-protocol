@@ -32,6 +32,7 @@
  * @usage const wire = await resolveWireAddress(storage, server);
  *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   2026-10-20 — The MCP client is the SDK v2 client package (@modelcontextprotocol/client), with the 2025 handshake it keeps by default (SDK v2 migration step 4a).
  *   v1.5.0 — 2026-09-26 — Every answer a remote server sends is read with a ceiling that holds while
  *     it arrives, MCP_RESPONSE_MAX_BYTES, per answer or per event on a stream (secaudit 2026-09, A2-2).
  *     The SDK held a JSON answer whole before anything measured it.
@@ -45,10 +46,9 @@
  *     peer list, gated on allowRouting, which is member and genesis only.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-import type { Transport, FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { StreamableHTTPClientTransport, SSEClientTransport } from '@modelcontextprotocol/client';
+import type { Transport, FetchLike } from '@modelcontextprotocol/client';
 import { safeFetch } from '../../utils/url-validator.js';
 import { capResponseBody } from '../../utils/read-capped.js';
 import { checkStdioPolicy } from './stdio-policy.js';

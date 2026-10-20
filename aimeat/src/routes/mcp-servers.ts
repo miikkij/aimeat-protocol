@@ -39,6 +39,7 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-10-20 — The OAuth callback hands the authorization server's `iss` (RFC 9207) to finishMcpOAuth.
  *   2026-10-16 — PUT /:id/grants stores a grant on a node-wide server under the caller's owner, where
  *     the access check now reads it; 409 GRANT_NOT_APPLICABLE is for somebody else's personal server
  *     only. An end date that is not a date answers 400 INVALID_INPUT (QA audit F01b-02).
@@ -533,7 +534,8 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
       ));
     }
 
-    const done = await finishMcpOAuth({ storage, config, state, code, binding: readRoundBinding(req, state) });
+    const iss = typeof req.query.iss === 'string' ? req.query.iss : '';
+    const done = await finishMcpOAuth({ storage, config, state, code, iss, binding: readRoundBinding(req, state) });
     if (!done.ok) {
       return res.status(done.code === 'BAD_STATE' ? 400 : done.code === 'NOT_THIS_BROWSER' ? 403 : 502)
         .json(error(config.nodeId, done.code, done.message));

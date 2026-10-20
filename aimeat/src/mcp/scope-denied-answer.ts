@@ -22,19 +22,20 @@
  * @structure answerScopeDeniedTools(mcp, opts)
  * @usage answerScopeDeniedTools(mcp, { missingWords: (name) => [...], principal: () => agentGaii });
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — The tools/call handler is wrapped through mcp/sdk-seams.ts.
  *   2026-10-17 — The answer tells the AI what it may not do in plain words and hands it the address
  *     where the person allows it with one press (services/permission-ask.ts). The permission word
  *     stays at the end, for the agent's own records, with the instruction not to show it to the
  *     person (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  *   2026-10-16 — Initial (QA audit E5-04).
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { noteMcpScopeRefusal } from './tool-usage-wrap.js';
 import { toolError } from './tool-error.js';
 import { permissionAskText } from '../services/permission-ask.js';
 import { logger } from '../utils/logger.js';
-
-type RequestHandler = (request: { method: string; params?: { name?: unknown } }, extra: unknown) => Promise<unknown>;
+import { wrapToolsCall } from './sdk-seams.js';
 
 export interface ScopeDeniedOptions {
   /** The permission words tool `name` needs and this request's token lacks; empty when it may be called. */
@@ -58,14 +59,8 @@ export function scopeDeniedText(name: string, words: string[], opts: { baseUrl: 
 }
 
 export function answerScopeDeniedTools(mcp: McpServer, opts: ScopeDeniedOptions): void {
-  // The SDK keeps its handlers in a map on the protocol object (mcp/moved-tools-answer.ts reads it the same way).
-  const handlers = (mcp.server as unknown as { _requestHandlers?: Map<string, RequestHandler> })._requestHandlers;
-  const original = handlers?.get('tools/call');
-  if (!handlers || !original) {
-    logger.warn('scope-denied: the MCP server has no tools/call handler to wrap; a tool without permission answers "not found"');
-    return;
-  }
-  handlers.set('tools/call', async (request, extra) => {
+  // The SDK has no public way to wrap tools/call; mcp/sdk-seams.ts reaches its handler map.
+  const wrapped = wrapToolsCall(mcp, (original) => async (request, extra) => {
     const name = typeof request.params?.name === 'string' ? request.params.name : '';
     const words = name ? opts.missingWords(name) : [];
     if (words.length === 0) return original(request, extra);
@@ -74,4 +69,5 @@ export function answerScopeDeniedTools(mcp: McpServer, opts: ScopeDeniedOptions)
     const text = scopeDeniedText(name, words, { baseUrl: opts.baseUrl, agentGaii: opts.principal() });
     return { content: [{ type: 'text', text }], isError: true };
   });
+  if (!wrapped) logger.warn('scope-denied: the MCP server has no tools/call handler to wrap; a tool without permission answers "not found"');
 }
