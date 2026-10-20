@@ -142,7 +142,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@js-temporal/polyfill](https://github.com/js-temporal/temporal-polyfill#readme) | 0.5.1 | ISC |
 | [@levischuck/tiny-cbor](https://github.com/levischuck/tiny-cbor#readme) | 0.2.11 | MIT |
 | [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 1.7.5 | MIT |
-| [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.31.0 | MIT |
+| [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.32.1 | MIT |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
 | [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0 | MIT |
@@ -1378,7 +1378,7 @@ CC-BY-4.0. See https://creativecommons.org/licenses/by/4.0/legalcode for
 the full license text.
 ```
 
-### @modelcontextprotocol/sdk 1.31.0
+### @modelcontextprotocol/sdk 1.32.1
 
 ```text
 MIT License
