@@ -13,6 +13,8 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-20 -- definitions/content.ts: aimeat_content_facts, _inspect, _scan, _classes and _settings
+ *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.x -- 2026-10-18 -- definitions/publish-requests.ts: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.x -- 2026-10-18 -- definitions/account-rights.ts: adult status, subscriptions, provenance embed (Comicland v3).
  *   v1.x -- 2026-10-17 -- definitions/exposure.ts: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
@@ -83,6 +85,7 @@ import { uiLibraryTools } from './definitions/ui-library.js';
 import { themeTools } from './definitions/themes.js';
 import { connectionTools } from './definitions/connections.js';
 import { refineryTools } from './definitions/refinery.js';
+import { contentTools } from './definitions/content.js';
 import { mcpProxyTools } from './definitions/mcp-proxy.js';
 import { visibilityTools } from './definitions/visibility.js';
 import { docsignTools } from './definitions/docsign.js';
@@ -122,6 +125,7 @@ const CATALOG = [
     ...themeTools,
     ...connectionTools,
     ...refineryTools,
+    ...contentTools,
     ...mcpProxyTools,
     ...visibilityTools,
     ...docsignTools,

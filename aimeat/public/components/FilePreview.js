@@ -16,13 +16,17 @@
  *     `errorLabel` and `noneLabel` (a kind with no preview) are the lines that say so.
  *   - `title`: the dialog's title (the file's name, also the picture's words for a screen reader).
  *   - `doors`: the actions at the dialog's foot (open in a new tab, download). `onClose`.
+ *   - `children`: what stands under the file in the dialog (the Memory page's fold of what is known
+ *     about the file, memory-tab/file-facts.js).
  *   Escape and the page behind always close it: there is nothing typed in it to lose.
- * @structure FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose })
+ * @structure FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose, children })
  * @usage html`<${FilePreview} title=${name} kind=${cat} src=${objUrl} text=${text} loading=${loading} error=${err}
  *          loadingLabel=${t('profile.files.previewLoading')} errorLabel=${t('profile.files.previewError')}
  *          noneLabel=${t('profile.files.noPreview')} onClose=${close}
  *          doors=${html`<${Action} onClick=${download}>${t('profile.files.download')}<//>`} />`
  * @version-history
+ *   v1.1.0 — 2026-10-20 — `children` under the file (content classes, wish-sis-ll-n-purku-luokittelu-ja-owl);
+ *     additive, a dialog without them is unchanged.
  *   v1.0.0 — 2026-09-26 — Initial: the memory tab's file preview body (views/profile/memory-tab/
  *     components.js FilePreviewModal, .pf-file-preview-*) as a component, its dialog width with it
  *     (page group G3).
@@ -44,7 +48,7 @@ function body({ kind, src, text, title }) {
   return null;
 }
 
-export function FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose }) {
+export function FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose, children }) {
   const status = (words) => html`<div class="file-preview-status" role="status">${words}</div>`;
   return html`
     <${Modal} open=${true} onClose=${onClose} title=${title} className="file-preview-dialog" guard=${false} footer=${doors}>
@@ -54,6 +58,7 @@ export function FilePreview({ title, kind, src, text, loading, error, loadingLab
         ${!loading && !error && kind === 'other' ? status(noneLabel) : null}
         ${!loading && !error ? body({ kind, src, text, title }) : null}
       </div>
+      ${children}
     <//>`;
 }
 

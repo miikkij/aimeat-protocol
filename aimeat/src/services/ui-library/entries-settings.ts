@@ -504,7 +504,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'A stored file shown in the site\'s dialog, up to 920px wide: on a grey ground in a thin frame, a picture, a PDF in a frame, a video or a sound with its controls, or text in the typewriter face; one grey line when it is loading, cannot be read, or has no preview; its doors at the dialog\'s foot. Escape and a press outside close it.',
         module: '/components/FilePreview.js', sheet: '/css/components/file-preview.css',
         data: {
-            shape: 'FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose })',
+            shape: 'FilePreview({ title, kind, src, text, loading, error, loadingLabel, errorLabel, noneLabel, doors, onClose, children })',
             fields: {
                 title: 'the dialog\'s title, the file\'s name (also the picture\'s words for a screen reader)',
                 kind: '\'image\' | \'pdf\' | \'video\' | \'audio\' | \'text\' | \'other\': how the file is shown',

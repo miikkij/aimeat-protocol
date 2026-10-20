@@ -38,6 +38,9 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.9.0 — 2026-10-20 — setStorageFileHooks(): the write and the delete tell the content class
+ *     pipeline about a stored or removed file once it has landed or gone (services/content/intake.ts),
+ *     scheduled and never awaited.
  *   v1.8.0 — 2026-10-18 — The write, the presigned mint and the visibility change refuse a level wider
  *     than the file's label allows with 409 LABEL_CAPS_AUDIENCE, before the publish gate (plan
  *     doc-mvdipuyqraas, L3.2; storage-file-publish.ts fileCapRefusal).
@@ -107,6 +110,23 @@ import { uploadVisibilityOf } from './content-defaults.js';
  */
 function levelOf(config: AimeatConfig, named: string | undefined, gate: StoragePublishGate | undefined): StorageFileRecord['visibility'] {
     return uploadVisibilityOf(config, named, !!gate && 'caller' in gate && gate.caller.kind === 'app') as StorageFileRecord['visibility'];
+}
+
+/** A function told about a stored or removed file after the fact. It returns at once and never throws. */
+export type StorageFileHook = (deps: { storage: Storage; config: AimeatConfig }, ownerGaii: string, key: string) => void;
+
+/**
+ * The hooks the write and the delete call once the file has landed or gone. Set at boot
+ * (setStorageFileHooks), as the write classifier is (classify-on-write.ts): the content class
+ * pipeline that listens here stores its own text files through this module, so a static import
+ * would close an import cycle.
+ */
+const fileHooks: { afterStore?: StorageFileHook; afterRemove?: StorageFileHook } = {};
+
+/** Set the hooks the write and the delete call. Called once at boot. */
+export function setStorageFileHooks(hooks: { afterStore?: StorageFileHook; afterRemove?: StorageFileHook }): void {
+    fileHooks.afterStore = hooks.afterStore;
+    fileHooks.afterRemove = hooks.afterRemove;
 }
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
@@ -443,6 +463,8 @@ export async function writeStorageFile(
     // announced to those who could read the earlier one.
     emitRecordChange('files', ownerGaii, level.visibility);
     emitRecordChange('memory', ownerGaii, level.visibility);
+    // The content class pipeline on arrival (services/content/intake.ts): scheduled, never awaited.
+    fileHooks.afterStore?.({ storage, config }, ownerGaii, input.key);
 
     // The request the publish gate asked for, now that the file it names exists.
     const filed = raise.kind === 'ask' ? await fileFilePublishRequest({ storage, config }, raise.requester, file) : null;
@@ -509,6 +531,7 @@ export async function removeStorageFile(
     // bytes in the budget the memory view renders. The route emitted only 'files'.
     emitRecordChange('files', ownerGaii, existing.visibility);
     emitRecordChange('memory', ownerGaii, existing.visibility);
+    fileHooks.afterRemove?.({ storage, config: deps.config }, ownerGaii, key);
 
     return {
         ok: true, key, size: existing.size, mimeType: existing.mimeType, visibility: existing.visibility,

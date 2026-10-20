@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.13.0 -- 2026-10-20 -- contentCliTools: aimeat_content_facts, _inspect, _scan, _classes and _settings
+ *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.12.0 -- 2026-10-20 -- extensionTools: the extension entries move out of tool-call-defs-apps.ts,
  *     plus aimeat_extension_unattended_reader (Jouni, 2026-10-20).
  *   v1.11.0 -- 2026-10-18 -- accountRightsCliTools: adult status, subscriptions, provenance embed (Comicland v3).
@@ -46,6 +48,7 @@ import { appManageCliTools } from './tool-call-defs-app-manage.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { connectionCliTools } from './tool-call-defs-connections.js';
 import { refineryCliTools } from './tool-call-defs-refinery.js';
+import { contentCliTools } from './tool-call-defs-content.js';
 import { classificationCliTools } from './tool-call-defs-classification.js';
 import { mcpProxyCliTools } from './tool-call-defs-mcp-proxy.js';
 import { adminCliTools } from './tool-call-defs-admin.js';
@@ -92,6 +95,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...exchangeTools,
     ...connectionCliTools,
     ...refineryCliTools,
+    ...contentCliTools,
     ...classificationCliTools,
     ...mcpProxyCliTools,
     ...adminCliTools,

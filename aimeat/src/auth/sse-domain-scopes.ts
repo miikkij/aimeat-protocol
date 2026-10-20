@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.6.0 — 2026-10-20 — `contentclass` passes for a principal holding storage:read: the content
+ *     class pipeline's facts changed (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.5.0 — 2026-10-18 — A workspace's own domain (`workspace:<organismId>/<ws>`) passes for a
  *     principal holding organism:read, as the `organisms` domain does.
  *   v1.0.0 — 2026-07-25 — Initial: scope-gated SSE domains (an app-grant stream no longer
@@ -51,6 +53,8 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   memory: 'memory:read',
   personal: 'memory:read',
   files: 'storage:read',
+  // The content class pipeline's facts about the owner's files and records (services/content/).
+  contentclass: 'storage:read',
 
   // Structured spaces
   organisms: 'organism:read',

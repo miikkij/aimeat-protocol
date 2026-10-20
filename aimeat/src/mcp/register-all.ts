@@ -24,6 +24,8 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-20 — registerContentTools (aimeat_content_facts, _inspect, _scan, _classes, _settings;
+ *     wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   2026-10-18 — registerSkillsTools and registerCortexTools receive the session's caller: the publish
  *     gate asks about it (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — registerCompanyTools and registerPortfolioTools receive the session caller, for the publish gate (V4).
@@ -162,6 +164,7 @@ import { registerToolLoader } from './tool-loader.js';
 import { registerAgentCrewTools } from './agent-crew.js';
 import { registerConnectionTools } from './connections.js';
 import { registerRefineryTools } from './refinery.js';
+import { registerContentTools } from './content.js';
 import { registerDocsignTools } from './docsign.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
@@ -213,6 +216,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerWorkspaceTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerConnectionTools(mcp, storage, config, agentGaii, scopes);
     registerRefineryTools(mcp, storage, config, agentGaii, scopes, caller);
+    registerContentTools(mcp, storage, config, caller);
     registerDocsignTools(mcp, storage, config, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);

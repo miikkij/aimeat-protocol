@@ -102,7 +102,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 485 npm packages that travel inside the `aimeat` package. Build and test
+The 496 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -118,6 +118,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.53 | Apache-2.0 |
 | [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.21 | Apache-2.0 |
 | [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.14 | Apache-2.0 |
+| [@cbor-extract/cbor-extract-win32-x64](https://github.com/kriszyp/cbor-extract#readme) | 2.2.2 | MIT |
 | [@cfworker/json-schema](https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md) | 4.1.1 | MIT |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
@@ -174,6 +175,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@so-ric/colorspace](https://github.com/so-ric/colorspace) | 1.1.6 | MIT |
 | [@standard-schema/spec](https://standardschema.dev) | 1.1.0 | MIT |
 | [@swc/helpers](https://swc.rs) | 0.5.23 | Apache-2.0 |
+| [@trustnxt/c2pa-ts](https://github.com/TrustNXT/c2pa-ts#readme) | 0.14.1 | Apache-2.0 |
 | [@types/debug](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/debug) | 4.1.13 | MIT |
 | [@types/minimatch](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/minimatch) | 3.0.5 | MIT |
 | [@types/ms](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ms) | 2.1.0 | MIT |
@@ -238,10 +240,13 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [buffer](https://github.com/feross/buffer) | 6.0.3 | MIT |
 | [busboy](https://github.com/mscdex/busboy#readme) | 1.6.0 | MIT |
 | [bytes](https://github.com/visionmedia/bytes.js#readme) | 3.1.2 | MIT |
+| [bytestreamjs](https://github.com/PeculiarVentures/ByteStream.js#readme) | 2.0.1 | BSD-3-Clause |
 | [call-bind-apply-helpers](https://github.com/ljharb/call-bind-apply-helpers#readme) | 1.0.2 | MIT |
 | [call-bind](https://github.com/ljharb/call-bind#readme) | 1.0.9 | MIT |
 | [call-bound](https://github.com/ljharb/call-bound#readme) | 1.0.4 | MIT |
 | [camelcase](https://github.com/sindresorhus/camelcase#readme) | 5.3.1 | MIT |
+| [cbor-extract](https://github.com/kriszyp/cbor-extract#readme) | 2.2.2 | MIT |
+| [cbor-x](https://github.com/kriszyp/cbor-x#readme) | 1.6.8 | MIT |
 | [chalk](https://github.com/chalk/chalk#readme) | 4.1.2 | MIT |
 | [chance](http://chancejs.com) | 1.1.13 | MIT |
 | [char-regex](https://github.com/Richienb/char-regex#readme) | 1.0.2 | MIT |
@@ -313,6 +318,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [eventsource-parser](https://github.com/rexxars/eventsource-parser#readme) | 3.1.1 | MIT |
 | [eventsource](https://github.com/EventSource/eventsource#readme) | 3.0.7 | MIT |
 | [execa](https://github.com/sindresorhus/execa#readme) | 5.1.1 | MIT |
+| [exifr](https://mutiny.cz/exifr/) | 7.1.3 | MIT |
 | [expand-template](https://github.com/ralphtheninja/expand-template) | 2.0.3 | (MIT OR WTFPL) |
 | [express-rate-limit](https://github.com/express-rate-limit/express-rate-limit) | 8.7.0 | MIT |
 | [express](https://expressjs.com/) | 5.2.1 | MIT |
@@ -417,6 +423,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
 | [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
+| [node-gyp-build-optional-packages](https://github.com/prebuild/node-gyp-build) | 5.1.1 | MIT |
 | [nodemailer](https://nodemailer.com/) | 10.0.13 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
@@ -456,6 +463,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [pg](https://github.com/brianc/node-postgres) | 8.23.1 | MIT |
 | [pgpass](https://github.com/hoegaarden/pgpass#readme) | 1.0.5 | MIT |
 | [pkce-challenge](https://github.com/crouchcd/pkce-challenge#readme) | 5.0.1 | MIT |
+| [pkijs](https://github.com/PeculiarVentures/PKI.js#readme) | 3.4.2 | BSD-3-Clause |
 | [playwright-core](https://playwright.dev) | 1.63.0 | Apache-2.0 |
 | [png-js](https://github.com/devongovett/png.js#readme) | 1.1.0 | MIT |
 | [pngjs](https://github.com/lukeapage/pngjs) | 5.0.0 | MIT |
@@ -497,6 +505,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [safe-stable-stringify](https://github.com/BridgeAR/safe-stable-stringify#readme) | 2.5.0 | MIT |
 | [safer-buffer](https://github.com/ChALkeR/safer-buffer#readme) | 2.1.2 | MIT |
 | [sax](https://github.com/isaacs/sax-js#readme) | 1.6.1 | BlueOak-1.0.0 |
+| [schema-dts-lib](https://opensource.google/projects/schema-dts) | 1.1.0 | Apache-2.0 |
+| [schema-dts](https://opensource.google/projects/schema-dts) | 2.1.0 | Apache-2.0 |
 | [scimmy-routers](https://github.com/scimmyjs/scimmy-routers#readme) | 1.3.2 | MIT |
 | [scimmy](https://scimmyjs.github.io) | 1.3.5 | MIT |
 | [semver](https://github.com/npm/node-semver#readme) | 7.8.5 | ISC |
@@ -549,6 +559,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [tunnel-agent](https://github.com/mikeal/tunnel-agent#readme) | 0.6.0 | Apache-2.0 |
 | [type-check](https://github.com/gkz/type-check) | 0.3.2 | MIT |
 | [type-is](https://github.com/jshttp/type-is#readme) | 2.1.0 | MIT |
+| [typed-binary](https://iwoplaza.github.io/typed-binary/) | 4.3.4 | MIT |
 | [undici-types](https://undici.nodejs.org) | 7.24.6 | MIT |
 | [undici](https://undici.nodejs.org) | 6.29.1 | MIT |
 | [undici](https://undici.nodejs.org) | 7.30.1 | MIT |
@@ -2852,7 +2863,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.9.1, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, b4a 1.9.0, bare-events 2.9.2, bare-fs 4.8.2, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.4, events-universal 1.0.1, text-decoder 1.2.7
+### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.9.1, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-events 2.9.2, bare-fs 4.8.2, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.4, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
 
 ```text
 Apache License
@@ -3746,6 +3757,40 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+### bytestreamjs 2.0.1
+
+```text
+Copyright (c) 2016-2022, Peculiar Ventures
+All rights reserved.
+
+Author 2016-2019, Yury Strozhevsky
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+* Neither the name of the {organization} nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
 ### call-bind-apply-helpers 1.0.2, call-bound 1.0.4, es-define-property 1.0.1, es-errors 1.3.0, es-object-atoms 1.1.2, possible-typed-array-names 1.1.0, side-channel-list 1.0.1, side-channel-map 1.0.1
 
 ```text
@@ -3778,6 +3823,32 @@ SOFTWARE.
 MIT License
 
 Copyright (c) 2020 Jordan Harband
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+### cbor-extract 2.2.2, cbor-x 1.6.8
+
+```text
+MIT License
+
+Copyright (c) 2020 Kris Zyp
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -5949,6 +6020,32 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+### exifr 7.1.3
+
+```text
+MIT License
+
+Copyright (c) 2020 Mike Kovařík, Mutiny.cz
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### expand-template 2.0.3
@@ -9147,6 +9244,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+### node-gyp-build-optional-packages 5.1.1
+
+```text
+The MIT License (MIT)
+
+Copyright (c) 2017 Mathias Buus
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+```
+
 ### nodemailer 10.0.13
 
 ```text
@@ -10432,6 +10555,41 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+### pkijs 3.4.2
+
+```text
+Copyright (c) 2014, GlobalSign
+Copyright (c) 2015-2019, Peculiar Ventures
+All rights reserved.
+
+Author 2014-2019, Yury Strozhevsky
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice, this
+  list of conditions and the following disclaimer in the documentation and/or
+  other materials provided with the distribution.
+
+* Neither the name of the {organization} nor the names of its
+  contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ### playwright-core 1.63.0
@@ -12340,6 +12498,32 @@ If the Work includes a "NOTICE" text file as part of its distribution, then any 
 9. Accepting Warranty or Additional Liability. While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this License. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
 
 END OF TERMS AND CONDITIONS
+```
+
+### typed-binary 4.3.4
+
+```text
+MIT License
+
+Copyright (c) 2026 Iwo Plaza
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ### undici-types 7.24.6, undici 6.29.1, undici 7.30.1

@@ -16,6 +16,8 @@
  * @structure startFakeMailServer(port) · decideAnswer · chatAnswer · the CLI entry (`tsx scripts/lib/fake-mail-server.ts <port>`)
  * @usage node --import tsx scripts/lib/fake-mail-server.ts 40703
  * @version-history
+ *   v1.6.0 — 2026-10-20 — The decision and completion stand-ins also answer the content class
+ *     pipeline's prompts (fake-content-model.ts), so its model stages run with no paid key.
  *   v1.5.0 — 2026-10-13 — A transcription stand-in at /ai/v1/audio/transcriptions: every recording
  *     is answered with one short meeting note, so a recorder's path to text runs with no paid key
  *     (asked for by the notes app of the October agents plan, brief 10).
@@ -33,6 +35,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { buildMailbox, MAILBOX_ADDRESS, SAMPLE_MESSAGES, type SampleMessage } from './fake-mailbox.js';
+import { contentDecideAnswer, contentChatAnswer } from './fake-content-model.js';
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -244,13 +247,18 @@ export function startFakeMailServer(port: number): Promise<FakeMailServer> {
       const body = await readJson(req);
       seen.decide.push(body);
       res.writeHead(200, { 'Content-Type': 'application/json', 'x-typesafe-request-id': 'sandbox-' + randomBytes(4).toString('hex') });
-      res.end(JSON.stringify(decideAnswer(body)));
+      res.end(JSON.stringify(contentDecideAnswer(body) ?? decideAnswer(body)));
       return;
     }
     if (path === '/ai/v1/chat/completions' && req.method === 'POST') {
       const body = await readJson(req);
       seen.chat.push(body);
-      return json(res, 200, chatAnswer(body));
+      const content = contentChatAnswer(promptText(body));
+      return json(res, 200, content === null ? chatAnswer(body) : {
+        id: 'chatcmpl-sandbox', object: 'chat.completion', model: body.model ?? 'sandbox-model',
+        choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 900, completion_tokens: 80, total_tokens: 980, cost: 0 },
+      });
     }
     // The transcription stand-in (the OpenAI-compatible form the node posts a stored recording to).
     // It reads nothing of the audio: every recording is answered with the same short meeting note,

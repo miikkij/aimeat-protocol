@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-20 — installContentIntake: the content class pipeline listens for stored files and memory
+ *     writes (services/content/intake.ts; wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   2026-10-16 — memory-ttl-cleanup is one provider DELETE over every owner (storage.deleteExpiredMemory);
  *     it removed nothing on PostgreSQL and skipped every row not owned by an agent (QA audit D4-01, E4-01).
  *   2026-10-16 — The work timeout and the dispute timeout write the refund and the status that stops a
@@ -58,6 +60,7 @@ import type { Storage } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { logger } from '../utils/logger.js';
 import { installWriteClassifier, runClassificationQueueJob } from './classification-queue-job.js';
+import { installContentIntake } from './content/intake.js';
 import { refreshTrustScore } from './trust.js';
 
 /**
@@ -165,6 +168,11 @@ export function registerCoreHandlers(
   // do nothing while classification is off.
   installWriteClassifier();
   scheduler.registerCoreHandler('classification-queue', async () => { await runClassificationQueueJob(config, storage); });
+
+  // The content class pipeline on arrival (wish-sis-ll-n-purku-luokittelu-ja-owl): stored files and
+  // memory writes are inspected under each owner's settings. Installed here for the same import-cycle
+  // reason as the write classifier above; does nothing while content classes are off.
+  installContentIntake({ storage, config });
 
   // Decision records past their retention window (TARGET-080). One indexed delete across owners.
   scheduler.registerCoreHandler('ai-decision-prune', async () => {

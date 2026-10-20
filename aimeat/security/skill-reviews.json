@@ -31,6 +31,17 @@
       ],
       "digest": "sha256:4501071b3e79ee48592a7d7a"
     },
+    "node:aimeat-content-classes": {
+      "reviewedOn": "2026-10-20",
+      "watches": [
+        "aimeat/src/services/content/pipeline.ts",
+        "aimeat/src/services/content/ai-stages.ts",
+        "aimeat/src/services/content/service.ts",
+        "aimeat/src/services/content/settings.ts",
+        "aimeat/src/data/content-classes.ts"
+      ],
+      "digest": "sha256:2ca5a4cd72670599fa2f5fc9"
+    },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-10-17",
       "watches": [
@@ -792,6 +803,13 @@
       "aimeat/src/services/agent-avatar.ts": "e723ba76d91fa56a",
       "aimeat/src/routes/agents/avatar.ts": "412e3df74736e1bf",
       "aimeat/src/data/agent-avatar-templates.ts": "d4bec4e052ffe810"
+    },
+    "node:aimeat-content-classes": {
+      "aimeat/src/services/content/pipeline.ts": "f9e32cf92b375612",
+      "aimeat/src/services/content/ai-stages.ts": "09f208b6f48245ed",
+      "aimeat/src/services/content/service.ts": "96ae087a30e3d48a",
+      "aimeat/src/services/content/settings.ts": "20f4f279a29775ab",
+      "aimeat/src/data/content-classes.ts": "1311caed193afa9d"
     }
   }
 }

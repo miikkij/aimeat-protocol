@@ -1222,6 +1222,49 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The organism workspace registry index, each entry gated by canReadWorkspace."
     },
+    "src/services/content/classes.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.ontology record (their classes and proposals), read to list it and to rewrite it on its version. No content of an item."
+    },
+    "src/services/content/facts-store.ts": {
+      "reads": {
+        "getMemory": 2,
+        "getMemoryByKeys": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.facts.<nn> shards and the text file the pipeline itself stored for an item. The item was shown to its reader by the pipeline (pipeline.ts loadItem, reader.show) before any fact or text was kept, and service.ts answers facts only to the item's own namespace or its account holder."
+    },
+    "src/services/content/intake.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the length of an arrived memory record, to decide whether to inspect it; nothing is shown or sent from here, and the inspection reads it again through the classification reader (pipeline.ts)."
+    },
+    "src/services/content/pipeline.ts": {
+      "reads": {
+        "getStorageFileMeta": 1,
+        "getStorageFile": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl): loadItem reads the item and passes it through the caller's classification reader (reader.show) before anything is read from it, and every model step asks reader.useForAi first; the bytes of a file are loaded only after show admitted its record."
+    },
+    "src/services/content/scan.ts": {
+      "reads": {
+        "listStorageFilesForOwners": 1,
+        "listMemory": 1,
+        "getStorageFileMeta": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: which keys exist in the owner's and their agents' namespaces (to choose the items of a scan, each then inspected through pipeline.ts and its reader) and whether an item still exists (prune). No content is read or shown here."
+    },
+    "src/services/content/settings.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-20 (wish-sis-ll-n-purku-luokittelu-ja-owl), the node's own read: the owner's own contentclass.settings record."
+    },
     "src/services/contribution-proofs.ts": {
       "reads": {
         "getMemory": 1
