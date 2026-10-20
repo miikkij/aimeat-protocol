@@ -20,7 +20,7 @@
  *   unit test holds every built-in property to a Finnish and an English label. `kinds` limits a class
  *   to the kinds of content it can apply to, so a photo is never asked about a text file; absent
  *   means every kind.
- * @structure L() · prop() · REFINERY_SAME_AS · REFINERY_LABELS · REFINERY_KINDS · fromPack() ·
+ * @structure L() · prop() · REFINERY_SAME_AS · REFINERY_LABELS · REFINERY_KINDS · EXTRA_PROPERTIES · fromPack() ·
  *   FILE_CLASSES · BUILTIN_CLASSES · builtinClass(id)
  * @usage import { BUILTIN_CLASSES, builtinClass } from '../data/content-classes.js';
  * @version-history
@@ -28,6 +28,8 @@
  *     certificate, photo, screenshot, diagram and presentation.
  *   v1.1.0 — 2026-10-21 — Every built-in property carries a label in fi, en and es; the refinery
  *     fields get theirs from REFINERY_LABELS.
+ *   v1.2.0 — 2026-10-21 — vat_rate on receipt and invoice (EXTRA_PROPERTIES): the rate an invoice
+ *     states beside its tax.
  */
 import { CLASS_PACKS, type RefineryClass } from './refinery-classes.js';
 import type { ClassProperty, ContentClass, ContentKind } from '../services/content/types.js';
@@ -122,6 +124,18 @@ const REFINERY_KINDS: Readonly<Record<string, readonly ContentKind[]>> = {
   invoice: DOCUMENT_KINDS,
 };
 
+/**
+ * Properties a content class has beyond its refinery pack's fields. The VAT rate (Jouni, 2026-10-21:
+ * an invoice states both the tax and its rate, and the rate had nowhere to go): a mail row keeps
+ * the pack's fields only, so it is added here and not to the pack.
+ */
+const VAT_RATE = prop('vat_rate', 'number', false, L('ALV-prosentti', 'VAT rate', 'Tasa de IVA'),
+  'The VAT rate in percent, e.g. 24, as a number without the % sign, when stated.');
+const EXTRA_PROPERTIES: Readonly<Record<string, readonly ClassProperty[]>> = {
+  receipt: [VAT_RATE],
+  invoice: [VAT_RATE],
+};
+
 /** One refinery pack as a content class: the same id, labels and type, its fields as properties. */
 function fromPack(pack: RefineryClass): ContentClass {
   const sameAs = REFINERY_SAME_AS[pack.id] ?? {};
@@ -134,7 +148,10 @@ function fromPack(pack: RefineryClass): ContentClass {
     process: pack.process,
     type: pack.type,
     ...(kinds ? { kinds: [...kinds] } : {}),
-    properties: pack.fields.map((f) => prop(f.name, f.type, f.required, labels[f.name], f.describe, sameAs[f.name])),
+    properties: [
+      ...pack.fields.map((f) => prop(f.name, f.type, f.required, labels[f.name], f.describe, sameAs[f.name])),
+      ...(EXTRA_PROPERTIES[pack.id] ?? []).map((p) => ({ ...p, ...(p.label ? { label: { ...p.label } } : {}) })),
+    ],
     origin: 'builtin',
   };
 }

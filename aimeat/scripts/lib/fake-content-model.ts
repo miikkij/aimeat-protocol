@@ -10,8 +10,10 @@
  *   - classify (a decision with yes-or-no questions `c_<class>`): yes when the item's words name the
  *     class ("lasku", "invoice" for invoice, and so on), no otherwise.
  *   - describe: a fixed alt text and description; a scanned PDF's "text" is a short invoice.
- *   - extract: every property of the asked shape filled (a string with a stand-in, a number 248, a
- *     date 2026-10-31), and when the shape asks for new properties, one: `payment_terms`, labelled.
+ *   - extract: what an invoice or a receipt states, read from the item's words by patterns (vendor,
+ *     total and currency, VAT and its rate, dates, reference, number); a property not found is null,
+ *     as a real model is told to answer; when the shape asks for new properties, one:
+ *     `payment_terms`, labelled.
  *   - propose: a `recipe` class when the item's words say "resepti" or "recipe", else none; its two
  *     properties carry labels in fi, en and es.
  * @structure contentDecideAnswer · contentChatAnswer
@@ -19,6 +21,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.1.0 — 2026-10-21 — The proposed properties (payment_terms, dish, servings) carry labels.
+ *   v1.2.0 — 2026-10-21 — The extraction reads the item's words (readDocumentFields) instead of
+ *     filling every property with a fixed value, which made the sandbox look as if the pipeline read
+ *     an invoice wrong (Jouni's look at it).
  */
 
 /** Words that make an item a member of a class, per class id. */
@@ -62,6 +67,33 @@ function askedShape(prompt: string): Record<string, unknown> | null {
   }
 }
 
+/** "248,00" → 248; "1 234,50" → 1234.5. */
+const num = (s: string): number => Number(s.replace(/\s/g, '').replace(',', '.'));
+
+/**
+ * What an invoice or a receipt states, read from its words by patterns in Finnish and English: the
+ * stand-in for a model's reading. Only what is there: a field it does not find is left out.
+ */
+function readDocumentFields(text: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  const m = (re: RegExp) => re.exec(text);
+  const vendor = m(/(?:Myyjä|Seller|Vendor)\s*:\s*([^,.\n]+)/i);
+  if (vendor) out.vendor = vendor[1].trim();
+  const total = m(/(?:Yhteensä|Total)\s*:\s*([\d\s]+,\d{2}|[\d\s]+\.\d{2}|\d+)\s*(EUR|USD|SEK|€)?/i);
+  if (total) { out.amount = num(total[1]); if (total[2]) out.currency = total[2] === '€' ? 'EUR' : total[2].toUpperCase(); }
+  const vat = m(/(?:ALV|VAT)\s*(\d+(?:[.,]\d+)?)\s*%\s*([\d\s]+,\d{2}|[\d\s]+\.\d{2})/i);
+  if (vat) { out.vat_rate = num(vat[1]); out.vat = num(vat[2]); }
+  const date = m(/(?:Päiväys|Laskun päivämäärä|Invoice date|Date)\s*:\s*(\d{4}-\d{2}-\d{2})/i);
+  if (date) out.date = date[1];
+  const due = m(/(?:Eräpäivä|Due date)\s*:\s*(\d{4}-\d{2}-\d{2})/i);
+  if (due) out.due_date = due[1];
+  const ref = m(/(?:Viitenumero|Viite|Reference)\s*:\s*([A-Z]{0,2}[\d ]{4,30}\d)/i);
+  if (ref) out.reference = ref[1].trim();
+  const number = m(/(?:LASKU|INVOICE)[^\n\d]*([0-9][\w-]{2,})/);
+  if (number) out.invoice_number = number[1];
+  return out;
+}
+
 /** The stand-in completion for a content class prompt, or null for any other prompt. */
 export function contentChatAnswer(prompt: string): string | null {
   if (prompt.startsWith('Describe this picture')) {
@@ -78,6 +110,10 @@ export function contentChatAnswer(prompt: string): string | null {
   }
   if (prompt.startsWith('Extract these properties of a')) {
     const shape = askedShape(prompt) ?? {};
+    // The item's words follow the shape line; what an invoice or a receipt states is read from
+    // them by a few patterns (the one fixture: test/e2e-content-class.ts, the sandbox's invoice.pdf).
+    const words = prompt.slice(prompt.indexOf('of this shape: ')).split('\n').slice(1).join('\n');
+    const read = readDocumentFields(words);
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(shape)) {
       if (k === '_confidence') out[k] = 0.88;
@@ -85,9 +121,9 @@ export function contentChatAnswer(prompt: string): string | null {
         out[k] = [{ name: 'payment_terms', type: 'string', describe: 'The payment terms the document states, e.g. 14 days net.',
           label: { fi: 'Maksuehto', en: 'Payment terms', es: 'Condiciones de pago' } }];
       }
-      else if (typeof v === 'number') out[k] = 248;
-      else if (typeof v === 'boolean') out[k] = false;
-      else out[k] = /date/.test(k) ? '2026-10-31' : `stand-in ${k}`;
+      else if (k in read) out[k] = read[k];
+      // A property the words do not state is null, as the prompt asks of a real model.
+      else out[k] = typeof v === 'boolean' ? false : null;
     }
     return JSON.stringify(out);
   }
