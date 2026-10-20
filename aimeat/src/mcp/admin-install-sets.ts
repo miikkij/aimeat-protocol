@@ -14,6 +14,7 @@
  * @structure registerAdminInstallSetTools(mcp, storage, config, peers, getAgentGaii, scopes)
  * @usage registered from src/mcp/register-all.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-10-02 — aimeat_package_sale action review (package sale design, phase 5).
@@ -23,7 +24,7 @@
  *     package repository with its own key; operator-only, the same test as the install set.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';

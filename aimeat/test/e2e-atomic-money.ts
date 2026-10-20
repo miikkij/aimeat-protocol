@@ -20,12 +20,13 @@
  *   (helpers/own-node-db.ts); a stand-in UCP platform answers the order webhook from this process.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=atomic-money
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-18 — Initial (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j, G1).
  */
 import { randomBytes } from 'node:crypto';
 import { createServer as createHttpServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { MemoryRecord } from '../src/storage/interface.js';
@@ -345,7 +346,7 @@ await test('aimeat_operator_ai_config applied beside an agent cap written at the
     const agentGaii = `opcfg#${owner.ghii}`;
     const scopes = ['memory:read', 'memory:write', 'memory:write-reserved', 'memory:write-as-owner'];
     const handlers: Record<string, (a: any) => Promise<any>> = {};
-    const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
+    const mock = { registerTool: (name: string, _config: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
     registerOperatorConfigTools(mock, storage, config, () => agentGaii, () => undefined, () => undefined, scopes,
         () => agentSessionCaller(agentGaii, owner.name, scopes, config.nodeId, storage));
     const proposal = JSON.parse((await handlers.aimeat_operator_ai_config!({ daily_budget_usd: 9 })).content[0].text);
@@ -361,7 +362,7 @@ await test('aimeat_operator_ai_config is refused to an agent without memory:writ
     const agentGaii = `opcfg#${owner.ghii}`;
     const scopes = ['memory:read', 'memory:write', 'memory:write-as-owner'];
     const handlers: Record<string, (a: any) => Promise<any>> = {};
-    const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
+    const mock = { registerTool: (name: string, _config: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
     registerOperatorConfigTools(mock, storage, config, () => agentGaii, () => undefined, () => undefined, scopes,
         () => agentSessionCaller(agentGaii, owner.name, scopes, config.nodeId, storage));
     const before = await storage.getMemory(owner.ghii, SETTINGS);

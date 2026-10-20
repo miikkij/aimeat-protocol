@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — The data map caller says whether it is a member of this node and carries its session for the operator question, so aimeat_datamap_get applies the app's own visibility as GET /v1/datamap/apps/:owner/:filename does (QA audit list review).
  *   2026-10-11 — aimeat_app_agent_tie and aimeat_app_agent_untie: one row of an app's map that names
@@ -30,7 +31,7 @@
  *     (DATA_MAP_PARAM in the catalog). It said /1, which the service refuses.
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';

@@ -24,6 +24,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-11 — The missing-annotations error names the four hints instead of a plan file that is no
  *     longer in the repository.
  *   2026-10-05 — TOOL_ANNOTATIONS is the catalog's: the hand-kept table is gone, and its notes sit beside
@@ -96,7 +97,7 @@
  *     (https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
  */
 
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../tool-catalog/definitions.js';
 
 /**

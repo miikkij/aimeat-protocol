@@ -12,6 +12,7 @@
  *   The upstream server is built with the SDK's own server half, so the protocol on the wire is the
  *   protocol, and the test moves when the SDK does.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.4.1 — 2026-10-18 — Every server listens on a port the system picks, and the unreachable case
  *     uses a port just closed; the fixed 40687 and 40693 to 40697 collided on CI (40693 and 40694 are
  *     also mcp-client-ssrf's).
@@ -33,8 +34,8 @@ import http from 'node:http';
 import net, { type AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
@@ -67,7 +68,7 @@ const KEY = 'a'.repeat(64);
 const config = { encryptionKey: KEY, totpSecretEncryptionKey: null } as never;
 
 let httpServer: http.Server;
-const openTransports = new Map<string, StreamableHTTPServerTransport>();
+const openTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 
 beforeAll(async () => {
   httpServer = http.createServer(async (req, res) => {
@@ -77,11 +78,9 @@ beforeAll(async () => {
       // A fresh McpServer per transport: one server instance binds to one transport, the same way
       // src/mcp/index.ts builds one per session.
       const srv = new McpServer({ name: 'upstream', version: '1.0.0' });
-      srv.tool('echo', 'Repeats its input.', { text: z.string() },
-        async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
-      srv.tool('always_fails', 'Answers isError, the way a tool says no.', {},
-        async () => ({ content: [{ type: 'text', text: 'nope' }], isError: true }));
-      const created = new StreamableHTTPServerTransport({
+      srv.registerTool('echo', { description: 'Repeats its input.', inputSchema: z.object({ text: z.string() }) }, async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
+      srv.registerTool('always_fails', { description: 'Answers isError, the way a tool says no.', inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text', text: 'nope' }], isError: true }));
+      const created = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id: string) => openTransports.set(id, created),
       });
@@ -386,18 +385,18 @@ describe('a tool list larger than this node keeps', () => {
   let MID_PORT = 0;
   let HUGE_PORT = 0;
   const servers: http.Server[] = [];
-  const transports: StreamableHTTPServerTransport[] = [];
+  const transports: NodeStreamableHTTPServerTransport[] = [];
 
   /** A server listing one tool with a description of `bytes` bytes; `json` answers without a stream. Answers its port. */
   async function serveOneTool(bytes: number, json = false): Promise<number> {
-    const sessions = new Map<string, StreamableHTTPServerTransport>();
+    const sessions = new Map<string, NodeStreamableHTTPServerTransport>();
     const server = http.createServer(async (req, res) => {
       const sid = req.headers['mcp-session-id'] as string | undefined;
       let transport = sid ? sessions.get(sid) : undefined;
       if (!transport) {
         const srv = new McpServer({ name: 'oversized', version: '1.0.0' });
-        srv.tool('huge', 'x'.repeat(bytes), {}, async () => ({ content: [{ type: 'text', text: 'ok' }] }));
-        const created = new StreamableHTTPServerTransport({
+        srv.registerTool('huge', { description: 'x'.repeat(bytes), inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text', text: 'ok' }] }));
+        const created = new NodeStreamableHTTPServerTransport({
           sessionIdGenerator: () => randomUUID(),
           onsessioninitialized: (id: string) => sessions.set(id, created),
           enableJsonResponse: json,

@@ -33,6 +33,7 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Phase 5e, on a recording far side of its own: another owner's `mcp` capability is
  *     refused on the direct, WebMCP, MCP-twin and checkout paths and the far side logs no call, an
  *     app-tool manifest may not bind another owner's capability, an agent without mcp:use is
@@ -82,8 +83,8 @@ import * as ed from '@noble/ed25519';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import http from 'node:http';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { BROWSER_START, roundCookie, readRoundRow, readRawRow } from './helpers/oauth-round.js';
 import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 
@@ -300,7 +301,7 @@ async function mcpTool(
 }
 
 // ─── The far side ───
-const upstreamTransports = new Map<string, StreamableHTTPServerTransport>();
+const upstreamTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 const upstream = http.createServer(async (req, res) => {
   const sid = req.headers['mcp-session-id'] as string | undefined;
   // An unknown session is 404, as the MCP transport specification says: the answer a restarted
@@ -315,11 +316,9 @@ const upstream = http.createServer(async (req, res) => {
     // A fresh McpServer per transport: one server instance binds to one transport.
     const srv = new McpServer({ name: 'e2e-upstream', version: '1.0.0' });
     // `echo` says it only reads; `refuses` says nothing about itself. Phase 4c rests on the pair.
-    srv.tool('echo', 'Repeats its input.', { text: z.string() }, { readOnlyHint: true },
-      async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
-    srv.tool('refuses', 'Answers isError, the way a tool says no.', {},
-      async () => ({ content: [{ type: 'text', text: 'not allowed' }], isError: true }));
-    const created = new StreamableHTTPServerTransport({
+    srv.registerTool('echo', { description: 'Repeats its input.', inputSchema: z.object({ text: z.string() }), annotations: { readOnlyHint: true } }, async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
+    srv.registerTool('refuses', { description: 'Answers isError, the way a tool says no.', inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text', text: 'not allowed' }], isError: true }));
+    const created = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id: string) => upstreamTransports.set(id, created),
     });
@@ -344,7 +343,7 @@ const VICTIM_URL = `http://127.0.0.1:${VICTIM_PORT}/mcp`;
 /** The static bearer the victim seals on their server: what a borrowed call would travel with. */
 const VICTIM_TOKEN = 'victim-static-secret';
 const victimCalls: Array<{ tool: string; args: unknown; authorization?: string }> = [];
-const victimTransports = new Map<string, StreamableHTTPServerTransport>();
+const victimTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 const victimUpstream = http.createServer(async (req, res) => {
   const sid = req.headers['mcp-session-id'] as string | undefined;
   if (sid && !victimTransports.has(sid)) {
@@ -355,9 +354,8 @@ const victimUpstream = http.createServer(async (req, res) => {
   let transport = sid ? victimTransports.get(sid) : undefined;
   if (!transport) {
     const srv = new McpServer({ name: 'e2e-victim-upstream', version: '1.0.0' });
-    srv.tool('record', 'Writes a note.', { text: z.string(), to: z.string().optional() },
-      async (args) => ({ content: [{ type: 'text', text: `recorded:${JSON.stringify(args)}` }] }));
-    const created = new StreamableHTTPServerTransport({
+    srv.registerTool('record', { description: 'Writes a note.', inputSchema: z.object({ text: z.string(), to: z.string().optional() }) }, async (args) => ({ content: [{ type: 'text', text: `recorded:${JSON.stringify(args)}` }] }));
+    const created = new NodeStreamableHTTPServerTransport({
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id: string) => victimTransports.set(id, created),
     });

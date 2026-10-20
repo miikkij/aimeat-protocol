@@ -9,6 +9,7 @@
  *   (own and shared learned entries), the MCP pitfall list and knowledge get/list tools, the
  *   operator's overview, the Knowledge tab service, and the REST get, export and clone routes.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so each test still proves what a hiding label does.
@@ -18,7 +19,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { MemoryRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';

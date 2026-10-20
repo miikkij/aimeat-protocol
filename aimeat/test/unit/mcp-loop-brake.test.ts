@@ -11,6 +11,7 @@
  *   check is for the person at the form: their own node's address is refused before anything is
  *   stored, and any other spelling of it is caught by the first look and leaves no row behind.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-09-17 — Initial.
  *   v1.1.0 — 2026-09-24 — Alice's calls say she is the owner in person (`ownerInPerson`), as the door
  *     now tells the chokepoint. Setup only: the assertions are unchanged.
@@ -23,8 +24,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import type { AimeatConfig } from '../../src/config.js';
@@ -121,7 +122,7 @@ describe('the address check at attach time', () => {
 const seen: Array<{ text: string; via: string | undefined }> = [];
 let upstream: http.Server;
 let looping: http.Server;
-const openTransports = new Map<string, StreamableHTTPServerTransport>();
+const openTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 
 beforeAll(async () => {
   upstream = http.createServer(async (req, res) => {
@@ -129,9 +130,8 @@ beforeAll(async () => {
     let transport = sid ? openTransports.get(sid) : undefined;
     if (!transport) {
       const srv = new McpServer({ name: 'upstream', version: '1.0.0' });
-      srv.tool('echo', 'Repeats its input.', { text: z.string() },
-        async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
-      const created = new StreamableHTTPServerTransport({
+      srv.registerTool('echo', { description: 'Repeats its input.', inputSchema: z.object({ text: z.string() }) }, async ({ text }) => ({ content: [{ type: 'text', text: `echo:${text}` }] }));
+      const created = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id: string) => openTransports.set(id, created),
       });

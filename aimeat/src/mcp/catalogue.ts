@@ -10,6 +10,7 @@
  *   import { registerCatalogueTools } from './catalogue.js';
  *   registerCatalogueTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — SECURITY: aimeat_catalogue_directory answers from the node's DirectoryService, so it
  *     lists only people holding an active federation consent, as GET /v1/catalogue/directory does;
@@ -24,7 +25,7 @@
  *   v1.3.0 — 2026-07-16 — directory reads profile.location/interests in 2 IN queries (was getMemory per owner)
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';

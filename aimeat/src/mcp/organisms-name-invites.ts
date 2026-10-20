@@ -11,6 +11,7 @@
  *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_organism_invitation_respond accepts only for the person in person (isOwnerPrincipal),
  *     as the REST route and the emailed link do; declining stays open (feature-list audit #57).
@@ -23,7 +24,7 @@
  *     `organisms` emit stay together with the REST decline route.
  *   v1.0.0 — 2026-07-16 — Extracted from mcp/organisms.ts; tools now ride the shared name-invite core.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';

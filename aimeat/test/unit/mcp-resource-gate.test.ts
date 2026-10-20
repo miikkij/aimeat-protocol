@@ -4,10 +4,11 @@
  *   secaudit 2026-10, AUTH-2): without the permission of the tool that reads the same thing, a read
  *   is refused and a template lists nothing; a resource with no entry is refused at registration.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-05 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ResourceTemplate } from '@modelcontextprotocol/server';
 import { withResourceGate } from '../../src/mcp/resource-gate.js';
 
 type Read = (...args: unknown[]) => Promise<{ contents: Array<{ text: string }> }>;

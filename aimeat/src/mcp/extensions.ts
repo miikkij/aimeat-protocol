@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v2.10.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read with nobody
  *     present. READ ONLY, because the write is the person's own decision and takes
@@ -78,7 +79,7 @@
  *     UNAVAILABLE over MCP
  */
 
-import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
 import { getExtSecretKeys, maskSecretFields } from '../services/extension-secrets.js';

@@ -11,6 +11,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Only registerTool is patched with the scope gate and the wrapper chain; tool()
  *     throws while the server registers, since every tool uses registerTool (SDK v2 migration, step 3).
  *   2026-10-20 — The server no longer declares resources.subscribe, which no handler served.
@@ -146,9 +147,9 @@
 import { Router, type Request, type Response } from 'express';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -195,7 +196,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     const router = Router();
 
     // Per-session transports
-    const transports = new Map<string, StreamableHTTPServerTransport>();
+    const transports = new Map<string, NodeStreamableHTTPServerTransport>();
     // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
     const sessionChatInstances = new Map<string, string>();
     const sessionPrincipals = new Map<string, VerifiedToken>();
@@ -669,7 +670,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         }
 
         // Create transport and MCP server for this session
-        const transport = new StreamableHTTPServerTransport({
+        const transport = new NodeStreamableHTTPServerTransport({
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 

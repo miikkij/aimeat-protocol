@@ -5,7 +5,7 @@
  * @description The MCP revision this node states on its server cards: the node card
  *   (routes/wellknown.ts) and an app origin's card (routes/subdomain-origin-docs.ts).
  *
- *   IT IS THE REVISION THE NODE NEGOTIATES. The MCP server is @modelcontextprotocol/sdk's, and its
+ *   IT IS THE REVISION THE NODE NEGOTIATES. The MCP server is @modelcontextprotocol/server's (SDK v2), and its
  *   `initialize` answers with the client's requested revision when it supports it, else with the
  *   SDK's LATEST_PROTOCOL_VERSION. So the highest revision a client can get from this node is that
  *   constant, and that is what a card states. Until 2026-10-19 both cards wrote `2025-06-18` by
@@ -24,6 +24,7 @@
  *   import { MCP_PROTOCOL_VERSION } from '../mcp/protocol-version.js';
  *   res.json({ protocolVersion: MCP_PROTOCOL_VERSION, ... });
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-19 — Initial: one declaration for both server cards, at the revision the SDK
  *     negotiates (wish-mcp-2026-07-28-ja-sdk-v2-siirtym-suunnitelma-palvelinkortin-, the server-card half).
  */

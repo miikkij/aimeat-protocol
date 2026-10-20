@@ -13,6 +13,7 @@
  *   import { registerAgentOnboardingTools } from './agent-onboarding.js';
  *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 -- 2026-08-24 -- The status hints carry `stuck` (failed steps, or a pending
@@ -34,7 +35,7 @@
  *     MCP could stay incomplete with everything else objectively passable. It does now.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
 import type { AimeatConfig } from '../config.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';

@@ -8,6 +8,7 @@
  *   registered and refuses: the capability has no HTTP route for the connector to proxy.
  * @usage registerKnowledgeTools(mcp, registry);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-06 — aimeat_knowledge_contribute registers the catalog's schema too.
@@ -24,7 +25,7 @@
  *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: rename id->package_id (get/contribute/links),
  *     add direction filter to links to match server/REST.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';

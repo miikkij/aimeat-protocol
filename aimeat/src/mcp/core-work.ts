@@ -13,7 +13,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Extracted from core.ts. No behaviour change.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { descriptionFor, structuredResult } from '../tool-catalog/shape.js';

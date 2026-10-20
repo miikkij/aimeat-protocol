@@ -19,6 +19,7 @@
  * @structure One probe: every tool invoked against a storage whose every method throws.
  * @usage pnpm exec vitest run test/unit/node-mcp-error-flag.test.ts
  * @version-history
+ *   2026-10-20 — On MCP SDK v2: only registerTool is patched with the chain, as mcp/index.ts does.
  *   2026-10-16 -- Registered through mcp/tool-registrar.ts, the chain mcp/index.ts uses, against a storage
  *     that fails the way the Postgres provider does (dbError: `<method> failed: <driver text>`, with the
  *     driver error as cause). A second assertion: no tool's answer carries the driver text (QA audit
@@ -26,9 +27,8 @@
  *   v1.0.0 -- 2026-09-07 -- Written with the notify fix it guards.
  */
 import { describe, it, expect } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { registerAllServerTools } from '../../src/mcp/register-all.js';
@@ -80,14 +80,12 @@ describe('the node MCP says when the work behind a tool failed', () => {
     const mcp = new McpServer({ name: 'probe', version: '0.0.0' }, { capabilities: { tools: {} } });
     // The registration chain of mcp/index.ts, for the duration of registration, as index.ts does it.
     type ToolFn = (...args: unknown[]) => unknown;
-    const patchable = mcp as unknown as { tool: ToolFn; registerTool: ToolFn };
-    const originalTool = patchable.tool.bind(mcp) as ToolFn;
+    const patchable = mcp as unknown as { registerTool: ToolFn };
     const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
     const chainDeps = {
       scopes: () => ['*'], principal: () => 'probebot#owner@probe-node', storage: throwingStorage,
       config: { nodeId: 'probe-node' } as unknown as AimeatConfig,
     };
-    patchable.tool = toolRegistrar(originalTool, chainDeps);
     patchable.registerTool = toolRegistrar(originalRegisterTool, chainDeps);
     registerAllServerTools(mcp, {
       storage: throwingStorage,
@@ -105,7 +103,6 @@ describe('the node MCP says when the work behind a tool failed', () => {
       emitResourceUpdated: noop,
       emitResourceListChanged: noop,
     });
-    patchable.tool = originalTool;
     patchable.registerTool = originalRegisterTool;
 
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

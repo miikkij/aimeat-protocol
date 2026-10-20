@@ -24,6 +24,7 @@
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The three reads pass the session principal as the viewer, so an agent sees and stops
  *     only the jobs it started unless it reads as the owner (secaudit 2026-10,
@@ -41,7 +42,7 @@
  *     the session's scopes), so the job reads its inputs as that agent (TARGET-082 V4). Takes the
  *     session's scopes as a fifth parameter.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';

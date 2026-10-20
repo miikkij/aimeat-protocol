@@ -8,16 +8,27 @@
  *   null that is refused (MCP migration plan doc-mvguy322f9se, step 2).
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-sdk-seams.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-20 — On SDK v2: @modelcontextprotocol/server, a z.object schema, and the tools
+ *     are called through a real client over an in-memory transport.
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { seamsPresent, wrapToolsCall, registeredTools, wrapToolInputValidation } from '../../src/mcp/sdk-seams.js';
+
+/** Call one tool on `mcp` through a real client over an in-memory transport. */
+async function call(mcp: McpServer, name: string, args: Record<string, unknown>): Promise<unknown> {
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'seams-test', version: '1.0.0' }, { capabilities: {} });
+    await Promise.all([mcp.server.connect(serverSide), client.connect(clientSide)]);
+    try { return await client.callTool({ name, arguments: args }); } finally { await client.close(); }
+}
 
 function server(): McpServer {
     const mcp = new McpServer({ name: 'seams', version: '1.0.0' });
-    mcp.registerTool('echo', { description: 'echo', inputSchema: { text: z.string(), note: z.string().optional() } },
+    mcp.registerTool('echo', { description: 'echo', inputSchema: z.object({ text: z.string(), note: z.string().optional() }) },
         async ({ text }) => ({ content: [{ type: 'text', text }] }));
     return mcp;
 }
@@ -31,8 +42,7 @@ describe('the SDK members mcp/sdk-seams.ts reaches', () => {
         const mcp = server();
         const seen: string[] = [];
         expect(wrapToolsCall(mcp, (original) => async (request, extra) => { seen.push(String(request.params?.name)); return original(request, extra); })).toBe(true);
-        const handler = (mcp.server as unknown as { _requestHandlers: Map<string, (r: unknown, e: unknown) => Promise<unknown>> })._requestHandlers.get('tools/call')!;
-        const out = await handler({ method: 'tools/call', params: { name: 'echo', arguments: { text: 'hi' } } }, { signal: new AbortController().signal, requestId: 1, sendNotification: async () => undefined, sendRequest: async () => undefined });
+        const out = await call(mcp, 'echo', { text: 'hi' });
         expect(seen).toEqual(['echo']);
         expect(JSON.stringify(out)).toContain('hi');
     });
@@ -52,8 +62,7 @@ describe('the SDK members mcp/sdk-seams.ts reaches', () => {
         const mcp = server();
         const seen: string[] = [];
         wrapToolInputValidation(mcp, (original) => async (tool, args, name) => { seen.push(name); return original(tool, args, name); });
-        const handler = (mcp.server as unknown as { _requestHandlers: Map<string, (r: unknown, e: unknown) => Promise<unknown>> })._requestHandlers.get('tools/call')!;
-        await handler({ method: 'tools/call', params: { name: 'echo', arguments: { text: 'x' } } }, { signal: new AbortController().signal, requestId: 2, sendNotification: async () => undefined, sendRequest: async () => undefined });
+        await call(mcp, 'echo', { text: 'x' });
         expect(seen).toEqual(['echo']);
     });
 });

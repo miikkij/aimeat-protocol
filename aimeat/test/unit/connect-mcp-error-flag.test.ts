@@ -22,6 +22,7 @@
  *   hole cli-tool-param-forwarding.test.ts had to close in its own v1.1.0.
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-09 — PROBE_SETUP entry for aimeat_docsign_lookup (a 64-hex SHA-256).
  *   2026-10-06 — PROBE_SETUP entries for seven tools that run their dispatch definition on the
  *     connector now (secaudit 2026-10 follow-up, Part B).
@@ -31,10 +32,8 @@
  *   v1.0.0 -- 2026-09-07 -- Written with the sweep it guards.
  */
 import { describe, it, expect } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { McpServer } from '@modelcontextprotocol/server';
 import { AimeatClient, type Transport } from '../../src/cli/connect/api-client.js';
 import { AgentRegistry } from '../../src/cli/connect/agent-registry.js';
 import { registerAllTools } from '../../src/cli/connect/mcp/tools/index.js';

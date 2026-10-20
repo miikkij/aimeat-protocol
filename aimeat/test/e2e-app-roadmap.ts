@@ -10,6 +10,7 @@
  *   shared app the person who loses by the silence is somebody else.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-roadmap
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-05 — The connector case takes aimeat_app_draft_publish from the whole connector (registerAllTools):
  *     it runs its CLI dispatch definition now (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — A6-16: one account holds at most ten open wishes on one app, another
@@ -19,8 +20,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
 import { appTools } from '../src/tool-dispatch/tool-call-defs-apps.js';
 
@@ -412,7 +412,7 @@ await test('connector and CLI draft publication reach the real authorized REST r
     const callbacks = new Map<string, (input: Record<string, unknown>) => Promise<any>>();
     // The whole connector: aimeat_app_draft_publish runs its CLI dispatch definition since 2026-10-05.
     const agent = { owner: builder.name, agent: 'probe', config: { node_url: BASE }, client: liveClient };
-    registerAllTools({ tool: (name: string, ...args: unknown[]) => callbacks.set(name, args.at(-1) as never) } as never,
+    registerAllTools({ registerTool: (name: string, ...args: unknown[]) => callbacks.set(name, args.at(-1) as never) } as never,
         { resolve: () => agent, list: () => [agent], size: () => 1 } as never);
     for (const surface of ['connector', 'CLI']) {
         const staged = await json(`/v1/apps/${owner.name}/${APP}/draft`, {

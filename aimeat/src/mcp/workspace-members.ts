@@ -11,6 +11,7 @@
  *   Access and grant live together because they are the two halves of ONE membership decision —
  *   someone asks, someone decides — and both were already reaching for the same role helpers.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-06 — member_grant and member_revoke answer as a refusal when every workspace refused, as
  *     the connector's tools did (secaudit 2026-10 follow-up, Part B).
@@ -23,7 +24,7 @@
  *     registration order preserved: it registers before the grant tools, exactly as before).
  *   v1.0.0 — 2026-07-13 — Extracted from mcp/workspaces.ts (max-file-lines)
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';

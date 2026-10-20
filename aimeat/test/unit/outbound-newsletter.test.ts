@@ -13,11 +13,12 @@
  *   all come out as inert text.
  * @usage cd aimeat && pnpm exec vitest run test/unit/outbound-newsletter.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { renderCampaignEmail, listUnsubscribeHeaders } from '../../src/services/outbound/campaign-email.js';
 import { parseCampaignBody, safeHttpsUrl } from '../../src/services/outbound/campaign-markup.js';
 import { validateSender, senderKey } from '../../src/services/outbound/sender-identity.js';

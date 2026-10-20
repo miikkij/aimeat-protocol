@@ -13,6 +13,7 @@
  *   cards said 2025-06-18 while SDK 1.31.0 negotiated 2025-11-25.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-protocol-version.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-19 — Initial (wish-mcp-2026-07-28-ja-sdk-v2-siirtym-suunnitelma-palvelinkortin-,
  *     the server-card half).
  */
@@ -20,8 +21,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
-
+import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';

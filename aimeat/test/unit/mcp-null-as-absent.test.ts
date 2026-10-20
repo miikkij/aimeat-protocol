@@ -11,33 +11,33 @@
  *   under test, and the control server without the helper shows the refusal it replaces.
  * @usage pnpm exec vitest run test/unit/mcp-null-as-absent.test.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { McpServer } from '@modelcontextprotocol/server';
 import { treatNullAsAbsent } from '../../src/mcp/null-as-absent.js';
 
 async function serverWith(repair: boolean) {
   const mcp = new McpServer({ name: 'null-as-absent-test', version: '1.0.0' });
   if (repair) treatNullAsAbsent(mcp);
   const received: unknown[] = [];
-  mcp.tool('propose', {
-    task_id: z.string(),
-    note: z.string().optional(),
-    // A field where null means "clear", like task_start or CORS origins.
-    clear: z.string().nullable().optional(),
-    todos: z.array(z.object({
-      title: z.string(),
-      description: z.string().optional(),
-      estimate_minutes: z.number().optional(),
-    })),
-  }, async (args) => {
-    received.push(args);
-    return { content: [{ type: 'text' as const, text: 'ok' }] };
-  });
+  mcp.registerTool('propose', { inputSchema: z.object({
+            task_id: z.string(),
+            note: z.string().optional(),
+            // A field where null means "clear", like task_start or CORS origins.
+            clear: z.string().nullable().optional(),
+            todos: z.array(z.object({
+              title: z.string(),
+              description: z.string().optional(),
+              estimate_minutes: z.number().optional(),
+            })),
+          }) }, async (args) => {
+            received.push(args);
+            return { content: [{ type: 'text' as const, text: 'ok' }] };
+          });
   const [clientT, serverT] = InMemoryTransport.createLinkedPair();
   await mcp.connect(serverT);
   const client = new Client({ name: 'probe', version: '1.0.0' });

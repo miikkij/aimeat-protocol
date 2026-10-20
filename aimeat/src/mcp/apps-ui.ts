@@ -33,6 +33,7 @@
  *   import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta } from './apps-ui.js';
  *   registerAppIndexUi(mcp);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.1 — 2026-08-09 — A node that cannot build the page offers none, instead of throwing from
  *     the resource handler. Prod had not installed the new dependency yet, and the throw reached
  *     the person as "Unable to reach AIMEAT": a missing picture took the whole tool call with it.
@@ -53,7 +54,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { logger } from '../utils/logger.js';
 
 /** The ui:// address of the app-index page. Referenced by aimeat_app_list's `_meta`. */

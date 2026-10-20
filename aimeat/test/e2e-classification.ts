@@ -21,6 +21,7 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.5.1 — 2026-10-18 — The setup takes the default audience caps off, which a new node carries from
  *     plan doc-mvdipuyqraas L5.1; the suite writes public records to test the reader, not the caps.
  *   v1.5.0 — 2026-09-30 — TARGET-082 test gaps: the operator's agent without operator:admin and the
@@ -54,8 +55,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { stringify as yamlStringify } from 'yaml';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { takeOffAudienceCaps } from './helpers/classification-caps.js';
