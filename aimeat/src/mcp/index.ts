@@ -11,6 +11,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-20 — The server no longer declares resources.subscribe, which no handler served.
  *   2026-10-20 — Every open session is recorded in mcp/session-registry.ts, so deleting an agent or
  *     rotating its key closes its live MCP transports at once, as both already close its connect
  *     tunnel (secaudit 2026-10, mcp-oauth:access-token-without-session-survives-agent-delete).
@@ -314,7 +315,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // tools.listChanged is the half that was missing: the agent's scopes decide which
                 // tools this session registered, so a permission change makes the client's list
                 // wrong, and without the declaration no client would ever ask again.
-                capabilities: { tools: { listChanged: true }, resources: { subscribe: true, listChanged: true } },
+                // resources.subscribe is NOT declared: nothing handles resources/subscribe, so a
+                // client that believed it got -32601 (decision 2026-10-20, MCP migration plan item 12).
+                capabilities: { tools: { listChanged: true }, resources: { listChanged: true } },
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.
