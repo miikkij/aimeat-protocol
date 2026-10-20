@@ -22,6 +22,9 @@
  *   Runs against a live server (E2E_BASE, default http://localhost:40251).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ai-provenance-rest-declare
  * @version-history
+ *   v1.0.1 — 2026-10-20 — The D7 case follows the secaudit 2026-10 fix (agent-task-fanout.ts v1.7.0):
+ *     its deliverable is written after the task exists, the feed entry is found by the deliverable
+ *     key, and the task title must not reach it. The setup no longer matched the code.
  *   v1.0.0 — 2026-10-08 — Initial (aiprov D5, D6, D7, D11, D14).
  */
 import * as ed from '@noble/ed25519';
@@ -216,9 +219,12 @@ await test('CROSS-SCOPE → refused: completing with a declaration without prove
 
 await test('A completion records the declaration; the public feed carries no completion message (D7)', async () => {
     const key = `rdeclare.deliverable.${stamp}`;
+    const title = `Declared completion ${stamp}`;
+    // The task exists before its deliverable is written: the feed admits only a record the task
+    // produced, which the node reads from the two dates (agent-task-fanout.ts deliverableOfTask).
+    const id = await activeTask(declarer.name, title);
     const w = await post('/v1/memory', declarer.token, { key, value: { report: 'public result' }, visibility: 'public' });
     assert(w.status === 201, `deliverable ${w.status}: ${JSON.stringify(w.body?.error)}`);
-    const id = await activeTask(declarer.name, `Declared completion ${stamp}`);
     const secret = `Private completion notes ${stamp}`;
     const r = await post(`/v1/agents/${declarer.name}/tasks/${id}/complete`, declarer.token, { message: secret, deliverable_key: key, ai_provenance: DECLARED });
     assert(r.status === 200 && r.body.data.task.status === 'done', `complete ${r.status}: ${JSON.stringify(r.body?.error)}`);
@@ -229,10 +235,12 @@ await test('A completion records the declaration; the public feed carries no com
     for (let i = 0; i < 20 && !item; i++) {
         await new Promise(res => setTimeout(res, 250));
         const feed = await json(`/v1/public/activity-feed?category=agents&limit=${100 + i}`);
-        item = (feed.body.data?.items ?? []).find((x: any) => String(x.summary).includes(`Declared completion ${stamp}`));
+        item = (feed.body.data?.items ?? []).find((x: any) => String(x.summary).includes(key));
     }
     assert(!!item, 'the public deliverable reached the feed');
     assert(!JSON.stringify(item).includes(secret), `the private completion message was copied to the public feed: ${JSON.stringify(item)}`);
+    // The entry names the public record, never the task title, which is private text (secaudit 2026-10).
+    assert(!JSON.stringify(item).includes(title), `the private task title was copied to the public feed: ${JSON.stringify(item)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

@@ -6,6 +6,10 @@
  *   by the member who wrote it (creator GHII) and only KEYED `organism.{id}.…`, so it was orphaned
  *   and stayed findable via the (indexed) librarian/$text search. Now it deletes by key prefix.
  * @version-history
+ *   2026-10-20 — The co-member case grants B the contributor role before B writes: a workspace role
+ *     is the member's own permission, so membership alone no longer carries a content write in
+ *     person (Core 2026-11 COL-09; secaudit 2026-10, defect 1). The setup changed, not the assertion
+ *     the test is about.
  *   2026-10-16 — An agent with organism:write and the default memory words is refused the delete
  *     (SCOPE_DENIED naming memory:purge); with memory:purge beside it the delete goes through
  *     (invariant 8 as ruled by the developer on 2026-10-16).
@@ -82,6 +86,10 @@ await test('A CO-MEMBER writes into the workspace, under their own identity', as
     B = await setupOwner('b');
     const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: authB(), body: JSON.stringify({}) });
     assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body?.error)}`);
+    // Writing workspace content needs the contributor role, in person as through an agent, so A
+    // grants it first (Core 2026-11 COL-09, ruled 2026-10-20). Membership alone used to be enough.
+    const g = await json(`/v1/organisms/${orgId}/workspace-access/grant`, { method: 'POST', headers: auth(), body: JSON.stringify({ ws: WS, grantee: B.name, role: 'contributor' }) });
+    assert(g.status === 200, `grant contributor ${g.status}: ${JSON.stringify(g.body?.error)}`);
 
     const w = await json('/v1/memory', {
         method: 'POST', headers: authB(),
