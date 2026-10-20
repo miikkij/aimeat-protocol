@@ -3,7 +3,7 @@
   "name": "io.aimeat/aimeat",
   "title": "AIMEAT",
   "description": "Your knowledge, agents and apps on a node you own, reached from the AI you already use.",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "websiteUrl": "https://aimeat.io",
   "repository": {
     "url": "https://github.com/miikkij/aimeat-protocol",
