@@ -31,6 +31,8 @@
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   v1.1.0 — 2026-10-20 — A GET /v1/pub call needs storage:read, also when the path is only in a regex
+ *     (S3-03 gated it on 2026-10-16 after the keep-working step was written; found on originalmiskate.com).
  *   v1.0.2 — 2026-10-17 — A realtime room made with createRoom() or a POST to /v1/realtime/rooms needs social:write (pitfall-list round).
  *   v1.0.1 — 2026-10-15 — cortexLibRefs bounds the cortex name and the file path in its pattern
  *     (CodeQL js/polynomial-redos).
@@ -99,6 +101,11 @@ const RULES: Rule[] = [
   // A realtime room made by the realtime library or by a POST (routes/realtime.ts); a list is a GET and open.
   { word: 'social:write', re: /\b[A-Za-z_$][\w$]*\.createRoom\s*\(/g },
   { word: 'social:write', re: new RegExp(`${LIT}/v1/realtime/rooms['"\\x60]\\s*,\\s*\\{[^}]{0,80}?method\\s*:\\s*['"\\x60]POST['"\\x60]`, 'gi') },
+  // A file that is not public, read with the reader's token (routes/storage-files.ts GET /v1/pub, QA
+  // audit S3-03). An app that shows workspace images often holds the path only in the pattern that
+  // finds an image address in a document, so the escaped form of a regex counts as well.
+  { word: 'storage:read', re: new RegExp(`${LIT}/v1/pub(?:/|['"\\x60])`, 'g') },
+  { word: 'storage:read', re: /\\{1,2}\/v1\\{1,2}\/pub\\{1,2}\//g },
 ];
 
 /** The text around a match, on one line, for the owner to read. */

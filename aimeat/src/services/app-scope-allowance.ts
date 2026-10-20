@@ -35,6 +35,9 @@
  *   const words = await appAllowanceWords(storage, 'alice/notes.html');
  *   const asked = withAllowance(requested, words);
  * @version-history
+ *   v1.2.0 — 2026-10-20 — keepWorkingAppsOnce takes `only` and a change-log reason, and adds to an app
+ *     that already has an allowance the words it lacks, never one its owner removed
+ *     (services/app-storage-read-keep-migration.ts).
  *   v1.1.0 — 2026-10-18 — keepWorkingAppsOnce writes each grant's words on the list that was read
  *     (services/scope-list-swap.ts), so a refresh or an owner's edit meanwhile is kept (check:atomic-writes).
  *   v1.0.0 — 2026-10-13 — Initial.
@@ -72,12 +75,24 @@ async function liveGrantsOf(storage: Storage, appId: string) {
 /** One app the step gave an allowance. */
 export interface KeptApp { appId: string; owner: string; name: string; words: string[]; grants: number }
 
+export interface KeepWorkingAppsOptions {
+  /** Only these words; every word the code needs when omitted. */
+  only?: readonly string[];
+  /** The reason written in the app's change log. */
+  reason?: string;
+}
+
 /**
  * For every app published before `cutoff` whose code needs a word its sign-in does not ask for:
  * record the allowance, put the words on its live grants, and note it in the app's own change log.
- * The caller (services/rest-scope-keep-working-migration.ts) decides that this runs once.
+ * An app that already has an allowance gets only the words it lacks, and never a word its owner
+ * removed. The callers (services/rest-scope-keep-working-migration.ts and
+ * services/app-storage-read-keep-migration.ts) decide that this runs once.
  */
-export async function keepWorkingAppsOnce(storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, cutoff: number): Promise<KeptApp[]> {
+export async function keepWorkingAppsOnce(
+  storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, cutoff: number, opts: KeepWorkingAppsOptions = {},
+): Promise<KeptApp[]> {
+  const reason = opts.reason ?? 'kept working from 3.x: its code calls routes that 4.0.0 checks';
   const kept: KeptApp[] = [];
   const libCache = new Map<string, string | null>();
   const libText = async (name: string, file: string): Promise<string | null> => {
@@ -99,18 +114,22 @@ export async function keepWorkingAppsOnce(storage: Storage, config: Pick<AimeatC
       const created = Date.parse(app.createdAt);
       if (!Number.isNaN(created) && created >= cutoff) continue;
       const appId = `${app.ownerName}/${app.filename}`;
-      if (await readAppScopeAllowance(storage, appId)) continue;
+      const had = await readAppScopeAllowance(storage, appId);
       const html = Buffer.isBuffer(app.data) ? app.data.toString('utf8') : String(app.data ?? '');
       const libs: Array<{ source: string; text: string }> = [];
       for (const ref of cortexLibRefs(html)) {
         const text = await libText(ref.name, ref.file);
         if (text !== null) libs.push({ source: ref.path, text });
       }
-      const { missing, evidence } = undeclaredScopeNeeds(html, libs);
+      const needs = undeclaredScopeNeeds(html, libs);
+      const missing = needs.missing.filter(w =>
+        (!opts.only || opts.only.includes(w)) && !had?.words.includes(w) && !had?.removed.includes(w));
       if (!missing.length) continue;
+      const evidence = needs.evidence.filter(e => missing.includes(e.word))
+        .map(e => ({ word: e.word, source: e.source, evidence: e.evidence.slice(0, 240) }));
       await writeAllowance(storage, {
-        spec: SPEC, appId, words: missing, removed: [],
-        evidence: evidence.map(e => ({ word: e.word, source: e.source, evidence: e.evidence.slice(0, 240) })),
+        spec: SPEC, appId, words: [...(had?.words ?? []), ...missing], removed: had?.removed ?? [],
+        evidence: [...(had?.evidence ?? []), ...evidence],
         at: new Date().toISOString(),
       });
       let grants = 0;
@@ -124,7 +143,7 @@ export async function keepWorkingAppsOnce(storage: Storage, config: Pick<AimeatC
       }
       await recordAppAudit(storage, {
         ownerGhii: app.ownerGaii, filename: app.filename, by: `system@${config.nodeId}`, action: 'scope_allowance.kept',
-        detail: { words: missing.join(', '), grants, reason: 'kept working from 3.x: its code calls routes that 4.0.0 checks' },
+        detail: { words: missing.join(', '), grants, reason },
       });
       kept.push({ appId, owner: app.ownerName, name: app.manifest?.name || app.filename, words: missing, grants });
     }

@@ -16,11 +16,14 @@
  *   afterwards with the agent editor or aimeat_agent_scope_narrow.
  *
  *   WHICH WORDS. REST_SCOPE_KEEP_WORKING_WORDS: every word a requireRestScope gate names under
- *   src/routes/ (auth/rest-scope-gate.ts, enforced from REST_SCOPE_GATES_ENFORCED_IN) and every word an
- *   MCP tool's catalog entry enforces from that release (`scopeEnforcedFrom`, tool-catalog/scopes.ts),
+ *   src/routes/ (auth/rest-scope-gate.ts, enforced from REST_SCOPE_GATES_ENFORCED_IN), every word an
+ *   MCP tool's catalog entry enforces from that release (`scopeEnforcedFrom`, tool-catalog/scopes.ts)
+ *   and every word a route refuses inline with denyScope403 (storage:read on GET /v1/pub, S3-03),
  *   the two earlier steps' words included: an agent made on 3.x after those steps ran reached their
  *   routes too. test/unit/rest-scope-keep-working.test.ts derives the same set from the source and
- *   fails when the two differ, so a gate added later fails there until it is listed here.
+ *   fails when the two differ, so a gate added later fails there until it is listed here. A node that
+ *   ran this step before a word joined the list gets it from a step of its own
+ *   (services/app-storage-read-keep-migration.ts for storage:read).
  *   - `passedBy`: a word that passes every gate of this word (requireRestScope `orScope` on every one,
  *     and no MCP tool asks the word). A principal holding it already passes, so it gets nothing.
  *   - `agentsOnly`: every REST gate of the word is followed by requireRole('agent') and no MCP tool
@@ -64,6 +67,9 @@
  *   const before = new Date().toISOString();
  *   migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   v1.3.0 — 2026-10-20 — storage:read joins the list: S3-03 (2026-10-16) checks it inline on GET /v1/pub,
+ *     which the test's scan did not read, so no app kept it (found on originalmiskate.com). tellAppOwners
+ *     is exported for the storage:read step and takes the record it reports.
  *   v1.2.0 — 2026-10-18 — Both records are claimed before the work (services/once-only-step.ts) and each
  *     scope list is written on the list that was read (services/scope-list-swap.ts), the take-back from
  *     anonymous mode's shared agent included (check:atomic-writes).
@@ -178,6 +184,11 @@ export const REST_SCOPE_KEEP_WORKING_WORDS: ReadonlyArray<KeepWorkingWord> = [
   {
     word: 'social:write',
     opens: 'POST /v1/flags/:flagId/appeal, POST /v1/appeals/:id/review (routes/appeals.ts)',
+  },
+  {
+    word: 'storage:read',
+    // Checked inline, not by requireRestScope, so it is in this list from the inline scan of the test.
+    opens: 'GET /v1/pub/:gaii/{key} for a file that is not public, read with a token (routes/storage-files.ts, QA audit S3-03)',
   },
   {
     word: 'task:read',
@@ -353,9 +364,10 @@ async function keepPrincipals(storage: Storage, cutoff: number, result: KeepWork
   }
 }
 
-/** One feed line per app owner: the published apps that kept words, and the words. */
-async function tellAppOwners(
+/** One feed line per app owner: the published apps that kept words, and the words. `subject` is the step's record. */
+export async function tellAppOwners(
   storage: Storage, config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>, apps: KeptApp[],
+  subject: string = APP_SCOPE_KEEP_WORKING_KEY,
 ): Promise<void> {
   const byOwner = new Map<string, KeptApp[]>();
   for (const a of apps) byOwner.set(a.owner, [...(byOwner.get(a.owner) ?? []), a]);
@@ -363,7 +375,7 @@ async function tellAppOwners(
     await recordAccountEvent(storage, {
       ownerGhii: owner.includes('@') ? owner : `${owner}@${config.nodeId}`,
       kind: 'app_scope_words_kept',
-      subject: APP_SCOPE_KEEP_WORKING_KEY,
+      subject,
       // The App Catalog, where each app's change log names the words and why it got them.
       link: '/v1/appcat',
       data: {

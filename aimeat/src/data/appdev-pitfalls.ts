@@ -541,12 +541,12 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
   E({
     id: 'undeclared-scope-words',
     title: 'From 4.0 a route the app calls refuses a word its aimeat-scopes does not name',
-    symptom: 'On a 4.0 node a signed-in app gets 403 SCOPE_DENIED from routes that answered on 3.x: an extension action (/v1/ext/..., AIMEAT.iam, AIMEAT.webhook, a cortex lib that calls one), the agent list (AIMEAT.agents.list, /v1/agents), organism workspaces (AIMEAT.organism.workspaces, AIMEAT.intake.listForms), schedules (POST /v1/schedules, AIMEAT.refinery.schedule) or a schedule edit (PATCH /v1/schedules/:id). The publish answer warns with the word and the line that needs it.',
-    fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept.',
+    symptom: 'On a 4.0 node a signed-in app gets 403 SCOPE_DENIED from routes that answered on 3.x: an extension action (/v1/ext/..., AIMEAT.iam, AIMEAT.webhook, a cortex lib that calls one), the agent list (AIMEAT.agents.list, /v1/agents), organism workspaces (AIMEAT.organism.workspaces, AIMEAT.intake.listForms), schedules (POST /v1/schedules, AIMEAT.refinery.schedule), a schedule edit (PATCH /v1/schedules/:id), or an image or file that is not public read from /v1/pub with the visitor\'s token (a workspace document\'s images stay empty). The publish answer warns with the word and the line that needs it.',
+    fix: 'Name every word the code needs in `<meta name="aimeat-scopes">`, beside the four the app already uses: ext:invoke for an extension action, agent:read for the agent list, task:write for a task or a new schedule, workflow:write for a schedule edit, organism:read for an organism\'s workspaces, organism:invite for workspace access, social:write for a new realtime room, storage:read for a file from /v1/pub that is not public. Declaring replaces the default set, so keep memory:read memory:write storage:read storage:write in it. An app published before the node moved to 4.0 kept these words by itself (aimeat_app_manage scope_allowance names them); declaring them is still the fix, and a new app gets nothing kept.',
     appliesTo: ['app', 'publish'],
     severity: 'warn',
     source: 'curated',
-    updatedAt: '2026-10-13',
+    updatedAt: '2026-10-20',
     ...CHECKED,
   }),
 ];

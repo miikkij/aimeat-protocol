@@ -124,6 +124,20 @@ after the start stays removed, and a republished app keeps its words until its o
 the app declares them itself. The operator sees one incident on the Security page with the counts per
 word for agents and for apps, which is expected after this upgrade and is resolved once read.
 
+**An app that shows workspace images needs `storage:read`.** Since node 4.0.3 (QA audit S3-03,
+2026-10-16), `GET /v1/pub/{gaii}/{key}` asks `storage:read` of a signed-in app, agent or ecosystem app
+for a file that is not public, such as an image in a workspace document. An app on the default set
+already has the word. An app whose own `aimeat-scopes` leaves it out gets 403 `SCOPE_DENIED` on every
+such image, and nothing else on the page shows it: the images stay empty until someone opens a
+document that has one. A node that moved to 4.0.x before that check existed did not give the word to
+any app, so on a later start the node gives `storage:read` once to every published app whose code
+reads `/v1/pub` (a string that starts with the path, or the path written escaped in a regex) and does
+not ask for it (`aimeat/src/services/app-storage-read-keep-migration.ts`). It is kept like the words
+above: one feed line per owner, one incident for the operator, and the owner removes it the same
+way. Agents and ecosystem apps on such a node do not get it by themselves; give it to an agent in its
+settings when it reads workspace files. The fix in the app itself is to name `storage:read` in
+`aimeat-scopes`.
+
 **An app published after the start keeps nothing.** Its publish answer carries a warning in
 `app_hints` (pitfall `undeclared-scope-words`) for each word its code needs and its `aimeat-scopes`
 does not name, with the line that needs it. Until the author adds the word, a signed-in visitor of that
