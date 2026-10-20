@@ -40,7 +40,7 @@
         "aimeat/src/services/content/settings.ts",
         "aimeat/src/data/content-classes.ts"
       ],
-      "digest": "sha256:551af3aa1e42f2366ad81214"
+      "digest": "sha256:67ceb63de462185031dd1735"
     },
     "node:aimeat-open-items": {
       "reviewedOn": "2026-10-17",
@@ -809,7 +809,7 @@
       "aimeat/src/services/content/ai-stages.ts": "15614778a33da5dc",
       "aimeat/src/services/content/service.ts": "1ba3ff26ed4bc45e",
       "aimeat/src/services/content/settings.ts": "20f4f279a29775ab",
-      "aimeat/src/data/content-classes.ts": "e47ea86960d7e698"
+      "aimeat/src/data/content-classes.ts": "9c81bbcf83c62949"
     }
   }
 }

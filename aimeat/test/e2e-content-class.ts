@@ -297,6 +297,7 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(f.classes?.some((c: any) => c.id === 'invoice' && c.confidence >= 0.6), `classes ${JSON.stringify(f.classes)}`);
     const e = f.entities?.invoice?.entity;
     assert(e && e['@type'].includes('cc:invoice') && e['@type'].includes('schema:Invoice') && e['cc:invoice.amount'] === 248, `entity ${JSON.stringify(e)}`);
+    assert(e['cc:invoice.vendor'] === 'Acme Oy' && e['cc:invoice.due_date'] === '2026-10-31' && !('cc:invoice.vat' in e), `what the invoice states, and nothing it does not ${JSON.stringify(e)}`);
     const p = await json('/v1/content/proposals?status=pending', { headers: auth(A.token) });
     assert(p.body.data.proposals.some((x: any) => x.kind === 'properties' && x.classId === 'invoice'), `proposals ${JSON.stringify(p.body.data.proposals)}`);
   });
@@ -417,10 +418,10 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     const e = f.body.data.facts.entities.invoice;
     assert(e.entity['cc:invoice.due_date'] === '2026-11-30' && !('cc:invoice.reference' in e.entity), `entity ${JSON.stringify(e.entity)}`);
     assert(JSON.stringify(e.corrected?.properties?.sort()) === JSON.stringify(['due_date', 'reference']), `corrected ${JSON.stringify(e.corrected)}`);
-    // Extract again: the model answers 2026-10-31 for every date; the corrected value stays.
+    // Extract again: the model reads the due date 2026-10-31 from the PDF; the corrected value stays.
     const again = await json('/v1/content/inspect', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ source: src, stages: ['extract'], force: true }) });
     assert(again.status === 200 && again.body.data.facts.entities.invoice.entity['cc:invoice.due_date'] === '2026-11-30', `after extract ${JSON.stringify(again.body?.data?.facts?.entities?.invoice?.entity)}`);
-    assert(again.body.data.facts.entities.invoice.entity['cc:invoice.date'] === '2026-10-31', 'an uncorrected field is extracted again');
+    assert(again.body.data.facts.entities.invoice.entity['cc:invoice.amount'] === 248, 'an uncorrected field is extracted again');
     // The class: the person says it is a receipt, not an invoice.
     const decisionId = again.body.data.facts.classes.find((m: any) => m.id === 'invoice')?.decisionId;
     const c = await json('/v1/content/correct', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ source: src, classes: ['receipt'] }) });
