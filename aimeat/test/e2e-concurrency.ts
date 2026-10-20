@@ -6,6 +6,9 @@
  *   parallel settlement, and the wallet balances after each round, asserted exactly.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-concurrency
  * @version-history
+ *   v1.0.4 — 2026-10-20 — The three work agents are registered with the scopes they use (work,
+ *     wallet, boards), so the suite runs on the production-settings lane, where an agent approved
+ *     with no list gets the shipped default (QA audit S10-10).
  *   v1.0.3 — 2026-10-16 — 12 to 14 skip with a reason under the runner's high auth limit, and the
  *     result line counts them, where an early return had counted them as passed (QA audit P1-04).
  *   v1.0.2 — 2026-10-14 — 32: the connectivity-key mint is removed (feature-list audit row 202), so
@@ -20,6 +23,13 @@ import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { registerOwner } from './helpers/owner-login.js';
 import { isSkip, skip } from './helpers/skip.js';
+
+/**
+ * What the work agents use: publishing, requesting, accepting and reading work, the wallet, and a
+ * board. Named here because a production node gives an agent approved with no list only the shipped
+ * default, which holds none of these.
+ */
+const WORK_AGENT_SCOPES = ['memory:read', 'memory:write', 'agent:read', 'work:publish', 'work:request', 'work:accept', 'work:read', 'wallet:read', 'social:read', 'social:write'];
 
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
@@ -157,7 +167,7 @@ await test('0a. Register owners + agents', async () => {
     const { body: rBody } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'cc-requester', owner: ownerName, capabilities: ['work'], model: 'gpt-4o' }),
+        body: JSON.stringify({ name: 'cc-requester', owner: ownerName, capabilities: ['work'], model: 'gpt-4o', scopes: WORK_AGENT_SCOPES }),
     });
     assert(rBody.ok, `requester: ${JSON.stringify(rBody.error)}`);
     requesterGaii = rBody.data.agent.gaii;
@@ -168,7 +178,7 @@ await test('0a. Register owners + agents', async () => {
     const { body: pBody } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${owner2Token}` },
-        body: JSON.stringify({ name: 'cc-provider', owner: owner2Name, capabilities: ['work'], model: 'gpt-4o' }),
+        body: JSON.stringify({ name: 'cc-provider', owner: owner2Name, capabilities: ['work'], model: 'gpt-4o', scopes: WORK_AGENT_SCOPES }),
     });
     assert(pBody.ok, `provider: ${JSON.stringify(pBody.error)}`);
     providerGaii = pBody.data.agent.gaii;
@@ -179,7 +189,7 @@ await test('0a. Register owners + agents', async () => {
     const { body: r2Body } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'cc-requester2', owner: ownerName, capabilities: ['work'], model: 'gpt-4o' }),
+        body: JSON.stringify({ name: 'cc-requester2', owner: ownerName, capabilities: ['work'], model: 'gpt-4o', scopes: WORK_AGENT_SCOPES }),
     });
     assert(r2Body.ok, `requester2: ${JSON.stringify(r2Body.error)}`);
     requester2Gaii = r2Body.data.agent.gaii;
