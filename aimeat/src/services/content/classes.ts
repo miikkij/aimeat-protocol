@@ -17,17 +17,19 @@
  *   updateOwnRecord() does this for this file, settings.ts and facts-store.ts.
  *
  *   OWL. owlOntology() answers the owner's classes as an OWL ontology in JSON-LD: one owl:Class per
- *   content class, a subclass of its schema.org type, and one owl:DatatypeProperty per property.
- *   entityFor() answers one extracted item as a JSON-LD node typed by its class, with each value
+ *   content class, a subclass of its schema.org type, and one owl:DatatypeProperty per property,
+ *   whose rdfs:label is its label per language when it has one and its name otherwise. entityFor() answers one extracted item as a JSON-LD node typed by its class, with each value
  *   coerced to the property's datatype.
  * @structure ContentClassError · ContentDeps · ContentWriter · updateOwnRecord() · validateClass() ·
- *   validateProperties() · listClasses() · getClass() · setOwnerClass() · removeOwnerClass() ·
+ *   validatePropertyLabel() · validateProperties() · listClasses() · getClass() · setOwnerClass() · removeOwnerClass() ·
  *   addProposal() · decideProposal() · listProposals() · contentContext() · owlOntology() · entityFor()
  * @usage
  *   const classes = await listClasses(storage, ownerGhii);
  *   const doc = owlOntology(classes, { ownerGhii, baseUrl: config.baseUrl });
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
+ *   v1.1.0 — 2026-10-21 — A property's optional label (fi, en, es; at most 80 characters each) is
+ *     validated, and owlOntology answers it as the property's rdfs:label per language.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -103,6 +105,31 @@ async function readOntology(storage: Storage, ownerGhii: string): Promise<Ontolo
 const invalid = (message: string): ContentClassError => new ContentClassError('INVALID_INPUT', 400, message);
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
+/** The longest a property label may be, per language. */
+const PROPERTY_LABEL_MAX = 80;
+
+/**
+ * A property's optional label, validated: absent (undefined or null) answers undefined; otherwise an
+ * object with non-empty `fi` and `en` strings and an optional `es` string, each at most
+ * PROPERTY_LABEL_MAX characters after trimming. An empty `es` is dropped. Any other shape is refused.
+ */
+function validatePropertyLabel(raw: unknown, where: string): ClassProperty['label'] {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw invalid(`${where}.label must be an object with fi and en, and optionally es.`);
+  const l = raw as Record<string, unknown>;
+  const out: Record<string, string> = {};
+  for (const lang of ['fi', 'en', 'es'] as const) {
+    const v = l[lang];
+    if (v === undefined || v === null) continue;
+    if (typeof v !== 'string') throw invalid(`${where}.label.${lang} must be a string.`);
+    const s = v.trim();
+    if (s.length > PROPERTY_LABEL_MAX) throw invalid(`${where}.label.${lang} is ${s.length} characters; the limit is ${PROPERTY_LABEL_MAX}.`);
+    if (s) out[lang] = s;
+  }
+  if (!out.fi || !out.en) throw invalid(`${where}.label.fi and ${where}.label.en are both required when a label is given.`);
+  return { fi: out.fi, en: out.en, ...(out.es ? { es: out.es } : {}) };
+}
+
 /** Validated properties, or a refusal naming the first bad one. */
 export function validateProperties(input: unknown, where = 'properties'): ClassProperty[] {
   if (!Array.isArray(input)) throw invalid(`${where} must be an array.`);
@@ -119,7 +146,11 @@ export function validateProperties(input: unknown, where = 'properties'): ClassP
     if (describe.length > 300) throw invalid(`${where}[${i}].describe is ${describe.length} characters; the limit is 300.`);
     const sameAs = str(p.sameAs);
     if (sameAs && !CURIE.test(sameAs)) throw invalid(`${where}[${i}].sameAs "${sameAs}" must be a prefixed name such as schema:totalPaymentDue.`);
-    return { name, type: p.type as ClassProperty['type'], required: p.required === true, describe, ...(sameAs ? { sameAs } : {}) };
+    const label = validatePropertyLabel(p.label, `${where}[${i}]`);
+    return {
+      name, type: p.type as ClassProperty['type'], required: p.required === true, describe,
+      ...(sameAs ? { sameAs } : {}), ...(label ? { label } : {}),
+    };
   });
 }
 
@@ -291,7 +322,8 @@ export function contentContext(baseUrl: string): Record<string, string> {
 
 const XSD_RANGE: Record<ClassProperty['type'], string> = { string: 'xsd:string', number: 'xsd:decimal', date: 'xsd:date', boolean: 'xsd:boolean' };
 
-function labels(label: ContentClass['label']): Array<{ '@value': string; '@language': string }> {
+/** A class or property label as an rdfs:label list, one language-tagged value per language that has text. */
+function labels(label: ContentClass['label'] | NonNullable<ClassProperty['label']>):Array<{ '@value': string; '@language': string }> {
   return Object.entries(label).filter(([, v]) => typeof v === 'string' && v).map(([lang, v]) => ({ '@value': v as string, '@language': lang }));
 }
 
@@ -303,7 +335,7 @@ export function owlOntology(classes: readonly ContentClass[], opts: { ownerGhii:
     graph.push({ '@id': `cc:${c.id}`, '@type': 'owl:Class', 'rdfs:label': labels(c.label), 'rdfs:comment': c.describe, 'rdfs:subClassOf': { '@id': c.type } });
     for (const p of c.properties) {
       graph.push({
-        '@id': `cc:${c.id}.${p.name}`, '@type': 'owl:DatatypeProperty', 'rdfs:label': p.name,
+        '@id': `cc:${c.id}.${p.name}`, '@type': 'owl:DatatypeProperty', 'rdfs:label': p.label ? labels(p.label) : p.name,
         'rdfs:domain': { '@id': `cc:${c.id}` }, 'rdfs:range': { '@id': XSD_RANGE[p.type] }, 'rdfs:comment': p.describe,
         ...(p.sameAs ? { 'owl:equivalentProperty': { '@id': p.sameAs } } : {}),
         'cc:required': p.required,

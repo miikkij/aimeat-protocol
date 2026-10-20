@@ -23,9 +23,17 @@
  *   (services/content/service.ts assertOn); readOverview() answers { off: true } for it.
  * @structure cc · classLabel · kindWord · aiWord · isAiMade · readOverview · readLatest · readItemFacts ·
  *   readClasses · readProposals · decideProposal · startScan · readScan · inspectItem · saveSettings ·
- *   readRules · downloadOntology · itemRow · detailRows
+ *   readRules · downloadOntology · fileSource · correctItem · readItemText · readOwlClass · percent ·
+ *   propertyWords · propertyLabel · readDecision · classesForKind · itemRow · detailRows
  * @usage import { readOverview, itemRow, detailRows } from './content-facts.js';
  * @version-history
+ *   v1.2.1 — 2026-10-21 — propertyHint: a property's English describe, on an English page only.
+ *   v1.2.0 — 2026-10-21 — propertyLabel (a property's label in the page language) and readDecision
+ *     (GET /v1/ai/decisions/{id}), for the file fold's third round.
+ *   v1.1.0 — 2026-10-21 — The calls and words of the file fold's second round (Jouni's look,
+ *     2026-10-21): fileSource, correctItem (POST /v1/content/correct), readItemText
+ *     (GET /v1/content/text), readOwlClass (one class's nodes out of the ontology), percent,
+ *     propertyWords, classesForKind; inspectItem takes the stages to run.
  *   v1.0.1 — 2026-10-20 — The AI column shows the verdict on every row (an empty label read as broken
  *     at phone width; browser check).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -132,13 +140,84 @@ export async function readScan(id) {
 }
 
 /**
- * POST /v1/content/inspect { source }: read one item now with the person's settings. A step that
- * calls a model can take a while, so the call waits up to two minutes.
+ * POST /v1/content/inspect { source, ...extra }: read one item now, with the person's settings or
+ * the stages `extra` names ({ stages: ['extract'], force: true } extracts again). A step that calls a
+ * model can take a while, so the call waits up to two minutes.
  */
-export async function inspectItem(source) {
-  const r = await api('/v1/content/inspect', { method: 'POST', body: JSON.stringify({ source }), timeoutMs: 120_000 });
+export async function inspectItem(source, extra = {}) {
+  const r = await api('/v1/content/inspect', { method: 'POST', body: JSON.stringify({ source, ...extra }), timeoutMs: 120_000 });
   return r?.data?.facts || null;
 }
+
+/** The `source` of a stored file: its key, and its owner when the file is one of the person's agents'. */
+export const fileSource = (key, owner) => ({ kind: 'file', key, ...(owner ? { owner } : {}) });
+
+/**
+ * POST /v1/content/correct { source, classes?, fields? }: the person's own correction of an item's
+ * content classes or of a class's extracted fields. Answers { facts, review }: `review` is the
+ * decision record after the person's review (a model's membership kept is confirmed, one removed is
+ * overridden), or null when no decision was involved.
+ */
+export async function correctItem(body) {
+  const r = await apiPost('/v1/content/correct', body);
+  return { facts: r?.data?.facts || null, review: r?.data?.review || null };
+}
+
+/** GET /v1/content/text?kind=file&key=…: the text kept for a file, { text, from }, or null when none was kept. */
+export async function readItemText(source) {
+  try {
+    const r = await apiGet(`/v1/content/text?kind=${enc(source.kind)}&key=${enc(source.key)}${source.owner ? `&owner=${enc(source.owner)}` : ''}`);
+    return r?.data || null;
+  } catch (e) {
+    if (e?.status === 404) return null;
+    throw e;
+  }
+}
+
+/**
+ * The OWL class of one content class and its datatype properties, out of GET /v1/content/ontology
+ * ?format=jsonld: the graph nodes whose @id is cc:<id> or starts with cc:<id>.
+ */
+export async function readOwlClass(classId) {
+  const doc = await apiGet('/v1/content/ontology?format=jsonld');
+  const own = `cc:${classId}`;
+  return (doc?.['@graph'] || []).filter((node) => node?.['@id'] === own || String(node?.['@id'] || '').startsWith(own + '.'));
+}
+
+/** A certainty (0..1) as a whole percent, the number in the reader's format and the sign as the language writes it. */
+export function percent(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v)) return '';
+  return cc('pct', { n: fmtNum(Math.round(v * 100)) });
+}
+
+/** A property's name as words: due_date → Due date. */
+export const propertyWords = (name) => {
+  const s = String(name || '').replace(/[_-]+/g, ' ').trim();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+};
+
+/** A class property's name in the page language: its label, the English one, or its name in words. */
+export function propertyLabel(p) {
+  const lang = String(getLocale() || 'en').slice(0, 2);
+  return p?.label?.[lang] || p?.label?.en || propertyWords(p?.name);
+}
+
+/**
+ * A property's `describe` as a hint, on an English page only: it is written in English for the model
+ * that extracts the property, and the label already says what the field is in the page language.
+ */
+export function propertyHint(p) {
+  return String(getLocale() || 'en').slice(0, 2) === 'en' ? (p?.describe || undefined) : undefined;
+}
+
+/** GET /v1/ai/decisions/{id}: one decision of the decision model, with its record and review. */
+export async function readDecision(id) {
+  const r = await apiGet(`/v1/ai/decisions/${enc(id)}`);
+  return r?.data || null;
+}
+
+/** The content classes that can apply to an item of this kind: a class without `kinds` applies to all. */
+export const classesForKind = (classes, kind) => (classes || []).filter((c) => !c.kinds?.length || c.kinds.includes(kind));
 
 /** PUT /v1/content/settings with a partial patch; answers the settings as stored. */
 export async function saveSettings(patch) {

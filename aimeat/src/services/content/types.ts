@@ -28,6 +28,7 @@
  * @usage import type { ContentFacts, ContentSource } from './types.js';
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
+ *   v1.1.0 — 2026-10-21 — ClassProperty.label: the property's name for a person in fi, en and es.
  */
 
 /** Where an item lives. The source id (sourceIdOf) is stable for the same item. */
@@ -201,7 +202,15 @@ export interface ContentFacts {
   description?: { text: string; altText?: string; model: string; provenanceId?: string; at: string };
   classes?: ClassMembership[];
   /** Per class id: the JSON-LD entity extracted with that class's properties. */
-  entities?: Record<string, { entity: Record<string, unknown>; model: string; confidence: number; provenanceId?: string; at: string }>;
+  entities?: Record<string, {
+    entity: Record<string, unknown>;
+    model: string;
+    confidence: number;
+    provenanceId?: string;
+    at: string;
+    /** Set when a person (or their AI) corrected values: those properties keep their value when the class is extracted again. */
+    corrected?: { by: string; at: string; properties: string[] };
+  }>;
   /** Which stages ran, when; a stage left out did not run. */
   stages: Partial<Record<StageName, { at: string; ok: boolean; note?: string }>>;
   /** The hash the facts were read from. Differs from the source's current hash: stale. */
@@ -254,6 +263,11 @@ export interface ClassProperty {
   describe: string;
   /** The schema.org (or other) property it maps to, as a CURIE: "schema:totalPaymentDue". */
   sameAs?: string;
+  /**
+   * What a person reads in place of `name`, per language (each at most 80 characters). Every
+   * built-in property has one; an owner or proposed property may lack it, and then `name` is shown.
+   */
+  label?: { fi: string; en: string; es?: string };
 }
 
 /**

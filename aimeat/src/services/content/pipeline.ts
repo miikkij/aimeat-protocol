@@ -25,6 +25,7 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.1.0 — 2026-10-21 — Extracting a class again keeps the values a person corrected (correct.ts).
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -44,6 +45,7 @@ import { aiMarksOf } from './provenance-read.js';
 import { getFacts, putFacts, putText, getText, sourceIdOf } from './facts-store.js';
 import { readSettings } from './settings.js';
 import { listClasses, addProposal, decideProposal, entityFor } from './classes.js';
+import { fieldsOf } from './correct-fields.js';
 import { describeItem, classifyItem, extractClass, proposeClass, type StageCtx, type StageItem } from './ai-stages.js';
 import {
   AI_STAGES, type ContentFacts, type ContentSource, type ContentSettings, type StageName, type ClassProposal,
@@ -334,9 +336,14 @@ async function runModelStages(deps: Deps, ctx: StageCtx, r: StageRun): Promise<v
       facts.entities = { ...(facts.entities ?? {}) };
       for (const cls of members) {
         const ex = await extractClass(ctx, si, cls!, r.wanted.includes('propose'));
+        // A value a person corrected (correct.ts) wins over what the model reads now.
+        const prev = facts.entities[cls!.id];
+        const kept = prev?.corrected ? fieldsOf(prev.entity, cls!.id) : {};
+        const fields = { ...ex.fields, ...Object.fromEntries((prev?.corrected?.properties ?? []).map((n) => [n, kept[n] ?? null])) };
         facts.entities[cls!.id] = {
-          entity: entityFor(cls!, ex.fields, { sourceId: r.sourceId, baseUrl: deps.config.baseUrl }),
+          entity: entityFor(cls!, fields, { sourceId: r.sourceId, baseUrl: deps.config.baseUrl }),
           model: ex.model, confidence: ex.confidence, ...(ex.provenanceId ? { provenanceId: ex.provenanceId } : {}), at: r.now,
+          ...(prev?.corrected ? { corrected: prev.corrected } : {}),
         };
         if (ex.newProperties.length) {
           r.proposals.push(await settle(deps, ctx, r, await addProposal(deps, r.writer, {

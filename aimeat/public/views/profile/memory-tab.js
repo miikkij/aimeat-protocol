@@ -5,6 +5,7 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.4.0 — 2026-10-21 — The Files list and its count leave out contentclass-text/ files (userFiles).
  *   v3.3.0 — 2026-10-16 — A failed load of the records or the files is drawn as one (the could-not-load
  *     note with Retry, through memFailed / filesFailed in the render context), never as "Nothing here
  *     yet"; changing the agent or the archived view starts the list from loading (QA audit F6-05).
@@ -109,7 +110,7 @@ import { useConfirm } from '/components/Modal.js';
 import { Note } from '/components/Note.js';
 import { Space } from '/components/Layout.js';
 import { shortTok } from './memory-tab/helpers.js';
-import { fetchFileBytes, uploadFilesPresigned } from './memory-tab/file-helpers.js';
+import { fetchFileBytes, uploadFilesPresigned, userFiles } from './memory-tab/file-helpers.js';
 import { EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
 import { renderMemoryView } from './memory-tab/cover.js';
@@ -351,7 +352,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     setValueCache({});
     if (!memArchived) onStats?.({ memory: items.length });
     // files
-    const fileList = ov.files?.files || [];
+    const fileList = userFiles(ov.files?.files);
     setFiles(fileList);
     filesLoad.ok();
     onStats?.({ files: fileList.length });
@@ -506,7 +507,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
 
   async function loadFiles() {
     try {
-      const list = await memoryService.listFiles();
+      const list = userFiles(await memoryService.listFiles());
       setFiles(Array.isArray(list) ? list : []);
       filesLoad.ok();
       onStats?.({ files: Array.isArray(list) ? list.length : 0 });

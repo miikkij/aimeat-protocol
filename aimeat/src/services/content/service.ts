@@ -13,11 +13,13 @@
  *   or a proposal needs memory:write-reserved, as the AI policy does (routes/ai-policy.ts): the
  *   settings decide what spends the owner's key. The account holder in person holds every word.
  *   A visitor from another node is refused: the facts are a local account's own.
- * @structure parseSource · factsFor · textFor · inspectFor · scanFor · scanStatusFor · settingsFor ·
+ * @structure parseSource · factsFor · textFor · inspectFor · correctFor · scanFor · scanStatusFor · settingsFor ·
  *   updateSettingsFor · classesFor · setClassFor · removeClassFor · proposalsFor · decideProposalFor ·
  *   ontologyFor · overviewFor · listFactsFor · RESERVED_WORD
  * @usage const out = await inspectFor(deps, caller, { source: { kind: 'file', key: 'a.pdf' } });
  * @version-history
+ *   v1.1.0 — 2026-10-21 — correctFor: a person or their AI corrects an item's classes and extracted
+ *     values (memory:write; extract again: ai:use).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -26,6 +28,7 @@ import type { CallerContext } from '../caller-context.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { inspectSource, stagesToRun, ContentError, type InspectResult } from './pipeline.js';
 import { startScan, getScan, runningScanOf, type ScanOptions, type ScanState } from './scan.js';
+import { correctFacts } from './correct.js';
 import { getFacts, getText, listFacts, coverage, sourceIdOf, type FactsFilter } from './facts-store.js';
 import { readSettings, writeSettings } from './settings.js';
 import {
@@ -116,6 +119,28 @@ export async function inspectFor(deps: Deps, caller: CallerContext, input: { sou
   const effective = stagesToRun(await readSettings(deps.storage, caller.ownerGhii), stages, false);
   if (effective.some((s) => (AI_STAGES as readonly string[]).includes(s))) requireWord(caller, 'ai:use', 'A stage that calls an AI model');
   return inspectSource(deps, caller, source, { ...(stages ? { stages } : {}), force: input.force === true, ...(appRef ? { appRef } : {}) });
+}
+
+/**
+ * Correct what was concluded about one item: its content classes, an extracted class's property
+ * values, or both (correct.ts). Writing the item's facts needs memory:write; `extract: true` then
+ * extracts the classes again (a model step, ai:use), keeping the corrected values.
+ */
+export async function correctFor(
+  deps: Deps, caller: CallerContext, input: { source?: unknown; classes?: unknown; fields?: unknown; extract?: unknown }, appRef?: string,
+): Promise<{ facts: ContentFacts; review: unknown }> {
+  assertOn(deps); assertLocal(caller);
+  const source = parseSource(caller, input.source);
+  requireWord(caller, readWord(source), 'Correcting what is known about an item');
+  requireWord(caller, 'memory:write', 'Correcting what is known about an item');
+  if (input.extract === true) requireWord(caller, 'ai:use', 'Extracting the fields again');
+  const out = await correctFacts(deps, caller, source, {
+    ...(input.classes !== undefined ? { classes: input.classes as string[] } : {}),
+    ...(input.fields !== undefined ? { fields: input.fields as Record<string, Record<string, string | number | boolean | null>> } : {}),
+  });
+  if (input.extract !== true) return out;
+  const again = await inspectSource(deps, caller, source, { stages: ['extract'], force: true, ...(appRef ? { appRef } : {}) });
+  return { facts: again.facts, review: out.review };
 }
 
 /** Start a scan of the caller's account. */

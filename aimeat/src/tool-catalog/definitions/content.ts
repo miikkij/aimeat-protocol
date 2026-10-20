@@ -22,6 +22,7 @@
  * @structure checkContentInput() · contentTools
  * @usage imported by tool-catalog/definitions.ts; checkContentInput by mcp/content.ts and tool-dispatch/tool-call-defs-content.ts
  * @version-history
+ *   v1.1.0 — 2026-10-21 — aimeat_content_correct: correct an item's classes and extracted values.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings.
  */
 
@@ -139,6 +140,23 @@ export const contentTools = [
             owner: SOURCE_OWNER,
             stages: STAGES,
             force: { type: 'boolean', description: 'Read the item again even when its facts are current.' },
+        },
+    },
+    {
+        name: 'aimeat_content_correct',
+        description: "Correct what was concluded about one item, when the person says it is wrong or you see it is. `classes` is the item's WHOLE list of content classes as it should be: a class the model gave and the list keeps stays, a class added is the person's, a class left out goes with its extracted fields; the model's decision is then marked on its decision record as confirmed (the same classes) or overridden (another list), so the person sees it was corrected. `fields` sets property values per class, e.g. { \"invoice\": { \"due_date\": \"2026-11-30\", \"amount\": 248 } } (null removes a value; aimeat_content_classes { action: \"list\" } names each class's properties); corrected values are kept when the class is extracted again. `extract: true` extracts the classes again afterwards (an AI step: needs ai:use and spends the owner's allowance). Correct only what the person confirmed, and tell them what you changed. Needs storage:read and memory:write.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Correct One Item', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'storage:read',
+        surfaces: ['appdev', 'agent', 'service'],
+        input: {
+            kind: SOURCE_KIND,
+            key: { type: 'string', required: true, description: 'The stored file\'s key, or the memory record\'s key.', zod: z.string().min(1).max(1024) },
+            owner: SOURCE_OWNER,
+            classes: { type: 'array', description: 'The item\'s whole list of content class ids as it should be; [] says it is in none.', zod: z.array(z.string().min(1).max(64)).max(50) },
+            fields: { type: 'object', description: 'Per content class id, the property values to set; null removes one.', zod: z.record(z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))) },
+            extract: { type: 'boolean', description: 'Extract the classes again afterwards (an AI step).' },
         },
     },
     {

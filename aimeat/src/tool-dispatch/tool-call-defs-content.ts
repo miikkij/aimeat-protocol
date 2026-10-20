@@ -14,6 +14,7 @@
  * @structure contentCliTools
  * @usage import { contentCliTools } from './tool-call-defs-content.js';
  * @version-history
+ *   v1.1.0 — 2026-10-21 — aimeat_content_correct, a proxy over POST /v1/content/correct.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
  */
@@ -76,6 +77,25 @@ export const contentCliTools: ConnectCliToolDefinition[] = [
                 },
                 ...(stages ? { stages } : {}),
                 ...(force !== undefined ? { force } : {}),
+            });
+        },
+    },
+    {
+        // → POST /v1/content/correct { source: { kind, key, owner }, classes?, fields?, extract? }
+        name: 'aimeat_content_correct',
+        handler: ({ client }, input) => {
+            const classes = optionalArray(input, 'classes');
+            const fields = optionalRecord(input, 'fields');
+            const extract = optionalBoolean(input, 'extract');
+            return client.post('/v1/content/correct', {
+                source: {
+                    key: requiredString(input, 'key'),
+                    ...(optionalString(input, 'kind') ? { kind: optionalString(input, 'kind') } : {}),
+                    ...(optionalString(input, 'owner') ? { owner: optionalString(input, 'owner') } : {}),
+                },
+                ...(classes ? { classes } : {}),
+                ...(fields ? { fields } : {}),
+                ...(extract !== undefined ? { extract } : {}),
             });
         },
     },
