@@ -6,12 +6,25 @@
  *   icons, authenticated blob fetch, and owner_gaii-aware byte-URL builders. Extracted from
  *   memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-21 — userFiles(): the Files list leaves out the content class pipeline's text files.
  *   v1.1.0 — 2026-07-31 — uploadFilesPresigned(): the Files tab's upload loop, moved here whole.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
 import * as memoryService from '/js/services/memory.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
+
+/**
+ * The files a person stored, without the content class pipeline's own text files
+ * (`contentclass-text/<hash>.txt`, services/content/facts-store.ts). Those hold the words the node
+ * took out of another file; a person reaches them from that file's fold "What is known about this
+ * file" (memory-tab/file-facts.js), and as rows of their own they read as files nobody stored
+ * (Jouni, 2026-10-21). They still count toward storage, which the server reports on its own.
+ * @param {unknown} list @returns {any[]}
+ */
+export function userFiles(list) {
+  return Array.isArray(list) ? list.filter((f) => !String(f?.key || f?.name || '').startsWith('contentclass-text/')) : [];
+}
 
 export function fileIcon(type) {
   if (type?.startsWith('image')) return '\u{1F5BC}️';

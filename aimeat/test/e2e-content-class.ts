@@ -407,6 +407,53 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(approve?.result?.isError === true && toolText(approve).includes('memory:write-reserved'), `approve over MCP ${toolText(approve).slice(0, 200)}`);
   });
 
+  await test('10. a person corrects a class and a field; the decision says so, and a new extraction keeps the value', async () => {
+    const src = { kind: 'file', key: 'docs/invoice.pdf' };
+    await json('/v1/content/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ stages: { extract: true } }) });
+    // The field first: the invoice's due date as the person says it is.
+    const f = await json('/v1/content/correct', { method: 'POST', headers: auth(A.token),
+      body: JSON.stringify({ source: src, fields: { invoice: { due_date: '2026-11-30', reference: null } } }) });
+    assert(f.status === 200, `fields ${f.status} ${JSON.stringify(f.body?.error)}`);
+    const e = f.body.data.facts.entities.invoice;
+    assert(e.entity['cc:invoice.due_date'] === '2026-11-30' && !('cc:invoice.reference' in e.entity), `entity ${JSON.stringify(e.entity)}`);
+    assert(JSON.stringify(e.corrected?.properties?.sort()) === JSON.stringify(['due_date', 'reference']), `corrected ${JSON.stringify(e.corrected)}`);
+    // Extract again: the model answers 2026-10-31 for every date; the corrected value stays.
+    const again = await json('/v1/content/inspect', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ source: src, stages: ['extract'], force: true }) });
+    assert(again.status === 200 && again.body.data.facts.entities.invoice.entity['cc:invoice.due_date'] === '2026-11-30', `after extract ${JSON.stringify(again.body?.data?.facts?.entities?.invoice?.entity)}`);
+    assert(again.body.data.facts.entities.invoice.entity['cc:invoice.date'] === '2026-10-31', 'an uncorrected field is extracted again');
+    // The class: the person says it is a receipt, not an invoice.
+    const decisionId = again.body.data.facts.classes.find((m: any) => m.id === 'invoice')?.decisionId;
+    const c = await json('/v1/content/correct', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ source: src, classes: ['receipt'] }) });
+    assert(c.status === 200, `classes ${c.status} ${JSON.stringify(c.body?.error)}`);
+    const cls = c.body.data.facts.classes;
+    assert(cls.length === 1 && cls[0].id === 'receipt' && cls[0].by === 'owner', `classes ${JSON.stringify(cls)}`);
+    assert(!c.body.data.facts.entities?.invoice, 'the invoice entity went with its class');
+    assert(JSON.stringify(c.body.data.review ?? null).includes('"overridden"'), `review ${JSON.stringify(c.body.data.review)?.slice(0, 300)}`);
+    const d = await json(`/v1/ai/decisions/${decisionId}`, { headers: auth(A.token) });
+    assert(JSON.stringify(d.body).includes('overridden'), `the decision record ${d.status} ${JSON.stringify(d.body)?.slice(0, 300)}`);
+    // Refusals: an unknown class, another owner, an agent without memory:write.
+    const unknown = await json('/v1/content/correct', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ source: src, classes: ['no-such-class'] }) });
+    assert(unknown.status === 400 && String(unknown.body.error?.message).includes('no-such-class'), `unknown class ${unknown.status}`);
+    const other = await json('/v1/content/correct', { method: 'POST', headers: auth(B.token), body: JSON.stringify({ source: { ...src, owner: A.gaii }, classes: [] }) });
+    assert(other.status === 404, `another owner ${other.status}`);
+    const reader = await connectAgent(A, `cccorr${Date.now()}`, ['storage:read', 'storage:write']);
+    await json('/v1/storage', { method: 'POST', headers: auth(reader),
+      body: JSON.stringify({ key: 'agent/corr.pdf', data: pdf.toString('base64'), mime_type: 'application/pdf' }) });
+    await factsOnArrival({ ...A, token: reader }, 'agent/corr.pdf');
+    const noWrite = await json('/v1/content/correct', { method: 'POST', headers: auth(reader), body: JSON.stringify({ source: { key: 'agent/corr.pdf' }, classes: [] }) });
+    assert(noWrite.status === 403 && String(noWrite.body.error?.message).includes('memory:write'), `no memory:write ${noWrite.status} ${JSON.stringify(noWrite.body?.error)}`);
+    // The same over MCP, as the person's AI does it.
+    const agent = await connectAgent(A, `ccmcpcorr${Date.now()}`, ['*']);
+    const viaMcp = await mcpCall(agent, 'aimeat_content_correct', { kind: 'file', key: 'docs/invoice.pdf', owner: A.gaii, classes: ['receipt'] });
+    assert(viaMcp?.result?.isError === true && toolText(viaMcp).includes('NOT_FOUND'), `an agent on its owner's item over MCP ${toolText(viaMcp).slice(0, 200)}`);
+    await json('/v1/storage', { method: 'POST', headers: auth(agent),
+      body: JSON.stringify({ key: 'mcp/corr.pdf', data: pdf.toString('base64'), mime_type: 'application/pdf' }) });
+    await mcpCall(agent, 'aimeat_content_inspect', { kind: 'file', key: 'mcp/corr.pdf' });
+    const mine = await mcpCall(agent, 'aimeat_content_correct', { kind: 'file', key: 'mcp/corr.pdf', classes: ['contract'], fields: { contract: { subject: 'Lease' } } });
+    assert(!mine?.result?.isError && toolText(mine).includes('cc:contract.subject'), `correct over MCP ${toolText(mine).slice(0, 300)}`);
+    await json('/v1/content/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ stages: { extract: false } }) });
+  });
+
   await stopServer(server);
   await mail.close();
   try { rmSync(dbDir, { recursive: true, force: true }); } catch { /* the OS will collect it */ }

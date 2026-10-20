@@ -61931,6 +61931,61 @@ paths:
           description: A token without the permission that reads the item, or without ai:use for a model stage.
         '404':
           description: No such item of yours, or content classes are off.
+  /v1/content/correct:
+    post:
+      operationId: correctContentFacts
+      summary: Correct an item's content classes and extracted values
+      description: >
+        `classes` is the item's whole list of content classes as you say it is: a class the model gave
+        and you keep stays, a class you add is yours, a class you leave out goes with its extracted
+        values. The model's decision is then reviewed on its decision record: confirmed when you kept
+        exactly its classes, overridden with your list otherwise. `fields` sets, per class, property
+        values (null removes one); the corrected values are kept when the class is extracted again.
+        `extract: true` extracts the classes again afterwards. Needs storage:read and memory:write;
+        `extract` also ai:use.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source]
+              properties:
+                source:
+                  type: object
+                  required: [key]
+                  properties:
+                    kind: { type: string, enum: [file, memory], default: file }
+                    key: { type: string }
+                    owner: { type: string }
+                classes:
+                  type: array
+                  items: { type: string }
+                fields:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    additionalProperties: true
+                extract:
+                  type: boolean
+      responses:
+        '200':
+          description: The facts as stored, and the decision record after its review (null when there was none).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without storage:read or memory:write, or without ai:use for extract.
+        '404':
+          description: No such item of yours, or nothing read from it yet.
   /v1/content/scans:
     post:
       operationId: startContentScan

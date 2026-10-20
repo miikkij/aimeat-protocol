@@ -18,6 +18,8 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.1.0 — 2026-10-21 — "When something is wrong: correct it": aimeat_content_correct, and who
+ *     decided a class (by, confidence, decisionId).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -30,7 +32,7 @@ export const CONTENT_CLASSES_SKILL_ENTRY: BuiltinSkillEntry =
     visibility: 'public',
     skillMd: `---
 name: aimeat-content-classes
-description: How to use what an AIMEAT node knows about the person's files and long texts — the facts it reads from every file without any AI (a PDF's author, pages and signatures; a picture's camera, time, size and whether it declares being AI-made; a video's length and codecs), and, when the person turns them on, a description and alt text, the content classes an item belongs to (invoice, contract, photo, ...) and each class's fields extracted as JSON-LD. Read the facts before reading a file again; scan old files; approve or reject the classes a model proposes; give the classes as an OWL ontology. Use when a person asks what a file is, who signed or wrote it, whether a picture is AI-made, to find their invoices or contracts, to describe their pictures, or to tabulate documents by their fields. Triggers on content class, sisältöluokka, what is this file, who signed this, is this picture AI, alt text, describe my pictures, find my invoices, extract fields, ontology, OWL, tiedoston tiedot, kuvan alt-teksti, onko kuva tekoälyn tekemä.
+description: What an AIMEAT node knows about the person's files and long texts — facts read without AI (a PDF's author, pages and signatures; a picture's camera, time, size and AI mark; a video's length and codecs) and, when the person turns them on, a description, the content classes (invoice, contract, photo, ...) and each class's fields as JSON-LD. Read the facts before the file; scan old files; decide proposed classes; correct a wrong class or field; give the OWL ontology. Use when a person asks what a file is, who signed it, whether a picture is AI-made, to find invoices or contracts, to describe pictures, or to tabulate documents by their fields. Triggers on content class, sisältöluokka, what is this file, who signed this, is this picture AI, alt text, find my invoices, extract fields, ontology, OWL, tiedoston tiedot, onko kuva tekoälyn tekemä.
 license: MIT
 metadata:
   audience: agent
@@ -107,7 +109,26 @@ decided by their decision rule (\`rule\`). Put a waiting proposal to the person 
 words ("I found recipes. Shall I start a Recipe class with dish and servings?"), never as an id.
 
 To find items of a class: \`aimeat_content_facts { class: "invoice" }\` pages through them, newest
-first; each item's \`entities.invoice.entity\` holds the extracted fields.
+first; each item's \`entities.invoice.entity\` holds the extracted fields. Each membership in
+\`classes\` says who decided it (\`by\`: model, owner, rule), how sure (\`confidence\`) and, for the
+model, its \`decisionId\` (the decision record, which the person sees on their AI page).
+
+## When something is wrong: correct it
+
+The person is the authority on their own content. When they say an item is in the wrong class, or an
+extracted value is wrong, call \`aimeat_content_correct\`:
+
+- \`classes\`: the item's WHOLE list as it should be (\`["contract"]\`, or \`[]\` for none). A class the
+  model gave and the list keeps stays as it was; one added is the person's; one left out goes, with
+  its fields. The model's decision is marked confirmed or overridden on its record, so the person
+  sees it was corrected.
+- \`fields\`: per class, the values to set, \`{ "invoice": { "due_date": "2026-11-30" } }\`; \`null\`
+  removes one. Use the property names \`aimeat_content_classes { action: "list" }\` gives.
+- \`extract: true\` extracts the classes again (an AI step, ask first). A value the person corrected
+  stays as they set it.
+
+Correct only what the person confirmed, and say what you changed in their words: "I moved it from
+invoice to receipt and set the date to 30 November."
 
 ## Saying it to the person
 

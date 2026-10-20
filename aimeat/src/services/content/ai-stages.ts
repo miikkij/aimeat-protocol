@@ -26,6 +26,8 @@
  * @usage const d = await describeItem(ctx, item); const m = await classifyItem(ctx, item, classes);
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   v1.1.0 — 2026-10-21 — A proposed property asks for a label in fi, en and es; cleanNewProperties
+ *     keeps it when fi and en are strings of at most 80 characters and drops it otherwise.
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -231,7 +233,25 @@ export interface Extraction { fields: Json; confidence: number; newProperties: C
 const PROPERTY_NAME = /^[a-z][a-z0-9_]{0,40}$/;
 const PROPERTY_TYPES = new Set(['string', 'number', 'date', 'boolean']);
 
-/** Properties a model named that the class lacks, cleaned: a bad entry is dropped, never repaired. */
+/** The longest a property label may be, per language (the same limit classes.ts validates). */
+const PROPERTY_LABEL_MAX = 80;
+
+/** The label shape a property proposal asks the model for, in the prompts below. */
+const PROPERTY_LABEL_SHAPE = { fi: 'Finnish name', en: 'English name', es: 'Spanish name' };
+
+/**
+ * A model's property label, kept when fi and en are non-empty strings of at most PROPERTY_LABEL_MAX
+ * characters (es likewise, or left out); undefined otherwise, and the property is kept without it.
+ */
+function cleanPropertyLabel(raw: unknown): ClassProperty['label'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const l = raw as Json;
+  const fit = (v: unknown): string => (typeof v === 'string' && v.trim().length <= PROPERTY_LABEL_MAX ? v.trim() : '');
+  const fi = fit(l.fi); const en = fit(l.en); const es = fit(l.es);
+  return fi && en ? { fi, en, ...(es ? { es } : {}) } : undefined;
+}
+
+/** Properties a model named that the class lacks, cleaned: a bad entry is dropped, never repaired; a bad label is dropped and its property kept. */
 function cleanNewProperties(raw: unknown, cls: ContentClass): ClassProperty[] {
   if (!Array.isArray(raw)) return [];
   const have = new Set(cls.properties.map((p) => p.name));
@@ -243,7 +263,8 @@ function cleanNewProperties(raw: unknown, cls: ContentClass): ClassProperty[] {
     const describe = String(o.describe ?? '').slice(0, 300);
     if (!PROPERTY_NAME.test(name) || have.has(name) || !PROPERTY_TYPES.has(type) || !describe) continue;
     have.add(name);
-    out.push({ name, type: type as ClassProperty['type'], required: false, describe });
+    const label = cleanPropertyLabel(o.label);
+    out.push({ name, type: type as ClassProperty['type'], required: false, describe, ...(label ? { label } : {}) });
   }
   return out;
 }
@@ -257,14 +278,14 @@ export async function extractClass(ctx: StageCtx, item: StageItem, cls: ContentC
   const shape: Json = {};
   for (const p of cls.properties) shape[p.name] = p.type === 'number' ? 0 : p.type === 'boolean' ? false : '';
   shape._confidence = 0;
-  if (propose) shape._newProperties = [{ name: '', type: 'string', describe: '' }];
+  if (propose) shape._newProperties = [{ name: '', type: 'string', describe: '', label: { fi: '', en: '', es: '' } }];
   const hasWords = !!(item.text && item.text.trim().length >= 40);
   const whole = !hasWords && !!item.bytes && (item.kind === 'image' || item.kind === 'pdf');
   const prompt = `Extract these properties of a ${cls.label.en.toLowerCase()} (${cls.type}: ${cls.describe}) from the content${whole ? ' attached' : ' below'}.\n`
     + `${propertyLines(cls.properties)}\n`
     + 'Use null for a property the content does not state. Never guess a value. A date is YYYY-MM-DD.\n'
     + 'Also answer "_confidence": a number from 0 to 1 for how sure you are of the whole record.\n'
-    + (propose ? 'In "_newProperties", name at most five facts this kind of content regularly states that the list above has no property for (name in lower_snake_case, type string, number, date or boolean, one sentence describing it); an empty list when there are none.\n' : '')
+    + (propose ? 'In "_newProperties", name at most five facts this kind of content regularly states that the list above has no property for (name in lower_snake_case, type string, number, date or boolean, one sentence describing it, and "label": the short name a person reads in Finnish, English and Spanish, at most 80 characters each); an empty list when there are none.\n' : '')
     + `Answer with ONLY a JSON object of this shape: ${JSON.stringify(shape)}`
     + (whole ? '' : `\n\n${redact((item.text ?? '').slice(0, MAX_PROMPT_TEXT)).text}`);
   const r = await askJson(ctx, prompt, whole
@@ -292,7 +313,7 @@ export async function proposeClass(ctx: StageCtx, item: StageItem, existing: rea
     + 'If the item is a kind of thing a person keeps more than one of and would want to find or tabulate by its facts, propose ONE new class for it. Otherwise answer {"none": true}.\n'
     + 'A class: {"id": "lower-case-with-dashes", "label": {"fi": "Finnish name", "en": "English name", "es": "Spanish name"}, '
     + '"describe": "one English sentence a classifier can weigh", "type": "the closest schema.org type as a CURIE, e.g. schema:DigitalDocument", '
-    + '"properties": [{"name": "lower_snake_case", "type": "string|number|date|boolean", "required": false, "describe": "one sentence"}], '
+    + `"properties": [{"name": "lower_snake_case", "type": "string|number|date|boolean", "required": false, "describe": "one sentence", "label": ${JSON.stringify(PROPERTY_LABEL_SHAPE)}}], `
     + '"why": "one sentence on why this deserves a class"}\n'
     + 'Answer with ONLY a JSON object.\n\n'
     + (item.description ? `Description: ${item.description}\n` : '')

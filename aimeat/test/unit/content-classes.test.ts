@@ -5,11 +5,14 @@
  * @description The content class ontology and settings on a real in-memory SQLite storage: the
  *   built-in classes agree with the refinery's ids, the OWL document and the JSON-LD entity carry the
  *   right types, proposals are not filed twice and an approval changes the owner's classes, and the
- *   settings start cautious and take a partial patch while refusing an unknown key.
+ *   settings start cautious and take a partial patch while refusing an unknown key. Every built-in
+ *   property carries a label, a property label reaches the OWL document per language, and a label of
+ *   the wrong shape is refused.
  * @structure builtins · owlOntology · entityFor · proposals · owner classes · settings
  * @usage cd aimeat && pnpm exec vitest run test/unit/content-classes.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
+ *   v1.1.0 — 2026-10-21 — Property labels: every built-in property, rdfs:label per language, validation.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
@@ -20,7 +23,7 @@ import { CLASS_PACKS } from '../../src/data/refinery-classes.js';
 import { BUILTIN_CLASSES, builtinClass } from '../../src/data/content-classes.js';
 import {
   ContentClassError, addProposal, decideProposal, entityFor, getClass, listClasses, listProposals, owlOntology,
-  removeOwnerClass, setOwnerClass, type ContentWriter,
+  removeOwnerClass, setOwnerClass, validateProperties, type ContentWriter,
 } from '../../src/services/content/classes.js';
 import { aiStagesOn, readSettings, writeSettings } from '../../src/services/content/settings.js';
 
@@ -49,6 +52,21 @@ describe('built-in classes', () => {
     expect(builtinClass('photo')).toMatchObject({ process: false, kinds: ['image'], label: { fi: 'Valokuva' } });
     expect(new Set(BUILTIN_CLASSES.map((c) => c.id)).size).toBe(BUILTIN_CLASSES.length);
   });
+
+  it('give every property a label with Finnish and English of at most 80 characters, and Spanish', () => {
+    const missing: string[] = [];
+    for (const c of BUILTIN_CLASSES) {
+      for (const p of c.properties) {
+        const l = p.label;
+        const ok = (s: unknown): boolean => typeof s === 'string' && s.trim().length > 0 && s.length <= 80;
+        if (!l || !ok(l.fi) || !ok(l.en) || !ok(l.es)) missing.push(`${c.id}.${p.name}`);
+      }
+    }
+    expect(missing).toEqual([]);
+    expect(builtinClass('invoice')!.properties.find((p) => p.name === 'due_date')?.label).toEqual({ fi: 'Eräpäivä', en: 'Due date', es: 'Fecha de vencimiento' });
+    expect(builtinClass('invoice')!.properties.find((p) => p.name === 'reference')?.label?.fi).toBe('Viitenumero');
+    expect(builtinClass('receipt')!.properties.find((p) => p.name === 'reference')?.label?.fi).toBe('Viite');
+  });
 });
 
 describe('owlOntology', () => {
@@ -72,6 +90,22 @@ describe('owlOntology', () => {
     expect(amount['cc:required']).toBe(true);
     expect(graph.find((n) => n['@id'] === 'cc:invoice.due_date')?.['rdfs:range']).toEqual({ '@id': 'xsd:date' });
     expect(graph.find((n) => n['@id'] === 'cc:system.action_required')?.['rdfs:range']).toEqual({ '@id': 'xsd:boolean' });
+  });
+
+  it('labels a property per language when it has a label, and with its name when it has none', () => {
+    const cls = { id: 'recipe', label: { fi: 'Resepti', en: 'Recipe' }, describe: 'A recipe.', process: true, type: 'schema:Recipe', origin: 'owner' as const,
+      properties: [
+        { name: 'dish', type: 'string' as const, required: false, describe: 'The dish.', label: { fi: 'Ruokalaji', en: 'Dish', es: 'Plato' } },
+        { name: 'servings', type: 'number' as const, required: false, describe: 'How many it serves.' },
+      ] };
+    const graph = (owlOntology([cls], { ownerGhii: 'alice@n', baseUrl: BASE }) as { '@graph': Array<Record<string, unknown>> })['@graph'];
+    expect(graph.find((n) => n['@id'] === 'cc:recipe.dish')?.['rdfs:label']).toEqual([
+      { '@value': 'Ruokalaji', '@language': 'fi' }, { '@value': 'Dish', '@language': 'en' }, { '@value': 'Plato', '@language': 'es' },
+    ]);
+    expect(graph.find((n) => n['@id'] === 'cc:recipe.servings')?.['rdfs:label']).toBe('servings');
+    expect(graph.find((n) => n['@id'] === 'cc:recipe')?.['rdfs:label']).toEqual([
+      { '@value': 'Resepti', '@language': 'fi' }, { '@value': 'Recipe', '@language': 'en' },
+    ]);
   });
 });
 
@@ -142,6 +176,33 @@ describe('owner classes', () => {
     await removeOwnerClass(deps, writer, 'ok-id');
     expect(await getClass(storage, ghii, 'ok-id')).toBeNull();
     await expect(removeOwnerClass(deps, writer, 'ok-id')).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
+  it('keeps a good property label, and refuses a label of any other shape', () => {
+    const base = { name: 'dish', type: 'string', describe: 'The dish.' };
+    expect(validateProperties([{ ...base, label: { fi: ' Ruokalaji ', en: 'Dish', es: 'Plato' } }])[0].label).toEqual({ fi: 'Ruokalaji', en: 'Dish', es: 'Plato' });
+    expect(validateProperties([{ ...base, label: { fi: 'Ruokalaji', en: 'Dish', es: '' } }])[0].label).toEqual({ fi: 'Ruokalaji', en: 'Dish' });
+    expect(validateProperties([{ ...base, label: null }])[0]).not.toHaveProperty('label');
+    expect(validateProperties([base])[0]).not.toHaveProperty('label');
+    for (const label of ['Dish', ['Dish'], { fi: 'Ruokalaji' }, { fi: '', en: 'Dish' }, { fi: 'Ruokalaji', en: 7 },
+      { fi: 'Ruokalaji', en: 'Dish', es: 3 }, { fi: 'x'.repeat(81), en: 'Dish' }, { fi: 'Ruokalaji', en: 'Dish', es: 'y'.repeat(81) }]) {
+      expect(() => validateProperties([{ ...base, label }]), JSON.stringify(label)).toThrowError(expect.objectContaining({ code: 'INVALID_INPUT' }));
+    }
+  });
+
+  it('stores a labelled property on an owner class, and an approval keeps the built-in labels', async () => {
+    const { deps, writer, ghii } = owner();
+    await setOwnerClass(deps, writer, { id: 'lbl-id', label: { fi: 'a', en: 'b' },
+      properties: [{ name: 'n', type: 'number', label: { fi: 'Määrä', en: 'Quantity', es: 'Cantidad' } }] });
+    expect((await getClass(storage, ghii, 'lbl-id'))?.properties[0].label).toEqual({ fi: 'Määrä', en: 'Quantity', es: 'Cantidad' });
+    await expect(setOwnerClass(deps, writer, { id: 'lbl-id', label: { fi: 'a', en: 'b' },
+      properties: [{ name: 'n', type: 'number', label: { en: 'Quantity' } }] })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    const p = await addProposal(deps, writer, { kind: 'properties', classId: 'invoice', sourceId: 'file:x:9', why: 'w',
+      properties: [{ name: 'payment_terms', type: 'string', required: false, describe: 'Terms.', label: { fi: 'Maksuehto', en: 'Payment terms' } }] });
+    await decideProposal(deps, writer, p.id, 'approve', ghii);
+    const inv = (await getClass(storage, ghii, 'invoice'))!;
+    expect(inv.properties.find((x) => x.name === 'due_date')?.label?.fi).toBe('Eräpäivä');
+    expect(inv.properties.find((x) => x.name === 'payment_terms')?.label).toEqual({ fi: 'Maksuehto', en: 'Payment terms' });
   });
 });
 

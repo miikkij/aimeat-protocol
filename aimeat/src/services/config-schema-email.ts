@@ -10,10 +10,12 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Moved from config-schema.ts, unchanged.
  */
-import type { AimeatConfig } from '../config.js';
+import type { smtpDefaults } from '../config-smtp.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 
-export const EMAIL_CONFIG_FIELDS: ConfigFieldShape<keyof AimeatConfig>[] = [
+// The keys are named by the loader that reads them (config-smtp.ts), as the data access rows do:
+// naming AimeatConfig here would close an import cycle through config-sealing.ts.
+export const EMAIL_CONFIG_FIELDS: ConfigFieldShape<keyof ReturnType<typeof smtpDefaults>>[] = [
   // ── Email (Phase 1.1, mutable) ──
   { key: 'emailEnabled', dotPath: 'email.enabled', envVar: 'AIMEAT_EMAIL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Email service enabled (requires SMTP host)' },
   { key: 'emailConfirmationRequired', dotPath: 'email.confirmation_required', envVar: 'AIMEAT_EMAIL_CONFIRMATION_REQUIRED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Require email confirmation for registration' },

@@ -15,20 +15,35 @@
  *   certificates, pictures and slide decks.
  *
  *   `describe` is one English sentence the classifier model weighs; the labels are what a person
- *   reads, in Finnish, English and Spanish. `kinds` limits a class to the kinds of content it can
- *   apply to, so a photo is never asked about a text file; absent means every kind.
- * @structure prop() · REFINERY_SAME_AS · REFINERY_KINDS · fromPack() · FILE_CLASSES ·
- *   BUILTIN_CLASSES · builtinClass(id)
+ *   reads, in Finnish, English and Spanish, for the class and for each of its properties. A refinery
+ *   field has no label of its own, so REFINERY_LABELS gives one per class id and field name; the
+ *   unit test holds every built-in property to a Finnish and an English label. `kinds` limits a class
+ *   to the kinds of content it can apply to, so a photo is never asked about a text file; absent
+ *   means every kind.
+ * @structure L() · prop() · REFINERY_SAME_AS · REFINERY_LABELS · REFINERY_KINDS · fromPack() ·
+ *   FILE_CLASSES · BUILTIN_CLASSES · builtinClass(id)
  * @usage import { BUILTIN_CLASSES, builtinClass } from '../data/content-classes.js';
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial: the nine refinery packs plus contract, report, meeting-notes,
  *     certificate, photo, screenshot, diagram and presentation.
+ *   v1.1.0 — 2026-10-21 — Every built-in property carries a label in fi, en and es; the refinery
+ *     fields get theirs from REFINERY_LABELS.
  */
 import { CLASS_PACKS, type RefineryClass } from './refinery-classes.js';
 import type { ClassProperty, ContentClass, ContentKind } from '../services/content/types.js';
 
-const prop = (name: string, type: ClassProperty['type'], required: boolean, describe: string, sameAs?: string): ClassProperty =>
-  (sameAs ? { name, type, required, describe, sameAs } : { name, type, required, describe });
+type PropertyLabel = NonNullable<ClassProperty['label']>;
+
+/** A property label in Finnish, English and Spanish. */
+const L = (fi: string, en: string, es: string): PropertyLabel => ({ fi, en, es });
+
+const prop = (
+  name: string, type: ClassProperty['type'], required: boolean, label: PropertyLabel | undefined, describe: string, sameAs?: string,
+): ClassProperty => ({
+  name, type, required, describe,
+  ...(sameAs ? { sameAs } : {}),
+  ...(label ? { label: { ...label } } : {}),
+});
 
 /** The schema.org property each refinery field maps to, per class id, where one plainly fits. */
 const REFINERY_SAME_AS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
@@ -38,6 +53,64 @@ const REFINERY_SAME_AS: Readonly<Record<string, Readonly<Record<string, string>>
   booking: { provider: 'schema:provider', booking_number: 'schema:reservationId', start: 'schema:startTime', end: 'schema:endTime', total: 'schema:totalPrice' },
   job: { employer: 'schema:hiringOrganization', title: 'schema:title', location: 'schema:jobLocation', deadline: 'schema:validThrough', link: 'schema:url' },
   system: { link: 'schema:url' },
+};
+
+/** The label of each refinery field, per class id and field name. */
+const REFINERY_LABELS: Readonly<Record<string, Readonly<Record<string, PropertyLabel>>>> = {
+  receipt: {
+    vendor: L('Myyjä', 'Vendor', 'Proveedor'),
+    amount: L('Summa', 'Amount', 'Monto'),
+    currency: L('Valuutta', 'Currency', 'Moneda'),
+    date: L('Maksupäivä', 'Payment date', 'Fecha de pago'),
+    reference: L('Viite', 'Reference', 'Referencia'),
+    vat: L('Arvonlisävero', 'VAT', 'IVA'),
+  },
+  invoice: {
+    vendor: L('Myyjä', 'Vendor', 'Proveedor'),
+    amount: L('Summa', 'Amount', 'Monto'),
+    currency: L('Valuutta', 'Currency', 'Moneda'),
+    invoice_number: L('Laskun numero', 'Invoice number', 'Número de factura'),
+    date: L('Laskun päivämäärä', 'Invoice date', 'Fecha de la factura'),
+    due_date: L('Eräpäivä', 'Due date', 'Fecha de vencimiento'),
+    reference: L('Viitenumero', 'Reference', 'Referencia'),
+    iban: L('Tilinumero (IBAN)', 'Account number (IBAN)', 'Número de cuenta (IBAN)'),
+    vat: L('Arvonlisävero', 'VAT', 'IVA'),
+  },
+  order: {
+    merchant: L('Kauppa', 'Shop', 'Tienda'),
+    order_number: L('Tilausnumero', 'Order number', 'Número de pedido'),
+    items: L('Tuotteet', 'Items', 'Productos'),
+    total: L('Yhteensä', 'Total', 'Total'),
+    carrier: L('Kuljetusliike', 'Carrier', 'Transportadora'),
+    expected: L('Arvioitu toimituspäivä', 'Expected delivery', 'Entrega estimada'),
+  },
+  booking: {
+    provider: L('Palveluntarjoaja', 'Provider', 'Proveedor'),
+    booking_number: L('Varausnumero', 'Booking number', 'Número de reserva'),
+    start: L('Alkupäivä', 'Start date', 'Fecha de inicio'),
+    end: L('Loppupäivä', 'End date', 'Fecha de fin'),
+    total: L('Hinta', 'Price', 'Precio'),
+  },
+  job: {
+    employer: L('Työnantaja', 'Employer', 'Empleador'),
+    title: L('Tehtävänimike', 'Job title', 'Cargo'),
+    location: L('Sijainti', 'Location', 'Ubicación'),
+    deadline: L('Hakuaika päättyy', 'Application deadline', 'Fecha límite de postulación'),
+    link: L('Linkki', 'Link', 'Enlace'),
+  },
+  system: {
+    system: L('Järjestelmä', 'System', 'Sistema'),
+    event: L('Tapahtuma', 'Event', 'Evento'),
+    status: L('Tila', 'Status', 'Estado'),
+    action_required: L('Vaatii toimia', 'Action required', 'Requiere acción'),
+    link: L('Linkki', 'Link', 'Enlace'),
+  },
+  support: {
+    customer: L('Asiakas', 'Customer', 'Cliente'),
+    topic: L('Aihe', 'Topic', 'Tema'),
+    customer_number: L('Asiakasnumero', 'Customer number', 'Número de cliente'),
+    urgency: L('Kiireellisyys', 'Urgency', 'Urgencia'),
+  },
 };
 
 /** Documents of these classes arrive as a PDF, a scanned picture or a text file. */
@@ -52,6 +125,7 @@ const REFINERY_KINDS: Readonly<Record<string, readonly ContentKind[]>> = {
 /** One refinery pack as a content class: the same id, labels and type, its fields as properties. */
 function fromPack(pack: RefineryClass): ContentClass {
   const sameAs = REFINERY_SAME_AS[pack.id] ?? {};
+  const labels = REFINERY_LABELS[pack.id] ?? {};
   const kinds = REFINERY_KINDS[pack.id];
   return {
     id: pack.id,
@@ -60,7 +134,7 @@ function fromPack(pack: RefineryClass): ContentClass {
     process: pack.process,
     type: pack.type,
     ...(kinds ? { kinds: [...kinds] } : {}),
-    properties: pack.fields.map((f) => prop(f.name, f.type, f.required, f.describe, sameAs[f.name])),
+    properties: pack.fields.map((f) => prop(f.name, f.type, f.required, labels[f.name], f.describe, sameAs[f.name])),
     origin: 'builtin',
   };
 }
@@ -71,43 +145,43 @@ const FILE_CLASSES: readonly ContentClass[] = [
     describe: 'A contract or agreement between two or more parties, with terms they have signed or are asked to sign.',
     kinds: [...DOCUMENT_KINDS], origin: 'builtin',
     properties: [
-      prop('parties', 'string', true, 'The parties to the contract, by name, separated by semicolons.'),
-      prop('subject', 'string', true, 'What the contract is about, in a few words.', 'schema:about'),
-      prop('signed_date', 'date', false, 'The date it was signed, YYYY-MM-DD.'),
-      prop('start_date', 'date', false, 'The date it takes effect, YYYY-MM-DD.'),
-      prop('end_date', 'date', false, 'The date it ends, YYYY-MM-DD, when stated.'),
-      prop('value', 'number', false, 'The total contract value, as a number without a currency symbol.'),
-      prop('currency', 'string', false, 'ISO 4217 currency code of the value, e.g. EUR.'),
-      prop('governing_law', 'string', false, 'The law that governs the contract, e.g. Finland.'),
+      prop('parties', 'string', true, L('Osapuolet', 'Parties', 'Partes'), 'The parties to the contract, by name, separated by semicolons.'),
+      prop('subject', 'string', true, L('Aihe', 'Subject', 'Objeto'), 'What the contract is about, in a few words.', 'schema:about'),
+      prop('signed_date', 'date', false, L('Allekirjoituspäivä', 'Signing date', 'Fecha de firma'), 'The date it was signed, YYYY-MM-DD.'),
+      prop('start_date', 'date', false, L('Voimassa alkaen', 'Start date', 'Fecha de inicio'), 'The date it takes effect, YYYY-MM-DD.'),
+      prop('end_date', 'date', false, L('Päättymispäivä', 'End date', 'Fecha de terminación'), 'The date it ends, YYYY-MM-DD, when stated.'),
+      prop('value', 'number', false, L('Arvo', 'Value', 'Valor'), 'The total contract value, as a number without a currency symbol.'),
+      prop('currency', 'string', false, L('Valuutta', 'Currency', 'Moneda'), 'ISO 4217 currency code of the value, e.g. EUR.'),
+      prop('governing_law', 'string', false, L('Sovellettava laki', 'Governing law', 'Ley aplicable'), 'The law that governs the contract, e.g. Finland.'),
     ] },
   { id: 'report', label: { fi: 'Raportti', en: 'Report', es: 'Informe' }, process: true, type: 'schema:Report',
     describe: 'A report, study or white paper that presents findings on a topic.',
     kinds: [...DOCUMENT_KINDS], origin: 'builtin',
     properties: [
-      prop('title', 'string', true, 'The title of the report.', 'schema:name'),
-      prop('author', 'string', false, 'The author or authors, separated by semicolons.', 'schema:author'),
-      prop('organisation', 'string', false, 'The organisation that published it.', 'schema:publisher'),
-      prop('published_date', 'date', false, 'The publication date, YYYY-MM-DD.', 'schema:datePublished'),
-      prop('summary', 'string', false, 'The main findings in two or three sentences.', 'schema:abstract'),
+      prop('title', 'string', true, L('Otsikko', 'Title', 'Título'), 'The title of the report.', 'schema:name'),
+      prop('author', 'string', false, L('Tekijä', 'Author', 'Autor'), 'The author or authors, separated by semicolons.', 'schema:author'),
+      prop('organisation', 'string', false, L('Julkaisija', 'Publisher', 'Publicado por'), 'The organisation that published it.', 'schema:publisher'),
+      prop('published_date', 'date', false, L('Julkaisupäivä', 'Publication date', 'Fecha de publicación'), 'The publication date, YYYY-MM-DD.', 'schema:datePublished'),
+      prop('summary', 'string', false, L('Tiivistelmä', 'Summary', 'Resumen'), 'The main findings in two or three sentences.', 'schema:abstract'),
     ] },
   { id: 'meeting-notes', label: { fi: 'Kokousmuistio', en: 'Meeting notes', es: 'Acta de reunión' }, process: true, type: 'schema:DigitalDocument',
     describe: 'Minutes or notes of a meeting: who took part, what was decided and what is to be done.',
     kinds: [...DOCUMENT_KINDS], origin: 'builtin',
     properties: [
-      prop('date', 'date', true, 'The date of the meeting, YYYY-MM-DD.', 'schema:dateCreated'),
-      prop('participants', 'string', false, 'The people who took part, separated by semicolons.', 'schema:contributor'),
-      prop('decisions', 'string', false, 'The decisions made, one per line.'),
-      prop('action_items', 'string', false, 'The tasks agreed, each with who does it, one per line.'),
+      prop('date', 'date', true, L('Päivämäärä', 'Date', 'Fecha'), 'The date of the meeting, YYYY-MM-DD.', 'schema:dateCreated'),
+      prop('participants', 'string', false, L('Osallistujat', 'Participants', 'Participantes'), 'The people who took part, separated by semicolons.', 'schema:contributor'),
+      prop('decisions', 'string', false, L('Päätökset', 'Decisions', 'Decisiones'), 'The decisions made, one per line.'),
+      prop('action_items', 'string', false, L('Tehtävät', 'Action items', 'Tareas'), 'The tasks agreed, each with who does it, one per line.'),
     ] },
   { id: 'certificate', label: { fi: 'Todistus', en: 'Certificate', es: 'Certificado' }, process: true, type: 'schema:EducationalOccupationalCredential',
     describe: 'A certificate, diploma, licence or other credential that an organisation issued to a person.',
     kinds: [...DOCUMENT_KINDS], origin: 'builtin',
     properties: [
-      prop('holder', 'string', true, 'The person the credential was issued to.'),
-      prop('issuer', 'string', true, 'The organisation that issued it.', 'schema:recognizedBy'),
-      prop('issued_date', 'date', false, 'The date it was issued, YYYY-MM-DD.', 'schema:dateCreated'),
-      prop('valid_until', 'date', false, 'The date it expires, YYYY-MM-DD, when stated.', 'schema:expires'),
-      prop('credential', 'string', true, 'What the credential is, e.g. a degree, a course or a licence.', 'schema:credentialCategory'),
+      prop('holder', 'string', true, L('Haltija', 'Holder', 'Titular'), 'The person the credential was issued to.'),
+      prop('issuer', 'string', true, L('Myöntäjä', 'Issuer', 'Entidad emisora'), 'The organisation that issued it.', 'schema:recognizedBy'),
+      prop('issued_date', 'date', false, L('Myöntämispäivä', 'Issue date', 'Fecha de emisión'), 'The date it was issued, YYYY-MM-DD.', 'schema:dateCreated'),
+      prop('valid_until', 'date', false, L('Voimassa asti', 'Valid until', 'Válido hasta'), 'The date it expires, YYYY-MM-DD, when stated.', 'schema:expires'),
+      prop('credential', 'string', true, L('Tutkinto tai pätevyys', 'Credential', 'Credencial'), 'What the credential is, e.g. a degree, a course or a licence.', 'schema:credentialCategory'),
     ] },
   { id: 'photo', label: { fi: 'Valokuva', en: 'Photo', es: 'Fotografía' }, process: false, type: 'schema:Photograph',
     describe: 'A photograph taken with a camera of people, places or things.',
@@ -122,9 +196,9 @@ const FILE_CLASSES: readonly ContentClass[] = [
     describe: 'A slide deck or presentation made to be shown to an audience.',
     kinds: [...DOCUMENT_KINDS], origin: 'builtin',
     properties: [
-      prop('title', 'string', true, 'The title of the presentation.', 'schema:name'),
-      prop('author', 'string', false, 'The presenter or author.', 'schema:author'),
-      prop('date', 'date', false, 'The date it was given or made, YYYY-MM-DD.', 'schema:dateCreated'),
+      prop('title', 'string', true, L('Otsikko', 'Title', 'Título'), 'The title of the presentation.', 'schema:name'),
+      prop('author', 'string', false, L('Esittäjä', 'Presenter', 'Presentado por'), 'The presenter or author.', 'schema:author'),
+      prop('date', 'date', false, L('Päivämäärä', 'Date', 'Fecha'), 'The date it was given or made, YYYY-MM-DD.', 'schema:dateCreated'),
     ] },
 ];
 

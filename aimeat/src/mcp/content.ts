@@ -18,6 +18,7 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.1.0 — 2026-10-21 — aimeat_content_correct: correct an item's classes and extracted values.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -31,7 +32,7 @@ import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
 import { checkContentInput } from '../tool-catalog/definitions/content.js';
 import {
-  factsFor, textFor, inspectFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
+  factsFor, textFor, inspectFor, correctFor, scanFor, scanStatusFor, settingsFor, updateSettingsFor, classesFor, setClassFor,
   removeClassFor, proposalsFor, decideProposalFor, ontologyFor, overviewFor, listFactsFor, ContentError, ContentClassError,
 } from '../services/content/service.js';
 
@@ -90,6 +91,14 @@ export function registerContentTools(
     async ({ kind, key, owner, stages, force }) => {
       try {
         return ok(await inspectFor(deps, caller(), { source: { kind, key, owner }, stages, force }));
+      } catch (err) { return fail(err); }
+    });
+
+  mcp.tool('aimeat_content_correct', descriptionFor('aimeat_content_correct'), zodShapeFor('aimeat_content_correct'),
+    annotationsFor('aimeat_content_correct'),
+    async ({ kind, key, owner, classes, fields, extract }) => {
+      try {
+        return ok(await correctFor(deps, caller(), { source: { kind, key, owner }, classes, fields, extract }));
       } catch (err) { return fail(err); }
     });
 

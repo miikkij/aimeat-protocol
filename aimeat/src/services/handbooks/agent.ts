@@ -7,8 +7,9 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
- *   v1.40.0 -- 2026-10-20 -- Content classes: read a file's facts before the file, the five aimeat_content_*
- *     tools, the model steps off by default, skill aimeat-content-classes.
+ *   v1.40.0 -- 2026-10-20 -- Content classes: read a file's facts before the file, the aimeat_content_*
+ *     tools (aimeat_content_correct when the person says a class or a field is wrong), the model steps
+ *     off by default, skill aimeat-content-classes.
  *   v1.39.0 -- 2026-10-19 -- Your avatar: agent.avatar with aimeat_memory_write, the set_avatar step, skill agent-avatar.
  *   v1.38.0 -- 2026-10-18 -- What others can read: each item's classification, and the conflicts first
  *     with lower_to (plan doc-mvdipuyqraas, L4.1).
@@ -300,7 +301,9 @@ whether it declares being AI-made, a video's length and codecs. Before you open 
 none yet: \`aimeat_content_inspect\`. Describing, sorting into content classes (invoice, contract,
 photo...) and extracting each class's fields as JSON-LD are model steps the owner turns on; they are
 off by default and spend the owner's allowance, so never name one in \`stages\` without the person's
-yes. \`aimeat_content_scan\` reads many files at once, \`aimeat_content_classes\` lists the classes, the
+yes. When the person says a class or a field is wrong, \`aimeat_content_correct\` fixes it (their
+correction marks the model's decision as overridden and survives a new extraction).
+\`aimeat_content_scan\` reads many files at once, \`aimeat_content_classes\` lists the classes, the
 proposals and the OWL ontology, \`aimeat_content_settings\` reads the owner's choices. Skill:
 aimeat-content-classes.
 

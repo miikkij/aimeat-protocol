@@ -11,12 +11,14 @@
  *     class ("lasku", "invoice" for invoice, and so on), no otherwise.
  *   - describe: a fixed alt text and description; a scanned PDF's "text" is a short invoice.
  *   - extract: every property of the asked shape filled (a string with a stand-in, a number 248, a
- *     date 2026-10-31), and when the shape asks for new properties, one: `payment_terms`.
- *   - propose: a `recipe` class when the item's words say "resepti" or "recipe", else none.
+ *     date 2026-10-31), and when the shape asks for new properties, one: `payment_terms`, labelled.
+ *   - propose: a `recipe` class when the item's words say "resepti" or "recipe", else none; its two
+ *     properties carry labels in fi, en and es.
  * @structure contentDecideAnswer · contentChatAnswer
  * @usage const a = contentChatAnswer(promptText); if (a) answer with it;
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   v1.1.0 — 2026-10-21 — The proposed properties (payment_terms, dish, servings) carry labels.
  */
 
 /** Words that make an item a member of a class, per class id. */
@@ -79,7 +81,10 @@ export function contentChatAnswer(prompt: string): string | null {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(shape)) {
       if (k === '_confidence') out[k] = 0.88;
-      else if (k === '_newProperties') out[k] = [{ name: 'payment_terms', type: 'string', describe: 'The payment terms the document states, e.g. 14 days net.' }];
+      else if (k === '_newProperties') {
+        out[k] = [{ name: 'payment_terms', type: 'string', describe: 'The payment terms the document states, e.g. 14 days net.',
+          label: { fi: 'Maksuehto', en: 'Payment terms', es: 'Condiciones de pago' } }];
+      }
       else if (typeof v === 'number') out[k] = 248;
       else if (typeof v === 'boolean') out[k] = false;
       else out[k] = /date/.test(k) ? '2026-10-31' : `stand-in ${k}`;
@@ -91,8 +96,12 @@ export function contentChatAnswer(prompt: string): string | null {
     return JSON.stringify({
       id: 'recipe', label: { fi: 'Resepti', en: 'Recipe', es: 'Receta' },
       describe: 'A recipe: the ingredients and the steps to cook or bake one dish.', type: 'schema:Recipe',
-      properties: [{ name: 'dish', type: 'string', required: false, describe: 'The name of the dish.' },
-        { name: 'servings', type: 'number', required: false, describe: 'How many people it serves.' }],
+      properties: [
+        { name: 'dish', type: 'string', required: false, describe: 'The name of the dish.',
+          label: { fi: 'Ruokalaji', en: 'Dish', es: 'Plato' } },
+        { name: 'servings', type: 'number', required: false, describe: 'How many people it serves.',
+          label: { fi: 'Annoksia', en: 'Servings', es: 'Porciones' } },
+      ],
       why: 'A person keeps many recipes and finds them by dish.',
     });
   }
