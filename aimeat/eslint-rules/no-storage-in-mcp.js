@@ -41,6 +41,7 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.1.2 — 2026-10-20 — src/mcp/legacy-sessions.ts inherits index.ts's line (pure extraction).
  *   v1.1.1 — 2026-10-20 — src/mcp/core-work.ts inherits core.ts's line (pure extraction).
  *   v1.1.0 — 2026-10-16 — A member receiver (`deps.storage.x()`) counts as a direct call, as the bare
  *     identifier does; appdev-pitfalls.ts left EXEMPT, it calls storage no more; check:shared-impl
@@ -88,6 +89,7 @@ const EXEMPT = new Set([
   'src/mcp/exchange.ts',
   'src/mcp/extensions.ts',
   'src/mcp/index.ts',
+  'src/mcp/legacy-sessions.ts',        // pure extraction out of index.ts (2026-10-20): the session layer, not a tool surface
   'src/mcp/knowledge.ts',
   'src/mcp/memory-extended.ts',
   'src/mcp/oauth.ts',

@@ -30,6 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.4.2 — 2026-10-20 — src/mcp/legacy-sessions.ts takes three lines of index.ts's ceiling (pure extraction).
  *   v1.4.1 — 2026-10-20 — src/mcp/core-work.ts takes one line of core.ts's ceiling (pure extraction).
  *   v1.4.0 — 2026-10-16 — The file count (SEED 38) became a per-file ceiling of direct-call lines that
  *     fails in both directions, and the ceilings are held to the lint rule's EXEMPT list. A new direct
@@ -134,7 +135,8 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/exchange-run.ts': 3,
     'src/mcp/exchange.ts': 3,
     'src/mcp/extensions.ts': 9,
-    'src/mcp/index.ts': 4,
+    'src/mcp/index.ts': 1,
+    'src/mcp/legacy-sessions.ts': 3,
     'src/mcp/knowledge.ts': 1,
     'src/mcp/memory-extended.ts': 1,
     'src/mcp/operator-config.ts': 2,
