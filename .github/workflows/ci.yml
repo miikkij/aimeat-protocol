@@ -254,6 +254,17 @@ jobs:
       - name: Reserve the E2E port range
         run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
 
+      # The lane nodes and a suite's own nodes can ask for more than the image's 100 connections;
+      # see the same step in e2e-full.yml.
+      - name: Raise the PostgreSQL connection limit
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$PG_CONTAINER" psql -U appuser -d aimeat_kysely_e2e -c "ALTER SYSTEM SET max_connections = 300"
+          docker restart "$PG_CONTAINER"
+          for i in $(seq 1 30); do docker exec "$PG_CONTAINER" pg_isready -U appuser -d aimeat_kysely_e2e && break; sleep 1; done
+          test "$(docker exec "$PG_CONTAINER" psql -U appuser -d aimeat_kysely_e2e -tAc 'SHOW max_connections')" = 300
+
       # The runner's lanes 1–3 each create a sibling database (aimeat_kysely_e2e_w1 …) beside the
       # service's; POSTGRES_USER is the superuser here, so CREATE DATABASE is allowed.
       - name: E2E guard tier (PostgreSQL + Kysely — primary backend) — blocking

@@ -76,6 +76,23 @@ jobs:
       - name: Reserve the E2E port range
         run: sudo sysctl -w net.ipv4.ip_local_reserved_ports=40000-40999
 
+      # THE CONNECTION LIMIT FITS THE LANES AND THE NODES A SUITE STARTS ITSELF. Every node opens a
+      # pool of up to 20 connections (src/storage/providers/postgres-kysely/pool-limits.ts). Since
+      # 2026-10-16 a suite's own nodes run on PostgreSQL too (test/helpers/own-node-db.ts), so four
+      # lane nodes and federation-messages' three nodes can ask for 140 at once, and the image's
+      # default is 100. On 2026-10-20 the sweep went red on "sorry, too many clients already" in
+      # federation-messages 5b, the moment its third node booted. A service container takes no
+      # command line, so the limit is set with ALTER SYSTEM and a restart, and read back.
+      - name: Raise the PostgreSQL connection limit
+        if: ${{ matrix.backend == 'postgres-kysely' }}
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$PG_CONTAINER" psql -U appuser -d aimeat_kysely_e2e -c "ALTER SYSTEM SET max_connections = 300"
+          docker restart "$PG_CONTAINER"
+          for i in $(seq 1 30); do docker exec "$PG_CONTAINER" pg_isready -U appuser -d aimeat_kysely_e2e && break; sleep 1; done
+          test "$(docker exec "$PG_CONTAINER" psql -U appuser -d aimeat_kysely_e2e -tAc 'SHOW max_connections')" = 300
+
       # Four lanes: four nodes at once, every suite still alone on an empty database. Measured on
       # one lane before this existed: 285 suites, 38 minutes, 20 of them restarts between suites.
       #
