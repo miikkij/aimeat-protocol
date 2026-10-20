@@ -28,6 +28,9 @@
  *   v1.23.0 — 2026-10-08 — visibilityDefaults(): one switch per visibility layer (config-visibility.ts).
  *   v1.22.0 — 2026-10-06 — SHIPPED_DEFAULT_AGENT_SCOPES carries organism:read (secaudit 2026-10 last
  *     items, D4).
+ *   v1.22.0 — 2026-10-20 — contentClassDefaults(): the content class switch and the ffprobe and
+ *     ffmpeg paths (config-content-class.ts). The SMTP settings move to config-smtp.ts
+ *     smtpDefaults(), unchanged (max-file-lines).
  *   v1.21.1 — 2026-10-06 — isPrivateHost moved to config-private-host.ts (max-file-lines), unchanged.
  *   v1.21.0 — 2026-10-02 — packagePeerCap (AIMEAT_PACKAGE_PEER_CAP, default 500).
  *   v1.20.0 — 2026-10-01 — appAuditKeepDefault (AIMEAT_APP_AUDIT_KEEP, default 0 = keep all).
@@ -99,6 +102,8 @@ import { pagesDefaults } from './config-pages.js';
 import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
+import { contentClassDefaults } from './config-content-class.js';
+import { smtpDefaults } from './config-smtp.js';
 import { updateCheckDefaults } from './config-update-check.js';
 import { themesDefaults } from './config-themes.js';
 import { federationDefaults } from './config-federation.js';
@@ -416,6 +421,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     jsonBodyLimitLargeMb: parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_LARGE_MB ?? '15', 10),
     genesisUrl: process.env.AIMEAT_GENESIS_URL ?? null,
     ...dataAccessDefaults(),
+    ...contentClassDefaults(),
     ...updateCheckDefaults(),
     // Two-step sign-in, passkeys, and the key that encrypts what they store at rest. The relying
     // party id is derived from the address this node believes it has, which is why baseUrl goes in.
@@ -453,15 +459,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     connectTunnelMaxResponseBytes: parseInt(process.env.AIMEAT_CONNECT_TUNNEL_MAX_RESPONSE_BYTES
       ?? String((parseInt(process.env.AIMEAT_JSON_BODY_LIMIT_LARGE_MB ?? '25', 10)) * 1024 * 1024), 10),
     crewTryTimeoutMs: parseInt(process.env.AIMEAT_CREW_TRY_TIMEOUT_MS ?? '300000', 10),
-    smtpHost: process.env.AIMEAT_SMTP_HOST || null,
-    smtpPort: parseInt(process.env.AIMEAT_SMTP_PORT ?? '587', 10),
-    smtpUser: process.env.AIMEAT_SMTP_USER ?? null,
-    smtpPass: process.env.AIMEAT_SMTP_PASS ?? null,
-    smtpFrom: process.env.AIMEAT_SMTP_FROM ?? 'AIMEAT <noreply@localhost>',
-    smtpSecure: process.env.AIMEAT_SMTP_SECURE === 'true',
-    smtpRejectUnauthorized: process.env.AIMEAT_SMTP_REJECT_UNAUTHORIZED !== 'false',
-    emailConfirmationRequired: process.env.AIMEAT_EMAIL_CONFIRMATION_REQUIRED === 'true',
-    emailEnabled: !!(process.env.AIMEAT_SMTP_HOST),
+    ...smtpDefaults(),
     proactiveGuidanceEnabled: process.env.AIMEAT_PROACTIVE_GUIDANCE !== 'false',
     marketplaceEnabled: process.env.AIMEAT_MARKETPLACE_ENABLED !== 'false',
     marketplaceTransactionFeePercent: parseInt(process.env.AIMEAT_MARKETPLACE_TX_FEE_PERCENT ?? '5', 10),

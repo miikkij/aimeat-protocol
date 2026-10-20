@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-20 — content_class.mode, content_class.ffprobe_path, content_class.ffmpeg_path
+ *     (config-schema-content-class.ts; wish-sis-ll-n-purku-luokittelu-ja-owl). The email rows move
+ *     to config-schema-email.ts, unchanged (max-file-lines).
  *   2026-10-18 — The consent, account-events and classification rows moved unchanged to config-schema-data-access.ts (max-file-lines), where classification.agent_clearance_default joined them (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-16 — node.page_host, the host the HTML pages of workspaces run on (config-schema-pages.ts).
  *   2026-10-16 — node.type takes mirror, as the loader does; the start check (config-start-check.ts) runs these validators over the environment (QA audit D8-02).
@@ -120,6 +123,8 @@ import { MORSEL_CONFIG_FIELDS } from './config-schema-morsels.js';
 import { RATE_LIMIT_CONFIG_FIELDS } from './config-schema-rate-limits.js';
 import { CONNECT_CLIENT_CONFIG_FIELDS } from './config-schema-connections.js';
 import { DATA_ACCESS_CONFIG_FIELDS } from './config-schema-data-access.js';
+import { CONTENT_CLASS_CONFIG_FIELDS } from './config-schema-content-class.js';
+import { EMAIL_CONFIG_FIELDS } from './config-schema-email.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -261,21 +266,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Rate Limits (mutable, per-endpoint with global fallback) ── config-schema-rate-limits.ts
   ...RATE_LIMIT_CONFIG_FIELDS,
 
-  // ── Email (Phase 1.1, mutable) ──
-  { key: 'emailEnabled', dotPath: 'email.enabled', envVar: 'AIMEAT_EMAIL_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Email service enabled (requires SMTP host)' },
-  { key: 'emailConfirmationRequired', dotPath: 'email.confirmation_required', envVar: 'AIMEAT_EMAIL_CONFIRMATION_REQUIRED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Require email confirmation for registration' },
-  { key: 'smtpHost', dotPath: 'email.smtp_host', envVar: 'AIMEAT_SMTP_HOST', type: 'string', validate: v => v === null || typeof v === 'string', immutable: false, description: 'SMTP server hostname' },
-  { key: 'smtpPort', dotPath: 'email.smtp_port', envVar: 'AIMEAT_SMTP_PORT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 65535, immutable: false, description: 'SMTP server port', range: '1-65535' },
-  { key: 'smtpFrom', dotPath: 'email.smtp_from', envVar: 'AIMEAT_SMTP_FROM', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'SMTP From address' },
-  { key: 'smtpSecure', dotPath: 'email.smtp_secure', envVar: 'AIMEAT_SMTP_SECURE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Use implicit TLS (port 465). Set false for STARTTLS (port 587).' },
-  { key: 'smtpRejectUnauthorized', dotPath: 'email.smtp_reject_unauthorized', envVar: 'AIMEAT_SMTP_REJECT_UNAUTHORIZED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Reject unauthorized TLS certificates. Set false for self-signed certs or STARTTLS.' },
-
-  // ── Email secrets (immutable — read-only in admin) ──
-  { key: 'smtpUser', dotPath: 'email.smtp_user', envVar: 'AIMEAT_SMTP_USER', type: 'string', validate: () => true, immutable: true, description: 'SMTP username (secret)', adminDisplay: 'configured' },
-  { key: 'smtpPass', dotPath: 'email.smtp_pass', envVar: 'AIMEAT_SMTP_PASS', type: 'string', validate: () => true, immutable: true, description: 'SMTP password (secret)', adminDisplay: 'configured' },
+  // ── Email (Phase 1.1) and its secrets ── config-schema-email.ts
+  ...EMAIL_CONFIG_FIELDS,
 
   // ── Consent (Phase 0.3) and classification (TARGET-082), mutable ──
   ...DATA_ACCESS_CONFIG_FIELDS,
+
+  // ── Content classes (wish-sis-ll-n-purku-luokittelu-ja-owl), mutable ──
+  ...CONTENT_CLASS_CONFIG_FIELDS,
 
   // ── TOTP (Phase 0.5, mutable) ──
   { key: 'totpEnabled', dotPath: 'totp.enabled', envVar: 'AIMEAT_TOTP_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'TOTP two-factor authentication enabled' },

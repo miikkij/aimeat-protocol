@@ -11,6 +11,8 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-20 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
+ *     own node on 40451, against the sandbox's decision and completion stand-ins.
  *   2026-10-20 -- e2e-workspace-transfer-gates.ts joins the list (not the guard tier): a workspace
  *     backup is not a way round the write rules on a restore, the ecosystem read data-areas on an
  *     export, or the credential mask, on its own node with the publish gate on, port 40496
@@ -851,6 +853,10 @@ const ALL_SUITES = [
     // decision and completion stand-ins on an ephemeral port, so each queue a message lands in is
     // the pipeline's doing. Follows the runner's backend.
     'test/e2e-refinery.ts',
+    // Content classes: its own node on 40451, the sandbox's decision and completion stand-ins on an
+    // ephemeral port answering the content class prompts, so the class an item lands in is the
+    // pipeline's doing. Follows the runner's backend.
+    'test/e2e-content-class.ts',
     // The model policy (System 2, V2): its own node on 40438 with a recommended list set the way an
     // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
     // sent is read from what arrived. Follows the runner's backend.

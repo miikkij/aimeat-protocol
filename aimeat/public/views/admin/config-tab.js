@@ -32,6 +32,10 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   v3.7.0 -- 2026-10-20 -- The `content_class` section (content classes: on or off, and the ffprobe and
+ *     ffmpeg programs that read a video) sits under AI after the decision model: its steps that describe,
+ *     sort and pick out fields call a model, and its sorting asks the decision model. It stays out of
+ *     Identity, where `classification` (the sensitivity labels) is, because the two are different things.
  *   v3.6.0 -- 2026-10-14 -- The admin menu find opens a setting here: the `configFind` prop
  *     ({ q, n }) puts its words into the search; configLabel and configGroupLabel are exported for it.
  *   v3.5.1 -- 2026-10-11 -- The quota section sits under limits, beside the rate limits: the list
@@ -125,7 +129,7 @@ const SOURCE_BADGE = {
  * matched nothing (`quotas` for `quota`, `sync` for `federation_sync`, `tunnel` for `connect_tunnel`).
  */
 const DOMAINS = [
-  { id: 'ai', groups: ['ai', 'decide', 'agent', 'agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
+  { id: 'ai', groups: ['ai', 'decide', 'content_class', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'features', 'packages'] },

@@ -20,6 +20,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.26.0 — 2026-10-20 — `contentclass.` joins the list: the content class settings, ontology and
+ *     facts, which decide what spends the owner's AI key and what extraction prompts say
+ *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.25.0 — 2026-10-18 — `identity.adult.` is service-owned: the verified-adult record, written
  *     only by services/adult-assurance.ts (Comicland v3 A-3). `commerce.subscription.` too: a paid
  *     subscription's end date and kept card, written only by commerce/subscriptions.ts (A-5).
@@ -176,6 +179,15 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // Measured 2026-08-31: nothing writes this prefix through the memory API. The legitimate writer is
   // services/ai-jobs/, server-side, which never passes through this gate.
   'ai.jobs.',
+  // 2026-10-20: `contentclass.` holds the content class pipeline's records (services/content/):
+  // `contentclass.settings` decides which steps call an AI model on the owner's key when content
+  // arrives, `contentclass.ontology` holds the classes and properties the extraction prompts are
+  // built from, and `contentclass.facts.<nn>` what was read. The `ai.jobs.` reasoning: a granted app
+  // that could write the settings could start spending the owner never turned on, and one that
+  // could write the ontology could approve its own class into every later extraction. The owner's
+  // own routes (/v1/content/settings, /v1/content/classes) and the pipeline write it server-side.
+  // A new prefix, so nothing wrote it through the memory API before this.
+  'contentclass.',
   // 2026-09-09: `crews.llm.<agent>` and `crews.llm.default` say WHICH MODEL an agent thinks with,
   // and a `model` choice carries the provider block whole — including `base_url`, the endpoint the
   // agent's own runtime will then talk to, and `api_key_env`, the name of the variable it reads a

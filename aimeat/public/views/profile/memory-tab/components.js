@@ -8,6 +8,8 @@
  *   Extracted from memory-tab.js to satisfy max-file-lines. Every part is a component of the kit
  *   that gets data; the file writes no class.
  * @version-history
+ *   v2.2.0 -- 2026-10-20 -- The file preview carries the fold "What is known about this file" under the
+ *     file (memory-tab/file-facts.js, content classes, wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v2.1.1 -- 2026-10-16 -- Sending the collection to a workspace adds its sources on top of a strict
  *     read (addWorkspaceSources): a failed read saves nothing instead of replacing the workspace's
  *     sources with the collection (QA audit F6-04).
@@ -78,6 +80,7 @@ import { Select } from '/components/Select.js';
 import { TagInput } from '/components/TagInput.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { fileIcon, fileCategory, fileBytesUrl, fetchFileBytes, encKeyPath } from './file-helpers.js';
+import { FileFacts } from './file-facts.js';
 import { swallowed } from '/js/swallowed.js';
 
 /** A public value, read on the spot: the opened row's panel holds it (browse-view.js). */
@@ -287,7 +290,9 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
       onClose=${onClose}
       doors=${html`
         <${Action} onClick=${openInTab}>${t('profile.files.openInTab') || 'Open in new tab'} ↗<//>
-        <${Action} onClick=${() => onDownload(file)}>${t('profile.files.download')}<//>`} />`;
+        <${Action} onClick=${() => onDownload(file)}>${t('profile.files.download')}<//>`}>
+      <${FileFacts} file=${file} />
+    <//>`;
 }
 
 export function FileUploadForm({ onUpload, onCancel }) {

@@ -5350,6 +5350,52 @@ components:
           description: >
             Connected accounts created with this app. They can only be renewed by it, so this is
             also how many would stop renewing if it were removed.
+    ContentFacts:
+      type: object
+      description: >
+        What the content class pipeline keeps about one item (src/services/content/types.ts). The
+        technical facts need no model; description, classes and entities are there only when the
+        owner turned those steps on.
+      required: [source, sourceId, technical, stages, readFrom, updatedAt]
+      properties:
+        source:
+          type: object
+          properties:
+            kind: { type: string, enum: [file, memory] }
+            owner: { type: string }
+            key: { type: string }
+        sourceId: { type: string }
+        textKey: { type: string, description: The stored file holding the item's text. }
+        technical:
+          type: object
+          description: kind, mimeType, size, contentHash, and per kind pdf, image, video or text facts, and ai (the declared AI marks and the EU AI Act marking).
+          additionalProperties: true
+        description:
+          type: object
+          properties:
+            text: { type: string }
+            altText: { type: string }
+            model: { type: string }
+            provenanceId: { type: string }
+            at: { type: string, format: date-time }
+        classes:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              confidence: { type: number }
+              by: { type: string, enum: [model, owner, rule] }
+              decisionId: { type: string }
+        entities:
+          type: object
+          description: Per content class id, the JSON-LD entity extracted with that class's properties.
+          additionalProperties: true
+        stages:
+          type: object
+          additionalProperties: true
+        readFrom: { type: string }
+        updatedAt: { type: string, format: date-time }
     RefineryClass:
       type: object
       description: >
@@ -61733,6 +61779,430 @@ paths:
           description: A token without connections:read-through; the rows name the subjects of the mail read.
         '404':
           description: No such run of yours, or it finished more than an hour ago.
+
+  /v1/content:
+    get:
+      operationId: getContentOverview
+      summary: How far your content is read, your settings, and what waits for you
+      description: >
+        Content classes (wish-sis-ll-n-purku-luokittelu-ja-owl). How many of your items have facts,
+        by kind (pdf, image, video, text, other) and by content class; your settings; how many
+        proposed classes wait for your decision; and the scan that is running, if one is. A content
+        class is the kind of thing an item is (an invoice, a contract, a photo); it is not the
+        sensitivity classification and not the MIME type. Answers 404 when content classes are off
+        on this node.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The overview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A visitor from another node; the facts belong to a local account.
+        '404':
+          description: Content classes are off on this node.
+  /v1/content/facts:
+    get:
+      operationId: getContentFacts
+      summary: What is known about one item, or a page of all of them
+      description: >
+        With `key`: the facts kept about one item, read without a model (a PDF's author, dates,
+        pages and signatures; a picture's camera, time, size, colour and location; a video's length,
+        size and codecs; whether the item declares being made by AI, with the IPTC or C2PA mark that
+        says so), and, when the owner turned the AI steps on, its description and alt text, its
+        content classes and the entity extracted for each class (JSON-LD typed by the class's OWL
+        class). Without `key`: a page of facts, newest first. Needs storage:read (memory:read for a
+        memory record). The account holder may name one of their agents as `owner`; anything else
+        answers 404, as an item that does not exist does.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [file, memory, pdf, image, video, text, other] }, description: 'With key: file or memory. Without key: filter the page by item kind.' }
+        - { name: key, in: query, schema: { type: string } }
+        - { name: owner, in: query, schema: { type: string }, description: The identity the item is stored under, when it is one of your agents. }
+        - { name: class, in: query, schema: { type: string }, description: Only items of this content class. }
+        - { name: stale, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
+        - { name: after, in: query, schema: { type: string }, description: The cursor the previous page answered as next. }
+      responses:
+        '200':
+          description: The facts of one item, or a page.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          facts: { $ref: '#/components/schemas/ContentFacts' }
+                          items: { type: array, items: { $ref: '#/components/schemas/ContentFacts' } }
+                          total: { type: integer }
+                          next: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without storage:read (or memory:read), or a visitor from another node.
+        '404':
+          description: No such item of yours, nothing read from it yet, or content classes are off.
+  /v1/content/text:
+    get:
+      operationId: getContentText
+      summary: The text kept for one item
+      description: >
+        A PDF's text layer, the words a model read from a picture or a scanned page, or a video's
+        transcript. Same permissions as GET /v1/content/facts.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [file, memory] } }
+        - { name: key, in: query, required: true, schema: { type: string } }
+        - { name: owner, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: The text and where it came from (file, pdf-text-layer, model, memory).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without the permission that reads the item.
+        '404':
+          description: No such item, or no text was kept for it.
+  /v1/content/inspect:
+    post:
+      operationId: inspectContent
+      summary: Read one item now
+      description: >
+        Reads the item's technical facts when they are missing or the item changed, then the asked
+        stages. Without `stages` the owner's settings decide, and every stage that calls an AI model
+        is off until the owner turns it on. A stage that calls a model needs ai:use and spends the
+        owner's AI allowance. A stage that fails is answered in `skipped` with its reason; the others
+        still run. When the item's sensitivity label keeps it from a model, every model stage is
+        skipped and the technical facts are kept.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source]
+              properties:
+                source:
+                  type: object
+                  required: [key]
+                  properties:
+                    kind: { type: string, enum: [file, memory], default: file }
+                    key: { type: string }
+                    owner: { type: string }
+                stages:
+                  type: array
+                  items: { type: string, enum: [technical, describe, classify, extract, propose] }
+                force:
+                  type: boolean
+                  description: Run the asked stages again even when they ran on the same bytes.
+      responses:
+        '200':
+          description: The facts, the stages that ran, those skipped with why, and any proposals made.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without the permission that reads the item, or without ai:use for a model stage.
+        '404':
+          description: No such item of yours, or content classes are off.
+  /v1/content/scans:
+    post:
+      operationId: startContentScan
+      summary: Go through many items at once
+      description: >
+        For content already on the node, or that arrived while the pipeline was off. Goes through
+        your files and your agents' (or exactly `keys`), filtered by `kinds`, by default only the
+        items without facts; memory records only under `memory_prefix`. `prune` also removes the
+        facts of items that are gone. Answers at once, 202; follow it with GET
+        /v1/content/scans/{id}, or listen for the `contentclass` change on your event stream. One
+        scan per account at a time: a second start answers 200 with the one running.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keys: { type: array, items: { type: string } }
+                kinds: { type: array, items: { type: string, enum: [pdf, image, video, text, other] } }
+                memory_prefix: { type: string }
+                missing_only: { type: boolean, default: true }
+                stages: { type: array, items: { type: string, enum: [technical, describe, classify, extract, propose] } }
+                force: { type: boolean }
+                limit: { type: integer, minimum: 1, maximum: 2000 }
+                prune: { type: boolean }
+      responses:
+        '200':
+          description: A scan was already running; this is it.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '202':
+          description: The scan started.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without storage:read (memory:read for a memory prefix), or without ai:use for a model stage.
+        '404':
+          description: Content classes are off on this node.
+  /v1/content/scans/{id}:
+    get:
+      operationId: getContentScan
+      summary: How far a scan is
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The scan's counts, the item it is on, and the last failures.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such scan of yours, or it finished more than an hour ago.
+  /v1/content/settings:
+    get:
+      operationId: getContentSettings
+      summary: Your content class settings
+      description: >
+        onArrival (run when content arrives), stages (technical on; describe, classify, extract and
+        propose off until you turn them on), sources (files, memory, workspace), minTextChars (a
+        shorter memory record gets no facts on arrival), approval (ask, auto, or rule with
+        approvalRule: how a proposed class or property is approved), onlineSignatureChecks, models
+        and language.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      operationId: updateContentSettings
+      summary: Change your content class settings
+      description: >
+        A partial patch, merged onto the current settings; an unknown key is refused with its name.
+        Needs memory:write-reserved, because the settings decide what spends your AI key.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: The settings as they are now.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+  /v1/content/classes:
+    get:
+      operationId: listContentClasses
+      summary: The content classes items are sorted into
+      description: >
+        The built-in classes (the refinery's class packs with the same ids, and classes for files:
+        contract, report, meeting notes, certificate, photo, screenshot, diagram, presentation), then
+        your own. Each class says what a model is told it is, the kinds of item it applies to, and
+        its properties, which are its OWL datatype properties.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The classes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/content/classes/{id}:
+    put:
+      operationId: setContentClass
+      summary: Add or change one of your content classes
+      description: Needs memory:write-reserved. A class with a built-in's id replaces it for you.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, pattern: '^[a-z][a-z0-9-]{1,40}$' } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: The class as stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+    delete:
+      operationId: removeContentClass
+      summary: Remove one of your content classes
+      description: Needs memory:write-reserved. Removing your change to a built-in class brings the built-in back.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Removed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+        '404':
+          description: You have no class with that id.
+  /v1/content/proposals:
+    get:
+      operationId: listContentProposals
+      summary: Classes and properties a model proposed
+      description: >
+        A model proposes a class when no class fits an item, and properties when an extraction finds
+        facts its class has no property for. Depending on your approval setting a proposal waits for
+        you, is approved at once, or is decided by your decision rule.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending, approved, rejected] } }
+      responses:
+        '200':
+          description: The proposals, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/content/proposals/{id}:
+    post:
+      operationId: decideContentProposal
+      summary: Approve or reject a proposed class or properties
+      description: Needs memory:write-reserved. An approved class joins your ontology; approved properties join their class.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+      responses:
+        '200':
+          description: The proposal as decided.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A token without memory:write-reserved.
+  /v1/content/ontology:
+    get:
+      operationId: getContentOntology
+      summary: Your content classes as an OWL ontology
+      description: >
+        JSON-LD: an owl:Ontology whose graph holds one owl:Class per content class (rdfs:label in
+        Finnish, English and Spanish, rdfs:subClassOf its schema.org type) and one
+        owl:DatatypeProperty per property (rdfs:domain, an xsd range, owl:equivalentProperty its
+        schema.org property when it has one). `format=jsonld` answers the JSON-LD document itself as
+        application/ld+json, for an RDF tool.
+      tags: [ContentClasses]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [jsonld] } }
+      responses:
+        '200':
+          description: The ontology.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+            application/ld+json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/connections/providers:
     get:

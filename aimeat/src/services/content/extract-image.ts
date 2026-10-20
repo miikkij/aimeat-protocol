@@ -1,0 +1,200 @@
+/**
+ * @file src/services/content/extract-image.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description What a picture says about itself, read with exifr from its EXIF, IPTC, XMP and ICC
+ *   segments and, for PNG, from the IHDR chunk: size, bit depth, colour, camera, exposure, the times
+ *   it was taken and changed, the software, a GPS position when one is present, the creator and
+ *   rights fields, an existing alt text, and the IPTC DigitalSourceType that provenance-read.ts maps
+ *   to an AI verdict (types.ts ImageFacts).
+ *
+ *   exifr runs with reviveValues and translateValues off, so dates stay as the camera wrote them
+ *   ("2024:05:01 12:00:00") and enumerations stay numbers. The dates are then rewritten to ISO 8601
+ *   here, with the zone when an OffsetTime tag carries one, and without a zone otherwise, because a
+ *   camera's local time with no offset is not a UTC instant.
+ *
+ *   A failure in exifr is recorded in `errors.exif` and the picture still gets its format and its
+ *   size from the IHDR chunk or from sniffImage (services/openrouter.ts).
+ * @structure readImageFacts · pngHeader · isoOf · textOf
+ * @usage const { facts, digitalSourceType, software, errors } = await readImageFacts(bytes, 'image/png');
+ * @version-history
+ *   v1.0.0 — 2026-10-20 — Initial.
+ */
+import exifr from 'exifr';
+import { sniffImage } from '../openrouter.js';
+import type { ImageFacts } from './types.js';
+
+type Seg = Record<string, unknown>;
+
+const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/** PNG colour type to a colour space name (PNG spec 11.2.2). */
+const PNG_COLOR: Record<number, string> = { 0: 'Gray', 2: 'RGB', 3: 'Indexed', 4: 'GrayAlpha', 6: 'RGBA' };
+
+/** EXIF ColorSpace values. */
+const EXIF_COLOR: Record<number, string> = { 1: 'sRGB', 2: 'Adobe RGB', 65535: 'Uncalibrated' };
+
+/** Width, height, bit depth and colour type from a PNG's IHDR chunk, read from the bytes. */
+function pngHeader(b: Buffer): { width: number; height: number; bitDepth: number; colorType: number } | null {
+  if (b.length < 29 || !b.subarray(0, 8).equals(PNG_SIG) || b.toString('latin1', 12, 16) !== 'IHDR') return null;
+  return { width: b.readUInt32BE(16), height: b.readUInt32BE(20), bitDepth: b[24], colorType: b[25] };
+}
+
+/**
+ * A metadata value as one string: a string or number as is, an XMP language alternative's value,
+ * an XMP list joined with ", ". Anything else gives undefined.
+ */
+function textOf(v: unknown): string | undefined {
+  if (v === null || v === undefined) return undefined;
+  if (typeof v === 'string') return v.trim() || undefined;
+  if (typeof v === 'number') return String(v);
+  if (Array.isArray(v)) {
+    const parts = v.map(textOf).filter((x): x is string => !!x);
+    return parts.length ? parts.join(', ') : undefined;
+  }
+  if (typeof v === 'object' && 'value' in (v as Seg)) return textOf((v as Seg).value);
+  return undefined;
+}
+
+const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+/**
+ * An EXIF or XMP date as ISO 8601. "2024:05:01 12:00:00" with offset "+03:00" gives
+ * "2024-05-01T12:00:00+03:00"; without an offset the zone is left off. An XMP date that is already
+ * ISO is returned as it is. A value that does not parse is returned trimmed.
+ */
+function isoOf(v: unknown, offset?: unknown): string | undefined {
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString();
+  const s = textOf(v);
+  if (!s) return undefined;
+  const m = /^(\d{4})[:-](\d{2})[:-](\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/.exec(s);
+  if (!m) return s;
+  const zone = m[8] ?? (typeof offset === 'string' && /^[+-]\d{2}:\d{2}$/.test(offset.trim()) ? offset.trim() : '');
+  return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6] ?? '00'}${m[7] ?? ''}${zone}`;
+}
+
+/** Exposure time as a photographer writes it: "1/250" under a second, "2" or "2.5" above. */
+function exposureTimeOf(v: unknown): string | undefined {
+  const n = num(v);
+  if (n === undefined || n <= 0) return undefined;
+  if (n >= 1) return String(Math.round(n * 10) / 10);
+  return `1/${Math.round(1 / n)}`;
+}
+
+/** The EXIF Flash value as words: bit 0 says whether it fired. */
+function flashOf(v: unknown): string | undefined {
+  const n = num(v);
+  if (n === undefined) return textOf(v);
+  return (n & 1) ? 'fired' : 'did not fire';
+}
+
+const nonEmpty = <T extends object>(o: T): T | undefined =>
+  (Object.values(o).some(v => v !== undefined) ? o : undefined);
+
+/** Drops undefined keys so the facts record carries only what was read. */
+function compact<T extends object>(o: T): T {
+  for (const k of Object.keys(o) as Array<keyof T>) if (o[k] === undefined) delete o[k];
+  return o;
+}
+
+/**
+ * The facts a picture carries about itself.
+ * @param {Buffer} bytes - The file.
+ * @param {string} mimeType - Its MIME type; the format is the subtype ("png", "jpeg").
+ * @returns {Promise<{facts: ImageFacts, digitalSourceType?: string, software?: string, errors: Record<string, string>}>}
+ */
+export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
+  facts: ImageFacts; digitalSourceType?: string; software?: string; errors: Record<string, string>;
+}> {
+  const errors: Record<string, string> = {};
+  const mime = (mimeType || '').toLowerCase().split(';')[0].trim();
+  const sniff = sniffImage(bytes);
+  const format = (mime.startsWith('image/') ? mime.slice(6) : sniff.mime?.slice(6)) || undefined;
+
+  let out: Record<string, Seg> = {};
+  try {
+    const parsed: unknown = await exifr.parse(bytes, {
+      tiff: true, ifd0: true, exif: true, gps: true, iptc: true, xmp: true, icc: true, ihdr: true,
+      mergeOutput: false, reviveValues: false, translateValues: false, translateKeys: true,
+    } as never);
+    if (parsed && typeof parsed === 'object') out = parsed as Record<string, Seg>;
+  } catch (err) {
+    errors.exif = (err as Error).message || String(err);
+  }
+
+  const seg = (name: string): Seg => (out[name] && typeof out[name] === 'object' ? out[name] : {});
+  const ifd0 = seg('ifd0');
+  const exif = seg('exif');
+  const gps = seg('gps');
+  const iptc = seg('iptc');
+  const icc = seg('icc');
+  const ihdr = seg('ihdr');
+  const dc = seg('dc');
+  const xmp = seg('xmp');
+  const photoshop = seg('photoshop');
+  const core = seg('Iptc4xmpCore');
+  const ext = seg('Iptc4xmpExt');
+  const aux = seg('aux');
+  const tiffXmp = seg('tiff');
+  const exifXmp = seg('exifEX');
+  const rights = seg('xmpRights');
+
+  const png = pngHeader(bytes);
+  const width = png?.width ?? num(exif.ExifImageWidth) ?? num(ifd0.ImageWidth) ?? num(ihdr.ImageWidth) ?? sniff.width;
+  const height = png?.height ?? num(exif.ExifImageHeight) ?? num(ifd0.ImageHeight) ?? num(ihdr.ImageHeight) ?? sniff.height;
+
+  const bits = ifd0.BitsPerSample ?? tiffXmp.BitsPerSample;
+  const bitDepth = png?.bitDepth ?? num(ihdr.BitDepth)
+    ?? (Array.isArray(bits) ? num(bits[0]) : num(bits) ?? (typeof bits === 'string' ? Number.parseInt(bits, 10) || undefined : undefined));
+
+  const colorSpace = png ? PNG_COLOR[png.colorType]
+    : (num(exif.ColorSpace) !== undefined ? EXIF_COLOR[num(exif.ColorSpace)!] : undefined) ?? textOf(icc.ColorSpaceData);
+
+  const software = textOf(ifd0.Software) ?? textOf(xmp.CreatorTool);
+
+  const facts: ImageFacts = compact({
+    format,
+    width,
+    height,
+    bitDepth,
+    colorSpace,
+    iccProfile: textOf(icc.ProfileDescription),
+    orientation: num(ifd0.Orientation) ?? num(tiffXmp.Orientation),
+    camera: nonEmpty(compact({
+      make: textOf(ifd0.Make) ?? textOf(tiffXmp.Make),
+      model: textOf(ifd0.Model) ?? textOf(tiffXmp.Model),
+      lens: textOf(exif.LensModel) ?? textOf(aux.Lens) ?? textOf(exifXmp.LensModel),
+      serial: textOf(exif.BodySerialNumber) ?? textOf(aux.SerialNumber),
+    })),
+    exposure: nonEmpty(compact({
+      iso: num(exif.ISO) ?? (Array.isArray(exif.ISO) ? num(exif.ISO[0]) : undefined),
+      fNumber: num(exif.FNumber),
+      exposureTime: exposureTimeOf(exif.ExposureTime),
+      focalLength: num(exif.FocalLength),
+      flash: flashOf(exif.Flash),
+    })),
+    takenAt: isoOf(exif.DateTimeOriginal, exif.OffsetTimeOriginal) ?? isoOf(photoshop.DateCreated),
+    createdAt: isoOf(exif.CreateDate, exif.OffsetTimeDigitized) ?? isoOf(xmp.CreateDate),
+    modifiedAt: isoOf(ifd0.ModifyDate, exif.OffsetTime) ?? isoOf(xmp.ModifyDate),
+    software,
+    gps: num(gps.latitude) !== undefined && num(gps.longitude) !== undefined
+      ? compact({
+        lat: num(gps.latitude)!,
+        lon: num(gps.longitude)!,
+        altitude: num(gps.GPSAltitude) !== undefined ? (gps.GPSAltitudeRef === 1 ? -num(gps.GPSAltitude)! : num(gps.GPSAltitude)) : undefined,
+      })
+      : undefined,
+    creator: textOf(dc.creator) ?? textOf(ifd0.Artist) ?? textOf(iptc.Byline),
+    copyright: textOf(dc.rights) ?? textOf(ifd0.Copyright) ?? textOf(iptc.CopyrightNotice) ?? textOf(rights.UsageTerms),
+    credit: textOf(photoshop.Credit) ?? textOf(iptc.Credit),
+    title: textOf(dc.title) ?? textOf(iptc.ObjectName) ?? textOf(photoshop.Headline) ?? textOf(iptc.Headline),
+    description: textOf(dc.description) ?? textOf(ifd0.ImageDescription) ?? textOf(iptc.Caption) ?? textOf(ihdr.Description),
+    altText: textOf(core.AltTextAccessibility),
+  });
+
+  const digitalSourceType = textOf(ext.DigitalSourceType) ?? textOf(core.DigitalSourceType) ?? textOf(iptc.DigitalSourceType);
+  const result: { facts: ImageFacts; digitalSourceType?: string; software?: string; errors: Record<string, string> } = { facts, errors };
+  if (digitalSourceType) result.digitalSourceType = digitalSourceType;
+  if (software) result.software = software;
+  return result;
+}

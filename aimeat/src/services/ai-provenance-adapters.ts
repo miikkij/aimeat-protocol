@@ -30,6 +30,8 @@
  *   import { toIptc, toEuIcon } from './ai-provenance-adapters.js';
  *   const uri = toIptc(record);              // undefined = emit nothing
  * @version-history
+ *   v1.2.0 — 2026-10-20 — fromIptc(): the reading direction, what a digital source type a file carries
+ *     says about AI involvement, for the content class pipeline (services/content/provenance-read.ts).
  *   v1.1.0 — 2026-10-18 — iptcComposite(): the value for a work combined from several pieces, for
  *     provenance written into exported files (services/provenance-embed/; Comicland v3 A-8).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1. Mapping is the truth table in
@@ -97,6 +99,36 @@ export function toIptc(input: MaybeAiProvenance): string | undefined {
  */
 export function iptcComposite(): string {
   return `${IPTC_DIGITAL_SOURCE_TYPE}compositeWithTrainedAlgorithmicMedia`;
+}
+
+/** What an IPTC digital source type a file carries says about AI involvement: the reading direction. */
+export type IptcAiVerdict = 'ai-generated' | 'ai-assisted' | 'human' | 'unknown';
+
+/** IPTC NewsCodes digital source type terms, read from a file, and what each says about AI involvement. */
+const IPTC_TERM_VERDICT: Readonly<Record<string, IptcAiVerdict>> = Object.freeze({
+  trainedAlgorithmicMedia: 'ai-generated',
+  compositeSynthetic: 'ai-assisted',
+  compositeWithTrainedAlgorithmicMedia: 'ai-assisted',
+  algorithmicallyEnhanced: 'ai-assisted',
+  digitalCapture: 'human',
+  negativeFilm: 'human',
+  positiveFilm: 'human',
+  print: 'human',
+  minorHumanEdits: 'human',
+  humanEdits: 'human',
+  digitalCreation: 'human',
+  algorithmicMedia: 'human',
+});
+
+/**
+ * The verdict a digital source type value says, read from a file's XMP or a C2PA action: a full
+ * NewsCodes URI or the bare term, and the C2PA alias `c2pa.trainedAlgorithmicData`. 'unknown' for a
+ * value the vocabulary does not have (services/content/provenance-read.ts reads files with it).
+ */
+export function fromIptc(value: string): IptcAiVerdict {
+  const v = value.trim();
+  const term = v === 'c2pa.trainedAlgorithmicData' ? 'trainedAlgorithmicMedia' : v.slice(v.lastIndexOf('/') + 1);
+  return Object.hasOwn(IPTC_TERM_VERDICT, term) ? IPTC_TERM_VERDICT[term] : 'unknown';
 }
 
 // ── W3C ─────────────────────────────────────────────────────────────────────────────────────────

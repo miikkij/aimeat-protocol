@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.19.0 — 2026-10-20 — ContentClassConfig mixed in (config-content-class.ts): contentClassMode,
+ *     ffprobePath, ffmpegPath.
  *   v1.17.3 — 2026-10-16 — LoadConfigOptions and LoadConfigResult moved to config-load-types.ts (pure extraction, max-file-lines).
  *   v1.18.0 — 2026-10-16 — PagesConfig mixed in (config-pages.ts): pageHost.
  *   v1.17.2 — 2026-10-14 — otkGraceMs removed with the connectivity-key routes (feature-list audit row 202).
@@ -167,8 +169,9 @@ import type { VisibilityConfig } from './config-visibility.js';
 import type { TurnConfig } from './config-turn.js';
 import type { DocsignConfig } from './config-docsign.js';
 import type { PagesConfig } from './config-pages.js';
+import type { ContentClassConfig } from './config-content-class.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig {
   port: number;
   baseUrl: string;
   /**

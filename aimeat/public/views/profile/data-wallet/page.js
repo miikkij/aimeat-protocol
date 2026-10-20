@@ -8,12 +8,16 @@
  *   the revoked ones); 02 what happened (the trail grouped: who tried what, how many times, with the
  *   grants and revocations read off the permissions' own timestamps); 03 the grant form as a fold;
  *   04 everything you own as one file, with what is inside; 05 classification (classification.js);
- *   06 how your AI uses the wallet. A wallet that lives on another server shows one box. Pure render
- *   over the ctx bag; the rows are rows.js.
+ *   06 what is known about your content (content-classes.js); 07 how your AI uses the wallet. A
+ *   wallet that lives on another server shows one box. Pure render over the ctx bag; the rows are
+ *   rows.js.
  * @structure renderPage · federated · head · strip · secTargets · secTrail · secGrant · secExport ·
  *   secRoads
  * @usage import { renderPage } from './data-wallet/page.js';
  * @version-history
+ *   v1.24.0 — 2026-10-20 — Section 06 is what is known about your content (content classes,
+ *     wish-sis-ll-n-purku-luokittelu-ja-owl, data-wallet/content-classes.js), and how your AI uses
+ *     the wallet moves to 07.
  *   v1.23.0 — 2026-10-02 — The question marks that explain the grant form: consent.scope, consent.key_area (components/HelpTip.js). The key area's example is portfolio.** (portfolio/contact* matched only a key of that exact name).
  *   v1.22.0 — 2026-09-29 — Section 05 is classification (TARGET-082 V5, data-wallet/classification.js),
  *     and how your AI uses the wallet moves to 06.
@@ -78,6 +82,7 @@ import { HelpTip } from '/components/HelpTip.js';
 import { x, n, crumb, pageLinks, whoOf } from './frame.js';
 import { targetRow, personRow, revokedRow, groupRow, eventRow, groupId } from './rows.js';
 import { secClassification, classificationCount } from './classification.js';
+import { secContentClasses, contentCount } from './content-classes.js';
 
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 
@@ -90,7 +95,8 @@ export function renderPage(ctx) {
     { id: 'dw-grant', num: '03', label: x('secGrant'), count: ov ? `${ctx.active.length} / ${ctx.quota}` : '' },
     { id: 'dw-export', num: '04', label: x('secExport'), count: ov ? n(ov.permSummary.total_memory_keys) : '' },
     { id: 'dw-class', num: '05', label: x('cls.title'), count: classificationCount(ctx.cls) },
-    { id: 'dw-roads', num: '06', label: x('secRoads'), count: '' },
+    { id: 'dw-content', num: '06', label: x('cc.title'), count: contentCount(ctx.content) },
+    { id: 'dw-roads', num: '07', label: x('secRoads'), count: '' },
   ];
   return html`
     <${SettingsPage} name="dw" crumb=${crumb()} ...${head(ctx)} strip=${strip(ctx)}
@@ -102,6 +108,7 @@ export function renderPage(ctx) {
         ${secGrant(ctx)}
         ${secExport(ctx)}
         ${secClassification(ctx, '05')}
+        ${secContentClasses(ctx, '06')}
         ${secRoads()}`}
     <//>`;
 }
@@ -284,12 +291,13 @@ function secExport(ctx) {
     <//>`;
 }
 
-/* ── 06 (05, the classification, is data-wallet/classification.js) ─────────────────────────────── */
+/* ── 07 (05, the classification, is data-wallet/classification.js; 06, what is known about your
+   content, is data-wallet/content-classes.js) ─────────────────────────────────────────────────── */
 
 function secRoads() {
   const ask = x('roadAskPrompt');
   return html`
-    <${Section} id="dw-roads" num="06" title=${x('secRoads')}>
+    <${Section} id="dw-roads" num="07" title=${x('secRoads')}>
       <${Roads} wide>
         <${Road} lead name=${x('roadAskTitle')} text=${x('roadAskBody')} code=${ask}
           doors=${html`<${Action} small soft copy=${ask}>${x('copyPrompt')}<//>`} />
