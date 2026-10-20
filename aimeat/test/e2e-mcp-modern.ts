@@ -143,6 +143,10 @@ await test('On chat, 2026-07-28: a tool off the core list runs by name, aimeat_i
     assert(viaInvoke.body.result?.isError !== true && toolText(viaInvoke).includes('contacts'), `invoke runs it: ${toolText(viaInvoke).slice(0, 200)}`);
     const found = await modern('/v2/mcp/chat', agent.token, 'tools/call', { name: 'aimeat_tools_find', arguments: { purpose: 'list my contacts' } });
     assert(toolText(found).includes('aimeat_contact_list'), `the finder names contact_list: ${toolText(found).slice(0, 200)}`);
+    // No session keeps a switched-on tool, so the answer promises no list change: it says to call by name.
+    const answer = JSON.parse(toolText(found)) as { added?: unknown; next_step?: string };
+    assert(answer.added === undefined && (answer.next_step ?? '').includes('by name') && !(answer.next_step ?? '').includes('rest of this conversation'),
+        `the finder on 2026-07-28 says to call by name, not that the list changed: ${JSON.stringify(answer).slice(0, 300)}`);
 });
 
 await test('An SDK v2 client negotiates 2026-07-28 by itself and calls a tool', async () => {

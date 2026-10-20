@@ -28,6 +28,8 @@
  *     aimeat_invoke runs the session's own tools
  * @usage in createMcpServer, for role 'chat' only
  * @version-history
+ *   2026-10-21 — On a 2026-07-28 request the finder names the tools and says to call them by name;
+ *     it no longer says they were added to a list that lasts only for that request.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The tools/call wrap and the registered-tool read go through mcp/sdk-seams.ts.
@@ -116,8 +118,16 @@ function needsOf(name: string): { required: string[]; optional: string[] } {
     };
 }
 
-/** aimeat_tools_find: search the session's tools by purpose and switch the matches on. */
-export function registerToolLoader(mcp: McpServer): void {
+/**
+ * aimeat_tools_find: search the session's tools by purpose and switch the matches on.
+ *
+ * On a 2026-07-28 request (`stateless`) the server lives for that one request, so a tool switched on
+ * here is gone by the next one, and the client's list stays the core list. The answer then names the
+ * tools and says to call them by name, which works for every permitted tool on that path
+ * (answerSwitchedOffTools below; decision 2026-10-20, MCP migration plan item 4), instead of
+ * promising a list change it cannot keep.
+ */
+export function registerToolLoader(mcp: McpServer, opts: { stateless?: boolean } = {}): void {
     mcp.registerTool(
         'aimeat_tools_find',
         {
@@ -140,6 +150,15 @@ export function registerToolLoader(mcp: McpServer): void {
                     }, null, 2) }],
                 };
             }
+            const named = found.map((f) => ({ name: f.name, what: firstSentence(f.description), ...needsOf(f.name) }));
+            if (opts.stateless) {
+                return {
+                    content: [{ type: 'text' as const, text: JSON.stringify({
+                        tools: named,
+                        next_step: 'Call any of these by name now: they run although your tool list does not show them, and your list stays as it is. If your client calls only the tools its list names, run one with aimeat_invoke: its name as `capability`, its inputs as `input`.',
+                    }, null, 2) }],
+                };
+            }
             const added: string[] = [];
             for (const f of found) {
                 const tool = tools[f.name];
@@ -149,7 +168,7 @@ export function registerToolLoader(mcp: McpServer): void {
             return {
                 content: [{ type: 'text' as const, text: JSON.stringify({
                     added,
-                    tools: found.map((f) => ({ name: f.name, what: firstSentence(f.description), ...needsOf(f.name) })),
+                    tools: named,
                     next_step: 'These are in your tool list for the rest of this conversation. If one is not in your list yet (some clients read the list again only on the next message), run it now with aimeat_invoke: its name as `capability`, its inputs as `input`.',
                 }, null, 2) }],
             };

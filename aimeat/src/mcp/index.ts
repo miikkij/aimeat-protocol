@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-21 — createMcpServer's last flag is `stateless` (a 2026-07-28 request) and reaches the
+ *     tool groups, so the chat surface's finder answers by era.
  *   2026-10-20 — The 2026-07-28 code path (mcp/modern-endpoint.ts) beside the sessions, routed by era
  *     per request and counted in mcp_requests_total; the guidance and support-route reads moved to
  *     services/mcp-build-inputs.ts, cached for the modern path only (SDK v2 migration step 5, plan item 5).
@@ -252,13 +254,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         role: SurfaceRole | 'all' = 'all',
         getToken: () => string | undefined = () => undefined,
         owner?: string,
-        cachedInputs = false,
+        /** A 2026-07-28 request: the server lives for this one request (mcp/modern-endpoint.ts). */
+        stateless = false,
     ): Promise<McpServer> {
         // What this account chose about being offered things it did not ask for, and who answers
         // support here. Read when the server is built, because that is the one moment every client
         // passes through, and never allowed to fail a connection (services/mcp-build-inputs.ts). A 2026-07-28
         // request builds a server per request and reads both through a short cache.
-        const { guidance, supportAnsweredBy } = await readBuildInputs(storage, config, owner, cachedInputs);
+        const { guidance, supportAnsweredBy } = await readBuildInputs(storage, config, owner, stateless);
         // An agent's person can allow a missing permission with one press; an owner, an app and an
         // ecosystem app have no such page (services/permission-ask.ts).
         const mayAsk = config.mcpEnforceScopes && !agentGaii.startsWith('eco:') && parseGaiiLoose(agentGaii).agent !== '';
@@ -342,7 +345,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // (mcp/register-all.ts). It used to stand here and the audit kept its own copy; the copies
         // drifted to 52 against 26 without either side going quiet about it.
         registerAllServerTools(mcp, {
-            storage, config, peers, scopes, getToken, role,
+            storage, config, peers, scopes, getToken, role, stateless,
             agentGaii: () => agentGaii,
             owner: () => owner ?? '',
             emitResourceUpdated, emitResourceListChanged,

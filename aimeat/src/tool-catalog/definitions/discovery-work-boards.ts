@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-21 — aimeat_tools_find says that on MCP 2026-07-28 the list does not change and the found
+ *     tools are called by name (one sentence added).
  *   2026-10-18 — aimeat_admin_incident_resolve decides an offered default audience cap too ("apply" /
  *     "keep", plan doc-mvdipuyqraas, L5.1).
  *   2026-10-18 — aimeat_storage_upload says that a public upload without publish:public answers with
@@ -125,7 +127,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_tools_find',
-        description: "Your tool list starts small, and this node has many more tools. When the job needs one you do not see, say what you want to do and this finds the tools for it and adds them to your list for the rest of this conversation. Then call them by name; a tool your list does not show yet (some clients read it again only on the next message) runs now through aimeat_invoke, with its name as `capability`. Search in English with plain words for the action and the thing (\"add a contact\", \"publish an app\", \"read my mail\", \"schedule a task\"). The answer names each tool, what it does and what it needs. Tools already in your list are named too, so a search never sends you looking for one you have.",
+        description: "Your tool list starts small, and this node has many more tools. When the job needs one you do not see, say what you want to do and this finds the tools for it and adds them to your list for the rest of this conversation. Then call them by name; a tool your list does not show yet (some clients read it again only on the next message) runs now through aimeat_invoke, with its name as `capability`. Search in English with plain words for the action and the thing (\"add a contact\", \"publish an app\", \"read my mail\", \"schedule a task\"). The answer names each tool, what it does and what it needs. Tools already in your list are named too, so a search never sends you looking for one you have. On a connection where every request stands on its own (MCP 2026-07-28), your list does not change: call the tools it names by name.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         // Read-only for the person's data: what it changes is which of this session's tools are listed.
