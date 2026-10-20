@@ -25,12 +25,13 @@
  * @structure McpClientPool — acquire · invalidate · closeAll · size
  * @usage const client = await pool.acquire(server, credential, identity);
  * @version-history
+ *   2026-10-20 — The MCP client is the SDK v2 client package (@modelcontextprotocol/client), with the 2025 handshake it keeps by default (SDK v2 migration step 4a).
  *   v1.2.0 — 2026-10-09 — The transport's sealed env and headers are opened at the connect and
  *     nowhere else (transport-secrets.ts; secrets audit 2026-10-09, chapter 2).
  *   v1.1.0 — 2026-09-17 — The node id reaches the transport, for the loop-brake header.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { Client } from '@modelcontextprotocol/client';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
 import type { AimeatConfig } from '../../config.js';
 import { buildTransport, MCP_CONNECT_TIMEOUT_MS } from './transport.js';

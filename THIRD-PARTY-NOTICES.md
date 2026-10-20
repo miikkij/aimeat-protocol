@@ -102,7 +102,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 485 npm packages that travel inside the `aimeat` package. Build and test
+The 487 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -141,6 +141,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@jitl/quickjs-wasmfile-release-sync](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [@js-temporal/polyfill](https://github.com/js-temporal/temporal-polyfill#readme) | 0.5.1 | ISC |
 | [@levischuck/tiny-cbor](https://github.com/levischuck/tiny-cbor#readme) | 0.2.11 | MIT |
+| [@modelcontextprotocol/client](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
+| [@modelcontextprotocol/core](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
 | [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 1.7.5 | MIT |
 | [@modelcontextprotocol/sdk](https://modelcontextprotocol.io) | 1.32.1 | MIT |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
@@ -1157,7 +1159,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @modelcontextprotocol/ext-apps 1.7.5
+### @modelcontextprotocol/client 2.3.1, @modelcontextprotocol/core 2.3.1, @modelcontextprotocol/ext-apps 1.7.5
 
 ```text
 The MCP project is undergoing a licensing transition from the MIT License to the Apache License, Version 2.0 ("Apache-2.0"). All new code and specification contributions to the project are licensed under Apache-2.0. Documentation contributions (excluding specifications) are licensed under CC-BY-4.0.
