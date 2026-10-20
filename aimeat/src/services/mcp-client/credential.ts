@@ -21,6 +21,8 @@
  * @structure sealMcpCredential · openMcpCredential
  * @usage const opened = openMcpCredential(row.credential, config);
  * @version-history
+ *   v1.1.0 — 2026-10-20 — openMcpCredential keeps oauthIssuer, the issuing authorization server's
+ *     stamp the MCP SDK v2 puts on tokens (SEP-2352).
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
 import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
@@ -72,6 +74,9 @@ export function openMcpCredential(
       ...(c.oauthClient && typeof c.oauthClient.client_id === 'string'
         ? { oauthClient: c.oauthClient }
         : {}),
+      // The issuing authorization server's stamp (SEP-2352): dropped here, a renewal would accept a
+      // token another authorization server is asked to honour.
+      ...(typeof c.oauthIssuer === 'string' ? { oauthIssuer: c.oauthIssuer } : {}),
     };
   } catch {
     // The FACT is logged; the exception is not. A failed decrypt's message can carry fragments of

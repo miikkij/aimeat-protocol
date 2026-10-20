@@ -15,6 +15,8 @@
  *   round that "works" against a server which never checks the verifier proves nothing about the
  *   half that never travels.
  * @version-history
+ *   2026-10-20 — On the SDK v2 client: the issuer stamp is sealed with the token and the client, the
+ *     callback's iss is taken when it matches and refuses the exchange when it does not.
  *   2026-10-18 — The authorization server listens on a port the system picks, not the fixed 40688.
  *   2026-10-15 — The renewal: a refused refresh token and a credential with no refresh token both
  *     answer 'renewal-failed' and park the server in needs_reauth at once; a working refresh token
@@ -225,6 +227,38 @@ describe('the OAuth round, against a real authorization server', () => {
     expect(opened.refreshToken).toBe('refresh-me');
     // The client that MINTED the token is sealed with it, or the first refresh finds out.
     expect(opened.oauthClient?.client_id).toBe('client-abc');
+    // The SDK v2 stamps both with the authorization server that issued them (SEP-2352), and the
+    // stamp is kept, so a renewal can tell this server's token from another's.
+    expect(opened.oauthIssuer).toBe(BASE);
+    expect(opened.oauthClient?.issuer).toBe(BASE);
+  });
+
+  it('takes the callback\'s iss when it names the authorization server the round started at (RFC 9207)', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow();
+    await storage.createMcpServer(row);
+    const started = await startMcpOAuth({ storage, config, server: row, ownerGhii: 'alice@test-node-001', bindBrowser });
+    if (!started.ok) throw new Error('start failed');
+    seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
+    const done = await finishMcpOAuth({ storage, config, state: started.state, code: 'the-code', iss: BASE, binding: BINDING });
+    expect(done.ok).toBe(true);
+  });
+
+  it('refuses a callback whose iss names another authorization server, before the code is exchanged', async () => {
+    const storage = new SqliteStorage(':memory:');
+    const row = makeRow();
+    await storage.createMcpServer(row);
+    const started = await startMcpOAuth({ storage, config, server: row, ownerGhii: 'alice@test-node-001', bindBrowser });
+    if (!started.ok) throw new Error('start failed');
+    seen.challenge = new URL(started.authorizeUrl).searchParams.get('code_challenge') ?? '';
+    seen.verifierAccepted = false;
+    const done = await finishMcpOAuth({ storage, config, state: started.state, code: 'the-code', iss: 'https://mix-up.example', binding: BINDING });
+    expect(done.ok).toBe(false);
+    if (done.ok) return;
+    expect(done.code).toBe('EXCHANGE_FAILED');
+    // Refused before the token endpoint was asked: the verifier never reached it.
+    expect(seen.verifierAccepted).toBe(false);
+    expect((await storage.getMcpServer(row.id))?.credential ?? null).toBeNull();
   });
 
   it('consumes the state, so a replayed callback finds nothing', async () => {

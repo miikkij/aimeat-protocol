@@ -19,6 +19,7 @@
  * @structure RemoteCallResult · callRemoteTool · listRemoteTools · toolCacheHash
  * @usage const r = await callRemoteTool({ storage, config, server, tool, args, caller, scopes });
  * @version-history
+ *   2026-10-20 — callTool takes the options as its second argument on the SDK v2 client; listTools() gathers every page (SDK v2 migration step 4a).
  *   2026-10-15 — A failed token renewal refuses the call with UPSTREAM_UNAUTHORIZED; refreshMcpOAuth
  *     has already parked the server in needs_reauth (feature-list audit #9).
  *   v1.9.0 — 2026-10-09 — A parked server's stored lastError and the log line carry the error through
@@ -293,7 +294,7 @@ async function resolveCredential(
  * either accepted the call or refused with a message that happened to say "unauthorized".
  */
 function isUnauthorized(err: unknown): boolean {
-  const status = (err as { code?: unknown } | null)?.code;
+  const status = httpStatusOf(err);
   if (status === 401 || status === 403) return true;
   const m = err instanceof Error ? err.message : String(err);
   return /\b401\b|\b403\b|unauthori[sz]ed|forbidden|authentication required/i.test(m);
@@ -368,7 +369,18 @@ async function refuseToolList(
  * (a restart, or the session expired). The SDK carries the HTTP status in `.code`, as it does for 401.
  */
 function isSessionGone(err: unknown): boolean {
-  return (err as { code?: unknown } | null)?.code === 404;
+  return httpStatusOf(err) === 404;
+}
+
+/**
+ * The HTTP status a client error carries. The SDK v2 client's SdkHttpError carries it in `.status`
+ * (its `.code` is the SDK's own error code, a string); SseError, and the v1 errors this code was
+ * written against, carry it as a number in `.code`. Undefined when the error is not an HTTP answer.
+ */
+function httpStatusOf(err: unknown): number | undefined {
+  const e = err as { status?: unknown; code?: unknown } | null;
+  if (typeof e?.status === 'number') return e.status;
+  return typeof e?.code === 'number' ? e.code : undefined;
 }
 
 /** The guarded fetch's ceiling was hit (transport.ts, utils/read-capped.ts), not the network. */
@@ -400,8 +412,8 @@ async function parkAndDescribe(
   }
   // 508 is an AIMEAT on the far side saying this call has already passed through it (hops.ts). The
   // SERVER is not parked and its client is kept: it answers every other call, and only this one went
-  // round in a circle. The SDK carries the status in `.code`, as it does for 401.
-  if (tagged === 508) {
+  // round in a circle. httpStatusOf reads the status wherever the SDK put it, as for 401.
+  if (httpStatusOf(err) === 508) {
     return {
       code: 'LOOP_DETECTED',
       // One sentence for both refusals the far side sends with 508: a circle, and a chain too long.
@@ -524,7 +536,7 @@ export async function callRemoteTool(input: RemoteCallInput): Promise<RemoteCall
   try {
     const callOnce = async () => {
       const client = await mcpClientPool.acquire(wire.server, resolved.credential, identity, config);
-      return client.callTool({ name: tool, arguments: effectiveArgs }, undefined, { timeout: CALL_TIMEOUT_MS });
+      return client.callTool({ name: tool, arguments: effectiveArgs }, { timeout: CALL_TIMEOUT_MS });
     };
     let result: Awaited<ReturnType<typeof callOnce>>;
     try {
