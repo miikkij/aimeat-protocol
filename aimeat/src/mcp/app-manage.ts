@@ -23,6 +23,7 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — action "settings" asks the publish gate as PATCH /v1/apps/:filename does: a change that
  *     makes the app public, by an agent without publish:public, is applied without that one field and
  *     answers with `publish_request` (services/app-publish-gate.ts; plan doc-mvcn6c7e4e5q, V4).
@@ -116,11 +117,13 @@ export function registerAppManageTool(
 ): void {
     const ui = new AppUiService(storage, config);
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_manage',
-        descriptionFor('aimeat_app_manage'),
-        zodShapeFor('aimeat_app_manage'),
-        annotationsFor('aimeat_app_manage'),
+        {
+            description: descriptionFor('aimeat_app_manage'),
+            inputSchema: zodShapeFor('aimeat_app_manage'),
+            annotations: annotationsFor('aimeat_app_manage'),
+        },
         async (raw) => {
             const args = raw as Args;
             const checked = checkAppManageInput(args);

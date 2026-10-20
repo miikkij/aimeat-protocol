@@ -11,6 +11,7 @@
  *   403 CLASSIFIED on /v1/ai/complete rather than 502 PROVIDER_ERROR.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-ai-warnings.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.1.0 — 2026-09-30 — No default label hides from AI (option B): the node policy hides the
  *     highest label explicitly, so the CLASSIFIED test still proves what a hiding label does.
  *   v1.0.0 — 2026-09-30 — TARGET-082 review, item 2. Initial.
@@ -151,7 +152,7 @@ describe('TARGET-082 review, item 2: an AI call names the warning-classified con
 
   it('node MCP aimeat_ai_transcribe names warning-classified audio', async () => {
     const tools = new Map<string, (args: Record<string, unknown>) => Promise<{ content: Array<{ text: string }> }>>();
-    const fakeMcp = { tool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as never); } };
+    const fakeMcp = { registerTool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as never); } };
     registerAiCapabilityTools(fakeMcp as never, storage, config, () => AGENT);
     // The tool reads the agent's own storage, so the audio is the agent's.
     await storage.createStorageFile({ key: 'audio/agent.webm', ownerGaii: AGENT, visibility: 'private', mimeType: 'audio/webm', size: 4, data: Buffer.from('abcd'), tags: [], createdAt: stamp });

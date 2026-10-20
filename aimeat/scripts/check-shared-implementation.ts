@@ -30,6 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.4.1 — 2026-10-20 — src/mcp/core-work.ts takes one line of core.ts's ceiling (pure extraction).
  *   v1.4.0 — 2026-10-16 — The file count (SEED 38) became a per-file ceiling of direct-call lines that
  *     fails in both directions, and the ceilings are held to the lint rule's EXEMPT list. A new direct
  *     read inside an exempt file passed until now; 155 lines in 38 tool-surface files when the
@@ -125,9 +126,10 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/companies.ts': 2,
     'src/mcp/consent.ts': 1,
     'src/mcp/core-boards.ts': 2,
+    'src/mcp/core-work.ts': 1,
     'src/mcp/core-admin.ts': 9,
     'src/mcp/core-resources.ts': 4,
-    'src/mcp/core.ts': 10,
+    'src/mcp/core.ts': 9,
     'src/mcp/cortex.ts': 1,
     'src/mcp/exchange-run.ts': 3,
     'src/mcp/exchange.ts': 3,

@@ -21,6 +21,7 @@
  * @structure registerSeoTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage import { registerSeoTools } from './seo.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.1 — 2026-10-05 — A comment names requireOperator, the REST route's check since secaudit 2026-10, C2.
  *   v1.3.0 — 2026-09-27 — aimeat_app_seo_set moved into aimeat_app_manage (action "seo", src/mcp/app-manage.ts).
@@ -52,11 +53,13 @@ export function registerSeoTools(
   /** This session's granted scopes: the two operator tools ask operator:admin of them at call time. */
   scopes: readonly string[] = [],
 ): void {
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_seo_status',
-    descriptionFor('aimeat_seo_status'),
-    zodShapeFor('aimeat_seo_status'),
-    annotationsFor('aimeat_seo_status'),
+    {
+        description: descriptionFor('aimeat_seo_status'),
+        inputSchema: zodShapeFor('aimeat_seo_status'),
+        annotations: annotationsFor('aimeat_seo_status'),
+    },
     async () => {
       // The REST route is behind requireOperator() (askOperator with operator:admin), and this tool
       // calls buildSeoStatus() directly rather than over HTTP, so the check has to be made HERE too, or the tool
@@ -74,11 +77,13 @@ export function registerSeoTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_seo_announce',
-    descriptionFor('aimeat_seo_announce'),
-    zodShapeFor('aimeat_seo_announce'),
-    annotationsFor('aimeat_seo_announce'),
+    {
+        description: descriptionFor('aimeat_seo_announce'),
+        inputSchema: zodShapeFor('aimeat_seo_announce'),
+        annotations: annotationsFor('aimeat_seo_announce'),
+    },
     async (args: { scope?: 'all' | 'pages'; plan?: boolean }) => {
       // Operator-gated here for the same reason aimeat_seo_status is: this calls the service the
       // route calls, not the route, so the route's gate has to be repeated at this door.

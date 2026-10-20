@@ -10,6 +10,7 @@
  *   import { registerWalletExtendedTools } from './wallet-extended.js';
  *   registerWalletExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: aimeat_wallet_transactions tool
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -38,11 +39,13 @@ export function registerWalletExtendedTools(
     const agentGaii = getAgentGaii();
 
     // ── Tool 1: aimeat_wallet_transactions ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_wallet_transactions',
-        descriptionFor('aimeat_wallet_transactions'),
-        zodShapeFor('aimeat_wallet_transactions'),
-        annotationsFor('aimeat_wallet_transactions'),
+        {
+            description: descriptionFor('aimeat_wallet_transactions'),
+            inputSchema: zodShapeFor('aimeat_wallet_transactions'),
+            annotations: annotationsFor('aimeat_wallet_transactions'),
+        },
         async ({ limit }) => {
             const effectiveLimit = limit ?? 20;
 

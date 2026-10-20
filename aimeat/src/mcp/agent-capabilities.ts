@@ -11,6 +11,7 @@
  *   import { registerAgentCapabilityTools } from './agent-capabilities.js';
  *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -42,11 +43,13 @@ export function registerAgentCapabilityTools(
     const agentGaii = getAgentGaii();
 
     // ── Tool 1: aimeat_agent_capabilities_report ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_capabilities_report',
-        descriptionFor('aimeat_agent_capabilities_report'),
-        zodShapeFor('aimeat_agent_capabilities_report'),
-        annotationsFor('aimeat_agent_capabilities_report'),
+        {
+            description: descriptionFor('aimeat_agent_capabilities_report'),
+            inputSchema: zodShapeFor('aimeat_agent_capabilities_report'),
+            annotations: annotationsFor('aimeat_agent_capabilities_report'),
+        },
         async ({ technical, domain, languages }) => {
             // The caller reached this tool over an authenticated agent session. An mcp-type capability
             // is marked verified only when it also names a server the node knows for the owner
@@ -75,11 +78,13 @@ export function registerAgentCapabilityTools(
     );
 
     // ── Tool 2: aimeat_agent_activity ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_activity',
-        descriptionFor('aimeat_agent_activity'),
-        zodShapeFor('aimeat_agent_activity'),
-        annotationsFor('aimeat_agent_activity'),
+        {
+            description: descriptionFor('aimeat_agent_activity'),
+            inputSchema: zodShapeFor('aimeat_agent_activity'),
+            annotations: annotationsFor('aimeat_agent_activity'),
+        },
         async ({ days, granularity }) => {
             const agent = await storage.getAgent(agentGaii);
             if (!agent) {

@@ -12,6 +12,7 @@
  * @structure registerAdminNodeUpdateTools(mcp, storage, config, getAgentGaii, scopes)
  * @usage registerAdminNodeUpdateTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-30 — Initial.
  */
@@ -37,9 +38,9 @@ export function registerAdminNodeUpdateTools(
 ): void {
   const agentGaii = getAgentGaii();
 
-  mcp.tool('aimeat_admin_node_update', descriptionFor('aimeat_admin_node_update'),
-    zodShapeFor('aimeat_admin_node_update'),
-    annotationsFor('aimeat_admin_node_update'),
+  mcp.registerTool('aimeat_admin_node_update', { description: descriptionFor('aimeat_admin_node_update'),
+    inputSchema: zodShapeFor('aimeat_admin_node_update'),
+    annotations: annotationsFor('aimeat_admin_node_update') },
     async ({ refresh }) => {
       if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);
       return text(await getNodeUpdateStatus(config, { refresh: refresh === true }));

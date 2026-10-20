@@ -8,6 +8,7 @@
  * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged, caller)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The fork passes the publish gate (services/app-publish-gate.ts): a fork the node's
  *     defaults would make public, by an agent without publish:public, lands unlisted and answers with
  *     `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -53,11 +54,13 @@ export function registerAppForkTool(
     caller: () => CallerContext,
 ): void {
     // ── Tool 6: aimeat_app_fork ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_fork',
-        descriptionFor('aimeat_app_fork'),
-        zodShapeFor('aimeat_app_fork'),
-        annotationsFor('aimeat_app_fork'),
+        {
+            description: descriptionFor('aimeat_app_fork'),
+            inputSchema: zodShapeFor('aimeat_app_fork'),
+            annotations: annotationsFor('aimeat_app_fork'),
+        },
         async ({ owner, filename, new_filename, version }) => {
             const agentGaii = getAgentGaii();
             const scope = await resolveAppOwnerScope(storage, config, agentGaii);

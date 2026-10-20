@@ -41,6 +41,7 @@
  * @usage
  *   'aimeat/no-storage-in-mcp': 'error'
  * @version-history
+ *   v1.1.1 — 2026-10-20 — src/mcp/core-work.ts inherits core.ts's line (pure extraction).
  *   v1.1.0 — 2026-10-16 — A member receiver (`deps.storage.x()`) counts as a direct call, as the bare
  *     identifier does; appdev-pitfalls.ts left EXEMPT, it calls storage no more; check:shared-impl
  *     now holds each exempt file to a per-file ceiling (QA audit P3-09).
@@ -78,6 +79,7 @@ const EXEMPT = new Set([
   'src/mcp/companies.ts',
   'src/mcp/consent.ts',
   'src/mcp/core-boards.ts',            // pure extraction out of core.ts (max-file-lines), same backlog
+  'src/mcp/core-work.ts',              // pure extraction out of core.ts (max-file-lines, 2026-10-20), same backlog
   'src/mcp/core-admin.ts',
   'src/mcp/core-resources.ts',         // extraction out of core.ts (max-file-lines): the same four storage reads
   'src/mcp/core.ts',

@@ -21,6 +21,7 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii, caller)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — `access` (anyone, signed-in, organism:<id>) says who may open the page, and `html` may be
  *     left out to change only that; opening a page that is on to anyone passes the publish gate (V3.10).
  *   2026-10-18 — `enable: true` asks the publish gate (services/portfolio-publish-gate.ts): an agent without
@@ -79,11 +80,13 @@ export function registerPortfolioTools(
     // and be handed a /p/{owner} address the node does not serve.
     if (!config.portfolioEnabled) return;
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_portfolio_publish',
-        descriptionFor('aimeat_portfolio_publish'),
-        zodShapeFor('aimeat_portfolio_publish'),
-        annotationsFor('aimeat_portfolio_publish'),
+        {
+            description: descriptionFor('aimeat_portfolio_publish'),
+            inputSchema: zodShapeFor('aimeat_portfolio_publish'),
+            annotations: annotationsFor('aimeat_portfolio_publish'),
+        },
         async ({ html, enable, access: accessIn }): Promise<TextResult> => {
             const owner = parseGAII(getAgentGaii()) ? localAccountName(getAgentGaii()) : '';
             if (!owner) {

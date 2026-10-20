@@ -28,6 +28,7 @@
  *     aimeat_invoke runs the session's own tools
  * @usage in createMcpServer, for role 'chat' only
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The tools/call wrap and the registered-tool read go through mcp/sdk-seams.ts.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-02 — Initial.
@@ -116,11 +117,13 @@ function needsOf(name: string): { required: string[]; optional: string[] } {
 
 /** aimeat_tools_find: search the session's tools by purpose and switch the matches on. */
 export function registerToolLoader(mcp: McpServer): void {
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_tools_find',
-        descriptionFor('aimeat_tools_find'),
-        zodShapeFor('aimeat_tools_find'),
-        annotationsFor('aimeat_tools_find'),
+        {
+            description: descriptionFor('aimeat_tools_find'),
+            inputSchema: zodShapeFor('aimeat_tools_find'),
+            annotations: annotationsFor('aimeat_tools_find'),
+        },
         async ({ purpose, limit }) => {
             const tools = registered(mcp);
             const entries: ToolEntry[] = Object.entries(tools)

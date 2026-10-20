@@ -20,6 +20,7 @@
  * @structure registerDispatchTools(mcp, registry, registered)
  * @usage registerDispatchTools(mcp, registry, namesTheModulesRegistered)
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.1.0 — 2026-10-06 — `response_format` is taken as the view only on a tool whose catalog entry
  *     supports one; on any other it is the tool's own input and reaches its handler. aimeat_voice_speak
  *     names its audio format so, and would have lost an mp3 request when it moved here. The same for
@@ -52,7 +53,7 @@ export function registerDispatchTools(mcp: McpServer, registry: AgentRegistry, r
         // `response_format` is the concise/detailed view only on a tool that supports one; on any other
         // it is the tool's own input (aimeat_voice_speak's audio format) and goes to the handler.
         const viewParam = def.supportsResponseFormat === true;
-        mcp.tool(tool.name, descriptionFor(tool.name), shape, annotationsFor(tool.name), async (args: Record<string, unknown>) => {
+        mcp.registerTool(tool.name, { description: descriptionFor(tool.name), inputSchema: shape, annotations: annotationsFor(tool.name) }, async (args: Record<string, unknown>) => {
             const { agent_name, ...routed } = args;
             const rest = ownsAgentName ? args : routed;
             const { response_format, ...viewless } = rest;

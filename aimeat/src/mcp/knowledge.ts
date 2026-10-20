@@ -11,6 +11,7 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — SECURITY: aimeat_knowledge_links asks the package read first (readPackage), as the
  *     REST route does; it answered any package's links to any agent.
  *   2026-10-13 — aimeat_knowledge_get and the knowledge-package resource answer a manifest's pacing
@@ -158,11 +159,13 @@ export function registerKnowledgeTools(
     );
 
     // ── Tool 1: aimeat_knowledge_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_knowledge_list',
-        descriptionFor('aimeat_knowledge_list'),
-        zodShapeFor('aimeat_knowledge_list'),
-        annotationsFor('aimeat_knowledge_list'),
+        {
+            description: descriptionFor('aimeat_knowledge_list'),
+            inputSchema: zodShapeFor('aimeat_knowledge_list'),
+            annotations: annotationsFor('aimeat_knowledge_list'),
+        },
         async () => {
             const entries = await listOwnerScopePackages();
             const manifests = entries.filter(e => e.key.endsWith('/manifest'));
@@ -191,11 +194,13 @@ export function registerKnowledgeTools(
     );
 
     // ── Tool 2: aimeat_knowledge_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_knowledge_get',
-        descriptionFor('aimeat_knowledge_get'),
-        zodShapeFor('aimeat_knowledge_get'),
-        annotationsFor('aimeat_knowledge_get'),
+        {
+            description: descriptionFor('aimeat_knowledge_get'),
+            inputSchema: zodShapeFor('aimeat_knowledge_get'),
+            annotations: annotationsFor('aimeat_knowledge_get'),
+        },
         async ({ package_id }) => {
             // A manifest the agent may not see answers the same as one that does not exist.
             const found = await readPackage(package_id);
@@ -238,11 +243,13 @@ export function registerKnowledgeTools(
     );
 
     // ── Tool 3: aimeat_knowledge_contribute ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_knowledge_contribute',
-        descriptionFor('aimeat_knowledge_contribute'),
-        zodShapeFor('aimeat_knowledge_contribute'),
-        annotationsFor('aimeat_knowledge_contribute'),
+        {
+            description: descriptionFor('aimeat_knowledge_contribute'),
+            inputSchema: zodShapeFor('aimeat_knowledge_contribute'),
+            annotations: annotationsFor('aimeat_knowledge_contribute'),
+        },
         async ({ package_id, entry_key, content, model, ai_provenance, ai_provenance_id }) => {
             // ONE implementation (services/knowledge-package-entry.ts). The tool declares its
             // parameters because the protocol requires that, maps `ai_provenance` from the wire
@@ -281,11 +288,13 @@ export function registerKnowledgeTools(
     );
 
     // ── Tool 4: aimeat_knowledge_links ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_knowledge_links',
-        descriptionFor('aimeat_knowledge_links'),
-        zodShapeFor('aimeat_knowledge_links'),
-        annotationsFor('aimeat_knowledge_links'),
+        {
+            description: descriptionFor('aimeat_knowledge_links'),
+            inputSchema: zodShapeFor('aimeat_knowledge_links'),
+            annotations: annotationsFor('aimeat_knowledge_links'),
+        },
         async ({ package_id, direction }) => {
             // The package read first, as GET /v1/knowledge/:id/links asks it: links of a package the
             // agent may not read answer the same as a package that does not exist.

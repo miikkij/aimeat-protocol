@@ -11,6 +11,7 @@
  *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_organism_invitation_respond accepts only for the person in person (isOwnerPrincipal),
  *     as the REST route and the emailed link do; declining stays open (feature-list audit #57).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -65,11 +66,13 @@ export function registerOrganismNameInviteTools(
     // ── Tool: aimeat_organism_invite ──
     // Mirrors POST /v1/organisms/:id/invitations — shared core in services/invitations.ts. Carries
     // an org role + per-workspace grants chosen at invite time, applied on accept.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invite',
-        descriptionFor('aimeat_organism_invite'),
-        zodShapeFor('aimeat_organism_invite'),
-        annotationsFor('aimeat_organism_invite'),
+        {
+            description: descriptionFor('aimeat_organism_invite'),
+            inputSchema: zodShapeFor('aimeat_organism_invite'),
+            annotations: annotationsFor('aimeat_organism_invite'),
+        },
         async ({ organism_id, invitee, role, workspaces }) => {
             const gate = await inviteAdminGate(organism_id);
             if (gate.err !== undefined) return { content: [{ type: 'text' as const, text: gate.err }], isError: true };
@@ -87,11 +90,13 @@ export function registerOrganismNameInviteTools(
     // ── Tool: aimeat_organism_member_add ──
     // Mirrors POST /v1/organisms/:id/members — DIRECT ADD: the owner becomes an active member with
     // role + workspace grants applied immediately (no accept round-trip; they are notified and can leave).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_member_add',
-        descriptionFor('aimeat_organism_member_add'),
-        zodShapeFor('aimeat_organism_member_add'),
-        annotationsFor('aimeat_organism_member_add'),
+        {
+            description: descriptionFor('aimeat_organism_member_add'),
+            inputSchema: zodShapeFor('aimeat_organism_member_add'),
+            annotations: annotationsFor('aimeat_organism_member_add'),
+        },
         async ({ organism_id, ghii, role, workspaces }) => {
             const gate = await inviteAdminGate(organism_id);
             if (gate.err !== undefined) return { content: [{ type: 'text' as const, text: gate.err }], isError: true };
@@ -109,11 +114,13 @@ export function registerOrganismNameInviteTools(
     // ── Tool: aimeat_organism_member_remove ──
     // Mirrors DELETE /v1/organisms/:id/members/:ghii and calls the same service, so the refusals,
     // the agent detach, the workspace-grant revoke and the notice are one implementation.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_member_remove',
-        descriptionFor('aimeat_organism_member_remove'),
-        zodShapeFor('aimeat_organism_member_remove'),
-        annotationsFor('aimeat_organism_member_remove'),
+        {
+            description: descriptionFor('aimeat_organism_member_remove'),
+            inputSchema: zodShapeFor('aimeat_organism_member_remove'),
+            annotations: annotationsFor('aimeat_organism_member_remove'),
+        },
         async ({ organism_id, ghii, ban }) => {
             const gate = await inviteAdminGate(organism_id);
             if (gate.err !== undefined) return { content: [{ type: 'text' as const, text: gate.err }], isError: true };
@@ -132,11 +139,13 @@ export function registerOrganismNameInviteTools(
     // ── Tool: aimeat_organism_owner_add ──
     // Mirrors POST /v1/organisms/:id/owners, and calls the same service, so the membership rules and
     // the notifications cannot differ between the two doors.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_owner_add',
-        descriptionFor('aimeat_organism_owner_add'),
-        zodShapeFor('aimeat_organism_owner_add'),
-        annotationsFor('aimeat_organism_owner_add'),
+        {
+            description: descriptionFor('aimeat_organism_owner_add'),
+            inputSchema: zodShapeFor('aimeat_organism_owner_add'),
+            annotations: annotationsFor('aimeat_organism_owner_add'),
+        },
         async ({ organism_id, ghii }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
@@ -153,11 +162,13 @@ export function registerOrganismNameInviteTools(
     // ── Tool: aimeat_organism_owner_remove ──
     // Mirrors DELETE /v1/organisms/:id/owners/:ghii. The last owner cannot be removed: an organism
     // with no owner is the one state nobody inside it can repair.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_owner_remove',
-        descriptionFor('aimeat_organism_owner_remove'),
-        zodShapeFor('aimeat_organism_owner_remove'),
-        annotationsFor('aimeat_organism_owner_remove'),
+        {
+            description: descriptionFor('aimeat_organism_owner_remove'),
+            inputSchema: zodShapeFor('aimeat_organism_owner_remove'),
+            annotations: annotationsFor('aimeat_organism_owner_remove'),
+        },
         async ({ organism_id, ghii }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
@@ -173,11 +184,13 @@ export function registerOrganismNameInviteTools(
 
     // ── Tool: aimeat_organism_invitation_update ──
     // Mirrors PATCH /v1/organisms/:id/invitations/:ghii — edit a PENDING name invitation's rights.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invitation_update',
-        descriptionFor('aimeat_organism_invitation_update'),
-        zodShapeFor('aimeat_organism_invitation_update'),
-        annotationsFor('aimeat_organism_invitation_update'),
+        {
+            description: descriptionFor('aimeat_organism_invitation_update'),
+            inputSchema: zodShapeFor('aimeat_organism_invitation_update'),
+            annotations: annotationsFor('aimeat_organism_invitation_update'),
+        },
         async ({ organism_id, invitee, role, workspaces }) => {
             const gate = await inviteAdminGate(organism_id);
             if (gate.err !== undefined) return { content: [{ type: 'text' as const, text: gate.err }], isError: true };
@@ -197,11 +210,13 @@ export function registerOrganismNameInviteTools(
 
     // ── Tool: aimeat_organism_invitation_cancel ──
     // Mirrors DELETE /v1/organisms/:id/invitations/:ghii — withdraw a PENDING name invitation.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invitation_cancel',
-        descriptionFor('aimeat_organism_invitation_cancel'),
-        zodShapeFor('aimeat_organism_invitation_cancel'),
-        annotationsFor('aimeat_organism_invitation_cancel'),
+        {
+            description: descriptionFor('aimeat_organism_invitation_cancel'),
+            inputSchema: zodShapeFor('aimeat_organism_invitation_cancel'),
+            annotations: annotationsFor('aimeat_organism_invitation_cancel'),
+        },
         async ({ organism_id, invitee }) => {
             const gate = await inviteAdminGate(organism_id);
             if (gate.err !== undefined) return { content: [{ type: 'text' as const, text: gate.err }], isError: true };
@@ -217,11 +232,13 @@ export function registerOrganismNameInviteTools(
     );
 
     // ── Tool: aimeat_organism_invitations ── (your own pending invitations across organisms)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invitations',
-        descriptionFor('aimeat_organism_invitations'),
-        zodShapeFor('aimeat_organism_invitations'),
-        annotationsFor('aimeat_organism_invitations'),
+        {
+            description: descriptionFor('aimeat_organism_invitations'),
+            inputSchema: zodShapeFor('aimeat_organism_invitations'),
+            annotations: annotationsFor('aimeat_organism_invitations'),
+        },
         async () => {
             const ownerName = getOwnerName();
             const memberships = (await storage.listMembershipsByGhii(ownerName)).filter(m => m.status === 'invited');
@@ -235,11 +252,13 @@ export function registerOrganismNameInviteTools(
     );
 
     // ── Tool: aimeat_organism_invitation_respond ── (accept | decline your invitation)
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_organism_invitation_respond',
-        descriptionFor('aimeat_organism_invitation_respond'),
-        zodShapeFor('aimeat_organism_invitation_respond'),
-        annotationsFor('aimeat_organism_invitation_respond'),
+        {
+            description: descriptionFor('aimeat_organism_invitation_respond'),
+            inputSchema: zodShapeFor('aimeat_organism_invitation_respond'),
+            annotations: annotationsFor('aimeat_organism_invitation_respond'),
+        },
         async ({ organism_id, decision }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };

@@ -11,6 +11,7 @@
  *   Access and grant live together because they are the two halves of ONE membership decision —
  *   someone asks, someone decides — and both were already reaching for the same role helpers.
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-06 — member_grant and member_revoke answer as a refusal when every workspace refused, as
  *     the connector's tools did (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -67,9 +68,9 @@ export function registerWorkspaceMemberTools(
     // Registered FIRST, before the grant tools, to preserve the tool order this surface had while it
     // lived in workspaces.ts. It belongs here rather than there: a request and a grant are the two
     // halves of one membership decision, and they were reaching for the same role helpers already.
-    mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
-        zodShapeFor('aimeat_workspace_access'),
-        annotationsFor('aimeat_workspace_access'),
+    mcp.registerTool('aimeat_workspace_access', { description: descriptionFor('aimeat_workspace_access'),
+        inputSchema: zodShapeFor('aimeat_workspace_access'),
+        annotations: annotationsFor('aimeat_workspace_access') },
         async ({ organism_id, ws, action, message, requester, decision, role }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const entry = await findWsEntry(organism_id, ws);
@@ -128,9 +129,9 @@ export function registerWorkspaceMemberTools(
     };
 
     // ── aimeat_workspace_member_grant ── (proactively add an existing member; no prior request needed)
-    mcp.tool('aimeat_workspace_member_grant', descriptionFor('aimeat_workspace_member_grant'),
-        zodShapeFor('aimeat_workspace_member_grant'),
-        annotationsFor('aimeat_workspace_member_grant'),
+    mcp.registerTool('aimeat_workspace_member_grant', { description: descriptionFor('aimeat_workspace_member_grant'),
+        inputSchema: zodShapeFor('aimeat_workspace_member_grant'),
+        annotations: annotationsFor('aimeat_workspace_member_grant') },
         async ({ organism_id, ws, workspaces, grantee, role }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const targets = wsList(ws, workspaces);
@@ -153,9 +154,9 @@ export function registerWorkspaceMemberTools(
         });
 
     // ── aimeat_workspace_member_revoke ── (remove a member's role on one or many workspaces)
-    mcp.tool('aimeat_workspace_member_revoke', descriptionFor('aimeat_workspace_member_revoke'),
-        zodShapeFor('aimeat_workspace_member_revoke'),
-        annotationsFor('aimeat_workspace_member_revoke'),
+    mcp.registerTool('aimeat_workspace_member_revoke', { description: descriptionFor('aimeat_workspace_member_revoke'),
+        inputSchema: zodShapeFor('aimeat_workspace_member_revoke'),
+        annotations: annotationsFor('aimeat_workspace_member_revoke') },
         async ({ organism_id, ws, workspaces, grantee }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const targets = wsList(ws, workspaces);
@@ -176,9 +177,9 @@ export function registerWorkspaceMemberTools(
         });
 
     // ── aimeat_workspace_members ── (list a workspace's members with roles + grant provenance)
-    mcp.tool('aimeat_workspace_members', descriptionFor('aimeat_workspace_members'),
-        zodShapeFor('aimeat_workspace_members'),
-        annotationsFor('aimeat_workspace_members'),
+    mcp.registerTool('aimeat_workspace_members', { description: descriptionFor('aimeat_workspace_members'),
+        inputSchema: zodShapeFor('aimeat_workspace_members'),
+        annotations: annotationsFor('aimeat_workspace_members') },
         async ({ organism_id, ws }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const mgr = await wsManager(organism_id, ws);

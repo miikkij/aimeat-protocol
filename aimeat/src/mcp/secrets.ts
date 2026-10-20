@@ -20,6 +20,7 @@
  * @structure registerSecretTools(mcp, storage, config, getAgentGaii)
  * @usage registerSecretTools(mcp, storage, config, agentGaii) — from mcp/register-all.ts
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-09 — aimeat_secret_set takes an optional `host`, the same as PUT /v1/secrets/:name (secrets
  *     audit 2026-10-09, item 10).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -45,12 +46,12 @@ export function registerSecretTools(
     // asking about the account it acts within, exactly as aimeat_access_list does.
     const vaultOf = (): string => ownerGhiiOf(getAgentGaii());
 
-    mcp.tool('aimeat_secret_list', descriptionFor('aimeat_secret_list'), zodShapeFor('aimeat_secret_list'), annotationsFor('aimeat_secret_list'), async () => {
+    mcp.registerTool('aimeat_secret_list', { description: descriptionFor('aimeat_secret_list'), inputSchema: zodShapeFor('aimeat_secret_list'), annotations: annotationsFor('aimeat_secret_list') }, async () => {
         const secrets = await listOwnerSecrets(storage, vaultOf());
         return { content: [{ type: 'text' as const, text: JSON.stringify({ secrets, count: secrets.length }, null, 2) }] };
     });
 
-    mcp.tool('aimeat_secret_set', descriptionFor('aimeat_secret_set'), zodShapeFor('aimeat_secret_set'), annotationsFor('aimeat_secret_set'), async ({ name, value, host }) => {
+    mcp.registerTool('aimeat_secret_set', { description: descriptionFor('aimeat_secret_set'), inputSchema: zodShapeFor('aimeat_secret_set'), annotations: annotationsFor('aimeat_secret_set') }, async ({ name, value, host }) => {
         const ownerGhii = vaultOf();
         // `host` binds the secret now; the session's principal is recorded as the one who set it.
         const r = await putOwnerSecret(storage, config, ownerGhii, name, value, { host, by: getAgentGaii() });
@@ -61,7 +62,7 @@ export function registerSecretTools(
         return { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] };
     });
 
-    mcp.tool('aimeat_secret_delete', descriptionFor('aimeat_secret_delete'), zodShapeFor('aimeat_secret_delete'), annotationsFor('aimeat_secret_delete'), async ({ name }) => {
+    mcp.registerTool('aimeat_secret_delete', { description: descriptionFor('aimeat_secret_delete'), inputSchema: zodShapeFor('aimeat_secret_delete'), annotations: annotationsFor('aimeat_secret_delete') }, async ({ name }) => {
         const ownerGhii = vaultOf();
         const r = await deleteOwnerSecret(storage, ownerGhii, name);
         if (!r.ok) {

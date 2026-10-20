@@ -10,6 +10,7 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-11 — _get's source_app carries `toll_morsels` (the app's pacing amount; a morsel is pacing,
  *     not a price), `price_morsels` as its deprecated mirror until 4.0.0, and how_to_start names the take.
  *   2026-10-06 — A memory ceiling refusal reads `QUOTA_EXCEEDED: ...` (secaudit 2026-10 last items, F3).
@@ -51,11 +52,13 @@ export function registerAppTemplateProposalTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_template_propose',
-        descriptionFor('aimeat_app_template_propose'),
-        zodShapeFor('aimeat_app_template_propose'),
-        annotationsFor('aimeat_app_template_propose'),
+        {
+            description: descriptionFor('aimeat_app_template_propose'),
+            inputSchema: zodShapeFor('aimeat_app_template_propose'),
+            annotations: annotationsFor('aimeat_app_template_propose'),
+        },
         async (input) => {
             const result = await proposeTemplate(storage, config, agentGaii, input);
             // A memory ceiling refusal carries its code (F3): `QUOTA_EXCEEDED: ...`, as REST answers.
@@ -64,11 +67,13 @@ export function registerAppTemplateProposalTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_template_list',
-        descriptionFor('aimeat_app_template_list'),
-        zodShapeFor('aimeat_app_template_list'),
-        annotationsFor('aimeat_app_template_list'),
+        {
+            description: descriptionFor('aimeat_app_template_list'),
+            inputSchema: zodShapeFor('aimeat_app_template_list'),
+            annotations: annotationsFor('aimeat_app_template_list'),
+        },
         async () => {
             const proposals = await listTemplateProposals(storage, config, agentGaii);
             return text({
@@ -86,11 +91,13 @@ export function registerAppTemplateProposalTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_template_get',
-        descriptionFor('aimeat_app_template_get'),
-        zodShapeFor('aimeat_app_template_get'),
-        annotationsFor('aimeat_app_template_get'),
+        {
+            description: descriptionFor('aimeat_app_template_get'),
+            inputSchema: zodShapeFor('aimeat_app_template_get'),
+            annotations: annotationsFor('aimeat_app_template_get'),
+        },
         async ({ id, part }) => {
             const found = await getTemplateProposal(storage, config, agentGaii, id);
             if (!found) {
@@ -138,11 +145,13 @@ export function registerAppTemplateProposalTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_app_template_delete',
-        descriptionFor('aimeat_app_template_delete'),
-        zodShapeFor('aimeat_app_template_delete'),
-        annotationsFor('aimeat_app_template_delete'),
+        {
+            description: descriptionFor('aimeat_app_template_delete'),
+            inputSchema: zodShapeFor('aimeat_app_template_delete'),
+            annotations: annotationsFor('aimeat_app_template_delete'),
+        },
         async ({ id }) => {
             const ok = await deleteTemplateProposal(storage, config, agentGaii, id);
             if (!ok) return errText(`Template proposal not found: ${id}`);

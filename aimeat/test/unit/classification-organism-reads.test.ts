@@ -11,6 +11,7 @@
  *   are the positive controls.
  * @usage cd aimeat && pnpm exec vitest run test/unit/classification-organism-reads.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-16 — The auth fixtures carry `scopes`, as every real token does: the by-identity read now asks the caller for memory:read (QA audit S3-03), and an owner fixture without the field was not a token the node issues.
  *   v1.0.0 — 2026-09-30 — TARGET-082 review, item 1. Initial.
  */
@@ -155,7 +156,7 @@ describe('TARGET-082 review, item 1: an organism record read by its visibility s
 
   it('node MCP aimeat_memory_read_public: CLASSIFIED for an agent whose owner is not a member', async () => {
     const tools = new Map<string, (args: Record<string, unknown>) => Promise<{ isError?: boolean; content: Array<{ text: string }> }>>();
-    const fakeMcp = { tool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as never); } };
+    const fakeMcp = { registerTool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as never); } };
     const call = async (agent: string, key: string) => {
       registerMemoryExtendedTools(fakeMcp as never, storage, config, () => agent, () => undefined, () => undefined);
       return tools.get('aimeat_memory_read_public')!({ gaii: ALICE, key });

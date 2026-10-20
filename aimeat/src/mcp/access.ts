@@ -18,6 +18,7 @@
  * @structure registerAccessTools(mcp, storage, config, getAgentGaii)
  * @usage registerAccessTools(mcp, storage, config, agentGaii) — from mcp/register-all.ts
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", decision 8).
  *   v1.0.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
@@ -40,7 +41,7 @@ export function registerAccessTools(
 ): void {
     const accessDb = createAccessTabService(storage, config);
 
-    mcp.tool('aimeat_access_list', descriptionFor('aimeat_access_list'), zodShapeFor('aimeat_access_list'), annotationsFor('aimeat_access_list'), async () => {
+    mcp.registerTool('aimeat_access_list', { description: descriptionFor('aimeat_access_list'), inputSchema: zodShapeFor('aimeat_access_list'), annotations: annotationsFor('aimeat_access_list') }, async () => {
         // The human behind this session, whichever principal is speaking: the keys are the owner's,
         // and an agent asking about "my access" is asking about the account it acts within.
         const ownerGhii = ownerGhiiOf(getAgentGaii());

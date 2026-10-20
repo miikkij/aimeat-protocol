@@ -11,6 +11,7 @@
  * @structure registerWorkspaceDocumentTools(mcp, deps, caller)
  * @usage registerWorkspaceDocumentTools(mcp, { storage, config }, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The deps no longer carry agentGaii and ownerName.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-02 — Initial (wish-workspace-append-ja-osiomuokkaus).
@@ -64,9 +65,9 @@ export function registerWorkspaceDocumentTools(
         throw err;
     };
 
-    mcp.tool('aimeat_workspace_doc_append', descriptionFor('aimeat_workspace_doc_append'),
-        zodShapeFor('aimeat_workspace_doc_append'),
-        annotationsFor('aimeat_workspace_doc_append'),
+    mcp.registerTool('aimeat_workspace_doc_append', { description: descriptionFor('aimeat_workspace_doc_append'),
+        inputSchema: zodShapeFor('aimeat_workspace_doc_append'),
+        annotations: annotationsFor('aimeat_workspace_doc_append') },
         async ({ organism_id, ws, space, id, markdown, section }): Promise<TextResult> => {
             try {
                 return ok(await appendToDocument(editDeps, editCaller(), {
@@ -77,9 +78,9 @@ export function registerWorkspaceDocumentTools(
             } catch (err) { return editFail(err); }
         });
 
-    mcp.tool('aimeat_workspace_doc_section_replace', descriptionFor('aimeat_workspace_doc_section_replace'),
-        zodShapeFor('aimeat_workspace_doc_section_replace'),
-        annotationsFor('aimeat_workspace_doc_section_replace'),
+    mcp.registerTool('aimeat_workspace_doc_section_replace', { description: descriptionFor('aimeat_workspace_doc_section_replace'),
+        inputSchema: zodShapeFor('aimeat_workspace_doc_section_replace'),
+        annotations: annotationsFor('aimeat_workspace_doc_section_replace') },
         async ({ organism_id, ws, space, id, section, markdown }): Promise<TextResult> => {
             try {
                 return ok(await replaceDocumentSection(editDeps, editCaller(), {

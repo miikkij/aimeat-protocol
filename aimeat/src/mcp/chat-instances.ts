@@ -11,6 +11,7 @@
  *   import { registerChatInstancesTools } from './chat-instances.js';
  *   registerChatInstancesTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — The chat-instance resource refuses another owner's instance with resourceRefusal
  *     (ACCESS_DENIED and a next step) instead of the bare "Access denied" (feature-list audit #186).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -98,11 +99,13 @@ export function registerChatInstancesTools(
     );
 
     // ── Tool 1: aimeat_instance_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_instance_list',
-        descriptionFor('aimeat_instance_list'),
-        zodShapeFor('aimeat_instance_list'),
-        annotationsFor('aimeat_instance_list'),
+        {
+            description: descriptionFor('aimeat_instance_list'),
+            inputSchema: zodShapeFor('aimeat_instance_list'),
+            annotations: annotationsFor('aimeat_instance_list'),
+        },
         async () => {
             const instances = await storage.listChatInstances({ ownerName: ownerName() });
 
@@ -125,11 +128,13 @@ export function registerChatInstancesTools(
     );
 
     // ── Tool 2: aimeat_instance_create ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_instance_create',
-        descriptionFor('aimeat_instance_create'),
-        zodShapeFor('aimeat_instance_create'),
-        annotationsFor('aimeat_instance_create'),
+        {
+            description: descriptionFor('aimeat_instance_create'),
+            inputSchema: zodShapeFor('aimeat_instance_create'),
+            annotations: annotationsFor('aimeat_instance_create'),
+        },
         async ({ name, model }) => {
             // The tool's own parameter is a model id; the record's platform is its vendor segment.
             const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
@@ -162,11 +167,13 @@ export function registerChatInstancesTools(
     );
 
     // ── Tool 3: aimeat_instance_status ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_instance_status',
-        descriptionFor('aimeat_instance_status'),
-        zodShapeFor('aimeat_instance_status'),
-        annotationsFor('aimeat_instance_status'),
+        {
+            description: descriptionFor('aimeat_instance_status'),
+            inputSchema: zodShapeFor('aimeat_instance_status'),
+            annotations: annotationsFor('aimeat_instance_status'),
+        },
         async ({ instance_id }) => {
             const inst = await storage.getChatInstance(instance_id);
             if (!inst) {

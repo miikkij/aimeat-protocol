@@ -11,6 +11,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-20 — Only registerTool is patched with the scope gate and the wrapper chain; tool()
+ *     throws while the server registers, since every tool uses registerTool (SDK v2 migration, step 3).
  *   2026-10-20 — The server no longer declares resources.subscribe, which no handler served.
  *   2026-10-20 — Every open session is recorded in mcp/session-registry.ts, so deleting an agent or
  *     rotating its key closes its live MCP transports at once, as both already close its connect
@@ -328,8 +330,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // (mcp/null-as-absent.ts): CrewAI does that for every optional field, nested ones included.
         treatNullAsAbsent(mcp);
 
-        // F1: enforce per-agent scopes on the tool surface. We monkeypatch BOTH mcp.tool and
-        // mcp.registerTool (tools may use either) for the duration of registration so each
+        // F1: enforce per-agent scopes on the tool surface. We monkeypatch mcp.registerTool (and
+        // make mcp.tool refuse) for the duration of registration so each
         // registerXxxTools() call only registers tools this agent's scopes allow (mirrors REST
         // requireScope gates). Owner-attached agents with a '*' scope get everything. Warn-only
         // mode (config.mcpEnforceScopes=false) registers all tools but logs what WOULD be filtered.
@@ -352,7 +354,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             // warn-only: still register (true); enforce: skip (false) unless the person can allow it
             return !enforce || askable(name);
         };
-        const originalTool = patchable.tool.bind(mcp) as ToolFn;
+        // Every tool registers through registerTool, the form the MCP SDK v2 keeps; tool() would skip
+        // the gate and the wrapper chain, so while registering it throws instead of registering.
+        const originalTool = patchable.tool;
         const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
         // Measured INSIDE the gate: a tool this agent's scopes filtered out is never wrapped, so a
         // tool that was never offered is never counted as one that was not called. The wrap sits at
@@ -367,7 +371,6 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // A tool that throws, or returns a caught internal error, is logged, reported to the operator
         // and answered with a sentence (mcp/tool-fault.ts). The whole chain and its order: mcp/tool-registrar.ts.
         const registrarDeps = { scopes: () => scopes, principal: () => agentGaii, storage, config };
-        const measuredTool = toolRegistrar(originalTool, registrarDeps);
         const measuredRegisterTool = toolRegistrar(originalRegisterTool, registrarDeps);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.
@@ -375,9 +378,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // in the same session; any other newly granted tool still requires re-initialization.
         const liveGate = (name: string) => !enforce || scopeAllowsTool(scopes, name);
         const listedGate = (name: string) => liveGate(name) || askable(name);
-        const liveTool = withRequestPermission(measuredTool, listedGate);
         const liveRegisterTool = withRequestPermission(measuredRegisterTool, listedGate);
-        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? liveTool(...args) : undefined;
+        patchable.tool = (...args: unknown[]) => { throw new Error(`the tool() form is not used here (${String(args[0])}): register with registerTool`); };
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? liveRegisterTool(...args) : undefined;
         // Resources answer under the tools' rules: the scope of the tool that reads the same thing,
         // from this request's token, and the organism agent gate (mcp/resource-gate.ts, AUTH-2).

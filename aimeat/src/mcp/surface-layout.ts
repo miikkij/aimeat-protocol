@@ -22,6 +22,7 @@
  * @structure registerSurfaceLayoutTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerSurfaceLayoutTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-08 — aimeat_surface_layout_set passes the session's scopes with the passage provenance
  *     (aiprov E9).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -92,11 +93,13 @@ export function registerSurfaceLayoutTools(
         message: 'Only the person who runs this installation can arrange its pages.',
     }, true);
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_surface_layout_get',
-        descriptionFor('aimeat_surface_layout_get'),
-        zodShapeFor('aimeat_surface_layout_get'),
-        annotationsFor('aimeat_surface_layout_get'),
+        {
+            description: descriptionFor('aimeat_surface_layout_get'),
+            inputSchema: zodShapeFor('aimeat_surface_layout_get'),
+            annotations: annotationsFor('aimeat_surface_layout_get'),
+        },
         async ({ surface }): Promise<TextResult> => {
             if (!await isOperator()) return notOperator();
             if (!SurfaceLayoutService.isSurface(surface)) {
@@ -126,11 +129,13 @@ export function registerSurfaceLayoutTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_surface_layout_set',
-        descriptionFor('aimeat_surface_layout_set'),
-        zodShapeFor('aimeat_surface_layout_set'),
-        annotationsFor('aimeat_surface_layout_set'),
+        {
+            description: descriptionFor('aimeat_surface_layout_set'),
+            inputSchema: zodShapeFor('aimeat_surface_layout_set'),
+            annotations: annotationsFor('aimeat_surface_layout_set'),
+        },
         async ({ surface, blocks, note, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
             if (!await isOperator()) return notOperator();
             if (!SurfaceLayoutService.isSurface(surface)) {

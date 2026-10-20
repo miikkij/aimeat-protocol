@@ -12,6 +12,7 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — aimeat_dm_send_as_owner calls services/message-send-as-owner.ts, the implementation
  *     POST /v1/messages/as-owner calls too: the message names the agent that sent it, and a group
  *     address (support@operators) reaches the thread instead of being queued as a 1:1.
@@ -157,11 +158,13 @@ export function registerDmMessageTools(
     });
 
     // ── aimeat_dm_send — send a federated direct message from this agent to anyone ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_send',
-        descriptionFor('aimeat_dm_send'),
-        zodShapeFor('aimeat_dm_send'),
-        annotationsFor('aimeat_dm_send'),
+        {
+            description: descriptionFor('aimeat_dm_send'),
+            inputSchema: zodShapeFor('aimeat_dm_send'),
+            annotations: annotationsFor('aimeat_dm_send'),
+        },
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
             // Reassigned when support here is answered on another node (see the redirect below).
@@ -285,11 +288,13 @@ export function registerDmMessageTools(
     // aimeat_dm_send, which produces one untagged thread per recipient and fills a person's list with
     // twenty identical rows in one minute. A broadcast tags every copy with one shared id, and that id
     // is what the recipient's conversations list folds on.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_broadcast',
-        descriptionFor('aimeat_dm_broadcast'),
-        zodShapeFor('aimeat_dm_broadcast'),
-        annotationsFor('aimeat_dm_broadcast'),
+        {
+            description: descriptionFor('aimeat_dm_broadcast'),
+            inputSchema: zodShapeFor('aimeat_dm_broadcast'),
+            annotations: annotationsFor('aimeat_dm_broadcast'),
+        },
         async ({ to, group_id, audience, mode, subject, body, attachments, interactive, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
             if (!body?.trim() && !attachments?.length && !interactive) {
@@ -353,11 +358,13 @@ export function registerDmMessageTools(
     // another (no cross-owner impersonation). The reply lands in the OWNER's thread, sent by the owner,
     // and since 2026-10-17 the message names the agent that sent it (sentByAgent), for the owner and the
     // recipient alike. Powers Inbox "Reply with AI".
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_send_as_owner',
-        descriptionFor('aimeat_dm_send_as_owner'),
-        zodShapeFor('aimeat_dm_send_as_owner'),
-        annotationsFor('aimeat_dm_send_as_owner'),
+        {
+            description: descriptionFor('aimeat_dm_send_as_owner'),
+            inputSchema: zodShapeFor('aimeat_dm_send_as_owner'),
+            annotations: annotationsFor('aimeat_dm_send_as_owner'),
+        },
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             // One implementation with POST /v1/messages/as-owner (services/message-send-as-owner.ts): the
             // owner derived from this session's agent, the address resolved as POST /v1/messages does
@@ -403,11 +410,13 @@ export function registerDmMessageTools(
     // can read what was sent, while this destroys part of their correspondence and leaves nothing to
     // read. The mailbox is derived server-side from the session GAII, so an agent can only ever reach
     // its own owner's messages.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_delete_as_owner',
-        descriptionFor('aimeat_dm_delete_as_owner'),
-        zodShapeFor('aimeat_dm_delete_as_owner'),
-        annotationsFor('aimeat_dm_delete_as_owner'),
+        {
+            description: descriptionFor('aimeat_dm_delete_as_owner'),
+            inputSchema: zodShapeFor('aimeat_dm_delete_as_owner'),
+            annotations: annotationsFor('aimeat_dm_delete_as_owner'),
+        },
         async ({ message_id }) => {
             const agentGaii = getAgentGaii();
             // The SAME service the REST door calls, so the two surfaces cannot come to different
@@ -428,11 +437,13 @@ export function registerDmMessageTools(
     // to the AGENT; this reads what the owner holds, which is what "reply as me" needs in order to read
     // the thread it answers. The SAME service as GET /v1/messages/overview, so the two surfaces show
     // the same list and leave the same audit line (services/owner-mailbox-reads.ts).
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_inbox_as_owner',
-        descriptionFor('aimeat_dm_inbox_as_owner'),
-        zodShapeFor('aimeat_dm_inbox_as_owner'),
-        annotationsFor('aimeat_dm_inbox_as_owner'),
+        {
+            description: descriptionFor('aimeat_dm_inbox_as_owner'),
+            inputSchema: zodShapeFor('aimeat_dm_inbox_as_owner'),
+            annotations: annotationsFor('aimeat_dm_inbox_as_owner'),
+        },
         async ({ limit, unread_only }) => {
             const reader = delegateReaderFor(getAgentGaii(), config.nodeId);
             const data = await readOwnerOverview(storage, reader, { unreadOnly: unread_only ?? false, limit: limit ?? 30 });
@@ -474,11 +485,13 @@ export function registerDmMessageTools(
 
     // ── aimeat_dm_thread_as_owner — one conversation from the OWNER's mailbox, oldest first ──
     // Same word and same service as the tool above; the REST twin is GET /v1/messages/conversations/:id.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_thread_as_owner',
-        descriptionFor('aimeat_dm_thread_as_owner'),
-        zodShapeFor('aimeat_dm_thread_as_owner'),
-        annotationsFor('aimeat_dm_thread_as_owner'),
+        {
+            description: descriptionFor('aimeat_dm_thread_as_owner'),
+            inputSchema: zodShapeFor('aimeat_dm_thread_as_owner'),
+            annotations: annotationsFor('aimeat_dm_thread_as_owner'),
+        },
         async ({ conversation_id, page, per_page }) => {
             const reader = delegateReaderFor(getAgentGaii(), config.nodeId);
             const result = await readOwnerThread(storage, reader, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
@@ -516,11 +529,13 @@ export function registerDmMessageTools(
     );
 
     // ── aimeat_dm_ask — ask a person a STRUCTURED question (a federated AskUserQuestion) ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_ask',
-        descriptionFor('aimeat_dm_ask'),
-        zodShapeFor('aimeat_dm_ask'),
-        annotationsFor('aimeat_dm_ask'),
+        {
+            description: descriptionFor('aimeat_dm_ask'),
+            inputSchema: zodShapeFor('aimeat_dm_ask'),
+            annotations: annotationsFor('aimeat_dm_ask'),
+        },
         async ({ to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
             const recipientGhii = to.trim();
@@ -578,11 +593,13 @@ export function registerDmMessageTools(
     );
 
     // ── aimeat_dm_inbox — read recent federated DMs addressed to this agent ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_inbox',
-        descriptionFor('aimeat_dm_inbox'),
-        zodShapeFor('aimeat_dm_inbox'),
-        annotationsFor('aimeat_dm_inbox'),
+        {
+            description: descriptionFor('aimeat_dm_inbox'),
+            inputSchema: zodShapeFor('aimeat_dm_inbox'),
+            annotations: annotationsFor('aimeat_dm_inbox'),
+        },
         async ({ page, per_page }) => {
             const agentGaii = getAgentGaii();
             const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
@@ -611,11 +628,13 @@ export function registerDmMessageTools(
     );
 
     // ── aimeat_dm_thread — full federated DM thread (this agent's view), oldest-first ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_thread',
-        descriptionFor('aimeat_dm_thread'),
-        zodShapeFor('aimeat_dm_thread'),
-        annotationsFor('aimeat_dm_thread'),
+        {
+            description: descriptionFor('aimeat_dm_thread'),
+            inputSchema: zodShapeFor('aimeat_dm_thread'),
+            annotations: annotationsFor('aimeat_dm_thread'),
+        },
         async ({ conversation_id, page, per_page }) => {
             const agentGaii = getAgentGaii();
             const mailboxOwnerGhii = ownerGhiiOf(agentGaii);

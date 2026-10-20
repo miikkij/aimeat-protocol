@@ -8,6 +8,7 @@
  *   through the node MCP tools, which call the same service functions as the REST routes.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connections-history-holders.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.0.0 — 2026-10-16 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -28,7 +29,7 @@ type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: str
 
 function toolsFor(scopes: string[]): Record<string, Handler> {
   const tools: Record<string, Handler> = {};
-  const mcp = { tool: (name: string, ...rest: unknown[]) => { tools[name] = rest[rest.length - 1] as Handler; } } as unknown as McpServer;
+  const mcp = { registerTool: (name: string, ...rest: unknown[]) => { tools[name] = rest[rest.length - 1] as Handler; } } as unknown as McpServer;
   const config = {
     nodeId: NODE, connectionsEnabled: true, connectRedirectUri: '', connectFakeBaseUrl: '',
     // A key, so the replies tool reaches the ownership check instead of stopping at NO_ENCRYPTION_KEY.

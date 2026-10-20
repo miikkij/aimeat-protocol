@@ -16,6 +16,7 @@
  * @structure registerAppdevProofTools()
  * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 -- 2026-08-11 -- The attach moved to services/contribution-proofs.ts and the record now
@@ -45,11 +46,13 @@ export function registerAppdevProofTools(
      *  inside the shared memory write. */
     caller: () => CallerContext,
 ): void {
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_appdev_proof_attach',
-        descriptionFor('aimeat_appdev_proof_attach'),
-        zodShapeFor('aimeat_appdev_proof_attach'),
-        annotationsFor('aimeat_appdev_proof_attach'),
+        {
+            description: descriptionFor('aimeat_appdev_proof_attach'),
+            inputSchema: zodShapeFor('aimeat_appdev_proof_attach'),
+            annotations: annotationsFor('aimeat_appdev_proof_attach'),
+        },
         async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
             const attached = await attachContributionProof({ storage, config }, caller().principalView, {
                 subjectType: subject_type,

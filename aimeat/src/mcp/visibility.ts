@@ -10,6 +10,7 @@
  * @structure registerVisibilityTools(mcp, storage, config, caller)
  * @usage import { registerVisibilityTools } from './visibility.js';
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.3.0 — 2026-10-08 — aimeat_visibility_behaviour, _behaviour_set and _behaviour_fix (layer D).
  *   v1.2.0 — 2026-10-08 — aimeat_visibility_feed, over the same service functions as /v1/visibility/feed (layer E).
  *   v1.1.0 — 2026-10-08 — aimeat_visibility_settings_set takes the Clarity and GA4 ids (layer B).
@@ -48,11 +49,13 @@ export function registerVisibilityTools(
   };
   const NO_PLACE = 'A session from another node has no visibility report here.';
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_visibility_report',
-    descriptionFor('aimeat_visibility_report'),
-    zodShapeFor('aimeat_visibility_report'),
-    annotationsFor('aimeat_visibility_report'),
+    {
+        description: descriptionFor('aimeat_visibility_report'),
+        inputSchema: zodShapeFor('aimeat_visibility_report'),
+        annotations: annotationsFor('aimeat_visibility_report'),
+    },
     async ({ days }) => {
       const owner = ownerOf();
       if (!owner) return toolError('FORBIDDEN', NO_PLACE);
@@ -60,11 +63,13 @@ export function registerVisibilityTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_visibility_settings_set',
-    descriptionFor('aimeat_visibility_settings_set'),
-    zodShapeFor('aimeat_visibility_settings_set'),
-    annotationsFor('aimeat_visibility_settings_set'),
+    {
+        description: descriptionFor('aimeat_visibility_settings_set'),
+        inputSchema: zodShapeFor('aimeat_visibility_settings_set'),
+        annotations: annotationsFor('aimeat_visibility_settings_set'),
+    },
     async ({ enabled, clarity_project_id, ga4_measurement_id }) => {
       const owner = ownerOf();
       if (!owner) return toolError('FORBIDDEN', NO_PLACE);
@@ -80,11 +85,13 @@ export function registerVisibilityTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_visibility_feed',
-    descriptionFor('aimeat_visibility_feed'),
-    zodShapeFor('aimeat_visibility_feed'),
-    annotationsFor('aimeat_visibility_feed'),
+    {
+        description: descriptionFor('aimeat_visibility_feed'),
+        inputSchema: zodShapeFor('aimeat_visibility_feed'),
+        annotations: annotationsFor('aimeat_visibility_feed'),
+    },
     async ({ enabled, brand, return_policy_label, store_url, product_links, stripe_profile_id, stripe_sync }) => {
       const c = caller();
       if (c.visitor) return toolError('FORBIDDEN', 'A session from another node has no product feed here.');
@@ -106,11 +113,13 @@ export function registerVisibilityTools(
   );
 
   // ── On-page behaviour (layer D), over the functions routes/visibility-behaviour.ts calls ────
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_visibility_behaviour',
-    descriptionFor('aimeat_visibility_behaviour'),
-    zodShapeFor('aimeat_visibility_behaviour'),
-    annotationsFor('aimeat_visibility_behaviour'),
+    {
+        description: descriptionFor('aimeat_visibility_behaviour'),
+        inputSchema: zodShapeFor('aimeat_visibility_behaviour'),
+        annotations: annotationsFor('aimeat_visibility_behaviour'),
+    },
     async ({ app, days }) => {
       const owner = ownerOf();
       if (!owner) return toolError('FORBIDDEN', NO_PLACE);
@@ -118,11 +127,13 @@ export function registerVisibilityTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_visibility_behaviour_set',
-    descriptionFor('aimeat_visibility_behaviour_set'),
-    zodShapeFor('aimeat_visibility_behaviour_set'),
-    annotationsFor('aimeat_visibility_behaviour_set'),
+    {
+        description: descriptionFor('aimeat_visibility_behaviour_set'),
+        inputSchema: zodShapeFor('aimeat_visibility_behaviour_set'),
+        annotations: annotationsFor('aimeat_visibility_behaviour_set'),
+    },
     async ({ app, app_enabled, fixer }) => {
       const owner = ownerOf();
       if (!owner) return toolError('FORBIDDEN', NO_PLACE);
@@ -136,11 +147,13 @@ export function registerVisibilityTools(
     },
   );
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_visibility_behaviour_fix',
-    descriptionFor('aimeat_visibility_behaviour_fix'),
-    zodShapeFor('aimeat_visibility_behaviour_fix'),
-    annotationsFor('aimeat_visibility_behaviour_fix'),
+    {
+        description: descriptionFor('aimeat_visibility_behaviour_fix'),
+        inputSchema: zodShapeFor('aimeat_visibility_behaviour_fix'),
+        annotations: annotationsFor('aimeat_visibility_behaviour_fix'),
+    },
     async ({ app }) => {
       const owner = ownerOf();
       if (!owner) return toolError('FORBIDDEN', NO_PLACE);

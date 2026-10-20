@@ -11,6 +11,7 @@
  *   import { registerMemoryExtendedTools } from './memory-extended.js';
  *   registerMemoryExtendedTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — aimeat_memory_search calls searchMemoryRecords (services/memory-query.ts), the one
  *     search GET /v1/memory/search calls, instead of the storage primitive (QA audit D2-06).
  *   2026-10-15 — aimeat_memory_search reads storage.searchText, as GET /v1/memory/search does: word-start over the values, no longer a substring match (feature-list audit #52).
@@ -75,11 +76,13 @@ export function registerMemoryExtendedTools(
     // way and both connector doors returned whole records instead — the same tool name meaning two
     // different searches (review item 6.4). One shape, one place, every door.
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_memory_search',
-        descriptionFor('aimeat_memory_search'),
-        zodShapeFor('aimeat_memory_search'),
-        annotationsFor('aimeat_memory_search'),
+        {
+            description: descriptionFor('aimeat_memory_search'),
+            inputSchema: zodShapeFor('aimeat_memory_search'),
+            annotations: annotationsFor('aimeat_memory_search'),
+        },
         async ({ query, type, visibility, limit, include_versions }) => {
             const cap = Math.max(1, Math.min(limit ?? 50, 200));
             const wantedTypes = type ? type.split(',').map(t => t.trim()).filter(Boolean) : [];
@@ -135,11 +138,13 @@ export function registerMemoryExtendedTools(
     );
 
     // ── Tool 2: aimeat_memory_read_public ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_memory_read_public',
-        descriptionFor('aimeat_memory_read_public'),
-        zodShapeFor('aimeat_memory_read_public'),
-        annotationsFor('aimeat_memory_read_public'),
+        {
+            description: descriptionFor('aimeat_memory_read_public'),
+            inputSchema: zodShapeFor('aimeat_memory_read_public'),
+            annotations: annotationsFor('aimeat_memory_read_public'),
+        },
         async ({ gaii, key }) => {
             // ONE CAPABILITY, ONE DOOR: a Design Book part is read through the Design Book, which
             // benches a component again before it hands one out (utils/own-door-keys.ts).

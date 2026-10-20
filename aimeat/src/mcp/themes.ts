@@ -17,6 +17,7 @@
  * @structure registerThemeTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerThemeTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v2.3.0 — 2026-10-03 — aimeat_theme_font_save (add, change or remove a face the operator adds);
@@ -66,22 +67,26 @@ export function registerThemeTools(
         return (await svc.callerIsOperator(session.auth)) ? session.principal : null;
     };
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_list',
-        descriptionFor('aimeat_theme_list'),
-        zodShapeFor('aimeat_theme_list'),
-        annotationsFor('aimeat_theme_list'),
+        {
+            description: descriptionFor('aimeat_theme_list'),
+            inputSchema: zodShapeFor('aimeat_theme_list'),
+            annotations: annotationsFor('aimeat_theme_list'),
+        },
         async () => {
             // `fonts` carries the owners' fonts in storage only for the operator's own agent.
             try { return out(await svc.catalogue(true, !!(await operatorGaii()))); } catch (err) { return refusal(err); }
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_font_save',
-        descriptionFor('aimeat_theme_font_save'),
-        zodShapeFor('aimeat_theme_font_save'),
-        annotationsFor('aimeat_theme_font_save'),
+        {
+            description: descriptionFor('aimeat_theme_font_save'),
+            inputSchema: zodShapeFor('aimeat_theme_font_save'),
+            annotations: annotationsFor('aimeat_theme_font_save'),
+        },
         async (args) => {
             const gaii = await operatorGaii();
             if (!gaii) return toolError('ACCESS_DENIED', NOT_OPERATOR);
@@ -101,11 +106,13 @@ export function registerThemeTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_get',
-        descriptionFor('aimeat_theme_get'),
-        zodShapeFor('aimeat_theme_get'),
-        annotationsFor('aimeat_theme_get'),
+        {
+            description: descriptionFor('aimeat_theme_get'),
+            inputSchema: zodShapeFor('aimeat_theme_get'),
+            annotations: annotationsFor('aimeat_theme_get'),
+        },
         async ({ id }) => {
             try {
                 const theme = await svc.get(id);
@@ -115,11 +122,13 @@ export function registerThemeTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_save',
-        descriptionFor('aimeat_theme_save'),
-        zodShapeFor('aimeat_theme_save'),
-        annotationsFor('aimeat_theme_save'),
+        {
+            description: descriptionFor('aimeat_theme_save'),
+            inputSchema: zodShapeFor('aimeat_theme_save'),
+            annotations: annotationsFor('aimeat_theme_save'),
+        },
         async (args) => {
             const gaii = await operatorGaii();
             if (!gaii) return toolError('ACCESS_DENIED', NOT_OPERATOR);
@@ -140,11 +149,13 @@ export function registerThemeTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_style_save',
-        descriptionFor('aimeat_theme_style_save'),
-        zodShapeFor('aimeat_theme_style_save'),
-        annotationsFor('aimeat_theme_style_save'),
+        {
+            description: descriptionFor('aimeat_theme_style_save'),
+            inputSchema: zodShapeFor('aimeat_theme_style_save'),
+            annotations: annotationsFor('aimeat_theme_style_save'),
+        },
         async (args) => {
             const gaii = await operatorGaii();
             if (!gaii) return toolError('ACCESS_DENIED', NOT_OPERATOR);
@@ -164,11 +175,13 @@ export function registerThemeTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_policy_set',
-        descriptionFor('aimeat_theme_policy_set'),
-        zodShapeFor('aimeat_theme_policy_set'),
-        annotationsFor('aimeat_theme_policy_set'),
+        {
+            description: descriptionFor('aimeat_theme_policy_set'),
+            inputSchema: zodShapeFor('aimeat_theme_policy_set'),
+            annotations: annotationsFor('aimeat_theme_policy_set'),
+        },
         async (args) => {
             if (!await operatorGaii()) return toolError('ACCESS_DENIED', NOT_OPERATOR);
             try {
@@ -178,11 +191,13 @@ export function registerThemeTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_theme_component_css_set',
-        descriptionFor('aimeat_theme_component_css_set'),
-        zodShapeFor('aimeat_theme_component_css_set'),
-        annotationsFor('aimeat_theme_component_css_set'),
+        {
+            description: descriptionFor('aimeat_theme_component_css_set'),
+            inputSchema: zodShapeFor('aimeat_theme_component_css_set'),
+            annotations: annotationsFor('aimeat_theme_component_css_set'),
+        },
         async (args) => {
             const gaii = await operatorGaii();
             if (!gaii) return toolError('ACCESS_DENIED', NOT_OPERATOR);

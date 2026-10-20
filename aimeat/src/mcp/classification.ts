@@ -15,6 +15,7 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — get, set and review take a container (kind organism, workspace, board with
  *     board_id, app with app) through the catalog's input and targetOf; get answers `effective`
  *     (plan doc-mvdipuyqraas, L1.5).
@@ -65,11 +66,13 @@ export function registerClassificationTools(
 ): void {
   const deps = { storage, config };
 
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_classification',
-    descriptionFor('aimeat_classification'),
-    zodShapeFor('aimeat_classification'),
-    annotationsFor('aimeat_classification'),
+    {
+        description: descriptionFor('aimeat_classification'),
+        inputSchema: zodShapeFor('aimeat_classification'),
+        annotations: annotationsFor('aimeat_classification'),
+    },
     async (args) => {
       // The same field check the connector and the CLI make (catalog/definitions/classification.ts).
       const checked = checkClassificationInput(args as Record<string, unknown>);

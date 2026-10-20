@@ -15,6 +15,7 @@
  * @structure registerRefineryTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerRefineryTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  *   v1.0.1 — 2026-10-05 — The run scopes and the prefix rule are the one copy in
  *     services/refinery/schedule-input.ts (secaudit 2026-10, drift 1).
@@ -57,13 +58,13 @@ export function registerRefineryTools(
     };
   };
 
-  mcp.tool('aimeat_refinery_classes', descriptionFor('aimeat_refinery_classes'), zodShapeFor('aimeat_refinery_classes'),
-    annotationsFor('aimeat_refinery_classes'),
+  mcp.registerTool('aimeat_refinery_classes', { description: descriptionFor('aimeat_refinery_classes'), inputSchema: zodShapeFor('aimeat_refinery_classes'),
+    annotations: annotationsFor('aimeat_refinery_classes') },
     async () => ok({ classes: CLASS_PACKS }));
 
-  mcp.tool('aimeat_refinery_run', descriptionFor('aimeat_refinery_run'),
-    zodShapeFor('aimeat_refinery_run'),
-    annotationsFor('aimeat_refinery_run'),
+  mcp.registerTool('aimeat_refinery_run', { description: descriptionFor('aimeat_refinery_run'),
+    inputSchema: zodShapeFor('aimeat_refinery_run'),
+    annotations: annotationsFor('aimeat_refinery_run') },
     async ({ prefix, message_ids }) => {
       const missing = RUN_SCOPES.filter((s) => !scopeIsCovered(scopes, s));
       if (missing.length) return toolError('SCOPE_DENIED', `A batch needs ${missing.join(', ')} as well. Ask the owner to grant ${missing.length === 1 ? 'it' : 'them'}.`);
@@ -78,9 +79,9 @@ export function registerRefineryTools(
       return ok({ run, already_running: already, next: `Follow it with aimeat_refinery_status { run_id: "${run.id}" }.` });
     });
 
-  mcp.tool('aimeat_refinery_status', descriptionFor('aimeat_refinery_status'),
-    zodShapeFor('aimeat_refinery_status'),
-    annotationsFor('aimeat_refinery_status'),
+  mcp.registerTool('aimeat_refinery_status', { description: descriptionFor('aimeat_refinery_status'),
+    inputSchema: zodShapeFor('aimeat_refinery_status'),
+    annotations: annotationsFor('aimeat_refinery_status') },
     async ({ run_id }) => {
       const who = refineryCaller();
       const run = who ? getRun(String(run_id ?? ''), who.ownerGhii) : null;

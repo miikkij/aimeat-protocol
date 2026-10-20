@@ -13,6 +13,7 @@
  * @structure registerAdminHooksTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminHooksTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.1 — 2026-09-26 — aimeat_admin_hook_set's `actions` says each reference names an action
  *     already published: publish it, then bind it (security audit A8-3).
@@ -44,16 +45,16 @@ export function registerAdminHooksTools(
   const agentGaii = getAgentGaii();
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
-  mcp.tool('aimeat_admin_hooks', descriptionFor('aimeat_admin_hooks'),
-    zodShapeFor('aimeat_admin_hooks'), annotationsFor('aimeat_admin_hooks'),
+  mcp.registerTool('aimeat_admin_hooks', { description: descriptionFor('aimeat_admin_hooks'),
+    inputSchema: zodShapeFor('aimeat_admin_hooks'), annotations: annotationsFor('aimeat_admin_hooks') },
     async () => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       return text(await buildHooksOverview(config, storage));
     });
 
-  mcp.tool('aimeat_admin_hook_set', descriptionFor('aimeat_admin_hook_set'),
-    zodShapeFor('aimeat_admin_hook_set'),
-    annotationsFor('aimeat_admin_hook_set'),
+  mcp.registerTool('aimeat_admin_hook_set', { description: descriptionFor('aimeat_admin_hook_set'),
+    inputSchema: zodShapeFor('aimeat_admin_hook_set'),
+    annotations: annotationsFor('aimeat_admin_hook_set') },
     async ({ hook, actions }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       const out = await setHookActions(config, storage, hook, actions);
