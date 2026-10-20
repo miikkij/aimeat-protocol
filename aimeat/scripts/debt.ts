@@ -44,6 +44,8 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   2026-10-20 — The unbounded storage lists, the whole-table reads and the repositories no
+ *     two-provider case calls join the report (QA audit P7-10, P4-09).
  *   2026-10-18 — The reads followed by an unconditional write of the same key join the report
  *     (wish wish-tarkistus-ei-atomiselle-kirjoitukselle-uudessa-koodissa).
  *   2026-10-18 — The pairs written twice join the report: offer and signal fields the Python builders
@@ -174,6 +176,28 @@ const RATCHETS: Ratchet[] = [
     },
     { file: 'aimeat/security/route-refusal-exemptions.json', label: 'Authenticated routes no suite refuses', check: 'check:denial-coverage', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/storage-parity-exemptions.json', label: 'Tables outside the cascades', check: 'check:storage-parity', count: exemptMap, open: exemptOpen },
+    // QA audit P7-10 and P4-09 (2026-10-20): what grows without a bound, and what the two providers never compare.
+    {
+        file: 'aimeat/security/unbounded-lists-baseline.json',
+        label: 'Storage lists with no bound',
+        check: 'check:unbounded-lists',
+        count: raw => Object.keys((parse(raw).methods ?? {}) as Json).length,
+        open: raw => Object.values((parse(raw).methods ?? {}) as Json).filter(isOpen).length,
+    },
+    {
+        file: 'aimeat/security/unbounded-lists-baseline.json',
+        label: 'Whole-table reads outside storage',
+        check: 'check:unbounded-lists',
+        count: raw => Object.values((parse(raw).wholeTableCalls ?? {}) as Record<string, Record<string, number>>)
+            .reduce((total, counts) => total + Object.values(counts).reduce((sum, n) => sum + n, 0), 0),
+    },
+    {
+        file: 'aimeat/security/storage-conformance-baseline.json',
+        label: 'Repositories no two-provider case calls',
+        check: 'check:storage-conformance',
+        count: raw => Object.keys((parse(raw).uncovered ?? {}) as Json).length,
+        open: raw => Object.values((parse(raw).uncovered ?? {}) as Json).filter(isOpen).length,
+    },
     { file: 'aimeat/security/scope-parity-exemptions.json', label: 'Permission words on one side', check: 'check:scope-parity', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/field-reach-exemptions.json', label: 'REST reads with no agent twin', check: 'check:field-reach', count: exemptMap, open: exemptOpen },
     { file: 'aimeat/security/connect-serve-parity-exemptions.json', label: 'MCP tools not on connect serve', check: 'check:mcp-tools', count: exemptMap },
