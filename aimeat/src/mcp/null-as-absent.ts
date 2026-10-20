@@ -25,10 +25,12 @@
  * @structure treatNullAsAbsent · nullPathsRefused · withoutKeys
  * @usage treatNullAsAbsent(mcp) right after `new McpServer(...)`, before any tool is called.
  * @version-history
+ *   v1.0.1 — 2026-10-20 — validateToolInput is wrapped through mcp/sdk-seams.ts.
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { normalizeObjectSchema, safeParseAsync, type AnySchema } from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import { wrapToolInputValidation } from './sdk-seams.js';
 
 /** How many rounds of removal before giving up. Each round removes every refused null it can see. */
 const MAX_ROUNDS = 8;
@@ -76,13 +78,10 @@ function holdsNull(v: unknown): boolean {
   return Object.values(v as Record<string, unknown>).some(holdsNull);
 }
 
-type Validate = (tool: { inputSchema?: unknown }, args: unknown, toolName: string) => Promise<unknown>;
-
 /** Read a refused null on an optional field as the field left out, for every tool on `mcp`. */
 export function treatNullAsAbsent(mcp: McpServer): void {
-  const server = mcp as unknown as { validateToolInput: Validate };
-  const original = server.validateToolInput.bind(mcp) as Validate;
-  server.validateToolInput = async (tool, args, toolName) => {
+  // The SDK has no public validation hook; mcp/sdk-seams.ts reaches validateToolInput.
+  wrapToolInputValidation(mcp, (original) => async (tool, args, toolName) => {
     try {
       return await original(tool, args, toolName);
     } catch (err) {
@@ -99,5 +98,5 @@ export function treatNullAsAbsent(mcp: McpServer): void {
       }
       throw err;
     }
-  };
+  });
 }

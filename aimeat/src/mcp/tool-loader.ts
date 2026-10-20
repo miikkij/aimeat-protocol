@@ -28,6 +28,7 @@
  *     aimeat_invoke runs the session's own tools
  * @usage in createMcpServer, for role 'chat' only
  * @version-history
+ *   2026-10-20 — The tools/call wrap and the registered-tool read go through mcp/sdk-seams.ts.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
@@ -37,6 +38,7 @@ import { getAimeatToolDefinition } from '../tool-catalog/definitions.js';
 import { annotationsFor } from './annotations.js';
 import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { wrapToolsCall, registeredTools, type ToolsCallRequest } from './sdk-seams.js';
 
 export interface ToolEntry { name: string; description: string; enabled: boolean }
 
@@ -82,9 +84,9 @@ export function rankTools(purpose: string, tools: ToolEntry[], limit: number): T
     return scored.slice(0, limit).map((s) => s.tool);
 }
 
-/** The session's registered tools. The SDK keeps them in a field it does not export a getter for. */
+/** The session's registered tools (mcp/sdk-seams.ts reads the SDK's private field). */
 function registered(mcp: McpServer): Record<string, RegisteredTool> {
-    return (mcp as unknown as { _registeredTools?: Record<string, RegisteredTool> })._registeredTools ?? {};
+    return registeredTools(mcp);
 }
 
 /** Switch off every registered tool `on` does not name. Returns how many were switched off. */
@@ -151,9 +153,6 @@ export function registerToolLoader(mcp: McpServer): void {
     );
 }
 
-type CallParams = { name?: unknown; arguments?: Record<string, unknown> };
-type RequestHandler = (request: { method: string; params?: CallParams }, extra: unknown) => Promise<unknown>;
-
 /** Tools aimeat_invoke does not run in-session: itself, and the finder, which has its own name. */
 const NOT_RUN_BY_INVOKE = new Set(['aimeat_invoke', 'aimeat_tools_find']);
 
@@ -173,15 +172,9 @@ const NOT_RUN_BY_INVOKE = new Set(['aimeat_invoke', 'aimeat_tools_find']);
  * 2026-10-02, the contact and company tools among them).
  */
 export function answerSwitchedOffTools(mcp: McpServer): void {
-    const handlers = (mcp.server as unknown as { _requestHandlers?: Map<string, RequestHandler> })._requestHandlers;
-    const original = handlers?.get('tools/call');
-    if (!handlers || !original) {
-        logger.warn('tool-loader: the MCP server has no tools/call handler to wrap; a switched-off tool answers "disabled" until aimeat_tools_find adds it');
-        return;
-    }
-    handlers.set('tools/call', async (request, extra) => {
+    const wrapped = wrapToolsCall(mcp, (original) => async (request, extra) => {
         let name = typeof request.params?.name === 'string' ? request.params.name : '';
-        let call = request;
+        let call: ToolsCallRequest = request;
         if (name === 'aimeat_invoke') {
             const args = request.params?.arguments ?? {};
             const target = typeof args.capability === 'string' ? args.capability.trim() : '';
@@ -198,4 +191,5 @@ export function answerSwitchedOffTools(mcp: McpServer): void {
         }
         return original(call, extra);
     });
+    if (!wrapped) logger.warn('tool-loader: the MCP server has no tools/call handler to wrap; a switched-off tool answers "disabled" until aimeat_tools_find adds it');
 }
