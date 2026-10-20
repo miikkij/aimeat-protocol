@@ -28,6 +28,14 @@
  *   import { workflowsRouter } from './routes/workflows.js';
  *   app.use(workflowsRouter(config, storage));
  * @version-history
+ *   2026-10-20 — GET /:id/preflight passes the caller: it evaluates every signal and, with
+ *     llm.approved, asks the node's model about each llm leaf, so it costs the words a signals-only
+ *     run costs and the model call goes out as that caller. GET /:id/runs and /:id/runs/:runId
+ *     withhold a run's observed values from a caller that does not read the owner's records as the
+ *     owner (secaudit 2026-10, wf-preflight-skips-step-authority and the run-read gap beside it).
+ *   2026-10-20 — A save clears the workflow's open trigger refusal: the refusal pins the definition
+ *     it refused, and "Run as me" on it now answers DEFINITION_CHANGED once the definition is
+ *     replaced (secaudit 2026-10, wf-run-as-owner-not-bound-to-refused-snapshot).
  *   2026-10-15 — GET /:id/preflight answers a missing workflow 404 NOT_FOUND, as the contract and the
  *     other workflow routes do; it answered 404 with WORKFLOW_STALE (feature-list audit #87).
  *   v1.7.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts;
@@ -71,6 +79,8 @@ import { denyScope403 } from '../auth/deny.js';
 import type { WorkflowCaller } from '../services/workflow/step-authority.js';
 import { runRefusedAsOwner, clearRefusal } from '../services/workflow/trigger-authority.js';
 import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
+import { callerOf as callerContextOf } from '../middleware/caller.js';
+import { readsAsOwner } from '../services/owner-scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
@@ -148,6 +158,10 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     ...(req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
   });
 
+  /** True when this caller reads the owner's records as the owner (services/owner-scope-read.ts):
+   *  a run's observed values are the owner's record content, so everyone else is served without them. */
+  const readsOwnerRecords = (req: Request): boolean => readsAsOwner(callerContextOf(req, config.nodeId, storage));
+
   // GET /v1/workflows — list the owner's workflows. ?include=health attaches each workflow's run-health
   // inline (replaces the list view's per-workflow GET /:id/health fan-out).
   router.get('/v1/workflows', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
@@ -200,6 +214,10 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       return;
     }
     await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhiiOf(req), createdBy);
+    // This definition replaces the one an open refusal pinned, so that refusal is over: the next one
+    // is recorded and told anew, and "Run as me" on the old one refuses DEFINITION_CHANGED
+    // (trigger-authority.ts). The MCP save does the same.
+    await clearRefusal(storage, config.nodeId, ownerGhiiOf(req), id);
     emitChange('workflows');
     // One route saves both. `existed` is read BEFORE the save, because after it there is no way to
     // tell a create from an update — and "you created a workflow" said about an edit is a small lie
@@ -414,7 +432,9 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/workflows/:id/runs', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const checks = req.query.only === 'checks' ? 'only' : String(req.query.include ?? '').split(',').includes('checks') ? 'include' : 'exclude';
-    const all = await listRuns(storage, ownerGhiiOf(req), id, { checks, reader: readerFor({ storage, config }, req.auth) });
+    const all = await listRuns(storage, ownerGhiiOf(req), id, {
+      checks, reader: readerFor({ storage, config }, req.auth), asOwner: readsOwnerRecords(req),
+    });
     // ?limit=N: a run record carries the pinned definition and every step's observations, so a
     // cover that wants each workflow's LAST run should not be handed a hundred of them.
     const limit = Math.min(Math.max(0, parseInt(String(req.query.limit ?? '0'), 10) || 0), 200);
@@ -427,11 +447,17 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // run and the resolved variables. Reads memory the way a check does; persists nothing.
   router.get('/v1/workflows/:id/preflight', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
-    const result = await preflightWorkflow({ storage, config, engine }, ownerGhiiOf(req), req.auth!.owner, id);
+    const result = await preflightWorkflow({ storage, config, engine }, ownerGhiiOf(req), req.auth!.owner, id, undefined, callerOf(req));
     // A missing workflow is NOT_FOUND, as on every other workflow route; WORKFLOW_STALE is for one
     // that exists and whose offers changed (feature-list audit #87).
     if (!result.ok && result.notFound) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Workflow "${id}" not found`));
+      return;
+    }
+    // A preflight reads the owner's records and can spend the owner's AI, so it costs what the run
+    // door charges for the same work (step-authority.ts, signals-only).
+    if (!result.ok && result.denied) {
+      denyScope403(req, res, result.denied.needed, result.denied.message);
       return;
     }
     if (!result.ok) {
@@ -447,7 +473,10 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.get('/v1/workflows/:id/runs/:runId', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const runId = req.params.runId as string;
-    const run = await getRun(storage, ownerGhiiOf(req), id, runId, readerFor({ storage, config }, req.auth));
+    // A run holds what its signals read out of the owner's records, so a caller that does not read
+    // those records as the owner is served the states without the values (run-redaction.ts).
+    const run = await getRun(storage, ownerGhiiOf(req), id, runId,
+      readerFor({ storage, config }, req.auth), { asOwner: readsOwnerRecords(req) });
     if (!run) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Run "${runId}" not found`)); return; }
     res.json(success(config.nodeId, run));
   });

@@ -5,6 +5,11 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   2026-10-20 — 41b-41e: a workspace skill is workspace content, so publishing and deleting one
+ *     asks the workspace WRITE rule. A member with no grant and a viewer are refused POST
+ *     /v1/skills (scope workspace) and DELETE /v1/skills/:name, in person and through an agent, the
+ *     creator's SKILL.md is unchanged, and a contributor publishes. Both doors answered 201 and 200
+ *     to a viewer before the fix (secaudit 2026-10, defect 2).
  *   2026-10-16 — 17b-17d: GET /v1/agents/:name/skills refuses an app grant without memory:read and another owner's agent, and serves an app grant holding memory:read (QA audit P3-03).
  *   v1.5.0 -- 2026-10-16 -- Test 34 asked a '*' agent for words '*' covers and passed on the proposal,
  *     so it passed with the narrow-only guard removed; 34 and 34b now ask for a word the target lacks
@@ -1169,6 +1174,74 @@ await test('41. Workspace skills ride the workspace export/import round-trip', a
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(list.body.data.skills.some((s: any) => s.name === 'team-style'), `imported ws skills: ${JSON.stringify(list.body.data.skills)}`);
+});
+
+// ─── A workspace skill is workspace CONTENT, so writing one asks the workspace WRITE rule ───
+//
+// publishSkill and deleteSkill authorized a workspace write with canReadWorkspace, the READ
+// decision, so a `viewer` grant passed both: freshest-wins across owners let a viewer's copy
+// replace the creator's, and the delete removed every member's copies. Owner B joins the organism
+// here, after test 39 has driven the non-member case (secaudit 2026-10, defect 2).
+
+let bAgentToken = '';
+const PLANTED = WS_SKILL_MD.replace('Research briefs', 'PLANTED BY A VIEWER');
+const wsSkillPublish = (token: string, md: string) => json('/v1/skills', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ skill_md: md, scope: 'workspace', organism: orgId, ws: WS }),
+});
+const wsSkillDelete = (token: string) => json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+});
+const creatorBody = async (): Promise<string> => {
+    const r = await json(`/v1/skills/team-style?scope=workspace&organism=${orgId}&ws=${WS}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(r.status === 200, `the creator's skill is still there: ${r.status}`);
+    return r.body.data.skill.fileContents['SKILL.md'] as string;
+};
+const setWsRole = (role: string) => json(`/v1/organisms/${orgId}/workspace-access/grant`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ ws: WS, grantee: otherOwnerName, role }),
+});
+
+await test('41b. Setup: owner B joins the organism as a plain member, with an agent that may write', async () => {
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${otherOwnerToken}` }, body: '{}' });
+    assert(j.status === 201, `B joins ${j.status}: ${JSON.stringify(j.body.error)}`);
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ name: 'skills-ws-writer', owner: otherOwnerName, capabilities: ['memory'], scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(reg.status === 201, `B's agent ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+    bAgentToken = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key);
+});
+
+await test('41c. A member with NO grant cannot publish over the creator\'s workspace skill, in person or as their agent', async () => {
+    for (const [who, token] of [['in person', otherOwnerToken], ['their agent', bAgentToken]] as const) {
+        const p = await wsSkillPublish(token, PLANTED);
+        assert(p.status === 403, `a member with no grant published ${who}: ${p.status} ${JSON.stringify(p.body.data ?? p.body.error)}`);
+    }
+    assert((await creatorBody()).includes('Research briefs'), 'the creator\'s SKILL.md is unchanged');
+});
+
+await test('41d. A VIEWER cannot publish or delete it either, in person or as their agent', async () => {
+    const g = await setWsRole('viewer');
+    assert(g.status === 200 && g.body.data.role === 'viewer', `grant viewer ${g.status}: ${JSON.stringify(g.body)}`);
+    for (const [who, token] of [['in person', otherOwnerToken], ['their agent', bAgentToken]] as const) {
+        const p = await wsSkillPublish(token, PLANTED);
+        assert(p.status === 403, `a viewer published ${who}: ${p.status} ${JSON.stringify(p.body.data ?? p.body.error)}`);
+        const d = await wsSkillDelete(token);
+        assert(d.status === 403, `a viewer deleted the workspace skill ${who}: ${d.status} ${JSON.stringify(d.body.data ?? d.body.error)}`);
+    }
+    const body = await creatorBody();
+    assert(body.includes('Research briefs') && !body.includes('PLANTED BY A VIEWER'), `the creator's SKILL.md is unchanged: ${body.slice(0, 120)}`);
+});
+
+await test('41e. A CONTRIBUTOR publishes, in person', async () => {
+    const g = await setWsRole('contributor');
+    assert(g.status === 200 && g.body.data.role === 'contributor', `grant contributor ${g.status}: ${JSON.stringify(g.body)}`);
+    const p = await wsSkillPublish(otherOwnerToken, WS_SKILL_MD.replace('Research briefs', 'Research briefs, by a contributor'));
+    assert(p.status === 201, `a contributor was refused the publish: ${p.status} ${JSON.stringify(p.body.error)}`);
+    assert((await creatorBody()).includes('by a contributor'), 'the contributor\'s copy is the one a reader takes');
 });
 
 await test('42. Member deletes the workspace skill', async () => {

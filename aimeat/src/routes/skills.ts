@@ -101,6 +101,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       reader: readerFor({ storage, config }, req.auth),
       // The organisation level asks services/audience.ts with the session itself.
       auth,
+      // The workspace WRITE rule for a workspace skill decides on the session (secaudit 2026-10).
+      caller: callerOf(req as Request, config.nodeId, storage),
     };
   }
 

@@ -65,6 +65,11 @@
  *   v1.18.0 — 2026-10-12 — costCapMorsels is a version gate: from COST_CAP_MORSELS_REMOVED_IN (4.0.0) a
  *     save that sets it is refused (400 WORKFLOW_INVALID on REST, "Validation failed" over MCP); before
  *     it, the warning stays and the use is counted and named on the response (Core 2026-11 HTTP-07, HTTP-08).
+ *   v1.19.0 — 2026-10-20 — listRuns and getRun take `asOwner`: a caller that does not read the owner's
+ *     records as the owner (services/owner-scope-read.ts) is served the run without its observed
+ *     values, and keeps every step's state. workflow:read alone had served the owner's private field
+ *     values out of any run of theirs (secaudit 2026-10, the run-read gap beside
+ *     wf-preflight-skips-step-authority).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
@@ -73,7 +78,7 @@ import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, 
 import { template } from './engine-util.js';
 import { triggerErrors, eventVarNames } from './workflow-event.js';
 import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
-import { shownRun } from './run-redaction.js';
+import { shownRun, withoutObservedValues } from './run-redaction.js';
 import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
 import type { ContentReader } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
@@ -631,12 +636,12 @@ export const isCheckRun = (run: Pick<WorkflowRun, 'mode'>): boolean => run.mode 
  */
 export async function listRuns(
   storage: Storage, ownerGhii: string, id: string,
-  opts: { checks?: 'exclude' | 'include' | 'only'; reader?: ContentReader } = {},
+  opts: { checks?: 'exclude' | 'include' | 'only'; reader?: ContentReader; asOwner?: boolean } = {},
 ): Promise<WorkflowRun[]> {
   const recs = await storage.listMemory(ownerGhii, { prefix: runKeyPrefix(id) });
   const checks = opts.checks ?? 'exclude';
   // As a door may serve it: an observation of a credential record is redacted (run-redaction.ts).
-  const runs = recs.map(r => shownRun(r.value as WorkflowRun))
+  const runs = recs.map(r => servedRun(r.value as WorkflowRun, opts.asOwner))
     .filter(r => checks === 'include' || (checks === 'only') === isCheckRun(r))
     .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''));
   return opts.reader ? withheldFor(opts.reader, ownerGhii, runs) : runs;
@@ -644,13 +649,27 @@ export async function listRuns(
 
 /**
  * One run. `reader` is given by a caller that serves the run's observed values (the run routes);
- * the engine's own reads of its run state leave it out.
+ * the engine's own reads of its run state leave it out. `asOwner` is false for a caller that does
+ * not read the owner's records as the owner, and then the observed values are withheld.
  */
-export async function getRun(storage: Storage, ownerGhii: string, id: string, runId: string, reader?: ContentReader): Promise<WorkflowRun | null> {
+export async function getRun(
+  storage: Storage, ownerGhii: string, id: string, runId: string,
+  reader?: ContentReader, opts: { asOwner?: boolean } = {},
+): Promise<WorkflowRun | null> {
   const rec = await storage.getMemory(ownerGhii, runKey(id, runId));
-  // As a door may serve it: an observation of a credential record is redacted (run-redaction.ts).
-  const run = rec ? shownRun(rec.value as WorkflowRun) : null;
+  const run = rec ? servedRun(rec.value as WorkflowRun, opts.asOwner) : null;
   return run && reader ? (await withheldFor(reader, ownerGhii, [run]))[0]! : run;
+}
+
+/**
+ * A stored run as a door may serve it: an observation of a credential record is redacted
+ * (run-redaction.ts), and for a caller that does not read the owner's records as the owner the
+ * observed values are withheld as well. `asOwner` absent is an internal read (the engine, the MCP
+ * tools that serve only a run's status), which is not a door and withholds nothing.
+ */
+function servedRun(stored: WorkflowRun, asOwner?: boolean): WorkflowRun {
+  const run = shownRun(stored);
+  return asOwner === false ? withoutObservedValues(run) : run;
 }
 
 /** What an observed value reads as when the record it was copied from is hidden from the caller. */

@@ -12,6 +12,9 @@
  *   (buildExtensionRecordFromManifest) + extensions/permissions.ts (write/manage guards).
  * @usage app.use(extensionsRouter(config, storage, scheduler, emailService)) in server.ts
  * @version-history
+ *   v1.6.0 — 2026-10-20 — extensions/unattended-reader.ts: GET and PATCH
+ *     /v1/extensions/:name/unattended-reader, what an extension may read with nobody present
+ *     (Jouni, 2026-10-20).
  *   v1.5.0 — 2026-10-09 — extensions/config.ts: PATCH /v1/extensions/:name/config sets config values
  *     of an installed extension in place.
  *   v1.4.0 — 2026-07-13 — Split into extensions/ sibling modules (crud/instances/actions/manifest/
@@ -36,6 +39,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { registerExtensionCrudRoutes } from './extensions/crud.js';
 import { registerExtensionInstanceRoutes } from './extensions/instances.js';
 import { registerExtensionConfigRoutes } from './extensions/config.js';
+import { registerExtensionUnattendedReaderRoutes } from './extensions/unattended-reader.js';
 import { registerExtensionActionRoutes } from './extensions/actions.js';
 
 export function extensionsRouter(config: AimeatConfig, storage: Storage, scheduler?: Scheduler, emailService?: import('../services/email.js').EmailService): Router {
@@ -45,6 +49,7 @@ export function extensionsRouter(config: AimeatConfig, storage: Storage, schedul
   // then per-instance routes, then the /v1/ext/... action-execution routes.
   registerExtensionCrudRoutes(router, config, storage, scheduler);
   registerExtensionConfigRoutes(router, config, storage);
+  registerExtensionUnattendedReaderRoutes(router, config, storage);
   registerExtensionInstanceRoutes(router, config, storage);
   registerExtensionActionRoutes(router, config, storage, emailService);
 

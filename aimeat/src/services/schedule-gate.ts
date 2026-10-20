@@ -29,6 +29,8 @@
  *   const bad = checkScheduleGate({ kind, cron, timezone }, caller);
  *   if (bad) return renderRefusal(bad);   // each door renders its own way
  * @version-history
+ *   2026-10-20 — The `eco-capability` kind asks `work:request`, the word POST /v1/capabilities/:id/invoke
+ *     requires, on create, edit and run (secaudit 2026-10, runEcoCapabilityJob:owner-caller-no-scope-no-maker-check).
  *   2026-10-16 — scheduleKindScopeRefusal(): the per-kind scope as its own check, so editing and
  *     running a schedule ask it as creating does (QA audit F08a-02).
  *   v1.1.1 — 2026-10-05 — hasScope is scopeIsCovered (secaudit 2026-10, C3).
@@ -51,6 +53,10 @@ export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' 
 export const SCHEDULE_KIND_SCOPE: Partial<Record<ScheduleKind, string | readonly string[]>> = {
     ai: 'ai:use',
     agent_task: 'task:write',
+    // Invoking a connected ecosystem app's capability, which is what this kind does on every fire.
+    // The direct route POST /v1/capabilities/:id/invoke asks the same word, and a schedule must not
+    // be the cheaper way in (secaudit 2026-10).
+    'eco-capability': 'work:request',
     'connections-publish': 'connections:use',
     // A refinery batch reads a mailbox, asks the models, writes rows and moves its cursor.
     refinery: ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'],

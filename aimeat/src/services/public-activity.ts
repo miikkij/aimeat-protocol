@@ -12,12 +12,22 @@
  *   prunes agent-owned memory, never system@). Privacy: callers MUST emit only
  *   when the underlying thing is genuinely public; `detail` carries already-public
  *   fields only (never raw memory values); `actor` is reduced to its name segment.
+ *
+ *   THE TEST A CALLER APPLIES, in the words the two 2026-10 defects were found by: can an
+ *   anonymous reader open what this event names, as the event is about to be stored? Not "did a
+ *   flag change" (a workspace share whose access is 'organism', 'password' or 'account' turns the
+ *   public flag on and opens nothing: services/workspace-share.ts) and not "is some related record
+ *   public" (a task completion named any public record of the agent to carry the task's private
+ *   title out: services/agent-task-fanout.ts). Every field put in `summary`, `detail` and `link`
+ *   answers the same question on its own, field by field.
  * @structure recordPublicActivity() + readPublicActivity() helper for the REST feed.
  * @usage import { recordPublicActivity } from '../services/public-activity.js';
  *   void recordPublicActivity(storage, config, { category, actor, summary, detail, link })
  *     .catch(err => logger.error('recordPublicActivity failed', { error: String(err) }));
  * @version-history
  *   v1.0.0 — 2026-06-16 — Initial: public landing activity feed (events + SSE).
+ *   v1.0.2 — 2026-10-20 — The header states the test a caller applies before it emits, after two
+ *     callers read the contract as a flag edge (secaudit 2026-10). No code change.
  *   v1.0.1 — 2026-09-26 — nameSegment takes an owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { randomUUID } from 'node:crypto';

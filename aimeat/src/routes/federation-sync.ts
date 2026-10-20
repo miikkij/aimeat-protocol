@@ -18,6 +18,8 @@
  *   v1.3.0 — 2026-06-19 — Trust advisory: a `suspend` demotes a member peer back to the visiting
  *     tier (strips elevated flags); `ban` now also purges the peer from storage (Phase B).
  *   v1.4.0 — 2026-07-13 — Split handler groups into ./federation-sync/* siblings (max-file-lines); order/behaviour preserved
+ *   v1.5.0 — 2026-10-20 — POST /v1/federation/retract (./federation-sync/retract.ts): a peer removes a
+ *     replica it sent here when the record stopped being eligible (secaudit 2026-10).
  */
 
 import { Router } from 'express';
@@ -25,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { registerMessagingRoutes } from './federation-sync/messaging.js';
+import { registerRetractRoute } from './federation-sync/retract.js';
 import { registerCatalogueTrustRoutes } from './federation-sync/catalogue-trust.js';
 import { registerRoutingRoutes } from './federation-sync/routing.js';
 import { registerTemplatesRoutes } from './federation-sync/templates.js';
@@ -35,6 +38,9 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
 
     // Register handler groups in the original declaration order (Express matches top-to-bottom).
     registerMessagingRoutes(router, config, storage, peers);
+    // The way back from a replicate: no path prefix is shared with anything above, so the order is
+    // for reading rather than for matching.
+    registerRetractRoute(router, config, storage, peers);
     registerCatalogueTrustRoutes(router, config, storage, peers);
     registerRoutingRoutes(router, config, storage, peers);
     registerTemplatesRoutes(router, config, storage, peers);

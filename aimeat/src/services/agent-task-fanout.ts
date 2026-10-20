@@ -38,6 +38,11 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.7.0 — 2026-10-20 — The public feed entry for a completed task names the public deliverable
+ *     instead of the task title, and it is written only for a deliverable the task produced
+ *     (deliverableOfTask). The title is the task creator's private text, the assigned agent may
+ *     change it before completing, and any public record in the agent's namespace used to unlock
+ *     the entry (secaudit 2026-10, agent-task-fanout.ts:afterTaskCompleted:feed-copies-task-title).
  *   v1.6.0 — 2026-10-11 — afterTaskCompleted shares the task's result with the workspace the owner
  *     named for the agent's work (services/agent-workplace.ts shareFinishedWork).
  *   v1.5.0 — 2026-10-08 — completeTask() takes the session's scopes and answers a declaration the
@@ -79,6 +84,20 @@ import { onUcpTaskDone } from '../commerce/ucp-guest-checkout.js';
 import { shareFinishedWork } from './agent-workplace.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
+
+/**
+ * Is the record at the named deliverable key work of THIS task? The key is whatever the agent typed
+ * at completion, and the record is read from the agent's own namespace, so before this check any
+ * public record the agent held unlocked a public feed entry about a task it had nothing to do with.
+ * The node keeps no link between a record and a task, and the one fact it does have is the time: a
+ * record last written before the task existed was not produced by it. An unreadable date on either
+ * side answers no, because the feed entry is the thing that must be certain.
+ */
+function deliverableOfTask(recordUpdatedAt: string | undefined, taskCreatedAt: string): boolean {
+    const wrote = Date.parse(recordUpdatedAt ?? '');
+    const made = Date.parse(taskCreatedAt ?? '');
+    return Number.isFinite(wrote) && Number.isFinite(made) && wrote >= made;
+}
 
 /**
  * A task reached 'done'. Everything here is best-effort and isolated: none of it may fail a
@@ -136,14 +155,19 @@ export async function afterTaskCompleted(
         void (async () => {
             const rec = await storage.getMemory(task.agentGaii, deliverableKey);
             if (rec?.visibility !== 'public') return;
+            // And only for a record THIS task produced (deliverableOfTask).
+            if (!deliverableOfTask(rec.updatedAt, task.createdAt)) return;
             await recordPublicActivity(storage, config, {
                 category: 'agents',
                 actor: task.agentGaii,
-                summary: `Agent ${task.agentGaii.split('#')[0]} completed "${task.title}"`,
-                // No completion message here. That text is the task's private event, usually written
-                // by a model, and the public feed copied it out with no provenance record and no
-                // label (aiprov D7). The feed entry links the public deliverable, which carries its
-                // own record, and public-activity.ts admits already-public fields only.
+                // What this entry is about is the public record, and its key is already public: the
+                // link below reads it with no token. THE TASK TITLE IS NOT. The person who
+                // commissioned the task wrote it for the agent, and the assigned agent may change it
+                // while the task runs (routes/agent-tasks/lifecycle.ts), so copying it here put text
+                // of the agent's own choosing on the anonymous feed, with no publish gate in front
+                // of it (secaudit 2026-10). Same reason the completion message left this entry
+                // (aiprov D7): public-activity.ts admits already-public fields only.
+                summary: `Agent ${task.agentGaii.split('#')[0]} published "${deliverableKey}"`,
                 detail: '',
                 link: `/v1/memory/${encodeURIComponent(task.agentGaii)}/${encodeURIComponent(deliverableKey)}`,
             });

@@ -1396,11 +1396,13 @@ export interface Extension {
   id: Generated<string>;
   installedAt: Generated<Timestamp>;
   installedBy: string;
+  installedByPrincipal: string | null;
   instances: Json | null;
   limits: Json;
   name: string;
   requiredApis: string[] | null;
   status: Generated<string>;
+  unattendedReadAuthority: string | null;
   updatedAt: Timestamp;
   version: string;
 }

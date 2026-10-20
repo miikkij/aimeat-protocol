@@ -3,6 +3,9 @@
  * @description E2E tests for MCP extensions module — 2 tools + 1 resource.
  *   Tests extension listing, action invocation, and the extension details resource.
  * @version-history
+ *   v1.5.0 — 2026-10-20 — Test 22b: aimeat_extension_unattended_reader names the agent that installed
+ *     the extension and the address the person changes the setting at, and refuses another owner's
+ *     agent without leaking an agent name (Jouni, 2026-10-20).
  *   v1.0.0 — 2026-03-21 — Initial creation
  *   v1.1.0 — 2026-08-05 — Test 9b: ctx.files reaches the sandbox over MCP (write + read back +
  *     missing ref), guarding the makeExtensionFiles parity fix in mcp/extensions.ts
@@ -846,6 +849,28 @@ await test('22. Another owner\'s agent holding ext:write is refused the source, 
     const plain = await strangerCall('aimeat_extension_get', { name: srcName });
     assert(!plain.isError, `the record itself is readable: ${plain.text}`);
     assert(plain.data.name === srcName, `name: ${plain.data?.name}`);
+});
+
+await test('22b. aimeat_extension_unattended_reader names the installer and sends the person to the control', async () => {
+    // The agent installed this extension (test 21), so the answer must name that agent and say the
+    // reach in force. READ ONLY over MCP on purpose: the write takes requireOwnerPrincipal, which no
+    // MCP session holds, so the answer carries where the person changes it instead
+    // (routes/extensions/unattended-reader.ts; Jouni, 2026-10-20).
+    const mine = await asInstaller('aimeat_extension_unattended_reader', { name: srcName }, 407);
+    assert(!mine.isError, `the installer's own agent is refused: ${mine.text}`);
+    assert(mine.data.authority === 'owner', `the default in force is the owner's reach: ${mine.data.authority}`);
+    assert(mine.data.is_default === true, `and it says nobody has chosen it yet: ${JSON.stringify(mine.data.is_default)}`);
+    assert(mine.data.installed_by_kind === 'agent', `an agent wrote this code: ${mine.data.installed_by_kind}`);
+    assert(typeof mine.data.installed_by_principal === 'string' && mine.data.installed_by_principal.includes('#'),
+        `named exactly: ${mine.data.installed_by_principal}`);
+    assert(typeof mine.data.changed_at_url === 'string' && mine.data.changed_at_url.length > 0,
+        'the answer carries the address the person presses, because this agent cannot change it');
+
+    // AND THE REFUSAL. Another owner's agent gets the same answer every other door of an installed
+    // extension gives a stranger: not found, with no agent name in it.
+    const refused = await strangerCall!('aimeat_extension_unattended_reader', { name: srcName });
+    assert(refused.isError, `another owner read whose agent installed this: ${refused.text.slice(0, 200)}`);
+    assert(!refused.text.includes('#'), `and the refusal leaks no agent name: ${refused.text.slice(0, 200)}`);
 });
 
 await test('23. Read the source, add an action, redeploy with update:true: both scripts are installed', async () => {

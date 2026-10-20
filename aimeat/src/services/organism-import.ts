@@ -6,9 +6,14 @@
  *   importer becomes creator/admin/member, with a fresh discussion board) and restore every workspace
  *   under it via restoreWorkspace(). Membership/board from the source are NOT restored — only the
  *   organism's settings + its workspace content.
- * @structure importOrganism(storage, config, { importerGaii, importerOwner, zip }) ·
- *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, files })
+ * @structure importOrganism(storage, config, { importerGaii, importerOwner, caller, zip }) ·
+ *   restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, caller, files })
  * @version-history
+ *   v1.4.0 -- 2026-10-20 -- The organism is created through createOrganismRecord, so an imported
+ *     bundle meets the label's audience cap and the publish gate that POST /v1/organisms meets: a
+ *     bundle naming a public organism, restored by a caller the node asks the owner about, is created
+ *     private and the answer carries the request (secaudit 2026-10,
+ *     workspace-import:restore-skips-write-gates). Every caller passes `caller`, the session's facts.
  *   v1.3.0 -- 2026-10-18 -- A listed or private imported organism's board is at `organism:<id>` (was
  *     'shared' with an empty roster, which refused the members; plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.2.0 -- 2026-08-29 -- An imported type is kept as written (free text, cut to 40 characters); only an
@@ -19,13 +24,14 @@
  *     unzips then delegates. Behaviour unchanged for the bundle-import path.
  *   v1.0.0 -- 2026-06-09 -- Initial: organism bundle import (create org + restore all workspaces).
  */
-import { v4 as uuidv4 } from 'uuid';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { unzipBuffer, restoreWorkspace } from './workspace-import.js';
 import { ORG_EXPORT_VERSION } from './organism-export.js';
 import { logger } from '../utils/logger.js';
-import { organismBoardVisibility } from './organism-board.js';
+import { createOrganismRecord } from './organism-lifecycle.js';
+import { importCallerContext, type ImportCaller } from './workspace-import-gates.js';
+import type { PublishRequestedBody } from './publish-requests/door.js';
 
 interface OrgJson {
   aimeatOrganismExport: string;
@@ -33,7 +39,13 @@ interface OrgJson {
   workspaces?: Array<{ ws: string; name?: string; folder?: string }>;
 }
 
-export interface OrganismImportResult { organism_id: string; name: string; workspaces: Array<{ from: string; ws: string }> }
+export interface OrganismImportResult {
+  organism_id: string;
+  name: string;
+  workspaces: Array<{ from: string; ws: string }>;
+  /** The bundle named a public organism and making it public waits for the owner (publish gate). */
+  publish_request?: PublishRequestedBody;
+}
 
 /** Allowed entry layout for an organism bundle ZIP — anything else is rejected as a bad format. */
 const ORGANISM_ALLOW = (n: string) =>
@@ -44,11 +56,11 @@ const ORGANISM_ALLOW = (n: string) =>
 export async function importOrganism(
   storage: Storage,
   config: AimeatConfig,
-  opts: { importerGaii: string; importerOwner: string; zip: Buffer },
+  opts: { importerGaii: string; importerOwner: string; caller: ImportCaller; zip: Buffer },
 ): Promise<OrganismImportResult> {
-  const { importerGaii, importerOwner, zip } = opts;
+  const { importerGaii, importerOwner, caller, zip } = opts;
   const files = await unzipBuffer(zip, ORGANISM_ALLOW);
-  return restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, files });
+  return restoreOrganismFromFiles(storage, config, { importerGaii, importerOwner, caller, files });
 }
 
 /**
@@ -56,13 +68,17 @@ export async function importOrganism(
  * workspaces/{ws}/workspace.json + images/). The importer becomes the new organism's creator. Extracted
  * so the use-case template instantiate flow (Secretary P5 / S-B) can reuse organism creation without
  * re-implementing it — it unzips with a broader allowlist (to permit template.json) and then calls this.
+ *
+ * The organism itself is created through services/organism-lifecycle.ts, the same function
+ * POST /v1/organisms calls, so the label's audience cap and the publish gate hold for a bundle as
+ * they do for a create: the settings in an organism.json are the archive's words, not the node's.
  */
 export async function restoreOrganismFromFiles(
   storage: Storage,
   config: AimeatConfig,
-  opts: { importerGaii: string; importerOwner: string; files: Map<string, Buffer> },
+  opts: { importerGaii: string; importerOwner: string; caller: ImportCaller; files: Map<string, Buffer> },
 ): Promise<OrganismImportResult> {
-  const { importerGaii, importerOwner, files } = opts;
+  const { importerGaii, importerOwner, caller, files } = opts;
   const ojBuf = files.get('organism.json');
   if (!ojBuf) throw new Error('organism.json missing from the ZIP');
   let oj: OrgJson;
@@ -74,31 +90,21 @@ export async function restoreOrganismFromFiles(
   // A type is free text (2026-08-29): keep the exported word, cut to a label; only an empty one
   // falls back.
   const type = typeof o.type === 'string' && o.type.trim() ? o.type.trim().slice(0, 40) : 'project';
+  // The bundle's words are validated here rather than left to the create's fallbacks, because an
+  // unrecognised value there takes the NODE's starting level, which may be more open than a backup
+  // should produce. An import that names nothing usable stays closed.
   const joinPolicy = ['open', 'approval_required', 'invite_only'].includes(o.joinPolicy ?? '') ? (o.joinPolicy as string) : 'invite_only';
   const visibility = ['public', 'listed', 'private'].includes(o.visibility ?? '') ? (o.visibility as string) : 'private';
 
-  // Create the new organism (mirrors POST /v1/organisms; the importer is the creator).
-  const id = uuidv4();
-  const now = new Date().toISOString();
-  const boardId = `org-${id}`;
-  await storage.createBoard({
-    id: boardId, name: `${name} — Discussion`, description: `Discussion board for ${name}`,
-    // A listed or private organism's board is read by its active members (services/organism-board.ts).
-    visibility: organismBoardVisibility(id, visibility), ownerGaii: importerGaii, allowedGaiis: [], createdAt: now,
+  // Create the new organism through the shared service: the board, the record, the creator's
+  // membership, the audience cap and the publish gate, all as POST /v1/organisms makes them.
+  const created = await createOrganismRecord({ storage, config }, importerOwner, {
+    name, description: o.description || '', type, joinPolicy, visibility,
+    interests: Array.isArray(o.interests) ? o.interests : [],
+    publishGate: { caller: importCallerContext({ storage, config }, caller), ...(caller.app ? { app: caller.app } : {}) },
   });
-  await storage.createOrganism({
-    id, name, description: o.description || '', type,
-    location: {}, interests: Array.isArray(o.interests) ? o.interests as string[] : [],
-    // An import makes a NEW organism here, so the importer both made it and holds it. The exporting
-    // node's creator is not carried over: they have no account on this node to be an owner of.
-    creatorGhii: importerOwner, createdBy: importerOwner, owners: [importerOwner],
-    admins: [importerOwner], members: [importerOwner], agentGaiis: [],
-    boardId, joinPolicy: joinPolicy as 'open' | 'approval_required' | 'invite_only', maxMembers: 500,
-    visibility: visibility as 'public' | 'listed' | 'private',
-    moderationConfig: { flagsEnabled: true, autoHideThreshold: 3, appealsEnabled: true },
-    memoryNamespace: `organism.${id}`, createdAt: now, updatedAt: now,
-  });
-  await storage.createMembership({ id: uuidv4(), organismId: id, ghii: importerOwner, role: 'creator', status: 'active', joinedAt: now });
+  if (!created.ok) throw new Error(created.message);
+  const id = created.organism.id;
 
   // Restore each workspace into the new organism.
   const restored: Array<{ from: string; ws: string }> = [];
@@ -112,10 +118,13 @@ export async function restoreOrganismFromFiles(
     const imgs = new Map<string, Buffer>();
     for (const [fname, buf] of files) if (fname.startsWith(`${folder}/images/`)) imgs.set(fname.slice(folder.length + 1), buf);
     try {
-      const r = await restoreWorkspace(storage, config, { orgId: id, importerGaii, importerOwner, data, images: imgs });
+      const r = await restoreWorkspace(storage, config, { orgId: id, importerGaii, importerOwner, caller, data, images: imgs });
       restored.push({ from: w.ws, ws: r.ws });
     } catch (err) { logger.warn('name: skip a workspace that fails to restore', { error: String(err) }); }
   }
 
-  return { organism_id: id, name, workspaces: restored };
+  return {
+    organism_id: id, name, workspaces: restored,
+    ...(created.publishRequest ? { publish_request: created.publishRequest } : {}),
+  };
 }

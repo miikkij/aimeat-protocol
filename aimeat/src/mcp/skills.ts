@@ -97,6 +97,8 @@ export function registerSkillsTools(
         sub: agentGaii,
         gaii: agentGaii,
         reader: readerForAgent({ storage, config }, agentGaii, scopes),
+        // The workspace WRITE rule for a workspace skill decides on the session (secaudit 2026-10).
+        caller: caller ? caller() : agentSessionCaller(agentGaii, ownerName ?? '', scopes, config.nodeId, storage),
     });
 
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });

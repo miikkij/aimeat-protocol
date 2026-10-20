@@ -31,6 +31,10 @@
  *     field, and the key's draft / latest / version ending is never the name (it showed "draft" and
  *     bare UUIDs in the Search everything dialog). titleOf is exported for its test. The snippet is a
  *     window of about 420 characters (was 200), so a record's note survives a long address before it.
+ *   v1.7.0 — 2026-10-20 — An own-scope search passes its hits through ownerScopeView: a caller that
+ *     does not read as the owner (`readsAll`) gets its own records plus the owner-, members- and
+ *     public-visibility ones, never a private record of the owner or of a sibling agent. The count
+ *     left out is returned so the route can say which permission would show them (secaudit 2026-10).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -38,6 +42,7 @@ import { presentMemories } from './classification/present-memory.js';
 import type { ContentReader } from './classification/reader.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { organismKeysCarried } from './group-shares-classification.js';
+import { ownerScopeView } from './owner-scope-read.js';
 
 export interface LibrarianHit {
   key: string;
@@ -159,10 +164,10 @@ function snippetOf(text: string, tokens: string[]): string {
 export async function librarianSearch(
   storage: Storage,
   config: AimeatConfig,
-  opts: { ownerName: string; fanOutOwner: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public'; reader: ContentReader },
-): Promise<{ hits: LibrarianHit[]; ownersSearched: number }> {
+  opts: { ownerName: string; fanOutOwner: boolean; readsAll: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public'; reader: ContentReader },
+): Promise<{ hits: LibrarianHit[]; ownersSearched: number; omitted: number }> {
   const tokens = queryTokens(opts.query);
-  if (tokens.length === 0) return { hits: [], ownersSearched: 0 };
+  if (tokens.length === 0) return { hits: [], ownersSearched: 0, omitted: 0 };
   const limit = opts.limit ?? 50;
 
   let raw;
@@ -195,6 +200,18 @@ export async function librarianSearch(
     const carried = new Set((await organismKeysCarried({ storage, config }, candidates.map(h => h.record), opts.viewerGaii)).kept);
     candidates = candidates.filter(h => carried.has(h.record));
   }
+  // THE OWN SCOPE IS THE OWNER'S WHOLE IDENTITY SET, AND NOT EVERY CALLER READS ALL OF IT. The owner
+  // in person, an app grant and an agent holding memory:read-as-owner read every record; any other
+  // same-owner caller reads its own plus the owner-, members- and public-visibility ones
+  // (services/owner-scope-read.ts, 2026-10-15). Until 2026-10-20 the fan-out was chosen on
+  // memory:read alone and nothing filtered the hits, so a default-approved agent read the owner's
+  // and every sibling agent's private records as snippets (secaudit 2026-10).
+  let omitted = 0;
+  if (opts.scope !== 'public' && opts.fanOutOwner) {
+    const shown = new Set(ownerScopeView(candidates.map(h => h.record), opts.viewerGaii, opts.readsAll));
+    omitted = candidates.length - shown.size;
+    candidates = candidates.filter(h => shown.has(h.record));
+  }
   // The one presentation of memory values (classification reader + credential mask, TARGET-082).
   const scoreOf = new Map(candidates.map(h => [`${h.record.ownerGaii}\u0000${h.record.key}`, h.score]));
   const presented = await presentMemories(opts.reader, candidates.map(h => h.record));
@@ -226,5 +243,5 @@ export async function librarianSearch(
     };
   });
 
-  return { hits, ownersSearched };
+  return { hits, ownersSearched, omitted };
 }

@@ -5,14 +5,19 @@
  * @description The rows of the Extensions page's two lists and what opens under one. A server
  *   extension row: name and version with its status, what it does, who uses it (apps, a clock,
  *   or nothing visible) and its action ids, the doors. Opened: the actions with their input and
- *   output and a test panel, the address and a call example, the memory area, instances, settings,
- *   schedules with their last runs, limits, state, kept versions, the apps that use it. A cortex
+ *   output and a test panel, the address and a call example, the memory area, who wrote the code and
+ *   what it reads when it runs on its own, instances, settings, schedules with their last runs,
+ *   limits, state, kept versions, the apps that use it. A cortex
  *   row: name and version, what it gives an app, its API, who loads it. Opened: the script tag
  *   pinned to the current version, the API surface, the prompt, the parts, visibility, versions.
  *   Made of the component kit: the rows pass data and never a class.
- * @structure extRow · extOpen · cortexRow · cortexOpen
+ * @structure extRow · codeByRow · unattendedRow · extOpen · cortexRow · cortexOpen
  * @usage import { extRow, cortexRow } from './rows.js';
  * @version-history
+ *   v2.1.0 -- 2026-10-20 -- Two facts on an opened extension, for the account holder in person: who
+ *     wrote its code, and what it reads when it runs with nobody present, with the control that
+ *     changes it (codeByRow, unattendedRow; the server's English `summary` is never drawn, the page
+ *     says the same thing in the reader's own language).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): a row is
  *     the List's Row (the status dot and the version tag are the Name's `dot` and `tag`), who uses it
  *     the typewriter Cell with its bold head word (main's .ex-me: ink, grey when nothing is seen), the
@@ -51,6 +56,8 @@ import { Mark, Marks, Label, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Facts, FactLine } from '/components/Facts.js';
 import { Box } from '/components/Box.js';
+import { Choice } from '/components/Choice.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { x, day, when, kindOf, cronWords, appName, appUrlOf } from './frame.js';
 
@@ -120,6 +127,40 @@ function testBox(ctx, ext, test) {
     <//>`;
 }
 
+/**
+ * Who wrote the extension's code, as the server names the principal: one of the owner's agents, an
+ * outside app, the account holder in person, or nobody, for a record written before the node kept
+ * the name. `view` is the answer of /v1/extensions/:name/unattended-reader.
+ */
+function codeByRow(view) {
+  const named = view.installedByKind === 'agent' || view.installedByKind === 'ecosystem';
+  const value = named ? view.installedByPrincipal
+    : view.installedByKind === 'self' ? x('codeByYou') : x('codeByNotRecorded');
+  const sub = x('codeBySub.' + view.installedByKind);
+  return { key: 'codeBy', k: x('codeBy'), v: value, mono: named, missing: view.installedByKind === 'unknown', sub };
+}
+
+/**
+ * What the extension reads when a schedule, an activation or a workflow step runs it with nobody
+ * present, and the control that changes it. When narrowing would change nothing for this extension,
+ * the note beside the control says so and why; the control stays, because the choice starts working
+ * as soon as an agent publishes the extension's code.
+ */
+function unattendedRow(ctx, ext, view) {
+  const busy = ctx.busy === 'reader:' + ext.name;
+  const state = view.authority === 'installer' ? x('unattendedInstaller') : x('unattendedOwner');
+  const control = html`<${Choice} ariaLabel=${x('readerAria')} value=${view.authority} disabled=${busy}
+    onChange=${(v) => ctx.setReader(ext, v)}
+    options=${[['owner', x('readerOwner')], ['installer', x('readerInstaller')]]} />`;
+  return {
+    key: 'unattended',
+    k: html`<${HelpLabel} term="extension.unattended_reader" label=${x('unattended')}>${x('unattended')}<//>`,
+    v: html`${state}${view.narrowingIsInert ? html`<${Note} kind="state">${x('unattendedInert.' + view.installedByKind)}<//>` : null}`,
+    sub: x('unattendedWhen'),
+    actions: control,
+  };
+}
+
 function extOpen(ctx, ext, own) {
   const d = ctx.details['ext:' + ext.name];
   if (!d || d.error) return waitPanel(d);
@@ -134,6 +175,10 @@ function extOpen(ctx, ext, own) {
   const test = ctx.test && ctx.test.ext === ext.name ? ctx.test : null;
   const used = ext.used_by || {};
   const instances = ctx.instances[ext.name] || [];
+  // The two lines stand once /v1/extensions/:name/unattended-reader has answered. The server refuses
+  // that door to everybody but the account holder in person, so its answer, and not a test here,
+  // decides who sees the setting.
+  const reader = ctx.readers[ext.name] || null;
   const doors = own ? html`
     <${Action} small onClick=${() => (active ? ctx.deactivateExt(ext) : ctx.activateExt(ext))}>${active ? x('deactivate') : x('activate')}<//>
     <${Action} small soft onClick=${() => ctx.removeExt(ext)}>${x('removeExt')}<//>` : null;
@@ -157,6 +202,8 @@ function extOpen(ctx, ext, own) {
           ? { k: x('usedBy'), v: appLinks(used), sub: (used.cortex_names || []).length ? x('usedCortexList', { list: used.cortex_names.join(', ') }) : undefined }
           : { k: x('usedBy'), v: x('usedNone'), sub: x('usedNoneSub') },
         { k: x('memoryArea'), v: `ext:${ext.name}`, mono: true, sub: x('memoryAreaSub') },
+        reader && codeByRow(reader),
+        reader && unattendedRow(ctx, ext, reader),
         ext.instances?.supported
           ? {
             k: x('instances'),

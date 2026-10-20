@@ -26,6 +26,12 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   v1.6.0 — 2026-10-20 — 3f: the WebMCP route refuses a manifest binding its owner does not own
+ *     (CAPABILITY_NOT_OWNED_BY_APP, 403) before a pass is minted, so the two arms that reached
+ *     ownerA's capability through ownerB's manifest assert that refusal and that nothing was
+ *     charged. The paywall's product-coordinate check is unchanged; the binding that produced the
+ *     mismatch can no longer exist (secaudit 2026-10, capability-invoke.ts:mcp-source:server-slug-
+ *     resolved-in-caller-reach, part 2).
  *   v1.5.0 — 2026-10-18 — 3f: the test was stale, not the paywall. da1fc12cc (2026-10-17) made a tool
  *     with a pacing amount and no money price a free product on the raw route as well (served at its
  *     pacing, 402 only for a money price), and `paid` carried only `tollMorsels: 3`, so the forged-pass
@@ -614,36 +620,43 @@ async function run() {
     ]);
   });
 
-  await test('an internal pass excuses payment only on the call it was minted for', async () => {
+  await test("a manifest naming another owner's capability is refused before any pass is minted", async () => {
     // ownerB's manifest binds ownerA's capability, and ownerB calls their own tool. So the app-tool
-    // door rules "the owner calls their own product free", mints a `settled` pass on
-    // `apptool:{ownerB}/{appB}`, and invokes ownerA's action carrying it. The pass is genuine and
+    // route used to rule "the owner calls their own product free", mint a `settled` pass on
+    // `apptool:{ownerB}/{appB}`, and invoke ownerA's action carrying it. The pass is genuine and
     // unforged. It is about a product ownerA never sold, and the paywall used to read only its kind.
-    const forged = await json(`/v1/apps/${ownerB.name}/${appB}/webmcp/tools/freebie`, {
+    //
+    // UNTIL 2026-10-20 THIS ASSERTED 402, the paywall catching that pass on its product coordinate.
+    // The coordinate check is still there, and the binding that produced the mismatch is now
+    // refused one step earlier: an app-tool manifest may name only its own owner's capabilities
+    // (secaudit 2026-10, capability-invoke.ts appToolBindingRefusal). ctx.buy has refused the same
+    // binding since the August 2026 audit H-17; the WebMCP route, its MCP twin and the checkout
+    // resolver asked nothing.
+    const borrowed = await json(`/v1/apps/${ownerB.name}/${appB}/webmcp/tools/freebie`, {
       method: 'POST', headers: auth(ownerB.token), body: JSON.stringify({ input: {} }),
     });
-    assert(forged.status === 402,
-      `ownerB reached ownerA's priced capability through a pass minted for ownerB's own app: got ${forged.status} `
-      + `${JSON.stringify(forged.body?.data ?? forged.body?.error)}`);
+    assert(borrowed.status === 403 && borrowed.body?.error?.code === 'CAPABILITY_NOT_OWNED_BY_APP',
+      `ownerB reached ownerA's priced capability through their own manifest: got ${borrowed.status} `
+      + `${JSON.stringify(borrowed.body?.data ?? borrowed.body?.error)}`);
   });
 
-  await test('an internal pass for another product does not excuse a free tool\'s pacing either', async () => {
-    // The same forged pass onto an action ownerA sells only through a free tool with a pacing amount.
-    // Since da1fc12cc (2026-10-17) such an action is served to any caller at that pacing, so 200 is the
-    // intended answer here. The pass must excuse nothing: ownerB pays the 3 morsels any caller pays.
+  await test('…and the refused call costs the caller nothing', async () => {
+    // The same binding onto an action ownerA sells only through a free tool with a pacing amount.
+    // Until 2026-10-20 the call ran and ownerB paid the 3 morsels any caller pays; now the binding
+    // is refused, and a refusal must leave the balance where it was.
     const wallet = async () => {
       const r = await json('/v1/wallet', { headers: auth(ownerB.token) });
       assert(r.status === 200, `wallet ${r.status}: ${JSON.stringify(r.body?.error)}`);
       return Number(r.body.data.balance ?? r.body.data.total ?? 0);
     };
     const before = await wallet();
-    const forged = await json(`/v1/apps/${ownerB.name}/${appB}/webmcp/tools/freebie-paced`, {
+    const borrowed = await json(`/v1/apps/${ownerB.name}/${appB}/webmcp/tools/freebie-paced`, {
       method: 'POST', headers: auth(ownerB.token), body: JSON.stringify({ input: {} }),
     });
-    assert(forged.status === 200,
-      `a free paced product is served to any caller: got ${forged.status} ${JSON.stringify(forged.body?.data ?? forged.body?.error)}`);
+    assert(borrowed.status === 403 && borrowed.body?.error?.code === 'CAPABILITY_NOT_OWNED_BY_APP',
+      `a borrowed binding was served: got ${borrowed.status} ${JSON.stringify(borrowed.body?.data ?? borrowed.body?.error)}`);
     const paid = before - await wallet();
-    assert(paid === 3, `the pass minted for ownerB's own app excused the pacing: ownerB paid ${paid}, expected 3`);
+    assert(paid === 0, `the refused call charged ${paid} morsels`);
   });
 
   await test('a pass that IS about this call still stands the paywall down', async () => {

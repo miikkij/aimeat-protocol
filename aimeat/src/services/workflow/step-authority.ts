@@ -17,12 +17,19 @@
  *   principal that saved the workflow, whose words are asked again when it starts
  *   (trigger-authority.ts).
  * @structure WORKFLOW_AUTHORITY_VERSION · STEP_KIND_SCOPES · stepKindScopes(kind, authority) · LLM_SCOPES ·
- *   MEMORY_READ_SCOPES · WorkflowCaller · ownerInPerson(caller) · saverFromCaller(caller, ownerGhii) ·
+ *   MEMORY_READ_SCOPES · READ_AS_OWNER_SCOPES · WorkflowCaller · ownerInPerson(caller) · saverFromCaller(caller, ownerGhii) ·
  *   missingStepScopes(def, caller, mode) · stepScopeRefusal(missing)
  * @usage
  *   const missing = missingStepScopes(def, caller, 'full');
  *   if (missing.length > 0) return stepScopeRefusal(missing);   // 403 SCOPE_DENIED, the words named
  * @version-history
+ *   v1.5.0 — 2026-10-20 — A step that reads owner records costs memory:read-as-owner too, for every
+ *     caller but the owner in person and an app grant: the step reads the whole owner scope, which
+ *     the memory route shows only to a caller that reads as the owner (services/owner-scope-read.ts,
+ *     2026-10-15). An agent with workflow:read, workflow:write and memory:read read the owner's
+ *     private field values out of a run (secaudit 2026-10, wf-step-read-skips-read-as-owner). A
+ *     workflow an agent saved before this is refused at its next trigger; trigger-authority.ts
+ *     records that refusal with the three ways on, and the owner can run it as themself.
  *   v1.4.0 — 2026-10-08 — An extension step with `input_from` reads owner records, so it costs
  *     memory:read like an ai step's input_keys.
  *   v1.3.1 — 2026-10-05 — ownerInPerson asks isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -37,7 +44,7 @@
  *     too: every signal leaf reads a record and the run keeps what it saw, which workflow:read serves.
  *   v1.0.0 — 2026-09-24 — Initial.
  */
-import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
 import type { WorkflowStep, Signal, WorkflowSaver } from '../../models/workflow-schemas.js';
 
@@ -87,8 +94,22 @@ export const LLM_SCOPES: readonly string[] = ['ai:use'];
  * record by key or by key pattern, and the run keeps what it saw (a json_field leaf keeps the field's
  * value), which workflow:read then serves. So a workflow that reads costs memory:read, on a check as
  * on a run.
+ *
+ * It reads the WHOLE owner scope: the owner GHII first, then every agent and ecosystem app of the
+ * owner (services/workflow/eval-context.ts, the same aggregation as GET /v1/memory?owner_scope=true).
+ * Since 2026-10-15 that read costs memory:read-as-owner on the memory route for any caller that is
+ * not the owner in person and not an app grant, because an agent must not ride the human's ownership
+ * (services/owner-scope-read.ts). A step does what its own route does, so it costs the same word:
+ * READ_AS_OWNER_SCOPES below, added by missingStepScopes for those callers.
  */
 export const MEMORY_READ_SCOPES: readonly string[] = ['memory:read'];
+
+/**
+ * The word on top of memory:read for reading the owner's and a sibling agent's private records. An
+ * app grant is exempt because it already acts as the owner, and the owner in person passes every
+ * check above this one.
+ */
+export const READ_AS_OWNER_SCOPES: readonly string[] = [READ_AS_OWNER_SCOPE];
 
 /** Does this signal tree hold a leaf? Every leaf reads a record. */
 function hasLeaf(signal: Signal | 'none' | undefined): boolean {
@@ -188,8 +209,13 @@ export function missingStepScopes(
             for (const scope of stepKindScopes(kind, authority)) need(scope, step.id, kind);
         }
     }
+    // An app grant already reads the owner's records as the owner, so it pays memory:read alone.
+    // Everything else (an agent, an ecosystem app) pays the read-as-owner word on top.
+    const asOwnerNeeded = !caller.roles.includes('app');
     for (const step of def.steps) {
-        if (readsOwnerRecords(step)) for (const scope of MEMORY_READ_SCOPES) need(scope, step.id, 'read');
+        if (!readsOwnerRecords(step)) continue;
+        for (const scope of MEMORY_READ_SCOPES) need(scope, step.id, 'read');
+        if (asOwnerNeeded) for (const scope of READ_AS_OWNER_SCOPES) need(scope, step.id, 'read');
     }
     if (def.llm?.approved) for (const scope of LLM_SCOPES) need(scope, '', 'llm');
     return needs.filter(n => !scopeIsCovered(caller.scopes, n.scope));

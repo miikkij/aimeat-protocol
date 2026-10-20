@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-20 -- DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey close the agent's open MCP
+ *     transports too (mcp/session-registry.ts), as they already close its connect tunnel, and the
+ *     delete answers mcp_sessions_closed beside sessions_revoked (secaudit 2026-10,
+ *     mcp-oauth:access-token-without-session-survives-agent-delete).
  *   2026-10-18 -- A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 -- An imported agent is tagged `unlisted` too when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-17 -- announceScopes() moved unchanged to ./announce-scopes.ts, which ./permission-allow.ts
@@ -86,6 +90,7 @@ import { executeHooks } from '../../services/hooks.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
+import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { announceScopes } from './announce-scopes.js';
 import { logger } from '../../utils/logger.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
@@ -335,6 +340,10 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // live socket after the rotation. It is cut here, as agent delete does, without a reason the
     // connector would read as "forget this agent" (QA audit F03b-01).
     try { getActiveConnectTunnelManager()?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('rekey: tunnel close failed', { gaii, error: String(err) }); }
+    // An open MCP session is the same shape of long-lived socket, and it was left standing: the
+    // transport verified its bearer once, at initialize. Closed here, so the client re-initializes
+    // with a credential this node reads again (mcp/session-registry.ts).
+    closeMcpSessionsForGaii(gaii);
 
     // Extension hook: agent_rekey (fire-and-forget)
     fireHook(config, storage, 'agent_rekey', { gaii, owner: agent.owner });
@@ -690,11 +699,18 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       logger.warn('deleteAgent: tunnel close failed', { gaii: agent.gaii, error: String(err) });
     }
 
+    // An open MCP session held the same kind of live socket and was left standing. Its bearer is
+    // refused from the next request on (auth/agent-alive.ts, the agent question credentialRevoked
+    // asks), and an MCP OAuth access token carries no session row for revokeSessionsByGaii above to
+    // reach at all, so this is what takes the socket itself down (mcp/session-registry.ts).
+    const closedMcp = closeMcpSessionsForGaii(agent.gaii);
+
     res.json(success(config.nodeId, {
       deleted: true, name: agentName, gaii: agent.gaii,
       // Say how many credentials this ended. "Deleted" and "and it can no longer act" are different
       // claims, and the owner is entitled to the second one.
       sessions_revoked: endedSessions,
+      mcp_sessions_closed: closedMcp,
     }));
     emitChange('agents');
   });

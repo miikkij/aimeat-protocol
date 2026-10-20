@@ -40,6 +40,14 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-20 — Four refusals from secaudit 2026-10, all on the same rule (a schedule acts as its
+ *     maker, and a maker reaches no further through a schedule than it reaches directly):
+ *     canManageSchedule names the caller's kind, so an ecosystem app manages only what it made and
+ *     an agent manages no app-made or ecosystem-made schedule; an `ai` schedule's output_visibility
+ *     is validated against the memory visibility vocabulary and the maker's organism membership at
+ *     create AND at edit; the `eco-capability` input is checked by one helper on both paths; and a
+ *     connections-publish schedule made by a non-owner may name only a file its maker can read,
+ *     asked again at the fire (scheduleStorageFileRefusal).
  *   2026-10-16 — updateScheduleRecord and triggerScheduleRecord ask the per-kind scope of a caller
  *     who is not the owner in person, as create does (scheduleKindScopeRefusal); a pause or a rename
  *     asks none (QA audit F08a-02).
@@ -64,10 +72,15 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentTaskScope, AgentRecord } from '../storage/interface.js';
-import { buildGAII, isSameOwner } from '../utils/gaii.js';
+import { buildGAII, isGEAI, isSameOwner } from '../utils/gaii.js';
+import { memoryWriteVisibilitySchema } from '../utils/visibility-words.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
+import { readerForCaller } from './classification/reader.js';
 import { emitChange } from './event-bus.js';
+import type { FileRefAccessor } from './file-refs.js';
+import { organismVisibilityRefusal } from './organism-visibility.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
+import { scheduleFileDenial } from './schedule-file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
@@ -97,20 +110,41 @@ export interface ScheduleWriteCaller {
     /** True only for a session acting as the owner themselves. Drives the scope bypass and canManage. */
     isOwnerSession: boolean;
     scopes: string[];
+    /** The session's roles, for the reader a file-access check runs as (services/file-refs.ts). */
+    roles?: string[];
     /** The app grant an app's token was issued under (`req.auth.app_grant`): the schedule fires as
      *  that app, while the grant is live (services/schedule-actor.ts). */
     appGrant?: string;
     /** True for an app's session (CallerContext kind 'app'): it manages only its own schedules. */
     isApp?: boolean;
+    /**
+     * True for an ecosystem app's session (CallerContext kind 'ecosystem'). A GEAI is a separately
+     * consented third party, not one of the owner's agents, so it manages only what it made itself.
+     * Without this flag it reached canManageSchedule's agent branch (secaudit 2026-10).
+     */
+    isEcosystem?: boolean;
+}
+
+/** The reader and identity a file-access check runs as, from the facts every door supplies. */
+function accessorOf(
+    deps: { storage: Storage; config: AimeatConfig }, caller: ScheduleWriteCaller,
+): FileRefAccessor {
+    const roles = caller.roles ?? [];
+    return {
+        gaii: caller.identity,
+        sub: caller.identity,
+        owner: caller.owner,
+        reader: readerForCaller(deps, { gaii: caller.identity, owner: caller.owner, roles, scopes: caller.scopes }),
+    };
 }
 
 export type ScheduleWriteErrorCode =
     | 'INVALID_KIND' | 'SCOPE_DENIED' | 'INVALID_CRON'
     | 'NOT_FOUND' | 'FORBIDDEN'
-    | 'INVALID_INPUT' | 'CONNECTION_UNAVAILABLE' | 'NO_SUCH_FILE'
+    | 'INVALID_INPUT' | 'CONNECTION_UNAVAILABLE' | 'NO_SUCH_FILE' | 'FILE_ACCESS_DENIED'
     | 'AGENT_NOT_FOUND' | 'AGENT_REQUIRED'
     | 'INVALID_EXTENSION_JOB' | 'EXTENSION_NOT_FOUND'
-    | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED' | 'RESERVED_KEY'
+    | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED' | 'RESERVED_KEY' | 'NOT_ORGANISM_MEMBER'
     | 'INVALID_TASK_TEMPLATE'
     // A prompt edit on a kind that runs with structured input (services/schedule-prompt.ts).
     | 'NO_PROMPT'
@@ -180,9 +214,15 @@ function foreignNamespace(ownerIdentity: string, raw: unknown): string | null {
  * that only ran at create time would be a check anyone could walk around by editing afterwards.
  * The publish gate would still refuse a foreign connection — that is the wall — but a schedule
  * that is going to fail should be refused where somebody can see it, not at 07:00.
+ *
+ * `maker` is null for the owner in person and the accessor otherwise. The named file is read from
+ * the OWNER's storage when the schedule fires and sent to an outside account, so a schedule made by
+ * an agent, an app or an ecosystem app may name only a file that maker can read itself — the rule a
+ * task attachment already follows (services/task-files.ts). Without it an agent that GET /v1/pub
+ * answers 403 to published the owner's private file (secaudit 2026-10).
  */
 async function checkConnectionsPublishInput(
-    storage: Storage, owner: string, raw: unknown,
+    storage: Storage, config: AimeatConfig, owner: string, raw: unknown, maker: FileRefAccessor | null,
 ): Promise<ScheduleWriteRefusal | null> {
     const input = (raw ?? {}) as { connection_id?: unknown; storage_key?: unknown };
     const connectionId = typeof input.connection_id === 'string' ? input.connection_id : '';
@@ -202,10 +242,69 @@ async function checkConnectionsPublishInput(
         };
     }
     const storageKey = typeof input.storage_key === 'string' ? input.storage_key : '';
-    if (storageKey && !(await storage.getStorageFile(owner, storageKey))) {
-        return { ok: false, status: 404, code: 'NO_SUCH_FILE', message: `you have no stored file named '${storageKey}'` };
+    if (storageKey) {
+        if (!(await storage.getStorageFile(owner, storageKey))) {
+            return { ok: false, status: 404, code: 'NO_SUCH_FILE', message: `you have no stored file named '${storageKey}'` };
+        }
+        const denied = maker ? await scheduleFileDenial(storage, config, owner, storageKey, maker) : null;
+        if (denied) return { ok: false, ...denied };
     }
     return null;
+}
+
+/**
+ * The `ai` kind writes the model's answer into the owner's namespace at `output_visibility`, so the
+ * word has to be one a memory write accepts, and an `organism:<id>` one has to name an organism the
+ * maker's account is in. The fire writes through the memory write service, which asks both again;
+ * this is the same question at save time, where somebody can read the answer. Nothing is checked
+ * when no visibility is named: the fire then stores the record private.
+ */
+async function aiOutputVisibilityRefusal(
+    storage: Storage, raw: unknown, callerIdentity: string,
+): Promise<ScheduleWriteRefusal | null> {
+    if (raw === undefined || raw === null) return null;
+    if (!memoryWriteVisibilitySchema.safeParse(raw).success) {
+        return {
+            ok: false, status: 400, code: 'INVALID_AI_JOB',
+            message: 'output_visibility must be private, owner, group, members, public or "organism:<organism id>".',
+        };
+    }
+    const audience = await organismVisibilityRefusal(storage, raw, { identity: callerIdentity });
+    return audience ? { ok: false, ...audience } : null;
+}
+
+/**
+ * Everything about an `eco-capability` input that can be checked before it fires: the app is
+ * connected under this owner and it declared the capability. Shared by create AND edit, because an
+ * edit replaces `input` wholesale — until 2026-10-20 only create asked, so a PATCH stored a
+ * capability the app never declared and the next fire sent it (secaudit 2026-10). The answer
+ * carries the narrowed input, so only the three fields the executor reads are stored.
+ */
+async function checkEcoCapabilityInput(
+    storage: Storage, ownerName: string, raw: unknown,
+): Promise<{ ok: true; input: Record<string, unknown> } | ScheduleWriteRefusal> {
+    const source = (raw ?? {}) as { app?: unknown; capability_id?: unknown; input?: unknown };
+    const app = typeof source.app === 'string' ? source.app : '';
+    const capabilityId = typeof source.capability_id === 'string' ? source.capability_id : '';
+    if (!app || !capabilityId) {
+        return { ok: false, status: 400, code: 'INVALID_ECO_JOB', message: 'app and capability_id are required for eco-capability schedules' };
+    }
+    const ecoApp = await storage.getEcosystemAppByOwnerAndApp(ownerName, app);
+    if (!ecoApp) {
+        return { ok: false, status: 404, code: 'ECO_APP_NOT_FOUND', message: `Ecosystem app "${app}" is not connected for this owner` };
+    }
+    const declared = (ecoApp.capabilities ?? []).map(c => c.id);
+    if (!declared.includes(capabilityId)) {
+        return { ok: false, status: 400, code: 'CAPABILITY_NOT_DECLARED', message: `Ecosystem app "${app}" does not declare capability "${capabilityId}"` };
+    }
+    return {
+        ok: true,
+        input: {
+            app,
+            capability_id: capabilityId,
+            input: (source.input && typeof source.input === 'object') ? source.input as Record<string, unknown> : {},
+        },
+    };
 }
 
 /**
@@ -213,14 +312,22 @@ async function checkConnectionsPublishInput(
  * the same owner manages every schedule an agent of that owner made, its siblings' included (decision
  * "Core 2026-11 open questions", 2026-10-12, Q4). An app manages only the schedule it made under its
  * own grant: an app grant is limited to its own purpose, so it reaches no agent's schedule and no
- * other app's (feature-list audit #85). Exported because "run it now" answers to the same rule as
- * editing and cancelling, and a second copy of it in the router is how the three would drift.
+ * other app's (feature-list audit #85). An ecosystem app manages only the schedule it made itself:
+ * it is a separately consented third party with its own scope and data-area allowlist, not one of
+ * the owner's agents. Exported because "run it now" answers to the same rule as editing and
+ * cancelling, and a second copy of it in the router is how the three would drift.
+ *
+ * `createdByAgent` is set from `!isOwnerSession`, so it is true for an agent-made, an app-made AND
+ * an ecosystem-made schedule. Reading it as "an agent made this" is what let an ecosystem app
+ * delete the owner's agents' schedules and an agent edit an app's (secaudit 2026-10), so the agent
+ * branch now also asks that no app grant and no GEAI made it.
  */
 export function canManageSchedule(caller: ScheduleWriteCaller, ownerScope: string, job: ScheduledJobRecord): boolean {
     if (job.ownerScope !== ownerScope) return false;
     if (caller.isOwnerSession) return true;
     if (caller.isApp || caller.appGrant) return !!caller.appGrant && job.createdByApp === caller.appGrant;
-    return job.createdByAgent === true;
+    if (caller.isEcosystem) return job.createdBy === caller.identity;
+    return job.createdByAgent === true && !job.createdByApp && !isGEAI(job.createdBy ?? '');
 }
 
 /**
@@ -251,7 +358,10 @@ export async function createScheduleRecord(
     );
     if (gateRefusal) return { ok: false, ...gateRefusal };
     if (kind === 'connections-publish') {
-        const bad = await checkConnectionsPublishInput(storage, owner, body.input);
+        const bad = await checkConnectionsPublishInput(
+            storage, config, owner, body.input,
+            caller.isOwnerSession ? null : accessorOf({ storage, config }, caller),
+        );
         if (bad) return bad;
     }
     if (kind === 'refinery') {
@@ -351,6 +461,10 @@ export async function createScheduleRecord(
         // name a record the node keeps for itself. The fire asks again (scheduler-remote-jobs.ts).
         const kept = aiJobKeyRefusal({ inputKeys: body.input_keys, outputKey: body.output_key });
         if (kept) return { ok: false, ...kept };
+        // The answer lands in the owner's namespace at this word, so it answers to memory's audience
+        // rules here as well as at the fire (secaudit 2026-10).
+        const badVisibility = await aiOutputVisibilityRefusal(storage, body.output_visibility, caller.identity);
+        if (badVisibility) return badVisibility;
         base.input = {
             inputKeys: Array.isArray(body.input_keys) ? body.input_keys : [],
             inputNamespaces: Array.isArray(body.input_namespaces) ? body.input_namespaces : undefined,
@@ -386,27 +500,14 @@ export async function createScheduleRecord(
             },
         };
     } else if (kind === 'eco-capability') {
-        // Invoke a connected ecosystem app's capability over the connect-tunnel on each fire.
-        const app = typeof body.app === 'string' ? body.app : '';
-        const capabilityId = typeof body.capability_id === 'string' ? body.capability_id : '';
-        if (!app || !capabilityId) {
-            return { ok: false, status: 400, code: 'INVALID_ECO_JOB', message: 'app and capability_id are required for eco-capability schedules' };
-        }
-        // The app must be connected under this owner.
-        const ecoApp = await storage.getEcosystemAppByOwnerAndApp(caller.owner, app);
-        if (!ecoApp) {
-            return { ok: false, status: 404, code: 'ECO_APP_NOT_FOUND', message: `Ecosystem app "${app}" is not connected for this owner` };
-        }
-        // The named capability must be one the app actually declared at approval.
-        const declared = (ecoApp.capabilities ?? []).map(c => c.id);
-        if (!declared.includes(capabilityId)) {
-            return { ok: false, status: 400, code: 'CAPABILITY_NOT_DECLARED', message: `Ecosystem app "${app}" does not declare capability "${capabilityId}"` };
-        }
-        base.input = {
-            app,
-            capability_id: capabilityId,
-            input: (body.input && typeof body.input === 'object') ? body.input as Record<string, unknown> : {},
-        };
+        // Invoke a connected ecosystem app's capability over the connect-tunnel on each fire. The
+        // app must be connected under this owner and must have declared the capability at approval;
+        // the edit path asks the same helper.
+        const checked = await checkEcoCapabilityInput(storage, caller.owner, {
+            app: body.app, capability_id: body.capability_id, input: body.input,
+        });
+        if (!checked.ok) return checked;
+        base.input = checked.input;
     } else if (kind === 'connections-publish') {
         // Narrowed to the fields the executor reads. Copying the body wholesale would let a caller park
         // arbitrary JSON on the owner's schedule row, and `ref` is deliberately the ONLY free-form field
@@ -478,8 +579,18 @@ export async function updateScheduleRecord(
         // A connections-publish edit is re-checked against the SAME rule the create used. Without this
         // the ownership check is create-only, and "edit the schedule afterwards" walks around it.
         if (job.type === 'connections-publish') {
-            const bad = await checkConnectionsPublishInput(storage, ownerScope, patch.input);
+            const bad = await checkConnectionsPublishInput(
+                storage, config, job.ownerScope ?? ownerScope, patch.input,
+                caller.isOwnerSession ? null : accessorOf({ storage, config }, caller),
+            );
             if (bad) return bad;
+        }
+        // The eco-capability rule from create, on the input that replaces the old one. Without it a
+        // PATCH stored a capability the app never declared and the next fire sent it.
+        if (job.type === 'eco-capability') {
+            const checked = await checkEcoCapabilityInput(storage, caller.owner, patch.input);
+            if (!checked.ok) return checked;
+            patch = { ...patch, input: checked.input };
         }
         if (job.type === 'refinery') {
             const bad = await checkRefineryScheduleInput(storage, job.ownerScope ?? ownerScope, refineryRunAs(job), patch.input);
@@ -492,6 +603,7 @@ export async function updateScheduleRecord(
             const p = patch.input as {
                 inputNamespaces?: unknown; input_namespaces?: unknown;
                 inputKeys?: unknown; input_keys?: unknown; outputKey?: unknown; output_key?: unknown;
+                outputVisibility?: unknown; output_visibility?: unknown;
             };
             const foreign = foreignNamespace(job.ownerScope ?? ownerScope, p.inputNamespaces ?? p.input_namespaces);
             if (foreign) {
@@ -508,6 +620,11 @@ export async function updateScheduleRecord(
                 outputKey: p.outputKey ?? p.output_key,
             });
             if (kept) return { ok: false, ...kept };
+            // And the create's rule about who the answer may be shown to. Both spellings, as above.
+            const badVisibility = await aiOutputVisibilityRefusal(
+                storage, p.outputVisibility ?? p.output_visibility, caller.identity,
+            );
+            if (badVisibility) return badVisibility;
         }
         updates.input = patch.input as Record<string, unknown>;
     }

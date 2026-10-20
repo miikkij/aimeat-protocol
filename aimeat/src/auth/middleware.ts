@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-20 — credentialRevoked asks a SIXTH question (./agent-alive.ts agentGone): an agent-role
+ *     credential counts only while its agent record is there and is not newer than the credential.
+ *     An MCP OAuth access token carries no session id, so deleting the agent revoked nothing of it.
  *   2026-10-16 — optionalAuth answers 401 invalid_token for a Bearer token it refuses (expired,
  *     revoked, dead PAT, an account that refuses it) on every route, instead of continuing with no
  *     identity or the shared anonymous one; a request with no token is unchanged (QA audit F1-01).
@@ -125,6 +128,7 @@ import { logger } from '../utils/logger.js';
 import { deny401, deny403, denyScope403, denyInvalidToken } from './deny.js';
 import { mcpTokenOnRestVerdict, MCP_TOKEN_ON_REST_MESSAGE } from './mcp-token-on-rest.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
+import { agentGone } from './agent-alive.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
@@ -311,12 +315,13 @@ async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
 }
 
 /**
- * Is this credential dead? Five ways a JWT stops being one, and an endpoint that asks fewer than
- * five questions is one the revoked keep opening:
+ * Is this credential dead? Six ways a JWT stops being one, and an endpoint that asks fewer than
+ * six questions is one the revoked keep opening:
  *   - the exact token was revoked          (POST /v1/auth/revoke)
  *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
  *   - its app grant was revoked            (the owner pressed Revoke on the app)
  *   - its ecosystem app is gone            (disconnected, or its account deleted)
+ *   - its agent is gone                    (deleted, or registered again under the released name)
  *   - the account it acts for refuses it   (deleted, deactivated as BR-04 asks, or newer than the
  *                                           credential because the name was registered again)
  *
@@ -332,6 +337,9 @@ export async function credentialRevoked(token: string, verified: VerifiedToken):
   const grant = await standingAppGrant(verified);
   if (grant === false) return true;
   if (await ecosystemAppGone(verified)) return true;
+  // The agent question (./agent-alive.ts). It reads storage only for an agent-role credential, and
+  // it is what ends an MCP OAuth access token, which carries no session row for the delete to reach.
+  if (await agentGone(sessionStorage(), verified)) return true;
   // The account question: a credential dies with its account even when the token itself was never
   // revoked. An MCP OAuth token carries no session row at all, and the erasure deletes the session
   // rows of the account on Postgres, so this is the check that ends those tokens.

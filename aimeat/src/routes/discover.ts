@@ -15,6 +15,9 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   v0.5.0 — 2026-10-20 — buildContext carries the principal kind (isApp, isEcosystem) into the
+ *     discovery context, so the memory source can refuse the owner's records to an app grant without
+ *     memory:read and to an ecosystem app (secaudit 2026-10).
  *   v0.4.1 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v0.4.0 — 2026-09-29 — The context carries the caller's classification reader (TARGET-082).
  *   v0.3.0 — 2026-08-31 — `tool` accepted as a type filter: an app's published tool is a thing to
@@ -91,9 +94,14 @@ function buildContext(
           sub: req.auth.sub,
           gaii: resolveIdentity(req.auth, config.nodeId),
           isOwnerSession: isOwnerInPerson(req.auth),
+          // The principal kind, which a source needs before it narrows anybody to "their own
+          // records": for an app grant that is the owner's whole personal memory, and an ecosystem
+          // app is fenced to its granted data areas (secaudit 2026-10).
+          isApp: req.auth.roles.includes('app'),
+          isEcosystem: req.auth.roles.includes('ecosystem'),
           scopes: req.auth.scopes ?? [],
         }
-      : { ownerName: '', sub: '', gaii: '', isOwnerSession: false, scopes: [] },
+      : { ownerName: '', sub: '', gaii: '', isOwnerSession: false, isApp: false, isEcosystem: false, scopes: [] },
     scope,
     filters,
     nodeId: config.nodeId,

@@ -23,13 +23,18 @@
  *   A WORKSPACE SHARE RECORD (`organism.<id>.w.<ws>.meta.share`) is an ordinary record that carries
  *   one secret field: the scrypt hash of the share password. The share routes read it from storage
  *   and never show it (routes/organisms/shared.ts), but the generic doors returned it to the creator's
- *   agents and to any app holding memory:read. They now show `has_password` in its place. The record
- *   stays writable through the generic doors: a write without the hash leaves a password share that
- *   no password opens, which is closed, not open.
+ *   agents and to any app holding memory:read. They now show `has_password` in its place, and
+ *   `has_ics_key` in place of the SHA-256 of the calendar feed key, the second secret on that record,
+ *   which the share routes likewise never show. The record stays writable through the generic doors:
+ *   a write without the hash leaves a password share that no password opens, which is closed, not open.
  * @structure SECRET_RECORD_KEYS · isSecretRecordKey · isWorkspaceShareKey · shownMemoryValue ·
  *   secretRecordBinRefusal · secretRecordWriteRefusal
  * @usage value: shownMemoryValue(record.key, record.value)
  * @version-history
+ *   v1.6.0 — 2026-10-20 — The workspace share record's `icsKeyHash` is shown as `has_ics_key`, as the
+ *     share routes have always shown it. The workspace export now passes its records through this
+ *     mask, and the bundle carried both hashes (secaudit 2026-10,
+ *     collectWorkspace:share-password-hash-unmasked).
  *   v1.5.1 — 2026-10-12 — The refusals for `openrouter.apikey` name the provider routes: node 4.0.0
  *     removes /v1/openrouter/settings, which they named.
  *   v1.5.0 — 2026-10-09 — secretRecordBinRefusal: the generic delete and restore refuse these keys for
@@ -85,9 +90,13 @@ export function isWorkspaceShareKey(key: unknown): boolean {
 /** The value a generic door may show. Every other key passes through untouched. */
 export function shownMemoryValue(key: string, value: unknown): unknown {
   if (isWorkspaceShareKey(key) && value && typeof value === 'object' && !Array.isArray(value)
-    && 'passwordHash' in (value as Record<string, unknown>)) {
-    const { passwordHash, ...rest } = value as Record<string, unknown>;
-    return { ...rest, has_password: typeof passwordHash === 'string' && passwordHash.length > 0 };
+    && ('passwordHash' in (value as Record<string, unknown>) || 'icsKeyHash' in (value as Record<string, unknown>))) {
+    const { passwordHash, icsKeyHash, ...rest } = value as Record<string, unknown>;
+    return {
+      ...rest,
+      has_password: typeof passwordHash === 'string' && passwordHash.length > 0,
+      has_ics_key: typeof icsKeyHash === 'string' && icsKeyHash.length > 0,
+    };
   }
   if (!isSecretRecordKey(key) || value === null || value === undefined) return value;
   if (key !== PSP_RECORD_KEY) return { configured: true };

@@ -6,6 +6,8 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.1 — 2026-10-20 — GET /v1/extensions/:name leaves out unattendedReadAuthority too: it is served with its meaning on GET /v1/extensions/:name/unattended-reader (Jouni, 2026-10-20).
+ *   v1.10.0 — 2026-10-20 — GET /v1/extensions/:name leaves out installedByPrincipal: the door is optionalAuth, and the field names the owner's agent (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.9.1 — 2026-10-05 — POST /v1/extensions drops its unused owner-role variable, so no hand-written owner test is left here (secaudit 2026-10, C4).
  *   v1.9.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
@@ -330,6 +332,14 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       res.json(success(config.nodeId, {
         extension: {
           ...ext,
+          // The installing PRINCIPAL stays inside the node. This door is optionalAuth, and while
+          // the installing ACCOUNT name is already public here, the names of that person's agents
+          // are not (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii). The read
+          // authority goes with it: on its own it says only whether this owner narrowed something,
+          // which is their business, and it is served with its meaning on
+          // GET /v1/extensions/:name/unattended-reader behind requireOwnerPrincipal.
+          installedByPrincipal: undefined,
+          unattendedReadAuthority: undefined,
           // What the manifest declared under `workspace:`, so an app author can see whether the
           // extension may act on the caller's organism workspace without reading its config.
           workspace: workspaceDeclarationOf(ext),

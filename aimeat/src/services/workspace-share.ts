@@ -25,6 +25,11 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   v1.8.0 — 2026-10-20 — The public activity feed is told only when the stored share opens a target
+ *     to anyone who has the link (newlyOpened on the share as stored, after the closed-node level and
+ *     after a held-back opening). A flag edge under access 'organism', 'password' or 'account' used
+ *     to announce a workspace and its organism to anonymous readers who can open neither
+ *     (secaudit 2026-10, workspace-share.ts:setWorkspaceShareOp:feed-newlyPublic-ignores-access).
  *   v1.7.0 — 2026-10-18 — A share wider than the workspace's label, or a newly shared page's label,
  *     allows is refused with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas,
  *     L3.5; workspace-share-gate.ts shareCapRefusal).
@@ -303,13 +308,16 @@ export async function setWorkspaceShareOp(
         ? await fileShareAsk(deps, publishGate, ask, { orgId, ws, wsName: reg.entry.name ?? ws, version, from: prev.access, opened }, held)
         : {};
 
-    // Public landing feed: once, on the FIRST public edge of this call (the workspace, a space, or a page).
-    const newlyPublic = (
-        (next.public === true && prev.public === false)
-        || Object.entries(next.spaces).some(([k, v]) => v === true && prev.spaces[k] !== true)
-        || Object.entries(next.docs).some(([k, v]) => v === true && prev.docs[k] !== true)
-    );
-    if (newlyPublic) {
+    // Public landing feed: once, when this call opened something to anyone who has the link.
+    //
+    // Asked of the share as STORED, so after the closed-node level and after any opening the publish
+    // gate held back, and asked with openTargets (workspace-share-gate.ts), which counts nothing
+    // while the access is 'organism', 'password' or 'account'. A flag edge alone is not the test: a
+    // share at one of those levels hands nothing to an anonymous reader, and announcing it on the
+    // public feed named the organism, the workspace and both ids to readers who cannot open either
+    // (secaudit 2026-10). services/public-activity.ts: a caller emits only when the underlying thing
+    // is genuinely public, with already-public fields.
+    if (newlyOpened(prev, next).length > 0) {
         const name = reg.entry.name ?? ws;
         void recordPublicActivity(storage, config, {
             category: 'organisms', actor: who.owner ?? '',

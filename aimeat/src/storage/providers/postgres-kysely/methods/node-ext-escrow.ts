@@ -8,6 +8,10 @@
  *   Translated 1:1 from the Prisma implementation against the same tables — jsonb columns go
  *   through the shared `jsonb()` param helper; status/visibility unions are DB strings.
  * @version-history
+ *   v1.5.0 — 2026-10-20 — Extension.unattendedReadAuthority is written, selected and mapped, and only
+ *     'installer' is carried up (migration 0109; Jouni, 2026-10-20).
+ *   v1.4.0 — 2026-10-20 — Extension.installedByPrincipal is written, selected and mapped (migration
+ *     0108; secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.3.0 — 2026-09-09 — Generic escrow holds (EscrowHold) deleted: no caller. The file keeps its
  *     name so its history stays findable.
  *   v1.2.0 — 2026-08-17 — `lean` listings strip scriptContent / manifest / seed-data entries IN SQL
@@ -36,6 +40,11 @@ function toExtension(r: Selectable<Extension>): ExtensionRecord {
     actions: r.actions as unknown as ExtensionRecord['actions'], config: r.config as Record<string, unknown>,
     limits: r.limits as unknown as ExtensionRecord['limits'], federation: r.federation as unknown as ExtensionRecord['federation'],
     installedBy: r.installedBy, installedAt: iso(r.installedAt), activatedAt: isoOpt(r.activatedAt),
+    ...(r.installedByPrincipal ? { installedByPrincipal: r.installedByPrincipal } : {}),
+    // Only 'installer' is carried up. NULL and every other value read as the owner's own reach,
+    // which is the default and the behaviour every node already has, so an unknown string can never
+    // widen or narrow a run by accident.
+    ...(r.unattendedReadAuthority === 'installer' ? { unattendedReadAuthority: 'installer' as const } : {}),
     ...(r.instances ? { instances: r.instances as unknown as ExtensionRecord['instances'] } : {}),
   };
 }
@@ -67,7 +76,9 @@ export const nodeExtEscrowMethods = {
       name: record.name, version: record.version, description: record.description, author: record.author,
       status: record.status, requiredApis: record.requiredApis, actions: jsonb(record.actions), config: jsonb(record.config),
       limits: jsonb(record.limits), federation: jsonb(record.federation), instances: jsonb(record.instances ?? null),
-      installedBy: record.installedBy, installedAt: new Date(record.installedAt),
+      installedBy: record.installedBy, installedByPrincipal: record.installedByPrincipal ?? null,
+      unattendedReadAuthority: record.unattendedReadAuthority ?? null,
+      installedAt: new Date(record.installedAt),
       activatedAt: record.activatedAt ? new Date(record.activatedAt) : null, updatedAt: new Date(),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
@@ -82,7 +93,7 @@ export const nodeExtEscrowMethods = {
       // scriptContent is stripped IN SQL, per action, so the source bytes never leave the database
       // (see node.repository.ts — the capability aggregator reads schemas, never code).
       let q = this.db.selectFrom('Extension')
-        .select(['id', 'name', 'version', 'description', 'author', 'status', 'requiredApis', 'config', 'limits', 'federation', 'instances', 'installedBy', 'installedAt', 'activatedAt', 'createdAt', 'updatedAt'])
+        .select(['id', 'name', 'version', 'description', 'author', 'status', 'requiredApis', 'config', 'limits', 'federation', 'instances', 'installedBy', 'installedByPrincipal', 'unattendedReadAuthority', 'installedAt', 'activatedAt', 'createdAt', 'updatedAt'])
         .select(sql`(SELECT coalesce(jsonb_agg(t.elem - 'scriptContent' ORDER BY t.ord), '[]'::jsonb) FROM jsonb_array_elements(("Extension"."actions")::jsonb) WITH ORDINALITY AS t(elem, ord))`.as('actions'));
       if (opts.status) q = q.where('status', '=', opts.status);
       return (await q.execute()).map(r => toExtension(r as unknown as Selectable<Extension>));

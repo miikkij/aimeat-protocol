@@ -14,6 +14,9 @@
  * @usage
  *   import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
  * @version-history
+ *   2026-10-20 — expireConsents() tells the member directory when it expired anything, so a person
+ *     whose federation consent ran out leaves the directory without another change rebuilding it
+ *     (secaudit 2026-10, consent-write:revoke-directory-refresh-optional).
  *   2026-09-28 — A consent to an organism does not reach an agent the organism does not admit.
  *   v1.1.0 -- 2026-06-07 -- Resolve organism.{id} grants via active-membership lookup in
  *     checkConsentForRead (previously matchesRecipient returned false with no resolver).
@@ -33,6 +36,7 @@ import { parseGaiiLoose, localAccountName, localAccountOf } from '../utils/gaii.
 import { bufferConsentAudit } from './consent-audit-buffer.js';
 import { logger } from '../utils/logger.js';
 import { barredAgentFor } from './organism-agent-access.js';
+import { notifyDirectoryChange } from './directory.js';
 
 
 /**
@@ -183,10 +187,16 @@ export async function auditDataAccess(
 /**
  * Expire consents that have passed their expiration date.
  * Returns the number of expired consents.
+ *
+ * An expired `federation` consent takes the person out of the member directory, so the index hears
+ * about it here rather than waiting for an unrelated change to rebuild it. The job has no callback
+ * to pass, which is why the refresh is a module-level notifier (services/directory.ts).
  */
 export async function expireConsents(storage: Storage): Promise<number> {
   const now = new Date().toISOString();
-  return storage.expireStaleConsents(now);
+  const expired = await storage.expireStaleConsents(now);
+  if (expired > 0) notifyDirectoryChange();
+  return expired;
 }
 
 /**

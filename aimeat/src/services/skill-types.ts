@@ -9,6 +9,8 @@
  *   SkillAccessor · SkillAccessError
  * @usage import { type SkillSummary, SkillAccessError } from './skills.js';   // through the re-export
  * @version-history
+ *   v1.1.0 — 2026-10-20 — SkillAccessor.caller: the session (CallerContext) the workspace WRITE rule
+ *     for a workspace skill decides on (secaudit 2026-10, defect 2).
  *   v1.0.0 — 2026-10-17 — Extracted from skills.ts (pure extraction), with the organisation level's
  *     additions of the same change: SkillManifestValue.audience, SkillAccessor.auth, the
  *     BAD_VISIBILITY and NOT_ORGANISM_MEMBER codes (plan doc-mvcn6c7e4e5q, V3.9).
@@ -18,6 +20,7 @@ import type { ContentReader } from './classification/reader.js';
 import type { SkillScope } from './skill-refs.js';
 import type { SkillVisibility } from './skill-audience.js';
 import type { AudienceAuth } from './audience.js';
+import type { CallerContext } from './caller-context.js';
 
 export interface SkillVersionSnapshot {
   manifest: SkillManifestValue;
@@ -116,6 +119,12 @@ export interface SkillAccessor {
   reader?: ContentReader;
   /** The session's auth for the organisation level (audienceAllows); made from ownerName/sub when absent. */
   auth?: AudienceAuth | null;
+  /**
+   * The session itself (services/caller-context.ts), which the workspace WRITE rule decides on: the
+   * principal, the owner, the roles and the scopes in one object the route and the MCP tool already
+   * build. A code path that hands over none is read as a scoped principal, the stricter of the two.
+   */
+  caller?: CallerContext;
 }
 
 export class SkillAccessError extends Error {

@@ -12,6 +12,10 @@
  *   (federation.ts). A node id that is only a waiting package registration is deleted as that.
  * @structure PeerRemoveResult · removePeer()
  * @version-history
+ *   v1.2.0 — 2026-10-20 — The de-peering grace converts the peer's replicas by KEY PREFIX across every
+ *     owner principal (listAllMemory, paged), not by walking the local agents table. A replica sits
+ *     under the SENDING node's principal, which is in no agents table, so the walk converted none of
+ *     them and the copies survived de-peering (secaudit 2026-10, replica retention).
  *   v1.1.0 — 2026-10-16 — The emergency notice to the network is a signed peer request
  *     (federation-trust-notice.ts) and each peer's answer is read: the response lists the outcome per
  *     peer (`network_notices`), and `network_notified` is true only when every peer accepted (QA audit
@@ -30,6 +34,10 @@ import { sendTrustNotice } from './federation-trust-notice.js';
 import { deleteRemoteTemplates } from './federation-remote-templates.js';
 import { peerKeyCache } from './federation-helpers.js';
 import { forgetPeer, readPendingPeer, deletePendingPeer } from './peer-origin.js';
+
+/** Replicas read per listing call while de-peering converts them, and the paging loop's stop. */
+const REPLICA_PAGE_SIZE = 200;
+const REPLICA_MAX_PAGES = 10_000;
 
 export type PeerRemoveResult =
     | { ok: false; status: number; code: string; message: string }
@@ -127,22 +135,40 @@ export async function removePeer(
             }
         }
 
-        // C.4: Rename replica entries to expiring for grace period
-        const allAgents = await storage.listAgents();
+        // C.4: Rename replica entries to expiring for grace period.
+        //
+        // THE SCAN IS BY KEY PREFIX ACROSS EVERY OWNER. A replica is stored under the SENDING node's
+        // principal (`agent#owner@<peer>`), which no code path writes into the agents table, so the
+        // listAgents() walk this used until 2026-10-20 visited none of them: de-peering converted
+        // nothing and the copies stayed public for ever (secaudit 2026-10, replica retention).
+        const replicaPrefix = `replica:${nodeId}:`;
         let expiredReplicas = 0;
-        for (const agent of allAgents) {
-            const memories = await storage.listMemory(agent.gaii, { prefix: `replica:${nodeId}:` });
-            for (const mem of memories) {
-                const expiringKey = mem.key.replace(`replica:${nodeId}:`, `expiring:${nodeId}:`);
-                await storage.setMemory({
-                    ...mem,
-                    key: expiringKey,
-                    tags: [...mem.tags.filter(t => !t.startsWith('replica:')), `expiring:${nodeId}`],
-                    updatedAt: new Date().toISOString(),
-                });
-                await storage.deleteMemory(agent.gaii, mem.key);
-                expiredReplicas++;
+        for (let page = 0, offset = 0; page < REPLICA_MAX_PAGES; page++) {
+            const rows = (await storage.listAllMemory({ prefix: replicaPrefix, limit: REPLICA_PAGE_SIZE, offset })).items;
+            if (rows.length === 0) break;
+            // Rows left in place: a converted row is out of the next listing, so the window only has
+            // to step over what stayed.
+            let kept = 0;
+            for (const mem of rows) {
+                const expiringKey = `expiring:${nodeId}:${mem.key.slice(replicaPrefix.length)}`;
+                try {
+                    await storage.setMemory({
+                        ...mem,
+                        key: expiringKey,
+                        tags: [...mem.tags.filter(t => !t.startsWith('replica:')), `expiring:${nodeId}`],
+                        updatedAt: new Date().toISOString(),
+                    });
+                    await storage.deleteMemory(mem.ownerGaii, mem.key);
+                    expiredReplicas++;
+                } catch (err) {
+                    kept++;
+                    logger.warn('De-peering: a replica could not be converted, continuing', {
+                        peer: nodeId, key: mem.key, owner: mem.ownerGaii, error: String(err),
+                    });
+                }
             }
+            if (rows.length < REPLICA_PAGE_SIZE) break;
+            offset += kept;
         }
 
         // Remove peer keys from cache

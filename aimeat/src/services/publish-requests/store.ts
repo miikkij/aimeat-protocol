@@ -31,6 +31,9 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-20 — The kind `consent`: a consent whose recipient is `*` reaches the same readers a
+ *     public record does, so it asks the same gate (secaudit 2026-10,
+ *     grantConsent:wildcard-recipient-skips-publish-gate).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -56,7 +59,7 @@ const ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 /** What kind of content a request makes public. Each has an applier in appliers.ts. */
 export type PublishKind =
   | 'memory' | 'file' | 'workspace-share' | 'app' | 'organism' | 'board' | 'skill'
-  | 'package' | 'knowledge' | 'datapackage' | 'portfolio' | 'company' | 'cortex';
+  | 'package' | 'knowledge' | 'datapackage' | 'portfolio' | 'company' | 'cortex' | 'consent';
 
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
 

@@ -12,6 +12,8 @@
  *   2026-10-16 — aimeat_capabilities_vouch declares capability:write; the operator tools' descriptions say
  *     what the connector's routes now admit (QA audit D2-02).
  *   2026-10-12 — aimeat_skill_list names memory:read, the word GET /v1/skills asks; enforced from 4.0.0.
+ *   2026-10-20 — aimeat_consent_grant says whose data the consent covers (the caller's own), and what
+ *     recipient "*" meets on a node whose publish gate is on (secaudit 2026-10).
  *   2026-10-12 — aimeat_consent_grant: `scope` is the reach local, federation or auth (private and dmz
  *     kept as older names for local) and optional, the node picking the default (Core 2026-11 AUTHZ-18).
  *   2026-10-09 — aimeat_secret_set takes an optional `host`; aimeat_secret_list names the host binding
@@ -190,7 +192,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_consent_grant',
-        description: 'Grant data-sharing consent: authorize a recipient (a GAII, "*", or a prefixed scope like organism:/domain:/node:) to access memory matching a glob data pattern, with a reach and optional expiry. The reach is local (read on this node), federation (as local, and matching public records may be replicated to peers) or auth (another node may sign the person in); private and dmz are older names for local and are stored as local. Without a reach the node picks federation before 4.0.0 and local from 4.0.0. Creates an auditable consent record owned by your GHII (max 100). Manage existing grants with aimeat_consent_list / aimeat_consent_revoke.',
+        description: 'Grant data-sharing consent: authorize a recipient (a GAII, "*", or a prefixed scope like organism:/domain:/node:) to access memory matching a glob data pattern, with a reach and optional expiry. The reach is local (read on this node), federation (as local, and matching public records may be replicated to peers) or auth (another node may sign the person in); private and dmz are older names for local and are stored as local. Without a reach the node picks federation before 4.0.0 and local from 4.0.0. Creates an auditable consent record filed under YOU, the caller, so it covers your own records; your owner sees it in their list and can revoke it, and you can revoke only what you granted. Recipient "*" means everyone, the anonymous reader included: on a node that asks before anything is made public, it needs publish:public, or the answer is PUBLISH_REQUESTED and your owner approves it at the address in the answer. Max 100 records. Manage existing grants with aimeat_consent_list / aimeat_consent_revoke.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Grant Consent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

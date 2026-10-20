@@ -23,6 +23,10 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.12.0 — 2026-10-20 — Organism membership is read under the bare account name as well as the
+ *     GHII, and the name goes from every owners/admins/members array; the grants other parties made
+ *     TO the account and to each of its agents are cleared (secaudit 2026-10,
+ *     eraseOwner:memberships-by-ghii-not-bare-name and agent-delete:gaii-keyed-grants-outlive-agent).
  *   v1.11.0 — 2026-10-16 — Each tolerant step runs in a savepoint, so on PostgreSQL a step the
  *     database rejects no longer aborts the transaction and blocks the erasure (QA audit E6-01).
  *   v1.10.0 — 2026-10-09 — The provider_clients step also deletes the app clients each agent brought
@@ -59,8 +63,9 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/owners.ts by pure move, then wrapped in one
  *     storage.transaction() (GAP-001's route half).
  */
-import type { Storage } from '../storage/interface.js';
+import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { ERASED_PARTY_PREFIX, erasedPartyPseudonym } from '../storage/erased-party.js';
 import { inSavepoint } from './tolerant-step.js';
 import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { purgeClassificationAudit, flushClassificationAudit } from './classification/audit.js';
@@ -87,6 +92,63 @@ async function step(label: string, fn: () => Promise<string | null>, log: string
   } catch (err) {
     logger.warn('eraseOwner: step failed, continuing', { step: label, error: String(err) });
   }
+}
+
+/** What taking the erased account off one organism came to. */
+type OrganismOutcome = 'none' | 'removed' | 'handed-on' | 'orphaned';
+
+/**
+ * Take the erased account out of one organism's roster: `owners`, `admins` and `members`.
+ *
+ * THE ARRAYS NAME A PERSON BY THE BARE ACCOUNT NAME, which is released for reuse, so a surviving
+ * entry made the next holder of that name an active member, and a manager where this person was
+ * creator or admin (secaudit 2026-10). Both spellings are dropped, because a row written by another
+ * code path may carry the GHII.
+ *
+ * THE SOLE OWNER. `owners` is never empty: an organism with no owner is the state nobody can repair
+ * from the inside (services/organism-ownership.ts), and the rule for an owner who departs is that
+ * somebody else holds it first. An erasure cannot ask, so it hands the organism to the first admin,
+ * then to the first member, and that account's membership becomes `creator`. When nobody at all is
+ * left, the holder becomes the erasure pseudonym: no account can equal it (erased-party.ts), so the
+ * organism is held by nobody rather than by a name somebody can register, and the operator's
+ * break-glass (routes/admin-organisms.ts) seats a new owner.
+ */
+async function removeAccountFromOrganism(
+  storage: Storage, organism: OrganismRecord, name: string, ghii: string,
+): Promise<OrganismOutcome> {
+  const erased = new Set([name, ghii]);
+  const admins = organism.admins ?? [];
+  const members = organism.members ?? [];
+  // The same fallback organismOwners() uses: a record written before ownership went plural named its
+  // one owner in the deprecated mirror.
+  const owners = organism.owners?.length ? organism.owners : [organism.creatorGhii];
+  const heldIt = owners.some(o => erased.has(o));
+  if (!heldIt && !admins.some(a => erased.has(a)) && !members.some(m => erased.has(m))) return 'none';
+
+  let outcome: OrganismOutcome = 'removed';
+  let nextOwners = owners.filter(o => !erased.has(o));
+  if (heldIt && nextOwners.length === 0) {
+    const successor = [...admins, ...members].find(c => !erased.has(c) && !c.startsWith(ERASED_PARTY_PREFIX));
+    nextOwners = [successor ?? erasedPartyPseudonym()];
+    outcome = successor ? 'handed-on' : 'orphaned';
+  }
+
+  const kept = (xs: string[]) => xs.filter(x => !erased.has(x));
+  // An owner is not also an admin, and every owner is a member: the two rules ownershipFields()
+  // keeps. The pseudonym is not a member, because it is nobody.
+  const seated = nextOwners.filter(o => !o.startsWith(ERASED_PARTY_PREFIX));
+  await storage.updateOrganism(organism.id, {
+    owners: nextOwners,
+    creatorGhii: nextOwners[0],
+    admins: kept(admins).filter(a => !nextOwners.includes(a)),
+    members: [...new Set([...kept(members), ...seated])],
+    updatedAt: new Date().toISOString(),
+  });
+  if (outcome === 'handed-on') {
+    const membership = await storage.getMembership(organism.id, nextOwners[0]);
+    if (membership) await storage.updateMembership(membership.id, { role: 'creator', status: 'active' });
+  }
+  return outcome;
 }
 
 /**
@@ -126,10 +188,66 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return consents.length ? `consents:${consents.length}` : null;
     }, deletionLog, storage);
 
+    // Organism membership. The row names a person by the BARE account name on create, on open join
+    // and on a direct add (organism-lifecycle.ts, invitations.ts), and this step read it by GHII
+    // only: it matched nothing, deleted nothing and left the roster arrays untouched, so the next
+    // holder of the released name was an active member of every organism this person belonged to
+    // and a manager where they were creator or admin (secaudit 2026-10). The owner EXPORT was fixed
+    // to read both spellings on 2026-09-08; the erasure was not. Both are read here, and the arrays
+    // are cleared whether or not a row was found, because they are a second record of the same fact.
     await step('memberships', async () => {
-      const memberships = await storage.listMembershipsByGhii(ghii);
-      for (const m of memberships) await storage.deleteMembership(m.id);
-      return memberships.length ? `memberships:${memberships.length}` : null;
+      const byGhii = await storage.listMembershipsByGhii(ghii);
+      const byName = await storage.listMembershipsByGhii(name);
+      const rows = [...byGhii, ...byName.filter(m => !byGhii.some(g => g.id === m.id))];
+      const organismIds = new Set(rows.map(m => m.organismId));
+      // An array entry can outlive its row, so the organisms are collected by the roster too. The
+      // `member` filter reads `members`, which holds every owner and admin as well.
+      for (const spelling of [name, ghii]) {
+        for (const o of await storage.listOrganisms({ member: spelling })) organismIds.add(o.id);
+      }
+      for (const m of rows) await storage.deleteMembership(m.id);
+
+      const counts: Record<OrganismOutcome, number> = { none: 0, removed: 0, 'handed-on': 0, orphaned: 0 };
+      for (const id of organismIds) {
+        const organism = await storage.getOrganism(id);
+        if (!organism) continue;
+        counts[await removeAccountFromOrganism(storage, organism, name, ghii)]++;
+      }
+      const touched = counts.removed + counts['handed-on'] + counts.orphaned;
+      if (counts.orphaned) {
+        logger.warn('eraseOwner: organism left without a live owner', { owner: name, organisms: counts.orphaned });
+      }
+      const entry = [
+        rows.length ? `memberships:${rows.length}` : null,
+        touched ? `organism_rosters:${touched}` : null,
+        counts['handed-on'] ? `organisms_handed_on:${counts['handed-on']}` : null,
+        counts.orphaned ? `organisms_orphaned:${counts.orphaned}` : null,
+      ].filter(Boolean).join(',');
+      return entry || null;
+    }, deletionLog, storage);
+
+    // Grants other parties made TO this account, which no owner column can find: a consent whose
+    // recipient is this person (`alice@node`, and the `ghii:alice@node` form a workspace-role grant
+    // uses), a sharing group that holds them as a member, a board that lists them. The agents go
+    // below, each with its own sweep, because a grant can name the exact GAII.
+    await step('grants_to_account', async () => {
+      let n = 0;
+      for (const identity of [ghii, `ghii:${ghii}`]) {
+        const c = await storage.clearGrantsToIdentity(identity);
+        n += c.consents + c.organisms + c.boards + c.sharingGroups + c.registrations;
+      }
+      return n ? `grants_to_account:${n}` : null;
+    }, deletionLog, storage);
+
+    // The same sweep per agent. storage.deleteAgent runs it, but the account deletion below takes
+    // the agents through deleteOwner's cascade instead, which never calls that method.
+    await step('grants_to_agents', async () => {
+      let n = 0;
+      for (const agent of agents) {
+        const c = await storage.clearGrantsToIdentity(agent.gaii);
+        n += c.consents + c.organisms + c.boards + c.sharingGroups + c.registrations;
+      }
+      return n ? `grants_to_agents:${n}` : null;
     }, deletionLog, storage);
 
     await step('sessions', async () => { await storage.revokeAllSessions(name); return 'sessions'; }, deletionLog, storage);

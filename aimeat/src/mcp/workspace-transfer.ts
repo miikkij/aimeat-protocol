@@ -13,8 +13,12 @@
  * @structure registerWorkspaceTransferTool(mcp, storage, config, ctx)
  * @usage
  *   import { registerWorkspaceTransferTool } from './workspace-transfer.js';
- *   registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
+ *   registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, agentGaii, caller, ok, fail, denyReason, findWsEntry, roleOf });
  * @version-history
+ *   2026-10-20 — The export carries the session principal (`callerSub`), so an ecosystem session is
+ *     held to its owner-granted read data-areas, and the import carries the session's own facts
+ *     (`caller`), so the restore applies the write rules the archive's keys and levels would
+ *     otherwise skip (secaudit 2026-10).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — The export answers `truncated` when it reached a limit (feature-list audit #68).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -35,6 +39,8 @@ import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import type { CallerContext } from '../services/caller-context.js';
+import type { ImportCaller } from '../services/workspace-import-gates.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -43,6 +49,8 @@ export interface WorkspaceTransferToolCtx {
     ownerGhii: string;
     /** The session's agent, whose classification reader an export passes (TARGET-082). */
     agentGaii: string;
+    /** The session's caller (services/caller-context.ts), built per call: its scopes are this request's. */
+    caller: () => CallerContext;
     ok: (obj: unknown) => TextResult;
     fail: (msg: string) => TextResult;
     denyReason: (orgId: string) => Promise<string | null>;
@@ -59,7 +67,16 @@ export function registerWorkspaceTransferTool(
     config: AimeatConfig,
     ctx: WorkspaceTransferToolCtx,
 ): void {
-    const { ownerName, ownerGhii, agentGaii, ok, fail, denyReason, findWsEntry, roleOf } = ctx;
+    const { ownerName, ownerGhii, agentGaii, caller, ok, fail, denyReason, findWsEntry, roleOf } = ctx;
+
+    /** The session's own facts for the restore's write rules. The record namespace stays the owner's. */
+    const importCaller = (): ImportCaller => {
+        const session = caller();
+        return {
+            principal: session.principal, targetGaii: ownerGhii, owner: session.owner,
+            roles: [...session.roles], scopes: [...session.scopes],
+        };
+    };
 
     mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
         zodShapeFor('aimeat_workspace_transfer'),
@@ -73,7 +90,8 @@ export function registerWorkspaceTransferTool(
                 const role = await roleOf(organism_id);
                 if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
                 const { buffer, filename, leftOut, truncated } = await exportWorkspace(storage, config, {
-                    orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString(),
+                    orgId: organism_id, ws, exporterGaii: ownerGhii, callerSub: caller().principal,
+                    exportedAt: new Date().toISOString(),
                     isOrgManager: role === 'creator' || role === 'admin',
                     reader: readerForAgent({ storage, config }, agentGaii),
                 });
@@ -90,7 +108,7 @@ export function registerWorkspaceTransferTool(
                 const buf = Buffer.from(zip_base64, 'base64');
                 if (!buf.length) return fail('zip_base64 is empty or invalid.');
                 try {
-                    const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
+                    const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, caller: importCaller(), zip: buf });
                     emitChange('organisms');
                     return ok(result);
                 } catch (e: unknown) {

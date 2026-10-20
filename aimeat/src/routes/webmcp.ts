@@ -17,6 +17,12 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   v1.10.0 — 2026-10-20 — Both invoke paths refuse an `action_id` whose capability the app's owner
+ *     does not own (CAPABILITY_NOT_OWNED_BY_APP, 403), on the metered path after the price is
+ *     decided and on the free path before the pacing is charged. The manifest names a bare id in a
+ *     node-wide registry, so another owner's capability ran here with the manifest's lockedInput
+ *     deciding the arguments (secaudit 2026-10, capability-invoke.ts:mcp-source:server-slug-
+ *     resolved-in-caller-reach).
  *   v1.9.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). Only a money price answers 402. A tool entry carries `toll_morsels`
  *     (and `payment.price` as a deprecated mirror until 4.0.0). A free tool with a pacing amount runs
@@ -62,6 +68,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
+import { appToolBindingRefusal } from '../services/capability-invoke.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
 import { appToolsKey, isToolPriced, toolMoneyPrices, presentToolPacing, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
@@ -285,6 +292,15 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${binding}`));
           return;
         }
+        // The manifest NAMES a capability; it does not confer one. Refused after the price was
+        // decided and before anything is settled, so a mis-bound tool takes no money it has to give
+        // back (services/capability-invoke.ts appToolBindingRefusal; secaudit 2026-10).
+        const misbound = appToolBindingRefusal(cap, ownerName, appRef, toolName);
+        if (misbound) {
+          if (outcome.kind === 'settled') await outcome.refund();
+          res.status(misbound.statusCode).json(error(config.nodeId, misbound.code, misbound.message));
+          return;
+        }
         const jwt = (req.headers.authorization || '').replace('Bearer ', '');
         try {
           const { invokeCapability } = await import('../services/capability-invoke.js');
@@ -365,6 +381,13 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       const cap = await storage.getCapability(tool.action_id);
       if (!cap) {
         res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${tool.action_id}`));
+        return;
+      }
+      // A capability the app's owner does not own is refused BEFORE the pacing is charged, so a
+      // mis-bound tool costs the caller nothing (capability-invoke.ts appToolBindingRefusal).
+      const misbound = appToolBindingRefusal(cap, ownerName, appRef, toolName);
+      if (misbound) {
+        res.status(misbound.statusCode).json(error(config.nodeId, misbound.code, misbound.message));
         return;
       }
       const callerGhii = resolveIdentity(req.auth!, config.nodeId);

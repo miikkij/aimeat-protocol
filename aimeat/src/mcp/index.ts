@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-20 — Every open session is recorded in mcp/session-registry.ts, so deleting an agent or
+ *     rotating its key closes its live MCP transports at once, as both already close its connect
+ *     tunnel (secaudit 2026-10, mcp-oauth:access-token-without-session-survives-agent-delete).
  *   2026-10-17 — An agent's tool whose missing permissions its person can allow with one press stays
  *     on the list, and a call answers with the address (mcp/permission-ask-gate.ts). An MCP OAuth
  *     token older than a permission its agent now holds answers 401 invalid_token, so the client
@@ -182,6 +185,7 @@ import { emitResourceUpdated, emitResourceListChanged } from './resource-events.
 import { answerMovedTools } from './moved-tools-answer.js';
 import { treatNullAsAbsent } from './null-as-absent.js';
 import { mcpSessionPlatform } from './session-platform.js';
+import { noteMcpSession, forgetMcpSession } from './session-registry.js';
 export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -272,6 +276,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 sessionPrincipals.delete(id);
                 sessionLastSeen.delete(id);
                 sessionAgents.delete(id);
+                forgetMcpSession(id);
             }
         }
         if (reaped > 0) logger.info(`MCP idle sweep: closed ${reaped} session(s) idle over ${config.mcpSessionIdleMinutes} min (${transports.size} remain)`);
@@ -673,6 +678,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 sessionPrincipals.delete(transport.sessionId);
                 sessionLastSeen.delete(transport.sessionId);
                 sessionAgents.delete(transport.sessionId);
+                forgetMcpSession(transport.sessionId);
             }
         };
 
@@ -690,6 +696,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
             }
             if (sessionAgentInfo) sessionAgents.set(transport.sessionId, sessionAgentInfo);
+            // So DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey can take this socket down
+            // with the agent's other credentials (mcp/session-registry.ts).
+            noteMcpSession(transport.sessionId, authenticatedGaii, () => transport.close());
         }
     };
 

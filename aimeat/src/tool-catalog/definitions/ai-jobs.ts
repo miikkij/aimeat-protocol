@@ -14,6 +14,9 @@
  * @structure aiJobTools -- AimeatToolDefinition[]
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   2026-10-20 — list, get and cancel say whose jobs a caller reaches: the ones it started, and the
+ *     owner's and its siblings' only with memory:read-as-owner (secaudit 2026-10,
+ *     mcp/ai-jobs.ts:registerAiJobTools:jobs-keyed-by-owner-ghii).
  *   2026-10-19 — aimeat_ai_job_get names `finish_reason` and `truncated` on a text job's record (wish
  *     ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -63,7 +66,7 @@ export const aiJobTools = [
     },
     {
         name: 'aimeat_ai_job_list',
-        description: 'List the owner\'s background AI jobs. Defaults to the LIVE ones (queued and running), which is what "what am I still waiting for" means. A finished job is folded into its day\'s log and shows up under state="all" or under its own state; its live record is deleted at that point, because one key per run would fill this node\'s per-account key ceiling within weeks. Use before starting another job to see whether the one you want is already running.',
+        description: 'List the background AI jobs you started. Defaults to the LIVE ones (queued and running), which is what "what am I still waiting for" means. A finished job is folded into its day\'s log and shows up under state="all" or under its own state; its live record is deleted at that point, because one key per run would fill this node\'s per-account key ceiling within weeks. Use before starting another job to see whether the one you want is already running. The owner\'s own jobs, and the jobs of their other agents, are left out unless you hold the memory:read-as-owner permission.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List AI Jobs', readOnlyHint: true },
@@ -76,7 +79,7 @@ export const aiJobTools = [
     },
     {
         name: 'aimeat_ai_job_get',
-        description: 'Read one background AI job: its state, what it cost, where its answer went, and — when it failed — the code and message saying why. A text job that got an answer carries `finish_reason` (why the provider stopped) and `truncated`: true means the answer was cut at a token limit, so treat it as unfinished and say so, or ask again. A job that ended `failed` with `chain_stopped` set is one whose on_done callback could not continue the chain, which is deliberately NOT reported as success. Only the owner\'s own jobs are reachable; anything else is simply not found.',
+        description: 'Read one background AI job: its state, what it cost, where its answer went, and — when it failed — the code and message saying why. A text job that got an answer carries `finish_reason` (why the provider stopped) and `truncated`: true means the answer was cut at a token limit, so treat it as unfinished and say so, or ask again. A job that ended `failed` with `chain_stopped` set is one whose on_done callback could not continue the chain, which is deliberately NOT reported as success. Only a job you started is reachable; anything else is simply not found, the owner\'s own jobs and the jobs of their other agents included, unless you hold the memory:read-as-owner permission.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get AI Job', readOnlyHint: true },
@@ -88,7 +91,7 @@ export const aiJobTools = [
     },
     {
         name: 'aimeat_ai_job_cancel',
-        description: 'Stop a background AI job. A queued one leaves the wait line and nothing is spent; a running one has its provider call torn down, so a stuck long call can be cleared instead of waited out. Whatever the provider had already billed stays recorded — a cancelled call is not a free call. A job that has already finished answers that there is nothing left to stop.',
+        description: 'Stop a background AI job. A queued one leaves the wait line and nothing is spent; a running one has its provider call torn down, so a stuck long call can be cleared instead of waited out. Whatever the provider had already billed stays recorded — a cancelled call is not a free call. A job that has already finished answers that there is nothing left to stop. You can stop only a job you started; any other job answers that there is no such job, unless you hold the memory:read-as-owner permission.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Destructive: it stops work the owner asked for, and a cancelled job cannot be resumed.

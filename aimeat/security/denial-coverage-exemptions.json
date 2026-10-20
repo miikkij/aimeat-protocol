@@ -119,10 +119,6 @@
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "1b72f3b6c3ac226a"
     },
-    "test/e2e-agent-token-revocation.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "2db30403b13c7051"
-    },
     "test/e2e-mcp-sse-parity.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "ae03d38abc355f10"
@@ -188,8 +184,8 @@
       "sha": "d55330b1acc8ca87"
     },
     "test/e2e-discover.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "1e2c094da7dc94fd"
+      "reason": "REVIEWED 2026-10-20 (secaudit 2026-10). The surface this suite drives, GET /v1/discover and the MCP aimeat_discover tool that shares it, has exactly one refusal status in its code: the 401 on line 86 of routes/discover.ts, for a scope that needs a session. Every other fence it has is the RESULT SET: a principal who may not read a thing gets 200 and a list without it, because a 403 naming the entry would itself say the entry exists. So this suite stays on the anonymous_only list by the instrument's definition while asserting four second-principal refusals as absence, and that is the shape the refusals have here: an agent with `memory:read` does not get the owner's private records (the 2026-10-15 memory:read-as-owner ruling), an agent with `memory:read-as-owner` does, so the first assertion is not an empty pass; an ecosystem app approved with the node's default scopes and no data areas gets none of the owner's records, by id and by query; and an agent's discovery of produced material carries its own tasks and never a sibling agent's, by id and by the description text. The status-shaped refusals of the same fences are asserted where the routes do answer one: GET /v1/memory/:key and GET /v1/agents/:name/tasks. Sha re-stamped for the edit that added those four cases.",
+      "sha": "fbcdb813748ec401"
     },
     "test/e2e-memory-discover.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",

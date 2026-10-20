@@ -6,6 +6,10 @@
  *   security invariant (Rule 10) — CROSS-OWNER protection: a member cannot bulk-delete another member's
  *   records (their rows are skipped, not deleted).
  * @version-history
+ *   v1.0.1 — 2026-10-20 — The cross-owner case grants B the contributor role before B writes: a
+ *     workspace role is the member's own permission, so membership alone no longer carries a
+ *     content write in person (Core 2026-11 COL-09; secaudit 2026-10, defect 1). The setup changed,
+ *     not the assertion the test is about.
  *   v1.0.0 — 2026-07-15 — Initial: batched record delete happy path + append-only + cross-owner denial.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-bulk-delete
@@ -92,9 +96,13 @@ await test('Non-member → 403', async () => {
 });
 
 await test('CROSS-OWNER: a member cannot bulk-delete another member\'s record (Rule 10)', async () => {
-    // B joins the open org and writes their OWN record into the shared namespace.
+    // B joins the open org and writes their OWN record into the shared namespace. Writing workspace
+    // content needs the contributor role, in person as through an agent, so A grants it first
+    // (Core 2026-11 COL-09, ruled 2026-10-20). Membership alone used to be enough here.
     const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: authB() });
     assert(j.status === 200 || j.status === 201, `join ${j.status}`);
+    const g = await json(`/v1/organisms/${orgId}/workspace-access/grant`, { method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS, grantee: B.name, role: 'contributor' }) });
+    assert(g.status === 200, `grant contributor ${g.status}: ${JSON.stringify(g.body?.error)}`);
     const w = await json('/v1/memory', { method: 'POST', headers: authB(), body: JSON.stringify({ key: `${root()}.shared.notes.b1`, value: { id: 'b1', body: 'B owns this' }, visibility: 'members' }) });
     assert(w.status === 201 || w.status === 200, `B write ${w.status}`);
     // A (a member) tries to bulk-delete B's record — B's rows are NOT owned by A, so nothing is deleted.

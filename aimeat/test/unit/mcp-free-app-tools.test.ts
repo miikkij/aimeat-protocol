@@ -2,6 +2,8 @@
  * @file test/unit/mcp-free-app-tools.test.ts
  * @description MCP app-tool price decisions preserve free calls, refusals and pinned contracts.
  * @version-history
+ *   2026-10-20 — appToolBindingRefusal is part of the capability-invoke module this suite mocks, and
+ *     a refusal from it fails the tool without invoking anything (secaudit 2026-10).
  *   2026-10-11 — The `price.morsels` case asserted the old model; a morsel amount is pacing, so only money keeps a tool behind its contract.
  *   2026-10-06 —Regression: cross-owner unpriced tools incorrectly answered NO_CONTRACT over MCP.
  */
@@ -12,13 +14,13 @@ import type { Storage } from '../../src/storage/interface.js';
 import type { MeteredOutcome } from '../../src/services/metered-access.js';
 import { registerExchangeRunTools } from '../../src/mcp/exchange-run.js';
 import { authoriseMeteredCall } from '../../src/services/metered-access.js';
-import { invokeCapability } from '../../src/services/capability-invoke.js';
+import { invokeCapability, appToolBindingRefusal } from '../../src/services/capability-invoke.js';
 import { consumeInternalPass } from '../../src/routes/extensions/internal-pass.js';
 import { membersOnlyRefusalForCapability } from '../../src/services/members-only.js';
 import { getInterfaceVersion } from '../../src/services/app-tool-interfaces.js';
 
 vi.mock('../../src/services/metered-access.js', () => ({ authoriseMeteredCall: vi.fn() }));
-vi.mock('../../src/services/capability-invoke.js', () => ({ invokeCapability: vi.fn() }));
+vi.mock('../../src/services/capability-invoke.js', () => ({ invokeCapability: vi.fn(), appToolBindingRefusal: vi.fn() }));
 vi.mock('../../src/services/call-timing.js', () => ({ recordCallDuration: vi.fn() }));
 vi.mock('../../src/services/members-only.js', () => ({ membersOnlyRefusalForCapability: vi.fn(), MEMBERS_ONLY_MESSAGE: 'Members only.' }));
 vi.mock('../../src/services/app-tool-interfaces.js', () => ({ getInterfaceVersion: vi.fn() }));
@@ -45,6 +47,7 @@ beforeEach(() => {
   vi.mocked(authoriseMeteredCall).mockResolvedValue({ kind: 'no_right' });
   vi.mocked(membersOnlyRefusalForCapability).mockResolvedValue(null);
   vi.mocked(getInterfaceVersion).mockResolvedValue(null);
+  vi.mocked(appToolBindingRefusal).mockReturnValue(null);
   vi.mocked(invokeCapability).mockResolvedValue({ result: { ready: true } } as never);
 });
 
@@ -80,6 +83,15 @@ describe('unpriced app tools over node MCP', () => {
     vi.mocked(authoriseMeteredCall).mockResolvedValue({ kind, entitlement: { state: 'revoked', contractRef: 'old', unit: 'morsels', budget: { capUnits: 1 } } } as MeteredOutcome);
     const result = await harness().call();
     expect(result.isError).toBe(true); expect(invokeCapability).not.toHaveBeenCalled();
+  });
+
+  it("refuses a manifest binding the app's owner does not own, without invoking it", async () => {
+    vi.mocked(appToolBindingRefusal).mockReturnValue(
+      { statusCode: 403, code: 'CAPABILITY_NOT_OWNED_BY_APP', message: 'not the app owner\'s' });
+    const result = await harness().call();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('CAPABILITY_NOT_OWNED_BY_APP:');
+    expect(invokeCapability).not.toHaveBeenCalled();
   });
 
   it('preserves the members-only and spending-scope refusals', async () => {

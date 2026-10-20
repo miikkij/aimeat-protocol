@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.12.0 -- 2026-10-20 -- extensionTools: the extension entries move out of tool-call-defs-apps.ts,
+ *     plus aimeat_extension_unattended_reader (Jouni, 2026-10-20).
  *   v1.11.0 -- 2026-10-18 -- accountRightsCliTools: adult status, subscriptions, provenance embed (Comicland v3).
  *   v1.10.0 -- 2026-10-18 -- publishCliTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.9.0 -- 2026-10-17 -- exposureCliTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
@@ -31,6 +33,7 @@ import { skillTools } from './tool-call-defs-skills.js';
 import { secretTools } from './tool-call-defs-secrets.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
+import { extensionTools } from './tool-call-defs-extensions.js';
 import { commerceCliTools } from './tool-call-defs-commerce.js';
 import { packageTools } from './tool-call-defs-packages.js';
 import { workflowTools } from './tool-call-defs-workflows.js';
@@ -76,6 +79,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...secretTools,
     ...organismTools,
     ...appTools,
+    ...extensionTools,
     ...commerceCliTools,
     ...packageTools,
     ...workflowTools,

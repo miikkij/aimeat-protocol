@@ -15,6 +15,9 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.6.0 — 2026-10-20 — DiscoveryContext.caller carries the principal kind (isApp, isEcosystem):
+ *     a source cannot otherwise tell an app grant, whose identity is the owner's GHII, from an agent
+ *     with a namespace of its own (secaudit 2026-10).
  *   v0.5.0 — 2026-09-29 — DiscoveryContext carries the caller's classification reader (TARGET-082).
  *   v0.4.0 — 2026-08-31 — +'tool' (an app's published tool, apps.{appId}.tools). Until now the one
  *     directory that answers "what exists here that I can use?" had no word for the callable thing,
@@ -117,6 +120,13 @@ export interface DiscoveryContext {
     /** Full GAII (agent) or GHII (owner session) — `resolveIdentity` result. */
     gaii: string;
     isOwnerSession: boolean;
+    /** An app grant (role 'app'). Its own identity IS the owner's GHII, so "the caller's own
+     *  records" are the owner's whole personal memory: a source must know this before it narrows a
+     *  caller to its own identity (secaudit 2026-10). */
+    isApp: boolean;
+    /** An ecosystem app (role 'ecosystem', a GEAI). Fenced to the data areas its owner granted, so
+     *  it never gets the owner-wide identity set (services/ecosystem-access.ts). */
+    isEcosystem: boolean;
     /** Granted read-scopes — used to filter an agent's view of the owner set (design §11.3). */
     scopes: string[];
   };

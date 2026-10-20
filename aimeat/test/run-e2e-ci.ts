@@ -11,6 +11,13 @@
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  * @version-history
+ *   2026-10-20 -- e2e-workspace-transfer-gates.ts joins the list (not the guard tier): a workspace
+ *     backup is not a way round the write rules on a restore, the ecosystem read data-areas on an
+ *     export, or the credential mask, on its own node with the publish gate on, port 40496
+ *     (secaudit 2026-10).
+ *   2026-10-20 -- e2e-catalogue-classification.ts joins the list (not the guard tier): the public
+ *     knowledge catalogue and the single read of the same manifest answer the same, on its own node
+ *     with classification on, port 40495 (secaudit 2026-10).
  *   2026-10-19 -- e2e-agent-avatar.ts joins the list (not the guard tier): an agent's own picture at agent.avatar.
  *   2026-10-18 -- e2e-exposure-conflicts.ts joins the list (not the guard tier): the conflicts in what others can see (plan doc-mvdipuyqraas, L4.1).
  *   2026-10-18 -- e2e-classification-defaults.ts joins the list (not the guard tier): the default audience caps a new node takes and a running node is offered (plan doc-mvdipuyqraas, L5). Its own node on 40492.
@@ -23,6 +30,11 @@
  *     da1fc12cc, whose paywall rule their assertions predated; a payment refusal now stops a push
  *     (wish wish-y-ajon-maksun-ohitus-oikea-vika-vai-vanhentunut-testi).
  *   2026-10-18 -- e2e-closed-node-levels.ts joins the list (not the guard tier): a public write on a node closed to strangers lands at the signed-in level, and the new-app feed.
+ *   2026-10-20 -- e2e-consent-publish-gate.ts joins the list (not the guard tier): a consent whose
+ *     recipient is `*` meets the publish gate, on a node that has it on (secaudit 2026-10).
+ *   2026-10-20 -- e2e-public-feed-exposure.ts joins the list (not the guard tier): what reaches the
+ *     anonymous activity feed, and the publish gate in front of a restore, on its own node with the
+ *     publish gate on, port 40497 (secaudit 2026-10).
  *   2026-10-18 -- e2e-page-access.ts joins the list (not the guard tier): who may open a welcome page and a company front page (V3.10).
  *   2026-10-18 -- e2e-content-defaults.ts joins the list (not the guard tier): the node's starting levels for content.
  *   2026-10-18 -- e2e-publish-gate-files.ts joins the list (not the guard tier): the publish gate on stored files and on memory bulk, import and copy.
@@ -493,6 +505,15 @@ const ALL_SUITES = [
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.
     'test/e2e-page-access.ts',
+    // Self-spawns its own node with the publish gate on: a consent to everyone meets the same gate.
+    'test/e2e-consent-publish-gate.ts',
+    // Self-spawns its own node with the publish gate on, port 40496: a workspace backup is not a way
+    // round the write rules on a restore, the read rules on an export, or the credential mask.
+    'test/e2e-workspace-transfer-gates.ts',
+    // Self-spawns its own node with the publish gate on and anonymous mode, port 40497: what reaches
+    // the public activity feed (a share that opens nothing, a task's private title) and what a
+    // restore puts back.
+    'test/e2e-public-feed-exposure.ts',
     'test/e2e-app-grants.ts',
     'test/e2e-app-grants-tasks.ts',
     'test/e2e-app-members.ts',
@@ -892,6 +913,9 @@ const ALL_SUITES = [
     // caps, the same database made a pre-cap node is offered them on the Security page and takes each
     // on the operator's decision, with no content level changed (plan doc-mvdipuyqraas, L5).
     'test/e2e-classification-defaults.ts',
+    // Owns its node on 40495 with AIMEAT_CLASSIFICATION=all: the public knowledge catalogue and the
+    // single read of the same manifest answer the same once the listing has the classification reader.
+    'test/e2e-catalogue-classification.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',

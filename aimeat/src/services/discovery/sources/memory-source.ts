@@ -16,6 +16,12 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.9.0 — 2026-10-20 — Three refusals on the own scope (secaudit 2026-10). An app grant without
+ *     memory:read gets an EMPTY owner set, because its own identity is the owner's GHII and
+ *     narrowing it to "its own records" narrowed nothing; an ecosystem app searches only its own
+ *     identity, because its data-area allowlist is its fence; and the hits pass ownerScopeView, so
+ *     an agent that does not read as the owner no longer sees the owner's or a sibling agent's
+ *     private records (services/owner-scope-read.ts, the 2026-10-15 rule).
  *   v0.8.0 — 2026-10-09 — An entry is built from the value the generic memory doors show
  *     (shownMemoryValue): the description was built from the raw record, so the whole ciphertext of
  *     the owner's AI keys reached the owner and every agent or app with memory:read (secrets audit
@@ -55,6 +61,7 @@ import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '
 import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
+import { ownerScopeView, readsAsOwner } from '../../owner-scope-read.js';
 import { readWorkspaceManifest } from '../../workspace-meta.js';
 import { shownMemoryValue } from '../../secret-records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
@@ -189,8 +196,23 @@ function toMemHit(rec: {
 }
 
 /**
+ * Does this caller read the owner's identity set as the owner does, private records of the other
+ * identities included? The owner in person, an app grant, or an agent holding memory:read-as-owner
+ * (services/owner-scope-read.ts readsAsOwner, which this asks rather than repeating its rule).
+ */
+function readsAllOf(ctx: DiscoveryContext): boolean {
+  if (ctx.caller.isOwnerSession) return true;
+  return readsAsOwner({
+    kind: ctx.caller.isApp ? 'app' : 'agent',
+    has: (word: string) => scopeIsCovered(ctx.caller.scopes, word),
+  });
+}
+
+/**
  * Resolve which owner identities to search for the `own` scope, honoring the agent read-scope rule.
- * Returns null for the public scope (caller wants whole-node public content, not an owner set).
+ * Returns null for the public scope (caller wants whole-node public content, not an owner set), and
+ * an EMPTY ARRAY for a caller that may read no owner record at all — which the caller must treat as
+ * "no records", never as a fall-through to the public branch.
  */
 async function resolveOwnerSet(
   storage: Storage,
@@ -199,11 +221,22 @@ async function resolveOwnerSet(
 ): Promise<string[] | null> {
   if (ctx.scope === 'public') return null;
   const ghii = `${ctx.caller.ownerName}@${config.nodeId}`;
+  // An ecosystem app is fenced to the data areas its owner granted (services/ecosystem-access.ts),
+  // and the owner-wide set walks around that fence: it searches its own GEAI namespace only. The
+  // generic memory routes have refused it the broadening since it existed (routes/memory/crud.ts).
+  if (ctx.caller.isEcosystem) return [ctx.caller.gaii];
   // Via scopeIsCovered, not includes(): the exact-string test meant a FULL-ACCESS agent ('*') got
   // the narrow own-content-only set while a narrowly-scoped one got the wide set — more access
   // from less permission, which no caller would ever think to report.
   const fullSet = ctx.caller.isOwnerSession || scopeIsCovered(ctx.caller.scopes, 'memory:read');
-  if (!fullSet) return [ctx.caller.gaii]; // agent without memory:read → its own content only (§11.3)
+  if (!fullSet) {
+    // AN APP GRANT'S OWN IDENTITY IS THE OWNER'S GHII, so "its own content only" was the owner's
+    // entire personal memory, private records and all, for a token the same node refuses at GET
+    // /v1/memory/:key, GET /v1/memory/search and the librarian (F05b-01). It reads the owner's
+    // memory on memory:read or not at all: no owner identity is searched.
+    if (ctx.caller.isApp) return [];
+    return [ctx.caller.gaii]; // agent without memory:read → its own content only (§11.3)
+  }
   const [agents, ecoApps] = await Promise.all([
     storage.getAgentsByOwner(ctx.caller.ownerName),
     storage.getEcosystemAppsByOwner(ctx.caller.ownerName),
@@ -282,6 +315,10 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
       const limit = Math.min(ctx.filters.limit ?? 50, MAX_LIMIT);
       const q = ctx.filters.q?.trim();
       const ownerGaiis = await resolveOwnerSet(storage, config, ctx);
+      // An EMPTY owner set means this caller may read no owner record. It is not the public branch,
+      // and it is not "no filter": handing [] to searchText or to a listing would answer with the
+      // whole node, which is the opposite of what the empty set says.
+      if (ownerGaiis && ownerGaiis.length === 0) return [];
       let hits: MemHit[];
 
       if (q) {
@@ -306,6 +343,12 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
       }
 
       let candidates = hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key));
+      // The owner's identity set holds more than this caller may read. The owner in person, an app
+      // grant and an agent holding memory:read-as-owner see every record; any other same-owner
+      // caller sees its own plus the owner-, members- and public-visibility ones
+      // (services/owner-scope-read.ts). Until 2026-10-20 nothing filtered these hits, so a
+      // memory:read agent read the owner's and its siblings' private records as descriptions.
+      if (ownerGaiis) candidates = ownerScopeView(candidates, ctx.caller.gaii, readsAllOf(ctx));
       // The public scope is other accounts' public records: an organism's record among them reaches a
       // caller outside that organism only when its label lets it leave (TARGET-082 review, item 1).
       if (!ownerGaiis) candidates = (await organismKeysCarried({ storage, config }, candidates, ctx.caller.gaii)).kept;

@@ -9,6 +9,12 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.4.0 — 2026-10-20 — Phase 4b: a device-authorize naming an agent that ALREADY EXISTS. An
+ *     approver holding agent:write plus one ordinary scope, and a second holding the wildcard, are
+ *     both refused the auto-approval, the device-token poll yields no credential, and the sibling's
+ *     stored scopes and keypair are unchanged. Positive controls: the same approver still registers
+ *     a NEW name, and the owner in person still reconnects the sibling with its reserved grant
+ *     intact (secaudit 2026-10, sibling-reapproval-takeover).
  *   v1.3.3 — 2026-10-12 — Phase 5 publishes its offers with tollMorsels instead of price.morsels, which
  *     node 4.0.0 refuses with MORSEL_PRICE_REMOVED; the secret offer's 999 becomes 99 (the pacing cap is
  *     100, and 3.x clamped the old 999 to it). The deprecated `price` mirror is asserted on 3.x and its
@@ -58,7 +64,7 @@ async function signMsg(privB64: string, message: string): Promise<string> {
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
-/** Register an agent under `ownerToken`'s owner and return { gaii, token }. */
+/** Register an agent under `ownerToken`'s owner and return { gaii, token, privateKey }. */
 async function registerAgent(ownerToken: string, ownerName: string, name: string, mode: string, scopes: string[]) {
     const reg = await json('/v1/agents', {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -66,11 +72,42 @@ async function registerAgent(ownerToken: string, ownerName: string, name: string
     });
     assert(reg.status === 201, `agent ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
     const gaii = reg.body.data.agent.gaii as string;
+    const privateKey = reg.body.data.private_key as string;
     const ts = new Date().toISOString();
-    const sig = await signMsg(reg.body.data.private_key, gaii + ts);
+    const sig = await signMsg(privateKey, gaii + ts);
     const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
     assert(tok.body.ok === true, `agent token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { gaii, token: tok.body.data.token as string };
+    return { gaii, token: tok.body.data.token as string, privateKey };
+}
+
+/**
+ * Can this private key still sign for this agent? The node verifies the signature against the
+ * agent's STORED public key, so a key rotation makes the original key stop working. That is the
+ * readable proof that nothing rotated the agent's keypair: the listing does not carry the public
+ * key, and this asks the same question the agent's own sign-in asks.
+ */
+async function canStillSign(gaii: string, privateKey: string): Promise<boolean> {
+    const ts = new Date().toISOString();
+    const sig = await signMsg(privateKey, gaii + ts);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+    return tok.status === 200 && tok.body.ok === true;
+}
+
+/** What the owner's agent list says this agent may do. */
+async function storedScopes(ownerToken: string, name: string): Promise<string[]> {
+    const r = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(r.status === 200, `list agents: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const a = (r.body.data.agents as any[]).find(x => x.name === name);
+    assert(!!a, `agent ${name} is not in the listing`);
+    return (a.default_scopes ?? []) as string[];
+}
+
+/** One device-token poll, as the unauthenticated client of RFC 8628 makes it. */
+async function poll(deviceCode: string) {
+    return json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: deviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
 }
 
 const crewDef = (agentName = 'demo-joker') => ({
@@ -397,6 +434,100 @@ async function main() {
             body: JSON.stringify({ owner: owner1, agent_name: 'foreign-agent' }),
         });
         assert(r.status === 200 && r.body.data.auto_approved !== true, `cross-owner: ${r.status} ${JSON.stringify(r.body.data)}`);
+    });
+
+    // ── Phase 4b: the same door, pointed at an agent that ALREADY EXISTS ──
+    //
+    // Everything above registers a NEW name. A device-authorize naming an EXISTING agent is a
+    // RE-APPROVAL, and it does four things to that agent: it rotates its keypair, overwrites its
+    // stored scopes, mints a ninety-day token for it, and leaves both the token and the new private
+    // key for the unauthenticated device-token poll to hand to whoever started the request. The
+    // 2026-09-01 work read `agent:write` on the creation path and left this one open, so any agent
+    // of the owner holding `agent:write` took over a sibling and collected the scopes the owner had
+    // given that sibling and not to it (secaudit 2026-10, sibling-reapproval-takeover).
+    console.log('\nPhase 4b: re-approval of an EXISTING sibling');
+    const VICTIM = 'takeover-victim';
+    // memory:write-reserved is the discriminator: it is outside every wildcard, so an approver
+    // holding `*` still does not hold it, and approveDeviceAuth used to carry it into the grant.
+    const VICTIM_SCOPES = ['memory:read', 'memory:write-reserved'];
+    let victimGaii = '', victimKey = '';
+    let raiderNarrowToken = '', raiderWideToken = '';
+
+    /** The sibling as the owner left it: the same permissions, and the same keypair. */
+    async function assertSiblingUntouched(label: string) {
+        const s = await storedScopes(owner1Token, VICTIM);
+        assert(s.length === VICTIM_SCOPES.length && VICTIM_SCOPES.every(x => s.includes(x)),
+            `${label}: the sibling's stored scopes changed: ${JSON.stringify(s)}`);
+        assert(await canStillSign(victimGaii, victimKey),
+            `${label}: the sibling's keypair was rotated, so its own sign-in key stopped working`);
+    }
+
+    await test('setup: a sibling holding a scope no wildcard carries, and two approvers', async () => {
+        const v = await registerAgent(owner1Token, owner1, VICTIM, 'interactive', VICTIM_SCOPES);
+        victimGaii = v.gaii; victimKey = v.privateKey;
+        // The narrow approver is the reproduction: `agent:write` plus one ordinary scope.
+        raiderNarrowToken = (await registerAgent(owner1Token, owner1, 'takeover-raider', 'task-runner',
+            ['memory:read', 'agent:write'])).token;
+        // The wide one holds the wildcard, which covers every node-default scope. Without it the
+        // silent variant below would be refused by the older escalation check (the node defaults
+        // are what a request naming no scopes falls back to) and would prove nothing about this one.
+        raiderWideToken = (await registerAgent(owner1Token, owner1, 'takeover-raider-wide', 'task-runner',
+            ['*'])).token;
+        assert((await storedScopes(owner1Token, VICTIM)).includes('memory:write-reserved'),
+            'the sibling must start out holding the reserved grant');
+    });
+
+    await test('SECURITY: an agent naming an EXISTING sibling with explicit scopes is not auto-approved', async () => {
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${raiderNarrowToken}` },
+            body: JSON.stringify({ owner: owner1, agent_name: VICTIM, scopes: ['memory:read'] }),
+        });
+        assert(r.status === 200, `authorize: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.data.auto_approved !== true && r.body.data.status !== 'approved',
+            `a sibling was taken over: ${JSON.stringify(r.body.data)}`);
+        const p = await poll(r.body.data.device_code);
+        assert(p.status !== 200 && !p.body.access_token && !p.body.privateKey,
+            `the poll handed out the sibling's credential: ${JSON.stringify(p.body).slice(0, 240)}`);
+        await assertSiblingUntouched('explicit scopes');
+    });
+
+    await test('SECURITY: the silent variant (no scopes named) is not auto-approved either', async () => {
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${raiderWideToken}` },
+            body: JSON.stringify({ owner: owner1, agent_name: VICTIM }),
+        });
+        assert(r.status === 200, `authorize: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.data.auto_approved !== true && r.body.data.status !== 'approved',
+            `silence took the sibling over: ${JSON.stringify(r.body.data)}`);
+        const p = await poll(r.body.data.device_code);
+        assert(p.status !== 200 && !p.body.access_token && !p.body.privateKey,
+            `the poll handed out the sibling's credential: ${JSON.stringify(p.body).slice(0, 240)}`);
+        await assertSiblingUntouched('no scopes named');
+    });
+
+    await test('POSITIVE CONTROL: the same approver still auto-registers a NEW name within its own scopes', async () => {
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${raiderNarrowToken}` },
+            body: JSON.stringify({ owner: owner1, agent_name: `fresh-sibling-${Date.now() % 100000}`, scopes: ['memory:read'] }),
+        });
+        assert(r.status === 200 && r.body.data.auto_approved === true,
+            `the refusal above also stopped the deliberate case: ${r.status} ${JSON.stringify(r.body.data)}`);
+        const p = await poll(r.body.data.device_code);
+        assert(p.status === 200 && !!p.body.access_token, `new-name creds: ${p.status} ${JSON.stringify(p.body).slice(0, 200)}`);
+    });
+
+    await test('POSITIVE CONTROL: the owner in person still reconnects the same sibling, with its scopes intact', async () => {
+        const r = await json('/v1/agents/device-authorize', {
+            method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ owner: owner1, agent_name: VICTIM }),
+        });
+        assert(r.status === 200 && r.body.data.auto_approved === true,
+            `the owner can no longer bring their own agent back: ${r.status} ${JSON.stringify(r.body.data)}`);
+        const p = await poll(r.body.data.device_code);
+        assert(p.status === 200 && p.body.gaii === victimGaii && !!p.body.access_token && !!p.body.privateKey,
+            `owner reconnect creds: ${p.status} ${JSON.stringify(p.body).slice(0, 240)}`);
+        assert(Array.isArray(p.body.scopes) && p.body.scopes.includes('memory:write-reserved'),
+            `the owner's own reconnect dropped the reserved grant: ${JSON.stringify(p.body.scopes)}`);
     });
 
     console.log('\nPhase 5: Hosted-instance discovery (use it hosted vs deploy your own)');

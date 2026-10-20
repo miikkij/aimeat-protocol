@@ -10,6 +10,14 @@
  *   v1.1.0 — 2026-07-05 — Fan-out gating: a grant with `memory:read` searches the owner's full read
  *     surface (finds a sibling agent's private record); without it the search stays self-scoped. This
  *     closes the gap that hid the DROP app's app-grant scope collapse (only ever searched as owner before).
+ *   v1.2.0 — 2026-10-20 — Test 14 asserted the hole. It required a `memory:read` agent to FIND a
+ *     sibling agent's private record, which the 2026-10-15 ruling (memory:read-as-owner,
+ *     services/owner-scope-read.ts) had already taken away from every direct memory read; the
+ *     librarian kept giving it. It now asserts the refusal and the note that names the permission,
+ *     with the sibling's owner-visibility record still found (the rule is a filter, not a ban), and
+ *     tests 14b to 14d are the positive controls: memory:read-as-owner, and the owner in person.
+ *     Test 16: an ecosystem app approved with the node's default scopes gets no owner record at all,
+ *     because its data-area allowlist is its fence and the fan-out walked around it (secaudit 2026-10).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=librarian
 
@@ -245,18 +253,57 @@ await test('13. plan rejects a token WITHOUT ai:use (403 FORBIDDEN)', async () =
 // agent's private, GAII-owned records — only when the grant carries memory:read. This is the exact
 // path that was hiding the DROP app's librarian_assess results. --
 const GHOST = 'zorptagentmarker';
-await test('Setup: agent G (owned by A) authors a private record under its own GAII namespace', async () => {
+await test('Setup: agent G (owned by A) authors a private and an owner-visibility record under its own GAII namespace', async () => {
     const G = await connectAgent(A.token, A.name, 'lib-writer', ['memory:read', 'memory:write']);
     const w = await json('/v1/memory', { method: 'POST', headers: auth(G.token), body: JSON.stringify({ key: 'notebook.gsecret.n1', value: { text: `agent-authored ${GHOST} note` }, visibility: 'private' }) });
     assert(w.status === 201 || w.status === 200, `agent write ${w.status}: ${JSON.stringify(w.body.error)}`);
+    // The same marker on a record the sibling keeps for the whole account: what a same-owner reader
+    // IS admitted to, so the refusal below is a filter on visibility and not a blanket ban.
+    const s = await json('/v1/memory', { method: 'POST', headers: auth(G.token), body: JSON.stringify({ key: 'notebook.gshared.n1', value: { text: `agent-authored ${GHOST} shared note` }, visibility: 'owner' }) });
+    assert(s.status === 201, `agent shared write ${s.status}: ${JSON.stringify(s.body.error)}`);
 });
 
-await test('14. A memory:read grant fans across the owner\'s agents — finds a sibling agent\'s private record', async () => {
+// Until 2026-10-20 this test required the OPPOSITE: that a `memory:read` agent finds the sibling's
+// PRIVATE record. That was the hole. Reading another same-owner identity's private records costs its
+// own word, memory:read-as-owner (the 2026-10-15 ruling, services/owner-scope-read.ts), which every
+// direct memory read has enforced since; the librarian search handed them over anyway.
+await test('14. A memory:read grant fans across the owner\'s agents, and a sibling\'s PRIVATE record stays hidden (2026-10-15 ruling)', async () => {
     const H = await connectAgent(A.token, A.name, 'lib-reader', ['memory:read']);
     const r = await json(`/v1/librarian/search?q=${GHOST}`, { headers: auth(H.token) });
     assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
-    const hit = (r.body.data.hits || []).find((h: any) => h.key === 'notebook.gsecret.n1');
-    assert(!!hit, `memory:read must fan across the owner's agents, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+    const keys = (r.body.data.hits || []).map((h: any) => h.key);
+    assert(!keys.includes('notebook.gsecret.n1'), `a sibling agent's private record must not be a hit, got ${JSON.stringify(keys)}`);
+    assert(!keys.includes('notebook.inbox.n1'), `the owner's own private note must not be a hit either, got ${JSON.stringify(keys)}`);
+    // The answer says what was left out and which permission shows it, so the agent can ask for it.
+    assert(r.body.data.omitted >= 1, `the answer must count what it left out, got ${JSON.stringify(r.body.data.omitted)}`);
+    assert(typeof r.body.data.note === 'string' && r.body.data.note.includes('memory:read-as-owner'),
+        `the note must name the permission, got ${JSON.stringify(r.body.data.note)}`);
+});
+
+await test('14b. The fan-out still works: the same agent finds the sibling\'s OWNER-visibility record', async () => {
+    const H = await connectAgent(A.token, A.name, 'lib-reader2', ['memory:read']);
+    const r = await json(`/v1/librarian/search?q=${GHOST}`, { headers: auth(H.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const keys = (r.body.data.hits || []).map((h: any) => h.key);
+    assert(keys.includes('notebook.gshared.n1'), `an owner-visibility record of a sibling is still found, got ${JSON.stringify(keys)}`);
+    assert(r.body.data.owners_searched > 1, `the search still spans the owner's identities, got ${r.body.data.owners_searched}`);
+});
+
+await test('14c. An agent holding memory:read-as-owner DOES find the sibling\'s private record', async () => {
+    const R = await connectAgent(A.token, A.name, 'lib-asowner', ['memory:read', 'memory:read-as-owner']);
+    const r = await json(`/v1/librarian/search?q=${GHOST}`, { headers: auth(R.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const keys = (r.body.data.hits || []).map((h: any) => h.key);
+    assert(keys.includes('notebook.gsecret.n1'), `memory:read-as-owner must read the private record, got ${JSON.stringify(keys)}`);
+    assert(r.body.data.note === undefined, `nothing was left out, so there is no note: ${JSON.stringify(r.body.data.note)}`);
+});
+
+await test('14d. The owner in person still finds the agent-authored private record', async () => {
+    const r = await json(`/v1/librarian/search?q=${GHOST}`, { headers: auth(A.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const keys = (r.body.data.hits || []).map((h: any) => h.key);
+    assert(keys.includes('notebook.gsecret.n1') && keys.includes('notebook.gshared.n1'),
+        `the owner reads everything their agents hold, got ${JSON.stringify(keys)}`);
 });
 
 await test('15. Without memory:read, the search stays self-scoped — a sibling agent\'s private record is NOT visible', async () => {
@@ -265,6 +312,51 @@ await test('15. Without memory:read, the search stays self-scoped — a sibling 
     assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
     const hit = (r.body.data.hits || []).find((h: any) => h.key === 'notebook.gsecret.n1');
     assert(!hit, `a token without memory:read must not see a sibling agent's private record, got ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+});
+
+// -- An ecosystem app (GEAI) is fenced to the data areas its owner granted (ecoMayReadKey). The
+// owner-wide fan-out walked around that fence: an app approved with the node's default scopes, which
+// include memory:read, searched the owner's whole identity set and read private records as snippets,
+// while GET /v1/memory/:key?owner_scope=true answered 404 to the same token (secaudit 2026-10). --
+const ECO_TERM = 'ecolibrarianterm';
+await test('16. An ecosystem app with the default scopes and no data areas finds no owner record; the owner finds it', async () => {
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ key: 'notebook.inbox.ecoprobe', value: { text: `an ${ECO_TERM} only the owner may read` }, visibility: 'private' }),
+    });
+    assert(w.status === 201, `owner write ${w.status}: ${JSON.stringify(w.body.error)}`);
+
+    const hello = await json('/v1/ecosystem-apps/hello', {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: A.name, app: 'libeco', display_name: 'Lib Eco',
+            public_key: 'e2e-librarian-eco-pinned-key',
+            scopes: ['memory:read', 'memory:write', 'organism:read'],
+        }),
+    });
+    assert(hello.status === 200, `hello ${hello.status}: ${JSON.stringify(hello.body.error ?? hello.body)}`);
+    const ap = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+        method: 'POST', headers: auth(A.token),
+        // No data_areas: the owner granted the app nothing of their own areas.
+        body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write', 'organism:read'] }),
+    });
+    assert(ap.status === 200, `approve ${ap.status}: ${JSON.stringify(ap.body.error ?? ap.body)}`);
+    const tok = await json('/v1/ecosystem-apps/token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(tok.status === 200 && tok.body.access_token, `eco token ${tok.status}: ${JSON.stringify(tok.body)}`);
+
+    const r = await json(`/v1/librarian/search?q=${ECO_TERM}`, { headers: auth(tok.body.access_token) });
+    assert(r.status === 200, `eco search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const keys = (r.body.data.hits || []).map((h: any) => h.key);
+    assert(keys.length === 0, `an ecosystem app must not read the owner's memory here, got ${JSON.stringify(keys)}`);
+    assert(r.body.data.owners_searched === 1, `it searches its own identity only, got ${r.body.data.owners_searched}`);
+
+    // The term is genuinely indexed, so the absence above is a refusal and not a miss.
+    const mine = await json(`/v1/librarian/search?q=${ECO_TERM}`, { headers: auth(A.token) });
+    assert((mine.body.data.hits || []).some((h: any) => h.key === 'notebook.inbox.ecoprobe'),
+        `the owner finds their own record: ${JSON.stringify((mine.body.data.hits || []).map((h: any) => h.key))}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

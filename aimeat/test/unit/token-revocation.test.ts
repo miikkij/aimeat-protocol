@@ -175,12 +175,16 @@ describe('a credential counts only while the account it acts for holds its name'
     const owners = new Map<string, { name: string; roles: string[]; createdAt: string; disabledAt: string | null }>();
     const grants = new Map<string, { grantId: string; owner: string; createdAt: string; revoked: boolean }>();
     const ecosystemApps = new Map<string, { geai: string; status: string; createdAt: string }>();
+    const agentRecords = new Map<string, { gaii: string; owner: string; createdAt: string }>();
     const revokedSessions = new Set<string>();
     const accounts = {
         ...store,
         getOwner: async (name: string) => owners.get(name) ?? null,
         getAppGrant: async (id: string) => grants.get(id) ?? null,
         getEcosystemApp: async (geai: string) => ecosystemApps.get(geai) ?? null,
+        // The sixth question (auth/agent-alive.ts): an agent-role credential counts only while its
+        // agent record is there and is not newer than the credential.
+        getAgent: async (gaii: string) => agentRecords.get(gaii) ?? null,
         isSessionRevoked: async (sessionId: string) => revokedSessions.has(sessionId),
     } as unknown as Storage;
 
@@ -205,6 +209,10 @@ describe('a credential counts only while the account it acts for holds its name'
     const second = () => Math.floor(Date.now() / 1000) - 60;
     const account = (name: string, createdMs: number, disabled = false) => {
         owners.set(name, { name, roles: ['owner'], createdAt: at(createdMs), disabledAt: disabled ? at(createdMs + 1) : null });
+    };
+    /** An agent record, so the account question below is what refuses an agent token, not the agent one. */
+    const agentRecord = (gaii: string, owner: string, createdMs: number) => {
+        agentRecords.set(gaii, { gaii, owner, createdAt: at(createdMs) });
     };
 
     /** A token signed as issueJWT signs one, with its issue time set by the test: `ms` is its
@@ -237,6 +245,8 @@ describe('a credential counts only while the account it acts for holds its name'
 
     it('refuses an owner token and an agent token whose owner name no account holds', async () => {
         const s = second();
+        // The agent record stands, so the refusal below is the ACCOUNT question's and not the agent one's.
+        agentRecord(`bot#nobody@${NODE}`, 'nobody', s * 1000 - 10_000);
         expect(await refused(await signed({ sub: 'nobody', owner: 'nobody', roles: ['owner'] }, s, s * 1000 + 100))).toBe(true);
         expect(await refused(await signed({ sub: `bot#nobody@${NODE}`, owner: 'nobody', roles: ['agent'] }, s, s * 1000 + 100))).toBe(true);
     });
@@ -244,6 +254,7 @@ describe('a credential counts only while the account it acts for holds its name'
     it('refuses a token made before the account that holds its owner name now, to the millisecond', async () => {
         const s = second();
         account('dora', s * 1000 + 500); // the name registered again 300 ms after the tokens were made
+        agentRecord(`bot#dora@${NODE}`, 'dora', s * 1000 - 10_000);
         expect(await refused(await signed({ sub: 'dora', owner: 'dora', roles: ['owner'] }, s, s * 1000 + 200))).toBe(true);
         expect(await refused(await signed({ sub: `bot#dora@${NODE}`, owner: 'dora', roles: ['agent'], mcp_client: 'Probe' }, s, s * 1000 + 200))).toBe(true);
     });
@@ -251,8 +262,40 @@ describe('a credential counts only while the account it acts for holds its name'
     it('keeps the account\'s own tokens, also one made in the same second as the account', async () => {
         const s = second();
         account('erin', s * 1000 + 200);
+        agentRecord(`bot#erin@${NODE}`, 'erin', s * 1000 + 300);
         expect(await refused(await signed({ sub: 'erin', owner: 'erin', roles: ['owner'] }, s, s * 1000 + 500))).toBe(false);
         expect(await refused(await signed({ sub: `bot#erin@${NODE}`, owner: 'erin', roles: ['agent'] }, s + 5, (s + 5) * 1000))).toBe(false);
+    });
+
+    // The sixth question (auth/agent-alive.ts). An MCP OAuth access token is minted with no session
+    // id, so revokeSessionsByGaii could not reach it and deleting the agent left it working; this is
+    // the check that ends it, and the one that must not fire for anyone else.
+    it('refuses an agent token whose agent record is gone, or is newer than the token', async () => {
+        const s = second();
+        account('jane', s * 1000 - 60_000);
+        const token = (agent: string, ms: number) => signed({ sub: `${agent}#jane@${NODE}`, owner: 'jane', roles: ['agent'] }, s, ms);
+        // Deleted: no record at all.
+        expect(await refused(await token('deleted', s * 1000))).toBe(true);
+        // Registered again under the released name, 300 ms after the token was made.
+        agentRecord(`remade#jane@${NODE}`, 'jane', s * 1000 + 300);
+        expect(await refused(await token('remade', s * 1000))).toBe(true);
+        // Its own agent, made before it: kept.
+        expect(await refused(await token('remade', s * 1000 + 800))).toBe(false);
+    });
+
+    it('asks no agent of an owner session, an app grant, an ecosystem app or a token made from a PAT', async () => {
+        const s = second();
+        account('kari', s * 1000 - 60_000);
+        grants.set('g-kari', { grantId: 'g-kari', owner: 'kari', createdAt: at(s * 1000 - 30_000), revoked: false });
+        ecosystemApps.set(`eco:horn#kari@${NODE}`, { geai: `eco:horn#kari@${NODE}`, status: 'active', createdAt: at(s * 1000 - 30_000) });
+        const ms = s * 1000;
+        // None of these names an agent record, and none of them may be refused for want of one.
+        expect(await refused(await signed({ sub: 'kari', owner: 'kari', roles: ['owner'] }, s, ms))).toBe(false);
+        expect(await refused(await signed({ sub: 'kari', owner: 'kari', roles: ['owner', 'operator'] }, s, ms))).toBe(false);
+        expect(await refused(await signed({ sub: `kari@${NODE}`, owner: 'kari', roles: ['app'], app_grant: 'g-kari' }, s, ms))).toBe(false);
+        expect(await refused(await signed({ sub: `eco:horn#kari@${NODE}`, owner: 'kari', roles: ['ecosystem'], eco_app: 'horn' }, s, ms))).toBe(false);
+        // A scoped personal access token is minted with a sandboxed GAII that names no agent record.
+        expect(await refused(await signed({ sub: `apptester-9f2c1a4e#kari@${NODE}`, owner: 'kari', roles: ['agent'], via: 'pat' }, s, ms))).toBe(false);
     });
 
     it('compares a token minted without iat_ms in whole seconds', async () => {

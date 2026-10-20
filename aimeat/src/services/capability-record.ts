@@ -47,6 +47,9 @@
  *     cost.morsels is accepted with the Deprecation headers and counted (capability_cost_morsels), a
  *     mismatch of the two is 400 TOLL_MORSELS_MISMATCH, and MORSEL_PRICE_NAMES_REMOVED_IN refuses the
  *     old name (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
+ *   v1.4.0 — 2026-10-20 — CAPABILITY_SOURCE_TYPES says why `mcp` stays acceptable here now that
+ *     `invokeCapability` refuses another owner's `mcp` capability outside a shared server
+ *     (secaudit 2026-10). Comment only; the registration rules are unchanged.
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -116,9 +119,16 @@ function refuse(status: number, code: string, message: string): CapabilityRefusa
  * the node when a published app or an offer creates them, and letting a caller claim one would let
  * them publish something that looks like it came from a place it did not.
  *
- * `mcp` is here because a remote tool IS somebody's own to publish: they attached the server. It is
- * safe to accept because the ref is resolved through the CALLER's reach at invoke time, so naming
- * somebody else's server in one buys nothing.
+ * `mcp` is here because a remote tool IS somebody's own to publish: they attached the server.
+ *
+ * THIS COMMENT USED TO SAY that accepting it is safe because the ref resolves through the CALLER's
+ * reach at invoke time, so naming somebody else's server buys the registrant nothing. That covers
+ * one direction only: the registrant's own server is not exposed to the world by publishing a
+ * capability over it. In the other direction the slug resolved to a server only the CALLER had
+ * attached, so the registrant chose the tool, and through an app-tool manifest's lockedInput the
+ * arguments, of a call made with the caller's credential (secaudit 2026-10). The registration stays
+ * open and the refusal is at the last decision point: `invokeCapability` case 'mcp' refuses another
+ * owner's capability unless the registrant reaches the same server row under that slug.
  */
 const CAPABILITY_SOURCE_TYPES: CapabilityRecord['source']['type'][] = ['extension', 'action', 'cortex', 'app', 'manual', 'ecosystem', 'mcp'];
 

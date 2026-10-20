@@ -11,6 +11,10 @@
  *   import { registerOrganismWorkspaceTransferRoutes } from './organisms/workspace-transfer.js';
  *   registerOrganismWorkspaceTransferRoutes(router, config, storage, H);
  * @version-history
+ *   2026-10-20 -- Both exports carry the CALLER's resolved principal (`callerSub`), so an ecosystem
+ *     app is held to its owner-granted read data-areas even where the bundle reads as the member's
+ *     owner GHII; both imports carry the session's own facts (`caller`), so the restore can apply
+ *     the write rules the archive's keys and levels would otherwise skip (secaudit 2026-10).
  *   2026-10-15 -- Both exports say when they reached a limit: `truncated` in the base64 answer and
  *     the X-Aimeat-Export-Truncated header on the binary download; the bundles now carry the row
  *     spaces and the imports restore them (feature-list audit #68).
@@ -24,6 +28,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import type { VerifiedToken } from '../../auth/jwt.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { exportWorkspace } from '../../services/workspace-export.js';
@@ -33,10 +38,22 @@ import { exportOrganism } from '../../services/organism-export.js';
 import { importOrganism } from '../../services/organism-import.js';
 import { ZipSecurityError } from '../../services/safe-zip.js';
 import { recordSecurityIncident } from '../../services/security-incident.js';
+import type { ImportCaller } from '../../services/workspace-import-gates.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismWorkspaceTransferRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, findWsEntry, bareOwner } = H;
+
+  /** The session's own facts, which the restore's write rules read (services/workspace-import-gates.ts). */
+  const importCaller = (auth: VerifiedToken): ImportCaller => {
+    const principal = resolveIdentity(auth, config.nodeId);
+    return {
+      principal, targetGaii: principal, owner: String(auth.owner ?? ''),
+      roles: auth.roles ?? [], scopes: auth.scopes ?? [],
+      ...(auth.federated !== undefined ? { federated: auth.federated } : {}),
+      ...(auth.app ? { app: auth.app } : {}),
+    };
+  };
 
   /* ── GET /v1/organisms/:id/workspace/export?ws= — download a full-fidelity ZIP backup of a
    * workspace (workspace.json + images/). The workspace creator (or an org admin) only. ── */
@@ -55,7 +72,8 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the workspace creator or an org admin can export')); return;
     }
     const { buffer, filename, leftOut, truncated } = await exportWorkspace(storage, config, {
-      orgId: id, ws, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
+      orgId: id, ws, exporterGaii: resolveIdentity(req.auth!, config.nodeId),
+      callerSub: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
       isOrgManager: role === 'creator' || role === 'admin',
       reader: readerFor({ storage, config }, req.auth),
     });
@@ -93,7 +111,7 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
     const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
     if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the workspace ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
     try {
-      const result = await importWorkspace(storage, config, { orgId: id, importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, zip: buf });
+      const result = await importWorkspace(storage, config, { orgId: id, importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, caller: importCaller(req.auth!), zip: buf });
       emitChange('organisms');
       res.status(201).json(success(config.nodeId, result));
     } catch (e) {
@@ -120,8 +138,11 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
     if (!m || m.status !== 'active') { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an active member of the organism can export it')); return; }
     // Export as the member's owner GHII — a member reads the whole organism live, and the per-creator
     // registry + records are GHII-owned (an agent-session GAII used to yield a near-empty bundle).
+    // `callerSub` is who is actually asking: the owner identity above is the READ identity, and
+    // deciding workspace access with it skipped the ecosystem data-area gate (secaudit 2026-10).
     const { buffer, filename, leftOut, truncated } = await exportOrganism(storage, config, {
-      orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString(),
+      orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`,
+      callerSub: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
       reader: readerFor({ storage, config }, req.auth),
     });
     if (req.query.format === 'base64') {
@@ -146,7 +167,7 @@ export function registerOrganismWorkspaceTransferRoutes(router: Router, config: 
     const buf = Buffer.isBuffer(req.body) ? req.body : (typeof b64 === 'string' ? Buffer.from(b64, 'base64') : null);
     if (!buf || buf.length === 0) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send the organism ZIP as the raw body (Content-Type: application/zip) or JSON { zip_base64 }')); return; }
     try {
-      const result = await importOrganism(storage, config, { importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, zip: buf });
+      const result = await importOrganism(storage, config, { importerGaii: resolveIdentity(req.auth!, config.nodeId), importerOwner: req.auth!.owner as string, caller: importCaller(req.auth!), zip: buf });
       emitChange('organisms');
       res.status(201).json(success(config.nodeId, result));
     } catch (e) {

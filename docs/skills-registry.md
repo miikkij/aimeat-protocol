@@ -217,5 +217,13 @@ auto-trigger via Claude's native skill discovery.
 ## Security
 
 Skill ZIP uploads go through the hardened `safeUnzip` (traversal/symlink/zip-bomb guards) with
-a strict layout allowlist; publish/link are owner-authed; workspace scope is membership-gated
-(`canReadWorkspace`); operator config-writes use propose-then-confirm tokens.
+a strict layout allowlist; publish/link are owner-authed; operator config-writes use
+propose-then-confirm tokens.
+
+**Reading a workspace skill is membership-gated** (`canReadWorkspace`). **Writing one asks the
+workspace WRITE rule**, because a workspace skill is workspace content stored under
+`organism.{org}.w.{ws}.skills.*` that every member's agents load as instructions: publishing or
+deleting it needs the workspace's registered creator, an organism manager, or an active
+`workspace-contributor` grant (`services/skill-workspace-gate.ts`, Core 2026-11 COL-09). A `viewer`
+grant reads and does not write. The delete removes every member's copies for the creator and an
+organism manager; a contributor removes their own.

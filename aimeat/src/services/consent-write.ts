@@ -22,11 +22,21 @@
  *   One capability, one implementation, whatever the interface — CLAUDE.md, Backend.
  * @structure
  *   - VALID_RECIPIENT_PATTERNS — the seven shapes a recipient may take
+ *   - CONSENT_PUBLISH_KIND — the publish-request kind a consent to everyone is filed as
  *   - grantConsent() / revokeConsent() — the whole sequence, gate first
  * @usage
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-20 — A consent whose recipient is `*` asks the publish gate (services/publish-gate.ts),
+ *     the same question a raise to public asks: a scoped agent without publish:public files a
+ *     request for the owner and nothing is opened. The only gate was consent:manage, which every
+ *     wildcard scope carries, so the same world-readable state had two doors with two permission
+ *     words (secaudit 2026-10, grantConsent:wildcard-recipient-skips-publish-gate).
+ *   2026-10-20 — The member-directory refresh is notifyDirectoryChange() (services/directory.ts),
+ *     not the optional onDirectoryChange only the REST route passed: a federation consent revoked
+ *     through aimeat_consent_revoke left the person listed (secaudit 2026-10,
+ *     consent-write:revoke-directory-refresh-optional).
  *   2026-10-15 — A grant stamps metadata.collection_method from ConsentCaller.collectionMethod, which
  *     the consent receipt reads (feature-list audit #161).
  *   2026-10-15 — The consent_granted and consent_revoked account events go to the owner's GHII (ownerGhiiOf) on both REST and MCP; the consent record keeps the identity it was filed under (feature-list audit #44).
@@ -50,12 +60,15 @@ import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isSameOwner, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
+import { isSameOwner, localAccountName, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import {
     CONSENT_REACH_ALIAS_REMOVED_IN, CONSENT_REACH_INPUTS, consentReachOf, defaultConsentReach, isConsentReachAlias,
 } from '../utils/consent-reach.js';
 import { noteDeprecatedUse, removedFrom } from './deprecation.js';
 import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
+import { notifyDirectoryChange } from './directory.js';
+import { callerFromAuth } from './caller-context.js';
+import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -124,7 +137,33 @@ export interface ConsentGrantInput {
 
 export type ConsentResult<T> =
     | { ok: true; value: T }
-    | { ok: false; status: number; code: string; message: string };
+    | {
+        ok: false; status: number; code: string; message: string;
+        /**
+         * Set with code PUBLISH_REQUESTED: nothing was granted, and the owner has been asked. A door
+         * that wants to show more than the message reads the request id and the approve address here.
+         */
+        publishRequest?: ReturnType<typeof publishRequestedBody>;
+    };
+
+/** What a consent to everyone is filed as while it waits for the owner (publish-requests/). */
+export const CONSENT_PUBLISH_KIND = 'consent' as const;
+
+/** The recipient that means everyone, the anonymous reader included. */
+const EVERYONE = '*';
+
+/** The deps every write here takes. */
+export interface ConsentWriteDeps {
+    storage: Storage;
+    config: AimeatConfig;
+    /**
+     * No longer read. The member-directory refresh is notifyDirectoryChange() (services/directory.ts),
+     * which runs whoever made the change: the REST route passed this callback and the MCP tool and the
+     * expiry job did not, so a person who withdrew through their AI stayed listed. Still accepted so
+     * the callers that pass it compile; remove the argument when each of them is next touched.
+     */
+    onDirectoryChange?: () => void;
+}
 
 /** Does this session carry the scope? scopeIsCovered, the rule requireScope applies (C3). */
 const hasScope = (scopes: string[], needed: string): boolean => scopeIsCovered(scopes, needed);
@@ -148,13 +187,58 @@ function gate(caller: ConsentCaller): ConsentRefusal | null {
     };
 }
 
+/**
+ * Everyone-readable is everyone-readable whichever door opens it, so a consent whose recipient is
+ * `*` asks the publish gate that a raise to public asks (services/publish-gate.ts). The owner in
+ * person passes, an agent or app holding publish:public passes, and anything else files a request
+ * for the owner and grants nothing. Null when the consent may go ahead.
+ *
+ * `consent:manage` alone is not that permission: it is inside every wildcard scope, and
+ * `publish:public` is deliberately outside all of them (utils/scope-coverage.ts).
+ */
+async function wildcardPublishRefusal(
+    deps: ConsentWriteDeps, caller: ConsentCaller, input: ConsentGrantInput, reach: string,
+): Promise<Extract<ConsentResult<never>, { ok: false }> | null> {
+    if (input.recipient !== EVERYONE) return null;
+    const ctx = { storage: deps.storage, config: deps.config };
+    // An identity of another node names no account here (localAccountOf), and the gate has nobody
+    // on this node to ask for it, so it is told so rather than asked about.
+    const foreign = localAccountOf(caller.ownerGaii) === null;
+    const gateCaller = callerFromAuth({
+        sub: caller.ownerGaii, owner: localAccountName(ownerGhiiOf(caller.ownerGaii)),
+        roles: [...caller.roles], scopes: [...caller.scopes], federated: foreign,
+    }, deps.config.nodeId, deps.storage);
+    const ask = publishAskOf(ctx, gateCaller);
+    if (ask.kind === 'allowed') return null;
+    if (ask.kind === 'refused') return { ok: false, status: ask.status, code: ask.code, message: ask.message };
+
+    const filed = await fileAsk(ctx, gateCaller.owner, ask.requester, {
+        kind: CONSENT_PUBLISH_KIND,
+        target: {
+            namespace: caller.ownerGaii, pattern: input.dataPattern, purpose: input.purpose, reach,
+            ...(input.expires ? { expires: input.expires } : {}),
+        },
+        title: `the records matching ${input.dataPattern}, to anyone`,
+        name: input.dataPattern,
+        change: { field: 'recipient', from: null, to: EVERYONE },
+    });
+    if (!filed.ok) {
+        return {
+            ok: false, status: 403, code: 'PUBLISH_NOT_ASKED',
+            message: `Nothing was opened, and the owner could not be asked: ${filed.message}`,
+        };
+    }
+    const body = publishRequestedBody(ctx, filed);
+    return { ok: false, status: 403, code: 'PUBLISH_REQUESTED', message: body.next_step, publishRequest: body };
+}
+
 /** Grant one consent. The order is REST's order, which is the one with the audit entry in it. */
 export async function grantConsent(
-    deps: { storage: Storage; config: AimeatConfig; onDirectoryChange?: () => void },
+    deps: ConsentWriteDeps,
     caller: ConsentCaller,
     input: ConsentGrantInput,
 ): Promise<ConsentResult<ConsentRecord>> {
-    const { storage, onDirectoryChange } = deps;
+    const { storage } = deps;
 
     const denied = gate(caller);
     if (denied) return denied;
@@ -184,6 +268,11 @@ export async function grantConsent(
         });
     }
     const reach = input.scope === undefined ? defaultConsentReach() : consentReachOf(input.scope);
+
+    // Recipient `*` is the anonymous reader too, so it meets the publish gate before anything is
+    // stored. Asked here and not at each door, because both doors reach this one function.
+    const notOurs = await wildcardPublishRefusal(deps, caller, input, reach);
+    if (notOurs) return notOurs;
 
     const existing = await storage.listConsents(caller.ownerGaii);
     if (existing.length >= CONSENT_QUOTA) {
@@ -217,7 +306,9 @@ export async function grantConsent(
     // here, so a consent granted by an agent was invisible to it.
     await auditDataAccess(storage, consent.id, caller.ownerGaii, consent.recipient, consent.dataPattern, 'grant', true);
 
-    if (consent.scope === 'federation' && onDirectoryChange) onDirectoryChange();
+    // A federation consent decides who is in the member directory, so the index hears it from the
+    // change itself. It depended on the caller passing onDirectoryChange, which only the REST route did.
+    if (consent.scope === 'federation') notifyDirectoryChange();
     emitChange('consent');
 
     // Giving someone access to your data is exactly the kind of thing you want a durable record of,
@@ -239,11 +330,11 @@ export async function grantConsent(
 
 /** Revoke one consent. Ownership is checked here rather than by the caller, for the same reason. */
 export async function revokeConsent(
-    deps: { storage: Storage; config: AimeatConfig; onDirectoryChange?: () => void },
+    deps: ConsentWriteDeps,
     caller: ConsentCaller,
     consentId: string,
 ): Promise<ConsentResult<{ id: string; revokedAt: string }>> {
-    const { storage, onDirectoryChange } = deps;
+    const { storage } = deps;
 
     const denied = gate(caller);
     if (denied) return denied;
@@ -260,7 +351,9 @@ export async function revokeConsent(
     await storage.updateConsent(consentId, { status: 'revoked', revokedAt: now });
     await auditDataAccess(storage, consentId, consent.ownerGaii, consent.recipient, consent.dataPattern, 'revoke', true);
 
-    if (consent.scope === 'federation' && onDirectoryChange) onDirectoryChange();
+    // Withdrawing is the half that must not be missed: the person is in the directory with their
+    // display name, bio, city and coordinates until the index hears about it.
+    if (consent.scope === 'federation') notifyDirectoryChange();
     emitChange('consent');
     void recordAccountEvent(storage, {
         ownerGhii: ownerGhiiOf(consent.ownerGaii),

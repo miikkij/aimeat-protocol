@@ -8,6 +8,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   2026-10-20 -- A catalogue:read app gets no owner memory record from GET /v1/discover or its
+ *     facets, with a query and without one; an app holding memory:read still finds it (secaudit
+ *     2026-10, the F05b-01 rule on the master directory).
  *   2026-10-16 -- A catalogue:read app is refused the owner's private record by GET /v1/memory/:gaii/:key,
  *     the private file by GET /v1/pub/:gaii/{key} (QA audit S3-03) and the owner's memory by GET
  *     /v1/librarian/search (F05b-01); an app holding memory:read or storage:read still reads them.
@@ -472,6 +475,33 @@ async function main() {
         const r = await json('/v1/librarian/search?q=zebrafinch', { headers: { Authorization: `Bearer ${narrowToken}` } });
         assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
         assert(!JSON.stringify(r.body).includes(PRIVATE_KEY), 'the private key leaked in the refusal');
+    });
+
+    // The same hole on the master directory. An app grant's own identity IS the owner's GHII, so the
+    // narrowing that keeps an agent without memory:read inside its own namespace kept the app inside
+    // the owner's whole personal memory: GET /v1/discover listed the private record with a
+    // 240-character excerpt of its value, and /v1/discover/facets counted it, for a token the same
+    // node refuses at GET /v1/memory/:key and GET /v1/librarian/search (secaudit 2026-10).
+    await test('app without memory:read gets no owner memory record from GET /v1/discover (with and without q)', async () => {
+        for (const query of ['scope=own&per_page=100', `scope=own&q=zebrafinch&per_page=100`, 'scope=own&type=memory&per_page=100']) {
+            const r = await json(`/v1/discover?${query}`, { headers: { Authorization: `Bearer ${narrowToken}` } });
+            assert(r.status === 200, `${query}: expected 200, got ${r.status}`);
+            const entries = (r.body.data.entries ?? []) as any[];
+            assert(!entries.some(e => e.id === PRIVATE_KEY), `${query}: the private record is listed: ${JSON.stringify(entries.map(e => e.id))}`);
+            assert(!JSON.stringify(entries).includes('zebrafinch'), `${query}: the private value leaked in an entry`);
+        }
+        const f = await json('/v1/discover/facets?scope=own', { headers: { Authorization: `Bearer ${narrowToken}` } });
+        assert(f.status === 200, `facets: expected 200, got ${f.status}`);
+        const memory = (f.body.data.types as any[]).find(t => t.value === 'memory');
+        assert(memory === undefined || memory.count === 0, `the count must not reveal it either, got ${JSON.stringify(memory)}`);
+    });
+
+    await test('app WITH memory:read still finds the owner\'s record through GET /v1/discover', async () => {
+        const mem = (await grantAppToken('memory:read')).access_token as string;
+        const r = await json('/v1/discover?scope=own&type=memory&per_page=100', { headers: { Authorization: `Bearer ${mem}` } });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        assert(((r.body.data.entries ?? []) as any[]).some(e => e.id === PRIVATE_KEY),
+            `memory:read reads the owner's memory: ${JSON.stringify(((r.body.data.entries ?? []) as any[]).map(e => e.id))}`);
     });
 
     await test('apps WITH the words still read: memory:read by identity and search, storage:read the file', async () => {

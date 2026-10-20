@@ -1,18 +1,6 @@
 {
   "about": "Every file under src/ that calls a storage method loading content (memory, files, workspace rows), how many calls of each, and why. The reads either pass the classification reader (services/classification/, TARGET-082) or are the node's own. pnpm check:classification-reach fails on a new file, a count that grew, and a line that is stale; --shrink lowers the counts that fell. Reasoning: aimeat/scripts/check-classification-reach.ts.",
   "files": {
-    "src/routes/agents/avatar.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-19, the node's own read: the agent's agent.avatar record, read before the owner's DELETE to tell the change stream what visibility it had. Nothing is shown from it."
-    },
-    "src/services/agent-avatar.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
-    },
     "src/commerce/agent-order-intake.ts": {
       "reads": {
         "getMemory": 2
@@ -34,10 +22,10 @@
     },
     "src/commerce/beneficiary-book.ts": {
       "reads": {
-        "getMemory": 1,
-        "listAllMemory": 1,
         "listMemory": 1,
-        "listAllMemoryPages": 1
+        "listAllMemoryPages": 1,
+        "getMemory": 1,
+        "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's beneficiary ledger (commerce.benefit.*): read-to-update and ledger listings for its owner. 2026-10-16 (QA audit S8-10): the beneficiary's own entries are read with listMemory on their own identity, and a provider's obligations with listAllMemoryPages over every commerce.benefit.* record, so totals are not sums of a window."
     },
@@ -116,6 +104,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The checkout-session and order ledger, returned to its buyer or seller."
     },
+    "src/commerce/subscriptions.ts": {
+      "reads": {
+        "getMemory": 5,
+        "listMemory": 2,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-5), the node's own read: an extension's own published offer (`subscription.plans` in ext:{name}), the buyer's service-owned subscription records (commerce.subscription.*) to extend, list, cancel and renew them, and the seller's payment setup (commerce.psp) for the renewal charge. What a buyer is shown is their own records' facts without the kept card's ids; no content is shown to anyone else."
+    },
     "src/commerce/ucp-guest-checkout.ts": {
       "reads": {
         "getMemory": 7,
@@ -128,12 +124,6 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The seller's payment settings, read for the x402 payTo address."
-    },
-    "src/mcp/catalogue.ts": {
-      "reads": {
-        "listMemoryForOwners": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Profile location and interests of people who opted into the public directory; published by their choice."
     },
     "src/mcp/commerce.ts": {
       "reads": {
@@ -254,6 +244,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists task live-trace keys only to delete them on task delete."
     },
+    "src/routes/agents/avatar.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-19, the node's own read: the agent's agent.avatar record, read before the owner's DELETE to tell the change stream what visibility it had. Nothing is shown from it."
+    },
     "src/routes/agents/management.ts": {
       "reads": {
         "listMemory": 1
@@ -328,7 +324,7 @@
       "reads": {
         "listAllMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Public knowledge package manifests, published by their owners' choice."
+      "why": "Reviewed 2026-10-20 (secaudit 2026-10): the node-wide scan of public knowledge-package manifests behind GET /v1/catalogue/knowledge. The scan itself is unchecked and cached raw; every manifest it hands to a caller goes through that caller's classification reader first (presentMemories, readerFor), so the listing answers what GET /v1/knowledge/:id answers. Until 2026-10-20 it had no reader, and a manifest hidden from AI was listed to the anonymous internet while the single read answered 404."
     },
     "src/routes/commerce-acp.ts": {
       "reads": {
@@ -426,6 +422,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The attachment passes leave (federation) before a download token is minted; the other read is a replication version compare."
     },
+    "src/routes/federation-sync/retract.ts": {
+      "reads": {
+        "listMemory": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-20 (secaudit 2026-10, replica retention), the node's own read: POST /v1/federation/retract removes the copies a peer replicated here. The listing finds the conflict copies kept beside the replica, and the getMemory reads each candidate only to check it carries a tag naming the node whose signature was verified, so a record of this node's own at the same key is left alone. Neither value leaves the handler: the response carries the removed keys and a count, never content."
+    },
     "src/routes/federation-sync/templates.ts": {
       "reads": {
         "listMemory": 1
@@ -474,8 +477,8 @@
     },
     "src/routes/knowledge/sharing.ts": {
       "reads": {
-        "getMemory": 2,
-        "listMemoryForOwners": 1
+        "listMemoryForOwners": 1,
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Clone passes reader.show and export passes show and leave; the other read is read-to-update. 2026-10-17: the export's manifest lookup now goes through helpers.ts findReadableManifest, so two reads left this file."
     },
@@ -487,8 +490,8 @@
     },
     "src/routes/memory/batch-guards.ts": {
       "reads": {
-        "getMemory": 1,
-        "getStorageFile": 1
+        "getStorageFile": 1,
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that a referenced file exists. Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.2): getMemory reads the visibility a batch entry's record has now, for the audience cap; nothing is returned to anyone."
     },
@@ -584,18 +587,6 @@
         "listAllMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Draft reopen copies internally, collapse deletes, and the organism meta.config."
-    },
-    "src/services/workspace-public-collectors.ts": {
-      "reads": {
-        "listAllMemory": 2
-      },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Moved from src/routes/organisms/shared-public.ts unchanged on 2026-10-16."
-    },
-    "src/services/design-book/part-provenance.ts": {
-      "reads": {
-        "listMemory": 1
-      },
-      "why": "Reads only the key and the provenance record id of the Design Book's own public part rows (the node's system identity), never their content, so the read routes can serve each part's AI label."
     },
     "src/routes/organisms/shared.ts": {
       "reads": {
@@ -732,11 +723,23 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The provider's payout address."
     },
+    "src/services/adult-assurance.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-3), the node's own read: the service-owned verified-adult record (identity.adult.status) of one account, read to update it and to answer yes or no. It holds no content and no personal data beyond the method and the time."
+    },
     "src/services/agent-ai-keys.ts": {
       "reads": {
         "getMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Per-agent encrypted AI keys, usage counters and settings."
+    },
+    "src/services/agent-avatar.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-19: an agent's own picture at agent.avatar, public by design like its description (the agent's face on every listing), so it is profile metadata rather than classified content. The value is read only as one emoji or one SVG and served as an image; no other key is read."
     },
     "src/services/agent-offers-write.ts": {
       "reads": {
@@ -834,26 +837,6 @@
         "getMemory": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI usage counters."
-    },
-    "src/commerce/subscriptions.ts": {
-      "reads": {
-        "getMemory": 5,
-        "listMemory": 2,
-        "listAllMemory": 1
-      },
-      "why": "Reviewed 2026-10-18 (Comicland v3 A-5), the node's own read: an extension's own published offer (`subscription.plans` in ext:{name}), the buyer's service-owned subscription records (commerce.subscription.*) to extend, list, cancel and renew them, and the seller's payment setup (commerce.psp) for the renewal charge. What a buyer is shown is their own records' facts without the kept card's ids; no content is shown to anyone else."
-    },
-    "src/services/adult-assurance.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-18 (Comicland v3 A-3), the node's own read: the service-owned verified-adult record (identity.adult.status) of one account, read to update it and to answer yes or no. It holds no content and no personal data beyond the method and the time."
-    },
-    "src/services/provenance-embed/index.ts": {
-      "reads": {
-        "getStorageFile": 1
-      },
-      "why": "Reviewed 2026-10-18 (Comicland v3 A-8), the node's own read: the caller's own file in the caller's own storage namespace, read to write a marked copy of it back into the same namespace with the same visibility. Its bytes go to no model and to nobody else."
     },
     "src/services/ai/call-files.ts": {
       "reads": {
@@ -1008,8 +991,8 @@
     },
     "src/services/app-template-proposals.ts": {
       "reads": {
-        "getMemory": 1,
-        "listMemory": 1
+        "listMemory": 1,
+        "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Template proposal manifests, listed to and read by their owner."
     },
@@ -1028,8 +1011,8 @@
     },
     "src/services/app-tools-key.ts": {
       "reads": {
-        "getMemory": 2,
-        "listMemory": 1
+        "listMemory": 1,
+        "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A one-time migration of manifest keys."
     },
@@ -1083,9 +1066,9 @@
     },
     "src/services/cache-cleanup.ts": {
       "reads": {
-        "listMemory": 1
+        "listAllMemoryMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones. From 2026-10-20 the listing is listAllMemoryMeta, by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk visited none of them (secaudit 2026-10, replica retention). It is the value-free META projection, read to compare an updatedAt against the TTL and delete; nothing is served to anyone."
     },
     "src/services/call-timing.ts": {
       "reads": {
@@ -1116,9 +1099,9 @@
     "src/services/classification/audience-settle.ts": {
       "reads": {
         "getMemory": 2,
+        "listAllMemoryMeta": 1,
         "getMemoryByKeysAnyOwner": 1,
         "getStorageFileMeta": 1,
-        "listAllMemoryMeta": 1,
         "listMemoryMeta": 1,
         "listStorageFiles": 1
       },
@@ -1183,6 +1166,12 @@
         "getStorageFile": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The company page file, published by its owner on the company origin."
+    },
+    "src/services/company/company-publish-gate.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: when the company's own page was written, stamped on the publish request as its version. No content is read or returned."
     },
     "src/services/company/company-service.ts": {
       "reads": {
@@ -1282,6 +1271,14 @@
         "listStorageFiles": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave(). 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry."
+    },
+    "src/services/datapackage/version-audience.ts": {
+      "reads": {
+        "getStorageFile": 3,
+        "getMemory": 2,
+        "listStorageFiles": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
     },
     "src/services/db/agent-data-access-overview-db-service.ts": {
       "reads": {
@@ -1402,6 +1399,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Parts read to run the bench and a notice digest; only ids and reasons reach the notification."
+    },
+    "src/services/design-book/part-provenance.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reads only the key and the provenance record id of the Design Book's own public part rows (the node's system identity), never their content, so the read routes can serve each part's AI label."
     },
     "src/services/design-book/reasons.ts": {
       "reads": {
@@ -1531,8 +1534,8 @@
     },
     "src/services/exposure/sources-records.ts": {
       "reads": {
-        "getMemory": 1,
-        "listStorageFilesForOwners": 1
+        "listStorageFilesForOwners": 1,
+        "getMemory": 1
       },
       "why": "Reviewed 2026-10-17 (plan doc-mvcn6c7e4e5q, V6.1), checked: the person's own file META rows (no bytes), and one knowledge manifest per exposed package for its name. Every item carries its content address and passes the caller's classification reader in exposure-report.ts before it is listed; a hidden one is only counted."
     },
@@ -1554,7 +1557,7 @@
       "reads": {
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The file passes reader.show as the extension's caller, after authorizeRead."
+      "why": "Reviewed 2026-10-20 (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii), checked: the file passes reader.show as the READER, after authorizeRead judged against the same reader. The reader is the caller on an attended call and the principal that wrote the extension's code on an unattended one."
     },
     "src/services/extension-lifecycle.ts": {
       "reads": {
@@ -1576,9 +1579,9 @@
     },
     "src/services/federation-peer-remove.ts": {
       "reads": {
-        "listMemory": 1
+        "listAllMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Rewrites replica records to expiring when a peer is removed (read-to-rewrite). Moved here from routes/federation-peer/lifecycle.ts on 2026-10-01 unchanged."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Rewrites replica records to expiring when a peer is removed (read-to-rewrite). Moved here from routes/federation-peer/lifecycle.ts on 2026-10-01 unchanged. From 2026-10-20 the listing is listAllMemory, paged by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk converted none of them (secaudit 2026-10, replica retention). The value is read because the row is written back under the expiring key, and it goes nowhere else."
     },
     "src/services/federation-remote-templates.ts": {
       "reads": {
@@ -1702,6 +1705,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest existence check and read-to-update of an entry."
     },
+    "src/services/knowledge-publish-ask.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: after a knowledge write by the caller's own account, the manifest's and the named entries' versions are read to stamp the publish request. Only the version numbers leave this file."
+    },
     "src/services/ledger-billing.ts": {
       "reads": {
         "getMemory": 1
@@ -1753,10 +1762,10 @@
     },
     "src/services/memory-bin.ts": {
       "reads": {
-        "getMemory": 1,
+        "getMemory": 2,
         "listDeletedMemory": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), the node's own read: whether a key exists before a delete, and whether it is in the bin before a restore."
+      "why": "Reviewed 2026-10-20 (secaudit 2026-10, restoreMemoryRecord:skips-publish-gate-and-cap), the node's own read: whether a key exists before a delete, whether it is in the bin before a restore, and, on a closed node, the record the restore just took out of the bin so its level can be written back lower on the version that was read. No read on this path hands content to a caller; a restore answers the key and nothing else."
     },
     "src/services/memory-ceilings.ts": {
       "reads": {
@@ -1857,18 +1866,18 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding marker and track records."
     },
-    "src/services/once-only-step.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. No content is shown to anyone."
-    },
     "src/services/onboarding-validator.ts": {
       "reads": {
         "getMemory": 2,
         "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Agent commands, config and offers checked for onboarding."
+    },
+    "src/services/once-only-step.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. No content is shown to anyone."
     },
     "src/services/open-items.ts": {
       "reads": {
@@ -1966,77 +1975,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Install-request state records."
     },
-    "src/services/publish-requests/store.ts": {
-      "reads": {
-        "getMemory": 2,
-        "listMemory": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: publish request records under the reserved prefix publish.requests., which only the filing path writes. They hold ids, a title and the change asked for, never the content being published."
-    },
-    "src/services/publish-requests/apply-file.ts": {
-      "reads": {
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the approved file's metadata (no bytes) is read only to compare its created_at, size and visibility with the request before making it public; nothing is returned to anyone."
-    },
-    "src/services/publish-requests/cap-recheck.ts": {
-      "reads": {
-        "getMemory": 1,
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.3), the node's own read: an approved request's record or file is read for its current level and workspace binding, to hold the approval to the label's audience cap before the applier runs; nothing is returned to anyone."
-    },
-    "src/services/publish-requests/apply-memory.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: the approved record is read only to compare its version and visibility with the request before making it public; its value goes back into the same record and is returned to nobody."
-    },
-    "src/services/publish-requests/apply-knowledge.ts": {
-      "reads": {
-        "getMemory": 3
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: an approved knowledge request reads the owner's manifest and the named entries only to compare their versions and visibilities with the request before making them public, then re-reads the manifest between its own writes. Nothing read is returned to anyone."
-    },
-    "src/services/knowledge-publish-ask.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: after a knowledge write by the caller's own account, the manifest's and the named entries' versions are read to stamp the publish request. Only the version numbers leave this file."
-    },
-    "src/services/datapackage/version-audience.ts": {
-      "reads": {
-        "getStorageFile": 3,
-        "getMemory": 2,
-        "listStorageFiles": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the owner's own data package files (latest.json, the version's files rewritten at a new tier with the same bytes) and the catalogue rows read-to-update, as ./store.ts read them before writeLatest and upsertCatalogueEntry moved here. Nothing read is returned to a caller."
-    },
-    "src/services/served-page-provenance.ts": {
-      "reads": {
-        "getStorageFileMeta": 2
-      },
-      "why": "Reviewed 2026-10-18, the node's own read: the metadata of a welcome page or a company front page (which provenance record it carries), to tell whether that record belongs to a page served to anyone now. No content is read or returned."
-    },
-    "src/services/publish-requests/apply-company.ts": {
-      "reads": {
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the metadata (when it was written) of the company's own page, compared with the request before the address is pointed at it. No content is read or returned."
-    },
-    "src/services/company/company-publish-gate.ts": {
-      "reads": {
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: when the company's own page was written, stamped on the publish request as its version. No content is read or returned."
-    },
-    "src/services/portfolio-config.ts": {
-      "reads": {
-        "getMemory": 2,
-        "getStorageFileMeta": 1
-      },
-      "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
-    },
     "src/services/packages/install/package-skill-component.ts": {
       "reads": {
         "listMemory": 1,
@@ -2109,6 +2047,13 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: how a federation peer arrived, the package registrations waiting for their node, and the markers of its Security page events, in the federation-peer-origin system namespace. No content of a person's."
     },
+    "src/services/portfolio-config.ts": {
+      "reads": {
+        "getMemory": 2,
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
+    },
     "src/services/portfolio-members.ts": {
       "reads": {
         "listMemoryForOwners": 1
@@ -2133,11 +2078,55 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The proactive-mode setting."
     },
+    "src/services/provenance-embed/index.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-18 (Comicland v3 A-8), the node's own read: the caller's own file in the caller's own storage namespace, read to write a marked copy of it back into the same namespace with the same visibility. Its bytes go to no model and to nobody else."
+    },
     "src/services/public-activity.ts": {
       "reads": {
         "listAllMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's own public activity events."
+    },
+    "src/services/publish-requests/apply-company.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the metadata (when it was written) of the company's own page, compared with the request before the address is pointed at it. No content is read or returned."
+    },
+    "src/services/publish-requests/apply-file.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: the approved file's metadata (no bytes) is read only to compare its created_at, size and visibility with the request before making it public; nothing is returned to anyone."
+    },
+    "src/services/publish-requests/apply-knowledge.ts": {
+      "reads": {
+        "getMemory": 3
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4), the node's own read: an approved knowledge request reads the owner's manifest and the named entries only to compare their versions and visibilities with the request before making them public, then re-reads the manifest between its own writes. Nothing read is returned to anyone."
+    },
+    "src/services/publish-requests/apply-memory.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: the approved record is read only to compare its version and visibility with the request before making it public; its value goes back into the same record and is returned to nobody."
+    },
+    "src/services/publish-requests/cap-recheck.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvdipuyqraas, L3.3), the node's own read: an approved request's record or file is read for its current level and workspace binding, to hold the approval to the label's audience cap before the applier runs; nothing is returned to anyone."
+    },
+    "src/services/publish-requests/store.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: publish request records under the reserved prefix publish.requests., which only the filing path writes. They hold ids, a title and the change asked for, never the content being published."
     },
     "src/services/quota.ts": {
       "reads": {
@@ -2176,12 +2165,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A stored-file existence check."
     },
-    "src/services/scheduler-remote-jobs.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
-    },
     "src/services/scope-use.ts": {
       "reads": {
         "getMemory": 1
@@ -2199,6 +2182,12 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: System security-incident records."
+    },
+    "src/services/served-page-provenance.ts": {
+      "reads": {
+        "getStorageFileMeta": 2
+      },
+      "why": "Reviewed 2026-10-18, the node's own read: the metadata of a welcome page or a company front page (which provenance record it carries), to tell whether that record belongs to a page served to anyone now. No content is read or returned."
     },
     "src/services/signals/signal-service.ts": {
       "reads": {
@@ -2493,6 +2482,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Read-to-update of meta records and the registry."
+    },
+    "src/services/workspace-public-collectors.ts": {
+      "reads": {
+        "listAllMemory": 2
+      },
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. Moved from src/routes/organisms/shared-public.ts unchanged on 2026-10-16."
     },
     "src/services/workspace-records-delete-op.ts": {
       "reads": {

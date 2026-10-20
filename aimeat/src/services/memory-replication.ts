@@ -12,9 +12,18 @@
  *   - isEligibleForReplication(storage, ownerGaii, key): public + federation-consent gate
  *   - (module) replicationState + tracking-key helpers for per-peer/per-key sync state
  *   - replicateMemoryToPeer / replicateMemoryToAllPeers: the single send and the scheduled round
+ *   - retractMemoryFromPeer: the signed "this record is gone" a peer removes its replica on
  *   - enqueueMemoryReplication / sendQueuedMemoryEntries / onMemoryReplicationEnqueued: the queue
  *
  * @version-history
+ *   v1.6.0 — 2026-10-20 — RETRACTION. A record that stops being eligible is taken back from the peers
+ *     that hold it: retractMemoryFromPeer sends a signed POST /v1/federation/retract, and the
+ *     scheduled round reconciles what it has sent to each peer against what is eligible now and
+ *     retracts the rest. That covers a delete, a visibility change away from public, a revoked
+ *     federation consent and an erased account, none of which told a peer anything before. The round
+ *     reads each identity's consents once instead of asking isEligibleForReplication per record, so
+ *     an already-synced record's consent is checked too; it was not, and a revoked consent left the
+ *     replica in place (secaudit 2026-10, replica retention).
  *   v1.5.0 — 2026-10-16 — The queued path sends (QA audit F3-01): sendQueuedMemoryEntries is the
  *     single-record send per queued job, which the scheduler's drain calls and marks by result;
  *     enqueueMemoryReplication writes one row per replicating peer, skips a peer that already has
@@ -37,7 +46,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sign } from '../auth/keypair.js';
-import { deliveryProof } from './signed-node-request.js';
+import { deliveryProof, audienceProof } from './signed-node-request.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import { peerFetch } from '../utils/peer-fetch.js';
 import { logger } from '../utils/logger.js';
@@ -50,15 +59,34 @@ export interface ReplicationResult {
   consent_denied: number;
   /** Public records the classification kept on this node (TARGET-082); their keys are in the log. */
   classified_withheld: number;
+  /** Records this round told the peer to remove, because they stopped being eligible. */
+  entries_retracted: number;
   success: boolean;
   error?: string;
 }
 
-/** Per-key per-peer replication tracking. */
-const replicationState = new Map<string, string>(); // `${peerId}:${gaii}:${key}` → lastSyncAt
+/** What this node has sent to one peer, for one record: the address, so nothing is parsed back out. */
+interface SentRecord {
+  peerId: string;
+  ownerGaii: string;
+  key: string;
+  lastSyncAt: string;
+}
+
+/**
+ * Per-key per-peer replication tracking, and what the scheduled round reconciles against. It lives in
+ * this process only: after a restart the node no longer knows what it sent, so a retraction can be
+ * missed and the receiving peer's 168 h TTL (services/cache-cleanup.ts) is the backstop.
+ */
+const replicationState = new Map<string, SentRecord>(); // `${peerId}:${gaii}:${key}` → what was sent
 
 function replicationTrackingKey(peerId: string, gaii: string, key: string): string {
   return `${peerId}:${gaii}:${key}`;
+}
+
+/** One record's address within a round, for the set the reconciliation compares against. */
+function recordMark(ownerGaii: string, key: string): string {
+  return `${ownerGaii}\u0000${key}`;
 }
 
 /**
@@ -208,7 +236,7 @@ export async function replicateMemoryToPeer(
     if (resp.status >= 200 && resp.status < 300) {
       // Track successful replication
       const trackKey = replicationTrackingKey(peer.nodeId, ownerGaii, key);
-      replicationState.set(trackKey, new Date().toISOString());
+      replicationState.set(trackKey, { peerId: peer.nodeId, ownerGaii, key, lastSyncAt: new Date().toISOString() });
       return { success: true };
     } else {
       return { success: false, error: `HTTP ${resp.status}: ${resp.text}` };
@@ -216,6 +244,99 @@ export async function replicateMemoryToPeer(
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : 'unknown error' };
   }
+}
+
+/** Why a record is taken back. The receiving node stores no reason; it is for the peer's log. */
+export type RetractionReason = 'deleted' | 'not_public' | 'consent_revoked' | 'no_longer_eligible';
+
+/**
+ * Tell one peer that a record it replicated is gone or no longer eligible, so it removes its copy.
+ *
+ * The message is signed with this node's key the way a replicate is, and the receiving end builds the
+ * replica key from the node id its signature proved, never from a body field, so this can only reach
+ * the copies THIS node put there (routes/federation-sync/messaging.ts, POST /v1/federation/retract).
+ * It carries its own send time: unlike a replicate, whose timestamp is the record's update time,
+ * nothing here is older than the moment it is sent, so the five-minute window applies.
+ *
+ * A peer on an older version answers 404. That is reported as a failure and left to the peer's TTL.
+ */
+export async function retractMemoryFromPeer(
+  peer: PeerInfo,
+  ownerGaii: string,
+  key: string,
+  reason: RetractionReason,
+  config: AimeatConfig,
+  storage: Storage,
+): Promise<{ success: boolean; error?: string }> {
+  if (!peer.replicateMemory) return { success: false, error: 'Peer has memory replication disabled' };
+
+  const nodeKey = await storage.getNodeKey();
+  if (!nodeKey?.privateKey) return { success: false, error: 'This node has no signing key' };
+
+  const urlCheck = await validateOutboundUrl(peer.url);
+  if (!urlCheck.valid) return { success: false, error: `SSRF blocked: ${urlCheck.reason}` };
+
+  const payload = {
+    source_node: config.nodeId,
+    gaii: ownerGaii,
+    key,
+    reason,
+    timestamp: new Date().toISOString(),
+  };
+  const signed = JSON.stringify(payload);
+  // The audience proof names the node this retraction is for, under a second signature, so a captured
+  // one cannot be sent to a third node. Carried from the first version of this message, so no peer
+  // ever sees it without the proof.
+  const audience = await audienceProof(nodeKey.privateKey, signed, peer.nodeId);
+
+  try {
+    const resp = await peerFetch(`${peer.url}/v1/federation/retract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...payload, signature: await sign(nodeKey.privateKey, signed), ...audience }),
+    }, { timeoutMs: config.federationTimeoutMs });
+    if (!resp.ok) return { success: false, error: resp.message };
+    if (resp.status >= 200 && resp.status < 300) return { success: true };
+    return { success: false, error: `HTTP ${resp.status}: ${resp.text}` };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'unknown error' };
+  }
+}
+
+/**
+ * The records this node has sent to `peer` that are no longer eligible, taken back.
+ *
+ * `stillEligible` holds the addresses the round has just confirmed, so the common case costs nothing.
+ * Everything else is asked again through isEligibleForReplication, which answers false for a record
+ * that was deleted, made private, lost its federation consent or went with an erased account: the
+ * four ways a replica outlived its source. A peer that accepts the retraction is forgotten, so the
+ * next round does not ask again.
+ */
+async function retractNoLongerEligible(
+  peer: PeerInfo,
+  stillEligible: ReadonlySet<string>,
+  config: AimeatConfig,
+  storage: Storage,
+): Promise<number> {
+  let retracted = 0;
+  for (const [trackKey, sent] of [...replicationState]) {
+    if (sent.peerId !== peer.nodeId) continue;
+    if (stillEligible.has(recordMark(sent.ownerGaii, sent.key))) continue;
+
+    const { eligible } = await isEligibleForReplication(storage, sent.ownerGaii, sent.key);
+    if (eligible) continue;
+
+    const result = await retractMemoryFromPeer(peer, sent.ownerGaii, sent.key, 'no_longer_eligible', config, storage);
+    if (result.success) {
+      replicationState.delete(trackKey);
+      retracted++;
+    } else {
+      logger.warn('A replica could not be taken back from a peer; its TTL there is the backstop', {
+        peer: peer.nodeId, gaii: sent.ownerGaii, key: sent.key, error: result.error,
+      });
+    }
+  }
+  return retracted;
 }
 
 /**
@@ -249,10 +370,19 @@ export async function replicateMemoryToAllPeers(
     let entriesFailed = 0;
     let consentDenied = 0;
     let classifiedWithheld = 0;
+    // What this round confirmed is still eligible, so the reconciliation below knows what it may
+    // leave on the peer.
+    const stillEligible = new Set<string>();
 
     for (const agent of owners) {
       try {
         const memories = await storage.listMemory(agent.gaii, agent.listOpts);
+        // The identity's federation consents, read ONCE for the whole listing. Until 2026-10-20 the
+        // round asked isEligibleForReplication per record, which re-read both the record and the
+        // consents, and asked it only for a record that had changed: a revoked consent on an
+        // already-synced record was never noticed. The record itself is listed here as public, so
+        // the consent is the whole of what is left to decide.
+        const consents = await storage.listConsents(agent.gaii);
         // Memory leaving for a peer asks the classification component first (TARGET-082), and what
         // stays is counted in the peer's result (keys in the log only).
         const { kept: publicMemories, withheld } = await leaveMemoriesToPeer({ storage, config },
@@ -267,18 +397,20 @@ export async function replicateMemoryToAllPeers(
             continue;
           }
 
+          // Eligibility: the record is public (the listing filtered on that) and a federation
+          // consent covers the key. Asked BEFORE the already-synced skip, so a record whose consent
+          // was revoked is reported here and taken back below.
+          if (!federationConsentCovers(consents, memory.key)) {
+            consentDenied++;
+            continue;
+          }
+          stillEligible.add(recordMark(agent.gaii, memory.key));
+
           // Check if already synced and unchanged
           const trackKey = replicationTrackingKey(peer.nodeId, agent.gaii, memory.key);
           const lastSync = replicationState.get(trackKey);
-          if (lastSync && new Date(lastSync) >= new Date(memory.updatedAt)) {
+          if (lastSync && new Date(lastSync.lastSyncAt) >= new Date(memory.updatedAt)) {
             continue; // Already synced, no changes
-          }
-
-          // Check eligibility
-          const eligibility = await isEligibleForReplication(storage, agent.gaii, memory.key);
-          if (!eligibility.eligible) {
-            consentDenied++;
-            continue;
           }
 
           // Replicate
@@ -295,20 +427,30 @@ export async function replicateMemoryToAllPeers(
       }
     }
 
+    // What this node already sent to the peer and may no longer leave there.
+    let entriesRetracted = 0;
+    try {
+      entriesRetracted = await retractNoLongerEligible(peer, stillEligible, config, storage);
+    } catch (err) {
+      logger.warn('replicateMemoryToAllPeers: the retraction pass was suppressed, continuing', { peer: peer.nodeId, error: String(err) });
+    }
+
     results.push({
       peer_node_id: peer.nodeId,
       entries_sent: entriesSent,
       entries_failed: entriesFailed,
       consent_denied: consentDenied,
       classified_withheld: classifiedWithheld,
+      entries_retracted: entriesRetracted,
       success: entriesFailed === 0,
     });
 
-    if (entriesSent > 0 || entriesFailed > 0) {
+    if (entriesSent > 0 || entriesFailed > 0 || entriesRetracted > 0) {
       logger.info(`Memory replication to peer ${peer.nodeId}`, {
         sent: entriesSent,
         failed: entriesFailed,
         consent_denied: consentDenied,
+        retracted: entriesRetracted,
       });
     }
   }

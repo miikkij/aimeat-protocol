@@ -11,6 +11,9 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-20 — registerDirectoryNotifier(): the member-directory refresh is reachable from the
+ *     services and jobs that change who belongs in it (secaudit 2026-10,
+ *     consent-write:revoke-directory-refresh-optional).
  *   2026-10-18 — Core handler subscription-renewals (commerce/subscriptions.ts; Comicland v3 A-5).
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.22.0 — 2026-10-13 — migrateRestScopeKeepWorkingOnce(), chained after migrateAgentReadGrantOnce: on the
@@ -123,7 +126,7 @@ import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.j
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
-import { DirectoryService } from '../services/directory.js';
+import { DirectoryService, registerDirectoryNotifier } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { Scheduler, setActiveScheduler } from '../services/scheduler.js';
@@ -141,6 +144,7 @@ import { sweepHeldPushes, sweepNotificationDigests } from '../services/notificat
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 import { runRefineryJob } from '../services/refinery/scheduled-job.js';
+import { runAiJob } from '../services/scheduler-ai-job.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { bindLegacyExtensionSecrets } from '../services/extension-secrets.js';
 import { sealLegacyTransportSecrets } from '../services/mcp-client/transport-secrets.js';
@@ -206,6 +210,9 @@ export async function initializeServices(
   // Register core job handlers
   registerCoreHandlers(scheduler, config, storage);
   scheduler.registerKindExecutor('refinery', (job) => runRefineryJob(storage, config, job));
+  // The `ai` kind for the same reason: it writes its answer through the shared memory write
+  // service, which reaches the Scheduler, so the Scheduler cannot import it (secaudit 2026-10).
+  scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
 
   // Seed standardized profile schemas — Phase 0.4
   seedProfileSchemas(storage, `system@${config.nodeId}`)
@@ -409,6 +416,10 @@ export async function initializeServices(
 
   // Directory service — Phase 1.4 (indexes GHII profiles for local + thematic search)
   const directoryService = new DirectoryService(config, storage);
+  // The one refresh every write that changes who is listed calls (services/directory.ts). A
+  // federation consent granted, revoked or expired reaches the index through this, whichever door
+  // or background job ran it; before, only the REST consent route passed a callback.
+  registerDirectoryNotifier(() => directoryService.notifyChange());
   directoryService.rebuildIndex()
     .then(() => logger.info('Directory index built'))
     .catch(err => logger.error('Failed to build directory index', { error: String(err) }));

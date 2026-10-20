@@ -22,6 +22,11 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.12.0 — 2026-10-20 — `getJob`, `listJobs` and `cancelJob` take a `viewer` (types.ts AiJobViewer):
+ *     a caller that does not read as the owner sees and stops only the jobs it started. The MCP tools
+ *     look the OWNER's namespace up, so without it an agent holding ai:use read its owner's and its
+ *     siblings' job prompts and cancelled their running jobs, while the REST twin answered 404
+ *     (secaudit 2026-10, mcp/ai-jobs.ts:registerAiJobTools:jobs-keyed-by-owner-ghii).
  *   v1.11.0 — 2026-10-19 — A text job's record carries `finish_reason` and `truncated` once the model
  *     answered (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.10.1 — 2026-10-18 — The job record is stored once the answer is written, so result_version
@@ -88,12 +93,21 @@ import {
     AiJobError,
     type AiJobRecord, type AiJobState, type AiJobLogEntry, type AiJobClassificationWarnings,
     type StartAiJobInput, type StartAiJobContext, type StartAiJobResult, type AiJobStarter,
-    type AiJobResultRead,
+    type AiJobResultRead, type AiJobViewer,
 } from './types.js';
 
 /** How long a caller is asked to wait after a queue-full refusal. A guess would be worse than a
  *  round number: what it really says is "shortly", and Retry-After has no way to say that. */
 const RETRY_AFTER_SECONDS = 30;
+
+/**
+ * Whether this viewer may see this job. No viewer means the caller's own key IS the lookup key (the
+ * REST routes resolve the principal) or the caller is the node itself, so there is nothing to fence.
+ * A viewer that does not read as the owner sees only what it started: `created_by` is the audit
+ * trail, and it is the only field that says which principal asked for the job.
+ */
+const visibleToViewer = (job: { created_by: string }, viewer?: AiJobViewer): boolean =>
+    !viewer || viewer.all || job.created_by === viewer.principal;
 
 /** What a live job carries in this process, beside the record in storage. */
 interface LiveEntry {
@@ -224,8 +238,15 @@ export class AiJobService implements AiJobStarter {
     // ── read ──────────────────────────────────────────────────────────────────
 
     /** One job by id, live or finished. Null when it is neither — which is also the answer a
-     *  stranger gets, because whose jobs exist is not their business. */
-    async getJob(ownerGhii: string, jobId: string): Promise<AiJobRecord | AiJobLogEntry | null> {
+     *  stranger gets, and the answer a `viewer` that did not start this job gets, because whose jobs
+     *  exist is not their business and a live record carries the prompt. */
+    async getJob(ownerGhii: string, jobId: string, viewer?: AiJobViewer): Promise<AiJobRecord | AiJobLogEntry | null> {
+        const found = await this.findJob(ownerGhii, jobId);
+        return found && visibleToViewer(found, viewer) ? found : null;
+    }
+
+    /** The job itself, with no viewer fence. Private: every caller goes through getJob. */
+    private async findJob(ownerGhii: string, jobId: string): Promise<AiJobRecord | AiJobLogEntry | null> {
         const liveRecord = this.live.get(jobId);
         if (liveRecord && liveRecord.job.owner === ownerGhii) return liveRecord.job;
         const stored = await readJob(this.storage, ownerGhii, jobId);
@@ -263,14 +284,15 @@ export class AiJobService implements AiJobStarter {
         return { ...base, value: shown.value };
     }
 
-    /** `state` defaults to the live ones, which is what "what am I waiting for" means. */
+    /** `state` defaults to the live ones, which is what "what am I waiting for" means. A `viewer`
+     *  that does not read as the owner is shown only the jobs it started. */
     async listJobs(
-        ownerGhii: string, opts: { state?: AiJobState | 'live' | 'all'; limit?: number } = {},
+        ownerGhii: string, opts: { state?: AiJobState | 'live' | 'all'; limit?: number; viewer?: AiJobViewer } = {},
     ): Promise<Array<AiJobRecord | AiJobLogEntry>> {
         const want = opts.state ?? 'live';
         const limit = Math.min(Math.max(Math.trunc(opts.limit ?? 50) || 50, 1), 500);
 
-        const liveJobs = await listLiveJobs(this.storage, ownerGhii);
+        const liveJobs = (await listLiveJobs(this.storage, ownerGhii)).filter(j => visibleToViewer(j, opts.viewer));
         let out: Array<AiJobRecord | AiJobLogEntry>;
 
         if (want === 'live') {
@@ -278,7 +300,7 @@ export class AiJobService implements AiJobStarter {
         } else if (want === 'queued' || want === 'running') {
             out = liveJobs.filter(j => j.state === want);
         } else {
-            const logged = await listLogged(this.storage, ownerGhii);
+            const logged = (await listLogged(this.storage, ownerGhii)).filter(j => visibleToViewer(j, opts.viewer));
             const all = [...liveJobs, ...logged];
             out = want === 'all' ? all : all.filter(j => j.state === want);
         }
@@ -297,9 +319,13 @@ export class AiJobService implements AiJobStarter {
      * provider call is torn down through the signal threaded into complete(). One writer reaches the
      * terminal state either way — `run()` — so there is no race between a cancel and a completion
      * over which of them gets to fold the record.
+     *
+     * THE VIEWER IS CHECKED BEFORE ANYTHING IS ABORTED. Stopping somebody else's job is a write, so
+     * it is held to the same rule as the read: a `viewer` that did not start the job is refused with
+     * the same 404 a read answers, and the job keeps running.
      */
-    async cancelJob(ownerGhii: string, jobId: string): Promise<AiJobRecord | AiJobLogEntry> {
-        const existing = await this.getJob(ownerGhii, jobId);
+    async cancelJob(ownerGhii: string, jobId: string, viewer?: AiJobViewer): Promise<AiJobRecord | AiJobLogEntry> {
+        const existing = await this.getJob(ownerGhii, jobId, viewer);
         if (!existing) throw new AiJobError('NOT_FOUND', 404, 'No such job.');
         if (existing.state !== 'queued' && existing.state !== 'running') {
             throw new AiJobError('AI_JOB_ALREADY_TERMINAL', 409,
@@ -323,6 +349,8 @@ export class AiJobService implements AiJobStarter {
         entry.controller.abort();
         await entry.finished;
 
+        // No viewer here: the cancel was authorized above, and this read only reports the state the
+        // job reached.
         const after = await this.getJob(ownerGhii, jobId);
         if (!after) throw new AiJobError('NOT_FOUND', 404, 'No such job.');
         return after;

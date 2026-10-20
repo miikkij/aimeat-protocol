@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
-import { DirectoryService } from '../../src/services/directory.js';
+import { DirectoryService, registerDirectoryNotifier } from '../../src/services/directory.js';
+import { expireConsents } from '../../src/services/consent.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 // Minimal config sufficient for DirectoryService
@@ -439,5 +440,66 @@ describe('DirectoryService', () => {
         });
 
         expect(result.total).toBe(0);
+    });
+});
+
+/**
+ * The index is a cache of a decision each person makes, and the decision can end three ways: a
+ * revoke on either door, and an expiry. Until 2026-10-20 the refresh ran only when the caller
+ * passed an onDirectoryChange callback, which only the REST route did (secaudit 2026-10,
+ * consent-write:revoke-directory-refresh-optional). These two hold the two halves of the fix: the
+ * expiry job tells the directory, and a search drops a person whose consent has ended whatever the
+ * index still holds.
+ */
+describe('A consent that ends takes the person out of the directory', () => {
+    let storage: SqliteStorage;
+    let directory: DirectoryService;
+
+    beforeEach(() => {
+        storage = new SqliteStorage(':memory:');
+        directory = new DirectoryService(testConfig, storage);
+    });
+
+    afterEach(() => {
+        registerDirectoryNotifier(() => { /* the next test registers its own */ });
+    });
+
+    it('expireConsents tells the directory when it expired anything', async () => {
+        const seeded = await seedUser(storage, { username: 'alice', displayName: 'Alice' });
+        await storage.updateConsent('consent-alice', { expires: new Date(Date.now() - 60_000).toISOString() });
+        let told = 0;
+        registerDirectoryNotifier(() => { told += 1; });
+
+        expect(await expireConsents(storage)).toBe(1);
+        expect(told).toBe(1);
+        expect((await storage.getConsent('consent-alice'))?.status).toBe('expired');
+        expect(seeded.agentGaii).toContain('alice');
+
+        // Nothing expired the second time, so the directory is not told again.
+        expect(await expireConsents(storage)).toBe(0);
+        expect(told).toBe(1);
+    });
+
+    it('a search drops a person whose consent ended after the last rebuild', async () => {
+        await seedUser(storage, { username: 'alice', displayName: 'Alice', city: 'Helsinki' });
+        await directory.rebuildIndex();
+        expect((await directory.search({})).total).toBe(1);
+
+        // Revoked, and no rebuild: the index still holds the entry, and the search must not serve it.
+        await storage.updateConsent('consent-alice', { status: 'revoked', revokedAt: new Date().toISOString() });
+        expect((await directory.search({})).total).toBe(0);
+        // Dropped from the index as well, so the stats agree with the search.
+        expect(directory.getStats().totalPeople).toBe(0);
+    });
+
+    it('a search drops a person whose consent ran out but was not swept yet', async () => {
+        await seedUser(storage, { username: 'bob', displayName: 'Bob', city: 'Tampere' });
+        await directory.rebuildIndex();
+        expect((await directory.search({})).total).toBe(1);
+
+        // Still `active`, because the expiry job has not run: the date is what decides.
+        await storage.updateConsent('consent-bob', { expires: new Date(Date.now() - 1000).toISOString() });
+        expect((await storage.getConsent('consent-bob'))?.status).toBe('active');
+        expect((await directory.search({})).total).toBe(0);
     });
 });

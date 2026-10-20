@@ -11,6 +11,10 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — consentCaller() files and checks a consent under the session's principal, as POST
+ *     /v1/consent does: an agent's consent covers the agent's own records, and an agent revokes only
+ *     its own rows. It used the owner's account GHII, so the tool reached the owner's whole namespace
+ *     and revoked consents the owner had made in person (secaudit 2026-10, consent-identity).
  *   2026-10-15 — aimeat_consent_grant stamps how the consent was given (MCP tool call by an agent or
  *     the person), which the consent receipt reads (feature-list audit #161).
  *   2026-10-15 — The consent-record resource refuses another owner's record with resourceRefusal
@@ -60,11 +64,25 @@ export function registerConsentTools(
         return `${localAccountName(agentGaii)}@${config.nodeId}`;
     }
 
-    /** The consent services' caller: the owner's account, with this session's scopes and roles. */
+    /**
+     * The consent services' caller: the SESSION'S PRINCIPAL, with this session's scopes and roles.
+     *
+     * The identity a consent is filed under is the identity whose data it covers, because every
+     * access check reads the consents of the data's owner (services/consent.ts
+     * checkConsentForRead). POST /v1/consent files under resolveIdentity, which for an agent token
+     * is the agent's own GAII: an agent's consent covers the agent's own records (decision
+     * 2026-10-02, 'consent stays per agent', routes/consent.ts).
+     *
+     * This function passed session.ownerGhii, the account GHII, until 2026-10-20. The same request
+     * through this tool therefore covered every private record in the owner's own namespace, which
+     * the REST route refuses for the same token, and revokeConsent's accountHoldsConsent admitted an
+     * agent revoking a consent the owner had made in person (secaudit 2026-10, consent-identity).
+     * aimeat_consent_list stays account-wide (ownerGhii): reading the account's consents is by design.
+     */
     function consentCaller(): { ownerGaii: string; scopes: string[]; roles: string[]; collectionMethod: string } {
         const session = caller();
         return {
-            ownerGaii: session.ownerGhii, scopes: [...session.scopes], roles: [...session.roles],
+            ownerGaii: session.principal, scopes: [...session.scopes], roles: [...session.roles],
             // How it was given, for the consent receipt (feature-list audit #161).
             collectionMethod: consentCollectionMethod('mcp', session),
         };
@@ -139,7 +157,10 @@ export function registerConsentTools(
                 expires: ttl_hours != null ? new Date(Date.now() + ttl_hours * 3_600_000).toISOString() : null,
             });
             if (!granted.ok) {
-                return { content: [{ type: 'text' as const, text: `${granted.code}: ${granted.message}` }], isError: true };
+                // Nothing was granted, and the owner was asked: the answer carries the request so the
+                // agent can name it to them (services/consent-write.ts, recipient '*' publish gate).
+                const asked = granted.publishRequest ? `\n${JSON.stringify({ publish_request: granted.publishRequest }, null, 2)}` : '';
+                return { content: [{ type: 'text' as const, text: `${granted.code}: ${granted.message}${asked}` }], isError: true };
             }
             const consent = granted.value;
 

@@ -8,6 +8,9 @@
  *   app not connected). The actual tunnel invocation is NOT exercised here — that needs a live
  *   connected GEAI; the schedule CRUD + validation + capabilities-stored surface is the testable part.
  * @version-history
+ *   v1.2.0 — 2026-10-20 — Phase 4b (secaudit 2026-10): the kind asks `work:request` on create and on
+ *     run, an edit is judged by the create's rule, and a schedule whose maker agent was deleted does
+ *     not fire.
  *   v1.0.0 — 2026-06-15 — Initial creation (eco-capability scheduling).
  *   v1.1.0 — 2026-06-16 — Phase 5: hard-delete (disconnect) coverage. Deposit owner data + create a
  *     recipe, then DELETE the app and assert: the app is gone from the list (not status:revoked),
@@ -58,7 +61,10 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
   throw new Error('unreachable');
 }
 
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 
@@ -272,6 +278,117 @@ await test('Missing capability_id → 400 INVALID_ECO_JOB', async () => {
   });
   assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'INVALID_ECO_JOB', `expected INVALID_ECO_JOB, got ${body.error?.code}`);
+});
+
+// ─── Phase 4b: the kind asks the invoke word, the edit is re-checked, and a gone maker stops it ───
+//
+// secaudit 2026-10, runEcoCapabilityJob:owner-caller-no-scope-no-maker-check. SCHEDULE_KIND_SCOPE had
+// no entry for this kind, so create, edit and trigger asked no word at all, while the direct route
+// POST /v1/capabilities/:id/invoke asks work:request. The edit replaced `input` wholesale, so the
+// declared-capability check from create was skipped. And the fire never asked scheduleActor, so it
+// invoked as the OWNER whoever made the schedule, and went on doing it after the maker was deleted.
+console.log('\nPhase 4b — The invoke word, the re-checked edit, and the maker that is gone');
+
+async function agentToken(name: string, scopes: string[]): Promise<{ token: string; name: string }> {
+  const made = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], scopes }),
+  });
+  assert(made.status === 201, `agent ${name}: ${made.status} ${JSON.stringify(made.body?.error)}`);
+  const gaii = made.body.data.agent.gaii as string;
+  const timestamp = new Date().toISOString();
+  const sig = await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(made.body.data.private_key, 'base64'));
+  const tok = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ gaii, timestamp, signature: Buffer.from(sig).toString('base64') }),
+  });
+  assert(tok.body.ok === true, `agent token ${name}: ${JSON.stringify(tok.body.error)}`);
+  return { token: tok.body.data.token as string, name };
+}
+
+const ecoBody = (extra: Record<string, unknown> = {}) => JSON.stringify({
+  kind: 'eco-capability', app: APP, capability_id: CAP, cron: '0 9 * * 1',
+  display_name: 'Agent-made stats publish', input: { window: 'last-week' }, ...extra,
+});
+let makerScheduleId = '';
+
+// The positive control first, so the schedule the three tests below work on exists whatever the
+// refusal does: an agent that holds work:request creates the same schedule the owner creates.
+const maker = await agentToken('ecoschedmaker', ['task:write', 'workflow:read', 'workflow:write', 'work:request', 'memory:write']);
+await test('An agent that holds work:request creates an eco-capability schedule', async () => {
+  const made = await json('/v1/schedules', {
+    method: 'POST', headers: { Authorization: `Bearer ${maker.token}` }, body: ecoBody(),
+  });
+  assert(made.status === 201, `create with work:request: ${made.status} ${JSON.stringify(made.body?.error)}`);
+  makerScheduleId = made.body.data.schedule.id;
+  assert(made.body.data.schedule.createdByAgent === true, 'the schedule records that an agent made it');
+});
+
+await test('An agent without work:request is refused the create', async () => {
+  const noWord = await agentToken('ecoschednoword', ['task:write', 'workflow:read', 'workflow:write', 'memory:write']);
+  const refused = await json('/v1/schedules', {
+    method: 'POST', headers: { Authorization: `Bearer ${noWord.token}` }, body: ecoBody(),
+  });
+  assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED',
+    `create without work:request: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+  assert(/work:request/.test(refused.body.error?.message ?? ''), `the refusal names the word: ${refused.body.error?.message}`);
+});
+
+await test('Triggering it needs the same word', async () => {
+  const noWord = await agentToken('ecoschednorun', ['task:write', 'workflow:read', 'workflow:write', 'memory:write']);
+  const refused = await json(`/v1/schedules/${makerScheduleId}/trigger`, {
+    method: 'POST', headers: { Authorization: `Bearer ${noWord.token}` },
+  });
+  assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED',
+    `trigger without work:request: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+});
+
+await test('An edit is judged by the create\'s rule: an undeclared capability is refused, a declared one is stored', async () => {
+  const refused = await json(`/v1/schedules/${makerScheduleId}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${maker.token}` },
+    body: JSON.stringify({ input: { app: APP, capability_id: 'undeclared-cap', input: { window: 'all' } } }),
+  });
+  assert(refused.status === 400 && refused.body.error?.code === 'CAPABILITY_NOT_DECLARED',
+    `edit to an undeclared capability: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+  const stored = await json(`/v1/schedules/${makerScheduleId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(stored.body.data.schedule.input?.capability_id === CAP,
+    `the refused edit was stored: ${JSON.stringify(stored.body.data.schedule.input)}`);
+
+  // The positive control: an edit naming a capability the app DID declare goes through, narrowed to
+  // the three fields the executor reads.
+  const allowed = await json(`/v1/schedules/${makerScheduleId}`, {
+    method: 'PATCH', headers: { Authorization: `Bearer ${maker.token}` },
+    body: JSON.stringify({ input: { app: APP, capability_id: 'fetch-report', input: { window: 'all' }, junk: 'should not be stored' } }),
+  });
+  assert(allowed.status === 200, `edit to a declared capability: ${allowed.status} ${JSON.stringify(allowed.body?.error)}`);
+  const after = await json(`/v1/schedules/${makerScheduleId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(after.body.data.schedule.input?.capability_id === 'fetch-report', `stored: ${JSON.stringify(after.body.data.schedule.input)}`);
+  assert(after.body.data.schedule.input?.junk === undefined, `the edit parked free-form JSON on the row: ${JSON.stringify(after.body.data.schedule.input)}`);
+});
+
+await test('After the owner deletes the maker agent, the schedule does not fire and says why', async () => {
+  // Before the delete the fire gets as far as the tunnel, which is what "it runs" looks like here:
+  // there is no connected GEAI in this suite, so it skips rather than invoking.
+  const before = await json(`/v1/schedules/${makerScheduleId}/trigger`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(before.status === 200, `trigger before the delete: ${before.status} ${JSON.stringify(before.body?.error)}`);
+  assert(!/no longer connected|no longer holds/.test(JSON.stringify(before.body.data)),
+    `the maker was already treated as gone: ${JSON.stringify(before.body.data)}`);
+
+  const gone = await json(`/v1/agents/${maker.name}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(gone.status === 200, `delete the maker agent: ${gone.status} ${JSON.stringify(gone.body?.error)}`);
+
+  const after = await json(`/v1/schedules/${makerScheduleId}/trigger`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(after.status === 200, `trigger after the delete: ${after.status} ${JSON.stringify(after.body?.error)}`);
+  assert(/no longer connected/.test(JSON.stringify(after.body.data)),
+    `a schedule whose maker is gone still fired: ${JSON.stringify(after.body.data)}`);
+  const row = await json(`/v1/schedules/${makerScheduleId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(row.body.data.schedule.lastRunResult === 'error', `the run was not recorded as failed: ${row.body.data.schedule.lastRunResult}`);
+
+  await json(`/v1/schedules/${makerScheduleId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
 });
 
 // ─── Phase 5: hard delete (disconnect) cleans up the binding + app-owned config, preserves data ───

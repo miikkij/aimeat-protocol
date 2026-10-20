@@ -322,6 +322,10 @@ export function registerCoreTools(
                     sub: agentGaii,
                     gaii: agentGaii,
                     isOwnerSession: false,
+                    // An MCP session is always the connected AGENT: not an app grant, not a GEAI.
+                    // The memory source reads these before it decides whose records to search.
+                    isApp: false,
+                    isEcosystem: false,
                     scopes: agent?.defaultScopes ?? [],
                 },
                 scope: (scope ?? 'own') as 'own' | 'public' | 'shared',

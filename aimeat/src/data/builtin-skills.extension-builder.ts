@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-20 — An unattended ctx.files.read can be narrower than the attended one, because the owner
+ *     chooses whose reach it uses per extension (Jouni, 2026-10-20).
  *   2026-10-18 — How an extension reads the answer of its ctx.ai.start job: input.result, ctx.ai.result.
  *   2026-10-18 — A `public: true` action answers a visitor, read-only; ctx.caller.adult and
  *     ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
@@ -224,6 +226,14 @@ Every action can carry two values, and they do different jobs:
   Never put a key in a script or a return value.
 - Files: a client uploads through the storage API and passes the keys; \`ctx.files\` reads and writes
   stored files by reference. Return references, not large payloads.
+- **A read with nobody present may be narrower than the same read with a person there.** A write
+  always lands in the owner's namespace under \`ext/{name}/\`, on every road. A READ on a schedule, an
+  \`@activate\` job or a workflow step is judged against whoever the owner chose: their own reach by
+  default, which is every node's behaviour, or the reach of the principal that wrote the code when
+  they set that per extension. So an unattended \`ctx.files.read\` of the owner's private file can be
+  refused although the same call works when the owner invokes the action. Catch it and say which file
+  and why; the refusal names the setting and where the person changes it. Their AI can read the
+  current setting with \`aimeat_extension_unattended_reader\`, and only the person can change it.
 
 ## 10. Who may install
 

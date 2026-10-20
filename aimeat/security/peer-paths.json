@@ -95,6 +95,10 @@
       "count": 7,
       "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's or a broadcast's sender must be on the signing node (2026-10-01; broadcast QA audit S6-03, 2026-10-16), and a replicate lands only under a principal of the signing node or an existing one of this node (QA audit S6-02). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). Replicate and the receipt read it once more for the delivery proof, which names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
     },
+    "src/routes/federation-sync/retract.ts": {
+      "count": 2,
+      "why": "POST /v1/federation/retract, a peer taking back a record it replicated here: gatePeer with the capability word ('replicateMemory', so an active peer with a key and the replication door), then the retraction's own signature against the pinned key, verified unconditionally before anything is read. The same pinned key is read again for the audience proof that names this node and for the pin, and the signed send time carries a five-minute single-use window, checked after the signature so a forged message cannot use up a real one. The replica key is built from the node id the signature proved, never from a body field, and a row is removed only when it carries a tag naming that node, so a peer reaches its own copies and nothing else (secaudit 2026-10, replica retention)."
+    },
     "src/routes/federation-sync/routing.ts": {
       "count": 7,
       "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
@@ -152,8 +156,8 @@
       "why": "Attached MCP calls go to an active peer with allowRouting; a packages-only peer has it off."
     },
     "src/services/memory-replication.ts": {
-      "count": 2,
-      "why": "Replication goes to active peers with replicateMemory, validateOutboundUrl first."
+      "count": 4,
+      "why": "Replication goes to active peers with replicateMemory, validateOutboundUrl first. The retraction send (retractMemoryFromPeer) reads the same two: it refuses a peer whose replicateMemory is off and runs validateOutboundUrl on the url before the post, and it signs the message with this node's key plus an audience proof naming the target peer, so a captured retraction cannot be replayed at a third node (secaudit 2026-10, replica retention)."
     },
     "src/services/message-broadcast.ts": {
       "count": 1,

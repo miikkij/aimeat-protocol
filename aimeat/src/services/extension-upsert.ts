@@ -19,6 +19,11 @@
  *     { ownerName, actor, wasActive });
  *   if (!out.record) return refuse('the write did not apply');
  * @version-history
+ *   v1.2.1 — 2026-10-20 — Says why the swap leaves `unattendedReadAuthority` alone: it is the owner's
+ *     decision about the extension, not a property of the code (Jouni, 2026-10-20).
+ *   v1.2.0 — 2026-10-20 — The swap carries `installedByPrincipal`, so the record never holds a
+ *     principal older than its code (secaudit 2026-10,
+ *     extension-system-run:files-read-as-owner-ghii).
  *   v1.1.0 — 2026-08-16 — Schedule re-registration goes through services/extension-schedules.ts, so a
  *     redeployed extension's jobs carry the installer's `ownerScope` like every other road's.
  *   v1.0.0 — 2026-08-11 — Extracted after the copied-logic check found the pair.
@@ -73,6 +78,15 @@ export async function upsertExtensionInPlace(
         limits: record.limits,
         federation: record.federation,
         instances: record.instances,
+        // The principal that wrote THIS code, which an unattended run reads its files as
+        // (services/extension-system-run.ts). It travels with the code, so a redeploy by another
+        // principal moves it.
+        installedByPrincipal: record.installedByPrincipal,
+        // `unattendedReadAuthority` is DELIBERATELY ABSENT. It is the owner's decision about this
+        // extension, not a property of the code, so publishing a new version must not reset it —
+        // neither provider touches a column this object leaves out. An agent that could clear the
+        // setting by redeploying its own extension would make the setting theatre, which is the one
+        // thing it exists to prevent.
     });
     if (!updated) return { record: null, reinitialized: false };
 

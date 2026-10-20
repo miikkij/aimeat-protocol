@@ -7,9 +7,19 @@
  *   will be skipped, how long the run may take, what the last real run took, and the variables the
  *   run would resolve to. The signals are evaluated against memory now, the way a check does, but
  *   nothing is persisted: a preflight is a question, not a run and not a check.
+ *
+ *   It reads and spends what a check reads and spends: every step's signals are evaluated against
+ *   the whole owner scope, and with `llm.approved` the node's model judges each llm leaf. So the
+ *   caller pays the same words the run door charges for that work (step-authority.ts, signals-only
+ *   mode), and the model call goes out as that caller (ai-caller.ts), not as the workflow's saver.
  * @structure preflightWorkflow
- * @usage const p = await preflightWorkflow({ storage, config, engine }, ownerGhii, ownerName, id, vars);
+ * @usage const p = await preflightWorkflow({ storage, config, engine }, ownerGhii, ownerName, id, vars, caller);
  * @version-history
+ *   v1.1.0 — 2026-10-20 — The caller is asked for the words a signals-only run costs, and the
+ *     preflight run's aiCaller is that caller. The route was gated on workflow:read alone and passed
+ *     no caller, so a principal holding it read the owner's records and spent the owner's AI, once
+ *     per call, with no run record and no per-run cost cap (secaudit 2026-10,
+ *     wf-preflight-skips-step-authority).
  *   2026-10-15 — A missing workflow is answered with `notFound: true` (feature-list audit #87).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
@@ -21,6 +31,8 @@ import type { WorkflowRun, WorkflowRunStep } from '../../models/workflow-schemas
 import { getWorkflow, validateWorkflow, listRuns } from './store.js';
 import { buildEvalCtx } from './eval-context.js';
 import { evaluateSignal } from './signal-eval.js';
+import { aiCallerForStart } from './ai-caller.js';
+import { missingStepScopes, stepScopeRefusal, type WorkflowCaller } from './step-authority.js';
 
 export interface PreflightStep {
   id: string;
@@ -47,8 +59,14 @@ export interface Preflight {
   lastRun: { startedAt: string; endedAt?: string; status: string; durationMs?: number } | null;
 }
 
-/** `notFound` is set when the workflow does not exist, so the route answers 404 NOT_FOUND rather than a stale-offer refusal. */
-export type PreflightResult = { ok: true; preflight: Preflight } | { ok: false; errors: string[]; notFound?: true };
+/**
+ * `notFound` is set when the workflow does not exist, so the route answers 404 NOT_FOUND rather than
+ * a stale-offer refusal. `denied` is set when the caller lacks a word the same work costs on the run
+ * door (step-authority.ts), so the route answers 403 SCOPE_DENIED in its usual shape.
+ */
+export type PreflightResult =
+  | { ok: true; preflight: Preflight }
+  | { ok: false; errors: string[]; notFound?: true; denied?: { needed: string[]; message: string } };
 
 const HUMAN_TIMEOUT_MIN = 1440;
 
@@ -58,10 +76,22 @@ export async function preflightWorkflow(
   ownerName: string,
   workflowId: string,
   varOverrides?: Record<string, string>,
+  /** The principal asking. Absent only where no door was crossed; every door passes one. */
+  caller?: WorkflowCaller,
 ): Promise<PreflightResult> {
   const { storage, config, engine } = deps;
   const def = await getWorkflow(storage, ownerGhii, workflowId);
   if (!def) return { ok: false, errors: [`workflow "${workflowId}" not found`], notFound: true };
+  // A preflight evaluates every signal and asks the model about every llm leaf, which is what a
+  // signals-only run does and what the run door charges memory:read and ai:use for. Refused before
+  // anything is read or any model is called. The owner in person passes, as they pass every door.
+  if (caller) {
+    const missing = missingStepScopes(def, caller, 'signals-only');
+    if (missing.length > 0) {
+      const refusal = stepScopeRefusal(missing);
+      return { ok: false, errors: [refusal.message], denied: { needed: refusal.needed, message: refusal.message } };
+    }
+  }
   const v = await validateWorkflow(storage, config, ownerName, def);
   if (!v.ok || !v.resolved) return { ok: false, errors: v.errors };
 
@@ -73,6 +103,9 @@ export async function preflightWorkflow(
   const run: WorkflowRun = {
     runId, workflowId, defSnapshot: def, resolved: v.resolved, vars,
     mode: 'signals-only', keyPrefix: '', status: 'running', steps, startedAt: new Date().toISOString(),
+    // The judge of an llm leaf runs as the principal asking, as it does on a run (ai-caller.ts): the
+    // owner's model list, policy and daily cap for that principal apply to this spend.
+    aiCaller: await aiCallerForStart(storage, def, caller),
   };
   const ctx = buildEvalCtx(storage, config, ownerGhii, run);
   const resolved = new Map(v.resolved.map(r => [r.stepId, r]));

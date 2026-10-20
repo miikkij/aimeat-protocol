@@ -1741,6 +1741,102 @@ async function main(): Promise<void> {
         `missing file: ${noFile.status} ${noFile.data?.error?.code}`);
     });
 
+    // secaudit 2026-10, checkConnectionsPublishInput:owner-storage-file-for-non-owner-maker. The fire
+    // reads the OWNER's bytes and sends them to an outside account, and the only check was that the
+    // file exists. An agent that GET /v1/pub answers 403 to scheduled the owner's private file and
+    // the trigger sent it. A task attachment has followed the opposite rule since it was written:
+    // an attachment must be one the creator can read.
+    await test('an agent may schedule only a file it can read itself, at create, at edit and at the fire', async () => {
+      const name = `pubsched${stamp}`;
+      const made = await api('/v1/agents', { bearer: jwtA, body: { name, owner: userA, capabilities: ['memory'], model: 'test' } });
+      assert(made.status === 201, `agent: ${made.status} ${made.data?.error?.message}`);
+      const scoped = await api(`/v1/agents/${name}/scopes`, {
+        method: 'PATCH', bearer: jwtA,
+        body: { scopes: ['task:write', 'connections:use', 'workflow:read', 'workflow:write', 'memory:write'] },
+      });
+      assert(scoped.status === 200, `agent scopes: ${scoped.status} ${scoped.data?.error?.message}`);
+      const gaii = made.data.data.agent.gaii as string;
+      const ts = new Date().toISOString();
+      const sig = await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(made.data.data.private_key, 'base64'));
+      const tok = await api('/v1/auth/token', { body: { gaii, timestamp: ts, signature: Buffer.from(sig).toString('base64') } });
+      assert(tok.status === 200, `agent token: ${tok.status}`);
+      const agent = tok.data.data.token as string;
+
+      // The agent cannot read the owner's private file, which is the whole point.
+      const ownerGhii = gaii.split('#')[1];
+      const read = await api(`/v1/pub/${encodeURIComponent(ownerGhii)}/vid/test.mp4`, { method: 'GET', bearer: agent });
+      assert(read.status === 403 || read.status === 404, `the agent can read the owner's private file: ${read.status}`);
+
+      // THE REFUSAL: naming it on a schedule is refused where somebody can see it.
+      const refused = await api('/v1/schedules', {
+        bearer: agent,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC', constraints: ONE_SHOT,
+          display_name: 'the owner\'s private file', input: { connection_id: connA, storage_key: 'vid/test.mp4' },
+        },
+      });
+      assert(refused.status === 403 && refused.data.error?.code === 'FILE_ACCESS_DENIED',
+        `an agent scheduled the owner's private file: ${refused.status} ${refused.data?.error?.code}`);
+
+      // THE POSITIVE CONTROLS: the owner may schedule their own file, and the agent may schedule one
+      // the owner opened to it.
+      const byOwner = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC', constraints: ONE_SHOT,
+          display_name: 'the owner\'s own', input: { connection_id: connA, storage_key: 'vid/test.mp4' },
+        },
+      });
+      assert(byOwner.status === 201, `the owner was refused their own file: ${byOwner.status} ${byOwner.data?.error?.code}`);
+      await api(`/v1/schedules/${(byOwner.data.data.schedule ?? byOwner.data.data).id}`, { method: 'DELETE', bearer: jwtA });
+
+      const open = await api('/v1/storage', {
+        bearer: jwtA,
+        body: {
+          key: 'vid/open.mp4', visibility: 'members', mime_type: 'video/mp4',
+          data: Buffer.from('bytes the owner opened to signed-in accounts').toString('base64'),
+        },
+      });
+      assert(open.status === 200 || open.status === 201, `storage put: ${open.status} ${open.data?.error?.message}`);
+      const allowed = await api('/v1/schedules', {
+        bearer: agent,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC', constraints: ONE_SHOT,
+          display_name: 'a file the agent may read', input: { connection_id: connA, storage_key: 'vid/open.mp4' },
+        },
+      });
+      assert(allowed.status === 201,
+        `a readable file was refused: ${allowed.status} ${allowed.data?.error?.code} ${allowed.data?.error?.message}`);
+      const openSched = (allowed.data.data.schedule ?? allowed.data.data).id as string;
+
+      // The edit asks the same question, so "edit it afterwards" does not walk around the create.
+      const repoint = await api(`/v1/schedules/${openSched}`, {
+        method: 'PATCH', bearer: agent,
+        body: { input: { connection_id: connA, storage_key: 'vid/test.mp4' } },
+      });
+      assert(repoint.status === 403 && repoint.data.error?.code === 'FILE_ACCESS_DENIED',
+        `an agent repointed its schedule at the private file: ${repoint.status} ${repoint.data?.error?.code}`);
+
+      // AND AT THE FIRE, because a file's visibility can be narrowed after the schedule was saved.
+      const closed = await api('/v1/storage', {
+        bearer: jwtA,
+        body: {
+          key: 'vid/open.mp4', visibility: 'private', mime_type: 'video/mp4',
+          data: Buffer.from('bytes the owner opened to signed-in accounts').toString('base64'),
+        },
+      });
+      assert(closed.status === 200 || closed.status === 201, `narrowing the file: ${closed.status} ${closed.data?.error?.message}`);
+      const before = provider.stats.publishes;
+      const fired = await api(`/v1/schedules/${openSched}/trigger`, { bearer: jwtA });
+      assert(fired.status === 200, `trigger: ${fired.status} ${fired.data?.error?.message}`);
+      assert(provider.stats.publishes === before,
+        `the fire sent a file its maker can no longer read (${provider.stats.publishes - before} publish(es))`);
+      assert(/cannot read the stored file/.test(JSON.stringify(fired.data.data)),
+        `the run does not say why: ${JSON.stringify(fired.data.data)}`);
+
+      await api(`/v1/schedules/${openSched}`, { method: 'DELETE', bearer: jwtA });
+    });
+
     await test('an unknown time zone is refused by the scheduler’s own validation', async () => {
       const r = await api('/v1/schedules', {
         bearer: jwtA,

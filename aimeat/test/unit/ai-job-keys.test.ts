@@ -36,7 +36,7 @@ vi.mock('../../src/services/ai/completion.js', () => {
 const { AiJobService } = await import('../../src/services/ai-jobs/service.js');
 const { assembleJobPrompt } = await import('../../src/services/ai-jobs/prompt.js');
 const { createScheduleRecord, updateScheduleRecord } = await import('../../src/services/schedule-write.js');
-const { runAiJob } = await import('../../src/services/scheduler-remote-jobs.js');
+const { runAiJob } = await import('../../src/services/scheduler-ai-job.js');
 
 const NODE = 'aimeat-local-001-dev';
 const OWNER = `alice@${NODE}`;
@@ -45,6 +45,9 @@ const SECRET = 'sk-or-v1-the-owners-own-key';
 const config = {
     nodeId: NODE, aiJobSlots: 1, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
     aiJobMaxPromptBytes: 1_000_000, aiJobLogRetentionDays: 7,
+    // The ceilings the shared memory write asks about, since the scheduled ai job writes through it.
+    memoryQuotaMb: 100, memoryMaxKeysPerAgent: 1000, memoryMaxValueSizeKb: 1024,
+    memoryOverageMorselsPerMbMonth: 0,
 } as unknown as AimeatConfig;
 
 /** One of each kind the rule covers: a prefix the node acts on, a credential record, a key only the node writes. */
@@ -85,6 +88,13 @@ function watchedStorage(seed: Record<string, unknown> = {}, schedules: Scheduled
         listMemory: async (owner: string, opts: { prefix?: string } = {}) => [...rows.values()]
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),
         listMemoryForOwners: async () => [],
+        // The scheduled ai job writes its answer through services/memory-write.ts since 2026-10-20,
+        // so the stub answers the few lookups that write makes beyond the rows above.
+        findApplicableSchema: async () => null,
+        countMemory: async () => rows.size,
+        sumMemoryBytes: async () => 0,
+        getGHIIByOwner: async () => null,
+        transaction: async <T>(fn: () => Promise<T>) => fn(),
         getAgentsByOwner: async () => [],
         getEcosystemAppsByOwner: async () => [],
         getAgent: async () => null,

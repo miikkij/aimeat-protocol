@@ -41,8 +41,8 @@ const NODE_B = 'aimeat-auth-node-b';
 /** Every account here was made long before any credential. */
 const LONG_AGO = '2026-01-01T00:00:00.000Z';
 
-/** One node's store: its accounts, the sessions it ended, a personal access token, and what it records. */
-function nodeStore(opts: { accounts: string[]; endedSessions?: string[]; disabled?: string[]; patOwner?: string }) {
+/** One node's store: its accounts, its agents, the sessions it ended, a personal access token, and what it records. */
+function nodeStore(opts: { accounts: string[]; agents?: string[]; endedSessions?: string[]; disabled?: string[]; patOwner?: string }) {
     const revokedTokens = new Set<string>();
     const lastSeen: string[] = [];
     const store = {
@@ -54,7 +54,10 @@ function nodeStore(opts: { accounts: string[]; endedSessions?: string[]; disable
         isSessionRevoked: async (sessionId: string) => !!opts.endedSessions?.includes(sessionId),
         getAppGrant: async () => null,
         getEcosystemApp: async () => null,
-        getAgent: async () => null,
+        // An agent-role credential counts only while its agent record is there (auth/agent-alive.ts).
+        getAgent: async (gaii: string) => (opts.agents?.includes(gaii)
+            ? { gaii, owner: gaii.slice(gaii.indexOf('#') + 1, gaii.lastIndexOf('@')), createdAt: LONG_AGO }
+            : null),
         updateAgent: async (id: string) => { lastSeen.push(id); },
         isTokenRevoked: async (id: string) => revokedTokens.has(id),
         revokeToken: async (id: string) => { revokedTokens.add(id); },
@@ -70,7 +73,7 @@ function nodeStore(opts: { accounts: string[]; endedSessions?: string[]; disable
 // alice-a has an account on node A only, bob-b on node B only, and carol and dave on both: two people
 // each, who share a name. Node A ended carol's session sid-carol-ended and deactivated its dave; node
 // B did neither. Node A holds alice-a's personal access token.
-const storeA = nodeStore({ accounts: ['alice-a', 'carol', 'dave'], endedSessions: ['sid-carol-ended'], disabled: ['dave'], patOwner: 'alice-a' });
+const storeA = nodeStore({ accounts: ['alice-a', 'carol', 'dave'], agents: [`bot#alice-a@${NODE_A}`], endedSessions: ['sid-carol-ended'], disabled: ['dave'], patOwner: 'alice-a' });
 const storeB = nodeStore({ accounts: ['bob-b', 'carol', 'dave'] });
 
 const configOf = (node: string) => ({ nodeId: node, baseUrl: `http://${node}.test`, appHost: `apps.${node}.test` }) as AimeatConfig;

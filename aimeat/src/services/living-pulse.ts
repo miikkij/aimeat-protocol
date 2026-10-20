@@ -333,7 +333,9 @@ export async function pulseInstanceServer(
       const copies: SourceCopy[] = [];
       try {
         const { hits } = await librarianSearch(storage, config, {
-          ownerName, fanOutOwner: true, viewerGaii: ownerGaii,
+          // The pulse is the node's own work in the owner's name, so it reads the owner's identity
+          // set as the owner does (readsAll; services/owner-scope-read.ts).
+          ownerName, fanOutOwner: true, readsAll: true, viewerGaii: ownerGaii,
           query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
           // The pulse runs with no caller; what it hands the model passes useForAi at the model.
           reader: systemReader({ storage, config }, ownerGaii),

@@ -5560,6 +5560,24 @@
   "extpage.copyExample": "Kopioi esimerkki",
   "extpage.memoryArea": "Muistialue",
   "extpage.memoryAreaSub": "Laajennus kirjoittaa vain tänne, ja täältä kuka tahansa voi lukea.",
+  "extpage.codeBy": "Kuka kirjoitti koodin",
+  "extpage.codeByYou": "Sinä",
+  "extpage.codeByNotRecorded": "Ei tiedossa",
+  "extpage.codeBySub.self": "Julkaisit tämän laajennuksen koodin itse.",
+  "extpage.codeBySub.agent": "Yksi agenteistasi julkaisi tämän laajennuksen koodin.",
+  "extpage.codeBySub.ecosystem": "Ulkoinen sovellus julkaisi tämän laajennuksen koodin.",
+  "extpage.codeBySub.unknown": "Laajennus asennettiin ennen kuin koodin kirjoittaja alettiin tallentaa.",
+  "extpage.unattended": "Kun laajennus toimii yksin",
+  "extpage.unattendedWhen": "Ajastus, käyttöönotto tai työnkulun vaihe käynnistää laajennuksen silloin, kun kukaan ei ole paikalla.",
+  "extpage.unattendedOwner": "Laajennus lukee tiedostojasi sinun oikeuksillasi. Myös yksityiset tiedostot.",
+  "extpage.unattendedInstaller": "Laajennus lukee vain ne tiedostot, jotka koodin kirjoittaja saa lukea. Yksityiset tiedostosi jäävät sen ulottumattomiin.",
+  "extpage.unattendedInert.self": "Kirjoitit koodin itse, joten laajennus lukee sinun oikeuksillasi kummalla vastauksella tahansa. Vastaus alkaa vaikuttaa, jos joku agenteistasi julkaisee koodin myöhemmin.",
+  "extpage.unattendedInert.unknown": "Koodin kirjoittajaa ei tallennettu, joten laajennus lukee sinun oikeuksillasi. Vastaus alkaa vaikuttaa, kun koodi julkaistaan seuraavan kerran.",
+  "extpage.readerAria": "Mitä laajennus lukee, kun se toimii yksin",
+  "extpage.readerOwner": "Sinä",
+  "extpage.readerInstaller": "Koodin kirjoittaja",
+  "extpage.toastReaderOwner": "{name} lukee nyt tiedostojasi sinun oikeuksillasi, kun se toimii yksin.",
+  "extpage.toastReaderInstaller": "{name} lukee nyt vain sen, minkä koodin kirjoittaja saa lukea.",
   "extpage.instances": "Instanssit",
   "extpage.instancesSub": "Instanssi on sama laajennus omilla asetuksillaan, esimerkiksi yksi kutakin tiliä kohti.",
   "extpage.instancesNone": "Ei vielä yhtään.",
@@ -24667,6 +24685,22 @@
         "ex1": "Kaikki: sovellus, joka myy jotain tai käsittelee henkilötietoja. Voit näyttää, minä päivänä sen ehdot muuttuivat.",
         "ex2": "1 000: testisovellus, jota muutat usein. Jokaisen sovelluksen lokiin jää 1 000 uusinta merkintää.",
         "tip": "Säilytä kaikki, ellei sinulla ole syytä poistaa. Raja poistaa merkinnät lopullisesti, joten sivu kysyy sinulta ennen kuin se tallentaa. Jos haluat siirtää vanhat merkinnät syrjään poistamatta niitä, käytä kohtaa Arkistoi merkinnät ennen päivää."
+      }
+    },
+    "extension": {
+      "unattended_reader": {
+        "title": "Kun laajennus toimii yksin",
+        "short": "Kenen oikeuksilla laajennus lukee tiedostojasi silloin, kun kukaan ei ole paikalla. Oletuksena sinun oikeuksillasi.",
+        "what": "Laajennus voi toimia ilman sinua: ajastuksella, käyttöönoton yhteydessä tai työnkulun vaiheena. Silloin se lukee tallennettuja tiedostojasi. Sinun oikeuksillasi se lukee kaiken, minkä sinä saat lukea, myös yksityiset tiedostot. Toisella vastauksella se lukee vain sen, minkä koodin kirjoittaja saa lukea. Jos koodin kirjoitti joku agenteistasi, yksityinen tiedosto jää sen ulottumattomiin, kun agentilla ei ole siihen oikeutta. Vastaus koskee vain yksin tehtyjä ajoja. Sinun tai sovelluksen käynnistämä ajo lukee jo nyt käynnistäjän oikeuksilla.",
+        "range": "Kaksi vastausta: sinun oikeutesi, joka on oletus, tai koodin kirjoittajan oikeudet. Jokainen laajennus alkaa sinun oikeuksillasi, kuten laajennukset toimivat ennen tätä vastausta.",
+        "lowLabel": "Koodin kirjoittaja",
+        "highLabel": "Sinä",
+        "low": "Vain se, minkä kyseinen agentti tai ulkoinen sovellus saa lukea. Yksityinen tiedosto, johon sillä ei ole oikeutta, jää sen ulottumattomiin.",
+        "high": "Kaikki, minkä sinä saat lukea, myös yksityiset tiedostot. Tämä on oletus.",
+        "ex1": "Agentti asensi raportointilaajennuksen ja laittoi sen toimimaan joka yö. Sinun oikeuksillasi yöajo lukee myös yksityiset tiedostosi. Toisella vastauksella se lukee vain ne tiedostot, jotka agentti saa lukea.",
+        "ex2": "Kirjoitit laajennuksen itse. Kumpikin vastaus lukee samat tiedostot, koska kirjoittaja olet sinä.",
+        "ex3": "Laajennus asennettiin ennen kuin koodin kirjoittaja tallennettiin. Kumpikin vastaus lukee sinun oikeuksillasi, kunnes koodi julkaistaan uudelleen.",
+        "tip": "Rajaa vastaus silloin, kun koodin kirjoitti agentti etkä halua sen yksin tekemiä ajoja yksityisiin tiedostoihisi. Jätä vastaukseksi sinun oikeutesi silloin, kun laajennus tarvitsee kaiken, minkä sinä saat lukea, esimerkiksi varmuuskopio tai hakemisto. Vastauksen vaihto ei koskaan pysäytä laajennusta."
       }
     },
     "workspace": {

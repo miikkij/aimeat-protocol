@@ -119,7 +119,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/apps-fork.ts': 2,
     'src/mcp/boards.ts': 6,
     'src/mcp/capabilities.ts': 3,
-    'src/mcp/catalogue.ts': 5,
+    'src/mcp/catalogue.ts': 2,
     'src/mcp/chat-instances.ts': 4,
     'src/mcp/commerce.ts': 5,
     'src/mcp/companies.ts': 2,

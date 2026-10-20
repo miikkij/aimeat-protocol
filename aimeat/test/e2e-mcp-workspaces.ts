@@ -5,6 +5,10 @@
  *   schema) via REST, then drives the tools as the owner's agent over MCP, and checks the
  *   membership gate with a second owner's organism.
  * @version-history
+ *   2026-10-20 — Tests 22, 23 and 24 drive the member's OWN session beside the member's agent: a
+ *     workspace role is the member's permission, so a revoked member and a viewer are refused the
+ *     write in person as well, and a contributor makes it either way (Core 2026-11 COL-09; secaudit
+ *     2026-10, defect 1). The two in-person refusals answered 201 before the fix.
  *   2026-10-18 — Test 7b: _publish and _revert_to_draft take the space name _write took. Green by
  *     asserting the hole closed: publish by name answered "declares no space" beside a list showing it.
  *   2026-10-17 — Test 48: the MCP OAuth token older than the widened grant may be answered 401
@@ -694,7 +698,11 @@ await test("21. an agent's MCP-serve write is attributed to its GAII (not collap
 // ── Creator-managed workspace roles: viewer (read) vs contributor (read+write), grant/revoke ──
 const aOwner = () => ({ Authorization: `Bearer ${A.ownerToken}` });
 const bAgent = () => ({ Authorization: `Bearer ${B.agentToken}` });
-const bWrite = (id: string) => json('/v1/memory', { method: 'POST', headers: bAgent(), body: JSON.stringify({ key: `organism.${bootOrgId}.w.${bootWs.id}.shared.items.${id}.draft`, value: { id, title: 'x' }, visibility: 'private' }) });
+// The workspace role is B's own permission, not a fence around B's agent, so every case below is
+// driven twice: B's agent, and B signed in as themselves (Core 2026-11 COL-09, ruled 2026-10-20).
+const bOwner = () => ({ Authorization: `Bearer ${B.ownerToken}` });
+const bWriteAs = (headers: Record<string, string>, id: string) => json('/v1/memory', { method: 'POST', headers, body: JSON.stringify({ key: `organism.${bootOrgId}.w.${bootWs.id}.shared.items.${id}.draft`, value: { id, title: 'x' }, visibility: 'private' }) });
+const bWrite = (id: string) => bWriteAs(bAgent(), id);
 const bReadManifest = async () => (await json(`/v1/organisms/${bootOrgId}/workspace?ws=${bootWs.id}`, { headers: bAgent() })).body.data.manifest;
 
 await test('22. creator REVOKES B → B can no longer read or write (revoke is effective)', async () => {
@@ -703,6 +711,8 @@ await test('22. creator REVOKES B → B can no longer read or write (revoke is e
     assert((await bReadManifest()) === null, 'B read is empty after revoke');
     const wr = await bWrite('b-after-revoke');
     assert(wr.status === 403, `B write must be denied after revoke, got ${wr.status}: ${JSON.stringify(wr.body)}`);
+    const person = await bWriteAs(bOwner(), 'b-after-revoke-person');
+    assert(person.status === 403, `B IN PERSON must be denied after revoke too, got ${person.status}: ${JSON.stringify(person.body)}`);
 });
 
 await test('23. creator grants B the VIEWER role → B reads but cannot write', async () => {
@@ -711,6 +721,8 @@ await test('23. creator grants B the VIEWER role → B reads but cannot write', 
     assert((await bReadManifest())?.name === 'Bootstrapped', 'viewer B can read the manifest');
     const wr = await bWrite('b-viewer');
     assert(wr.status === 403, `viewer B write must be denied, got ${wr.status}: ${JSON.stringify(wr.body)}`);
+    const person = await bWriteAs(bOwner(), 'b-viewer-person');
+    assert(person.status === 403, `viewer B IN PERSON write must be denied, got ${person.status}: ${JSON.stringify(person.body)}`);
 });
 
 await test('24. creator upgrades B to CONTRIBUTOR → B reads and writes; members list shows the role', async () => {
@@ -719,6 +731,8 @@ await test('24. creator upgrades B to CONTRIBUTOR → B reads and writes; member
     assert((await bReadManifest())?.name === 'Bootstrapped', 'contributor B can read');
     const wr = await bWrite('b-contrib');
     assert(wr.status === 200 || wr.status === 201, `contributor B write ${wr.status}: ${JSON.stringify(wr.body)}`);
+    const person = await bWriteAs(bOwner(), 'b-contrib-person');
+    assert(person.status === 200 || person.status === 201, `contributor B IN PERSON write ${person.status}: ${JSON.stringify(person.body)}`);
     const list = await json(`/v1/organisms/${bootOrgId}/workspace-access?ws=${bootWs.id}`, { headers: aOwner() });
     assert((list.body.data.members || []).some((m: any) => m.owner === B.ownerName && m.role === 'contributor'), `members list shows B as contributor: ${JSON.stringify(list.body.data?.members)}`);
 });

@@ -249,7 +249,7 @@ describe('TARGET-082 review: what leaves, and what the answer says stayed', () =
       await storage.setMemory(mem(ALICE, ORG_KEY, 'stays'));
       await setLabel(deps(), alice, memoryTarget(ALICE, `organism.${ORG}.w.ws1.meta.manifest`), { label: 'julkinen' });
       const { json } = await collectWorkspace(storage, config, {
-        orgId: ORG, ws: 'ws1', exporterGaii: ALICE, exportedAt: stamp, isOrgManager: true, reader: readerFor(deps(), ownerAuth),
+        orgId: ORG, ws: 'ws1', exporterGaii: ALICE, callerSub: ALICE, exportedAt: stamp, isOrgManager: true, reader: readerFor(deps(), ownerAuth),
       });
       expect(json.leftOut.map(l => l.key)).toEqual([ORG_KEY]);
       expect(json.leftOut[0]).toMatchObject({ label: 'sisainen' });

@@ -26,11 +26,19 @@
  *       heartbeat cycle (runHeartbeatCycle) is accepted by B, which stamps when it last saw A, while
  *       a dead peer goes degraded after 3 failed cycles and offline after 10, and a de-peered peer
  *       past its grace is purged.
+ *     - A replica does not outlive its retention bound or its source: B serves A's replica to
+ *       anyone, B's retention sweep removes it once it is past the cache TTL although it sits under
+ *       a principal of A, a record A deletes is taken back and stops being served at once, an
+ *       unsigned retraction is refused, and a retraction signed by another peer removes nothing.
  *
  *   The two nodes run on the in-memory SQLite provider whatever the runner's backend is: what is under
  *   test is what crosses the wire, and the storage of both is the same code either way.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-two-real-nodes
  * @version-history
+ *   2026-10-20 — The replica's retention and its retraction: B's cleanup cycle removes an aged replica
+ *     that sits under a principal of A, POST /v1/federation/retract removes it at once when A deletes
+ *     the record, an unsigned retraction is refused and one peer cannot take back another peer's copy
+ *     (secaudit 2026-10, replica retention).
  *   2026-10-16 — Both directions of the window: B answers the unsigned service summary request from A
  *     while A's signed heartbeat names 4.0.2, and refuses it once A names 4.0.3 and from a peer of
  *     unknown version; a peer of unknown version that refuses the unsigned request is asked again
@@ -54,7 +62,8 @@ import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { runHeartbeatCycle } from '../src/services/federation.js';
 import { syncCatalogueToPeer } from '../src/services/catalogue-sync.js';
-import { replicateMemoryToPeer } from '../src/services/memory-replication.js';
+import { replicateMemoryToPeer, retractMemoryFromPeer } from '../src/services/memory-replication.js';
+import { runCleanupCycle } from '../src/services/cache-cleanup.js';
 import { bootNode, setupOperator, addPeer, auth, type NodeState } from './helpers/federation-two-node.js';
 import { suitePort } from './helpers/free-port.js';
 import { registerOwner } from './helpers/owner-login.js';
@@ -235,6 +244,79 @@ try {
         assert(r.success === true, `replication: ${JSON.stringify(r)}`);
         const replica = await B.storage.getMemory(agentGaii, `replica:${A_ID}:realfed.shared`);
         assert((replica?.value as { shared?: string } | undefined)?.shared === 'yes', `the replica on B: ${JSON.stringify(replica)}`);
+    });
+
+    // ─── The replica's retention and its retraction (secaudit 2026-10) ───
+    console.log('\nWhat happens to the replica on B when it ages, and when A takes it back');
+
+    const REPLICA_KEY = `replica:${A_ID}:realfed.shared`;
+    const replicaPath = `/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(REPLICA_KEY)}`;
+    /** Put the record back on A and replicate it to B, so the next case has a copy to act on. */
+    async function replicateAgain(value: unknown): Promise<void> {
+        const now = new Date().toISOString();
+        await A.storage.setMemory({ key: 'realfed.shared', ownerGaii: agentGaii, value, visibility: 'public', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+        const r = await replicateMemoryToPeer(peerInfo(B), agentGaii, 'realfed.shared', A.config, A.storage);
+        assert(r.success === true, `replication: ${JSON.stringify(r)}`);
+        assert(!!await B.storage.getMemory(agentGaii, REPLICA_KEY), 'the replica is not on B');
+    }
+
+    await test('B serves the replica to anyone, and its retention sweep removes it once it is past the cache TTL', async () => {
+        const open = await B.json(replicaPath);
+        assert(open.status === 200, `B does not serve the replica: ${open.status} ${JSON.stringify(open.body)}`);
+
+        // Age it past the 168 h cache TTL. It sits under A's agent principal, which is in no agents
+        // table on B, so the sweep that walked storage.listAgents() visited none of these rows and
+        // the TTL never applied (secaudit 2026-10).
+        const stored = await B.storage.getMemory(agentGaii, REPLICA_KEY);
+        assert(!!stored, 'the replica is not on B');
+        await B.storage.setMemory({ ...stored!, updatedAt: new Date(Date.now() - 30 * 24 * 3600_000).toISOString() });
+
+        const swept = await runCleanupCycle(B.config, B.storage);
+        assert(swept.replicaRemoved >= 1, `the sweep removed no replica: ${JSON.stringify(swept)}`);
+        assert(!await B.storage.getMemory(agentGaii, REPLICA_KEY), 'the aged replica is still on B');
+        const gone = await B.json(replicaPath);
+        assert(gone.status === 404, `B still serves the aged replica: ${gone.status} ${JSON.stringify(gone.body)}`);
+    });
+
+    await test('a record A deletes is taken back from B, and the copy stops being served at once', async () => {
+        await replicateAgain({ shared: 'again' });
+
+        await A.storage.deleteMemory(agentGaii, 'realfed.shared');
+        const r = await retractMemoryFromPeer(peerInfo(B), agentGaii, 'realfed.shared', 'deleted', A.config, A.storage);
+        assert(r.success === true, `retraction: ${JSON.stringify(r)}`);
+        assert(!await B.storage.getMemory(agentGaii, REPLICA_KEY), 'the replica outlived the record it copied');
+        const gone = await B.json(replicaPath);
+        assert(gone.status === 404, `B still serves the replica of a deleted record: ${gone.status} ${JSON.stringify(gone.body)}`);
+    });
+
+    await test('B refuses an unsigned retraction, and one peer cannot take back another peer\'s replica', async () => {
+        await replicateAgain({ shared: 'third' });
+
+        const unsigned = await B.json('/v1/federation/retract', {
+            method: 'POST',
+            body: JSON.stringify({ source_node: A_ID, gaii: agentGaii, key: 'realfed.shared', reason: 'deleted', timestamp: new Date().toISOString() }),
+        });
+        assert(unsigned.status === 401 && unsigned.body.error?.code === 'UNAUTHORIZED', `unsigned retraction: ${unsigned.status} ${JSON.stringify(unsigned.body)}`);
+        assert(!!await B.storage.getMemory(agentGaii, REPLICA_KEY), 'an unsigned retraction removed the replica');
+
+        // A third peer, with a key this suite holds, signs a well-formed retraction naming A's
+        // record. The replica key is built from the node id the signature proved, so it reaches
+        // nothing of A's (security DNA invariant 5).
+        const other = `aimeat-other-${stamp}`;
+        const kp = await generateKeyPair();
+        await addPeer(B, other, 'http://127.0.0.1:1', kp.publicKey, { replicate_memory: true, tier: 'member' });
+        const payload = { source_node: other, gaii: agentGaii, key: 'realfed.shared', reason: 'deleted', timestamp: new Date().toISOString() };
+        const signedPayload = JSON.stringify(payload);
+        const r = await B.json('/v1/federation/retract', {
+            method: 'POST',
+            body: JSON.stringify({
+                ...payload,
+                signature: await sign(kp.privateKey, signedPayload),
+                ...await audienceProof(kp.privateKey, signedPayload, B_ID),
+            }),
+        });
+        assert(r.status === 200 && r.body.data?.removed === 0, `another peer's retraction: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(!!await B.storage.getMemory(agentGaii, REPLICA_KEY), 'another peer took back A\'s replica');
     });
 
     await test('a heartbeat cycle reaches B, which accepts the signed ping and stamps when it last saw A', async () => {

@@ -22,6 +22,11 @@
  *     changes none of their answers
  * @usage cd aimeat && pnpm exec vitest run test/unit/workspace-meta-copies.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-20 — The workspace role is the MEMBER's permission, not an agent-only one, so a
+ *     plain member's content write is refused in person as it is through an agent, a contributor
+ *     grant opens it for both, and the creator, their agent and an organism manager keep writing
+ *     (Core 2026-11 COL-09; secaudit 2026-10, defect 1). One assertion flipped from null to a
+ *     CONSENT_REQUIRED refusal: the hole closed, the test was not wrong about what it drove.
  *   v1.1.1 — 2026-10-13 — updateWorkspaceMeta takes the session that asks (`caller`), which the
  *     fenced-space rule reads before a manifest is written; the update case passes the account
  *     holder in person. No assertion changed.
@@ -142,9 +147,41 @@ describe('who writes a workspace\'s meta namespace', () => {
     expect(await checkOrganismNamespaceAccess({ storage, config }, human('carol'), manifestKey('ws-unlisted'), 'write')).toBeNull();
   });
 
-  it('leaves reads, and a member\'s content writes, as they were', async () => {
+  it('leaves reads as they were', async () => {
     expect(await checkOrganismNamespaceAccess({ storage, config }, human('bob'), manifestKey(), 'read')).toBeNull();
-    expect(await checkOrganismNamespaceAccess({ storage, config }, human('bob'), `organism.${ORG}.w.${WS}.books.notes.n1.draft`, 'write')).toBeNull();
+  });
+
+  // Until 2026-10-20 this line read `.toBeNull()`: the consent step was skipped for the account
+  // holder in person, so the workspace role was tested on agents alone and any active member wrote
+  // any workspace's content as themselves. The assertion is flipped because the hole closed, not
+  // because the test was wrong about what it drove (Core 2026-11 COL-09; secaudit 2026-10, defect 1).
+  it('refuses a plain member\'s content write IN PERSON, as it refuses their agent', async () => {
+    const key = `organism.${ORG}.w.${WS}.books.notes.n1.draft`;
+    for (const caller of [human('bob'), { principal: `bot#bob@${NODE}`, owner: 'bob', roles: ['agent'] }]) {
+      const r = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
+      expect(r?.status, caller.principal).toBe(403);
+      expect(r?.code, caller.principal).toBe('CONSENT_REQUIRED');
+    }
+  });
+
+  it('takes a contributor grant from the creator for the member in person too', async () => {
+    await storage.createConsent({
+      id: 'consent-bob-person', ownerGaii: `alice@${NODE}`, dataPattern: `organism.${ORG}.w.${WS}.**`,
+      recipient: `ghii:bob@${NODE}`, purpose: 'workspace-contributor', scope: 'local',
+      expires: null, status: 'active', grantedAt: now(), revokedAt: null,
+    } as ConsentRecord);
+    const key = `organism.${ORG}.w.${WS}.books.notes.n1.draft`;
+    expect(await checkOrganismNamespaceAccess({ storage, config }, human('bob'), key, 'write')).toBeNull();
+  });
+
+  it('leaves the creator, their agent and an organism manager writing content', async () => {
+    const key = `organism.${ORG}.w.${WS}.books.notes.n1.draft`;
+    for (const caller of [
+      human('alice'), { principal: `bot#alice@${NODE}`, owner: 'alice', roles: ['agent'] },
+      human('carol'), human('dave'),
+    ]) {
+      expect(await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write'), caller.principal).toBeNull();
+    }
   });
 });
 

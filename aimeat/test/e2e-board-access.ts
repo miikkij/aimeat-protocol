@@ -5,6 +5,9 @@
  *   remain isolated, that external agents can be granted access via PATCH members,
  *   and that board listing aggregation works correctly for owners.
  * @version-history
+ *   v1.3.0 — 2026-10-20 — Test 15b: a subscriber taken off the roster receives no callback for the
+ *     next post and its subscription is gone, while a still-admitted subscriber receives it
+ *     (secaudit 2026-10, board-subscribers:notify-without-read-recheck).
  *   v1.2.0 — 2026-08-15 — Test 17b: a plain owner of ANOTHER account PATCHing this roster. 16
  *     refused an agent session and 17 admitted an operator, so the branch between them — the one
  *     that has to say no — was exercised by nothing here or anywhere else in test/. Deleting the
@@ -19,6 +22,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { registerOwner } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) =>
@@ -321,6 +326,132 @@ await test('15. agent-C CANNOT read the shared board after removal', async () =>
         headers: { Authorization: `Bearer ${agentCToken}` },
     });
     assert(status === 403, `expected 403 after removal, got ${status}`);
+});
+
+// ─── Phase 3b: a subscription ends with the access ───
+//
+// Board read access was checked once, at subscribe time. Every new post then went to every stored
+// callback, and no path that ends access removed the row: a member taken off the roster kept
+// receiving the board id, the post id, the author, the title and the category of every post, with
+// its own GET of the posts answering 403 (secaudit 2026-10,
+// board-subscribers:notify-without-read-recheck). Both halves are asserted here, because a fix that
+// simply stops delivering to everybody would pass the negative half alone.
+console.log('\nPhase 3b — a subscription ends with the access');
+
+await test('15b. a subscriber taken off the roster gets no callback, while an admitted one does', async () => {
+    const seen: Array<{ who: string; postId: string }> = [];
+    const listener = createServer((req, res) => {
+        const who = (req.url ?? '').slice(1);
+        let raw = '';
+        req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+        req.on('end', () => {
+            try { seen.push({ who, postId: JSON.parse(raw).post_id }); } catch { seen.push({ who, postId: '' }); }
+            res.writeHead(204).end();
+        });
+    });
+    await new Promise<void>(r => listener.listen(0, '127.0.0.1', r));
+    const port = (listener.address() as AddressInfo).port;
+    try {
+        // agent-C is back on the roster (test 14 removed it), and both it and agent-B subscribe.
+        const added = await json(`/v1/boards/${sharedBoardId}/members`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ add: [agentCGaii] }),
+        });
+        assert(added.status === 200, `re-add agent-C: ${added.status}: ${JSON.stringify(added.body)}`);
+        for (const [who, token] of [['c', agentCToken], ['b', agentBToken]] as const) {
+            const sub = await json(`/v1/boards/${sharedBoardId}/subscribe`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ callback_url: `http://127.0.0.1:${port}/${who}` }),
+            });
+            assert(sub.status === 201, `subscribe ${who}: ${sub.status}: ${JSON.stringify(sub.body)}`);
+        }
+
+        // The removal, and the proof that it bites on the read door.
+        const removed = await json(`/v1/boards/${sharedBoardId}/members`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ remove: [agentCGaii] }),
+        });
+        assert(removed.status === 200, `remove agent-C: ${removed.status}: ${JSON.stringify(removed.body)}`);
+        const read = await json(`/v1/boards/${sharedBoardId}/posts`, { headers: { Authorization: `Bearer ${agentCToken}` } });
+        assert(read.status === 403, `agent-C still reads the board after removal: ${read.status}`);
+
+        const posted = await json(`/v1/boards/${sharedBoardId}/posts`, {
+            method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+            body: JSON.stringify({ title: 'BA after the removal', body: 'only the admitted subscriber hears this' }),
+        });
+        assert(posted.status === 201, `post: ${posted.status}: ${JSON.stringify(posted.body)}`);
+        const postId = posted.body.data.id as string;
+
+        // The fan-out is fire-and-forget, so wait for the one delivery that must arrive.
+        for (let i = 0; i < 40 && !seen.some(s => s.who === 'b' && s.postId === postId); i++) await sleep(250);
+        assert(seen.some(s => s.who === 'b' && s.postId === postId),
+            `the still-admitted subscriber received nothing: ${JSON.stringify(seen)}`);
+        assert(!seen.some(s => s.who === 'c'),
+            `a subscriber removed from the roster still received the post: ${JSON.stringify(seen)}`);
+
+        const subs = await json('/v1/boards/subscriptions', { headers: { Authorization: `Bearer ${agentCToken}` } });
+        assert(subs.status === 200, `subscriptions ${subs.status}: ${JSON.stringify(subs.body)}`);
+        assert(!(subs.body.data.subscriptions as any[]).some(s => s.board_id === sharedBoardId),
+            `the subscription of a reader without access is still stored: ${JSON.stringify(subs.body.data.subscriptions)}`);
+    } finally {
+        await json(`/v1/boards/${sharedBoardId}/subscribe`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentBToken}` } });
+        await new Promise<void>(r => listener.close(() => r()));
+    }
+});
+
+// The roster prune alone would pass 15b, so this one ends the access a way no roster change
+// touches: the keeper narrows the board to private, and only the read rule asked at delivery stops
+// the callback. With the re-check removed, 15b stays green and this one fails.
+await test('15c. narrowing the board to private stops the callback and removes the subscription', async () => {
+    const seen: string[] = [];
+    const listener = createServer((req, res) => {
+        let raw = '';
+        req.on('data', (chunk: Buffer) => { raw += chunk.toString(); });
+        req.on('end', () => { seen.push(raw); res.writeHead(204).end(); });
+    });
+    await new Promise<void>(r => listener.listen(0, '127.0.0.1', r));
+    const port = (listener.address() as AddressInfo).port;
+    let narrowingBoardId = '';
+    try {
+        const made = await json('/v1/boards', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+            body: JSON.stringify({ name: 'BA Narrowing Board', visibility: 'shared' }),
+        });
+        assert(made.status === 201, `create: ${made.status}: ${JSON.stringify(made.body)}`);
+        narrowingBoardId = made.body.data.id;
+
+        const sub = await json(`/v1/boards/${narrowingBoardId}/subscribe`, {
+            method: 'POST', headers: { Authorization: `Bearer ${agentBToken}` },
+            body: JSON.stringify({ callback_url: `http://127.0.0.1:${port}/b` }),
+        });
+        assert(sub.status === 201, `subscribe: ${sub.status}: ${JSON.stringify(sub.body)}`);
+
+        // The keeper narrows it. Nothing touches the roster, and nothing touches the subscription.
+        const narrowed = await json(`/v1/boards/${narrowingBoardId}/visibility`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${agentAToken}` },
+            body: JSON.stringify({ visibility: 'private' }),
+        });
+        assert(narrowed.status === 200, `narrow: ${narrowed.status}: ${JSON.stringify(narrowed.body)}`);
+        const read = await json(`/v1/boards/${narrowingBoardId}/posts`, { headers: { Authorization: `Bearer ${agentBToken}` } });
+        assert(read.status === 403, `agent-B still reads the narrowed board: ${read.status}`);
+
+        const posted = await json(`/v1/boards/${narrowingBoardId}/posts`, {
+            method: 'POST', headers: { Authorization: `Bearer ${agentAToken}` },
+            body: JSON.stringify({ title: 'BA after narrowing', body: 'nobody outside hears this' }),
+        });
+        assert(posted.status === 201, `post: ${posted.status}: ${JSON.stringify(posted.body)}`);
+
+        // Long enough for a delivery to have arrived: 15b measured one in well under this.
+        await sleep(3000);
+        assert(seen.length === 0, `a subscriber who may no longer read received the post: ${JSON.stringify(seen)}`);
+        const subs = await json('/v1/boards/subscriptions', { headers: { Authorization: `Bearer ${agentBToken}` } });
+        assert(subs.status === 200, `subscriptions ${subs.status}: ${JSON.stringify(subs.body)}`);
+        assert(!(subs.body.data.subscriptions as any[]).some(s => s.board_id === narrowingBoardId),
+            `the subscription of a reader without access is still stored: ${JSON.stringify(subs.body.data.subscriptions)}`);
+    } finally {
+        if (narrowingBoardId) await json(`/v1/boards/${narrowingBoardId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentAToken}` } });
+        await new Promise<void>(r => listener.close(() => r()));
+    }
 });
 
 // ─── Phase 4: PATCH members authorization ───

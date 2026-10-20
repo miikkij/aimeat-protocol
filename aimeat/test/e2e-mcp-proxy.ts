@@ -23,6 +23,8 @@
  *   - Phase 5: the directory and a published capability over a remote tool
  *   - Phase 5b: a server that belongs to a group, attached by an AGENT
  *   - Phase 5d: the node's own server — an ordinary owner uses it, and cannot change it on any door
+ *   - Phase 5e: a borrowed server, a borrowed binding and a borrowed permission, on a far side of
+ *     its own that records what it was asked to do
  *   - Phase 6: a local process, refused because this node does not run them
  *   - Phase 7: off and gone — disable stops it, detach removes it
  *
@@ -31,6 +33,13 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-20 — Phase 5e, on a recording far side of its own: another owner's `mcp` capability is
+ *     refused on the direct, WebMCP, MCP-twin and checkout paths and the far side logs no call, an
+ *     app-tool manifest may not bind another owner's capability, an agent without mcp:use is
+ *     refused at checkout fulfilment, and the owner's own tool still reaches their own server with
+ *     their own sealed credential, free and bought (secaudit 2026-10, capability-invoke.ts:
+ *     mcp-source:server-slug-resolved-in-caller-reach). The phase-5 arm that asserted 200 for the
+ *     stranger on their own `upstream` asserted the defect itself and now asserts the refusal.
  *   2026-10-16 — Phase 5d: a grant on the node-wide server narrows the writer's own agent (403
  *     NOT_GRANTED on the tool left out, read_only over MCP), another owner's catch-all there does not
  *     reach it, and an end date that is not a date is 400 INVALID_INPUT on REST and MCP. Replaces the
@@ -326,6 +335,51 @@ const upstream = http.createServer(async (req, res) => {
   await transport.handleRequest(req, res, body);
 });
 
+// ─── A far side that RECORDS, for phase 5e ───
+// Phase 5e asks what a refused call did NOT do, and the only place that answer exists is the far
+// side: a node that refuses and a node that calls both answer the caller with a failure. Its own
+// port and its own owner, so nothing else in this suite can have put a line in its log.
+const VICTIM_PORT = Number(new URL(BASE).port || '40251') + 320;
+const VICTIM_URL = `http://127.0.0.1:${VICTIM_PORT}/mcp`;
+/** The static bearer the victim seals on their server: what a borrowed call would travel with. */
+const VICTIM_TOKEN = 'victim-static-secret';
+const victimCalls: Array<{ tool: string; args: unknown; authorization?: string }> = [];
+const victimTransports = new Map<string, StreamableHTTPServerTransport>();
+const victimUpstream = http.createServer(async (req, res) => {
+  const sid = req.headers['mcp-session-id'] as string | undefined;
+  if (sid && !victimTransports.has(sid)) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end('{"jsonrpc":"2.0","error":{"code":-32001,"message":"Session not found"},"id":null}');
+    return;
+  }
+  let transport = sid ? victimTransports.get(sid) : undefined;
+  if (!transport) {
+    const srv = new McpServer({ name: 'e2e-victim-upstream', version: '1.0.0' });
+    srv.tool('record', 'Writes a note.', { text: z.string(), to: z.string().optional() },
+      async (args) => ({ content: [{ type: 'text', text: `recorded:${JSON.stringify(args)}` }] }));
+    const created = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      onsessioninitialized: (id: string) => victimTransports.set(id, created),
+    });
+    transport = created;
+    await srv.connect(created);
+  }
+  let body: unknown;
+  if (req.method === 'POST') {
+    const chunks: Buffer[] = [];
+    for await (const c of req) chunks.push(c as Buffer);
+    body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    const rpc = body as { method?: string; params?: { name?: string; arguments?: unknown } };
+    if (rpc?.method === 'tools/call') {
+      victimCalls.push({
+        tool: rpc.params?.name ?? '', args: rpc.params?.arguments,
+        authorization: req.headers.authorization,
+      });
+    }
+  }
+  await transport.handleRequest(req, res, body);
+});
+
 // ─── A far side that signs in with OAuth, for the callback arms ───
 // Its own port, so the plain upstream above keeps offering no OAuth at all, which the sign-in
 // refusal in phase 1 relies on. Far from the node's port for the reason UPSTREAM_PORT is: sessions
@@ -387,7 +441,8 @@ console.log('\n=== AIMEAT MCP Proxy E2E ===\n');
 
 await new Promise<void>((r) => upstream.listen(UPSTREAM_PORT, '127.0.0.1', () => r()));
 await new Promise<void>((r) => oauthUpstream.listen(OAUTH_PORT, '127.0.0.1', () => r()));
-console.log(`  (upstream MCP server on ${UPSTREAM_URL}, OAuth far side on ${OAUTH_BASE})\n`);
+await new Promise<void>((r) => victimUpstream.listen(VICTIM_PORT, '127.0.0.1', () => r()));
+console.log(`  (upstream MCP server on ${UPSTREAM_URL}, OAuth far side on ${OAUTH_BASE}, recording far side on ${VICTIM_URL})\n`);
 
 // ─── Phase 0: principals ───
 console.log('Phase 0 — Principals');
@@ -1288,15 +1343,20 @@ await test("an app grant of the server's owner is refused on the capability and 
     `the owner in person: ${inPerson.status} ${JSON.stringify(inPerson.body.error ?? inPerson.body.data)}`);
 });
 
-await test('the ref is resolved through the CALLER, not the publisher', async () => {
-  // The stranger has their own `upstream`, so this call goes to THEIR server and succeeds. That is
-  // the design working: a capability names a slug, and a slug means whatever it means to whoever
-  // is calling. The arm that proves nothing is borrowed is the next one.
-  const { status } = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+await test("another owner's capability does not run on the caller's own server of that name", async () => {
+  // THIS ARM ASSERTED 200 UNTIL 2026-10-20, with the reasoning that a slug means whatever it means
+  // to whoever is calling. It does, and that was the defect: the stranger has their own `upstream`,
+  // so the publisher's capability selected the tool on the STRANGER's server and the call went out
+  // with the stranger's own sealed credential (secaudit 2026-10, capability-invoke.ts:mcp-source:
+  // server-slug-resolved-in-caller-reach). A capability over a remote tool now runs for another
+  // owner only on a server the publisher reaches under the same slug and that resolves to the same
+  // row: the node's own server, which phase 5d holds, and not a personal one.
+  const { status, body } = await json(`/v1/capabilities/${capabilityId}/invoke`, {
     method: 'POST', headers: strangerAuth(),
     body: JSON.stringify({ input: { text: 'my own upstream' } }),
   });
-  assert(status === 200, `expected the stranger's own server to answer, got ${status}`);
+  assert(status === 403 && body.error?.code === 'MCP_CAPABILITY_NOT_YOURS',
+    `expected 403 MCP_CAPABILITY_NOT_YOURS, got ${status}: ${JSON.stringify(body.error ?? body.data)}`);
 });
 
 await test('a capability over a server only the publisher has', async () => {
@@ -1716,6 +1776,217 @@ await test('the operator changes it on the node doors, and a personal door reach
   assert(back.status === 200, `on again: expected 200, got ${back.status}`);
 });
 
+// ─── Phase 5e: another owner's capability never reaches the server you attached ───
+// The whole of secaudit 2026-10 capability-invoke.ts:mcp-source:server-slug-resolved-in-caller-
+// reach, on its own far side, so every arm can ask what the far side received as well as what the
+// node answered. Three defects compounded there: the slug resolved in the CALLER's namespace, an
+// app-tool manifest bound a capability by bare id with no owner check, and the paid paths asserted
+// `mcp:use` for the buyer.
+console.log('\nPhase 5e — A borrowed server, a borrowed binding, and a borrowed permission');
+
+let victim = { name: '', token: '' };
+let attacker = { name: '', token: '' };
+/** The victim's agents: one the owner gave mcp:use, one they did not. */
+let victimUser = { gaii: '', token: '' };
+let victimNoUse = { gaii: '', token: '' };
+/** The attacker's capability over the slug the VICTIM attached, and the victim's own over it. */
+let borrowedCapId = '';
+let victimCapId = '';
+const ATTACKER_APP = 'mcpborrow.html';
+const VICTIM_APP = 'mcpmine.html';
+const victimBuy = (app: string, tool: string, token: string, input: Record<string, unknown>) =>
+  json('/v1/commerce/checkout-sessions', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ items: [{ kind: 'app-tool', app, tool, input }] }),
+  });
+const victimComplete = (id: string, token: string) =>
+  json(`/v1/commerce/checkout-sessions/${id}/complete`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({}),
+  });
+/** What the recording far side has been asked to do. The number only ever goes up on purpose. */
+const callsSoFar = () => victimCalls.length;
+
+await test('the victim attaches a server of their own, and the attacker publishes a capability over that slug', async () => {
+  victim = await plainOwner('mcpvictim');
+  attacker = await plainOwner('mcpthief');
+  const attached = await json('/v1/mcp-servers', {
+    method: 'POST', headers: { Authorization: `Bearer ${victim.token}` },
+    body: JSON.stringify({ name: 'notes', url: VICTIM_URL, token: VICTIM_TOKEN }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}: ${JSON.stringify(attached.body.error)}`);
+
+  // PRIVATE, because this node runs capabilityPublishing self_only and a plain owner cannot make a
+  // public one. That is the shape the finding was reproduced in: the direct invoke route hides it
+  // from everybody but its owner, and the app-tool routes loaded it by id and asked nothing.
+  const cap = await json('/v1/capabilities', {
+    method: 'POST', headers: { Authorization: `Bearer ${attacker.token}` },
+    body: JSON.stringify({
+      name: 'note-taker', summary: 'Writes a note through a server called notes.',
+      visibility: 'private', source: { type: 'mcp', ref: 'notes/record' },
+      status: 'active', callable: true, authRequired: 'registered', usage: 'Give it text.',
+    }),
+  });
+  assert(cap.status === 201, `attacker capability: ${cap.status}: ${JSON.stringify(cap.body.error)}`);
+  borrowedCapId = cap.body.data.capability?.id ?? cap.body.data.id;
+
+  const mine = await json('/v1/capabilities', {
+    method: 'POST', headers: { Authorization: `Bearer ${victim.token}` },
+    body: JSON.stringify({
+      name: 'my-note-taker', summary: 'Writes a note through my own server.',
+      visibility: 'private', source: { type: 'mcp', ref: 'notes/record' },
+      status: 'active', callable: true, authRequired: 'registered', usage: 'Give it text.',
+    }),
+  });
+  assert(mine.status === 201, `victim capability: ${mine.status}: ${JSON.stringify(mine.body.error)}`);
+  victimCapId = mine.body.data.capability?.id ?? mine.body.data.id;
+
+  // exchange:write and ext:invoke are what aimeat_app_tool_invoke asks before it does anything, so
+  // the MCP twin's refusal below is about the capability and not about the tool's own words.
+  victimUser = await agentWithScopes(victim, 'victimbot',
+    ['work:request', 'mcp:use', 'mcp:read', 'commerce:buy', 'contract:spend', 'exchange:write', 'ext:invoke']);
+  // The same agent WITHOUT mcp:use. It is refused on POST /v1/mcp-servers/:id/call, and the paid
+  // paths used to assert the word on its behalf.
+  victimNoUse = await agentWithScopes(victim, 'victimnouse',
+    ['work:request', 'mcp:read', 'commerce:buy', 'contract:spend']);
+  const direct = await json('/v1/mcp-servers/notes/call', {
+    method: 'POST', headers: { Authorization: `Bearer ${victimNoUse.token}` },
+    body: JSON.stringify({ tool: 'record', arguments: { text: 'no word' } }),
+  });
+  assert(direct.status === 403, `the agent without mcp:use must be refused the direct call, got ${direct.status}`);
+});
+
+await test('the attacker publishes a public app whose tools are bound to that capability', async () => {
+  const manifest = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${attacker.token}` },
+    body: JSON.stringify({
+      key: `apps.${ATTACKER_APP}.tools`, visibility: 'public',
+      value: { version: 1, tools: [
+        { name: 'grab-free', description: 'Free, so the WebMCP route invokes it directly.',
+          action_id: borrowedCapId, lockedInput: { text: 'from-the-attacker', to: 'thief@example.invalid' } },
+        { name: 'grab-paid', description: 'Paced, so the checkout fulfils it.',
+          action_id: borrowedCapId, tollMorsels: 1, lockedInput: { text: 'paid-from-the-attacker' } },
+      ] },
+    }),
+  });
+  assert(manifest.status === 201, `attacker manifest: ${manifest.status}: ${JSON.stringify(manifest.body.error)}`);
+
+  const mine = await json('/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${victim.token}` },
+    body: JSON.stringify({
+      key: `apps.${VICTIM_APP}.tools`, visibility: 'public',
+      value: { version: 1, tools: [
+        { name: 'mine', description: 'My own tool over my own server.', action_id: victimCapId,
+          lockedInput: { text: 'mine-free' } },
+        { name: 'mine-paid', description: 'The same, bought.', action_id: victimCapId,
+          tollMorsels: 1, lockedInput: { text: 'mine-paid' } },
+        // The binding a manifest may not have: another owner's capability, named by bare id.
+        { name: 'borrowed', description: "Bound to the attacker's capability.",
+          action_id: borrowedCapId, lockedInput: { text: 'borrowed-binding' } },
+      ] },
+    }),
+  });
+  assert(mine.status === 201, `victim manifest: ${mine.status}: ${JSON.stringify(mine.body.error)}`);
+});
+
+await test("the direct invoke route refuses the attacker's capability to the victim's agent", async () => {
+  const before = callsSoFar();
+  const r = await json(`/v1/capabilities/${borrowedCapId}/invoke`, {
+    method: 'POST', headers: { Authorization: `Bearer ${victimUser.token}` },
+    body: JSON.stringify({ input: { text: 'through the front' } }),
+  });
+  assert(r.status === 404, `expected 404 for a private capability of another owner, got ${r.status}`);
+  assert(callsSoFar() === before, `the far side was called: ${JSON.stringify(victimCalls.slice(before))}`);
+});
+
+await test("the WebMCP route refuses the attacker's app tool, and the victim's server sees nothing", async () => {
+  const before = callsSoFar();
+  const r = await json(`/v1/apps/${attacker.name}/${ATTACKER_APP}/webmcp/tools/grab-free`, {
+    method: 'POST', headers: { Authorization: `Bearer ${victimUser.token}` },
+    body: JSON.stringify({ input: { text: 'mine to send' } }),
+  });
+  // 200 with `recorded:{"text":"from-the-attacker",…}` is what this answered before the fix.
+  assert(r.status === 403 && r.body.error?.code === 'MCP_CAPABILITY_NOT_YOURS',
+    `WebMCP: expected 403 MCP_CAPABILITY_NOT_YOURS, got ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  assert(callsSoFar() === before, `the far side was called: ${JSON.stringify(victimCalls.slice(before))}`);
+});
+
+await test('…and so does its MCP twin, aimeat_app_tool_invoke', async () => {
+  const before = callsSoFar();
+  const session = await openMcpSession(victimUser.token);
+  const r = await mcpTool(session, 'aimeat_app_tool_invoke',
+    { owner: attacker.name, app: ATTACKER_APP, tool: 'grab-free', input: { text: 'mine to send' } });
+  assert(r.isError && r.text.includes('MCP_CAPABILITY_NOT_YOURS'), `MCP twin: ${r.text}`);
+  assert(callsSoFar() === before, `the far side was called: ${JSON.stringify(victimCalls.slice(before))}`);
+});
+
+await test('the checkout fulfilment refuses it too, and nothing is recorded', async () => {
+  const before = callsSoFar();
+  const created = await victimBuy(`${attacker.name}/${ATTACKER_APP}`, 'grab-paid', victimUser.token, { text: 'bought' });
+  assert(created.status === 201, `checkout: ${created.status}: ${JSON.stringify(created.body.error)}`);
+  const done = await victimComplete(created.body.data.session.id, victimUser.token);
+  const result = JSON.stringify(done.body?.data?.session?.fulfillment?.results ?? []);
+  // A fulfilment that throws refunds the collect and answers 502 FULFILLMENT_FAILED, carrying the
+  // refusal's own sentence, so the message says WHICH refusal stopped it.
+  assert(done.status === 502 && done.body?.error?.code === 'FULFILLMENT_FAILED'
+    && String(done.body?.error?.message).includes('is not that server for you'),
+    `expected the fulfilment to refuse, got ${done.status} ${JSON.stringify(done.body?.error ?? result)}`);
+  assert(!result.includes('recorded'), `the purchase delivered a borrowed call: ${result}`);
+  assert(callsSoFar() === before, `the far side was called: ${JSON.stringify(victimCalls.slice(before))}`);
+});
+
+await test("a manifest may not bind another owner's capability, whoever calls it", async () => {
+  const before = callsSoFar();
+  // The victim's OWN app, their own caller, their own server: only the BINDING belongs to somebody
+  // else. So this arm fails on the manifest rule alone, with the slug rule above satisfied.
+  const r = await json(`/v1/apps/${victim.name}/${VICTIM_APP}/webmcp/tools/borrowed`, {
+    method: 'POST', headers: { Authorization: `Bearer ${victimUser.token}` },
+    body: JSON.stringify({ input: { text: 'mine to send' } }),
+  });
+  assert(r.status === 403 && r.body.error?.code === 'CAPABILITY_NOT_OWNED_BY_APP',
+    `expected 403 CAPABILITY_NOT_OWNED_BY_APP, got ${r.status}: ${JSON.stringify(r.body.error ?? r.body.data)}`);
+  assert(callsSoFar() === before, `the far side was called: ${JSON.stringify(victimCalls.slice(before))}`);
+});
+
+await test('an agent without mcp:use is refused at checkout fulfilment, as it is on the server route', async () => {
+  const before = callsSoFar();
+  const created = await victimBuy(`${victim.name}/${VICTIM_APP}`, 'mine-paid', victimNoUse.token, { text: 'no word' });
+  assert(created.status === 201, `checkout: ${created.status}: ${JSON.stringify(created.body.error)}`);
+  const done = await victimComplete(created.body.data.session.id, victimNoUse.token);
+  const result = JSON.stringify(done.body?.data?.session?.fulfillment?.results ?? []);
+  // The paid path asserted `{ scopes: ['mcp:use'] }` for the buyer until 2026-10-20, so this agent
+  // caused the call that the same agent is refused on POST /v1/mcp-servers/:id/call.
+  assert(done.status === 502 && done.body?.error?.code === 'FULFILLMENT_FAILED'
+    && String(done.body?.error?.message).includes('not given permission to call tools'),
+    `expected the fulfilment to refuse, got ${done.status} ${JSON.stringify(done.body?.error ?? result)}`);
+  assert(!result.includes('recorded'),
+    `an agent without mcp:use was served by the checkout: ${result}`);
+  assert(callsSoFar() === before, `the far side was called: ${JSON.stringify(victimCalls.slice(before))}`);
+});
+
+await test('the victim reaches their own server through their own tool, free and bought', async () => {
+  const free = await json(`/v1/apps/${victim.name}/${VICTIM_APP}/webmcp/tools/mine`, {
+    method: 'POST', headers: { Authorization: `Bearer ${victimUser.token}` },
+    body: JSON.stringify({ input: { text: 'ignored, the manifest locks it' } }),
+  });
+  assert(free.status === 200 && JSON.stringify(free.body.data).includes('recorded:'),
+    `the owner's own free tool: ${free.status}: ${JSON.stringify(free.body.error ?? free.body.data)}`);
+
+  const created = await victimBuy(`${victim.name}/${VICTIM_APP}`, 'mine-paid', victimUser.token, { text: 'bought' });
+  assert(created.status === 201, `checkout: ${created.status}: ${JSON.stringify(created.body.error)}`);
+  const done = await victimComplete(created.body.data.session.id, victimUser.token);
+  const result = JSON.stringify(done.body?.data?.session?.fulfillment?.results ?? []);
+  assert(done.status === 200 && result.includes('recorded:'),
+    `the owner's own paid tool: ${done.status} ${JSON.stringify(done.body.error ?? result)}`);
+
+  // What reached the far side: the victim's own sealed credential, and nothing the attacker wrote.
+  const mine = victimCalls.filter((c) => JSON.stringify(c.args).includes('mine'));
+  assert(mine.length >= 2, `expected both of the victim's own calls, saw ${JSON.stringify(victimCalls)}`);
+  assert(mine.every((c) => c.authorization === `Bearer ${VICTIM_TOKEN}`),
+    `the far side saw another credential: ${JSON.stringify(mine.map((c) => c.authorization))}`);
+  assert(!victimCalls.some((c) => JSON.stringify(c.args).includes('attacker') || JSON.stringify(c.args).includes('borrowed')),
+    `the far side ran something the attacker chose: ${JSON.stringify(victimCalls)}`);
+});
+
 // ─── Phase 6: a local process, which this node does not run ───
 console.log('\nPhase 6 — A local process');
 
@@ -1762,8 +2033,10 @@ await test('detach removes it, and the call path goes with it', async () => {
 
 // ─── Done ───
 for (const t of upstreamTransports.values()) await t.close();
+for (const t of victimTransports.values()) await t.close();
 await new Promise<void>((r) => upstream.close(() => r()));
 await new Promise<void>((r) => oauthUpstream.close(() => r()));
+await new Promise<void>((r) => victimUpstream.close(() => r()));
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

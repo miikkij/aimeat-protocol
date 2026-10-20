@@ -11,6 +11,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-20 -- diagnose-a-workflow, step 3: a fire can fail for the maker rather than the work.
+ *     The maker is gone, it lost the permission its kind needs (`ai:use`, `work:request`), or the
+ *     file a publishing schedule names is one the maker may no longer read (secaudit 2026-10,
+ *     services/schedule-actor.ts, services/scheduler-remote-jobs.ts, services/schedule-file-access.ts).
  *   2026-10-19 -- agent-avatar (public): how an agent makes and sets its own picture at agent.avatar
  *     (builtin-skills.agent-avatar.ts). A new name, so seeding creates it on an existing node too.
  *   2026-10-18 -- use-app-bound-skills: on a node closed to strangers a public skill is saved at members, with a warning (plan V1.6).
@@ -595,6 +599,14 @@ metadata:
    not retried: it keeps \`lastRunError\` and has no next run, and the owner turns it on again or runs
    it now once the cause is fixed. A run that fell while the node was down is logged as skipped
    with a message starting \`Missed:\` and is not made up.
+   **A schedule acts as whoever made it**, asked again at every fire, so a run can fail for the
+   maker rather than for the work. The message says which: the agent or app that made it is gone
+   ("no longer connected", "no longer holds your permission"), it no longer holds the permission the
+   kind needs (\`ai:use\` for an \`ai\` schedule, \`work:request\` for one that calls a connected
+   outside app), or the file a publishing schedule names is one its maker may no longer read. Each
+   of these is logged as an error with that sentence, and nothing ran. The fix is the maker's
+   permission or a schedule made again by someone who has it, never the cron. A schedule an app made
+   before 2026-10-05 carries no grant, so the node cannot tell which app made it and says so.
 4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
    connected and seen recently (\`last_seen\`, \`mode\`)? \`aimeat_agent_activity\` and
    \`aimeat_task_list\` report on the CALLING agent only, so neither reads the worker's queue.

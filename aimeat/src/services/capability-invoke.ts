@@ -6,6 +6,15 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.7.0 - 2026-10-20 - The `mcp` case refuses a capability of ANOTHER owner unless the publisher
+ *     reaches the same server row the caller's slug resolves to (MCP_CAPABILITY_NOT_YOURS). The slug
+ *     was resolved in the caller's namespace alone, so another owner's capability selected the tool,
+ *     and through an app-tool manifest's lockedInput the arguments, of a call made on the caller's
+ *     own attached server with the caller's stored credential (secaudit 2026-10,
+ *     capability-invoke.ts:mcp-source:server-slug-resolved-in-caller-reach). Adds
+ *     appToolBindingRefusal (an app-tool manifest binds only its own owner's capabilities) and
+ *     authorityFromToken (a paid path reads the buyer session's own scopes instead of asserting a
+ *     list), both used by the WebMCP, MCP and checkout paths.
  *   v1.6.0 - 2026-10-12 - The extension case's loopback request carries the node's loopback pass for
  *     the caller's token (auth/loopback-pass.ts), so aimeat_capabilities_invoke and
  *     aimeat_app_tool_invoke keep working from 4.0.0 for a session whose token is bound to the MCP
@@ -33,9 +42,13 @@ import { safeFetch } from '../utils/url-validator.js';
 import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
 import { LOOPBACK_PASS_HEADER, mintLoopbackPass, revokeLoopbackPass } from '../auth/loopback-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { buildGEAI, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+import { buildGEAI, ownerGhiiOf, localAccountName, localAccountOf } from '../utils/gaii.js';
 import { requireUsableServer } from './mcp-client/registry.js';
 import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
+import { verifyJWT } from '../auth/jwt.js';
+import { callAuthority, withCurrentScopes } from '../auth/effective-scopes.js';
+import { resolvePat, PAT_PREFIX } from './access-token.js';
+import { logger } from '../utils/logger.js';
 
 export interface InvokeResult {
   capability: string;
@@ -43,6 +56,74 @@ export interface InvokeResult {
   duration_ms: number;
   source: { type: string; ref: string };
   mode: 'normal' | 'raw';
+}
+
+/** What a call may do on the strength of the session making it: see `authority` below. */
+export interface CallAuthority { scopes: string[]; ownerInPerson?: boolean }
+
+/**
+ * The authority of the session that holds `token`, for a path that has the buyer's token but no
+ * `req.auth` to ask: a checkout fulfilment.
+ *
+ * It is read from the credential rather than asserted, because asserting is the defect this
+ * replaces: the paid paths stated `{ scopes: ['mcp:use'] }` for the buyer, so an agent the owner
+ * never gave `mcp:use` caused a call on an attached server that the same agent is refused on
+ * `POST /v1/mcp-servers/:id/call` (secaudit 2026-10). Both credential shapes a buyer can complete a
+ * checkout with are read: a session JWT, narrowed to the agent record exactly as the auth
+ * middleware narrows it, and a raw PAT. Anything else (no token at all, a PSP callback completing
+ * the session for a buyer who is not there) holds nothing and is not the owner in person, which is
+ * the safe direction: the call is then refused unless the capability needs no remote server.
+ */
+export async function authorityFromToken(storage: Storage, token: string | undefined): Promise<CallAuthority> {
+  const none: CallAuthority = { scopes: [], ownerInPerson: false };
+  if (!token) return none;
+  if (token.startsWith(PAT_PREFIX)) {
+    const pat = await resolvePat(storage, token).catch((err: unknown) => {
+      logger.warn('capability-invoke: the access token could not be read, so the call carries nothing', { error: String(err) });
+      return null;
+    });
+    return pat ? callAuthority({ roles: pat.roles, scopes: pat.scopes }) : none;
+  }
+  const verified = await verifyJWT(token).catch((err: unknown) => {
+    logger.warn('capability-invoke: the session token could not be verified, so the call carries nothing', { error: String(err) });
+    return null;
+  });
+  if (!verified) return none;
+  return callAuthority(await withCurrentScopes(storage, verified));
+}
+
+/**
+ * Why this app-tool binding may not be run, or null when it is the app owner's own capability.
+ *
+ * `action_id` in an `apps.{appId}.tools` manifest is a bare id in a node-wide registry, and the only
+ * thing that supplied it is the app owner's own memory record. So an owner could name SOMEBODY
+ * ELSE'S capability there and have every caller of their tool invoke it, with the manifest's
+ * `lockedInput` deciding the arguments. `services/extension-purchase.ts` has refused that since the
+ * August 2026 audit (H-17); the WebMCP route, its MCP twin and the checkout resolver loaded the
+ * capability by id and checked nothing (secaudit 2026-10).
+ *
+ * Ownership is the whole test, and it subsumes the visibility question the direct invoke route asks
+ * (`POST /v1/capabilities/:id/invoke` hides a private capability from everyone but its owner). What
+ * is left after this check is the app owner's own capability, named by them in their own PUBLIC
+ * manifest, which is a publication rather than a leak — and refusing a private one there would turn
+ * off every app tool on a node whose `capabilityPublishing` is `self_only`, where a capability
+ * cannot be public at all.
+ */
+export function appToolBindingRefusal(
+  capability: CapabilityRecord, appOwnerName: string, appRef: string, toolName: string,
+): { statusCode: number; code: string; message: string } | null {
+  if (localAccountOf(capability.ownerGhii) === appOwnerName) return null;
+  return {
+    statusCode: 403,
+    code: 'CAPABILITY_NOT_OWNED_BY_APP',
+    message: `Tool "${toolName}" on app "${appRef}" is bound to a capability "${appOwnerName}" does not own, so it cannot be run from this app.`,
+  };
+}
+
+/** The owner GHII behind a capability's registrant, whose stored form may be a bare account name. */
+function registrantOwnerGhii(principal: string, nodeId: string): string {
+  const owner = ownerGhiiOf(principal);
+  return owner.includes('@') ? owner : `${owner}@${nodeId}`;
 }
 
 export async function invokeCapability(
@@ -62,11 +143,11 @@ export async function invokeCapability(
    * What authorises this call, asked only by a capability over a remote MCP tool: every scope the
    * caller holds, and whether it is the account holder in person (only then does the server's own
    * owner pass without mcp:use). A door with a session states callAuthority(req.auth); a paid path
-   * with none (a checkout fulfilling a purchase, one capability buying from another) states mcp:use,
-   * because the purchase authorises the call, and never the owner in person. Left out, nothing is
-   * held and the caller is nobody in person.
+   * with none (a checkout fulfilling a purchase) reads the buyer's own token with
+   * authorityFromToken(); a purchase made for an extension holds nothing of its buyer's session.
+   * Left out, nothing is held and the caller is nobody in person.
    */
-  authority: { scopes: string[]; ownerInPerson?: boolean } = { scopes: [] },
+  authority: CallAuthority = { scopes: [] },
 ): Promise<InvokeResult> {
   const start = Date.now();
 
@@ -154,14 +235,40 @@ export async function invokeCapability(
         });
       }
 
-      // The caller's OWN reach, not the publisher's. A capability is a signpost; it does not carry
+      // The caller's OWN reach, not the publisher's. A capability names a tool; it does not carry
       // access with it, so somebody who publishes one over their Jira has not given the world a
       // Jira. Absent and not-yours answer alike, as everywhere else here.
-      const server = await requireUsableServer(storage, ownerGhiiOf(callerGhii), slug, config);
+      const callerOwner = ownerGhiiOf(callerGhii);
+      const server = await requireUsableServer(storage, callerOwner, slug, config);
       if (!server) {
         throw Object.assign(new Error(`You have no MCP server called "${slug}"`), {
           statusCode: 404, code: 'NO_MCP_SERVER',
         });
+      }
+
+      // THE OTHER DIRECTION OF THE SAME RULE, and the one this resolution was missing. A bare slug
+      // means whatever it means to whoever is calling, so another owner's capability resolved to a
+      // server only the CALLER has attached: the publisher then chose the tool, and through an
+      // app-tool manifest's lockedInput the arguments, of a call made with the caller's own stored
+      // credential (secaudit 2026-10, capability-invoke.ts:mcp-source:server-slug-resolved-in-
+      // caller-reach). capability-record.ts accepts the `mcp` source on the reasoning that naming
+      // somebody else's server buys the publisher nothing, which covers only the direction where a
+      // publisher's server is exposed to the world.
+      //
+      // So a capability over a remote tool runs for another owner only on a server the PUBLISHER
+      // reaches under that same slug and that resolves to the same row: the node's own server and a
+      // group's server are one server for both, and an operator's capability over the node's server
+      // keeps working for every owner it is offered to, free and paid. A personal server of the
+      // caller's resolves to a different row and is refused.
+      const publisherOwner = registrantOwnerGhii(capability.ownerGhii, config.nodeId);
+      if (publisherOwner !== callerOwner) {
+        const publisherServer = await requireUsableServer(storage, publisherOwner, slug, config);
+        if (!publisherServer || publisherServer.id !== server.id) {
+          throw Object.assign(
+            new Error(`"${capability.name}" runs on an MCP server its publisher attached, and "${slug}" is not that server for you. Publish your own capability over your own server, or ask its publisher for one on a server you both reach.`),
+            { statusCode: 403, code: 'MCP_CAPABILITY_NOT_YOURS' },
+          );
+        }
       }
 
       // The same chokepoint every other door uses: the grant, the locked arguments, the price and
