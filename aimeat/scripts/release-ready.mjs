@@ -44,6 +44,9 @@
  *   node scripts/release-ready.mjs [--sha=<commit>] [--require=ci.yml,e2e-full.yml] [--no-main-check]
  *   AIMEAT_RELEASE_RED_REASON="<why this release cannot wait for the nightly>" npm publish
  * @version-history
+ *   v1.2.0 -- 2026-10-20 -- The nightly also passes with a green run of an earlier commit on main that
+ *     started within 24 hours; the commits since are printed, and CI must be green on the exact
+ *     commit (Jouni, 2026-10-20, after 4.1.2 waited for a sweep of test-only commits).
  *   v1.1.1 -- 2026-10-20 -- The header names pnpm release:bump as the step before a release.
  *   v1.1.0 -- 2026-10-16 -- A named reason (a `Red-Nightly:` line in the tag message, or
  *     AIMEAT_RELEASE_RED_REASON) lets a release go out over a red, missing or running nightly sweep,
@@ -52,10 +55,29 @@
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
-import { repoSlug, runsForCommit } from './lib/ci-runs.mjs';
+import { apiGet, repoSlug, runsForCommit } from './lib/ci-runs.mjs';
 
 /** The workflows a named reason may release over: the nightly sweep only. */
 const NIGHTLY_WORKFLOWS = ['e2e-full.yml'];
+/**
+ * A green nightly of an EARLIER commit on main counts when it started at most this long ago (Jouni,
+ * 2026-10-20: a release waited four hours for a sweep because another session pushed tests after the
+ * bump). CI must still be green on the exact commit, and the commits in between are printed.
+ */
+const NIGHTLY_ANCESTOR_MAX_AGE_MS = 24 * 3600_000;
+
+/** A green nightly run of an ancestor of `sha` that started within the window, newest first, or null. */
+async function recentAncestorNightly(slug, workflow, sha) {
+    const body = await apiGet(`/repos/${slug}/actions/workflows/${workflow}/runs`, 'branch=main&status=success&per_page=20');
+    const now = Date.now();
+    for (const r of body.workflow_runs ?? []) {
+        if (r.status !== 'completed' || r.conclusion !== 'success') continue;
+        if (now - Date.parse(r.created_at) > NIGHTLY_ANCESTOR_MAX_AGE_MS) continue;
+        try { git('merge-base', '--is-ancestor', r.head_sha, sha); } catch { continue; }
+        return r;
+    }
+    return null;
+}
 /** The line in an annotated tag's message that names the reason. */
 const TAG_REASON_LINE = /^Red-Nightly:[ \t]*(.+)$/im;
 
@@ -135,6 +157,17 @@ async function main() {
         const done = runs.filter(r => r.status === 'completed');
         const green = done.find(r => r.conclusion === 'success');
         if (green) { console.log(`  ✓ ${workflow}: green (${green.html_url})`); continue; }
+        if (NIGHTLY_WORKFLOWS.includes(workflow)) {
+            let earlier = null;
+            try { earlier = await recentAncestorNightly(slug, workflow, sha); } catch { /* the exact-commit answer below decides */ }
+            if (earlier) {
+                const between = git('log', '--format=%h %s', `${earlier.head_sha}..${sha}`).split('\n').filter(Boolean);
+                console.log(`  ✓ ${workflow}: green on the earlier commit ${earlier.head_sha.slice(0, 9)} at ${earlier.created_at} (${earlier.html_url}); `
+                    + `${between.length} commit(s) since, each with CI on main:`);
+                for (const line of between) console.log(`      ${line}`);
+                continue;
+            }
+        }
         const running = runs.find(r => r.status !== 'completed');
         const red = done[0];
         const into = NIGHTLY_WORKFLOWS.includes(workflow) ? nightly : problems;
