@@ -18,6 +18,8 @@
  * @structure zodShapeFor(name) · fieldSchema(field)
  * @usage mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), zodShapeFor('aimeat_board_post'), annotationsFor('aimeat_board_post'), handler)
  * @version-history
+ *   v1.1.0 — 2026-10-20 — A tool's shape is built once and frozen, because a 2026-07-28 request
+ *     builds a server per request (MCP SDK v2 migration, plan item 5).
  *   v1.0.1 — 2026-10-05 — A field that is not required gets `.optional()` unless its schema is
  *     optional on input already (a default). `z.unknown()` takes undefined, and the earlier test on
  *     that let a JSON Schema reader see the field as required.
@@ -80,11 +82,19 @@ export function fieldSchema(field: ToolInputField): z.ZodType {
 }
 
 /** The input shape of a catalog tool, for `mcp.tool(name, description, shape, …)`. Throws when the catalog lacks it. */
+// One shape per tool for the life of the process. A 2026-07-28 request builds a whole server, so
+// without this every request built about 360 shapes again (decision 2026-10-20, MCP migration plan
+// item 5). Frozen, because every server shares the one object: a caller adds fields by spreading it.
+const shapes = new Map<string, Readonly<Record<string, z.ZodType>>>();
+
 export function zodShapeFor<N extends string>(name: N): ToolShape<N> {
+    const known = shapes.get(name);
+    if (known) return known as ToolShape<N>;
     const def = getAimeatToolDefinition(name);
     if (!def) throw new Error(`Missing tool definition for "${name}" in src/tool-catalog/definitions/: the catalog is the input schema of both MCP surfaces.`);
     const shape: Record<string, z.ZodType> = {};
     for (const [key, field] of Object.entries(def.input)) shape[key] = fieldSchema(field);
     if (def.supportsResponseFormat) shape.response_format = responseFormatSchema;
+    shapes.set(name, Object.freeze(shape));
     return shape as ToolShape<N>;
 }

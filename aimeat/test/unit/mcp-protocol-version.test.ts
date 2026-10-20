@@ -2,17 +2,20 @@
  * @file test/unit/mcp-protocol-version.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The MCP revision the node's server card states is the revision its MCP server
- *   negotiates, on the real routers over in-memory SQLite.
+ * @description The MCP revisions the node's server card states are the revisions its MCP endpoint
+ *   serves, on the real routers over in-memory SQLite.
  *
  *   Both cards (the node's, routes/wellknown.ts, and an app origin's, routes/subdomain-origin-docs.ts)
- *   read MCP_PROTOCOL_VERSION (src/mcp/protocol-version.ts), a literal because
- *   `pnpm check:protocol-versions` reads it out of the source. This test binds that literal to the
- *   SDK's LATEST_PROTOCOL_VERSION, and the node card's answer to what `initialize` really answers, so
- *   an SDK upgrade that moves the revision fails here on the day of the upgrade. Until 2026-10-19 the
- *   cards said 2025-06-18 while SDK 1.31.0 negotiated 2025-11-25.
+ *   read MCP_PROTOCOL_VERSION and MCP_SERVED_REVISIONS (src/mcp/protocol-version.ts), a literal
+ *   because `pnpm check:protocol-versions` reads it out of the source. This test binds that literal
+ *   to what server/discover names on the 2026-07-28 code path, and the list to that plus what
+ *   `initialize` negotiates on the session path, so an SDK upgrade that moves either fails here on
+ *   the day of the upgrade. Until 2026-10-19 the cards said 2025-06-18 while SDK 1.31.0 negotiated
+ *   2025-11-25.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-protocol-version.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-20 — Bound to server/discover (2026-07-28) and initialize (2025-era) both, and
+ *     the cards' supportedProtocolVersions (MCP SDK v2 migration step 8).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-19 — Initial (wish-mcp-2026-07-28-ja-sdk-v2-siirtym-suunnitelma-palvelinkortin-,
  *     the server-card half).
@@ -21,7 +24,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/server';
+import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
@@ -33,7 +36,7 @@ import { setThisNodeId } from '../../src/utils/gaii.js';
 import { requestIdMiddleware } from '../../src/middleware/request-id.js';
 import { wellknownRouter } from '../../src/routes/wellknown.js';
 import { mcpRouter } from '../../src/mcp/index.js';
-import { MCP_PROTOCOL_VERSION } from '../../src/mcp/protocol-version.js';
+import { MCP_PROTOCOL_VERSION, MCP_SERVED_REVISIONS } from '../../src/mcp/protocol-version.js';
 
 const NODE_ID = 'aimeat-mcp-protocol-version-test';
 const OWNER = 'pvowner';
@@ -106,17 +109,42 @@ afterAll(async () => {
     setThisNodeId(null);
 });
 
+/** The revisions server/discover names on the 2026-07-28 code path. */
+async function discovered(): Promise<string[]> {
+    const res = await fetch(`${base}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${agentToken}`,
+            'MCP-Protocol-Version': MCP_PROTOCOL_VERSION, 'Mcp-Method': 'server/discover',
+        },
+        body: JSON.stringify({
+            jsonrpc: '2.0', id: 1, method: 'server/discover',
+            params: { _meta: { 'io.modelcontextprotocol/protocolVersion': MCP_PROTOCOL_VERSION, 'io.modelcontextprotocol/clientCapabilities': {} } },
+        }),
+    });
+    const json = await res.json() as { result?: { supportedVersions?: string[] } };
+    if (!json.result?.supportedVersions) throw new Error(`server/discover answered ${res.status}: ${JSON.stringify(json).slice(0, 300)}`);
+    return json.result.supportedVersions;
+}
+
 describe('the MCP revision on the server card', () => {
-    it('is the SDK\'s latest revision, the one the declaration literal holds', () => {
-        expect(MCP_PROTOCOL_VERSION).toBe(LATEST_PROTOCOL_VERSION);
+    it('is the highest revision server/discover names, the one the declaration literal holds', async () => {
+        const modern = await discovered();
+        expect(modern).toContain(MCP_PROTOCOL_VERSION);
+        expect([...modern].sort().at(-1)).toBe(MCP_PROTOCOL_VERSION);
     });
 
-    it('is what initialize negotiates for a client that asks for the newest revision or one the server does not know', async () => {
-        const highest = await negotiated('2099-01-01');
-        expect(await negotiated(LATEST_PROTOCOL_VERSION)).toBe(highest);
+    it('lists every served revision: the 2026-07-28 path and what initialize negotiates on the session path', async () => {
+        const highestSession = await negotiated('2099-01-01');
+        expect(highestSession).toBe(LATEST_PROTOCOL_VERSION);
+        expect(await negotiated('2025-03-26')).toBe('2025-03-26');
+        expect(MCP_SERVED_REVISIONS[0]).toBe(MCP_PROTOCOL_VERSION);
+        expect(MCP_SERVED_REVISIONS).toEqual(expect.arrayContaining([...(await discovered()), ...SUPPORTED_PROTOCOL_VERSIONS]));
         for (const path of ['/.well-known/mcp.json', '/.well-known/mcp/server-card.json']) {
-            const card = await (await fetch(`${base}${path}`)).json() as { protocolVersion?: string };
-            expect(card.protocolVersion, path).toBe(highest);
+            const card = await (await fetch(`${base}${path}`)).json() as { protocolVersion?: string; supportedProtocolVersions?: string[] };
+            expect(card.protocolVersion, path).toBe(MCP_PROTOCOL_VERSION);
+            expect(card.supportedProtocolVersions, path).toEqual([...MCP_SERVED_REVISIONS]);
+            expect(card.supportedProtocolVersions, path).toContain(highestSession);
         }
     });
 });
