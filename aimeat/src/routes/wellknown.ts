@@ -16,6 +16,8 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.12.0 — 2026-10-20 — The MCP server card states 2026-07-28 and lists every revision the node
+ *     serves in supportedProtocolVersions (MCP SDK v2 migration step 8, plan item 9).
  *   v1.11.2 — 2026-10-19 — The MCP server card states the revision the node negotiates (MCP_PROTOCOL_VERSION,
  *     src/mcp/protocol-version.ts, held to the SDK), 2025-11-25; it said 2025-06-18
  *     (wish-mcp-2026-07-28-ja-sdk-v2-siirtym-suunnitelma-palvelinkortin-).
@@ -61,7 +63,7 @@ import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { getSoftwareVersion } from '../utils/version.js';
-import { MCP_PROTOCOL_VERSION } from '../mcp/protocol-version.js';
+import { MCP_PROTOCOL_VERSION, MCP_SERVED_REVISIONS } from '../mcp/protocol-version.js';
 import { moneyPaymentHandlers } from '../commerce/protocol-money.js';
 import { businessProfile } from '../services/ucp/business-profile.js';
 import { coreDiscoveryFields } from '../services/core-discovery.js';
@@ -188,8 +190,9 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       name: `io.aimeat/${config.nodeId}`,
       description,
       version: getSoftwareVersion(),
-      // The revision the MCP server negotiates at most (src/mcp/protocol-version.ts).
+      // The highest revision the MCP endpoint serves, and every revision it serves (src/mcp/protocol-version.ts).
       protocolVersion: MCP_PROTOCOL_VERSION,
+      supportedProtocolVersions: MCP_SERVED_REVISIONS,
       serverInfo: {
         // Matches what the MCP server itself reports on initialize (src/mcp/index.ts)
         name: `AIMEAT Node ${config.nodeId}`,

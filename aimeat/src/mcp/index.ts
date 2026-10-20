@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-20 — The 2026-07-28 code path (mcp/modern-endpoint.ts) beside the sessions, routed by era
+ *     per request and counted in mcp_requests_total; the guidance and support-route reads moved to
+ *     services/mcp-build-inputs.ts, cached for the modern path only (SDK v2 migration step 5, plan item 5).
  *   2026-10-20 — The 2025-era session code (the session maps, the idle sweep, the session half of the
  *     POST handler, GET and DELETE) moved to mcp/legacy-sessions.ts unchanged (pure extraction, so the
  *     2026-07-28 path fits beside it; SDK v2 migration step 5).
@@ -154,7 +157,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
-import { resolveSupportRoute } from '../services/message-alias.js';
 // Every tool group, in one list this file no longer keeps: mcp/register-all.ts.
 import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
@@ -166,7 +168,7 @@ import { askableTool, staleGrantRefusal } from './permission-ask-gate.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
-import { proactiveGuidance } from '../services/proactive-mode.js';
+import { readBuildInputs } from '../services/mcp-build-inputs.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { mcpAudienceRefusal } from './oauth-binding.js';
@@ -179,12 +181,14 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { mcpRequestAuthority, withRequestPermission } from './request-authority.js';
 import { legacySessions } from './legacy-sessions.js';
+import { modernEndpoint, isModernRequest } from './modern-endpoint.js';
+import { getStats } from '../services/stats.js';
 
 // ── Resource change event bus ──
 // Lives in resource-events.ts, a leaf, so a service can notify an agent without importing the
 // registry this file assembles (which imports the service back: a cycle). Re-exported here so
 // every existing importer keeps working; new code imports the leaf.
-import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
+import { emitResourceUpdated, emitResourceListChanged, resourceEvents, type ResourceChangeEvent } from './resource-events.js';
 import { answerMovedTools } from './moved-tools-answer.js';
 import { treatNullAsAbsent } from './null-as-absent.js';
 export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
@@ -195,6 +199,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     const authority = mcpRequestAuthority();
     // The 2025-era session code (mcp/legacy-sessions.ts): one transport and one server per session.
     const legacy = legacySessions({ config, storage, authority, authenticate, createMcpServer });
+    // The 2026-07-28 code path (mcp/modern-endpoint.ts): stateless, one server per request, built by
+    // the same createMcpServer inside the same request authority.
+    const modern = modernEndpoint({
+        config, storage,
+        run: (token, verified, operation) => authority.run(token, verified, operation),
+        build: (agentGaii, role, owner) => createMcpServer(agentGaii, authority.scopes, role, authority.token, owner, true),
+    });
+    // Change events reach the open 2026-07-28 listen streams too (a 2025 session hears them in core.ts).
+    resourceEvents.on('tool:listChanged', () => modern.notify.toolsChanged());
+    resourceEvents.on('resource:listChanged', () => modern.notify.resourcesChanged());
+    resourceEvents.on('resource:updated', (evt: ResourceChangeEvent) => modern.notify.resourceUpdated(evt.uri));
 
     async function authenticate(req: Request, res: Response): Promise<VerifiedToken | null> {
         const header = req.headers.authorization;
@@ -237,21 +252,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         role: SurfaceRole | 'all' = 'all',
         getToken: () => string | undefined = () => undefined,
         owner?: string,
+        cachedInputs = false,
     ): Promise<McpServer> {
-        // What this account chose about being offered things it did not ask for. Read here because
-        // the handshake is the one moment every client passes through, and never allowed to fail a
-        // connection: proactiveGuidance() answers null on any trouble.
-        const guidance = await proactiveGuidance(storage, config, owner);
-        // Who answers support here. Read from the stored peer rows because this layer has no peer
-        // map, and through the SAME resolver the send path uses, so the sentence an agent is told
-        // and the address its message actually takes cannot disagree. Never fails a connection: an
-        // unreadable peer list means the instructions say what they always said.
-        const supportAnsweredBy = await storage.listFederationPeers()
-            .then(rows => {
-                const route = resolveSupportRoute(rows);
-                return route.kind === 'upstream' ? route.nodeId : null;
-            })
-            .catch(err => { logger.warn('mcp: support routing unread, instructions unchanged', { error: String(err) }); return null; });
+        // What this account chose about being offered things it did not ask for, and who answers
+        // support here. Read when the server is built, because that is the one moment every client
+        // passes through, and never allowed to fail a connection (services/mcp-build-inputs.ts). A 2026-07-28
+        // request builds a server per request and reads both through a short cache.
+        const { guidance, supportAnsweredBy } = await readBuildInputs(storage, config, owner, cachedInputs);
         // An agent's person can allow a missing permission with one press; an owner, an app and an
         // ecosystem app have no such page (services/permission-ask.ts).
         const mayAsk = config.mcpEnforceScopes && !agentGaii.startsWith('eco:') && parseGaiiLoose(agentGaii).agent !== '';
@@ -457,6 +464,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const verified = await authenticate(req, res);
         if (res.headersSent) return;
 
+        // The protocol era decides the code path. The count is what the later decision about the 2025
+        // era reads (decision 2026-10-20, item 2): mcp_requests_total:legacy and :modern on the stats page.
+        const modernEra = await isModernRequest(req);
+        getStats()?.incrementTyped('mcp_requests_total', modernEra ? 'modern' : 'legacy');
+        if (modernEra) {
+            await modern.serve(req, res, verified, token, serverRole);
+            return;
+        }
         await legacy.servePost(req, res, verified, token, serverRole);
     };
 

@@ -33,6 +33,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-20 — The teardown drops the fake far sides' open connections before closing them; the run
+ *     hung there on Postgres while the node's SDK v2 client still held a stream open.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Phase 5e, on a recording far side of its own: another owner's `mcp` capability is
  *     refused on the direct, WebMCP, MCP-twin and checkout paths and the far side logs no call, an
@@ -2032,6 +2034,10 @@ await test('detach removes it, and the call path goes with it', async () => {
 // ─── Done ───
 for (const t of upstreamTransports.values()) await t.close();
 for (const t of victimTransports.values()) await t.close();
+// close() waits for every open connection, and the node's MCP client may still hold a stream open to
+// a far side (SDK v2 keeps one per pooled session), so the run hung here on Postgres. The far sides
+// are this suite's own fakes: drop their connections first.
+for (const s of [upstream, oauthUpstream, victimUpstream]) s.closeAllConnections();
 await new Promise<void>((r) => upstream.close(() => r()));
 await new Promise<void>((r) => oauthUpstream.close(() => r()));
 await new Promise<void>((r) => victimUpstream.close(() => r()));

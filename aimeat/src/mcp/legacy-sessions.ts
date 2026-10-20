@@ -16,6 +16,9 @@
  *   const legacy = legacySessions({ config, storage, authority, authenticate, createMcpServer });
  *   await legacy.servePost(req, res, verified, token, serverRole);
  * @version-history
+ *   v1.1.0 — 2026-10-20 — The agent admission and the first-contact records come from
+ *     services/mcp-agent-admission.ts, and the answer to a request without a token from
+ *     mcp/unauthenticated-answer.ts, both shared with the 2026-07-28 path. Same answers, same writes.
  *   v1.0.0 — 2026-10-20 — Extracted from mcp/index.ts. No behaviour change.
  */
 import type { Request, Response } from 'express';
@@ -23,13 +26,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
-import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
+import { touchChatInstance } from '../services/chat-instance-write.js';
 import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
+import { admitMcpAgent, recordMcpContact } from '../services/mcp-agent-admission.js';
+import { answerWithoutToken } from './unauthenticated-answer.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import { sameMcpPrincipal, type mcpRequestAuthority } from './request-authority.js';
 import { mcpSessionPlatform } from './session-platform.js';
@@ -152,40 +156,8 @@ export function legacySessions(deps: LegacySessionDeps) {
         const mcpClientName = verified?.mcp_client;
 
         if (!agentGaii) {
-            // ONE QUESTION A STRANGER MAY ASK WITHOUT AN ACCOUNT: what can you do?
-            //
-            // A foreign agent arriving with nothing but the hostname could not learn a single
-            // capability without first getting a credential, which is the wrong way round — you
-            // decide whether to ask for an account by knowing what the account is for. `tools/list`
-            // answers with names, descriptions and input shapes: the contract, which openapi.json
-            // already publishes. No data, no session, no identity, and `tools/call` still 401s.
-            //
-            // `initialize` is DELIBERATELY NOT ANSWERED HERE, and the temptation is real because an
-            // agent-readiness scanner probes exactly that. Every real MCP client initializes first
-            // and relies on this 401 plus its WWW-Authenticate header to find the OAuth flow (MCP
-            // spec §5.3); answering 200 with no session would send Claude, Cursor and the rest past
-            // the only signpost they have and fail them one call later, on a route where the
-            // failure would read as ours. A single unauthenticated `tools/list` is not a step any
-            // real client takes before initializing, so this branch cannot be reached by one.
-            const probe = Array.isArray(req.body) ? undefined : req.body as { method?: string; id?: unknown } | undefined;
-            if (probe?.method === 'tools/list') {
-                const { publicToolCatalogue } = await import('./public-catalogue.js');
-                res.json({ jsonrpc: '2.0', id: probe.id ?? null, result: { tools: publicToolCatalogue() } });
-                return;
-            }
-            // No token — challenge client to authenticate via OAuth (MCP spec §5.3)
-            // THE MCP RESOURCE'S OWN METADATA, not the origin's. RFC 9728 §3.3 has a client reject
-            // metadata whose `resource` is not the resource it is talking to, and the bare
-            // well-known URL describes the origin — so pointing a client that is protecting
-            // `/v1/mcp` at it handed them a document they are entitled to throw away.
-            const resourceMetadataUrl = `${config.baseUrl.replace(/\/+$/, '')}${MCP_RESOURCE_METADATA_PATH}`;
-            res.status(401)
-                .setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl}"`)
-                .json({
-                    jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Authentication required. MCP requires a GHII account. Use OAuth 2.1 to obtain an access token.' },
-                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
-                });
+            // The public catalogue for tools/list, else the OAuth challenge (mcp/unauthenticated-answer.ts).
+            await answerWithoutToken(req, res, config, 'legacy');
             return;
         }
 
@@ -197,70 +169,25 @@ export function legacySessions(deps: LegacySessionDeps) {
         let sessionAgentInfo: { gaii: string; platform: string } | undefined;
 
         {
-            const agent = await storage.getAgent(authenticatedGaii);
-            if (!agent) {
-                res.status(401).json({
+            // A known agent, a real owner, a GHII account (services/mcp-agent-admission.ts, shared
+            // with the 2026-07-28 path).
+            const admitted = await admitMcpAgent(storage, authenticatedGaii);
+            if (!admitted.ok) {
+                res.status(admitted.status).json({
                     jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Agent not found. Connect it first through device authorization (POST /v1/agents/device-authorize), which your owner approves.' },
+                    error: { code: admitted.code, message: admitted.message },
                     id: req.body?.id ?? null,
                 });
                 return;
             }
-            const owner = await storage.getOwner(agent.owner);
-            if (!owner) {
-                res.status(403).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32003, message: 'Agent has no valid owner profile. Owner approval required.' },
-                    id: req.body?.id ?? null,
-                });
-                return;
-            }
-
-            // GHII account is required for MCP access
-            const ghiiRecord = await storage.getGHIIByOwner(agent.owner);
-            if (!ghiiRecord) {
-                res.status(403).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32004, message: 'GHII account required for MCP access. Create one at /v1/ghii first.' },
-                    id: req.body?.id ?? null,
-                });
-                return;
-            }
-            sessionOwner = agent.owner;
+            sessionOwner = admitted.owner;
 
             // Upsert ChatInstanceRecord for session tracking
             // Prefer mcp_client from JWT (set during OAuth consent) over User-Agent sniffing
             const platform = mcpSessionPlatform(mcpClientName, req.headers['user-agent']);
-
-            // The id predates buildChatInstanceId and every session row in production is addressed
-            // by it, so it is passed explicitly rather than derived.
-            chatInstanceId = `mcp-${platform}#${sessionOwner}@${config.nodeId}`;
-            try {
-                const out = await registerChatInstance(
-                    { storage, config },
-                    { ownerName: sessionOwner, agentGaii: authenticatedGaii },
-                    { platform, appName: `mcp-${platform}`, id: chatInstanceId },
-                );
-                if (!out.ok) {
-                    logger.warn('Failed to upsert ChatInstance for MCP session', { error: `${out.code}: ${out.message}` });
-                    chatInstanceId = undefined;
-                }
-            } catch (err) {
-                logger.warn('Failed to upsert ChatInstance for MCP session', { error: (err as Error).message });
-                chatInstanceId = undefined;
-            }
-
-            // Onboarding funnel: the owner's FIRST MCP session is the activation signal the
-            // rescue email keys off. Fire-and-forget; must never delay or break the session.
-            const { recordFirstMcpCall } = await import('../services/onboarding-funnel.js');
-            void recordFirstMcpCall(storage, config, sessionOwner, platform);
-
-            // The agent itself learns it was used over MCP, from which tool, and when. The session
-            // row above is per TOOL and keeps the first agent that ever opened it; this is the
-            // per-agent truth the MCP page lists. Forced: the session's first request is the one
-            // that carries a client name worth recording, whatever the throttle says.
+            // The chat-instance row, the onboarding signal and the agent's MCP-use mark, once per session.
+            chatInstanceId = await recordMcpContact({ storage, config }, { gaii: authenticatedGaii, owner: sessionOwner, platform });
             sessionAgentInfo = { gaii: authenticatedGaii, platform };
-            void markAgentMcpUse(storage, authenticatedGaii, platform, { force: true });
         }
 
         // Create transport and MCP server for this session
