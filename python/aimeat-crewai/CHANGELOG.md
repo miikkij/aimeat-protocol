@@ -3,6 +3,13 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.36.1 - 2026-10-20
+
+- **`sse_params()` points at a path the node serves.** Its default path was `/v1/mcp/sse`, which
+  the node never served, so a crew built with it could not connect. The default is now `/v1/mcp`.
+  The node serves MCP over Streamable HTTP and has no separate SSE endpoint: to reach a node, use
+  `http_params()`; `sse_params()` is for an SSE bridge you run in front of one.
+
 ## 0.36.0 - 2026-10-19
 
 - **`build_offer()` asks for a `deliverable`, as the node does.** The node refuses an offer without

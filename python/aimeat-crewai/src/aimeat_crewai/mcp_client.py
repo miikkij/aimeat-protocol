@@ -17,7 +17,8 @@ AIMEAT exposes the same tool surface through two MCP transports:
    container without local AIMEAT install).
 
 3. **SSE** -- legacy MCP transport using Server-Sent Events. Same auth as
-   HTTP. Use only if your runtime requires it; Streamable HTTP is preferred.
+   HTTP. The node itself does not serve it (it serves Streamable HTTP at
+   `/v1/mcp`), so `sse_params()` is only for an SSE bridge in front of a node.
 
 4. **serve (loopback HTTP)** -- attach to the long-lived `aimeat connect serve
    --http` daemon on 127.0.0.1 via its discovery file (`serve.json`),
@@ -196,14 +197,17 @@ def sse_params(
     *,
     node_url: str,
     agent_token: str,
-    mcp_path: str = "/v1/mcp/sse",
+    mcp_path: str = "/v1/mcp",
 ) -> dict[str, Any]:
     """
-    Build an SSE MCP server-params dict. Use only when Streamable-HTTP is
-    not supported by your runtime; otherwise prefer `http_params()`.
+    Build an SSE MCP server-params dict. Use `http_params()` to reach an
+    AIMEAT node: the node serves MCP over Streamable HTTP at `/v1/mcp` and has
+    no separate SSE endpoint, so this builder is for an SSE bridge you run in
+    front of it.
 
     See `http_params()` for argument semantics. The only difference is the
-    transport identifier and the default `mcp_path`.
+    transport identifier. The default `mcp_path` is the node's one MCP path;
+    until 0.36.1 it was `/v1/mcp/sse`, a path the node never served.
     """
     base = node_url.rstrip("/")
     return {
