@@ -40,6 +40,8 @@
  *   - McpPrice / normalizeMcpPrice — what a call costs, in money only, and the one check every door uses
  * @usage import type { McpServerRecord } from '../models/mcp-server-schemas.js';
  * @version-history
+ *   v1.2.0 — 2026-10-20 — McpServerCredential carries the issuing authorization server (oauthIssuer,
+ *     oauthClient.issuer), the stamp the MCP SDK v2 puts on tokens and client registrations.
  *   v1.1.0 — 2026-09-16 — McpPrice is money only. Morsels are a pacer and buy nothing; a morsel price
  *     is refused on every door through normalizeMcpPrice.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy: registry, client and gateway.
@@ -195,7 +197,13 @@ export interface McpServerCredential {
    * and it is as secret as the token it sits next to. Two rows that can disagree is how a
    * connection authorises fine and then dies on its first renewal.
    */
-  oauthClient?: { client_id: string; client_secret?: string };
+  oauthClient?: { client_id: string; client_secret?: string; issuer?: string };
+  /**
+   * oauth2 only: the authorization server that issued these tokens (its `issuer`), as the MCP SDK
+   * stamped it (SEP-2352). Round-tripped verbatim, so a renewal refuses a token or a client that
+   * another authorization server would be asked to honour.
+   */
+  oauthIssuer?: string;
 }
 
 /**

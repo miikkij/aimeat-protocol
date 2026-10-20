@@ -33,9 +33,10 @@
  *   const faulted = withToolFault(withErrorNextStep(noticed), { storage, config, principal });
  *   } catch (err) { return withCaughtError(fail(`Failed to publish app: ${(err as Error).message}`), err); }
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-16 — Initial (QA audit E1-01, D2-01, F5-02, E2-02, E5-01).
  */
-import { McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ProtocolError } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -127,7 +128,7 @@ export function withToolFault(register: AnyFn, deps: ToolFaultDeps): AnyFn {
       try {
         result = await (handler as AnyFn)(...handlerArgs) as ToolResult | undefined;
       } catch (err) {
-        if (err instanceof McpError) throw err;
+        if (err instanceof ProtocolError) throw err;
         const authored = authoredErrorOf(err);
         if (authored) return { content: [{ type: 'text', text: `${authored.code}: ${redactCredentialText(authored.message)}` }], isError: true };
         return faultAnswer(deps, name, err);

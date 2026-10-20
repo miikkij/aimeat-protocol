@@ -4,8 +4,9 @@
  *   of the Connector Forward Tunnel). Holds ONE persistent tunnel WS per agent
  *   to its AIMEAT node and exposes everything a local crew needs on
  *   `127.0.0.1:<ephemeral>`:
- *     - `/v1/mcp` — local Streamable-HTTP MCP endpoint (fresh McpServer per
- *       session, same tool surface as stdio serve). Every route, this one too,
+ *     - `/v1/mcp` — local Streamable-HTTP MCP endpoint (./local-mcp.ts: a fresh
+ *       McpServer per 2025 session or per 2026-07-28 request, same tool surface
+ *       as stdio serve). Every route, this one too,
  *       sits behind ./local-admission.ts: loopback Host, no Origin, the secret.
  *     - `ALL /v1/*` — REST proxy: method/path/query/body forwarded over the
  *       agent's tunnel (`X-Aimeat-Agent` header picks the agent; defaults to
@@ -34,6 +35,9 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-20 -- The local MCP routes moved to ./local-mcp.ts unchanged, where a 2026-07-28 request
+ *     is served statelessly beside the 2025 sessions (MCP SDK v2 migration step 10).
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-12 -- `GET /local/departed` (./local-departed.ts): who left on the node's word, and why. An identity the node refuses is not counted as carried.
  *   2026-10-11 -- An agent the node says was DELETED is removed from this home too (key, token and
  *     config), on the same word from the node as a moved one. It stayed listed, with its key on disk.
@@ -139,11 +143,8 @@
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
-import { randomBytes } from 'node:crypto';
 import { existsSync, unlinkSync } from 'node:fs';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { ConnectTunnelClient, type TunnelIdentity } from '../tunnel-client.js';
 import { TunnelHub, statusOfIdentity, principalRow, rehome } from './tunnel-hub.js';
 import { resolveToken, forgetCachedToken } from '../agent-key.js';
@@ -157,6 +158,7 @@ import { displayName } from '../agent-registry.js';
 import { startPollerForAgent } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
 import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
+import { registerLocalMcp } from './local-mcp.js';
 import { pollWaitMs, refuseUnknownAgent } from './local-poll-guard.js';
 import { DaemonStats, registerLocalStats } from './local-stats.js';
 import { admitLoopbackCaller, newLoopbackSecret } from './local-admission.js';
@@ -443,8 +445,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const app = express();
   app.use(admitLoopbackCaller(secret));
   app.use(express.json({ limit: '25mb' }));
-  const transports = new Map<string, StreamableHTTPServerTransport>();
-  registerLocalStats(app, stats, { startedAt, agents: () => registry.list(), channel: g => channels.get(g), mcpSessions: () => transports.size });
+  registerLocalStats(app, stats, { startedAt, agents: () => registry.list(), channel: g => channels.get(g), mcpSessions: () => localMcp.sessions() });
 
   /**
    * Which identity this loopback call is for.
@@ -467,76 +468,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   // GET /local/invoke/next + POST /local/invoke/:id/result — the invoke surface (./local-invoke.ts).
   registerLocalInvokeRoutes(app, resolveAgent, invokeChannels);
 
-  // ── Local MCP (Streamable HTTP) — mirrors the node's session plumbing; admitted above ──
-
-  app.post('/v1/mcp', async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (sessionId && transports.has(sessionId)) {
-      await transports.get(sessionId)!.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
-      return;
-    }
-    if (sessionId) {
-      const body = req.body;
-      const method = Array.isArray(body) ? body[0]?.method : body?.method;
-      if (method !== 'initialize') {
-        res.status(404).json({
-          jsonrpc: '2.0',
-          error: { code: -32600, message: 'Session not found. Please re-initialize.' },
-          id: (Array.isArray(body) ? body[0]?.id : body?.id) ?? null,
-        });
-        return;
-      }
-    }
-    // WHO this session speaks as, decided here and refused here. The identifier comes from the
-    // same header every other loopback route reads, so a client that already names its agent needs
-    // no change; one that names none while several agents are loaded is told so at connect time,
-    // in the registry's own words, naming the candidates. Before this the same refusal arrived as
-    // an exception thrown inside a tool module's constructor and took the daemon with it.
-    let sessionAgent: RegisteredAgent;
-    try { sessionAgent = resolveAgent(req); }
-    catch (err) {
-      res.status(400).json({
-        jsonrpc: '2.0',
-        error: { code: -32001, message: `${(err as Error).message} Send it as X-Aimeat-Agent on this MCP session.` },
-        id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
-      });
-      return;
-    }
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => `local-${randomBytes(16).toString('hex')}`,
-    });
-    // One identity, so `resolve()` inside every tool module has exactly one answer and cannot
-    // refuse. The scoping IS an AgentRegistry, which is why no tool module changes.
-    const sessionRegistry = new AgentRegistry();
-    sessionRegistry.add(sessionAgent);
-    const mcp = buildMcp(sessionRegistry);
-    transport.onclose = () => {
-      if (transport.sessionId) transports.delete(transport.sessionId);
-    };
-    await mcp.connect(transport);
-    await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
-    if (transport.sessionId) transports.set(transport.sessionId, transport);
-  });
-
-  app.get('/v1/mcp', async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (!sessionId || !transports.has(sessionId)) {
-      res.status(400).json({ error: 'Missing or invalid mcp-session-id header' });
-      return;
-    }
-    await transports.get(sessionId)!.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse);
-  });
-
-  app.delete('/v1/mcp', async (req: Request, res: Response) => {
-    const sessionId = req.headers['mcp-session-id'] as string | undefined;
-    if (!sessionId || !transports.has(sessionId)) {
-      res.status(404).json({ error: 'Session not found' });
-      return;
-    }
-    await transports.get(sessionId)!.close();
-    transports.delete(sessionId);
-    res.status(200).json({ closed: true });
-  });
+  // ── Local MCP (Streamable HTTP): both MCP eras, admitted above (./local-mcp.ts) ──
+  const localMcp = registerLocalMcp(app, { resolveAgent, buildMcp });
 
   // ── Push surface: long-poll fed by deliver/backlog (realtime, no spin) ──
   app.get('/local/tasks/next', async (req: Request, res: Response) => {

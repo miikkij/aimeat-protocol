@@ -23,6 +23,8 @@
  *     which is what keeps the import between the two files one-directional)
  * @usage registerAppOriginDocs(router, config, storage, { resolveApp, isRestricted });
  * @version-history
+ *   v1.4.0 — 2026-10-20 — The app's MCP server card states 2026-07-28 and lists every revision the
+ *     node serves in supportedProtocolVersions (MCP SDK v2 migration step 8, plan item 9).
  *   v1.3.2 — 2026-10-19 — The app's MCP server card states the revision the node negotiates (MCP_PROTOCOL_VERSION,
  *     src/mcp/protocol-version.ts), 2025-11-25; it said 2025-06-18 (wish-mcp-2026-07-28-ja-sdk-v2-siirtym-suunnitelma-palvelinkortin-).
  *   v1.3.1 — 2026-10-08 — A legal page's label is decided for a public surface when served (it is served without the access code).
@@ -41,7 +43,7 @@ import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { appToolNames } from '../services/app-tool-names.js';
-import { MCP_PROTOCOL_VERSION } from '../mcp/protocol-version.js';
+import { MCP_PROTOCOL_VERSION, MCP_SERVED_REVISIONS } from '../mcp/protocol-version.js';
 import { buildAppAgentFace } from '../services/agent-face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
@@ -213,6 +215,7 @@ export function registerAppOriginDocs(
       // on a scanner that had been passing it — a card is read by whoever reads it, not by the
       // spec. Node card (wellknown.ts) carries both for the same reason.
       protocolVersion: MCP_PROTOCOL_VERSION,
+      supportedProtocolVersions: MCP_SERVED_REVISIONS,
       serverInfo: {
         name: `${app.ownerName}/${app.filename}`,
         title: app.manifest?.name ?? app.filename.replace(/\.[^.]+$/, ''),

@@ -6,6 +6,7 @@
  *   ToolInputField, AimeatToolDefinition) plus the shared `agentEverywhere` visibility constant.
  *   Consumed by definitions.ts and every extracted definitions/*.ts tool-group module.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.3.0 — 2026-10-13 — scopeEnforcedFrom may name the release per word (ToolScopeEnforcedFrom), so a
  *     tool can defer a word it adds while the word it already had stays enforced.
  *   v1.2.0 — 2026-10-12 — connectorOnly: the visibility of a tool on both connector interfaces and not
@@ -16,7 +17,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
 import type { z } from 'zod';
-import type { ToolAnnotations } from '@modelcontextprotocol/sdk/types.js';
+import type { ToolAnnotations } from '@modelcontextprotocol/server';
 
 export type ToolCallerType = 'agent' | 'owner' | 'operator' | 'public';
 

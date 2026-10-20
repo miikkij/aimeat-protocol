@@ -16,6 +16,8 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_operator_ai_config writes `openrouter.settings` on the version it read
  *     (expectedVersion) and merges into a write made in between, read again, so an agent's cap or a
  *     POST /v1/ai/settings at the same moment persists (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -56,7 +58,7 @@
  *     it for itself and confirm it in the next call (the confirm token binds to the caller, so the
  *     "show the owner" step is instruction text). Coverage now comes from utils/scope-coverage.ts.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
@@ -140,12 +142,14 @@ export function registerOperatorConfigTools(
     const err = (text: string) => ({ content: [{ type: 'text' as const, text }], isError: true });
     const ok = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_operator_agent_configure',
-        descriptionFor('aimeat_operator_agent_configure'),
-        // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
-        zodShapeFor('aimeat_operator_agent_configure'),
-        annotationsFor('aimeat_operator_agent_configure'),
+        {
+            description: descriptionFor('aimeat_operator_agent_configure'),
+            // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
+            inputSchema: zodShapeFor('aimeat_operator_agent_configure'),
+            annotations: annotationsFor('aimeat_operator_agent_configure'),
+        },
         async ({ agent_name, display_name, description, mode, tags, scopes, clearance, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
             // One target resolution, the writer's: a bare name becomes a GAII under the CALLER's
@@ -270,12 +274,14 @@ export function registerOperatorConfigTools(
         execution_model?: string;
     }
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_operator_ai_config',
-        descriptionFor('aimeat_operator_ai_config'),
-        // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
-        zodShapeFor('aimeat_operator_ai_config'),
-        annotationsFor('aimeat_operator_ai_config'),
+        {
+            description: descriptionFor('aimeat_operator_ai_config'),
+            // The catalog's schema, which carries the bounds this tool wrote (secaudit 2026-10 follow-up, Part B).
+            inputSchema: zodShapeFor('aimeat_operator_ai_config'),
+            annotations: annotationsFor('aimeat_operator_ai_config'),
+        },
         async ({ daily_budget_usd, model, reasoning_model, execution_model, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
             // This tool writes into the OWNER's namespace, and the platform decides that move in one

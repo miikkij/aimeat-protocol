@@ -10,10 +10,11 @@
  * @structure Registers connector-local handbook and skill bundle resources for MCP clients.
  * @usage Called by the `aimeat connect serve` MCP server.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.9.4 -- 2026-05-28 -- Update connector guidance to the integrated AIMEAT CLI command
  *   v2.0.0 -- 2026-05-29 -- Registry-driven (primary agent's handbook/bundle)
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AgentRegistry } from '../agent-registry.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -24,7 +25,7 @@ const MODULES = ['tasks', 'messages', 'work', 'services', 'memory', 'activity', 
 export function registerResources(mcp: McpServer, registry: AgentRegistry): void {
   const { client, agent } = registry.resolve();
 
-  mcp.resource(
+  mcp.registerResource(
     'handbook',
     'aimeat://handbook',
     { mimeType: 'application/json', description: 'Agent operating handbook' },
@@ -35,7 +36,7 @@ export function registerResources(mcp: McpServer, registry: AgentRegistry): void
   );
 
   for (const mod of MODULES) {
-    mcp.resource(
+    mcp.registerResource(
       `handbook-${mod}`,
       `aimeat://handbook/${mod}`,
       { mimeType: 'application/json', description: `Handbook module: ${mod}` },
@@ -46,7 +47,7 @@ export function registerResources(mcp: McpServer, registry: AgentRegistry): void
     );
   }
 
-  mcp.resource(
+  mcp.registerResource(
     'skill-bundle',
     'aimeat://skill-bundle',
     { mimeType: 'text/markdown', description: 'Cached SKILL.md from last download' },

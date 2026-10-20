@@ -24,8 +24,9 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
- *   2026-10-20 — registerContentTools (aimeat_content_facts, _inspect, _scan, _classes, _settings;
- *     wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   2026-10-21 — registerContentTools (aimeat_content_facts, _inspect, _correct, _scan, _classes,
+ *     _settings; wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-18 — registerSkillsTools and registerCortexTools receive the session's caller: the publish
  *     gate asks about it (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — registerCompanyTools and registerPortfolioTools receive the session caller, for the publish gate (V4).
@@ -89,7 +90,7 @@
  *   v1.0.0 — 2026-09-03 — Extracted from index.ts so the schema audit registers what the server
  *     registers instead of a hand-kept copy that had drifted to half.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';

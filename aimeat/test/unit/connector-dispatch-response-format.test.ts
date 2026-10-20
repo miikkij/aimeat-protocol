@@ -6,6 +6,7 @@
  *   handler ran, so an mp3 request came back as pcm (secaudit 2026-10 follow-up, Part B).
  * @usage pnpm test -- connector-dispatch-response-format
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   v1.1.0 — 2026-10-13 — The agent_name routing is proven with toll_morsels on every version. The 3.x
  *     name price_morsels is routed the same way below MORSEL_PRICE_FIELDS_REMOVED_IN, as before, and
  *     refused with MORSEL_PRICE_REMOVED from it, with nothing sent.
@@ -19,7 +20,7 @@ type Sent = { method: string; path: string; body?: unknown };
 
 function connector(sent: Sent[]) {
     const tools = new Map<string, (args: Record<string, unknown>) => Promise<unknown>>();
-    const mcp = { tool: (...args: unknown[]) => { tools.set(args[0] as string, args[args.length - 1] as never); } };
+    const mcp = { registerTool: (...args: unknown[]) => { tools.set(args[0] as string, args[args.length - 1] as never); } };
     const answer = async () => ({ ok: true, data: { items: [{ id: 'a', title: 't', extra: 'x' }] } });
     const client = {
         get: async (path: string) => { sent.push({ method: 'GET', path }); return answer(); },

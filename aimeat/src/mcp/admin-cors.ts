@@ -9,12 +9,14 @@
  * @structure registerAdminCorsTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminCorsTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.1.0 — 2026-09-24 — SECURITY (audit A8-1): the operator test asks the operator:admin word as
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.0.0 — 2026-09-08 — Initial: aimeat_admin_cors_overview, aimeat_admin_cors_set.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -37,16 +39,16 @@ export function registerAdminCorsTools(
   const agentGaii = getAgentGaii();
   const operatorName = () => resolveOperatorAgentName(storage, agentGaii, scopes);
 
-  mcp.tool('aimeat_admin_cors_overview', descriptionFor('aimeat_admin_cors_overview'),
-    zodShapeFor('aimeat_admin_cors_overview'), annotationsFor('aimeat_admin_cors_overview'),
+  mcp.registerTool('aimeat_admin_cors_overview', { description: descriptionFor('aimeat_admin_cors_overview'),
+    inputSchema: zodShapeFor('aimeat_admin_cors_overview'), annotations: annotationsFor('aimeat_admin_cors_overview') },
     async () => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       return text(await buildCorsOverview(config, storage));
     });
 
-  mcp.tool('aimeat_admin_cors_set', descriptionFor('aimeat_admin_cors_set'),
-    zodShapeFor('aimeat_admin_cors_set'),
-    annotationsFor('aimeat_admin_cors_set'),
+  mcp.registerTool('aimeat_admin_cors_set', { description: descriptionFor('aimeat_admin_cors_set'),
+    inputSchema: zodShapeFor('aimeat_admin_cors_set'),
+    annotations: annotationsFor('aimeat_admin_cors_set') },
     async ({ who, origins }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       const r = await setCorsList(storage, config, who, origins);

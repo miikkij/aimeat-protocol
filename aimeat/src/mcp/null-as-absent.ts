@@ -25,10 +25,13 @@
  * @structure treatNullAsAbsent · nullPathsRefused · withoutKeys
  * @usage treatNullAsAbsent(mcp) right after `new McpServer(...)`, before any tool is called.
  * @version-history
+ *   v1.1.0 — 2026-10-20 — On MCP SDK v2: the repair parses with the registered Zod object's own
+ *     safeParseAsync; the v1 zod-compat helpers are gone (SDK v2 migration step 4b).
+ *   v1.0.1 — 2026-10-20 — validateToolInput is wrapped through mcp/sdk-seams.ts.
  *   v1.0.0 — 2026-10-04 — Initial.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { normalizeObjectSchema, safeParseAsync, type AnySchema } from '@modelcontextprotocol/sdk/server/zod-compat.js';
+import type { McpServer } from '@modelcontextprotocol/server';
+import { wrapToolInputValidation } from './sdk-seams.js';
 
 /** How many rounds of removal before giving up. Each round removes every refused null it can see. */
 const MAX_ROUNDS = 8;
@@ -76,21 +79,22 @@ function holdsNull(v: unknown): boolean {
   return Object.values(v as Record<string, unknown>).some(holdsNull);
 }
 
-type Validate = (tool: { inputSchema?: unknown }, args: unknown, toolName: string) => Promise<unknown>;
-
 /** Read a refused null on an optional field as the field left out, for every tool on `mcp`. */
 export function treatNullAsAbsent(mcp: McpServer): void {
-  const server = mcp as unknown as { validateToolInput: Validate };
-  const original = server.validateToolInput.bind(mcp) as Validate;
-  server.validateToolInput = async (tool, args, toolName) => {
+  // The SDK has no public validation hook; mcp/sdk-seams.ts reaches validateToolInput.
+  wrapToolInputValidation(mcp, (original) => async (tool, args, toolName) => {
     try {
       return await original(tool, args, toolName);
     } catch (err) {
       if (!tool.inputSchema || !holdsNull(args)) throw err;
-      const schema = (normalizeObjectSchema(tool.inputSchema as AnySchema) ?? tool.inputSchema) as AnySchema;
+      // On SDK v2 the registered schema is a Zod object (a raw shape is wrapped with z.object at
+      // registration). Zod's own parse is asked, not the Standard Schema interface, because only
+      // Zod's issues carry the per-branch errors of a union, which nullPathsRefused walks.
+      const schema = tool.inputSchema as { safeParseAsync?: (v: unknown) => Promise<{ success: boolean; data?: unknown; error?: { issues?: Issue[] } }> };
+      if (typeof schema.safeParseAsync !== 'function') throw err;
       let repaired = args;
       for (let round = 0; round < MAX_ROUNDS; round++) {
-        const result = await safeParseAsync(schema, repaired);
+        const result = await schema.safeParseAsync(repaired);
         if (result.success) return result.data;
         const issues = ((result as { error?: { issues?: Issue[] } }).error?.issues) ?? [];
         const paths = nullPathsRefused(issues, repaired);
@@ -99,5 +103,5 @@ export function treatNullAsAbsent(mcp: McpServer): void {
       }
       throw err;
     }
-  };
+  });
 }

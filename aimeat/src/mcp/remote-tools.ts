@@ -25,12 +25,13 @@
  * @structure remoteToolName · splitRemoteToolName · registerRemoteTools
  * @usage await registerRemoteTools(mcp, { storage, config, agentGaii, scopes });
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-09-24 — Each call resolves the server row again through requireUsableServer, as
  *     the gateway does, so a server switched off, detached or re-credentialed mid-session is honoured.
  *   v1.0.0 — 2026-09-16 — Phase 3 of the MCP proxy.
  */
 import { z } from 'zod';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { MCP_TOOL_SEPARATOR, type McpServerRecord } from '../models/mcp-server-schemas.js';

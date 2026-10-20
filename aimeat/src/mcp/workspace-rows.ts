@@ -13,6 +13,8 @@
  * @structure registerWorkspaceRowTools(mcp, deps, caller)
  * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, scopes }, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The deps no longer carry ownerName.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-26 — Initial: extracted from mcp/workspaces.ts.
@@ -22,7 +24,7 @@
  *   v1.3.0 — 2026-10-13 — The row caller carries the session's scopes, which the fenced-space rule
  *     reads through the access rule (services/fenced-space.ts, ruled 2026-10-13).
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readerForAgent } from '../services/classification/reader.js';
@@ -76,9 +78,9 @@ export function registerWorkspaceRowTools(
         throw err;
     };
 
-    mcp.tool('aimeat_workspace_rows_append', descriptionFor('aimeat_workspace_rows_append'),
-        zodShapeFor('aimeat_workspace_rows_append'),
-        annotationsFor('aimeat_workspace_rows_append'),
+    mcp.registerTool('aimeat_workspace_rows_append', { description: descriptionFor('aimeat_workspace_rows_append'),
+        inputSchema: zodShapeFor('aimeat_workspace_rows_append'),
+        annotations: annotationsFor('aimeat_workspace_rows_append') },
         async ({ organism_id, ws, space, body, row_id, occurred_at, rows }): Promise<TextResult> => {
             try {
                 const list = Array.isArray(rows) && rows.length
@@ -91,9 +93,9 @@ export function registerWorkspaceRowTools(
             } catch (err) { return rowFail(err); }
         });
 
-    mcp.tool('aimeat_workspace_rows_read', descriptionFor('aimeat_workspace_rows_read'),
-        zodShapeFor('aimeat_workspace_rows_read'),
-        annotationsFor('aimeat_workspace_rows_read'),
+    mcp.registerTool('aimeat_workspace_rows_read', { description: descriptionFor('aimeat_workspace_rows_read'),
+        inputSchema: zodShapeFor('aimeat_workspace_rows_read'),
+        annotations: annotationsFor('aimeat_workspace_rows_read') },
         async ({ organism_id, ws, space, where, since, until, changed_since, limit, cursor, order }): Promise<TextResult> => {
             try {
                 const page = await readRows(rowDeps, rowCaller(), {
@@ -109,18 +111,18 @@ export function registerWorkspaceRowTools(
             } catch (err) { return rowFail(err); }
         });
 
-    mcp.tool('aimeat_workspace_rows_stats', descriptionFor('aimeat_workspace_rows_stats'),
-        zodShapeFor('aimeat_workspace_rows_stats'),
-        annotationsFor('aimeat_workspace_rows_stats'),
+    mcp.registerTool('aimeat_workspace_rows_stats', { description: descriptionFor('aimeat_workspace_rows_stats'),
+        inputSchema: zodShapeFor('aimeat_workspace_rows_stats'),
+        annotations: annotationsFor('aimeat_workspace_rows_stats') },
         async ({ organism_id, ws, space }): Promise<TextResult> => {
             try {
                 return ok({ stats: await spaceStats(rowDeps, rowCaller(), organism_id, ws, space) });
             } catch (err) { return rowFail(err); }
         });
 
-    mcp.tool('aimeat_workspace_rows_delete', descriptionFor('aimeat_workspace_rows_delete'),
-        zodShapeFor('aimeat_workspace_rows_delete'),
-        annotationsFor('aimeat_workspace_rows_delete'),
+    mcp.registerTool('aimeat_workspace_rows_delete', { description: descriptionFor('aimeat_workspace_rows_delete'),
+        inputSchema: zodShapeFor('aimeat_workspace_rows_delete'),
+        annotations: annotationsFor('aimeat_workspace_rows_delete') },
         async ({ organism_id, ws, space, row_id, before }): Promise<TextResult> => {
             // Exactly one, and neither defaults. A delete that quietly meant "everything" because a
             // parameter was forgotten is the shape this refusal exists to prevent.

@@ -11,6 +11,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-20 — The three work tools moved to mcp/core-work.ts (pure extraction, max-file-lines).
  *   2026-10-19 — aimeat_agent_profile and aimeat_agents_list carry `avatar` (and the profile `avatar_problem`), as GET /v1/agents/:gaii and GET /v1/agents do (services/agent-avatar.ts).
  *   2026-10-18 — aimeat_agents_list answers `invites_people` per agent, as GET /v1/agents does (services/agent-invites.ts).
  *   2026-10-18 — aimeat_memory_write without a visibility takes visibility.memory_default (plan V5.1).
@@ -149,9 +152,10 @@
  *     a person editing the same record. Optional. Reasoning: mcp/memory-version-lock.ts.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { registerMemoryBinTools } from './core-memory-bin.js';
 import { registerCoreBoardTools } from './core-boards.js';
+import { registerCoreWorkTools } from './core-work.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, ownerGhiiOf } from '../utils/gaii.js';
@@ -166,7 +170,7 @@ import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';
 import { listMemoryMetaFor } from '../services/memory-query.js';
-import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
+import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
 import { registerCoreAdminTools } from './core-admin.js';
@@ -192,7 +196,6 @@ import { createWorkItem, workErrorText } from '../routes/work.js';
 // Imported, not restated. The route ENFORCES this cap and this surface only announces it; the two
 // disagreeing is how a published number becomes a promise nobody keeps.
 import { MEMORY_LIST_MAX_LIMIT } from '../routes/memory/shared.js';
-import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 import { taskStartView, scopeUseLookup } from '../services/agent-task-start-write.js';
 import { stoppedView } from '../services/agent-stop-rules.js';
@@ -276,11 +279,13 @@ export function registerCoreTools(
     };
 
     // ── Tool 1: aimeat_catalogue_search ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_catalogue_search',
-        descriptionFor('aimeat_catalogue_search'),
-        zodShapeFor('aimeat_catalogue_search'),
-        annotationsFor('aimeat_catalogue_search'),
+        {
+            description: descriptionFor('aimeat_catalogue_search'),
+            inputSchema: zodShapeFor('aimeat_catalogue_search'),
+            annotations: annotationsFor('aimeat_catalogue_search'),
+        },
         async ({ search, category, response_format }) => {
             const actions = await storage.listActions({ search, category });
             const payload = actions.map(a => ({
@@ -306,11 +311,13 @@ export function registerCoreTools(
     ]);
     const discoverCsv = (v: string | undefined): string[] =>
         typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_discover',
-        descriptionFor('aimeat_discover'),
-        zodShapeFor('aimeat_discover'),
-        annotationsFor('aimeat_discover'),
+        {
+            description: descriptionFor('aimeat_discover'),
+            inputSchema: zodShapeFor('aimeat_discover'),
+            annotations: annotationsFor('aimeat_discover'),
+        },
         async ({ mode, q, type, tags, segment, scope, limit, response_format }) => {
             const parsed = parseGAII(agentGaii);
             const agent = await storage.getAgent(agentGaii);
@@ -492,14 +499,16 @@ export function registerCoreTools(
     registerMemoryBinTools(mcp, { storage, config }, caller);
 
     // ── Tool 4: aimeat_memory_write ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_memory_write',
-        descriptionFor('aimeat_memory_write'),
-        // The catalog's schema, the one the connector and the shell take too (secaudit 2026-10
-        // follow-up, Part B). Its visibility and tags have no default there, so they are given here,
-        // the same two POST /v1/memory gives.
-        zodShapeFor('aimeat_memory_write'),
-        annotationsFor('aimeat_memory_write'),
+        {
+            description: descriptionFor('aimeat_memory_write'),
+            // The catalog's schema, the one the connector and the shell take too (secaudit 2026-10
+            // follow-up, Part B). Its visibility and tags have no default there, so they are given here,
+            // the same two POST /v1/memory gives.
+            inputSchema: zodShapeFor('aimeat_memory_write'),
+            annotations: annotationsFor('aimeat_memory_write'),
+        },
         async ({ key, value, visibility: givenVisibility, group_id, tags: givenTags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
             // No visibility named: the node's starting level (plan V5.1), as POST /v1/memory.
             const visibility = givenVisibility ?? memoryVisibilityDefault(config);
@@ -644,11 +653,13 @@ export function registerCoreTools(
     );
 
     // ── Tool 6: aimeat_action_execute ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_action_execute',
-        descriptionFor('aimeat_action_execute'),
-        zodShapeFor('aimeat_action_execute'),
-        annotationsFor('aimeat_action_execute'),
+        {
+            description: descriptionFor('aimeat_action_execute'),
+            inputSchema: zodShapeFor('aimeat_action_execute'),
+            annotations: annotationsFor('aimeat_action_execute'),
+        },
         async ({ action_id, provider_gaii, input, ttl_hours }) => {
             // One implementation, called from both doors. This tool used to re-do the commission by
             // hand and got a thinner version of it: it never resolved the provider, so cross-node
@@ -685,65 +696,8 @@ export function registerCoreTools(
         },
     );
 
-    // ── Tool 7: aimeat_work_inbox ──
-    mcp.registerTool(
-        'aimeat_work_inbox',
-        { description: descriptionFor('aimeat_work_inbox'), inputSchema: zodShapeFor('aimeat_work_inbox'), outputSchema: genericListOutput, annotations: annotationsFor('aimeat_work_inbox') },
-        async ({ response_format }) => {
-            const items = await storage.listWorkByProvider(agentGaii);
-            const pending = items.filter(w => ['pending', 'accepted', 'in_progress'].includes(w.status));
-            return structuredResult('aimeat_work_inbox', response_format, pending.map(w => ({
-                tracking_code: w.trackingCode,
-                status: w.status,
-                action_id: w.actionId,
-                requester_gaii: w.requesterGaii,
-                cost: w.cost,
-                created_at: w.createdAt,
-            })));
-        },
-    );
-
-    // ── Tool 8: aimeat_work_accept ──
-    mcp.tool(
-        'aimeat_work_accept',
-        descriptionFor('aimeat_work_accept'),
-        zodShapeFor('aimeat_work_accept'),
-        annotationsFor('aimeat_work_accept'),
-        async ({ tracking_code }) => {
-            // ONE implementation (services/work-lifecycle.ts). This tool wrote the status itself and
-            // skipped the work→task bridge the HTTP door runs, so an agent that accepted its work
-            // over MCP, the door an agent actually uses, got no task to drive the job from.
-            const accepted = await acceptWork({ storage, config }, agentGaii, tracking_code);
-            if (!accepted.ok) {
-                return { content: [{ type: 'text' as const, text: `${accepted.code}: ${accepted.message}` }], isError: true };
-            }
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: accepted.work.status }, null, 2) }] };
-        },
-    );
-
-    // ── Tool 9: aimeat_work_deliver ──
-    mcp.tool(
-        'aimeat_work_deliver',
-        descriptionFor('aimeat_work_deliver'),
-        zodShapeFor('aimeat_work_deliver'),
-        annotationsFor('aimeat_work_deliver'),
-        async ({ tracking_code, output }) => {
-            // ONE implementation (services/work-lifecycle.ts). This tool settled and stored the
-            // output by hand, and that was all it did: the requester's callback_url was never
-            // called, so a delivery made over MCP left a requester who is not sitting on the node
-            // waiting, and neither post_settlement nor post_work_delivery ran, so an installed
-            // extension saw the HTTP deliveries and none of these.
-            const delivered = await deliverWork({ storage, config }, agentGaii, tracking_code, output);
-            if (!delivered.ok) {
-                return { content: [{ type: 'text' as const, text: `${delivered.code}: ${delivered.message}` }], isError: true };
-            }
-            // Wallet balance changed for both parties
-            emitResourceUpdated(agentGaii, `aimeat://wallet/${encodeURIComponent(agentGaii)}`);
-            emitResourceUpdated(delivered.work.requesterGaii, `aimeat://wallet/${encodeURIComponent(delivered.work.requesterGaii)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: delivered.work.status,
-                ...(await writeProvenanceEcho(storage, config, delivered.work.aiProvenanceId)) }, null, 2) }] };
-        },
-    );
+    // ── Work Tools (inbox/accept/deliver) — extracted to ./core-work.ts ──
+    registerCoreWorkTools(mcp, { storage, config, agentGaii, emitResourceUpdated });
 
     // ── Tool 10: aimeat_wallet_balance ──
     mcp.registerTool(

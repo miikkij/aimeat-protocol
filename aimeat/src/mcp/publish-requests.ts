@@ -16,9 +16,11 @@
  * @structure registerPublishRequestTools(mcp, storage, config, caller)
  * @usage registerPublishRequestTools(mcp, storage, config, caller);  // register-all.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -36,7 +38,7 @@ export function registerPublishRequestTools(
   config: AimeatConfig,
   caller: () => CallerContext,
 ): void {
-  mcp.tool('aimeat_publish_requests', descriptionFor('aimeat_publish_requests'), zodShapeFor('aimeat_publish_requests'), annotationsFor('aimeat_publish_requests'), async ({ request_id, decision }) => {
+  mcp.registerTool('aimeat_publish_requests', { description: descriptionFor('aimeat_publish_requests'), inputSchema: zodShapeFor('aimeat_publish_requests'), annotations: annotationsFor('aimeat_publish_requests') }, async ({ request_id, decision }) => {
     // The owner the session acts for comes from its identity, never from input.
     const who = { caller: caller() };
     const ctx = { storage, config };

@@ -28,11 +28,12 @@
  *   registers: Stripe's id for the UCP card, and a kept-card handler for the renewal.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-path-races
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-18 — Initial (wish-rahapolkujen-kilpatilanteet-kaksoismyynti-peruutus-ja-tilin-).
  */
 import { randomBytes } from 'node:crypto';
 import type { Server } from 'node:http';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { registerPaymentHandler } from '../src/commerce/payment-handlers.js';
@@ -174,7 +175,7 @@ await test('Two deliveries of one work at once over REST: one settles, the other
 await test('Two deliveries of one work at once over MCP: one settles, the other is WORK_NOT_OPEN, the consumer pays once', async () => {
     const id = await startWork();
     const handlers: Record<string, (a: any) => Promise<any>> = {};
-    const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
+    const mock = { registerTool: (name: string, _config: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
     registerExchangeRunTools(mock, storage, config, () => provider.ghii, () => provider.token, ['exchange:write']);
     const before = await balance(consumer.token);
     const results = await Promise.all([1, 2].map(() => handlers.aimeat_exchange_work_deliver!({ work_id: id, output: { summary: 'Short.' } })));
@@ -188,7 +189,7 @@ await test('Two deliveries of one work at once over MCP: one settles, the other 
 await test('The consumer cannot deliver the provider\'s work over MCP, and nothing settles', async () => {
     const id = await startWork();
     const handlers: Record<string, (a: any) => Promise<any>> = {};
-    const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
+    const mock = { registerTool: (name: string, _config: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
     registerExchangeRunTools(mock, storage, config, () => consumer.ghii, () => consumer.token, ['exchange:write']);
     const before = await balance(consumer.token);
     const r = await handlers.aimeat_exchange_work_deliver!({ work_id: id, output: { summary: 'Mine.' } });

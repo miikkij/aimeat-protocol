@@ -9,14 +9,14 @@
  *   the word it needs, not "not found" (QA audit E1-01, D2-01, F5-02, E2-02, E5-01, E5-04).
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-tool-fault.test.ts
  * @version-history
+ *   2026-10-20 — On MCP SDK v2: tools register with registerTool, and an unknown tool rejects with -32602 as the spec has it (SDK v2 migration step 4b).
  *   2026-10-16 — Initial (QA audit E1-01, D2-01, F5-02, E2-02, E5-01, E5-04).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
 import winston from 'winston';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 
@@ -63,16 +63,16 @@ beforeAll(async () => {
     storage: {} as Storage,
     config: { nodeId: 'probe-node' } as unknown as AimeatConfig,
   };
-  const register = toolRegistrar(mcp.tool.bind(mcp) as (...a: unknown[]) => unknown, deps);
-  register('probe_throws', 'throws', {}, async () => { throw new Error(CANARY); });
-  register('probe_refuses', 'refuses', {}, async () => {
+  const register = toolRegistrar(mcp.registerTool.bind(mcp) as (...a: unknown[]) => unknown, deps);
+  register('probe_throws', { description: 'throws', inputSchema: {} }, async () => { throw new Error(CANARY); });
+  register('probe_refuses', { description: 'refuses', inputSchema: {} }, async () => {
     throw Object.assign(new Error('No record by that name.'), { code: 'NOT_FOUND', status: 404 });
   });
-  register('probe_caught_internal', 'caught', {}, async () => {
+  register('probe_caught_internal', { description: 'caught', inputSchema: {} }, async () => {
     try { (undefined as unknown as { x: () => void }).x(); return fail('unreachable'); }
     catch (err) { return withCaughtError(fail(`Failed to probe: ${(err as Error).message}`), err); }
   });
-  register('probe_caught_authored', 'caught', {}, async () => {
+  register('probe_caught_authored', { description: 'caught', inputSchema: {} }, async () => {
     const err = new Error('That name is already taken. Pick another.');
     return withCaughtError(fail(`Failed to publish app: ${err.message}`), err);
   });
@@ -176,8 +176,8 @@ describe('a tool the session may not use', () => {
   });
 
   it('a tool that does not exist still answers not found', async () => {
-    const r = await call('aimeat_no_such_tool');
-    expect(r.isError).toBe(true);
-    expect(r.text).toMatch(/not found/i);
+    // On SDK v2 an unknown tool is a JSON-RPC error (-32602 InvalidParams), as the MCP spec has it,
+    // where v1 resolved a result with isError. The words still say not found.
+    await expect(call('aimeat_no_such_tool')).rejects.toMatchObject({ code: -32602, message: expect.stringMatching(/not found/i) });
   });
 });

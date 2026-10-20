@@ -20,6 +20,8 @@
  * @structure registerDispatchTools(mcp, registry, registered)
  * @usage registerDispatchTools(mcp, registry, namesTheModulesRegistered)
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.1.0 — 2026-10-06 — `response_format` is taken as the view only on a tool whose catalog entry
  *     supports one; on any other it is the tool's own input and reaches its handler. aimeat_voice_speak
  *     names its audio format so, and would have lost an mp3 request when it moved here. The same for
@@ -27,7 +29,7 @@
  *     the routing choice (secaudit 2026-10 follow-up, Part B).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M3).
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { CONNECT_CLI_TOOLS } from '../../tool-call.js';
 import { getAimeatToolDefinition } from '../../../../tool-catalog/definitions.js';
@@ -52,7 +54,7 @@ export function registerDispatchTools(mcp: McpServer, registry: AgentRegistry, r
         // `response_format` is the concise/detailed view only on a tool that supports one; on any other
         // it is the tool's own input (aimeat_voice_speak's audio format) and goes to the handler.
         const viewParam = def.supportsResponseFormat === true;
-        mcp.tool(tool.name, descriptionFor(tool.name), shape, annotationsFor(tool.name), async (args: Record<string, unknown>) => {
+        mcp.registerTool(tool.name, { description: descriptionFor(tool.name), inputSchema: shape, annotations: annotationsFor(tool.name) }, async (args: Record<string, unknown>) => {
             const { agent_name, ...routed } = args;
             const rest = ownsAgentName ? args : routed;
             const { response_format, ...viewless } = rest;

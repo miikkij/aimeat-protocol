@@ -15,6 +15,8 @@
  *     aimeat_crew_draft, aimeat_crew_publish
  * @usage registerAgentCrewTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_crew_llm_set answers with `warning` when the owner's model policy leaves the
  *     chosen model out (feature-list audit #82).
  *   2026-10-11 — aimeat_crew_publish and aimeat_crew_seed answer with `warnings`.
@@ -24,7 +26,7 @@
  *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -71,11 +73,13 @@ export function registerAgentCrewTools(
         };
     };
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_get',
-        descriptionFor('aimeat_crew_get'),
-        zodShapeFor('aimeat_crew_get'),
-        annotationsFor('aimeat_crew_get'),
+        {
+            description: descriptionFor('aimeat_crew_get'),
+            inputSchema: zodShapeFor('aimeat_crew_get'),
+            annotations: annotationsFor('aimeat_crew_get'),
+        },
         async ({ target_agent_name }) => {
             const out = await crewState(deps, callerOf('mcp.crew_get'), target_agent_name);
             if (!out.ok) return refused(out);
@@ -83,11 +87,13 @@ export function registerAgentCrewTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_validate',
-        descriptionFor('aimeat_crew_validate'),
-        zodShapeFor('aimeat_crew_validate'),
-        annotationsFor('aimeat_crew_validate'),
+        {
+            description: descriptionFor('aimeat_crew_validate'),
+            inputSchema: zodShapeFor('aimeat_crew_validate'),
+            annotations: annotationsFor('aimeat_crew_validate'),
+        },
         async ({ target_agent_name, doc }) => {
             const out = await crewValidate(deps, callerOf('mcp.crew_validate'), target_agent_name, doc);
             if (!out.ok) return refused(out);
@@ -95,11 +101,13 @@ export function registerAgentCrewTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_try',
-        descriptionFor('aimeat_crew_try'),
-        zodShapeFor('aimeat_crew_try'),
-        annotationsFor('aimeat_crew_try'),
+        {
+            description: descriptionFor('aimeat_crew_try'),
+            inputSchema: zodShapeFor('aimeat_crew_try'),
+            annotations: annotationsFor('aimeat_crew_try'),
+        },
         async ({ target_agent_name, doc, prompt, try_id, wait_seconds }) => {
             const caller = callerOf('mcp.crew_try');
             const waitMs = Math.min(MAX_WAIT_SECONDS, wait_seconds ?? 50) * 1000;
@@ -124,11 +132,13 @@ export function registerAgentCrewTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_draft',
-        descriptionFor('aimeat_crew_draft'),
-        zodShapeFor('aimeat_crew_draft'),
-        annotationsFor('aimeat_crew_draft'),
+        {
+            description: descriptionFor('aimeat_crew_draft'),
+            inputSchema: zodShapeFor('aimeat_crew_draft'),
+            annotations: annotationsFor('aimeat_crew_draft'),
+        },
         async ({ target_agent_name, doc }) => {
             const caller = callerOf('mcp.crew_draft');
             const out = doc
@@ -139,11 +149,13 @@ export function registerAgentCrewTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_publish',
-        descriptionFor('aimeat_crew_publish'),
-        zodShapeFor('aimeat_crew_publish'),
-        annotationsFor('aimeat_crew_publish'),
+        {
+            description: descriptionFor('aimeat_crew_publish'),
+            inputSchema: zodShapeFor('aimeat_crew_publish'),
+            annotations: annotationsFor('aimeat_crew_publish'),
+        },
         async ({ target_agent_name, doc, revision }) => {
             const caller = callerOf('mcp.crew_publish');
             if (!doc && revision === undefined) {
@@ -157,11 +169,13 @@ export function registerAgentCrewTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_seed',
-        descriptionFor('aimeat_crew_seed'),
-        zodShapeFor('aimeat_crew_seed'),
-        annotationsFor('aimeat_crew_seed'),
+        {
+            description: descriptionFor('aimeat_crew_seed'),
+            inputSchema: zodShapeFor('aimeat_crew_seed'),
+            annotations: annotationsFor('aimeat_crew_seed'),
+        },
         async ({ target_agent_name, doc, validate_with }) => {
             const out = await crewSeed(deps, callerOf('mcp.crew_seed'), target_agent_name, doc, validate_with);
             if (!out.ok) return refused(out);
@@ -172,11 +186,13 @@ export function registerAgentCrewTools(
     // What the RUNTIME offers, asked rather than guessed. The fixed tool list in this node's own
     // publish description drifted two names behind crewaimeat's TOOL_REGISTRY; this is the runtime
     // answering for itself, and it carries the model profiles that machine can reach as well.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_menu',
-        descriptionFor('aimeat_crew_menu'),
-        zodShapeFor('aimeat_crew_menu'),
-        annotationsFor('aimeat_crew_menu'),
+        {
+            description: descriptionFor('aimeat_crew_menu'),
+            inputSchema: zodShapeFor('aimeat_crew_menu'),
+            annotations: annotationsFor('aimeat_crew_menu'),
+        },
         async ({ target_agent_name }) => {
             const out = await crewMenu(deps, callerOf('mcp.crew_menu'), target_agent_name);
             if (!out.ok) return refused(out);
@@ -186,11 +202,13 @@ export function registerAgentCrewTools(
 
     // Which model an agent thinks with. Same service the web door calls, so a choice made in chat
     // and a choice made on the page cannot mean two different things.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_crew_llm_set',
-        descriptionFor('aimeat_crew_llm_set'),
-        zodShapeFor('aimeat_crew_llm_set'),
-        annotationsFor('aimeat_crew_llm_set'),
+        {
+            description: descriptionFor('aimeat_crew_llm_set'),
+            inputSchema: zodShapeFor('aimeat_crew_llm_set'),
+            annotations: annotationsFor('aimeat_crew_llm_set'),
+        },
         async ({ target_agent_name, choice }) => {
             const caller = callerOf('mcp.crew_llm_set');
             let name: string | null = null;

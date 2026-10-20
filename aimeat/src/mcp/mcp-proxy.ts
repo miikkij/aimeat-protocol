@@ -30,6 +30,8 @@
  * @structure registerMcpProxyTools(mcp, storage, config, agentGaii, scopes)
  * @usage registerMcpProxyTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — aimeat_mcp_grant_set stores a grant on a node-wide server (the access check now reads
  *     it for the caller's own owner) and refuses an expires value that is not a date with
  *     INVALID_INPUT, as the REST route does (QA audit F01b-02).
@@ -51,7 +53,7 @@
  *     is used by the owners it admits and changed by none of them.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -109,14 +111,14 @@ export function registerMcpProxyTools(
 
   // ── Using what is attached ──────────────────────────────────────────────────────────────────
 
-  mcp.tool('aimeat_mcp_list', descriptionFor('aimeat_mcp_list'),
-    zodShapeFor('aimeat_mcp_list'),
-    annotationsFor('aimeat_mcp_list'),
+  mcp.registerTool('aimeat_mcp_list', { description: descriptionFor('aimeat_mcp_list'),
+    inputSchema: zodShapeFor('aimeat_mcp_list'),
+    annotations: annotationsFor('aimeat_mcp_list') },
     async (): Promise<TextResult> => ok({ servers: await listUsableServers(storage, ownerGhii()) }));
 
-  mcp.tool('aimeat_mcp_tools', descriptionFor('aimeat_mcp_tools'),
-    zodShapeFor('aimeat_mcp_tools'),
-    annotationsFor('aimeat_mcp_tools'),
+  mcp.registerTool('aimeat_mcp_tools', { description: descriptionFor('aimeat_mcp_tools'),
+    inputSchema: zodShapeFor('aimeat_mcp_tools'),
+    annotations: annotationsFor('aimeat_mcp_tools') },
     async ({ server, refresh }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
@@ -132,9 +134,9 @@ export function registerMcpProxyTools(
       return ok({ server: row.slug, tools: listed.tools, listed_at: new Date().toISOString() });
     });
 
-  mcp.tool('aimeat_mcp_call', descriptionFor('aimeat_mcp_call'),
-    zodShapeFor('aimeat_mcp_call'),
-    annotationsFor('aimeat_mcp_call'),
+  mcp.registerTool('aimeat_mcp_call', { description: descriptionFor('aimeat_mcp_call'),
+    inputSchema: zodShapeFor('aimeat_mcp_call'),
+    annotations: annotationsFor('aimeat_mcp_call') },
     async ({ server, tool, arguments: args }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
@@ -161,9 +163,9 @@ export function registerMcpProxyTools(
   // a question already answered, and it hid these two from the surface audit when it was tried —
   // `mcp:manage` sits outside the wildcard, so the audit's `scopes: ['*']` did not carry it.
 
-  mcp.tool('aimeat_mcp_attach', descriptionFor('aimeat_mcp_attach'),
-    zodShapeFor('aimeat_mcp_attach'),
-    annotationsFor('aimeat_mcp_attach'),
+  mcp.registerTool('aimeat_mcp_attach', { description: descriptionFor('aimeat_mcp_attach'),
+    inputSchema: zodShapeFor('aimeat_mcp_attach'),
+    annotations: annotationsFor('aimeat_mcp_attach') },
     async ({ name, url, peer, organism_id: group, ws, title, description, transport, token, header }): Promise<TextResult> => {
       if (!url && !peer) {
         return fail('Give either the server address, or the id of a peer node as peer.');
@@ -211,9 +213,9 @@ export function registerMcpProxyTools(
       });
     });
 
-  mcp.tool('aimeat_mcp_authorize', descriptionFor('aimeat_mcp_authorize'),
-    zodShapeFor('aimeat_mcp_authorize'),
-    annotationsFor('aimeat_mcp_authorize'),
+  mcp.registerTool('aimeat_mcp_authorize', { description: descriptionFor('aimeat_mcp_authorize'),
+    inputSchema: zodShapeFor('aimeat_mcp_authorize'),
+    annotations: annotationsFor('aimeat_mcp_authorize') },
     async ({ server, return_url }): Promise<TextResult> => {
       // A sign-in writes the credential onto the row, so it is a change like the two tools below.
       const row = await manageable(server);
@@ -242,9 +244,9 @@ export function registerMcpProxyTools(
       });
     });
 
-  mcp.tool('aimeat_mcp_update', descriptionFor('aimeat_mcp_update'),
-    zodShapeFor('aimeat_mcp_update'),
-    annotationsFor('aimeat_mcp_update'),
+  mcp.registerTool('aimeat_mcp_update', { description: descriptionFor('aimeat_mcp_update'),
+    inputSchema: zodShapeFor('aimeat_mcp_update'),
+    annotations: annotationsFor('aimeat_mcp_update') },
     async ({ server, enabled, title, description, exposure }): Promise<TextResult> => {
       const row = await manageable(server);
       if (!row) return notManageable(server);
@@ -268,9 +270,9 @@ export function registerMcpProxyTools(
   // not thereby control what the whole node offers, and the role alone armed every agent the
   // operator connected (security audit A8-1).
 
-  mcp.tool('aimeat_mcp_registry_list', descriptionFor('aimeat_mcp_registry_list'),
-    zodShapeFor('aimeat_mcp_registry_list'),
-    annotationsFor('aimeat_mcp_registry_list'),
+  mcp.registerTool('aimeat_mcp_registry_list', { description: descriptionFor('aimeat_mcp_registry_list'),
+    inputSchema: zodShapeFor('aimeat_mcp_registry_list'),
+    annotations: annotationsFor('aimeat_mcp_registry_list') },
     async (): Promise<TextResult> => {
       const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
       if (!operator) return fail(OPERATOR_AGENT_REFUSAL);
@@ -285,9 +287,9 @@ export function registerMcpProxyTools(
       });
     });
 
-  mcp.tool('aimeat_mcp_registry_set', descriptionFor('aimeat_mcp_registry_set'),
-    zodShapeFor('aimeat_mcp_registry_set'),
-    annotationsFor('aimeat_mcp_registry_set'),
+  mcp.registerTool('aimeat_mcp_registry_set', { description: descriptionFor('aimeat_mcp_registry_set'),
+    inputSchema: zodShapeFor('aimeat_mcp_registry_set'),
+    annotations: annotationsFor('aimeat_mcp_registry_set') },
     async ({ server, availability, allowlist, price, exposure, enabled }): Promise<TextResult> => {
       const operator = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
       if (!operator) return fail(OPERATOR_AGENT_REFUSAL);
@@ -313,15 +315,15 @@ export function registerMcpProxyTools(
       });
     });
 
-  mcp.tool('aimeat_mcp_grant_list', descriptionFor('aimeat_mcp_grant_list'),
-    zodShapeFor('aimeat_mcp_grant_list'),
-    annotationsFor('aimeat_mcp_grant_list'),
+  mcp.registerTool('aimeat_mcp_grant_list', { description: descriptionFor('aimeat_mcp_grant_list'),
+    inputSchema: zodShapeFor('aimeat_mcp_grant_list'),
+    annotations: annotationsFor('aimeat_mcp_grant_list') },
     async ({ server }): Promise<TextResult> =>
       ok({ grants: await listMcpGrants(storage, ownerGhii(), server) }));
 
-  mcp.tool('aimeat_mcp_grant_set', descriptionFor('aimeat_mcp_grant_set'),
-    zodShapeFor('aimeat_mcp_grant_set'),
-    annotationsFor('aimeat_mcp_grant_set'),
+  mcp.registerTool('aimeat_mcp_grant_set', { description: descriptionFor('aimeat_mcp_grant_set'),
+    inputSchema: zodShapeFor('aimeat_mcp_grant_set'),
+    annotations: annotationsFor('aimeat_mcp_grant_set') },
     async ({ server, grantee, tools, locked_input, call_cap, expires, read_only }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
@@ -351,9 +353,9 @@ export function registerMcpProxyTools(
       return ok({ grant });
     });
 
-  mcp.tool('aimeat_mcp_grant_revoke', descriptionFor('aimeat_mcp_grant_revoke'),
-    zodShapeFor('aimeat_mcp_grant_revoke'),
-    annotationsFor('aimeat_mcp_grant_revoke'),
+  mcp.registerTool('aimeat_mcp_grant_revoke', { description: descriptionFor('aimeat_mcp_grant_revoke'),
+    inputSchema: zodShapeFor('aimeat_mcp_grant_revoke'),
+    annotations: annotationsFor('aimeat_mcp_grant_revoke') },
     async ({ server, grantee }): Promise<TextResult> => {
       const row = await requireUsableServer(storage, ownerGhii(), server);
       if (!row) return notFound(server);
@@ -366,9 +368,9 @@ export function registerMcpProxyTools(
       });
     });
 
-  mcp.tool('aimeat_mcp_detach', descriptionFor('aimeat_mcp_detach'),
-    zodShapeFor('aimeat_mcp_detach'),
-    annotationsFor('aimeat_mcp_detach'),
+  mcp.registerTool('aimeat_mcp_detach', { description: descriptionFor('aimeat_mcp_detach'),
+    inputSchema: zodShapeFor('aimeat_mcp_detach'),
+    annotations: annotationsFor('aimeat_mcp_detach') },
     async ({ server }): Promise<TextResult> => {
       const row = await manageable(server);
       if (!row) return notManageable(server);

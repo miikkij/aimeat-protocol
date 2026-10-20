@@ -18,10 +18,12 @@
  * @structure registerContentTools(mcp, storage, config, caller)
  * @usage registerContentTools(mcp, storage, config, caller);
  * @version-history
+ *   v1.1.1 — 2026-10-21 — Tools register with mcp.registerTool and the MCP SDK v2 server types, the
+ *     form main moved to (plan doc-mvguy322f9se, steps 3 and 4b).
  *   v1.1.0 — 2026-10-21 — aimeat_content_correct: correct an item's classes and extracted values.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -57,8 +59,8 @@ export function registerContentTools(
     return withCaughtError(toolError('INTERNAL_ERROR', 'The content class request failed on the node.'), err);
   };
 
-  mcp.tool('aimeat_content_facts', descriptionFor('aimeat_content_facts'), zodShapeFor('aimeat_content_facts'),
-    annotationsFor('aimeat_content_facts'),
+  mcp.registerTool('aimeat_content_facts', { description: descriptionFor('aimeat_content_facts'), inputSchema: zodShapeFor('aimeat_content_facts'),
+    annotations: annotationsFor('aimeat_content_facts') },
     async (args) => {
       const checked = checkContentInput('aimeat_content_facts', args);
       if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
@@ -86,24 +88,24 @@ export function registerContentTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_content_inspect', descriptionFor('aimeat_content_inspect'), zodShapeFor('aimeat_content_inspect'),
-    annotationsFor('aimeat_content_inspect'),
+  mcp.registerTool('aimeat_content_inspect', { description: descriptionFor('aimeat_content_inspect'), inputSchema: zodShapeFor('aimeat_content_inspect'),
+    annotations: annotationsFor('aimeat_content_inspect') },
     async ({ kind, key, owner, stages, force }) => {
       try {
         return ok(await inspectFor(deps, caller(), { source: { kind, key, owner }, stages, force }));
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_content_correct', descriptionFor('aimeat_content_correct'), zodShapeFor('aimeat_content_correct'),
-    annotationsFor('aimeat_content_correct'),
+  mcp.registerTool('aimeat_content_correct', { description: descriptionFor('aimeat_content_correct'), inputSchema: zodShapeFor('aimeat_content_correct'),
+    annotations: annotationsFor('aimeat_content_correct') },
     async ({ kind, key, owner, classes, fields, extract }) => {
       try {
         return ok(await correctFor(deps, caller(), { source: { kind, key, owner }, classes, fields, extract }));
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_content_scan', descriptionFor('aimeat_content_scan'), zodShapeFor('aimeat_content_scan'),
-    annotationsFor('aimeat_content_scan'),
+  mcp.registerTool('aimeat_content_scan', { description: descriptionFor('aimeat_content_scan'), inputSchema: zodShapeFor('aimeat_content_scan'),
+    annotations: annotationsFor('aimeat_content_scan') },
     async (args) => {
       const checked = checkContentInput('aimeat_content_scan', args);
       if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
@@ -115,8 +117,8 @@ export function registerContentTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_content_classes', descriptionFor('aimeat_content_classes'), zodShapeFor('aimeat_content_classes'),
-    annotationsFor('aimeat_content_classes'),
+  mcp.registerTool('aimeat_content_classes', { description: descriptionFor('aimeat_content_classes'), inputSchema: zodShapeFor('aimeat_content_classes'),
+    annotations: annotationsFor('aimeat_content_classes') },
     async (args) => {
       // The action's fields, and the one it cannot run without (class for set, id for remove,
       // approve and reject), are checked before anything runs.
@@ -141,8 +143,8 @@ export function registerContentTools(
       } catch (err) { return fail(err); }
     });
 
-  mcp.tool('aimeat_content_settings', descriptionFor('aimeat_content_settings'), zodShapeFor('aimeat_content_settings'),
-    annotationsFor('aimeat_content_settings'),
+  mcp.registerTool('aimeat_content_settings', { description: descriptionFor('aimeat_content_settings'), inputSchema: zodShapeFor('aimeat_content_settings'),
+    annotations: annotationsFor('aimeat_content_settings') },
     async ({ patch }) => {
       try {
         const who = caller();

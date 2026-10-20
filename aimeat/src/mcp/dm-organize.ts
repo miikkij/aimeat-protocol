@@ -11,13 +11,15 @@
  * @structure registerDmOrganizeTools(mcp, storage, config, getAgentGaii)
  * @usage import { registerDmOrganizeTools } from './dm-organize.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
  *   v1.0.1 -- 2026-09-26 -- The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -41,11 +43,13 @@ export function registerDmOrganizeTools(
     /** The mailbox is the session agent's OWN owner's, derived here and never taken from arguments. */
     const mailbox = () => ownerMailbox({ owner: localAccountName(getAgentGaii()) }, config.nodeId);
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_archive_as_owner',
-        descriptionFor('aimeat_dm_archive_as_owner'),
-        zodShapeFor('aimeat_dm_archive_as_owner'),
-        annotationsFor('aimeat_dm_archive_as_owner'),
+        {
+            description: descriptionFor('aimeat_dm_archive_as_owner'),
+            inputSchema: zodShapeFor('aimeat_dm_archive_as_owner'),
+            annotations: annotationsFor('aimeat_dm_archive_as_owner'),
+        },
         async ({ conversation_ids, restore }) => {
             const back = restore === true;
             const { changed, organize } = await archiveConversations(storage, mailbox(), conversation_ids, back);
@@ -62,11 +66,13 @@ export function registerDmOrganizeTools(
         },
     );
 
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_dm_organize_as_owner',
-        descriptionFor('aimeat_dm_organize_as_owner'),
-        zodShapeFor('aimeat_dm_organize_as_owner'),
-        annotationsFor('aimeat_dm_organize_as_owner'),
+        {
+            description: descriptionFor('aimeat_dm_organize_as_owner'),
+            inputSchema: zodShapeFor('aimeat_dm_organize_as_owner'),
+            annotations: annotationsFor('aimeat_dm_organize_as_owner'),
+        },
         async ({ auto_archive_enabled, auto_archive_days, fold_same_subject, add_rule, remove_rule, rules }) => {
             const patch = InboxOrganizePatchSchema.safeParse({
                 ...(auto_archive_enabled !== undefined || auto_archive_days !== undefined

@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_agent_propose's next_step says when the proposed agent may invite people (proposalNextStep with the proposal's permissions).
  *   2026-10-14 — aimeat_connector_list answers `tunnel_enabled` too, through connectorListAnswer, the
  *     function GET /v1/agents/v2/connectors calls.
@@ -55,7 +57,7 @@
  *     7/16 where 7/7 was the truth.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, agentGaiiFromIdentifier } from '../utils/gaii.js';
@@ -89,11 +91,13 @@ export function registerAgentManagementTools(
     // Replaces the owner-managed tag list on a same-owner agent. Convention:
     // 'crew:<name>', 'source:<name>', 'role:<name>', 'project:<name>'. Any
     // lowercase alphanumeric-plus-`._-` string is accepted, max 20 tags.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_tags_set',
-        descriptionFor('aimeat_agent_tags_set'),
-        zodShapeFor('aimeat_agent_tags_set'),
-        annotationsFor('aimeat_agent_tags_set'),
+        {
+            description: descriptionFor('aimeat_agent_tags_set'),
+            inputSchema: zodShapeFor('aimeat_agent_tags_set'),
+            annotations: annotationsFor('aimeat_agent_tags_set'),
+        },
         async ({ target_agent_name, tags }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
@@ -127,11 +131,13 @@ export function registerAgentManagementTools(
     // ── Tool: aimeat_agent_description_set ──
     // The sentence a stranger reads on the A2A card. Write-once until 2026-09-03; the NAME stays
     // immutable because it is part of the GAII, and a description carries no identity.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_description_set',
-        descriptionFor('aimeat_agent_description_set'),
-        zodShapeFor('aimeat_agent_description_set'),
-        annotationsFor('aimeat_agent_description_set'),
+        {
+            description: descriptionFor('aimeat_agent_description_set'),
+            inputSchema: zodShapeFor('aimeat_agent_description_set'),
+            annotations: annotationsFor('aimeat_agent_description_set'),
+        },
         async ({ target_agent_name, description }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -147,11 +153,13 @@ export function registerAgentManagementTools(
     // GET /v1/agents?run_mode=spawn. Works on any agent the owner has, whatever runs it — a crew
     // whose behaviour lives in Python was locked out of that whole path while this had no tool, and
     // an owner with a browser was the only party who could set it.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_run_mode_set',
-        descriptionFor('aimeat_agent_run_mode_set'),
-        zodShapeFor('aimeat_agent_run_mode_set'),
-        annotationsFor('aimeat_agent_run_mode_set'),
+        {
+            description: descriptionFor('aimeat_agent_run_mode_set'),
+            inputSchema: zodShapeFor('aimeat_agent_run_mode_set'),
+            annotations: annotationsFor('aimeat_agent_run_mode_set'),
+        },
         async ({ target_agent_name, run_mode }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -163,11 +171,13 @@ export function registerAgentManagementTools(
 
     // ── Tool: aimeat_agent_runtime_report ──
     // What code backs the agent. Recorded, never checked — the node does not run the process.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_runtime_report',
-        descriptionFor('aimeat_agent_runtime_report'),
-        zodShapeFor('aimeat_agent_runtime_report'),
-        annotationsFor('aimeat_agent_runtime_report'),
+        {
+            description: descriptionFor('aimeat_agent_runtime_report'),
+            inputSchema: zodShapeFor('aimeat_agent_runtime_report'),
+            annotations: annotationsFor('aimeat_agent_runtime_report'),
+        },
         async ({ target_agent_name, ...src }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -187,11 +197,13 @@ export function registerAgentManagementTools(
     // Owner sets a same-owner agent's operational mode. The mode affects the
     // Hello Integration step set: task-runner gets a reduced 7-step flow,
     // workstation the narrowest 4-step flow; others get the full 13 steps.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_mode_set',
-        descriptionFor('aimeat_agent_mode_set'),
-        zodShapeFor('aimeat_agent_mode_set'),
-        annotationsFor('aimeat_agent_mode_set'),
+        {
+            description: descriptionFor('aimeat_agent_mode_set'),
+            inputSchema: zodShapeFor('aimeat_agent_mode_set'),
+            annotations: annotationsFor('aimeat_agent_mode_set'),
+        },
         async ({ target_agent_name, mode }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
@@ -220,11 +232,13 @@ export function registerAgentManagementTools(
     // requireOwnerPrincipal() and stays that way, because an agent calling in the owner's NAME is
     // not the owner, and creating agents is the account changing. So this hands the agent what to
     // say and where to send the person, and the person presses.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_basics_get',
-        descriptionFor('aimeat_agent_basics_get'),
-        zodShapeFor('aimeat_agent_basics_get'),
-        annotationsFor('aimeat_agent_basics_get'),
+        {
+            description: descriptionFor('aimeat_agent_basics_get'),
+            inputSchema: zodShapeFor('aimeat_agent_basics_get'),
+            annotations: annotationsFor('aimeat_agent_basics_get'),
+        },
         async () => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
@@ -239,11 +253,13 @@ export function registerAgentManagementTools(
     // ── Tool: aimeat_agent_basics_request ──
     // The other half of the chat path, and it still creates nothing: it puts one line on the
     // owner's open-items list, and that line retires itself once they press.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_basics_request',
-        descriptionFor('aimeat_agent_basics_request'),
-        zodShapeFor('aimeat_agent_basics_request'),
-        annotationsFor('aimeat_agent_basics_request'),
+        {
+            description: descriptionFor('aimeat_agent_basics_request'),
+            inputSchema: zodShapeFor('aimeat_agent_basics_request'),
+            annotations: annotationsFor('aimeat_agent_basics_request'),
+        },
         async ({ note }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
@@ -262,11 +278,13 @@ export function registerAgentManagementTools(
     // requireOwnerPrincipal(); this writes a proposal and one line on the owner's open items. The
     // tool's own description told agents to call this from 2026-09-02, and it did not exist until
     // 2026-09-08, so every agent that followed the advice got an unknown-tool error.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_propose',
-        descriptionFor('aimeat_agent_propose'),
-        zodShapeFor('aimeat_agent_propose'),
-        annotationsFor('aimeat_agent_propose'),
+        {
+            description: descriptionFor('aimeat_agent_propose'),
+            inputSchema: zodShapeFor('aimeat_agent_propose'),
+            annotations: annotationsFor('aimeat_agent_propose'),
+        },
         async (input) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
@@ -294,11 +312,13 @@ export function registerAgentManagementTools(
 
     // ── Tool: aimeat_connector_list ──
     // The machines the owner's agents run on. The same function GET /v1/agents/v2/connectors calls.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_connector_list',
-        descriptionFor('aimeat_connector_list'),
-        zodShapeFor('aimeat_connector_list'),
-        annotationsFor('aimeat_connector_list'),
+        {
+            description: descriptionFor('aimeat_connector_list'),
+            inputSchema: zodShapeFor('aimeat_connector_list'),
+            annotations: annotationsFor('aimeat_connector_list'),
+        },
         async () => {
             const answer = await connectorListAnswer({ config, storage }, caller().owner);
             return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
@@ -308,11 +328,13 @@ export function registerAgentManagementTools(
     // ── Tool: aimeat_connector_rename ──
     // The owner's name for one machine. The scope is asked here as PATCH /v1/agents/v2/connectors/:id
     // asks it, so the word decides on both interfaces.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_connector_rename',
-        descriptionFor('aimeat_connector_rename'),
-        zodShapeFor('aimeat_connector_rename'),
-        annotationsFor('aimeat_connector_rename'),
+        {
+            description: descriptionFor('aimeat_connector_rename'),
+            inputSchema: zodShapeFor('aimeat_connector_rename'),
+            annotations: annotationsFor('aimeat_connector_rename'),
+        },
         async ({ connector, name }) => {
             const who = caller();
             // The failures are written in the result shape the success uses, with the code first as
@@ -329,11 +351,13 @@ export function registerAgentManagementTools(
     // Where a same-owner agent is managed by whatever hosts it. The caller for this is normally the
     // sibling that just created the agent somewhere the node cannot see, reporting the address back
     // so the owner's profile can link to it.
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_agent_console_set',
-        descriptionFor('aimeat_agent_console_set'),
-        zodShapeFor('aimeat_agent_console_set'),
-        annotationsFor('aimeat_agent_console_set'),
+        {
+            description: descriptionFor('aimeat_agent_console_set'),
+            inputSchema: zodShapeFor('aimeat_agent_console_set'),
+            annotations: annotationsFor('aimeat_agent_console_set'),
+        },
         async ({ target_agent_name, console_url }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {

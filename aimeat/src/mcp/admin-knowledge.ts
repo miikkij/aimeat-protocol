@@ -25,6 +25,8 @@
  * @structure registerAdminKnowledgeTools(mcp, storage, config, getAgentGaii, scopes) — one read.
  * @usage registerAdminKnowledgeTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: the overview is built with the session's classification
  *     reader (readerForAgent). The data space stays the operator's GHII; what is shown is decided for
@@ -33,7 +35,7 @@
  *     well as the account (services/owner-lifecycle.ts resolveOperatorAgentName).
  *   v1.0.0 — 2026-09-12 — Initial, with the Knowledge page's rebuild.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -56,9 +58,9 @@ export function registerAdminKnowledgeTools(
 ): void {
   const agentGaii = getAgentGaii();
 
-  mcp.tool('aimeat_admin_knowledge', descriptionFor('aimeat_admin_knowledge'),
-    zodShapeFor('aimeat_admin_knowledge'),
-    annotationsFor('aimeat_admin_knowledge'),
+  mcp.registerTool('aimeat_admin_knowledge', { description: descriptionFor('aimeat_admin_knowledge'),
+    inputSchema: zodShapeFor('aimeat_admin_knowledge'),
+    annotations: annotationsFor('aimeat_admin_knowledge') },
     async ({ page, limit, q, author_key, content_type, flagged }) => {
       const operator = await resolveOperatorAgentName(storage, agentGaii, scopes);
       if (!operator) return refuse(OPERATOR_AGENT_REFUSAL);

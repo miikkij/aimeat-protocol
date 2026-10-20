@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-15 — aimeat_decide_rule_propose refuses an ecosystem app, as the REST route does
  *     (feature-list audit 95).
@@ -30,7 +32,7 @@
  *     aimeat_decision_list; aimeat_decide_rules; aimeat_decide_rule_propose (creates nothing).
  *   v1.0.0 — 2026-09-19 — Initial (TARGET-080).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -74,11 +76,13 @@ export function registerDecideTools(
   });
 
   // ── aimeat_decide ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decide',
-    descriptionFor('aimeat_decide'),
-    zodShapeFor('aimeat_decide'),
-    annotationsFor('aimeat_decide'),
+    {
+        description: descriptionFor('aimeat_decide'),
+        inputSchema: zodShapeFor('aimeat_decide'),
+        annotations: annotationsFor('aimeat_decide'),
+    },
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
       try {
@@ -103,11 +107,13 @@ export function registerDecideTools(
   );
 
   // ── aimeat_decision_list ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decision_list',
-    descriptionFor('aimeat_decision_list'),
-    zodShapeFor('aimeat_decision_list'),
-    annotationsFor('aimeat_decision_list'),
+    {
+        description: descriptionFor('aimeat_decision_list'),
+        inputSchema: zodShapeFor('aimeat_decision_list'),
+        annotations: annotationsFor('aimeat_decision_list'),
+    },
     async (a) => {
       try {
         if (a.decision_id) {
@@ -137,11 +143,13 @@ export function registerDecideTools(
   );
 
   // ── aimeat_decision_review ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decision_review',
-    descriptionFor('aimeat_decision_review'),
-    zodShapeFor('aimeat_decision_review'),
-    annotationsFor('aimeat_decision_review'),
+    {
+        description: descriptionFor('aimeat_decision_review'),
+        inputSchema: zodShapeFor('aimeat_decision_review'),
+        annotations: annotationsFor('aimeat_decision_review'),
+    },
     async (a) => {
       try {
         // A tool session is always an agent, never the owner in person: the service refuses it a
@@ -159,11 +167,13 @@ export function registerDecideTools(
   );
 
   // ── aimeat_decide_run ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decide_run',
-    descriptionFor('aimeat_decide_run'),
-    zodShapeFor('aimeat_decide_run'),
-    annotationsFor('aimeat_decide_run'),
+    {
+        description: descriptionFor('aimeat_decide_run'),
+        inputSchema: zodShapeFor('aimeat_decide_run'),
+        annotations: annotationsFor('aimeat_decide_run'),
+    },
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
       try {
@@ -197,11 +207,13 @@ export function registerDecideTools(
   );
 
   // ── aimeat_decide_settings ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decide_settings',
-    descriptionFor('aimeat_decide_settings'),
-    zodShapeFor('aimeat_decide_settings'),
-    annotationsFor('aimeat_decide_settings'),
+    {
+        description: descriptionFor('aimeat_decide_settings'),
+        inputSchema: zodShapeFor('aimeat_decide_settings'),
+        annotations: annotationsFor('aimeat_decide_settings'),
+    },
     async () => {
       try {
         return text({
@@ -215,11 +227,13 @@ export function registerDecideTools(
   );
 
   // ── aimeat_decide_rules ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decide_rules',
-    descriptionFor('aimeat_decide_rules'),
-    zodShapeFor('aimeat_decide_rules'),
-    annotationsFor('aimeat_decide_rules'),
+    {
+        description: descriptionFor('aimeat_decide_rules'),
+        inputSchema: zodShapeFor('aimeat_decide_rules'),
+        annotations: annotationsFor('aimeat_decide_rules'),
+    },
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
       try {
@@ -243,11 +257,13 @@ export function registerDecideTools(
   );
 
   // ── aimeat_decide_rule_propose ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_decide_rule_propose',
-    descriptionFor('aimeat_decide_rule_propose'),
-    zodShapeFor('aimeat_decide_rule_propose'),
-    annotationsFor('aimeat_decide_rule_propose'),
+    {
+        description: descriptionFor('aimeat_decide_rule_propose'),
+        inputSchema: zodShapeFor('aimeat_decide_rule_propose'),
+        annotations: annotationsFor('aimeat_decide_rule_propose'),
+    },
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
       // The REST route refuses an app and an ecosystem app (routes/ai-decide-rules.ts); this tool did

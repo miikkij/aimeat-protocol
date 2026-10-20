@@ -11,6 +11,16 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-20 — The 2026-07-28 code path (mcp/modern-endpoint.ts) beside the sessions, routed by era
+ *     per request and counted in mcp_requests_total; the guidance and support-route reads moved to
+ *     services/mcp-build-inputs.ts, cached for the modern path only (SDK v2 migration step 5, plan item 5).
+ *   2026-10-20 — The 2025-era session code (the session maps, the idle sweep, the session half of the
+ *     POST handler, GET and DELETE) moved to mcp/legacy-sessions.ts unchanged (pure extraction, so the
+ *     2026-07-28 path fits beside it; SDK v2 migration step 5).
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Only registerTool is patched with the scope gate and the wrapper chain; tool()
+ *     throws while the server registers, since every tool uses registerTool (SDK v2 migration, step 3).
+ *   2026-10-20 — The server no longer declares resources.subscribe, which no handler served.
  *   2026-10-20 — Every open session is recorded in mcp/session-registry.ts, so deleting an agent or
  *     rotating its key closes its live MCP transports at once, as both already close its connect
  *     tunnel (secaudit 2026-10, mcp-oauth:access-token-without-session-survives-agent-delete).
@@ -141,16 +151,12 @@
  */
 
 import { Router, type Request, type Response } from 'express';
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { randomBytes } from 'node:crypto';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
-import { resolveSupportRoute } from '../services/message-alias.js';
 // Every tool group, in one list this file no longer keeps: mcp/register-all.ts.
 import { registerAllServerTools } from './register-all.js';
 import { registerRemoteTools } from './remote-tools.js';
@@ -162,12 +168,10 @@ import { askableTool, staleGrantRefusal } from './permission-ask-gate.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
 import { instructionsFor } from './instructions.js';
-import { proactiveGuidance } from '../services/proactive-mode.js';
+import { readBuildInputs } from '../services/mcp-build-inputs.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { mcpAudienceRefusal } from './oauth-binding.js';
-import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
-import { markAgentMcpUse } from '../services/agent-mcp-touch.js';
 import { MCP_VIA_HEADER, parseVia, viaRefusal, runWithVia } from '../services/mcp-client/hops.js';
 import { verifyJWT, type VerifiedToken } from '../auth/jwt.js';
 import { credentialRevoked } from '../auth/middleware.js';
@@ -175,28 +179,37 @@ import { withCurrentScopes } from '../auth/effective-scopes.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { getSoftwareVersion } from '../utils/version.js';
-import { mcpRequestAuthority, sameMcpPrincipal, withRequestPermission } from './request-authority.js';
+import { mcpRequestAuthority, withRequestPermission } from './request-authority.js';
+import { legacySessions } from './legacy-sessions.js';
+import { modernEndpoint, isModernRequest } from './modern-endpoint.js';
+import { getStats } from '../services/stats.js';
 
 // ── Resource change event bus ──
 // Lives in resource-events.ts, a leaf, so a service can notify an agent without importing the
 // registry this file assembles (which imports the service back: a cycle). Re-exported here so
 // every existing importer keeps working; new code imports the leaf.
-import { emitResourceUpdated, emitResourceListChanged } from './resource-events.js';
+import { emitResourceUpdated, emitResourceListChanged, resourceEvents, type ResourceChangeEvent } from './resource-events.js';
 import { answerMovedTools } from './moved-tools-answer.js';
 import { treatNullAsAbsent } from './null-as-absent.js';
-import { mcpSessionPlatform } from './session-platform.js';
-import { noteMcpSession, forgetMcpSession } from './session-registry.js';
 export { resourceEvents, emitResourceUpdated, emitResourceListChanged, emitToolListChanged, type ResourceChangeEvent } from './resource-events.js';
 
 export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
 
-    // Per-session transports
-    const transports = new Map<string, StreamableHTTPServerTransport>();
-    // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
-    const sessionChatInstances = new Map<string, string>();
-    const sessionPrincipals = new Map<string, VerifiedToken>();
     const authority = mcpRequestAuthority();
+    // The 2025-era session code (mcp/legacy-sessions.ts): one transport and one server per session.
+    const legacy = legacySessions({ config, storage, authority, authenticate, createMcpServer });
+    // The 2026-07-28 code path (mcp/modern-endpoint.ts): stateless, one server per request, built by
+    // the same createMcpServer inside the same request authority.
+    const modern = modernEndpoint({
+        config, storage,
+        run: (token, verified, operation) => authority.run(token, verified, operation),
+        build: (agentGaii, role, owner) => createMcpServer(agentGaii, authority.scopes, role, authority.token, owner, true),
+    });
+    // Change events reach the open 2026-07-28 listen streams too (a 2025 session hears them in core.ts).
+    resourceEvents.on('tool:listChanged', () => modern.notify.toolsChanged());
+    resourceEvents.on('resource:listChanged', () => modern.notify.resourcesChanged());
+    resourceEvents.on('resource:updated', (evt: ResourceChangeEvent) => modern.notify.resourceUpdated(evt.uri));
 
     async function authenticate(req: Request, res: Response): Promise<VerifiedToken | null> {
         const header = req.headers.authorization;
@@ -232,56 +245,6 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         return withCurrentScopes(storage, verified);
     }
 
-    function sessionAllowed(req: Request, res: Response, id: string, auth: VerifiedToken | null): auth is VerifiedToken {
-        if (!auth) {
-            if (!res.headersSent) res.status(401).json({ jsonrpc: '2.0', error: {
-                code: -32001, message: 'Authentication required for this MCP session.' }, id: req.body?.id ?? null });
-            return false;
-        }
-        const initial = sessionPrincipals.get(id);
-        if (!initial || !sameMcpPrincipal(initial, auth)) {
-            res.status(403).json({ jsonrpc: '2.0', error: {
-                code: -32003, message: 'This MCP session belongs to a different principal.' }, id: req.body?.id ?? null });
-            return false;
-        }
-        return true;
-    }
-    // IDLE EXPIRY (memory trace 2026-08-19). Every session carries a full McpServer — hundreds of
-    // registered tools, each with its Zod schema graph — and until now a session died ONLY when the
-    // client sent DELETE. Most clients never do: a closed desktop app, a dropped connection or a
-    // restarted daemon just stops talking, so its server object stayed in `transports` forever.
-    // Production heap snapshot: 17,815 live Zod check-closures and ~1 GB of retained schema graphs
-    // after four hours. The sweep below closes any session with no request for
-    // config.mcpSessionIdleMinutes; a returning client gets the spec's 404 and re-initializes.
-    const sessionLastSeen = new Map<string, number>();
-    // Which agent a session belongs to and which tool it came from, so the requests that follow the
-    // initialize can keep the agent's MCP use current (services/agent-mcp-touch.ts) without a
-    // second token parse. Cleaned wherever the other session maps are.
-    const sessionAgents = new Map<string, { gaii: string; platform: string }>();
-    // Every config.mcpSessionSweepMs (10 s shipped): the scan is a Map walk over a handful of
-    // sessions, and a short interval is what lets the idle floor go sub-minute. The E2E runner pins
-    // 1 s so e2e-mcp-session-expiry proves a 6-second idle in 8 s rather than 18.
-    const sweeper = setInterval(() => {
-        const cutoff = Date.now() - config.mcpSessionIdleMinutes * 60_000;
-        let reaped = 0;
-        for (const [id, t] of transports) {
-            const seen = sessionLastSeen.get(id) ?? 0;
-            if (seen < cutoff) {
-                reaped++;
-                // close() fires transport.onclose, which removes the session from every map.
-                void Promise.resolve(t.close()).catch(err =>
-                    logger.warn('MCP idle sweep: transport close failed; maps are cleaned regardless', { error: String(err) }));
-                transports.delete(id);
-                sessionChatInstances.delete(id);
-                sessionPrincipals.delete(id);
-                sessionLastSeen.delete(id);
-                sessionAgents.delete(id);
-                forgetMcpSession(id);
-            }
-        }
-        if (reaped > 0) logger.info(`MCP idle sweep: closed ${reaped} session(s) idle over ${config.mcpSessionIdleMinutes} min (${transports.size} remain)`);
-    }, config.mcpSessionSweepMs);
-    sweeper.unref();
 
     async function createMcpServer(
         agentGaii: string,
@@ -289,21 +252,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         role: SurfaceRole | 'all' = 'all',
         getToken: () => string | undefined = () => undefined,
         owner?: string,
+        cachedInputs = false,
     ): Promise<McpServer> {
-        // What this account chose about being offered things it did not ask for. Read here because
-        // the handshake is the one moment every client passes through, and never allowed to fail a
-        // connection: proactiveGuidance() answers null on any trouble.
-        const guidance = await proactiveGuidance(storage, config, owner);
-        // Who answers support here. Read from the stored peer rows because this layer has no peer
-        // map, and through the SAME resolver the send path uses, so the sentence an agent is told
-        // and the address its message actually takes cannot disagree. Never fails a connection: an
-        // unreadable peer list means the instructions say what they always said.
-        const supportAnsweredBy = await storage.listFederationPeers()
-            .then(rows => {
-                const route = resolveSupportRoute(rows);
-                return route.kind === 'upstream' ? route.nodeId : null;
-            })
-            .catch(err => { logger.warn('mcp: support routing unread, instructions unchanged', { error: String(err) }); return null; });
+        // What this account chose about being offered things it did not ask for, and who answers
+        // support here. Read when the server is built, because that is the one moment every client
+        // passes through, and never allowed to fail a connection (services/mcp-build-inputs.ts). A 2026-07-28
+        // request builds a server per request and reads both through a short cache.
+        const { guidance, supportAnsweredBy } = await readBuildInputs(storage, config, owner, cachedInputs);
         // An agent's person can allow a missing permission with one press; an owner, an app and an
         // ecosystem app have no such page (services/permission-ask.ts).
         const mayAsk = config.mcpEnforceScopes && !agentGaii.startsWith('eco:') && parseGaiiLoose(agentGaii).agent !== '';
@@ -314,7 +269,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // tools.listChanged is the half that was missing: the agent's scopes decide which
                 // tools this session registered, so a permission change makes the client's list
                 // wrong, and without the declaration no client would ever ask again.
-                capabilities: { tools: { listChanged: true }, resources: { subscribe: true, listChanged: true } },
+                // resources.subscribe is NOT declared: nothing handles resources/subscribe, so a
+                // client that believed it got -32601 (decision 2026-10-20, MCP migration plan item 12).
+                capabilities: { tools: { listChanged: true }, resources: { listChanged: true } },
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.
@@ -325,8 +282,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // (mcp/null-as-absent.ts): CrewAI does that for every optional field, nested ones included.
         treatNullAsAbsent(mcp);
 
-        // F1: enforce per-agent scopes on the tool surface. We monkeypatch BOTH mcp.tool and
-        // mcp.registerTool (tools may use either) for the duration of registration so each
+        // F1: enforce per-agent scopes on the tool surface. We monkeypatch mcp.registerTool (and
+        // make mcp.tool refuse) for the duration of registration so each
         // registerXxxTools() call only registers tools this agent's scopes allow (mirrors REST
         // requireScope gates). Owner-attached agents with a '*' scope get everything. Warn-only
         // mode (config.mcpEnforceScopes=false) registers all tools but logs what WOULD be filtered.
@@ -349,7 +306,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             // warn-only: still register (true); enforce: skip (false) unless the person can allow it
             return !enforce || askable(name);
         };
-        const originalTool = patchable.tool.bind(mcp) as ToolFn;
+        // Every tool registers through registerTool, the form the MCP SDK v2 keeps; tool() would skip
+        // the gate and the wrapper chain, so while registering it throws instead of registering.
+        const originalTool = patchable.tool;
         const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
         // Measured INSIDE the gate: a tool this agent's scopes filtered out is never wrapped, so a
         // tool that was never offered is never counted as one that was not called. The wrap sits at
@@ -364,7 +323,6 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // A tool that throws, or returns a caught internal error, is logged, reported to the operator
         // and answered with a sentence (mcp/tool-fault.ts). The whole chain and its order: mcp/tool-registrar.ts.
         const registrarDeps = { scopes: () => scopes, principal: () => agentGaii, storage, config };
-        const measuredTool = toolRegistrar(originalTool, registrarDeps);
         const measuredRegisterTool = toolRegistrar(originalRegisterTool, registrarDeps);
         // Keep the initial surface ceiling and its memory footprint. The SDK reads enabled at
         // list/call time, so a removed permission affects discovery without rebuilding a session.
@@ -372,9 +330,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // in the same session; any other newly granted tool still requires re-initialization.
         const liveGate = (name: string) => !enforce || scopeAllowsTool(scopes, name);
         const listedGate = (name: string) => liveGate(name) || askable(name);
-        const liveTool = withRequestPermission(measuredTool, listedGate);
         const liveRegisterTool = withRequestPermission(measuredRegisterTool, listedGate);
-        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? liveTool(...args) : undefined;
+        patchable.tool = (...args: unknown[]) => { throw new Error(`the tool() form is not used here (${String(args[0])}): register with registerTool`); };
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? liveRegisterTool(...args) : undefined;
         // Resources answer under the tools' rules: the scope of the tool that reads the same thing,
         // from this request's token, and the organism agent gate (mcp/resource-gate.ts, AUTH-2).
@@ -507,232 +464,19 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const verified = await authenticate(req, res);
         if (res.headersSent) return;
 
-        // Determine session ID from header
-        const sessionId = req.headers['mcp-session-id'] as string | undefined;
-
-        if (sessionId && transports.has(sessionId)) {
-            if (!sessionAllowed(req, res, sessionId, verified)) return;
-            // Existing session — update lastSeen for session tracking
-            sessionLastSeen.set(sessionId, Date.now());
-            const ciId = sessionChatInstances.get(sessionId);
-            if (ciId) {
-                // notify:false — this heartbeat fires on every tool call, and a `chat` change event
-                // per call would have every open browser re-fetching the list dozens of times a minute.
-                touchChatInstance({ storage }, ciId, { notify: false }).catch(err => { logger.warn('handleMcpPost: continuing after a suppressed failure', { error: String(err) }); });
-            }
-            // The agent's own MCP-use mark, throttled inside: the MCP page reads "viimeksi" from it.
-            const who = sessionAgents.get(sessionId);
-            if (who) void markAgentMcpUse(storage, who.gaii, who.platform);
-            const transport = transports.get(sessionId)!;
-            await authority.run(token!, verified, () =>
-                transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body));
+        // The protocol era decides the code path. The count is what the later decision about the 2025
+        // era reads (decision 2026-10-20, item 2): mcp_requests_total:legacy and :modern on the stats page.
+        const modernEra = await isModernRequest(req);
+        getStats()?.incrementTyped('mcp_requests_total', modernEra ? 'modern' : 'legacy');
+        if (modernEra) {
+            await modern.serve(req, res, verified, token, serverRole);
             return;
         }
-
-        // Session ID was provided but session doesn't exist (server restart, expired, etc.)
-        // MCP spec: MUST return 404 so client knows to re-initialize
-        if (sessionId) {
-            const body = req.body;
-            const method = Array.isArray(body) ? body[0]?.method : body?.method;
-            if (method !== 'initialize') {
-                res.status(404).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32600, message: 'Session not found. Please re-initialize.' },
-                    id: (Array.isArray(body) ? body[0]?.id : body?.id) ?? null,
-                });
-                return;
-            }
-            // If method IS 'initialize', allow fall-through to create a new session
-        }
-
-        // New session: authenticate the agent via OAuth token
-        // MCP ALWAYS requires GHII authentication — no anonymous access allowed
-        const agentGaii = verified?.sub;
-        let sessionOwner = verified?.owner;
-        const mcpClientName = verified?.mcp_client;
-
-        if (!agentGaii) {
-            // ONE QUESTION A STRANGER MAY ASK WITHOUT AN ACCOUNT: what can you do?
-            //
-            // A foreign agent arriving with nothing but the hostname could not learn a single
-            // capability without first getting a credential, which is the wrong way round — you
-            // decide whether to ask for an account by knowing what the account is for. `tools/list`
-            // answers with names, descriptions and input shapes: the contract, which openapi.json
-            // already publishes. No data, no session, no identity, and `tools/call` still 401s.
-            //
-            // `initialize` is DELIBERATELY NOT ANSWERED HERE, and the temptation is real because an
-            // agent-readiness scanner probes exactly that. Every real MCP client initializes first
-            // and relies on this 401 plus its WWW-Authenticate header to find the OAuth flow (MCP
-            // spec §5.3); answering 200 with no session would send Claude, Cursor and the rest past
-            // the only signpost they have and fail them one call later, on a route where the
-            // failure would read as ours. A single unauthenticated `tools/list` is not a step any
-            // real client takes before initializing, so this branch cannot be reached by one.
-            const probe = Array.isArray(req.body) ? undefined : req.body as { method?: string; id?: unknown } | undefined;
-            if (probe?.method === 'tools/list') {
-                const { publicToolCatalogue } = await import('./public-catalogue.js');
-                res.json({ jsonrpc: '2.0', id: probe.id ?? null, result: { tools: publicToolCatalogue() } });
-                return;
-            }
-            // No token — challenge client to authenticate via OAuth (MCP spec §5.3)
-            // THE MCP RESOURCE'S OWN METADATA, not the origin's. RFC 9728 §3.3 has a client reject
-            // metadata whose `resource` is not the resource it is talking to, and the bare
-            // well-known URL describes the origin — so pointing a client that is protecting
-            // `/v1/mcp` at it handed them a document they are entitled to throw away.
-            const resourceMetadataUrl = `${config.baseUrl.replace(/\/+$/, '')}${MCP_RESOURCE_METADATA_PATH}`;
-            res.status(401)
-                .setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl}"`)
-                .json({
-                    jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Authentication required. MCP requires a GHII account. Use OAuth 2.1 to obtain an access token.' },
-                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
-                });
-            return;
-        }
-
-        // agentGaii is guaranteed to be a string here (401 returned above if not)
-        const authenticatedGaii: string = agentGaii;
-
-        // Validate agent exists and has a real owner
-        let chatInstanceId: string | undefined;
-        let sessionAgentInfo: { gaii: string; platform: string } | undefined;
-
-        {
-            const agent = await storage.getAgent(authenticatedGaii);
-            if (!agent) {
-                res.status(401).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Agent not found. Connect it first through device authorization (POST /v1/agents/device-authorize), which your owner approves.' },
-                    id: req.body?.id ?? null,
-                });
-                return;
-            }
-            const owner = await storage.getOwner(agent.owner);
-            if (!owner) {
-                res.status(403).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32003, message: 'Agent has no valid owner profile. Owner approval required.' },
-                    id: req.body?.id ?? null,
-                });
-                return;
-            }
-
-            // GHII account is required for MCP access
-            const ghiiRecord = await storage.getGHIIByOwner(agent.owner);
-            if (!ghiiRecord) {
-                res.status(403).json({
-                    jsonrpc: '2.0',
-                    error: { code: -32004, message: 'GHII account required for MCP access. Create one at /v1/ghii first.' },
-                    id: req.body?.id ?? null,
-                });
-                return;
-            }
-            sessionOwner = agent.owner;
-
-            // Upsert ChatInstanceRecord for session tracking
-            // Prefer mcp_client from JWT (set during OAuth consent) over User-Agent sniffing
-            const platform = mcpSessionPlatform(mcpClientName, req.headers['user-agent']);
-
-            // The id predates buildChatInstanceId and every session row in production is addressed
-            // by it, so it is passed explicitly rather than derived.
-            chatInstanceId = `mcp-${platform}#${sessionOwner}@${config.nodeId}`;
-            try {
-                const out = await registerChatInstance(
-                    { storage, config },
-                    { ownerName: sessionOwner, agentGaii: authenticatedGaii },
-                    { platform, appName: `mcp-${platform}`, id: chatInstanceId },
-                );
-                if (!out.ok) {
-                    logger.warn('Failed to upsert ChatInstance for MCP session', { error: `${out.code}: ${out.message}` });
-                    chatInstanceId = undefined;
-                }
-            } catch (err) {
-                logger.warn('Failed to upsert ChatInstance for MCP session', { error: (err as Error).message });
-                chatInstanceId = undefined;
-            }
-
-            // Onboarding funnel: the owner's FIRST MCP session is the activation signal the
-            // rescue email keys off. Fire-and-forget; must never delay or break the session.
-            const { recordFirstMcpCall } = await import('../services/onboarding-funnel.js');
-            void recordFirstMcpCall(storage, config, sessionOwner, platform);
-
-            // The agent itself learns it was used over MCP, from which tool, and when. The session
-            // row above is per TOOL and keeps the first agent that ever opened it; this is the
-            // per-agent truth the MCP page lists. Forced: the session's first request is the one
-            // that carries a client name worth recording, whatever the throttle says.
-            sessionAgentInfo = { gaii: authenticatedGaii, platform };
-            void markAgentMcpUse(storage, authenticatedGaii, platform, { force: true });
-        }
-
-        // Create transport and MCP server for this session
-        const transport = new StreamableHTTPServerTransport({
-            sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
-        });
-
-        const mcpServer = await authority.run(token!, verified!, () =>
-            createMcpServer(authenticatedGaii, authority.scopes, serverRole, authority.token, sessionOwner));
-
-        transport.onclose = () => {
-            if (transport.sessionId) {
-                transports.delete(transport.sessionId);
-                sessionChatInstances.delete(transport.sessionId);
-                sessionPrincipals.delete(transport.sessionId);
-                sessionLastSeen.delete(transport.sessionId);
-                sessionAgents.delete(transport.sessionId);
-                forgetMcpSession(transport.sessionId);
-            }
-        };
-
-        await mcpServer.connect(transport);
-
-        await authority.run(token!, verified!, () =>
-            transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body));
-
-        // Store transport for session reuse (sessionId is generated during handleRequest)
-        if (transport.sessionId) {
-            transports.set(transport.sessionId, transport);
-            sessionLastSeen.set(transport.sessionId, Date.now());
-            sessionPrincipals.set(transport.sessionId, verified!);
-            if (chatInstanceId) {
-                sessionChatInstances.set(transport.sessionId, chatInstanceId);
-            }
-            if (sessionAgentInfo) sessionAgents.set(transport.sessionId, sessionAgentInfo);
-            // So DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey can take this socket down
-            // with the agent's other credentials (mcp/session-registry.ts).
-            noteMcpSession(transport.sessionId, authenticatedGaii, () => transport.close());
-        }
+        await legacy.servePost(req, res, verified, token, serverRole);
     };
 
-    // GET handler (SSE server→client notifications) — role-agnostic; the session is already bound
-    // to its (role-scoped) server from the POST that created it.
-    const handleMcpGet = async (req: Request, res: Response) => {
-        const auth = await authenticate(req, res);
-        if (res.headersSent) return;
-        const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        if (!sessionId || !transports.has(sessionId)) {
-            res.status(400).json({ error: 'Missing or invalid mcp-session-id header' });
-            return;
-        }
-        if (!sessionAllowed(req, res, sessionId, auth)) return;
-        sessionLastSeen.set(sessionId, Date.now());
-        const transport = transports.get(sessionId)!;
-        await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse);
-    };
-
-    // DELETE handler — close session (role-agnostic)
-    const handleMcpDelete = async (req: Request, res: Response) => {
-        const auth = await authenticate(req, res);
-        if (res.headersSent) return;
-        const sessionId = req.headers['mcp-session-id'] as string | undefined;
-        if (!sessionId || !transports.has(sessionId)) {
-            res.status(404).json({ error: 'Session not found' });
-            return;
-        }
-        if (!sessionAllowed(req, res, sessionId, auth)) return;
-        const transport = transports.get(sessionId)!;
-        await transport.close();
-        transports.delete(sessionId);
-        res.status(200).json({ closed: true });
-    };
+    const handleMcpGet = legacy.handleGet;
+    const handleMcpDelete = legacy.handleDelete;
 
     // Validate the :role path param for v2 surfaces; replies 400 (JSON-RPC) on unknown role.
     const v2Role = (req: Request, res: Response): SurfaceRole | null => {

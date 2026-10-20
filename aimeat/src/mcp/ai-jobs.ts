@@ -24,6 +24,8 @@
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The three reads pass the session principal as the viewer, so an agent sees and stops
  *     only the jobs it started unless it reads as the owner (secaudit 2026-10,
  *     registerAiJobTools:jobs-keyed-by-owner-ghii).
@@ -40,7 +42,7 @@
  *     the session's scopes), so the job reads its inputs as that agent (TARGET-082 V4). Takes the
  *     session's scopes as a fifth parameter.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -89,11 +91,13 @@ export function registerAiJobTools(
     };
 
     // ── aimeat_ai_job_start ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_ai_job_start',
-        descriptionFor('aimeat_ai_job_start'),
-        zodShapeFor('aimeat_ai_job_start'),
-        annotationsFor('aimeat_ai_job_start'),
+        {
+            description: descriptionFor('aimeat_ai_job_start'),
+            inputSchema: zodShapeFor('aimeat_ai_job_start'),
+            annotations: annotationsFor('aimeat_ai_job_start'),
+        },
         async (a) => {
             if (!owner) return err('Could not resolve caller owner');
             try {
@@ -123,11 +127,13 @@ export function registerAiJobTools(
     );
 
     // ── aimeat_ai_job_list ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_ai_job_list',
-        descriptionFor('aimeat_ai_job_list'),
-        zodShapeFor('aimeat_ai_job_list'),
-        annotationsFor('aimeat_ai_job_list'),
+        {
+            description: descriptionFor('aimeat_ai_job_list'),
+            inputSchema: zodShapeFor('aimeat_ai_job_list'),
+            annotations: annotationsFor('aimeat_ai_job_list'),
+        },
         async (a) => {
             try {
                 const jobs = await service().listJobs(ownerGhii, {
@@ -143,11 +149,13 @@ export function registerAiJobTools(
     );
 
     // ── aimeat_ai_job_get ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_ai_job_get',
-        descriptionFor('aimeat_ai_job_get'),
-        zodShapeFor('aimeat_ai_job_get'),
-        annotationsFor('aimeat_ai_job_get'),
+        {
+            description: descriptionFor('aimeat_ai_job_get'),
+            inputSchema: zodShapeFor('aimeat_ai_job_get'),
+            annotations: annotationsFor('aimeat_ai_job_get'),
+        },
         async (a) => {
             try {
                 const job = await service().getJob(ownerGhii, a.job_id, viewer);
@@ -163,11 +171,13 @@ export function registerAiJobTools(
     );
 
     // ── aimeat_ai_job_cancel ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_ai_job_cancel',
-        descriptionFor('aimeat_ai_job_cancel'),
-        zodShapeFor('aimeat_ai_job_cancel'),
-        annotationsFor('aimeat_ai_job_cancel'),
+        {
+            description: descriptionFor('aimeat_ai_job_cancel'),
+            inputSchema: zodShapeFor('aimeat_ai_job_cancel'),
+            annotations: annotationsFor('aimeat_ai_job_cancel'),
+        },
         async (a) => {
             try {
                 // The viewer is checked before anything is aborted: a job this session did not start

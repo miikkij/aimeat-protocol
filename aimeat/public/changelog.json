@@ -2,6 +2,29 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-21",
+      "kind": "feature",
+      "id": "2026-10-21-ai-clients-on-the-newest-mcp-version-connect-directly",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "AI clients on the newest MCP version connect directly",
+        "fi": "Uusimman MCP-version AI-asiakkaat yhdistävät suoraan"
+      },
+      "summary": {
+        "en": "AI clients on MCP 2026-07-28 and on older versions use the same address and get the same tools.",
+        "fi": "AI-asiakkaat MCP 2026-07-28:lla ja vanhemmilla versioilla käyttävät samaa osoitetta ja saavat samat työkalut."
+      },
+      "body": {
+        "en": "Claude's connectors and other AI clients that speak the newest MCP version, 2026-07-28, now talk to your node in that version, without a step back to the older one first. Clients on older versions connect at the same address as before and see no change. On the new version every request stands on its own, so there is no session to lose. When you change an agent's permissions, a client that listens hears about it and reads its tool list again, and when you remove an agent, its connection closes. The aimeat connect serve command answers both versions too, and your node speaks the new version to other MCP servers that support it.",
+        "fi": "Clauden yhdistimet ja muut AI-asiakkaat, jotka puhuvat uusinta MCP-versiota 2026-07-28, keskustelevat nyt solmusi kanssa tällä versiolla. Ne eivät enää palaa ensin vanhempaan versioon. Vanhempia versioita käyttävät asiakkaat yhdistävät samaan osoitteeseen kuin ennenkin, eikä niille muutu mitään. Uudessa versiossa jokainen pyyntö on oma kokonaisuutensa, joten istuntoa ei voi menettää. Kun muutat agentin oikeuksia, kuunteleva asiakas saa tiedon ja lukee työkalulistansa uudelleen. Kun poistat agentin, sen yhteys sulkeutuu. Myös aimeat connect serve -komento vastaa molemmilla versioilla, ja solmusi puhuu uutta versiota muille MCP-palvelimille, jotka tukevat sitä."
+      }
+    },
+    {
       "date": "2026-10-19",
       "kind": "feature",
       "id": "2026-10-19-your-agents-have-faces-of-their-own",

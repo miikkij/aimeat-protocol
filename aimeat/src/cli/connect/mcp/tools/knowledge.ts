@@ -8,6 +8,8 @@
  *   registered and refuses: the capability has no HTTP route for the connector to proxy.
  * @usage registerKnowledgeTools(mcp, registry);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   2026-10-06 — aimeat_knowledge_contribute registers the catalog's schema too.
  *   v1.5.0 -- 2026-08-11 -- aimeat_knowledge_contribute stops posting {entry_key, content} to
@@ -23,7 +25,7 @@
  *   v1.2.0 -- 2026-05-30 -- F10 drift reconciliation: rename id->package_id (get/contribute/links),
  *     add direction filter to links to match server/REST.
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../tool-catalog/shape.js';
@@ -34,7 +36,7 @@ export function registerKnowledgeTools(mcp: McpServer, _registry: AgentRegistry)
   // The parameters stay as the catalog declares them, so an agent reading the tool list sees the same
   // capability it sees on the node. The call refuses, because the node keeps this one behind MCP and
   // the connector has no route to forward it to. The description says so before an agent spends a call.
-  mcp.tool('aimeat_knowledge_contribute', descriptionFor('aimeat_knowledge_contribute') + KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE, zodShapeFor('aimeat_knowledge_contribute'), annotationsFor('aimeat_knowledge_contribute'), () => {
+  mcp.registerTool('aimeat_knowledge_contribute', { description: descriptionFor('aimeat_knowledge_contribute') + KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE, inputSchema: zodShapeFor('aimeat_knowledge_contribute'), annotations: annotationsFor('aimeat_knowledge_contribute') }, () => {
     const refusal = knowledgeContributeUnreachable();
     return { content: [{ type: 'text' as const, text: JSON.stringify(refusal, null, 2) }], isError: true };
   });

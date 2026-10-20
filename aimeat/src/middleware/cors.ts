@@ -14,6 +14,8 @@
  *   - setCorsHeaders(): writes Allow-Origin/Methods/Headers/Expose headers
  *
  * @version-history
+ *   v1.1.0 — 2026-10-20 — The MCP 2026-07-28 request headers (MCP-Protocol-Version, Mcp-Method,
+ *     Mcp-Name) are allowed (MCP SDK v2 migration step 5).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-10 — Security audit C-1: the wildcard no longer reaches the three routes that
  *     authenticate with the `aimeat_rt` cookie and return a credential. App origins are same-site
@@ -108,7 +110,10 @@ export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage 
 function setCorsHeaders(res: { setHeader(name: string, value: string): void }, origin: string): void {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key, mcp-session-id');
+    // MCP 2026-07-28 requires MCP-Protocol-Version, Mcp-Method and Mcp-Name on every request POST
+    // (SEP-2243). Mcp-Param-* headers have tool-defined names a static list cannot name; the SDK's
+    // browser clients skip that mirroring for exactly this reason.
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Idempotency-Key, mcp-session-id, MCP-Protocol-Version, Mcp-Method, Mcp-Name');
     res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id');
 }
 

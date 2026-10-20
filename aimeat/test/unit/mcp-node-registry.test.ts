@@ -9,6 +9,7 @@
  *   strength of a half-finished setup. And no call may ever take morsels from anybody, because
  *   morsels are a pacer and buy nothing; that failure reaches a balance rather than a log.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.3.1 — 2026-10-18 — The upstream listens on a port the system picks; the fixed 40686 collided on
  *     CI (EADDRINUSE at a248ddd2a, run 39097196231).
  *   v1.3.0 — 2026-09-24 — The price arms hand the chokepoint Alice's scopes as a door does
@@ -25,8 +26,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { normalizeMcpPrice, type McpServerRecord } from '../../src/models/mcp-server-schemas.js';
 import {
@@ -49,7 +50,7 @@ const ALICE = 'alice@test-node-001';
 const BOB = 'bob@test-node-001';
 
 let upstream: http.Server;
-const transports = new Map<string, StreamableHTTPServerTransport>();
+const transports = new Map<string, NodeStreamableHTTPServerTransport>();
 
 beforeAll(async () => {
   upstream = http.createServer(async (req, res) => {
@@ -57,11 +58,9 @@ beforeAll(async () => {
     let t = sid ? transports.get(sid) : undefined;
     if (!t) {
       const srv = new McpServer({ name: 'paid-upstream', version: '1.0.0' });
-      srv.tool('quote', 'Costs money somewhere.', { symbol: z.string() },
-        async ({ symbol }) => ({ content: [{ type: 'text', text: `quote:${symbol}` }] }));
-      srv.tool('explodes', 'Throws, so the refund path is exercised.', {},
-        async () => { throw new Error('upstream blew up'); });
-      const created = new StreamableHTTPServerTransport({
+      srv.registerTool('quote', { description: 'Costs money somewhere.', inputSchema: z.object({ symbol: z.string() }) }, async ({ symbol }) => ({ content: [{ type: 'text', text: `quote:${symbol}` }] }));
+      srv.registerTool('explodes', { description: 'Throws, so the refund path is exercised.', inputSchema: z.object({}) }, async () => { throw new Error('upstream blew up'); });
+      const created = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id: string) => transports.set(id, created),
       });

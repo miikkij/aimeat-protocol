@@ -5,6 +5,8 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.6.1 -- 2026-10-20 -- Test 15 asserts the server does not declare resources.subscribe, which no
+ *     handler serves (test 29 still accepts -32601 for the method).
  *   v1.6.0 -- 2026-10-12 -- MCP-06 (a code without PKCE) and MCP-07 (a foreign resource) ask the node
  *     which release it runs (helpers/node-release.ts): 3.x asserts the issued code and the counter as
  *     before; 4.0.0 asserts 400 invalid_request / invalid_target, no code, and no counter move.
@@ -573,6 +575,8 @@ await test('15. Initialize MCP session', async () => {
     assert(body.result !== undefined, `has result: ${JSON.stringify(body)}`);
     assert(body.result.protocolVersion !== undefined, 'has protocolVersion');
     assert(body.result.capabilities !== undefined, 'has capabilities');
+    // Declared only what is served: no handler answers resources/subscribe (test 29).
+    assert(body.result.capabilities.resources?.subscribe !== true, `resources.subscribe is not declared: ${JSON.stringify(body.result.capabilities)}`);
     const sid = sessionId;
     assert(typeof sid === 'string' && sid.length > 0, `has mcp-session-id: "${sid}"`);
 

@@ -11,6 +11,7 @@
  *   caller holding only the read word can call a tool, and whether a tool saying no is told apart
  *   from the proxy failing. Each of those has a named test below.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.2 — 2026-10-20 — The server that will not answer is at a port the system handed out and the
  *     test closed again, not the fixed 40690, which another file's listen(0) can hold on CI
  *     (check:unit-ports).
@@ -26,8 +27,8 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { NodeStreamableHTTPServerTransport } from '@modelcontextprotocol/node';
+import { McpServer } from '@modelcontextprotocol/server';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { mcpServersRouter } from '../../src/routes/mcp-servers.js';
 import { mcpClientPool } from '../../src/services/mcp-client/pool.js';
@@ -51,7 +52,7 @@ const config = {
 } as unknown as AimeatConfig;
 
 let upstream: http.Server;
-const upstreamTransports = new Map<string, StreamableHTTPServerTransport>();
+const upstreamTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 
 /** Stands in for the auth middleware: whoever the test says is calling, with whatever scopes. */
 interface Caller { sub: string; owner: string; roles: string[]; scopes: string[] }
@@ -104,11 +105,9 @@ beforeAll(async () => {
     let transport = sid ? upstreamTransports.get(sid) : undefined;
     if (!transport) {
       const srv = new McpServer({ name: 'upstream', version: '1.0.0' });
-      srv.tool('create_issue', 'Creates an issue.', { title: z.string() },
-        async ({ title }) => ({ content: [{ type: 'text', text: `created:${title}` }] }));
-      srv.tool('refuses', 'Always says no.', {},
-        async () => ({ content: [{ type: 'text', text: 'not allowed' }], isError: true }));
-      const created = new StreamableHTTPServerTransport({
+      srv.registerTool('create_issue', { description: 'Creates an issue.', inputSchema: z.object({ title: z.string() }) }, async ({ title }) => ({ content: [{ type: 'text', text: `created:${title}` }] }));
+      srv.registerTool('refuses', { description: 'Always says no.', inputSchema: z.object({}) }, async () => ({ content: [{ type: 'text', text: 'not allowed' }], isError: true }));
+      const created = new NodeStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
         onsessioninitialized: (id: string) => upstreamTransports.set(id, created),
       });

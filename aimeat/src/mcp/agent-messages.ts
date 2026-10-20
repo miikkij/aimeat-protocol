@@ -8,6 +8,8 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_message_send passes metadata.prompt (the choice prompt) to the send service, as POST /v1/agents/:name/messages does (feature-list audit #126).
  *   2026-10-08 — aimeat_message_send hands the session's scopes to the send service (aiprov D5).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -35,7 +37,7 @@
  *     label is owed — not whether the world can read it.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -58,11 +60,13 @@ export function registerAgentMessageTools(
     const agentGaii = getAgentGaii();
 
     // ── Tool 1: aimeat_message_inbox ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_message_inbox',
-        descriptionFor('aimeat_message_inbox'),
-        zodShapeFor('aimeat_message_inbox'),
-        annotationsFor('aimeat_message_inbox'),
+        {
+            description: descriptionFor('aimeat_message_inbox'),
+            inputSchema: zodShapeFor('aimeat_message_inbox'),
+            annotations: annotationsFor('aimeat_message_inbox'),
+        },
         async () => {
             const messages = await storage.listPendingMessages(agentGaii);
             const provFor = await readProvenanceMany(storage, config, messages.map(m => m.aiProvenanceId));
@@ -86,11 +90,13 @@ export function registerAgentMessageTools(
     );
 
     // ── Tool 2: aimeat_message_send ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_message_send',
-        descriptionFor('aimeat_message_send'),
-        zodShapeFor('aimeat_message_send'),
-        annotationsFor('aimeat_message_send'),
+        {
+            description: descriptionFor('aimeat_message_send'),
+            inputSchema: zodShapeFor('aimeat_message_send'),
+            annotations: annotationsFor('aimeat_message_send'),
+        },
         async ({ content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
             // The record, the provenance stamp and the live-update emit are the REST route's, called
             // rather than copied (services/agent-message-send.ts). Direction is fixed: this tool is
@@ -148,11 +154,13 @@ export function registerAgentMessageTools(
     );
 
     // ── Tool 3: aimeat_message_history ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_message_history',
-        descriptionFor('aimeat_message_history'),
-        zodShapeFor('aimeat_message_history'),
-        annotationsFor('aimeat_message_history'),
+        {
+            description: descriptionFor('aimeat_message_history'),
+            inputSchema: zodShapeFor('aimeat_message_history'),
+            annotations: annotationsFor('aimeat_message_history'),
+        },
         async ({ thread_id, page, per_page }) => {
             const result = await storage.listMessages(agentGaii, {
                 threadId: thread_id,

@@ -26,6 +26,8 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.36.1 -- 2026-10-20 -- `sse_params()` defaults to `/v1/mcp`, the node's one MCP path; it named
+    `/v1/mcp/sse`, which the node never served. `http_params()` is what reaches a node.
   0.36.0 -- 2026-10-18 -- `build_offer()` requires `deliverable`, as the node's OfferSchema does
     (offers.py, DELIVERABLE_FORMATS). It raised nothing before and the node's catalogue then left out
     the agent's whole offers document; now a missing deliverable or one that is not a dict is a
@@ -239,7 +241,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.36.0"
+__version__ = "0.36.1"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

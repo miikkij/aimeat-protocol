@@ -13,6 +13,7 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.4.0 — 2026-10-17 — A tool with only pacing (solo, brief, cheap) is a free product on the raw and
  *     capability routes too, as the app-tool route already served it: an uncontracted caller is served
  *     and pays the pacing, a grant carries it, a revoked grant stops carrying it. Only a money price
@@ -46,7 +47,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { Server } from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
@@ -156,7 +157,7 @@ async function txns(token: string): Promise<any[]> {
 }
 function captureTools(gaii: string, token: string): Record<string, (a: any) => Promise<any>> {
     const handlers: Record<string, (a: any) => Promise<any>> = {};
-    const mock = { tool: (name: string, _d: unknown, _s: unknown, _a: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
+    const mock = { registerTool: (name: string, _config: unknown, h: (a: any) => Promise<any>) => { handlers[name] = h; } } as unknown as McpServer;
     registerExchangeRunTools(mock, storage, config, () => gaii, () => token);
     return handlers;
 }

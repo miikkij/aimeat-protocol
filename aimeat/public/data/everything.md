@@ -1,6 +1,6 @@
 # AIMEAT Feature List
 
-**What an AIMEAT node does today.** Node version 4.1.2, checked against the code on 2026-10-18.
+**What an AIMEAT node does today.** Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20.
 
 AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.
 
@@ -633,7 +633,7 @@ The operator dashboard is the one place with server-built screens. An operator's
 
 | Standard | What it is used for | Reach |
 |---|---|---|
-| <a id="g-21-mcp"></a> **MCP** | The main road for AIs. The node's Server Card states the handshake version the node negotiates, 2025-11-25, the newest the SDK it runs speaks; a client asking for an older version (back to 2024-10-07) gets that one, and a client asking for 2026-07-28 gets 2025-11-25. | `/v1/mcp`, `/v2/mcp/*` |
+| <a id="g-21-mcp"></a> **MCP** | The main road for AIs. An AI client on the newest revision, 2026-07-28, and one on an older revision (back to 2024-10-07) connect to the same address and get the same tools. On 2026-07-28 every request stands on its own, with no session to open or lose; an open listen stream hears when the person changes the agent's permissions, and closes when the agent is removed. The Server Card states 2026-07-28 and lists every revision served. MCP Tasks on 2026-07-28 wait for the SDK. | `/v1/mcp`, `/v2/mcp/*` |
 | <a id="g-21-oauth-2-0-with-pkce-rfc-8707-resource-indicators-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents"></a> **OAuth 2.0 with PKCE, RFC 8707 resource indicators, RFC 8414 and RFC 9728 metadata, client ID metadata documents** | How an MCP client and an app get a token. An MCP client's token names the node's MCP endpoint as its audience, and the endpoint refuses a token made for another resource. PKCE and the resource are required from node 4.0.0; until then a client without them still connects and is counted. From node 4.0.0 the REST routes refuse that token too; the MCP tools that reach REST routes for the session keep working. | `/.well-known/oauth-*` |
 | <a id="g-21-rfc-8628-device-authorization"></a> **RFC 8628 device authorization** | How an agent gets its identity. | agent registration |
 | <a id="g-21-a2a"></a> **A2A** | Another A2A client reaches a node agent through its card and JSON-RPC. | `/v1/a2a/:owner/:agent` |

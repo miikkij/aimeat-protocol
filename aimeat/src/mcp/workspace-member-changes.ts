@@ -16,11 +16,13 @@
  * @structure registerWorkspaceMemberChangeTools(mcp, deps, caller)
  * @usage registerWorkspaceMemberChangeTools(mcp, { storage, config }, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The deps no longer carry agentGaii and ownerName.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-25 — Initial: the member change doors (workspace actions for plain members).
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -56,25 +58,25 @@ export function registerWorkspaceMemberChangeTools(
     const changeCaller = (): ChangeCaller => caller().principalView;
     const ok = (obj: unknown): TextResult => ({ content: [{ type: 'text', text: JSON.stringify(obj, null, 2) }] });
 
-    mcp.tool('aimeat_workspace_space_add', descriptionFor('aimeat_workspace_space_add'),
-        zodShapeFor('aimeat_workspace_space_add'),
-        annotationsFor('aimeat_workspace_space_add'),
+    mcp.registerTool('aimeat_workspace_space_add', { description: descriptionFor('aimeat_workspace_space_add'),
+        inputSchema: zodShapeFor('aimeat_workspace_space_add'),
+        annotations: annotationsFor('aimeat_workspace_space_add') },
         async ({ organism_id, ws, spaces, schemas }): Promise<TextResult> => {
             const r = await addWorkspaceSpaces(svc, changeCaller(), { orgId: organism_id, ws, spaces: parsed(spaces), schemas: parsed(schemas) });
             return isRefusal(r) ? toolError(r.code, r.message) : ok(r);
         });
 
-    mcp.tool('aimeat_workspace_sections_set', descriptionFor('aimeat_workspace_sections_set'),
-        zodShapeFor('aimeat_workspace_sections_set'),
-        annotationsFor('aimeat_workspace_sections_set'),
+    mcp.registerTool('aimeat_workspace_sections_set', { description: descriptionFor('aimeat_workspace_sections_set'),
+        inputSchema: zodShapeFor('aimeat_workspace_sections_set'),
+        annotations: annotationsFor('aimeat_workspace_sections_set') },
         async ({ organism_id, ws, space, sections }): Promise<TextResult> => {
             const r = await setWorkspaceSections(svc, changeCaller(), { orgId: organism_id, ws, space, sections: parsed(sections) });
             return isRefusal(r) ? toolError(r.code, r.message) : ok(r);
         });
 
-    mcp.tool('aimeat_workspace_suggestions', descriptionFor('aimeat_workspace_suggestions'),
-        zodShapeFor('aimeat_workspace_suggestions'),
-        annotationsFor('aimeat_workspace_suggestions'),
+    mcp.registerTool('aimeat_workspace_suggestions', { description: descriptionFor('aimeat_workspace_suggestions'),
+        inputSchema: zodShapeFor('aimeat_workspace_suggestions'),
+        annotations: annotationsFor('aimeat_workspace_suggestions') },
         async ({ organism_id, action, ws, status, suggestion_id, decision, note }): Promise<TextResult> => {
             if (action === 'list') {
                 const r = await listSuggestions(svc, changeCaller(), { orgId: organism_id, ws, status });

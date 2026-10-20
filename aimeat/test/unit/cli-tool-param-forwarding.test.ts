@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-12 — The 30 tools that got a CLI dispatch definition are invoked here like every other one.
  *     Four of them branch on a parameter (beneficiary earnings, splits and approve, proposal decide)
  *     and get a PROBE_SETUP entry, and each of the six groups has one case that names the route it
@@ -440,8 +441,8 @@ describe('the redeploy, source and board-rules parameters reach the route that r
     function connectorTools(_module: unknown, sent: Sent[]) {
         const tools = new Map<string, { shape: Record<string, unknown>; handler: (args: Record<string, unknown>) => Promise<{ isError?: boolean }> }>();
         const mcp = {
-            tool: (...args: unknown[]) => {
-                const shape = (typeof args[1] === 'string' ? args[2] : args[1]) as Record<string, unknown>;
+            registerTool: (...args: unknown[]) => {
+                const shape = ((args[1] as { inputSchema?: Record<string, unknown> } | undefined)?.inputSchema ?? {}) as Record<string, unknown>;
                 tools.set(args[0] as string, { shape, handler: args[args.length - 1] as never });
             },
         };

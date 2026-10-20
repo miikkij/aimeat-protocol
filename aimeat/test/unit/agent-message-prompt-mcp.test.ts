@@ -8,6 +8,7 @@
  *   had no question for the owner to answer (feature-list audit #126).
  * @usage cd aimeat && pnpm exec vitest run test/unit/agent-message-prompt-mcp.test.ts
  * @version-history
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-15 — Initial (feature-list audit #126).
  */
 import { describe, it, expect } from 'vitest';
@@ -32,7 +33,7 @@ describe('aimeat_message_send carries metadata.prompt (feature-list audit #126)'
         const config = { nodeId: NODE, baseUrl: 'http://localhost', aiProvenance: false } as AimeatConfig;
         type Handler = (args: Record<string, unknown>) => Promise<{ content: { text: string }[]; isError?: boolean }>;
         const tools = new Map<string, Handler>();
-        const fakeMcp = { tool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as Handler); } };
+        const fakeMcp = { registerTool: (name: string, ...rest: unknown[]) => { tools.set(name, rest[rest.length - 1] as Handler); } };
         registerAgentMessageTools(fakeMcp as never, storage, config, () => AGENT, () => {}, () => {}, []);
 
         const args = z.object(zodShapeFor('aimeat_message_send')).parse({ content: 'Pick one', metadata: { prompt: PROMPT } });

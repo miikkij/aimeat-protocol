@@ -14,6 +14,8 @@
  * @structure registerAdminInstallSetTools(mcp, storage, config, peers, getAgentGaii, scopes)
  * @usage registered from src/mcp/register-all.ts
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.3.0 — 2026-10-02 — aimeat_package_sale action review (package sale design, phase 5).
  *   v1.2.0 — 2026-10-02 — aimeat_package_sale gains offer, claim, catalogue, price, requests and decide;
@@ -22,7 +24,7 @@
  *     package repository with its own key; operator-only, the same test as the install set.
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -48,7 +50,7 @@ export function registerAdminInstallSetTools(
     /** This session's granted scopes: operator:admin is asked of them at call time. */
     scopes: readonly string[] = [],
 ): void {
-    mcp.tool('aimeat_admin_install_set', descriptionFor('aimeat_admin_install_set'), zodShapeFor('aimeat_admin_install_set'), annotationsFor('aimeat_admin_install_set'), async ({ action, install_set, secrets }) => {
+    mcp.registerTool('aimeat_admin_install_set', { description: descriptionFor('aimeat_admin_install_set'), inputSchema: zodShapeFor('aimeat_admin_install_set'), annotations: annotationsFor('aimeat_admin_install_set') }, async ({ action, install_set, secrets }) => {
         const agentGaii = getAgentGaii();
         if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
         if (action === 'list') return text({ install_sets: await listAppliedSets(storage) });
@@ -60,7 +62,7 @@ export function registerAdminInstallSetTools(
     });
 
     // A selling node's signed sale requests: the same services /v1/package-sales/... calls.
-    mcp.tool('aimeat_package_sale', descriptionFor('aimeat_package_sale'), zodShapeFor('aimeat_package_sale'), annotationsFor('aimeat_package_sale'), async (input) => {
+    mcp.registerTool('aimeat_package_sale', { description: descriptionFor('aimeat_package_sale'), inputSchema: zodShapeFor('aimeat_package_sale'), annotations: annotationsFor('aimeat_package_sale') }, async (input) => {
         const agentName = await resolveOperatorAgentName(storage, getAgentGaii(), scopes);
         if (!agentName) return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
         const deps = { storage, config, peers };
@@ -98,7 +100,7 @@ export function registerAdminInstallSetTools(
     });
 
     // The buying node: its operator redeems a claim code with this node's own key (POST /v1/package-claims).
-    mcp.tool('aimeat_package_claim', descriptionFor('aimeat_package_claim'), zodShapeFor('aimeat_package_claim'), annotationsFor('aimeat_package_claim'), async (input) => {
+    mcp.registerTool('aimeat_package_claim', { description: descriptionFor('aimeat_package_claim'), inputSchema: zodShapeFor('aimeat_package_claim'), annotations: annotationsFor('aimeat_package_claim') }, async (input) => {
         if (!(await resolveOperatorAgentName(storage, getAgentGaii(), scopes))) return { content: [{ type: 'text' as const, text: OPERATOR_AGENT_REFUSAL }], isError: true };
         const repository = input.repository_link ? { node_id: input.repository, ...input.repository_link } : input.repository;
         const out = await claimPackageHere({ storage, config, peers }, repository, input.group_id, input.code);

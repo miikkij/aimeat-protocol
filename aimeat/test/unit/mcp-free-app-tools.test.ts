@@ -2,13 +2,15 @@
  * @file test/unit/mcp-free-app-tools.test.ts
  * @description MCP app-tool price decisions preserve free calls, refusals and pinned contracts.
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-20 — appToolBindingRefusal is part of the capability-invoke module this suite mocks, and
  *     a refusal from it fails the tool without invoking anything (secaudit 2026-10).
  *   2026-10-11 — The `price.morsels` case asserted the old model; a morsel amount is pacing, so only money keeps a tool behind its contract.
  *   2026-10-06 —Regression: cross-owner unpriced tools incorrectly answered NO_CONTRACT over MCP.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { MeteredOutcome } from '../../src/services/metered-access.js';
@@ -33,7 +35,7 @@ type Handler = (input: Record<string, unknown>) => Promise<ToolResult>;
 
 function harness(fields: Record<string, unknown> = {}) {
   const handlers = new Map<string, Handler>();
-  const mcp = { tool: (name: string, _description: unknown, _shape: unknown, _annotations: unknown, handler: Handler) => {
+  const mcp = { registerTool: (name: string, _config: unknown, handler: Handler) => {
     handlers.set(name, handler);
   } } as unknown as McpServer;
   const storage = { getMemory: vi.fn().mockResolvedValue({ visibility: 'public', value: { tools: [{ ...tool, ...fields }] } }),

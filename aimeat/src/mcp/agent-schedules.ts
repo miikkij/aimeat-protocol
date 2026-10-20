@@ -18,6 +18,8 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The write caller names the session's kind and roles, as the REST door does, so
  *     canManageSchedule can tell an agent from an ecosystem app (secaudit 2026-10).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -41,7 +43,7 @@
  *     where HTTP validates it, and a target agent that does not exist was caught for agent_task only.
  *   v1.0.0 — 2026-06-03 — Initial: agent-created recurring schedules + internal mirror
  */
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -96,11 +98,13 @@ export function registerAgentScheduleTools(
   };
 
   // ── aimeat_schedule_create ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_schedule_create',
-    descriptionFor('aimeat_schedule_create'),
-    zodShapeFor('aimeat_schedule_create'),
-    annotationsFor('aimeat_schedule_create'),
+    {
+        description: descriptionFor('aimeat_schedule_create'),
+        inputSchema: zodShapeFor('aimeat_schedule_create'),
+        annotations: annotationsFor('aimeat_schedule_create'),
+    },
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
 
@@ -139,11 +143,13 @@ export function registerAgentScheduleTools(
   );
 
   // ── aimeat_schedule_list ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_schedule_list',
-    descriptionFor('aimeat_schedule_list'),
-    zodShapeFor('aimeat_schedule_list'),
-    annotationsFor('aimeat_schedule_list'),
+    {
+        description: descriptionFor('aimeat_schedule_list'),
+        inputSchema: zodShapeFor('aimeat_schedule_list'),
+        annotations: annotationsFor('aimeat_schedule_list'),
+    },
     async ({ detail }) => {
       const all = await storage.listScheduledJobs({ ownerScope });
       const mine = all.filter(j => j.createdByAgent || j.agentGaii === agentGaii);
@@ -161,11 +167,13 @@ export function registerAgentScheduleTools(
   );
 
   // ── aimeat_schedule_update (pause/resume/edit) ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_schedule_update',
-    descriptionFor('aimeat_schedule_update'),
-    zodShapeFor('aimeat_schedule_update'),
-    annotationsFor('aimeat_schedule_update'),
+    {
+        description: descriptionFor('aimeat_schedule_update'),
+        inputSchema: zodShapeFor('aimeat_schedule_update'),
+        annotations: annotationsFor('aimeat_schedule_update'),
+    },
     async (a) => {
       // Same service as PATCH /v1/schedules/:id, which means an edit here is judged the way an edit
       // there is: only a schedule this agent created, and a cron expression that parses.
@@ -182,11 +190,13 @@ export function registerAgentScheduleTools(
   );
 
   // ── aimeat_schedule_delete (cancel) ──
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_schedule_delete',
-    descriptionFor('aimeat_schedule_delete'),
-    zodShapeFor('aimeat_schedule_delete'),
-    annotationsFor('aimeat_schedule_delete'),
+    {
+        description: descriptionFor('aimeat_schedule_delete'),
+        inputSchema: zodShapeFor('aimeat_schedule_delete'),
+        annotations: annotationsFor('aimeat_schedule_delete'),
+    },
     async (a) => {
       const out = await deleteScheduleRecord({ storage, config }, writeCaller(), a.schedule_id);
       if (!out.ok) return err(`${out.code}: ${out.message}`);
@@ -197,11 +207,13 @@ export function registerAgentScheduleTools(
   // ── aimeat_schedule_trigger (run now) ──
   // The proving step. A schedule that has never fired is a guess, so the tool that creates one is
   // worth little without the one that runs it while the caller is still there to read the result.
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_schedule_trigger',
-    descriptionFor('aimeat_schedule_trigger'),
-    zodShapeFor('aimeat_schedule_trigger'),
-    annotationsFor('aimeat_schedule_trigger'),
+    {
+        description: descriptionFor('aimeat_schedule_trigger'),
+        inputSchema: zodShapeFor('aimeat_schedule_trigger'),
+        annotations: annotationsFor('aimeat_schedule_trigger'),
+    },
     async (a) => {
       // Same service as POST /v1/schedules/:id/trigger: same manage rule, same clock, same outcome.
       const out = await triggerScheduleRecord({ storage, config }, writeCaller(), a.schedule_id);
@@ -224,11 +236,13 @@ export function registerAgentScheduleTools(
   // ── aimeat_schedule_report_internal ──
   // Agents that run their OWN cron (outside AIMEAT) publish a structured mirror
   // so the owner can see those schedules alongside AIMEAT-managed ones.
-  mcp.tool(
+  mcp.registerTool(
     'aimeat_schedule_report_internal',
-    descriptionFor('aimeat_schedule_report_internal'),
-    zodShapeFor('aimeat_schedule_report_internal'),
-    annotationsFor('aimeat_schedule_report_internal'),
+    {
+        description: descriptionFor('aimeat_schedule_report_internal'),
+        inputSchema: zodShapeFor('aimeat_schedule_report_internal'),
+        annotations: annotationsFor('aimeat_schedule_report_internal'),
+    },
     async (a) => {
       const key = `agents.${selfName}.scheduler`;
       const now = new Date().toISOString();

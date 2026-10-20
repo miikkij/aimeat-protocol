@@ -12,6 +12,8 @@
  *   import { registerFlagsTools } from './flags.js';
  *   registerFlagsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 1 tool for content moderation reporting via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -23,7 +25,7 @@
  *     flagCount bump on a flagged memory record, and the bounds on targetId and description.
  */
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -42,11 +44,13 @@ export function registerFlagsTools(
     const agentGaii = getAgentGaii();
 
     // ── Tool 1: aimeat_flag_report ──
-    mcp.tool(
+    mcp.registerTool(
         'aimeat_flag_report',
-        descriptionFor('aimeat_flag_report'),
-        zodShapeFor('aimeat_flag_report'),
-        annotationsFor('aimeat_flag_report'),
+        {
+            description: descriptionFor('aimeat_flag_report'),
+            inputSchema: zodShapeFor('aimeat_flag_report'),
+            annotations: annotationsFor('aimeat_flag_report'),
+        },
         async ({ target_type, target_id, reason, description }) => {
             const out = await createModerationFlag({ storage, config }, agentGaii, {
                 targetType: target_type,
