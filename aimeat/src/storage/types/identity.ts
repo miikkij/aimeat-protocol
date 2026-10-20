@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-20 — GrantsToIdentityCleared: what Storage.clearGrantsToIdentity() took away
+ *     when an agent ended (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   v1.9.0 — 2026-10-18 — AgentRecord.clearance: the highest classification label the agent may read
  *     (migration 0107, plan doc-mvdipuyqraas L2).
  *   v1.8.0 — 2026-10-11 — AgentRecord.stoppedAt and stoppedBy: an agent the owner stopped (migration 0101).
@@ -300,6 +302,24 @@ export interface AgentRecord {
  * spent it. Both are recorded because "who asked" and "who carried it out" are different questions,
  * and here the second one is a machine.
  */
+/**
+ * What `Storage.clearGrantsToIdentity()` took away: the references in which ANOTHER party named this
+ * identity as the one it grants to. Counted per kind so the caller can report it, because an erasure
+ * log that says nothing is a log that cannot be checked.
+ */
+export interface GrantsToIdentityCleared {
+  /** Consent grants whose `recipient` was this exact GAII, revoked (not deleted: the grantor keeps the record). */
+  consents: number;
+  /** Organisms that listed this GAII in `agentGaiis`. */
+  organisms: number;
+  /** Boards that listed this GAII in `allowedGaiis`. */
+  boards: number;
+  /** Sharing groups that had this GAII as a member. */
+  sharingGroups: number;
+  /** Agents whose `registeredBy` named this GAII, now cleared. */
+  registrations: number;
+}
+
 /** What an enrolment grant is for: see `kind` on AgentEnrolmentGrantRecord. */
 export type EnrolmentGrantKind = 'create' | 'migrate' | 'move';
 

@@ -49,6 +49,9 @@ export * from './types/commerce.js';
 export * from './types/apps.js';
 export * from './types/packages.js';
 export * from './types/organisms-federation.js';
+// The knowledge-package types, extracted from the module above on 2026-10-20 at the 800-line limit.
+// Re-exported here so every consumer keeps reading them from this one place.
+export * from './types/knowledge.js';
 export * from './types/dependencies.js';
 export * from './types/component-versions.js';
 export * from './types/passkeys.js';

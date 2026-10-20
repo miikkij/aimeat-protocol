@@ -86,6 +86,14 @@ describe('Push subscriptions: who may register one, and whose device it replaces
     for (const name of ['alice', 'bob']) {
       await storage.createOwner({ name, displayName: name, publicKey: kp.publicKey, roles: ['owner'], createdAt: now });
     }
+    // An agent-role credential counts only while its agent record is there (auth/agent-alive.ts),
+    // so the two agent tokens below need the records the real doors would have.
+    for (const name of ['bot', 'helper']) {
+      await storage.createAgent({
+        name, owner: 'alice', gaii: `${name}#alice@${NODE_ID}`, publicKey: kp.publicKey, trustScore: 50,
+        morselBalance: 0, capabilities: [], defaultScopes: ['*'], createdAt: now, lastSeen: now,
+      } as never);
+    }
 
     const app = express();
     app.use(express.json());

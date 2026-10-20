@@ -23873,7 +23873,13 @@ paths:
         every organism they have contributed to plus their personal memory. Returns ranked,
         snippeted, organism-annotated hits to pick from. Without `memory:read` an agent's search stays
         inside its own namespace; an app grant without it is refused with 403 SCOPE_DENIED on
-        scope=own, because its own identity is its owner's GHII. scope=public needs no scope.
+        scope=own, because its own identity is its owner's GHII; an ecosystem app never fans across
+        the owner's identities, because its data-area allowlist is its fence. What the fan-out shows
+        is the ordinary same-owner view: the owner in person, an app grant and an agent holding
+        `memory:read-as-owner` see private records of the other identities, every other caller sees
+        its own records plus the owner-, members- and public-visibility ones, and an answer with
+        records left out carries `omitted` and a `note` naming the permission. scope=public needs no
+        scope.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -23927,7 +23933,10 @@ paths:
         the caller cannot read is ever returned, and facet counts obey the identical gate). Default
         scope: authenticated → `own`, anonymous → `public`. For an agent caller, results span the full
         owner identity set only when the agent holds the `memory:read` scope; otherwise they are limited
-        to the agent's own content.
+        to the agent's own content, and private records of the owner or of a sibling agent need
+        `memory:read-as-owner`. An app grant without `memory:read` gets no owner memory record at all
+        (its own identity is the owner's GHII), an ecosystem app searches only its own namespace, and
+        an agent's produced material (`material`) is its own tasks, never a sibling agent's.
       tags: [Catalogue]
       security:
         - BearerAuth: []
@@ -30431,6 +30440,80 @@ paths:
                             type: string
                           version:
                             type: integer
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/federation/retract:
+    post:
+      operationId: federationRetract
+      summary: Take back a replicated memory entry
+      description: |
+        A peer node says that a record it replicated here is gone or no longer eligible, and this
+        node removes its copy. The sending node must be an active peer with `replicate_memory` on,
+        and the Ed25519 signature is verified unconditionally. The replica key is built from the node
+        id the signature proved, never from a body field, and a row is removed only when it carries a
+        tag naming that node, so a peer can take back what it sent and nothing else. The replica, the
+        copy a de-peering grace renamed to `expiring:{source}:{key}`, and the conflict copies kept
+        beside either all go. The answer is 200 whether or not a copy was here; `removed` says how
+        many rows went.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, gaii, key, timestamp, signature]
+              properties:
+                source_node:
+                  type: string
+                gaii:
+                  $ref: '#/components/schemas/GAII'
+                key:
+                  type: string
+                  description: The record's key on the sending node, without the replica prefix.
+                reason:
+                  type: string
+                  enum: [deleted, not_public, consent_revoked, no_longer_eligible]
+                  description: Why the record stopped being eligible. For the receiving node's log; nothing is stored.
+                timestamp:
+                  type: string
+                  format: date-time
+                  description: When the retraction was sent. Refused outside five minutes (400 STALE_TIMESTAMP) and the second time (401 REPLAYED).
+                signature:
+                  type: string
+                  description: Ed25519 signature of the payload.
+                audience:
+                  type: string
+                  description: The node this retraction is for.
+                audience_signature:
+                  type: string
+                  description: Ed25519 signature of "aimeat-audience:{audience}\n{the signed payload}" by the sending node.
+      responses:
+        '200':
+          description: Retraction accepted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          retracted:
+                            type: boolean
+                          source_node:
+                            type: string
+                          key:
+                            type: string
+                          removed:
+                            type: integer
+                          removed_keys:
+                            type: array
+                            items:
+                              type: string
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -37523,6 +37606,17 @@ paths:
       description: |
         Grant consent for a specific data pattern to be shared with a recipient
         for a stated purpose. Requires agent authentication.
+
+        A consent is filed under the identity that made it, and it covers that
+        identity's own records: an agent's consent covers the agent's data.
+
+        Recipient `*` means everyone, the anonymous reader included, so on a node
+        whose publish gate is on it meets the same gate a raise to public meets.
+        The account holder in person, and an agent or app holding
+        `publish:public`, grant it at once. For anyone else nothing is granted:
+        the answer is 403 `PUBLISH_REQUESTED` and the request waits on the
+        owner's list at /v1/publish-requests, where approving it grants the
+        consent.
       tags: [Consent]
       security:
         - BearerAuth: []
@@ -37561,6 +37655,23 @@ paths:
                                 format: date-time
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: |
+            Nothing was granted. Either the session does not carry
+            `consent:manage` (SCOPE_DENIED), or the recipient is `*` and the
+            publish gate asked the owner first (PUBLISH_REQUESTED).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: PUBLISH_REQUESTED
         '422':
           description: Invalid consent grant
           content:
@@ -42796,7 +42907,12 @@ paths:
           description: >-
             Imported. Returns { ws, objects, documents, rows, images, images_deduped, schemas }, and
             skipped_undeclared when the bundle carried records (or rows, role "row") in spaces its
-            own manifest does not declare.
+            own manifest does not declare. The archive is untrusted input, so the restore applies the
+            same write rules as the ordinary doors: `skipped` names what was not written at all (a
+            storage key outside the new workspace, or one a write door refuses), and `clamped` names
+            what was stored at a narrower level than the archive asked for (an organism the importer
+            is not a member of, a label's audience cap, the publish gate, a node closed to
+            strangers, or a share password a backup never carries).
           content:
             application/json:
               schema:
@@ -42826,6 +42942,34 @@ paths:
                                 namespace: { type: string }
                                 id: { type: string }
                                 role: { type: string, description: 'The record key suffix: draft, latest, version.N, or empty for a bare key' }
+                          skipped:
+                            type: array
+                            description: >-
+                              What the restore did not write at all: a storage key the archive named
+                              outside the new workspace root, or one a write door refuses. Absent
+                              when there were none.
+                            items:
+                              type: object
+                              required: [key, reason]
+                              properties:
+                                key: { type: string }
+                                reason: { type: string }
+                          clamped:
+                            type: array
+                            description: >-
+                              What the restore stored at a narrower level than the archive named, and
+                              why. Absent when the archive's levels were all kept.
+                            items:
+                              type: object
+                              required: [key, asked, stored, reason, message]
+                              properties:
+                                key: { type: string }
+                                asked: { type: string, description: The level the archive named }
+                                stored: { type: string, description: The level it was stored at }
+                                reason:
+                                  type: string
+                                  enum: [not_a_level, not_organism_member, signed_in_only, label_caps_audience, needs_the_owner, share_password_not_carried]
+                                message: { type: string }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -43489,7 +43633,11 @@ paths:
       description: |
         Restores an organism export ZIP as a NEW organism (settings from organism.json; the importer
         becomes creator) and restores every workspace inside it. Body is the raw ZIP
-        (Content-Type: application/zip) or JSON `{ zip_base64 }`.
+        (Content-Type: application/zip) or JSON `{ zip_base64 }`. The organism is made the same way
+        POST /v1/organisms makes one, so a bundle naming a public organism meets the label's audience
+        cap and the publish gate: by a caller the node asks the owner about, it is created private
+        and the answer carries `publish_request`. An unrecognised visibility or join policy in the
+        bundle falls back to private and invite_only.
       tags: [Organisms]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -43504,7 +43652,10 @@ paths:
               properties:
                 zip_base64: { type: string, description: The organism export ZIP, base64-encoded }
       responses:
-        '201': { description: Imported — returns the new organism id + restored workspaces }
+        '201':
+          description: >-
+            Imported — returns the new organism id, the restored workspaces, and publish_request
+            when making the organism public waits for the owner.
         '400': { $ref: '#/components/responses/BadRequest' }
 
   /v1/presence/me:
@@ -47918,6 +48069,76 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/extensions/{name}/unattended-reader:
+    get:
+      operationId: getExtensionUnattendedReader
+      summary: What an extension may read when it runs with nobody present
+      description: >-
+        An extension can run unattended: on a schedule, on an @activate job, or as a workflow step.
+        This says which principal wrote its code and whose reach its file reads are judged against.
+        `authority` is `owner` (the account holder's own reach, private files included, which is the
+        default on every node) or `installer` (only what the principal that wrote the code can read).
+        `installed_by_kind` is `self`, `agent`, `ecosystem`, or `unknown` for a record written before
+        the node recorded the principal; `narrowing_is_inert` is true when `installer` would change
+        nothing, which is the case for `self` and `unknown`. The installing owner or an operator;
+        requires ext:write, so the owner's own agent may read it and tell them. MCP:
+        aimeat_extension_unattended_reader.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: Extension name }
+      responses:
+        '200':
+          description: >-
+            `data` is `{ name, authority, is_default, installed_by_kind, installed_by_principal?,
+            narrowing_is_inert, summary, changed_by, changed_at_url }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: setExtensionUnattendedReader
+      summary: Choose what an extension may read when it runs with nobody present
+      description: >-
+        Set `authority` to `owner` so the extension reads unattended with the account holder's own
+        reach, which is the default and what every node does today, or to `installer` so it reads only
+        what the principal that wrote its code can read. Nothing else about the extension changes, and
+        publishing new code leaves this setting alone. THE ACCOUNT HOLDER SIGNED IN IN PERSON ONLY:
+        an agent, an app grant and an ecosystem token are refused 403, because an agent able to widen
+        its own extension would undo the setting. There is no MCP tool for the write for that reason;
+        `aimeat_extension_unattended_reader` reads it and names this page.
+      tags: [Extensions]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string }, description: Extension name }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [authority]
+              properties:
+                authority:
+                  type: string
+                  enum: [owner, installer]
+                  description: Whose reach an unattended read is judged against.
+      responses:
+        '200':
+          description: '`data` is the same shape the GET answers, as it now stands.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/extensions/{name}/deactivate:
@@ -55788,12 +56009,22 @@ paths:
         the steps that would run, the longest chain of timeouts along the after-edges in minutes,
         the last real run and the variables the run would resolve to. Reads memory the way a
         signals-only check does and persists nothing.
+
+
+        It reads and spends what that check reads and spends, so it costs the same permissions: a
+        step that reads the owner's records costs `memory:read` (and `memory:read-as-owner` for a
+        caller that is neither the account holder in person nor an app grant), and `llm.approved`
+        costs `ai:use`. A caller short of one gets 403 SCOPE_DENIED naming it, and the model call a
+        preflight makes goes out as the calling principal, under that principal's model list,
+        policy and daily cap.
       tags: [Workflows]
       security:
         - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -55858,6 +56089,12 @@ paths:
     get:
       operationId: getWorkflowRun
       summary: Get one workflow run (per-step state + observed values)
+      description: >-
+        A run keeps what each signal read out of the owner's records, so the observed values are
+        served only to a caller that reads those records as the owner: the account holder in person,
+        an app grant, or an agent holding `memory:read-as-owner`. Every other caller gets the same
+        run with each step's state, keys and verdict, and each observed value replaced by null with
+        a `withheld` note.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -55896,6 +56133,12 @@ paths:
         starts runs on its own permissions through POST /v1/workflows/{id}/run. 404 when this
         account has no such run, 409 when the run was not refused, was already started this way, or
         a run is already in flight.
+
+
+        The press is bound to the definition the refusal pinned. When the workflow has been saved
+        again, or deleted, since the refusal, nothing is started and the answer is 409
+        DEFINITION_CHANGED: the approval was for the definition the refusal shows, and a later save
+        by another principal would otherwise run under the account holder's own authority.
       tags: [Workflows]
       security:
         - BearerAuth: []
@@ -55927,7 +56170,9 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: The run was not refused, was already started as the owner, or a run is in flight
+          description: >-
+            The run was not refused, was already started as the owner, a run is in flight, or the
+            workflow was saved again or deleted after the refusal (DEFINITION_CHANGED)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -68280,6 +68525,9 @@ paths:
                           sessions_revoked:
                             type: integer
                             description: How many live sessions this ended. Deleted and "can no longer act" are different claims.
+                          mcp_sessions_closed:
+                            type: integer
+                            description: How many open MCP sessions of this agent were closed. An MCP OAuth access token carries no session row, so it is not counted in sessions_revoked; it is refused from the next request on either way.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

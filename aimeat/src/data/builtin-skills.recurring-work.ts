@@ -31,6 +31,12 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-20 — Section 5: an `ai` schedule's `output_visibility` over REST is checked when it is
+ *     saved, and a fire refuses when the maker is gone or lost the word its kind needs (secaudit
+ *     2026-10, services/schedule-write.ts, services/scheduler-ai-job.ts, services/schedule-actor.ts).
+ *   2026-10-20 — Section 5: a schedule belongs to its maker's kind. An agent reaches a sibling
+ *     agent's schedules and no app-made or outside-app-made one, and a connected outside app
+ *     reaches only its own (secaudit 2026-10, services/schedule-write.ts canManageSchedule).
  *   2026-10-16 — Section 5: editing and running a schedule need the word for its kind, as creating
  *     it does; a pause, rename or delete needs none (QA audit F08a-02).
  *   2026-10-15 — Section 4: the approval's llm_choice.warning when the person's model policy leaves
@@ -217,8 +223,9 @@ It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you mad
 each one's prompt), \`aimeat_schedule_update\` pauses (\`enabled: false\`), resumes, or changes the
 cron, the timezone, the name or the prompt, \`aimeat_schedule_trigger\` runs one now, and
 \`aimeat_schedule_delete\` removes it. These three reach any schedule an agent of your owner made, a
-sibling's included; a schedule the owner made is theirs, and an app reaches only the ones it made
-itself. Changing what a schedule does (its prompt, input, cron or timezone, or resuming it) and
+sibling's included, and no further: a schedule an app or a connected outside app made is that
+maker's own, and so is one the owner made. An app and a connected outside app each reach only the
+ones they made themselves. Changing what a schedule does (its prompt, input, cron or timezone, or resuming it) and
 running it now need the same word as creating it, the last column above; pausing, renaming and
 deleting need none. A clock you run yourself, outside the node, can still be shown
 to the owner: \`aimeat_schedule_report_internal\` lists it beside theirs, and the node does not run it.
@@ -229,7 +236,10 @@ the token. \`POST /v1/schedules\` takes the target in the body as \`agent_name\`
 or \`agent\`). An \`agent_task\` schedule needs the task, either \`task_template: { title,
 description }\` or \`task_title\` and \`task_description\`. An agent of another owner answers 404
 AGENT_NOT_FOUND. The rest is \`GET /v1/schedules\`, \`GET\`, \`PATCH\` and \`DELETE
-/v1/schedules/{id}\`, and \`POST /v1/schedules/{id}/trigger\`.
+/v1/schedules/{id}\`, and \`POST /v1/schedules/{id}/trigger\`. An \`ai\` schedule can name
+\`output_visibility\` for its answer in the body; the node refuses a word memory does not use, and an
+\`organism:<id>\` that names an organism the maker's account is not in, both when the schedule is
+created and when it is edited. With nothing named the answer stays private.
 
 **Steps are joined by memory keys, not by order.** No schedule waits for another to finish. Put the
 steps at different times (fetch at 06:00, write at 07:00), and name the exact memory key each step
@@ -251,6 +261,12 @@ nobody should have to approve every morning.
   morning; it does not run at noon.
 - The owner can cap a schedule: \`max_runs\` turns it off after that many runs, and \`daily_limit\`
   caps the day's AI spend in US dollars.
+- The maker is gone, or lost the permission the kind needs. A schedule acts as whoever made it, and
+  the node asks again at each fire. An \`ai\` schedule whose maker no longer holds \`ai:use\`, and one
+  that calls a connected outside app whose maker no longer holds \`work:request\`, do not run: the
+  fire is logged as an error saying to approve the maker again or delete the schedule. The same
+  happens when the agent or app that made it was deleted. Five failed runs in a row pause the
+  schedule and the owner is told, so the fix is the maker's permission, not the cron.
 
 ## The rule underneath all of this
 

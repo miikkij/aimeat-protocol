@@ -613,5 +613,5 @@ export function registerWorkspaceTools(
 
     // ── aimeat_workspace_transfer ── (workspace export/import as a base64 ZIP)
     // Extracted to workspace-transfer.ts; registered here to preserve tool order.
-    registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, agentGaii, ok, fail, denyReason, findWsEntry, roleOf });
+    registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, agentGaii, caller, ok, fail, denyReason, findWsEntry, roleOf });
 }

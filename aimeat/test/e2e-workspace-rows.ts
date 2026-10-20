@@ -11,6 +11,15 @@
  *   here is either "this works end to end" or "this is refused with a sentence naming the fix".
  *   There is deliberately no middle.
  * @version-history
+ *   2026-10-20 — The COL-09 cases: a workspace role is the MEMBER's permission, so a plain member
+ *     with no grant and a viewer are refused a workspace content write and a row delete while
+ *     signed in as themselves, and a contributor makes both. The three refusals answered 201 and
+ *     200 before the fix (secaudit 2026-10, owner-in-person-skips-workspace-role).
+ *   2026-10-20 — A read of a row space meets the same decision as a read of the workspace's records:
+ *     a plain member with no grant is refused the page, the single row, the stats and the MCP rows
+ *     tool; a viewer grant admits them over REST and a contributor grant admits their agent over
+ *     MCP, and revoking either refuses them again; the creator and an organism admin are never
+ *     refused (secaudit 2026-10, row-read-skips-decideWorkspaceRead).
  *   2026-10-16 — The quota refusals this header promised and nobody had written: a write past the workspace row quota and one past the organism row quota are refused whole, with the rows already there kept and nothing of the refused write stored (QA audit list review).
  *   v1.1.0 — 2026-09-24 — Which copy of the manifest decides a row space's policy (secaudit 2026-09,
  *     A6-9): an admin's copy written first and the creator's after it, and the row gate answers from
@@ -35,6 +44,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
 
 /** An owner with a token. Two of them, because half of what this suite proves is the boundary. */
 async function setupOwner(label: string) {
@@ -485,12 +495,223 @@ await test('A6-9: a plain member\'s own copy of the workspace manifest is refuse
     assert(member.status === 403, `still refused after the attempt: ${member.status}`);
 });
 
+// ── The read decision is the workspace's, not the organism's (secaudit 2026-10) ──────────────
+//
+// Membership opens the organism; reading ONE workspace is decided by decideWorkspaceRead, which the
+// records path has always asked and the row path did not. So a plain member with no grant used to
+// read every row of a workspace whose records answered them with manifest null and objects {}. Each
+// read surface is asked here, REST and MCP, before the grant, with it, and after it is revoked. The
+// creator and an organism admin are the positive controls: neither is ever refused.
+
+let M!: Awaited<ReturnType<typeof setupOwner>>;
+let G!: Awaited<ReturnType<typeof setupOwner>>;
+let org3 = '';
+let WS3 = '';
+let mSession!: McpSession;
+const authM = () => ({ Authorization: `Bearer ${M.token}` });
+const authG = () => ({ Authorization: `Bearer ${G.token}` });
+const guardedUrl = (suffix = '') => `/v1/organisms/${org3}/workspace/rows/log${suffix}?ws=${WS3}`;
+
+/** The three REST row reads, with the status each answered. */
+async function rowReads(headers: Record<string, string>): Promise<{ page: number; one: number; stats: number }> {
+    const page = await json(guardedUrl(), { headers });
+    const one = await json(guardedUrl('/r-1'), { headers });
+    const stats = await json(guardedUrl('/stats'), { headers });
+    return { page: page.status, one: one.status, stats: stats.status };
+}
+
+await test('Read gate setup: an organism with a row space, a plain member M, an admin G, two rows', async () => {
+    M = await setupOwner('m');
+    G = await setupOwner('g');
+    const o = await json('/v1/organisms', {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ name: 'Rows Read Gate', description: 'x', type: 'project', join_policy: 'invite_only', visibility: 'private' }),
+    });
+    assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body.error ?? o.body)}`);
+    org3 = o.body.data.organism.id;
+
+    const w = await json(`/v1/organisms/${org3}/workspaces`, {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ name: 'Guarded', manifest: { objectTypes: [
+            { name: 'log', schemaRef: 'schema:log@1', namespace: 'ops.log', backing: 'rows', writeRole: 'member', mode: 'records', indexOn: ['stream'] },
+        ] } }),
+    });
+    assert(w.status === 201, `workspace ${w.status}: ${JSON.stringify(w.body.error ?? w.body)}`);
+    WS3 = w.body.data.ws;
+
+    for (const who of [M, G]) {
+        const add = await json(`/v1/organisms/${org3}/members`, { method: 'POST', headers: authA(), body: JSON.stringify({ ghii: who.ownerName }) });
+        assert(add.status === 201, `add ${who.ownerName}: ${add.status} ${JSON.stringify(add.body.error ?? add.body)}`);
+    }
+    const promoted = await json(`/v1/organisms/${org3}/admins`, { method: 'POST', headers: authA(), body: JSON.stringify({ target_ghii: G.ownerName }) });
+    assert(promoted.status === 200, `G promoted ${promoted.status}: ${JSON.stringify(promoted.body.error ?? promoted.body)}`);
+
+    const seeded = await json(guardedUrl(), {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ rows: [
+            { row_id: 'r-1', body: { stream: 's-1', msg: 'secret-one' } },
+            { row_id: 'r-2', body: { stream: 's-1', msg: 'secret-two' } },
+        ] }),
+    });
+    assert(seeded.status === 200 && seeded.body.data.written === 2, `seed ${seeded.status}: ${JSON.stringify(seeded.body.error ?? seeded.body)}`);
+
+    mSession = await openSession(BASE, (await makeAgent(BASE, { name: M.ownerName, token: M.token },
+        ['organism:read', 'organism:rows', 'memory:read'])).token, 'wsrow-m');
+});
+
+await test('the member sees the workspace as empty on the records path, which is what the row path must match', async () => {
+    const r = await json(`/v1/organisms/${org3}/workspace?ws=${WS3}`, { headers: authM() });
+    assert(r.status === 200, `workspace read ${r.status}: ${JSON.stringify(r.body.error ?? r.body)}`);
+    assert(r.body.data.manifest === null, `the manifest is hidden from a member with no grant: ${JSON.stringify(r.body.data.manifest)}`);
+});
+
+await test('a plain member with no grant is refused the page, the single row and the stats', async () => {
+    const s = await rowReads(authM());
+    assert(s.page === 403 && s.one === 403 && s.stats === 403,
+        `expected 403 from all three, got page ${s.page}, row ${s.one}, stats ${s.stats}`);
+    const page = await json(guardedUrl(), { headers: authM() });
+    assert(page.body.error?.code === 'ACCESS_DENIED', `code: ${JSON.stringify(page.body.error)}`);
+    assert(!JSON.stringify(page.body).includes('secret-one'), `a row body rode the refusal: ${JSON.stringify(page.body).slice(0, 200)}`);
+});
+
+// An AGENT of that member is refused one step earlier: the organism namespace rule asks an agent
+// for the creator's contributor grant on every workspace key, in read mode as in write mode, and a
+// viewer grant does not match it. So the MCP tool's refusal here is CONSENT_REQUIRED rather than
+// ACCESS_DENIED, and the grant that admits the agent is `contributor`. The tool is asserted anyway,
+// because it calls the same readRows: a surface that stopped going through gate() would show up as
+// a page of rows where this expects a refusal.
+const MCP_DENIED = /^(ACCESS_DENIED|CONSENT_REQUIRED)\b/;
+
+await test('the MCP rows tool refuses that member\'s agent too, and carries no row', async () => {
+    const r = await callTool(mSession, 'aimeat_workspace_rows_read', { organism_id: org3, ws: WS3, space: 'log' });
+    assert(r.offered && r.isError && MCP_DENIED.test(r.text), `the member's agent read rows over MCP: ${r.text.slice(0, 200)}`);
+    assert(!r.text.includes('secret-one'), `a row body rode the MCP refusal: ${r.text.slice(0, 200)}`);
+});
+
+await test('the creator and an organism admin read the rows throughout', async () => {
+    for (const [who, headers] of [['the creator', authA()], ['the admin', authG()]] as const) {
+        const s = await rowReads(headers);
+        assert(s.page === 200 && s.one === 200 && s.stats === 200,
+            `${who}: page ${s.page}, row ${s.one}, stats ${s.stats}`);
+    }
+});
+
+const grantM = (role: 'viewer' | 'contributor') => json(`/v1/organisms/${org3}/workspace-access/grant`, {
+    method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS3, grantee: M.ownerName, role }),
+});
+const revokeM = () => json(`/v1/organisms/${org3}/workspace-access/revoke`, {
+    method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS3, grantee: M.ownerName }),
+});
+
+await test('a viewer grant admits the same member over REST', async () => {
+    const g = await grantM('viewer');
+    assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body.error ?? g.body)}`);
+    const s = await rowReads(authM());
+    assert(s.page === 200 && s.one === 200 && s.stats === 200,
+        `after the grant: page ${s.page}, row ${s.one}, stats ${s.stats}`);
+    const page = await json(guardedUrl(), { headers: authM() });
+    assert(page.body.data.rows.length === 2, `both rows: ${JSON.stringify(page.body.data.rows)}`);
+});
+
+await test('revoking the grant refuses the member again', async () => {
+    const rev = await revokeM();
+    assert(rev.status === 200, `revoke ${rev.status}: ${JSON.stringify(rev.body.error ?? rev.body)}`);
+    const s = await rowReads(authM());
+    assert(s.page === 403 && s.one === 403 && s.stats === 403,
+        `after the revoke: page ${s.page}, row ${s.one}, stats ${s.stats}`);
+    const admin = await rowReads(authG());
+    assert(admin.page === 200 && admin.stats === 200, `the admin is unaffected: page ${admin.page}, stats ${admin.stats}`);
+});
+
+await test('a contributor grant admits that member\'s agent over MCP, and revoking it refuses them again', async () => {
+    const g = await grantM('contributor');
+    assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body.error ?? g.body)}`);
+    const r = await callTool(mSession, 'aimeat_workspace_rows_read', { organism_id: org3, ws: WS3, space: 'log' });
+    assert(!r.isError && Array.isArray(r.data.rows) && r.data.rows.length === 2, `MCP after the grant: ${r.text.slice(0, 200)}`);
+    const rev = await revokeM();
+    assert(rev.status === 200, `revoke ${rev.status}: ${JSON.stringify(rev.body.error ?? rev.body)}`);
+    const after = await callTool(mSession, 'aimeat_workspace_rows_read', { organism_id: org3, ws: WS3, space: 'log' });
+    assert(after.isError && MCP_DENIED.test(after.text), `MCP after the revoke: ${after.text.slice(0, 200)}`);
+    assert(!after.text.includes('secret-one'), `a row body rode the MCP refusal: ${after.text.slice(0, 200)}`);
+    const stillRefused = await rowReads(authM());
+    assert(stillRefused.page === 403, `the member in person is refused again: ${stillRefused.page}`);
+});
+
+// ── The workspace role is the MEMBER's permission, not an agent-only one ─────────────────────
+//
+// Core 2026-11 COL-09: a workspace grant gives an OWNER `viewer` (read) or `contributor` (read and
+// write), and it covers that owner's agents. Until 2026-10-20 the write rule skipped the consent
+// step for the account holder in person, so the role was tested on agents alone and B, a plain
+// member, wrote any workspace's content and deleted its rows while signed in as themselves. B here
+// is a plain member of org2 with no grant on WS2, which A created (secaudit 2026-10, defect 1).
+
+const notesKey = (id: string) => `organism.${org2}.w.${WS2}.shared.notes.${id}.draft`;
+const noteWrite = (hdr: Record<string, string>, id: string) => json('/v1/memory', {
+    method: 'POST', headers: hdr,
+    body: JSON.stringify({ key: notesKey(id), value: { id, title: 'role test' }, visibility: 'private' }),
+});
+const logRowDelete = (hdr: Record<string, string>, rowId: string) =>
+    json(`/v1/organisms/${org2}/workspace/rows/log/${rowId}?ws=${WS2}`, { method: 'DELETE', headers: hdr });
+const setRole = (role: string) => json(`/v1/organisms/${org2}/workspace-access/grant`, {
+    method: 'POST', headers: authA(), body: JSON.stringify({ ws: WS2, grantee: B.ownerName, role }),
+});
+
+await test('COL-09 setup: the creator declares a member-writable memory space and row space, and seeds rows', async () => {
+    const manifest = {
+        manifestVersion: '1', id: org2, name: 'Ledger', kind: 'workspace', status: 'active',
+        objectTypes: [
+            { name: 'ledger', schemaRef: 'schema:ledger@1', namespace: 'books.ledger', backing: 'rows', writeRole: 'admin', indexOn: ['account'] },
+            // writeRole 'member' on both, so the ROLE rule is the only thing that can refuse B.
+            { name: 'log', schemaRef: 'schema:log@1', namespace: 'books.log', backing: 'rows', writeRole: 'member', indexOn: ['account'] },
+            { name: 'note', schemaRef: 'schema:note@1', namespace: 'shared.notes', backing: 'memory', writeRole: 'member', mode: 'records' },
+        ],
+    };
+    const m = await json('/v1/memory', { method: 'POST', headers: authA(), body: JSON.stringify({ key: ledgerKey(), value: manifest, visibility: 'private' }) });
+    assert(m.status === 200 || m.status === 201, `the creator's manifest ${m.status}: ${JSON.stringify(m.body.error)}`);
+    for (const rowId of ['role-1', 'role-2', 'role-3']) {
+        const r = await json(`/v1/organisms/${org2}/workspace/rows/log?ws=${WS2}`, {
+            method: 'POST', headers: authA(), body: JSON.stringify({ row_id: rowId, body: { account: 'a-1', amount: 1 } }),
+        });
+        assert(r.status === 200, `seed ${rowId}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+});
+
+await test('COL-09: a plain member with NO grant is refused the content write and the row delete, in person', async () => {
+    const wr = await noteWrite(authB(), 'n-nogrant');
+    assert(wr.status === 403, `a member with no grant wrote workspace content in person: ${wr.status} ${JSON.stringify(wr.body.data ?? wr.body.error)}`);
+    const del = await logRowDelete(authB(), 'role-1');
+    assert(del.status === 403, `a member with no grant deleted a row in person: ${del.status} ${JSON.stringify(del.body.data ?? del.body.error)}`);
+    const still = await json(`/v1/organisms/${org2}/workspace/rows/log/role-1?ws=${WS2}`, { headers: authA() });
+    assert(still.status === 200, `the row is still there: ${still.status}`);
+});
+
+await test('COL-09: a VIEWER is refused both, in person', async () => {
+    const g = await setRole('viewer');
+    assert(g.status === 200 && g.body.data.role === 'viewer', `grant viewer ${g.status}: ${JSON.stringify(g.body)}`);
+    const wr = await noteWrite(authB(), 'n-viewer');
+    assert(wr.status === 403, `a viewer wrote workspace content in person: ${wr.status} ${JSON.stringify(wr.body.data ?? wr.body.error)}`);
+    const del = await logRowDelete(authB(), 'role-2');
+    assert(del.status === 403, `a viewer deleted a row in person: ${del.status} ${JSON.stringify(del.body.data ?? del.body.error)}`);
+});
+
+await test('COL-09: a CONTRIBUTOR makes both, in person', async () => {
+    const g = await setRole('contributor');
+    assert(g.status === 200 && g.body.data.role === 'contributor', `grant contributor ${g.status}: ${JSON.stringify(g.body)}`);
+    const wr = await noteWrite(authB(), 'n-contrib');
+    assert(wr.status === 200 || wr.status === 201, `a contributor was refused the content write: ${wr.status} ${JSON.stringify(wr.body.error)}`);
+    const del = await logRowDelete(authB(), 'role-3');
+    assert(del.status === 200, `a contributor was refused the row delete: ${del.status} ${JSON.stringify(del.body.error)}`);
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: authA() });
     if (org2) await json(`/v1/organisms/${org2}`, { method: 'DELETE', headers: authA() });
+    if (org3) await json(`/v1/organisms/${org3}`, { method: 'DELETE', headers: authA() });
     await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: authA() });
     await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: authB() });
     if (C) await json(`/v1/owners/${C.ownerName}`, { method: 'DELETE', headers: authC() });
+    if (M) await json(`/v1/owners/${M.ownerName}`, { method: 'DELETE', headers: authM() });
+    if (G) await json(`/v1/owners/${G.ownerName}`, { method: 'DELETE', headers: authG() });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

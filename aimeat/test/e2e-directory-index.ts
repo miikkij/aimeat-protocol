@@ -35,6 +35,9 @@
  *   cd aimeat && AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-dir.db \
  *     pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-directory-index
  * @version-history
+ *   v1.2.0 -- 2026-10-20 -- The three ways a consent ends, each read without forcing a rebuild: the
+ *     REST revoke (which forced one until today, hiding the rest), the MCP revoke and the expiry job
+ *     (secaudit 2026-10, consent-write:revoke-directory-refresh-optional).
  *   v1.1.0 -- 2026-09-08 -- The `geo` test asserts the fixed indexer instead of pinning the miss,
  *     and the second account grants its consent from the owner session (fixed the same day).
  *   v1.0.0 -- 2026-09-08 -- Initial.
@@ -42,6 +45,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { openSession, callTool } from './helpers/mcp-session.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -342,18 +346,75 @@ await test('an entry with nothing to say carries neither knowsAbout nor homeLoca
     assert(Array.isArray(entry.interests) && entry.interests.length === 0, `interests: ${short(entry.interests)}`);
 });
 
-await test('revoking the consent takes the person back out of the index', async () => {
+// WITHDRAWING IS THE HALF THAT MUST NOT BE MISSED, AND NO TEST HERE MAY FORCE A REBUILD. Until
+// 2026-10-20 the index was refreshed only when the caller passed an onDirectoryChange callback: the
+// REST route passed one, aimeat_consent_revoke did not, and the expiry job notified nobody. The
+// three tests below each end a consent a different way and then read the directory as it stands,
+// so a refresh that depends on one caller fails them. The REST case forced a rebuild until today,
+// which is what hid the other two (secaudit 2026-10,
+// consent-write:revoke-directory-refresh-optional).
+
+/** Poll the operator's stats, which read the index itself, until it holds `want` people. */
+async function peopleSettleTo(want: number): Promise<number> {
+    let people = -1;
+    for (let i = 0; i < 40; i++) {
+        const r = await json('/v1/admin/directory/stats', { headers: bearer(listed.token) });
+        people = r.body?.data?.totalPeople ?? -1;
+        if (people === want) return people;
+        await new Promise(res => setTimeout(res, 250));
+    }
+    return people;
+}
+
+await test('a REST revoke takes the person out of the directory with no rebuild', async () => {
     const mine = await json('/v1/consent', { headers: bearer(bare.token) });
     const id = (mine.body.data.consents as any[]).find(c => c.scope === 'federation')?.id;
     assert(typeof id === 'string', `the person's own grant: ${short(mine.body.data.consents)}`);
     const revoke = await json(`/v1/consent/${id}`, { method: 'DELETE', headers: bearer(bare.token) });
     assert(revoke.status === 200, `revoke ${revoke.status}: ${short(revoke.body)}`);
-    const rebuild = await json('/v1/admin/directory/rebuild', { method: 'POST', headers: bearer(listed.token), body: '{}' });
-    assert(rebuild.status === 200, `rebuild ${rebuild.status}: ${short(rebuild.body)}`);
-    assert(rebuild.body.data.stats.totalPeople === 1,
-        `only an ACTIVE federation consent keeps a person listed: ${short(rebuild.body.data.stats)}`);
+    assert(await peopleSettleTo(1) === 1, 'the index still counts the person who withdrew, with no rebuild asked');
     const dir = await json('/v1/catalogue/directory?type=people&per_page=50', { headers: bearer(listed.token) });
     assert(!findEntry(dir.body, bare.ghii), `the revoked account is gone from the search too: ${short(dir.body.data.entries)}`);
+});
+
+await test('a revoke through the MCP tool does the same', async () => {
+    const session = await openSession(BASE, listed.agentToken, 'e2e-directory-index');
+    const mine = await json('/v1/consent', { headers: bearer(listed.agentToken) });
+    const id = (mine.body.data.consents as any[]).find(c => c.scope === 'federation' && c.status === 'active')?.id;
+    assert(typeof id === 'string', `the agent's own grant: ${short(mine.body.data.consents)}`);
+    const revoked = await callTool(session, 'aimeat_consent_revoke', { consent_id: id });
+    assert(!revoked.isError && revoked.data.revoked === true, `aimeat_consent_revoke: ${revoked.text}`);
+    assert(await peopleSettleTo(0) === 0, 'a revoke through the MCP tool left the person in the index');
+    const dir = await json('/v1/catalogue/directory?type=people&per_page=50', { headers: bearer(listed.token) });
+    assert(!findEntry(dir.body, listed.ghii), `still in the search after the MCP revoke: ${short(dir.body.data.entries)}`);
+});
+
+// The consent expiry job itself runs on a clock no route can trigger (a core schedule has no
+// ownerScope, so canManageSchedule refuses everyone), and its own notification to the directory is
+// held by test/unit/directory.test.ts. What is asserted here is the half a reader sees: a consent
+// that has run out takes the person out of the directory at the next read, whether or not the job
+// has swept it and with no rebuild.
+await test('a consent that has run out takes the person out of the directory, swept or not', async () => {
+    // Long enough that the debounced rebuild (2 s) lists the person before the grant runs out.
+    const expiresAt = Date.now() + 8000;
+    const granted = await json('/v1/consent', {
+        method: 'POST', headers: bearer(listed.agentToken),
+        body: JSON.stringify({
+            data_pattern: 'profile.*', recipient: '*', purpose: 'a grant with an end',
+            scope: 'federation', expires: new Date(expiresAt).toISOString(),
+        }),
+    });
+    assert(granted.status === 201, `grant with an expiry ${granted.status}: ${short(granted.body)}`);
+    assert(await peopleSettleTo(1) === 1, 'the grant did not put the person back in the index');
+    const listedNow = await json('/v1/catalogue/directory?type=people&per_page=50', { headers: bearer(listed.token) });
+    assert(findEntry(listedNow.body, listed.ghii), `the grant did not put the person back in the search: ${short(listedNow.body.data.entries)}`);
+
+    await new Promise(res => setTimeout(res, Math.max(0, expiresAt + 500 - Date.now())));
+    const dir = await json('/v1/catalogue/directory?type=people&per_page=50', { headers: bearer(listed.token) });
+    assert(!findEntry(dir.body, listed.ghii), `still in the search after the expiry: ${short(dir.body.data.entries)}`);
+    // And out of the index itself, so the operator's stats say the same.
+    const stats = await json('/v1/admin/directory/stats', { headers: bearer(listed.token) });
+    assert(stats.body?.data?.totalPeople === 0, `the index still counts them: ${short(stats.body?.data)}`);
 });
 
 console.log('\nPhase 6 — the refusals');

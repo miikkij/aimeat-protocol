@@ -19,12 +19,21 @@
  *
  *   The owner in person as saver is not checked, as no door checks them. A definition saved before
  *   2026-09-25 carries no savedBy, and its first author stands in.
+ *
+ *   "Run as me" is bound to the definition the refusal pinned (`defSnapshot`). The owner approves one
+ *   object, not a workflow id, so a save that replaced the definition after the refusal is refused
+ *   with DEFINITION_CHANGED and nothing starts.
  * @structure saverOfDef(def) · saverAuthority(storage, saver) · refuseTriggerStart(deps, ownerGhii, def) ·
  *   clearRefusal(storage, nodeId, ownerGhii, workflowId) · runRefusedAsOwner(deps, start, …)
  * @usage
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   v1.3.0 — 2026-10-20 — runRefusedAsOwner compares the current definition with the one the refusal
+ *     pinned and answers DEFINITION_CHANGED when they differ, starting nothing: the press started the
+ *     CURRENT definition by id, so a save by another principal after the refusal spent the owner's
+ *     one-press approval on a definition they were never shown, as the owner in person and with no
+ *     step-permission check (secaudit 2026-10, wf-run-as-owner-not-bound-to-refused-snapshot).
  *   v1.2.0 — 2026-10-18 — The open-refusal list is written on its version (editOpen over record-cas.ts
  *     updateRecord), since the lock holds within one process only (atomic-write round).
  *   v1.1.1 — 2026-09-26 — An agent saver's account comes from localAccountOf, so a saver of another
@@ -40,7 +49,7 @@ import { isGEAI, parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { notify, type NotifAction } from '../notify.js';
 import { emitChange } from '../event-bus.js';
-import { runKey } from './store.js';
+import { runKey, getWorkflow } from './store.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { loc } from './engine-util.js';
 import { missingStepScopes } from './step-authority.js';
@@ -244,12 +253,38 @@ export type StartAsOwner = (ownerGhii: string, ownerName: string, workflowId: st
 
 export type RunAsOwnerResult =
   | { ok: true; runId: string }
-  | { ok: false; code: 'NOT_FOUND' | 'NOT_REFUSED' | 'ALREADY_STARTED' | 'SKIPPED' | 'START_FAILED'; message: string; runId?: string; errors?: string[] };
+  | {
+    ok: false;
+    code: 'NOT_FOUND' | 'NOT_REFUSED' | 'ALREADY_STARTED' | 'SKIPPED' | 'START_FAILED' | 'DEFINITION_CHANGED';
+    message: string; runId?: string; errors?: string[];
+  };
+
+/**
+ * The definition as one comparable string, without the two fields a save sets on its own. Two saves
+ * of the same content compare equal; a change to a step, a trigger, a variable, a flag or the saver
+ * does not. Both sides come from the same stored shape, so the field order is the same.
+ */
+function definitionFingerprint(def: WorkflowDef): string {
+  const rest: Partial<WorkflowDef> = { ...def };
+  delete rest.updatedAt;
+  delete rest.createdAt;
+  return JSON.stringify(rest);
+}
+
+/** What the owner is told when the definition under this id is no longer the one they were shown. */
+const CHANGED = 'This workflow was saved again after the run was refused, so the definition on this node is not the one '
+  + 'this refusal shows. Nothing was started. Read the workflow and start it with "Run" when it is what you want.';
+const GONE = 'This workflow was deleted after the run was refused, so there is nothing to start.';
 
 /**
  * "Run as me": start the refused run once, on the owner's own authority. The door is the owner's
  * (requireOwnerPrincipal), `start` passes the owner in person as the caller, and the refusal keeps the
  * run it led to, so a second press starts nothing.
+ *
+ * The approval is bound to the definition the refusal pinned. `start` works by workflow id and loads
+ * the CURRENT definition, so a save by another principal between the refusal and the press would run
+ * steps the owner never read, as the owner in person and with no step-permission check. The
+ * definitions are compared first, and a difference refuses the press.
  */
 export async function runRefusedAsOwner(
   deps: TriggerAuthorityDeps, start: StartAsOwner, ownerGhii: string, ownerName: string, workflowId: string, refusedRunId: string,
@@ -263,6 +298,13 @@ export async function runRefusedAsOwner(
     }
     if (run.refusal.ranAsOwner) {
       return { ok: false, code: 'ALREADY_STARTED', message: `This was already started as you: run ${run.refusal.ranAsOwner.runId}.`, runId: run.refusal.ranAsOwner.runId };
+    }
+    // Bound to the object, not to the id: the press starts the definition this refusal pinned, or
+    // nothing. Refused before the start, so no run record and no AI call is made.
+    const current = await getWorkflow(deps.storage, ownerGhii, workflowId);
+    if (!current) return { ok: false, code: 'DEFINITION_CHANGED', message: GONE };
+    if (definitionFingerprint(current) !== definitionFingerprint(run.defSnapshot)) {
+      return { ok: false, code: 'DEFINITION_CHANGED', message: CHANGED };
     }
     const started = await start(ownerGhii, ownerName, workflowId);
     if ('error' in started) return { ok: false, code: 'START_FAILED', message: 'Could not start the run', errors: started.error };

@@ -7,6 +7,13 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.3.0 — 2026-10-20 — The §11.3 pair asserted the hole: "an agent WITH memory:read sees the full
+ *     owner set" required a private owner record to reach a `memory:read` agent, which the 2026-10-15
+ *     ruling (memory:read-as-owner, services/owner-scope-read.ts) took away from every direct memory
+ *     read. It now asserts the owner-visibility record is seen and the private one is not, with
+ *     memory:read-as-owner as the positive control. Added: an ecosystem app with the default scopes
+ *     gets no owner record, and an agent's discovery of produced material carries its own tasks only,
+ *     never a sibling agent's (secaudit 2026-10).
  *   v0.2.2 — 2026-10-16 — A refused token is answered 401 INVALID_TOKEN on this public route; a request
  *     with no token stays public (QA audit F1-01).
  *   v0.2.1 — 2026-10-11 — The priced tool has a money price; its morsel price asserted the old model, where a morsel amount was a price.
@@ -78,12 +85,14 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
     const K_WF = `workflows.def.wf-${stamp}`;                 // → workflow
     const K_PRIV = `personal.secret.${stamp}`;               // → memory (private)
     const K_PUB = `public.note.${stamp}`;                    // → memory (public)
+    const K_OWNERVIS = `personal.foragents.${stamp}`;        // → memory (owner: what the agents may read)
 
     await putMem(a.token, K_PKG, { name: 'Market study', content_type: 'research', description: 'A knowledge package' }, 'public');
     await putMem(a.token, K_RES, { title: 'Field research notes', description: 'raw findings' }, 'private', ['kind:research']);
     await putMem(a.token, K_WF, { title: 'Nightly sync workflow', description: 'syncs things' }, 'private');
     await putMem(a.token, K_PRIV, { title: 'Secret plan', description: 'do not leak' }, 'private');
     await putMem(a.token, K_PUB, { title: 'Public announcement', description: 'hello world' }, 'public');
+    await putMem(a.token, K_OWNERVIS, { title: 'For my agents', description: 'owner visibility' }, 'owner');
 
     // Seed table-backed domains (Phase 2): a public capability and a published app.
     const CAP_ID = `cap-${stamp}`;
@@ -335,11 +344,100 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         assert(!hasId(r.body.data.entries, K_RES), 'low-scope agent must NOT see owner private research');
     });
 
-    await test('agent WITH memory:read sees the full owner set', async () => {
+    // Until 2026-10-20 this test required the owner's PRIVATE record to reach a `memory:read` agent.
+    // That was the hole: reading another same-owner identity's private records costs its own word,
+    // memory:read-as-owner (the 2026-10-15 ruling, services/owner-scope-read.ts), which GET
+    // /v1/memory/:key, GET /v1/memory and GET /v1/memory/search have enforced since. Discovery, which
+    // the MCP aimeat_discover tool shares, handed them over with a 240-character excerpt of the value.
+    await test('agent WITH memory:read sees the full owner set, PRIVATE records excepted (2026-10-15 ruling)', async () => {
         const ag = await connectAgent(a.token, a.name, `readbot${stamp}`, ['memory:read', 'catalogue:read']);
         const r = await discover('scope=own&per_page=100', ag.token);
         assert(r.status === 200, `status ${r.status}`);
-        assert(hasId(r.body.data.entries, K_PRIV), 'read-scoped agent sees owner private (per §11.3)');
+        assert(hasId(r.body.data.entries, K_OWNERVIS), 'read-scoped agent sees the owner-visibility record (the fan-out works)');
+        assert(hasId(r.body.data.entries, K_PUB), 'and the public one');
+        assert(!hasId(r.body.data.entries, K_PRIV), 'but NOT the owner\'s private record');
+        assert(!hasId(r.body.data.entries, K_RES), 'and not the owner\'s private research');
+    });
+
+    await test('agent WITH memory:read-as-owner sees the owner\'s private records', async () => {
+        const ag = await connectAgent(a.token, a.name, `asownerbot${stamp}`, ['memory:read', 'memory:read-as-owner']);
+        const r = await discover('scope=own&per_page=100', ag.token);
+        assert(r.status === 200, `status ${r.status}`);
+        assert(hasId(r.body.data.entries, K_PRIV), 'memory:read-as-owner reads the private record');
+        assert(hasId(r.body.data.entries, K_OWNERVIS), 'and the owner-visibility one');
+    });
+
+    await test('the owner in person still sees every one of their records', async () => {
+        const r = await discover('scope=own&per_page=100', a.token);
+        assert(hasId(r.body.data.entries, K_PRIV) && hasId(r.body.data.entries, K_OWNERVIS) && hasId(r.body.data.entries, K_RES),
+            'the owner reads everything in their own account');
+    });
+
+    // An ecosystem app (GEAI) is fenced to the data areas its owner granted (ecoMayReadKey). The
+    // owner-wide identity set walked around that fence: an app approved with the node's default
+    // scopes, memory:read among them, listed the owner's private records with an excerpt of each
+    // value, while the direct read of the same key answered 404 (secaudit 2026-10).
+    await test('an ecosystem app with the default scopes and no data areas sees no owner record', async () => {
+        const hello = await json('/v1/ecosystem-apps/hello', {
+            method: 'POST',
+            body: JSON.stringify({
+                owner: a.name, app: 'discoeco', display_name: 'Disc Eco',
+                public_key: 'e2e-discover-eco-pinned-key',
+                scopes: ['memory:read', 'memory:write', 'organism:read'],
+            }),
+        });
+        assert(hello.status === 200, `hello ${hello.status}: ${JSON.stringify(hello.body.error ?? hello.body)}`);
+        const ap = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write', 'organism:read'] }),
+        });
+        assert(ap.status === 200, `approve ${ap.status}: ${JSON.stringify(ap.body.error ?? ap.body)}`);
+        const tok = await json('/v1/ecosystem-apps/token', {
+            method: 'POST',
+            body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+        });
+        assert(tok.status === 200 && tok.body.access_token, `eco token ${tok.status}: ${JSON.stringify(tok.body)}`);
+
+        const r = await discover('scope=own&per_page=100', tok.body.access_token);
+        assert(r.status === 200, `status ${r.status}`);
+        for (const k of [K_PRIV, K_RES, K_OWNERVIS, K_WF]) {
+            assert(!hasId(r.body.data.entries, k), `an ecosystem app must not see the owner's ${k}`);
+        }
+        const q = await discover(`scope=own&q=Secret&per_page=100`, tok.body.access_token);
+        assert(!hasId(q.body.data.entries, K_PRIV), 'nor find it with a query');
+    });
+
+    // The agent-tasks source listed every task of the OWNER for any caller in the own scope, so one
+    // agent read a sibling agent's task titles and descriptions through /v1/discover and MCP
+    // aimeat_discover, while GET /v1/agents/:name/tasks answered 403 to the same token (secaudit
+    // 2026-10). The rule is the route's: the owner in person reads the owner-wide list, an agent
+    // reads its own tasks.
+    await test('an agent sees its OWN task in the directory and not a sibling agent\'s', async () => {
+        const bName = `taskbotb${stamp}`;
+        const cName = `taskbotc${stamp}`;
+        const b = await connectAgent(a.token, a.name, bName, ['memory:write']);
+        await connectAgent(a.token, a.name, cName, ['memory:write']);
+        const mk = async (agentName: string, title: string, description: string) => {
+            const r = await json(`/v1/agents/${agentName}/tasks`, {
+                method: 'POST', headers: auth(a.token),
+                body: JSON.stringify({ title, description, status: 'queued' }),
+            });
+            assert(r.status === 201, `task for ${agentName}: ${r.status} ${JSON.stringify(r.body.error ?? r.body)}`);
+            return r.body.data.task.id as string;
+        };
+        const bTask = await mk(bName, `own task ${stamp}`, 'B may read this');
+        const cTask = await mk(cName, `sibling task ${stamp}`, 'a brief for agent C only');
+
+        const asB = await discover('scope=own&type=material&per_page=100', b.token);
+        assert(asB.status === 200, `status ${asB.status}`);
+        assert(hasId(asB.body.data.entries, bTask), 'an agent reads its own task');
+        assert(!hasId(asB.body.data.entries, cTask), 'and never a sibling agent\'s task');
+        assert(!JSON.stringify(asB.body.data.entries).includes('a brief for agent C only'),
+            'the sibling task\'s description must not reach it by any field');
+
+        const asOwner = await discover('scope=own&type=material&per_page=100', a.token);
+        assert(hasId(asOwner.body.data.entries, bTask) && hasId(asOwner.body.data.entries, cTask),
+            'the owner in person still reads both tasks');
     });
 
     // ── §6 / Phase 3: scope=shared per-workspace gating (the security-critical path) ──

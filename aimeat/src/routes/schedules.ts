@@ -31,6 +31,9 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-20 — The write caller says when it is an ecosystem app and carries its roles, so PATCH,
+ *     DELETE and trigger refuse a GEAI every schedule but its own and a file-access check can run as
+ *     the maker (secaudit 2026-10).
  *   2026-10-19 — GET /v1/scheduler/tab returns each agent's display_name, so the create-schedule picker shows the name a person sees.
  *   2026-10-15 — The write caller says when it is an app, so PATCH, DELETE and trigger refuse an app any
  *     schedule but its own (feature-list audit #85).
@@ -117,15 +120,22 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
 
   /** This session in the terms services/schedule-write.ts speaks. */
   const writeCaller = (req: Express.Request): ScheduleWriteCaller => {
-    // An app manages only its own schedules (services/schedule-write.ts canManageSchedule, audit #85).
-    const isApp = callerFromAuth(req.auth!, config.nodeId, storage).kind === 'app';
+    // An app manages only its own schedules and an ecosystem app only the ones it made itself
+    // (services/schedule-write.ts canManageSchedule, audit #85 and secaudit 2026-10). The kind is
+    // asked once here rather than guessed from the role list, which is how a GEAI token reached the
+    // agent branch and managed the owner's agents' schedules.
+    const caller = callerFromAuth(req.auth!, config.nodeId, storage);
+    const kind = caller.kind;
+    const isApp = kind === 'app';
     return {
       owner: req.auth!.owner as string,
       identity: resolveIdentity(req.auth!, config.nodeId),
       isOwnerSession: isOwnerInPerson(req.auth),
       scopes: req.auth!.scopes ?? [],
+      roles: [...caller.roles],
       ...(isApp && req.auth!.app_grant ? { appGrant: req.auth!.app_grant } : {}),
       isApp,
+      isEcosystem: kind === 'ecosystem',
     };
   };
 

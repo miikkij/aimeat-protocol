@@ -29,6 +29,14 @@
  *   THE OWNER'S EXCEPTION. An item with an 'audience' exception in force that still covers its label
  *   (audience-cap.ts) keeps its level.
  *
+ *   WHAT IS IN THE BIN IS NOT SETTLED, AND IS CAPPED ON THE WAY OUT. Everything read here
+ *   (getMemory, listAllMemoryMeta, listApps, the share and organism reads) skips a deleted row by
+ *   design, so a record binned at the moment of a raise keeps the level it went in with. Nothing
+ *   reads it there, so its level shows nobody anything; what matters is the level it comes back at,
+ *   and services/memory-bin.ts restoreMemoryRecord asks the cap before it clears the tombstone
+ *   (secaudit 2026-10). Lowering binned rows here as well would write the level of content no reader
+ *   can reach and would have to be undone by the same check anyway.
+ *
  *   WHAT IS TOLD. Each lowering writes an audit row (action changed, purpose `audience <from> → <to>`),
  *   and each owner gets one notification per raise naming what was lowered (notify.ts, the bell and
  *   the push). Every step is best effort past the raise itself: a failure is logged and the next item
@@ -36,6 +44,8 @@
  * @structure LoweredItem · settleAudienceAfterRise() · registerAudienceSettle()
  * @usage registerAudienceSettle(storage, config);   // once, at boot (server-bootstrap/routes-loader.ts)
  * @version-history
+ *   v1.2.1 — 2026-10-20 — Says where a binned record is held to the cap: on the restore, not here
+ *     (services/memory-bin.ts restoreLevel; secaudit 2026-10). No behaviour change.
  *   v1.2.0 — 2026-10-18 — A memory record is lowered on the version that was read (setMemoryIfVersion,
  *     re-read on a conflict), so an owner's write at the same moment is kept; the lowering now bumps
  *     the record's version like any other write (atomic-write round).

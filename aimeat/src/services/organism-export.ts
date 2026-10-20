@@ -7,8 +7,12 @@
  *   Reuses collectWorkspace() so a workspace is captured identically whether exported alone or in a
  *   bundle. Membership (members/board) is NOT exported — only the organism's settings; on import the
  *   importer becomes the new organism's creator.
- * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, exportedAt })
+ * @structure ORG_EXPORT_VERSION; exportOrganism(storage, config, { orgId, exporterGaii, callerSub, exportedAt })
  * @version-history
+ *   2026-10-20 -- `callerSub`, the caller's resolved principal, goes to every workspace's collection.
+ *     The bundle reads as the member's owner GHII, so without it an ecosystem app's workspace read
+ *     gate never ran and a GEAI exported workspaces outside its owner-granted read data-areas
+ *     (secaudit 2026-10, organism-export:owner-identity-drops-geai-data-area-gate).
  *   2026-10-15 -- organism.json and the result carry `truncated` ({ ws, what, namespace?, exported,
  *     total }): a workspace whose export reached a limit is named (feature-list audit #68).
  *   v1.1.0 -- 2026-06-24 -- Secretary P5 (S-B): add `skeleton` mode (strip every workspace's objects +
@@ -41,9 +45,16 @@ export const ORG_EXPORT_VERSION = '1.0';
 export async function exportOrganism(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; exporterGaii: string; exportedAt: string; reader: ContentReader },
+  opts: {
+    orgId: string;
+    /** The identity the bundle READS as: the member's owner GHII, so a member's bundle is not empty. */
+    exporterGaii: string;
+    /** The CALLER's resolved principal, which decides what an ecosystem app may collect. */
+    callerSub: string;
+    exportedAt: string; reader: ContentReader;
+  },
 ): Promise<{ buffer: Buffer; filename: string; workspaces: number; leftOut: Array<LeftOut & { ws: string }>; truncated: Array<ExportTruncation & { ws: string }> }> {
-  const { orgId, exporterGaii, exportedAt, reader } = opts;
+  const { orgId, exporterGaii, callerSub, exportedAt, reader } = opts;
   const org = await storage.getOrganism(orgId);
   if (!org) throw new Error('Organism not found');
 
@@ -84,7 +95,7 @@ export async function exportOrganism(
   const truncated: Array<ExportTruncation & { ws: string }> = [];
   for (const w of wss) {
     try {
-      const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt, isOrgManager, reader });
+      const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, callerSub, exportedAt, isOrgManager, reader });
       leftOut.push(...json.leftOut.map(l => ({ ws: w.id, ...l })));
       truncated.push(...(json.truncated ?? []).map(t => ({ ws: w.id, ...t })));
       const folder = `workspaces/${w.id}`;

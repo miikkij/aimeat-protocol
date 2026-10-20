@@ -3,6 +3,9 @@
  * @description E2E tests for MCP consent module — 3 tools + 1 resource.
  *   Tests consent grant, list, revoke, and the consent resource template.
  * @version-history
+ *   v1.1.0 — 2026-10-20 — 6b probes the AGENT's own record, and 6c/6d assert the reach of an agent's
+ *     consent on both doors: a wildcard grant does not open the owner's private record, and an agent
+ *     cannot revoke what the owner granted in person (secaudit 2026-10, consent-identity).
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
 
@@ -106,6 +109,7 @@ async function mcpRpc(method: string, params: Record<string, any> = {}, id: numb
 let ownerToken = '';
 let agentPrivKey = '';
 let agentGaii = '';
+let agentRestToken = '';
 const ownerName = `mcpcnt${Date.now()}`;
 const agentName = 'mcpcntagent';
 
@@ -149,6 +153,16 @@ await test('Register agent', async () => {
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentGaii = body.data.agent.gaii;
     agentPrivKey = body.data.private_key;
+});
+
+await test('Agent REST token (the same agent, on the HTTP door)', async () => {
+    const ts = new Date().toISOString();
+    const { status, body } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: agentGaii, timestamp: ts, signature: await signMsg(agentPrivKey, agentGaii + ts) }),
+    });
+    assert(status === 200 && typeof body.data?.token === 'string', `agent token ${status}: ${JSON.stringify(body)}`);
+    agentRestToken = body.data.token;
 });
 
 await test('OAuth client registration', async () => {
@@ -299,10 +313,16 @@ await test('6. Revoked consent shows status revoked in list', async () => {
 // `AND status = 'active'` from findMatchingConsents (both storage providers), or dropping the
 // in-loop expiry check, leaves revoked and expired consents granting private reads forever while
 // every test here still reports `status: 'revoked'` off the row it just wrote.
-await test('6b. A consent OPENS a private read, and revoking it CLOSES the read', async () => {
+//
+// THE RECORD IS THE AGENT'S OWN. Until 2026-10-20 this probe wrote the record as the OWNER and the
+// MCP consent opened it, because aimeat_consent_grant filed the consent under the owner's account
+// GHII. That is the defect, not the contract: POST /v1/consent files an agent's consent under the
+// agent's GAII, so it covers the agent's own records (decision 2026-10-02). The probe therefore
+// writes as the agent, and test 6c asserts that the owner's own record stays shut.
+await test('6b. A consent OPENS a private read of the agent\'s own record, and revoking it CLOSES the read', async () => {
     const probeKey = `profile.consentprobe${Date.now()}`;
     const w = await json('/v1/memory', {
-        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        method: 'POST', headers: { Authorization: `Bearer ${agentRestToken}` },
         body: JSON.stringify({ key: probeKey, value: { secret: 'only via consent' }, visibility: 'private' }),
     });
     assert(w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
@@ -317,8 +337,7 @@ await test('6b. A consent OPENS a private read, and revoking it CLOSES the read'
     const tok = await ownerSignIn(BASE, readerName, 'McpCnt1234');
     const readerToken = tok.body.data.token as string;
     const readerGhii = `${readerName}@${NODE_ID}`;
-    const ownerGhii = `${ownerName}@${NODE_ID}`;
-    const readIt = () => json(`/v1/memory/${encodeURIComponent(ownerGhii)}/${encodeURIComponent(probeKey)}`,
+    const readIt = () => json(`/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(probeKey)}`,
         { headers: { Authorization: `Bearer ${readerToken}` } });
 
     // Before: no consent, no read. Without this the "after" could be a key that was never readable.
@@ -345,6 +364,74 @@ await test('6b. A consent OPENS a private read, and revoking it CLOSES the read'
     const after = await readIt();
     assert(after.status === 403,
         `a REVOKED consent still opens the read: ${after.status} ${JSON.stringify(after.body?.data?.value)}`);
+});
+
+// THE REACH OF AN AGENT'S CONSENT, ON BOTH DOORS. aimeat_consent_grant built its caller with the
+// owner's account GHII, so a `*` consent through the tool made every private record in the OWNER's
+// namespace readable by anyone, while POST /v1/consent with the same token and the same body left
+// that record at 403 (secaudit 2026-10, consent-identity). Both readers here are the ones the
+// recipient `*` admits: nobody at all, and another account.
+await test('6c. an agent\'s wildcard consent does not open the OWNER\'s private record', async () => {
+    const ownerGhii = `${ownerName}@${NODE_ID}`;
+    const key = `ownercanary${Date.now()}`;
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key, value: { note: 'the owner\'s own private record' }, visibility: 'private' }),
+    });
+    assert(w.status === 201, `owner write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+    const strangerName = `mcpcnts${Date.now()}`;
+    const reg = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: strangerName, display_name: 'Cross Owner', password: 'McpCnt1234' }),
+    });
+    assert(reg.status === 201, `stranger ghii ${reg.status}`);
+    const strangerToken = (await ownerSignIn(BASE, strangerName, 'McpCnt1234')).body.data.token as string;
+    const url = `/v1/memory/${encodeURIComponent(ownerGhii)}/${encodeURIComponent(key)}`;
+
+    const granted = await mcpRpc('tools/call', {
+        name: 'aimeat_consent_grant',
+        arguments: { target_gaii: '*', scope: 'local', data_pattern: 'ownercanary*', purpose: 'reach probe' },
+    }, 1043);
+    const text = granted.body.result?.content?.[0]?.text ?? '';
+    assert(!/PUBLISH/.test(text), `the gate is off on this node, so the grant itself should go through: ${text}`);
+
+    const anon = await json(url);
+    assert(anon.status !== 200, `an agent's consent opened the owner's private record to anyone: ${anon.status} ${JSON.stringify(anon.body?.data?.value)}`);
+    const cross = await json(url, { headers: { Authorization: `Bearer ${strangerToken}` } });
+    assert(cross.status !== 200, `an agent's consent opened the owner's private record to another account: ${cross.status} ${JSON.stringify(cross.body?.data?.value)}`);
+
+    // The owner still reads their own record, and still sees the agent's consent on their list.
+    const mine = await json(url, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(mine.status === 200, `the owner lost the read of their own record: ${mine.status}`);
+    const id = JSON.parse(text).consent_id as string;
+    const list = await json('/v1/consent', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert((list.body.data?.consents ?? []).some((c: any) => c.id === id), 'the owner cannot see the consent their agent made');
+    await json(`/v1/consent/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+});
+
+// The mirror half of the same root cause: accountHoldsConsent admitted the MCP caller for every row
+// of the account, so an agent revoked a consent the owner had made in person, which DELETE
+// /v1/consent/:id refuses for the same agent. Both doors answer the same now.
+await test('6d. an agent cannot revoke a consent the owner made in person, on either door', async () => {
+    const granted = await json('/v1/consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ data_pattern: 'ownersown.*', recipient: `someone@${NODE_ID}`, purpose: 'the owner\'s own grant' }),
+    });
+    assert(granted.status === 201, `owner grant ${granted.status}: ${JSON.stringify(granted.body?.error)}`);
+    const id = granted.body.data.id as string;
+
+    const rest = await json(`/v1/consent/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentRestToken}` } });
+    assert(rest.status === 403, `REST let an agent revoke the owner's own consent: ${rest.status}`);
+
+    const mcp = await mcpRpc('tools/call', { name: 'aimeat_consent_revoke', arguments: { consent_id: id } }, 1044);
+    const text = mcp.body.result?.content?.[0]?.text ?? '';
+    assert(mcp.body.result?.isError === true, `the MCP tool let an agent revoke the owner's own consent: ${text}`);
+    assert(text.startsWith('ACCESS_DENIED'), `the two doors answer different codes: ${text}`);
+
+    const read = await json(`/v1/consent/${id}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(read.body.data?.status === 'active', `the consent was revoked anyway: ${JSON.stringify(read.body?.data)}`);
+    await json(`/v1/consent/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
 });
 
 await test('7. aimeat_consent_grant without ttl_hours creates indefinite consent', async () => {

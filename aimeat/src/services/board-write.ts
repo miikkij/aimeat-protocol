@@ -47,6 +47,9 @@
  *   const out = await createBoard({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.10.0 -- 2026-10-20 -- setBoardMembers() deletes the subscription of an identity it takes off
+ *     the roster that the board no longer serves. The delivery path asks the read rule again too
+ *     (services/board-subscribers.ts; secaudit 2026-10, board-subscribers:notify-without-read-recheck).
  *   v1.9.0 -- 2026-10-18 -- createBoard refuses a level wider than the owner's default label allows
  *     with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   v1.8.0 -- 2026-10-18 -- A new board's name and description meet the detection rules written for
@@ -83,6 +86,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, BoardRecord, BoardRules, BoardSubscriptionRecord } from '../storage/interface.js';
 import { isSameOwner, ownerGhiiOf } from '../utils/gaii.js';
+import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
 import { parseAudience, audienceAllows, formatAudience, type AudienceAuth } from './audience.js';
 import { boardOrganismAudience, organismBoardAdmits } from './board-read-access.js';
@@ -590,6 +594,19 @@ export async function setBoardMembers(
     const updated = await storage.updateBoardMembers(board.id, [...members]);
     if (!updated) {
         return { ok: false, status: 500, code: 'INTERNAL', message: 'Failed to update board members' };
+    }
+
+    // A standing subscription is not standing access: an identity taken off the roster that the
+    // board no longer serves loses its subscription with it. Delivery asks the read rule again
+    // anyway (services/board-subscribers.ts), so this keeps the stored rows honest rather than
+    // being the only check.
+    if (Array.isArray(changes.remove)) {
+        for (const g of changes.remove) {
+            const gaii = String(g);
+            if (boardVisibleTo(updated, gaii)) continue;
+            await storage.deleteBoardSubscription(updated.id, gaii)
+                .catch(err => logger.warn('Board subscription of a removed member could not be deleted', { boardId: updated.id, gaii, error: String(err) }));
+        }
     }
 
     // Who may read a shared board is what this changes, so the members list on screen must hear it.

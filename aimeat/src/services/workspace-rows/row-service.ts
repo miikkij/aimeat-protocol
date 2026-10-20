@@ -10,6 +10,8 @@
  *     1. the space is resolved from the manifest, and is really a row space
  *     2. the caller may touch this organism namespace at all (membership, role, consent) — the SAME
  *        rule the memory door runs, reached with the space's own address
+ *     2b. on a READ, the caller may read this workspace — decideWorkspaceRead, the SAME decision the
+ *        records loader makes, because membership alone is discovery-only
  *     3. the space's writeRole
  *     4. every row is well-formed and inside the per-row size ceiling
  *     5. the workspace's row count and the organism's byte quota, measured against what this call
@@ -28,6 +30,12 @@
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-10-20 — A read on the member path and the app path meets decideWorkspaceRead, the decision
+ *     the records loader makes (services/workspace-access.ts). A plain member with no workspace
+ *     grant read every row of a workspace whose records path gave them nothing, because
+ *     checkOrganismNamespaceAccess in read mode is membership alone for a person signed in as
+ *     themselves (secaudit 2026-10, row-read-skips-decideWorkspaceRead). Writes keep the namespace
+ *     rule they had.
  *   2026-10-15 — enforceQuota is exported: a workspace import checks the quotas for the rows it
  *     restores before it writes anything (services/workspace-transfer-rows.ts; feature-list audit #68).
  *   v1.7.0 — 2026-10-13 — RowCaller carries the session's scopes and the member path hands them to
@@ -58,6 +66,7 @@ import type {
   Storage, WorkspaceRowRecord, WorkspaceRowStats,
 } from '../../storage/interface.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
+import { decideWorkspaceRead } from '../workspace-access.js';
 import { readWorkspaceManifest, isRowBackedSpace } from '../workspace-meta.js';
 import { emitChange, emitRowsAppended } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -213,9 +222,44 @@ async function authorizeExtension(
 }
 
 /**
+ * A READ meets the workspace read decision, the same one the records loader makes.
+ *
+ * Membership opens the organism, not the workspace: the records path (services/workspace-access.ts
+ * decideWorkspaceRead) asks on top of it whether the caller may read THIS workspace's manifest, as
+ * its creator, as the same owner, as an organism manager, or on a viewer or contributor grant. Rows
+ * asked only the namespace rule, which for a person signed in as themselves is active membership
+ * alone, so a plain member read every row of a workspace whose records answered them with nothing
+ * (secaudit 2026-10). One read, one decision, taken here.
+ */
+async function requireWorkspaceRead(
+  deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string,
+): Promise<void> {
+  const organism = await deps.storage.getOrganism(organismId);
+  if (!organism) {
+    throw new WorkspaceRowError('NOT_FOUND', 404, `No organism "${organismId}".`);
+  }
+  const decision = await decideWorkspaceRead(
+    deps.storage, deps.config, organism, caller.principal, caller.owner, caller.identity, wsId,
+  );
+  if (!decision.canRead) {
+    throw new WorkspaceRowError('ACCESS_DENIED', 403,
+      'You may not read this workspace. Its creator, or an admin of this organism, gives you a viewer or contributor grant.');
+  }
+}
+
+/**
  * Every entry point goes through here: the app path or the extension path when the caller is one,
- * else the member path. Either way a write then meets the space's writeRole, with the membership of
- * the person the caller is or acts for: an app or an extension is never more than its person.
+ * else the member path. A read then meets the workspace read decision, and a write meets the space's
+ * writeRole, with the membership of the person the caller is or acts for: an app or an extension is
+ * never more than its person.
+ *
+ * The extension path and the app path do not meet the read decision, and that is deliberate. Each
+ * reaches ONE space the organism's manifest names it in, which is a grant an organism admin wrote
+ * on purpose, and an extension holds no session at all. The October 2026 audit reproduced the read
+ * past the workspace gate on the MEMBER path only (a person signed in as themselves), so only that
+ * path is closed here. Whether a named app should additionally need its person's workspace grant is
+ * a question about the app model, open for the developer; closing it would stop an app a manifest
+ * names from serving a member who holds no grant (test/e2e-app-rows.ts, case A6-8).
  */
 async function gate(
   deps: RowServiceDeps, caller: RowCaller, organismId: string, wsId: string, space: RowSpace, mode: 'read' | 'write',
@@ -226,6 +270,7 @@ async function gate(
     await authorizeApp(deps, caller, organismId, space);
   } else {
     await authorize(deps, caller, organismId, wsId, space.namespace, mode);
+    if (mode === 'read') await requireWorkspaceRead(deps, caller, organismId, wsId);
   }
   if (mode === 'write') await requireWriteRole(deps, caller, organismId, space);
 }

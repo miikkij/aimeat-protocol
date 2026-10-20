@@ -2,8 +2,10 @@
  * @file src/services/scheduler-remote-jobs.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Scheduled `ai`, `workflow`, and `eco-capability` job executors — the non-extension,
- *   non-core, non-agent_task kinds. Extracted from scheduler.ts to satisfy max-file-lines.
+ * @description Scheduled `workflow` and `eco-capability` job executors — the non-extension,
+ *   non-core, non-agent_task kinds the Scheduler dispatches directly. Extracted from scheduler.ts
+ *   to satisfy max-file-lines. The `ai` kind lived here until 2026-10-20 and is now
+ *   services/scheduler-ai-job.ts, registered at boot; that file says why.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from scheduler.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — Security audit C-2: an `ai` job refuses an input namespace outside its
@@ -27,123 +29,20 @@
  *     unattendedReader), not as the node's own reader (TARGET-082 V4).
  *   v1.7.0 — 2026-10-05 — An `ai` job's model call runs as whoever made the schedule, asked at the
  *     fire (services/schedule-actor.ts): gone, or without ai:use, it does not run (secaudit 2026-10, AI-3).
+ *   v1.8.0 — 2026-10-20 — An `eco-capability` job asks scheduleActor like the other kinds: a maker
+ *     that is gone, or that no longer holds work:request, does not fire, and the invoke frame
+ *     carries the maker's identity as caller instead of the owner's (secaudit 2026-10). The `ai`
+ *     job moved to services/scheduler-ai-job.ts, where it can write through the shared memory write
+ *     service without a module cycle.
  */
 import type { AimeatConfig } from '../config.js';
-import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { JobRunResult } from './scheduler.js';
-import { completeForOwner } from './ai/completion.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { buildGEAI, isSameOwner, localAccountName } from '../utils/gaii.js';
-import { aiJobKeyRefusal } from './ai-job-keys.js';
-import { readAiRecords } from './ai-inputs.js';
-import { unattendedReader } from './ai-jobs/starter.js';
+import { buildGEAI, localAccountName } from '../utils/gaii.js';
 import { scheduleActor } from './schedule-actor.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-
-/**
- * `ai` kind: gather predefined input memory keys, compose the prompt, run a
- * server-side completion on the owner's OpenRouter key, and store the result
- * to the owner's output key. Zero agent involvement; runs even when offline.
- */
-export async function runAiJob(storage: Storage, config: AimeatConfig, job: ScheduledJobRecord): Promise<JobRunResult> {
-  const owner = job.ownerScope;
-  if (!owner) throw new Error(`AI job "${job.id}" missing ownerScope`);
-  const cfg = (job.input ?? {}) as {
-    inputKeys?: string[]; inputNamespaces?: string[]; prompt?: string;
-    systemPrompt?: string; model?: string; outputKey?: string;
-    outputVisibility?: 'private' | 'owner' | 'public';
-  };
-  if (!cfg.prompt || typeof cfg.prompt !== 'string') {
-    throw new Error(`AI job "${job.id}" missing prompt`);
-  }
-  // Before the first read: every input goes to the provider and the answer lands at the output key,
-  // so neither may name a record the node keeps for itself. The doors refuse it at create and edit;
-  // this holds a schedule stored before they did to the same rule.
-  const kept = aiJobKeyRefusal({ inputKeys: cfg.inputKeys, outputKey: cfg.outputKey });
-  if (kept) throw new Error(`AI job "${job.id}": ${kept.message}`);
-
-  const inputKeys = Array.isArray(cfg.inputKeys) ? cfg.inputKeys : [];
-  const reads: string[] = [];
-  const parts: string[] = [cfg.prompt];
-  const named: Array<{ key: string; namespace: string }> = [];
-  for (let i = 0; i < inputKeys.length; i++) {
-    const key = inputKeys[i];
-    const ns: string = cfg.inputNamespaces?.[i] || owner;
-    // SECURITY (C-2): the read below is the raw composite-key lookup — it applies no visibility or
-    // consent check — and the value is pasted into a prompt whose output the job owner keeps. A
-    // namespace belonging to anyone else is therefore a verbatim read of their private memory. The
-    // create and patch routes refuse one, and this refuses it again at run time, which is what
-    // covers jobs stored before that gate existed.
-    if (ns !== owner && !isSameOwner(ns, owner)) {
-      throw new Error(`AI job "${job.id}" names an input namespace outside its owner: ${ns}`);
-    }
-    named.push({ key, namespace: ns });
-    reads.push(ns === owner ? key : `${ns}::${key}`);
-  }
-  // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
-  // classification check. A schedule fires with nobody present, so it always reads as an unattended
-  // AI run (TARGET-082 V4, decided 2026-09-29), whoever saved it.
-  const inputs = await readAiRecords({ storage, config }, unattendedReader({ storage, config }, owner), owner, named, { capability: 'text' });
-  for (const { key, value } of inputs) {
-    const valueText = value === undefined
-      ? '(empty)'
-      : (typeof value === 'string' ? value : JSON.stringify(value, null, 2));
-    parts.push(`\n--- INPUT: ${key} ---\n${valueText}`);
-  }
-  const composedPrompt = parts.join('\n');
-
-  // As whoever made the schedule, asked now (services/schedule-actor.ts): an agent's cap and the
-  // owner's rules for that agent or app apply, and a maker that is gone or lost ai:use stops it.
-  // Until 2026-10-05 it asked as the owner in person (secaudit 2026-10, AI-3).
-  const actor = await scheduleActor(storage, job);
-  if (!actor.ok) throw new Error(actor.reason);
-  if (!actor.isOwner && !scopeIsCovered(actor.scopes, 'ai:use')) {
-    throw new Error('What made this schedule no longer holds ai:use, so it does not run. Approve it again, or delete this schedule.');
-  }
-  const result = await completeForOwner(storage, config, owner, {
-    prompt: composedPrompt,
-    systemPrompt: cfg.systemPrompt,
-    model: cfg.model,
-    appId: `schedule:${job.id}`,
-    caller: actor.ai.caller,
-    ...(actor.ai.agent ? { agent: actor.ai.agent } : {}),
-    ...(actor.ai.verifiedApp ? { verifiedApp: actor.ai.verifiedApp } : {}),
-  });
-
-  const outputKey = cfg.outputKey || `scheduler.${job.id}.output`;
-  const now = new Date().toISOString();
-  const existing = await storage.getMemory(owner, outputKey);
-  await storage.setMemory({
-    key: outputKey,
-    ownerGaii: owner,
-    value: result.content,
-    // TARGET-058. A scheduled AI job is the purest autonomous path there is: it fires on a clock,
-    // writes, and nobody is present. The completion above already minted an observed record (the
-    // node watched the model produce these bytes), so it is CARRIED here rather than re-derived —
-    // same bytes, same statement.
-    //
-    // THE RULE, in the words it must keep: only a step where a person reads the substance and can
-    // reject it upgrades humanInvolvement. Clicking publish is not that step. A workflow human-input
-    // step that reviews substance MAY upgrade it. Nothing else may. There is no such step anywhere
-    // on this path, which is why nothing here touches the record's `humanInvolvement: 'none'`.
-    ...(result.provenance ? { aiProvenanceId: result.provenance.id } : {}),
-    visibility: cfg.outputVisibility || 'private',
-    tags: ['scheduler', 'ai-output'],
-    ttlHours: null,
-    version: existing ? existing.version + 1 : 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
-
-  // The highest-volume single writer on this node: a per-minute schedule is one tally row and a
-  // rising count, where an append log would have been one row per fire. `schedule:{id}` is the same
-  // identity string the AI ledger already uses for this job, so the two agree about whose hand it was.
-  recordMemoryTouch({ ownerGaii: owner, key: outputKey, writerPrincipal: `schedule:${job.id}`, kind: 'write' });
-
-  return { reads, writes: [outputKey] };
-}
 
 /**
  * `workflow` kind: fire one Agent Workflow run. The schedule is just the trigger; the deterministic
@@ -170,11 +69,21 @@ export async function runWorkflowJob(job: ScheduledJobRecord): Promise<JobRunRes
 /**
  * `eco-capability` kind: invoke a connected ecosystem app's (GEAI) capability over the
  * connect-tunnel on each fire. `input` is `{ app, capability_id, input? }`; `ownerScope` is the
- * owner GHII whose binding to drive. AIMEAT authenticates the owner as caller; the ecosystem
- * enforces its OWN ACL. When the GEAI is offline at fire time the run is SKIPPED (not an error) so
- * it does not hot-loop — the next scheduled fire retries.
+ * owner GHII whose binding to drive. The ecosystem enforces its OWN ACL on top. When the GEAI is
+ * offline at fire time the run is SKIPPED (not an error) so it does not hot-loop — the next
+ * scheduled fire retries.
+ *
+ * WHO THE INVOKE COMES FROM. The schedule acts as its maker, asked again here
+ * (services/schedule-actor.ts), exactly as the `ai` kind does: a maker that is gone does not fire,
+ * a maker that no longer holds `work:request` does not fire, and the frame names the maker rather
+ * than the owner. Until 2026-10-20 it hard-coded the owner's GHII as caller, so an agent's schedule
+ * reached a connected app with the owner's whole identity and went on doing it after the owner
+ * deleted the agent (secaudit 2026-10). The direct route POST /v1/capabilities/:id/invoke passes
+ * the caller's own identity and asks the same word.
  */
-export async function runEcoCapabilityJob(config: AimeatConfig, job: ScheduledJobRecord): Promise<JobRunResult> {
+export async function runEcoCapabilityJob(
+  storage: Storage, config: AimeatConfig, job: ScheduledJobRecord,
+): Promise<JobRunResult> {
   const owner = job.ownerScope;
   if (!owner) throw new Error(`eco-capability job "${job.id}" missing ownerScope`);
   const cfg = (job.input ?? {}) as { app?: string; capability_id?: string; input?: Record<string, unknown> };
@@ -184,9 +93,15 @@ export async function runEcoCapabilityJob(config: AimeatConfig, job: ScheduledJo
     throw new Error(`eco-capability job "${job.id}" missing app/capability_id in input`);
   }
 
+  const actor = await scheduleActor(storage, job);
+  if (!actor.ok) throw new Error(actor.reason);
+  if (!actor.isOwner && !scopeIsCovered(actor.scopes, 'work:request')) {
+    throw new Error('What made this schedule no longer holds work:request, so it does not run. Approve it again, or delete this schedule.');
+  }
+
   const ownerName = localAccountName(owner);
   const geai = buildGEAI(app, ownerName, config.nodeId);
-  const caller = `${ownerName}@${config.nodeId}`;
+  const caller = actor.isOwner ? `${ownerName}@${config.nodeId}` : actor.principal;
 
   const mgr = getActiveConnectTunnelManager();
   if (!mgr) {

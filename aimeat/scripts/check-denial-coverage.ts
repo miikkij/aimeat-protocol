@@ -38,6 +38,12 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-20 — ROUTE_CEILING 478: GET and DELETE /v1/organisms/{id}/workspace/rows/{space}/{rowId}
+ *     are refused to a plain member without a workspace grant, and to a viewer, by
+ *     test/e2e-workspace-rows.ts (secaudit 2026-10, the workspace read decision on the row path).
+ *   2026-10-20 — ROUTE_CEILING 480: GET /v1/consent is refused by test/e2e-consent-publish-gate.ts,
+ *     and DELETE /v1/boards/{boardId} and DELETE /v1/boards/{boardId}/subscribe by
+ *     test/e2e-board-access.ts (secaudit 2026-10).
  *   2026-10-19 — ROUTE_CEILING 483: POST /v1/portal/try-memory is refused to an agent without memory:write by test/e2e-atomic-content-b.ts.
  *   2026-10-18 — ROUTE_CEILING 484: GET /v1/ai/models is refused to an agent without ai:use by test/e2e-agent-permission-ask.ts.
  *   2026-10-18 — ROUTE_CEILING 485: PUT and DELETE /v1/commerce/payout/x402 are refused to an agent of the owner by test/e2e-x402.ts.
@@ -90,7 +96,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 483;
+export const ROUTE_CEILING = 478;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

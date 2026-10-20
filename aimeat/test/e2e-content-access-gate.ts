@@ -101,7 +101,7 @@ const OPEN_CODE_ROUTES = new Set<string>([
     'POST /v1/federation/heartbeat', 'POST /v1/federation/key-exchange', 'POST /v1/federation/link-invites', 'POST /v1/federation/memory/list', 'POST /v1/federation/message',
     'POST /v1/federation/message/receipt', 'POST /v1/federation/network-policy/pull', 'POST /v1/federation/package-claims/{}', 'POST /v1/federation/packages/pull',
     'POST /v1/federation/peer/activate', 'POST /v1/federation/peer/introduce', 'POST /v1/federation/peer/request', 'POST /v1/federation/peers', 'POST /v1/federation/peers/{}/promote',
-    'POST /v1/federation/ping', 'POST /v1/federation/presence', 'POST /v1/federation/replicate', 'POST /v1/federation/route', 'POST /v1/federation/settle',
+    'POST /v1/federation/ping', 'POST /v1/federation/presence', 'POST /v1/federation/replicate', 'POST /v1/federation/retract', 'POST /v1/federation/route', 'POST /v1/federation/settle',
     'POST /v1/federation/settle/outbound', 'POST /v1/federation/storage/grant', 'POST /v1/federation/templates/sync', 'POST /v1/federation/test', 'POST /v1/federation/trust-advisory',
     // The node describing itself to machines.
     'GET /v1/health', 'GET /v1/build', 'GET /v1/spec', 'GET /llms.txt', 'GET /llms-full.txt', 'GET /AGENTS.md', 'GET /agents.txt', 'GET /auth.md', 'GET /skill.md', 'GET /openapi.json',

@@ -24,6 +24,10 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.4.0 — 2026-10-20 — The invoke carries no scopes: it asserted mcp:use for a buyer that is the
+ *     extension's own GEAI, which caused calls on attached MCP servers for a principal the owner
+ *     never gave the word to (secaudit 2026-10, capability-invoke.ts:mcp-source:server-slug-
+ *     resolved-in-caller-reach).
  *   v1.3.0 — 2026-10-01 — A purchase of a tool whose backing extension serves members only refuses
  *     MEMBERS_ONLY before it is charged when the buying extension's owner is not a member.
  *   v1.2.2 — 2026-09-26 — ownerNameOf takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -166,8 +170,14 @@ export async function buyForExtension(args: {
       config, storage, cap, applyLockedInput(toolDef, input), buyer, jwt, 'normal',
       // Already settled on the product's own coordinate — the raw paywall must not charge it again.
       mintInternalPass(coordExt, tool),
-      // The paid purchase is what authorises this call, so a remote MCP tool behind it runs.
-      { scopes: ['mcp:use'] },
+      // NOTHING, and the buyer's own token is deliberately not read here. The buyer is the
+      // extension's GEAI, not the session that happens to be served; `jwt` belongs to whoever
+      // called the extension, so reading it would hand the purchase a permission that session holds
+      // and this extension does not. Asserting `{ scopes: ['mcp:use'] }` was the same mistake in the
+      // other direction: it caused calls on attached MCP servers for a principal nobody gave the
+      // word to (secaudit 2026-10). A capability over a remote MCP tool is therefore not buyable
+      // through ctx.buy; an extension that needs one attaches the server itself.
+      { scopes: [] },
     );
     // Delivered → book the SELLER's beneficiaries out of the seller's own cut, exactly as the REST
     // and MCP doors do. A capability buying from another capability is still a sale.

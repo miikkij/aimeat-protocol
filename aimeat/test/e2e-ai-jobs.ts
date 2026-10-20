@@ -20,6 +20,11 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.9.0 — 2026-10-20 — 18a-18g: over MCP an agent sees and stops only the jobs it started. A
+ *     second agent holding only ai:use is shown neither its owner's job nor its sibling's, gets "No
+ *     such job." for both and cannot cancel either, while the sibling's job keeps running; the
+ *     starter, an agent holding memory:read-as-owner and the owner over REST still see them
+ *     (secaudit 2026-10, mcp/ai-jobs.ts:registerAiJobTools:jobs-keyed-by-owner-ghii).
  *   v1.8.0 — 2026-10-19 — 1d and 1e: a job's record carries finish_reason and truncated, and the
  *     owner's saved max_tokens reaches a synchronous completion and not a job. The stub keeps each
  *     completion's max_tokens and answers finish_reason 'length' to a prompt holding CUT (wish
@@ -65,6 +70,7 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, imageJson, transcriptionJson, providerStatus, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const PORT = process.env.E2E_AI_JOBS_PORT ?? '40297';
 const BASE = `http://localhost:${PORT}`;
@@ -994,6 +1000,120 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(end.state === 'failed' && end.error?.code === 'PROVIDER_REJECTED' && end.error?.status === 422, `error: ${JSON.stringify(end.error)}`);
         assert(end.error.details?.provider_status === 415 && /Unsupported audio format/.test(end.error.details?.provider_message ?? ''),
             `details: ${JSON.stringify(end.error.details)}`);
+    });
+
+    // ── 18. An agent sees and stops only the jobs it started ──
+    // The MCP tools look the OWNER's namespace up, because that is where a job started over MCP
+    // lands, so the lookup key says nothing about who may read it. A live job record carries the
+    // prompt and the system prompt. Until 2026-10-20 a second agent holding only ai:use read its
+    // owner's and its siblings' prompts over MCP and cancelled their running jobs, while the REST
+    // routes answered 404 for the same ids (secaudit 2026-10, jobs-keyed-by-owner-ghii).
+    const d = await setupOwner('d');
+    await pointAtStub(d);
+    const agentA = await makeAgent(BASE, d, ['ai:use'], 'aijobviewa');
+    const agentB = await makeAgent(BASE, d, ['ai:use'], 'aijobviewb');
+    const agentO = await makeAgent(BASE, d, ['ai:use', 'memory:read-as-owner'], 'aijobviewo');
+    const sA = await openSession(BASE, agentA.token, 'aijob-sibling');
+    const sB = await openSession(BASE, agentB.token, 'aijob-other');
+    const sO = await openSession(BASE, agentO.token, 'aijob-as-owner');
+
+    const SIBLING_PROMPT = 'AIJOB SIBLING SECRET PROMPT';
+    const OWNER_PROMPT = 'AIJOB OWNER SECRET PROMPT';
+    let siblingJobId = '';
+    let ownerJobId = '';
+
+    await test('18a. Setup: agent A\'s MCP job runs and the owner\'s own job queues behind it', async () => {
+        holding = true;
+        const started = await callTool(sA, 'aimeat_ai_job_start', {
+            prompt: SIBLING_PROMPT, system_prompt: 'sibling system prompt', result_key: 'aijob.viewer.sibling',
+        });
+        assert(!started.isError, `agent A start: ${started.text}`);
+        siblingJobId = started.data.job_id;
+        assert(typeof siblingJobId === 'string' && siblingJobId.length > 0, `job id: ${started.text}`);
+        // It has to be LIVE for the rest of the case to mean anything: the live record is the one
+        // that carries the prompt.
+        const began = Date.now();
+        for (;;) {
+            const mine = await callTool(sA, 'aimeat_ai_job_get', { job_id: siblingJobId });
+            if (!mine.isError && mine.data.state === 'running') break;
+            if (Date.now() - began > 20_000) throw new Error(`agent A's job never ran: ${mine.text}`);
+            await sleep(150);
+        }
+        const own = await startJob(d, { prompt: OWNER_PROMPT, system_prompt: 'owner system prompt', result_key: 'aijob.viewer.owner' });
+        assert(own.status === 202, `the owner's start ${own.status}: ${JSON.stringify(own.body?.error)}`);
+        ownerJobId = own.body.data.job_id;
+    });
+
+    await test('18b. aimeat_ai_job_list shows agent B neither the owner\'s job nor its sibling\'s', async () => {
+        const all = await callTool(sB, 'aimeat_ai_job_list', { state: 'all' });
+        assert(all.offered, `the tool was not offered: ${all.text}`);
+        assert(!all.isError, `list: ${all.text}`);
+        const ids = (all.data.jobs ?? []).map((j: any) => j.id);
+        assert(!ids.includes(ownerJobId), `the owner's job is listed: ${JSON.stringify(ids)}`);
+        assert(!ids.includes(siblingJobId), `the sibling's job is listed: ${JSON.stringify(ids)}`);
+        assert(all.data.count === 0, `count ${all.data.count}: ${all.text.slice(0, 200)}`);
+    });
+
+    await test('18c. aimeat_ai_job_get answers "No such job." for both, and no prompt leaves the node', async () => {
+        for (const [whose, id] of [['the owner\'s', ownerJobId], ['the sibling\'s', siblingJobId]] as const) {
+            const r = await callTool(sB, 'aimeat_ai_job_get', { job_id: id });
+            assert(r.offered, `${whose} job: the tool was not offered: ${r.text}`);
+            assert(r.isError, `${whose} job was readable: ${r.text.slice(0, 200)}`);
+            assert(r.text.includes('No such job'), `${whose} job: ${r.text.slice(0, 200)}`);
+            assert(!r.text.includes('SECRET PROMPT'), `${whose} job gave up its prompt: ${r.text.slice(0, 200)}`);
+        }
+    });
+
+    await test('18d. aimeat_ai_job_cancel is refused before anything is aborted, and the jobs are untouched', async () => {
+        const stop = await callTool(sB, 'aimeat_ai_job_cancel', { job_id: siblingJobId });
+        assert(stop.offered, `the tool was not offered: ${stop.text}`);
+        assert(stop.isError, `the sibling's running job was cancelled: ${stop.text.slice(0, 200)}`);
+        assert(/NOT_FOUND/.test(stop.text), `code: ${stop.text.slice(0, 200)}`);
+        const still = await callTool(sA, 'aimeat_ai_job_get', { job_id: siblingJobId });
+        assert(!still.isError && still.data.state === 'running', `the sibling's job after the cancel: ${still.text.slice(0, 200)}`);
+        const stopOwner = await callTool(sB, 'aimeat_ai_job_cancel', { job_id: ownerJobId });
+        assert(stopOwner.isError, `the owner's job was cancelled: ${stopOwner.text.slice(0, 200)}`);
+        const ownerStill = await getJob(d, ownerJobId);
+        assert(ownerStill.status === 200 && ownerStill.body.data.state === 'queued',
+            `the owner's job after the cancel: ${ownerStill.status} ${ownerStill.body?.data?.state}`);
+    });
+
+    await test('18e. The agent that STARTED the job still reads it and lists it, and sees nothing else', async () => {
+        const mine = await callTool(sA, 'aimeat_ai_job_get', { job_id: siblingJobId });
+        assert(!mine.isError && mine.data.id === siblingJobId, `agent A's own job: ${mine.text.slice(0, 200)}`);
+        assert(mine.data.prompt === SIBLING_PROMPT, `agent A reads its own prompt: ${JSON.stringify(mine.data.prompt)}`);
+        const list = await callTool(sA, 'aimeat_ai_job_list', { state: 'all' });
+        const ids = (list.data.jobs ?? []).map((j: any) => j.id);
+        assert(ids.includes(siblingJobId), `agent A's own job is listed: ${JSON.stringify(ids)}`);
+        assert(!ids.includes(ownerJobId), `agent A must not see the owner's job: ${JSON.stringify(ids)}`);
+    });
+
+    await test('18f. memory:read-as-owner over MCP, and the owner over REST, still see both jobs', async () => {
+        const list = await callTool(sO, 'aimeat_ai_job_list', { state: 'all' });
+        assert(list.offered && !list.isError, `list: ${list.text.slice(0, 200)}`);
+        const ids = (list.data.jobs ?? []).map((j: any) => j.id);
+        assert(ids.includes(ownerJobId) && ids.includes(siblingJobId), `read-as-owner sees both: ${JSON.stringify(ids)}`);
+        const read = await callTool(sO, 'aimeat_ai_job_get', { job_id: ownerJobId });
+        assert(!read.isError && read.data.id === ownerJobId, `read-as-owner get: ${read.text.slice(0, 200)}`);
+        assert(read.data.prompt === OWNER_PROMPT, `read-as-owner reads the prompt: ${JSON.stringify(read.data.prompt)}`);
+        const viaRest = await getJob(d, siblingJobId);
+        assert(viaRest.status === 200 && viaRest.body.data.id === siblingJobId,
+            `the owner over REST reads its agent's job: ${viaRest.status}`);
+        const restIds = (await listJobs(d, '?state=all')).body.data.jobs.map((j: any) => j.id);
+        assert(restIds.includes(ownerJobId) && restIds.includes(siblingJobId),
+            `the owner's REST list: ${JSON.stringify(restIds)}`);
+    });
+
+    releaseHeld();
+    await test('18g. drain: the viewer case\'s jobs finish once the provider answers', async () => {
+        const began = Date.now();
+        for (;;) {
+            const live = (await listJobs(d, '?state=live')).body.data.count;
+            if (live === 0) return;
+            if (Date.now() - began > 30_000) throw new Error(`${live} jobs still live`);
+            releaseHeld();
+            await sleep(200);
+        }
     });
 
     // ── cleanup ──

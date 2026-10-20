@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.16.0 — 2026-10-20 — A memory component writes no `skills.` or `organism.` key: the raw setMemory below wrote the author's key verbatim under the installer's identity, so a package planted a workspace skill in an organism its installer is not a member of, and shadowed a node built-in skill (secaudit 2026-10; package-memory-component.ts v1.4.0 says why each prefix).
  *   v1.15.1 — 2026-10-18 — The app component's publish names no publish gate (`publishGate: null`): the install is the owner's act.
  *   v1.15.0 — 2026-10-13 — An extension component's actions are capability rows when its install answers (capability-aggregator.ts aggregateExtensionNow).
  *   v1.14.0 — 2026-10-09 — An extension component's config always goes through mergeExtensionConfig,
@@ -631,8 +632,8 @@ export async function registerComponent(
         // author's keys are used as-is (package-memory-component.ts reads them).
         const entries = memoryComponentEntries(content, registeredAs);
         // The keys land in the INSTALLER's namespace, and a package is somebody else's content: none
-        // of them may be a key the node reads and trusts. Every entry is checked before the first
-        // write, and a dry run gives the same answer.
+        // may be a key the node reads and trusts, nor one in the skill registry or an organism's
+        // namespace (package-memory-component.ts). Checked before the first write, dry run included.
         const reserved = reservedKeysInComponent(type, content, registeredAs);
         if (reserved.length > 0) {
           return { success: false, componentId, registeredAs, error: `RESERVED_KEY: ${reservedComponentMessage(componentId, reserved)}` };

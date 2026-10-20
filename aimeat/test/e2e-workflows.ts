@@ -6,6 +6,19 @@
  *   steps via simulated task completion (the onTaskTerminal hook). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows
  * @version-history
+ *   2026-10-20 — Three cases from the October security audit. "Run as me" on a refusal whose
+ *     definition was saved again by another principal answers 409 DEFINITION_CHANGED and starts
+ *     nothing, while an untouched refused run still runs as the owner. GET /:id/preflight by
+ *     workflow:read alone is refused 403 SCOPE_DENIED naming memory:read, memory:read-as-owner and
+ *     ai:use, and the stub provider counts no call, while a caller holding the words gets the
+ *     answer. A run's observed values are served only to a caller that reads the owner's records as
+ *     the owner; everyone else keeps the step states and gets the values withheld
+ *     (wf-run-as-owner-not-bound-to-refused-snapshot, wf-preflight-skips-step-authority).
+ *   2026-10-20 — A step that reads the owner's records costs memory:read-as-owner as well: an agent
+ *     with workflow:read, workflow:write and memory:read is refused the save and the signals-only
+ *     check with 403 SCOPE_DENIED naming that word, and the same agent holding it passes. Every
+ *     agent in this suite that saves or starts a reading workflow was given the word, which is the
+ *     setup moving with the rule (secaudit 2026-10, wf-step-read-skips-read-as-owner).
  *   2026-10-18 — An agent holding every word the steps cost but not workflow:write is refused POST
  *     /v1/workflows/:id/run with 403 SCOPE_DENIED and no run starts; red with requireScope('workflow:write')
  *     removed from the route (wish-kolme-puuttuvaa-kieltotesti-maksuosoite-ty-nkulun-ajo-ja-kyv).
@@ -957,8 +970,69 @@ async function run() {
     assert(body.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${JSON.stringify(body.error)}`);
   });
 
+  // A preflight evaluates every step's signals against the owner's records and, with llm.approved,
+  // asks the node's model about every llm leaf. That is the work a signals-only check does, and the
+  // run door charges memory:read, memory:read-as-owner and ai:use for it. This route asked
+  // workflow:read alone and handed preflightWorkflow no caller, so a session holding that one word
+  // read the owner's records and spent the owner's AI, once per call, with no run record and no
+  // per-run cost cap (secaudit 2026-10, wf-preflight-skips-step-authority). Both assertions below
+  // failed on the code before the fix: the refused call answered 200, and the stub counted its call.
+  await test('a preflight costs the words a check costs: workflow:read alone is refused, spends no AI, and a caller holding the words gets the answer', async () => {
+    const provider = await startFakeAiProvider(0);
+    try {
+      provider.setDefault('chat', chatJson('{"ok":true,"reason":"there is text"}', { usage: { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost: 0.01 } }));
+      const aim = await json('/v1/memory', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: provider.baseUrl, model: 'stub/test-model', daily_budget_usd: 5 } }),
+      });
+      assert(aim.body?.ok === true, `point the owner at the stub: ${aim.status} ${JSON.stringify(aim.body.error)}`);
+      await writeMem('wfpre.private', 'the owner\'s own text');
+      const wf = {
+        title: { en_US: 'Judged peek' }, description: { en_US: 'a judged signal over an owner record' },
+        trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect', llm: { approved: true },
+        steps: [{
+          id: 'peek', description: { en_US: 'Peek' }, required_to_function: 'none',
+          success_signal: { kind: 'llm', key: 'wfpre.private', ask: 'Is there text here?' },
+          action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } },
+        }],
+      };
+      assert((await json('/v1/workflows/pre-judged', { method: 'PUT', headers: auth, body: JSON.stringify(wf) })).status === 200, 'the owner saves the judged workflow');
+
+      // THE REFUSAL: workflow:read alone, which is all the route used to ask for.
+      const narrow = await mintAgent('wf-pre-narrow', ['workflow:read']);
+      const before = provider.requestsFor('chat').length;
+      const refused = await json('/v1/workflows/pre-judged/preflight', { headers: narrow.headers });
+      assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED',
+        `a preflight by workflow:read alone: ${refused.status} ${JSON.stringify(refused.body.error ?? refused.body.data)}`);
+      const said = String(refused.body.error?.message ?? '');
+      for (const word of ['memory:read', 'memory:read-as-owner', 'ai:use']) {
+        assert(said.includes(word), `the refusal names "${word}": ${said}`);
+      }
+      assert(provider.requestsFor('chat').length === before,
+        `the refused preflight spent the owner's AI: ${provider.requestsFor('chat').length - before} call(s)`);
+      assert(!JSON.stringify(refused.body).includes('the owner\'s own text'), 'the refusal carried the record content');
+
+      // POSITIVE CONTROL: the same agent shape holding those words gets the preflight, and the judge
+      // runs once for it.
+      const held = await mintAgent('wf-pre-held', ['workflow:read', 'memory:read', 'memory:read-as-owner', 'ai:use']);
+      const ok = await json('/v1/workflows/pre-judged/preflight', { headers: held.headers });
+      assert(ok.status === 200 && ok.body.data?.steps?.[0]?.id === 'peek',
+        `with the words the preflight answers: ${ok.status} ${JSON.stringify(ok.body.error ?? ok.body.data)}`);
+      assert(provider.requestsFor('chat').length === before + 1,
+        `the judge ran once, for the caller that paid for it: ${provider.requestsFor('chat').length - before}`);
+      // And the account holder in person passes, as they pass every door.
+      const byOwner = await json('/v1/workflows/pre-judged/preflight', { headers: auth });
+      assert(byOwner.status === 200, `the owner in person: ${byOwner.status} ${JSON.stringify(byOwner.body.error)}`);
+    } finally {
+      await forgetStubProvider();
+      await json('/v1/workflows/pre-judged?withRuns=true', { method: 'DELETE', headers: auth });
+      await json('/v1/memory/wfpre.private', { method: 'DELETE', headers: auth });
+      await provider.close();
+    }
+  });
+
   await test('aimeat_workflow_run in signals-only mode answers each step verdict and the status, as the REST route does', async () => {
-    const checker = await mintAgent('wf-mcp-check', ['workflow:read', 'workflow:write', 'memory:read']);
+    const checker = await mintAgent('wf-mcp-check', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner']);
     const out = await mcpCall(checker.token, 'aimeat_workflow_run', { id: 'news', mode: 'signals-only' });
     assert(!out.isError, `the check ran: ${out.raw}`);
     const d = JSON.parse(out.raw);
@@ -1037,7 +1111,7 @@ async function run() {
     const narrow = await mint('wf-narrow', ['memory:read']);
     // work:request beside the workflow words: WORKFLOW's steps give an agent work, which a save asks
     // for since 2026-09-25. The setup changed with the rule; the words under test did not.
-    const scoped = await mint('wf-scoped', ['workflow:read', 'workflow:write', 'memory:read', 'work:request']);
+    const scoped = await mint('wf-scoped', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner', 'work:request']);
 
     // WRITE: refused for the narrow agent, and nothing is written.
     const denied = await json('/v1/workflows/agent-denied-wf', {
@@ -1080,7 +1154,7 @@ async function run() {
   await test('workflow:write is what an agent needs to start a run', async () => {
     const save = await json('/v1/workflows/agent-run-wf', { method: 'PUT', headers: auth, body: JSON.stringify(WORKFLOW) });
     assert(save.status === 200, `owner saves the workflow: ${save.status} ${JSON.stringify(save.body.error)}`);
-    const steps = ['workflow:read', 'memory:read', 'work:request'];
+    const steps = ['workflow:read', 'memory:read', 'memory:read-as-owner', 'work:request'];
     const noWrite = await mintAgent('wf-run-nowrite', steps);
     const withWrite = await mintAgent('wf-run-write', [...steps, 'workflow:write']);
 
@@ -1231,7 +1305,7 @@ async function run() {
     }
     // A signals-only check dispatches no step, so it is not the step's door. It does read the owner's
     // records (the ai step's answer key is its signal), which is memory:read, and nothing more.
-    const readerOnly = await mint('wf-check', ['workflow:read', 'workflow:write', 'memory:read']);
+    const readerOnly = await mint('wf-check', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner']);
     const check = await run('scope-ask', readerOnly, { mode: 'signals-only' });
     assert(check.status === 200, `a check without ai:use: ${check.status} ${JSON.stringify(check.body.error)}`);
 
@@ -1241,7 +1315,7 @@ async function run() {
 
     // POSITIVE CONTROL: the same agent shape with the step's word, saves and runs the same ai step.
     // memory:read beside it, because the step's answer key is read back by its signal.
-    const granted = await mint('wf-ai', ['workflow:read', 'workflow:write', 'ai:use', 'memory:read']);
+    const granted = await mint('wf-ai', ['workflow:read', 'workflow:write', 'ai:use', 'memory:read', 'memory:read-as-owner']);
     const grantedSave = await put('scope-ask-granted', granted, ASK);
     assert(grantedSave.status === 200, `with ai:use the save passes: ${grantedSave.status} ${JSON.stringify(grantedSave.body.error)}`);
     const grantedRun = await run('scope-ask-granted', granted, { mode: 'full', target: 'sandbox' });
@@ -1285,7 +1359,11 @@ async function run() {
   // the field's value in the run, and workflow:read serves the run. So workflow:read+write alone read
   // any field of any owner record the memory door refused them, and a credential record's fields came
   // back whole where every memory door shows it redacted.
-  await test('a signal that reads an owner record costs memory:read, at save and at run', async () => {
+  // The owner-scope read is the whole owner scope, so since 2026-10-15 the memory route asks
+  // memory:read-as-owner of anyone who is neither the owner in person nor an app grant. The workflow
+  // check asked memory:read alone, so an agent with workflow:read, workflow:write and memory:read
+  // read the private field value out of the run (secaudit 2026-10, wf-step-read-skips-read-as-owner).
+  await test('a signal that reads an owner record costs memory:read and memory:read-as-owner, at save and at run', async () => {
     const mint = async (name: string, scopes: string[]) => {
       const reg = await json('/v1/agents', {
         method: 'POST', headers: auth,
@@ -1296,7 +1374,10 @@ async function run() {
       return { Authorization: `Bearer ${token}` };
     };
     const noRead = await mint('wf-noread', ['workflow:read', 'workflow:write']);
-    const reader = await mint('wf-reader', ['workflow:read', 'workflow:write', 'memory:read']);
+    // memory:read and nothing more: what the agent in the finding held. "*" would not help either,
+    // because memory:read-as-owner sits outside every wildcard.
+    const readOnly = await mint('wf-readonly', ['workflow:read', 'workflow:write', 'memory:read']);
+    const reader = await mint('wf-reader', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner']);
     const peek = (key: string, path: string) => ({
       title: { en_US: 'Peek' }, description: { en_US: 'a signal that reads a record' },
       trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
@@ -1316,6 +1397,10 @@ async function run() {
     assert(w.status === 200 || w.status === 201, `write the owner record: ${w.status}`);
     const direct = await json('/v1/memory/wfsig.private?owner_scope=true', { headers: noRead });
     assert(direct.status === 403, `the memory door refuses the agent: ${direct.status}`);
+    // The same door refuses the agent that HAS memory:read, because reading the owner's private
+    // record as the owner costs memory:read-as-owner (services/owner-scope-read.ts).
+    const directRead = await json('/v1/memory/wfsig.private?owner_scope=true', { headers: readOnly });
+    assert(directRead.status === 404, `the memory door hides the owner's private record from memory:read alone: ${directRead.status}`);
 
     // SAVE: the signal is the read, so it costs the read's word.
     const saved = await put('sig-peek', noRead, peek('wfsig.private', 'secret'));
@@ -1334,12 +1419,88 @@ async function run() {
       `a check by workflow:write alone: ${refused.status} ${JSON.stringify(refused.body.error ?? refused.body.data)}`);
     const none = await json('/v1/workflows/sig-peek/runs?include=checks', { headers: auth });
     assert(none.body.data.count === 0, `the refused check recorded nothing, found ${none.body.data.count}`);
-    // POSITIVE CONTROL: the same agent shape holding memory:read checks it.
+
+    // memory:read alone is refused on both doors, naming the word the memory route asks for. This is
+    // the hole the finding recorded: the save passed and the check served the private field value.
+    const readOnlySave = await put('sig-peek-ro', readOnly, peek('wfsig.private', 'secret'));
+    assert(readOnlySave.status === 403 && readOnlySave.body.error?.code === 'SCOPE_DENIED'
+      && /memory:read-as-owner/.test(readOnlySave.body.error?.message ?? ''),
+      `a save by memory:read alone: ${readOnlySave.status} ${JSON.stringify(readOnlySave.body.error)}`);
+    assert((await json('/v1/workflows/sig-peek-ro', { headers: auth })).status === 404, 'the refused save wrote nothing');
+    const readOnlyCheck = await check('sig-peek', readOnly);
+    assert(readOnlyCheck.status === 403 && readOnlyCheck.body.error?.code === 'SCOPE_DENIED'
+      && /memory:read-as-owner/.test(readOnlyCheck.body.error?.message ?? ''),
+      `a check by memory:read alone: ${readOnlyCheck.status} ${JSON.stringify(readOnlyCheck.body.error ?? readOnlyCheck.body.data)}`);
+    assert(!JSON.stringify(readOnlyCheck.body).includes('owner-only-value'),
+      `the refusal carried the private value: ${JSON.stringify(readOnlyCheck.body).slice(0, 200)}`);
+    const stillNone = await json('/v1/workflows/sig-peek/runs?include=checks', { headers: auth });
+    assert(stillNone.body.data.count === 0, `the refused check recorded nothing, found ${stillNone.body.data.count}`);
+
+    // POSITIVE CONTROL: the same agent shape holding memory:read-as-owner saves it and checks it.
+    const allowedSave = await put('sig-peek-ro', reader, peek('wfsig.private', 'secret'));
+    assert(allowedSave.status === 200, `with memory:read-as-owner the save passes: ${allowedSave.status} ${JSON.stringify(allowedSave.body.error)}`);
     const allowed = await check('sig-peek', reader);
-    assert(allowed.status === 200, `with memory:read the check runs: ${allowed.status} ${JSON.stringify(allowed.body.error)}`);
+    assert(allowed.status === 200, `with memory:read-as-owner the check runs: ${allowed.status} ${JSON.stringify(allowed.body.error)}`);
 
     await json('/v1/memory/wfsig.private', { method: 'DELETE', headers: auth });
-    for (const id of ['sig-peek', 'sig-agent']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+    for (const id of ['sig-peek', 'sig-peek-ro', 'sig-agent']) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+  });
+
+  // The scope check above stops an agent from CREATING such a run. It does not stop one from READING
+  // a run the owner started in person: a json_field leaf keeps the field value of an owner record on
+  // the run, and GET /v1/workflows/:id/runs/:runId served it to any caller holding workflow:read,
+  // withholding only classified values. A caller that does not read the owner's records as the owner
+  // (services/owner-scope-read.ts) now gets the states without the values (secaudit 2026-10, the
+  // run-read gap beside wf-preflight-skips-step-authority).
+  await test('a run\'s observed values are served only to a caller that reads the owner\'s records as the owner', async () => {
+    const w = await json('/v1/memory', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ key: 'wfobs.private', value: { pin: 'OWNER-ONLY-4711' }, visibility: 'private' }),
+    });
+    assert(w.body?.ok === true, `write the owner record: ${w.status} ${JSON.stringify(w.body.error)}`);
+    const wf = {
+      title: { en_US: 'Peek' }, description: { en_US: 'a signal that reads a record' },
+      trigger: { kind: 'manual' }, vars: [], on_step_fail: 'inspect',
+      steps: [{
+        id: 'peek', description: { en_US: 'Peek' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key: 'wfobs.private', op: 'json_field', path: 'pin', nonempty: true },
+        action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } },
+      }],
+    };
+    assert((await json('/v1/workflows/obs-peek', { method: 'PUT', headers: auth, body: JSON.stringify(wf) })).status === 200, 'the owner saves it');
+    const check = await json('/v1/workflows/obs-peek/run', { method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }) });
+    assert(check.status === 200, `the owner runs the check: ${check.status} ${JSON.stringify(check.body.error)}`);
+    const runId = check.body.data.runId as string;
+
+    // THE OWNER reads what the signal saw, as before.
+    const mine = await json(`/v1/workflows/obs-peek/runs/${runId}`, { headers: auth });
+    const seenByOwner = mine.body.data?.steps?.peek;
+    assert(seenByOwner?.outputObserved?.value === 'OWNER-ONLY-4711',
+      `the owner reads the field value: ${JSON.stringify(seenByOwner?.outputObserved)}`);
+    assert(seenByOwner?.state === 'green', `the step is green for the owner: ${JSON.stringify(seenByOwner?.state)}`);
+
+    // THE REFUSAL: workflow:read alone reads the run, keeps the state, and gets no value.
+    const narrow = await mintAgent('wf-obs-narrow', ['workflow:read']);
+    const theirs = await json(`/v1/workflows/obs-peek/runs/${runId}`, { headers: narrow.headers });
+    assert(theirs.status === 200, `the run is still readable: ${theirs.status} ${JSON.stringify(theirs.body.error)}`);
+    const seen = theirs.body.data?.steps?.peek;
+    assert(seen?.state === 'green', `the step's state is still shown: ${JSON.stringify(seen)}`);
+    assert(seen?.outputObserved?.value === null && typeof seen?.outputObserved?.withheld === 'string',
+      `the observed value is withheld: ${JSON.stringify(seen?.outputObserved)}`);
+    assert(!JSON.stringify(theirs.body).includes('OWNER-ONLY-4711'), 'the run carried the owner\'s private value');
+    // The run list is the same door, and serves the same observations.
+    const list = await json('/v1/workflows/obs-peek/runs?include=checks', { headers: narrow.headers });
+    assert(list.status === 200 && !JSON.stringify(list.body).includes('OWNER-ONLY-4711'),
+      `the run list carried the owner's private value: ${list.status}`);
+
+    // POSITIVE CONTROL: the same agent shape holding memory:read-as-owner reads the value.
+    const asOwner = await mintAgent('wf-obs-asowner', ['workflow:read', 'memory:read', 'memory:read-as-owner']);
+    const full = await json(`/v1/workflows/obs-peek/runs/${runId}`, { headers: asOwner.headers });
+    assert(full.body.data?.steps?.peek?.outputObserved?.value === 'OWNER-ONLY-4711',
+      `with memory:read-as-owner the value is served: ${JSON.stringify(full.body.data?.steps?.peek?.outputObserved)}`);
+
+    await json('/v1/memory/wfobs.private', { method: 'DELETE', headers: auth });
+    await json('/v1/workflows/obs-peek?withRuns=true', { method: 'DELETE', headers: auth });
   });
 
   await test('a run never serves a credential record\'s value, what a signal saw of it or what an older run recorded', async () => {
@@ -1761,7 +1922,7 @@ async function run() {
   });
 
   await test('a trigger does not start a run of a workflow whose saving agent lost a word it needs: one refusal on the run list, one notification with two actions, and "Run as me" starts it once as the owner', async () => {
-    const saver = await mintAgent('wf-trig-saver', ['workflow:read', 'workflow:write', 'memory:read']);
+    const saver = await mintAgent('wf-trig-saver', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner']);
     const put = await json('/v1/workflows/agent-trig', { method: 'PUT', headers: saver.headers, body: JSON.stringify(triggered('wftrig.fire.*')) });
     assert(put.status === 200, `the agent saves it: ${put.status} ${JSON.stringify(put.body.error)}`);
     // The owner takes memory:read away from that agent. The step reads the answer back, so it needs it.
@@ -1830,6 +1991,68 @@ async function run() {
     await json('/v1/workflows/agent-trig?withRuns=true', { method: 'DELETE', headers: auth });
   });
 
+  // "Run as me" is one press on ONE definition: the one the refusal pinned and the owner was shown.
+  // It started the workflow BY ID, so the engine loaded the CURRENT definition and ran it as the
+  // owner in person, with no step-permission check and with the run's AI calls going out as the
+  // owner. A save by another principal between the refusal and the press therefore spent the
+  // owner's approval on steps they had never read (secaudit 2026-10,
+  // wf-run-as-owner-not-bound-to-refused-snapshot). Both assertions below failed on the code before
+  // the fix: the press answered 200 and started a run of the second agent's definition.
+  await test('"Run as me" starts nothing when the workflow was saved again after the refusal, and still starts a refused run nobody touched', async () => {
+    const words = ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner'];
+    const first = await mintAgent('wf-snap-x', words);
+    const second = await mintAgent('wf-snap-y', words);
+    const cases = [['snap-changed', 'wfsnapa.fire.*'], ['snap-same', 'wfsnapb.fire.*']] as const;
+    for (const [id, key] of cases) {
+      const put = await json(`/v1/workflows/${id}`, { method: 'PUT', headers: first.headers, body: JSON.stringify(triggered(key)) });
+      assert(put.status === 200, `${id}: the first agent saves it: ${put.status} ${JSON.stringify(put.body.error)}`);
+    }
+    // The owner takes the read word away, so both triggers refuse.
+    const narrowed = await json('/v1/agents/wf-snap-x/scopes', { method: 'PATCH', headers: auth, body: JSON.stringify({ scopes: ['workflow:read', 'workflow:write'] }) });
+    assert(narrowed.status === 200, `narrow the first agent: ${narrowed.status} ${JSON.stringify(narrowed.body.error)}`);
+    await writeMem('wfsnapa.fire.1', 'go');
+    await sleep(800);
+    await writeMem('wfsnapb.fire.1', 'go');
+    await sleep(800);
+
+    const refusedOf = async (id: string) => {
+      const runs = await json(`/v1/workflows/${id}/runs`, { headers: auth });
+      const found = ((runs.body.data?.runs ?? []) as any[]).find(r => r.status === 'refused');
+      assert(!!found, `${id}: the trigger's start was refused: ${JSON.stringify((runs.body.data?.runs ?? []).map((r: any) => r.status))}`);
+      return found;
+    };
+    const changed = await refusedOf('snap-changed');
+    const untouched = await refusedOf('snap-same');
+
+    // The second agent saves a different definition under the same id.
+    const other = JSON.parse(JSON.stringify(triggered('wfsnapa.fire.*')));
+    other.description = { en_US: 'a different definition, saved after the refusal' };
+    other.steps[0].action.question = { prompt: 'Send the money?', options: [{ id: 'go', label: 'Go' }] };
+    const resave = await json('/v1/workflows/snap-changed', { method: 'PUT', headers: second.headers, body: JSON.stringify(other) });
+    assert(resave.status === 200, `the second agent saves a different definition: ${resave.status} ${JSON.stringify(resave.body.error)}`);
+
+    // THE REFUSAL: the press starts nothing and says the definition is not the one it shows.
+    const press = await json(`/v1/workflows/snap-changed/runs/${changed.runId}/run-as-owner`, { method: 'POST', headers: auth, body: '{}' });
+    assert(press.status === 409 && press.body.error?.code === 'DEFINITION_CHANGED',
+      `"Run as me" after another principal's save: ${press.status} ${JSON.stringify(press.body.error ?? press.body.data)}`);
+    const after = await json('/v1/workflows/snap-changed/runs?include=checks', { headers: auth });
+    assert(((after.body.data?.runs ?? []) as any[]).every(r => r.status === 'refused'),
+      `nothing was started: ${JSON.stringify((after.body.data?.runs ?? []).map((r: any) => r.status))}`);
+    assert(!(await refusedOf('snap-changed')).refusal?.ranAsOwner,
+      'the refusal records no run, because none was started');
+
+    // POSITIVE CONTROL: the refused run whose definition nobody replaced still runs as the owner.
+    const good = await json(`/v1/workflows/snap-same/runs/${untouched.runId}/run-as-owner`, { method: 'POST', headers: auth, body: '{}' });
+    assert(good.status === 200 && typeof good.body.data?.runId === 'string',
+      `an untouched refused run still starts: ${good.status} ${JSON.stringify(good.body.error ?? good.body.data)}`);
+    const started = await json(`/v1/workflows/snap-same/runs/${good.body.data.runId}`, { headers: auth });
+    assert(started.body.data?.status === 'waiting-step', `the started run is going: ${started.body.data?.status}`);
+
+    await json(`/v1/workflows/snap-same/runs/${good.body.data.runId}/cancel`, { method: 'POST', headers: auth, body: '{}' });
+    for (const [id] of cases) await json(`/v1/workflows/${id}?withRuns=true`, { method: 'DELETE', headers: auth });
+    for (const key of ['wfsnapa.fire.1', 'wfsnapb.fire.1']) await json(`/v1/memory/${key}`, { method: 'DELETE', headers: auth });
+  });
+
   // ── an agent step costs work:request, for a workflow saved from 2026-09-25 on (2026-09-25) ──
   // Giving one of the owner's agents work is what work:request names. A new save or update asks it
   // of the saver, and a run asks it of the starter; each workflow keeps the rules it was saved under
@@ -1842,13 +2065,13 @@ async function run() {
   };
 
   await test('a new save with an agent step asks the saver for work:request, and a workflow saved before still runs without it', async () => {
-    const noWord = await mintAgent('wf-giver-no', ['workflow:read', 'workflow:write', 'memory:read']);
+    const noWord = await mintAgent('wf-giver-no', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner']);
     const refused = await json('/v1/workflows/give-new', { method: 'PUT', headers: noWord.headers, body: JSON.stringify(WORKFLOW) });
     assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED' && /work:request/.test(refused.body.error?.message ?? ''),
       `an agent step saved without work:request: ${refused.status} ${JSON.stringify(refused.body.error)}`);
     assert((await json('/v1/workflows/give-new', { headers: auth })).status === 404, 'the refused save wrote nothing');
 
-    const withWord = await mintAgent('wf-giver', ['workflow:read', 'workflow:write', 'memory:read', 'work:request']);
+    const withWord = await mintAgent('wf-giver', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner', 'work:request']);
     const saved = await json('/v1/workflows/give-new', { method: 'PUT', headers: withWord.headers, body: JSON.stringify(WORKFLOW) });
     assert(saved.status === 200 && saved.body.data.authority === 2,
       `with work:request it saves, under the new rules: ${saved.status} ${JSON.stringify(saved.body.data?.authority ?? saved.body.error)}`);
@@ -1869,11 +2092,11 @@ async function run() {
   });
 
   await test('a trigger asks the agent that saved a workflow for work:request only when it was saved under the new rules', async () => {
-    const giver = await mintAgent('wf-trig-giver', ['workflow:read', 'workflow:write', 'memory:read', 'work:request']);
+    const giver = await mintAgent('wf-trig-giver', ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner', 'work:request']);
     const wf = { ...WORKFLOW, title: { en_US: 'Give on a write' }, trigger: { kind: 'event', on: 'memory.write', match: { key: 'wfgive.fire.*' } }, steps: [WORKFLOW.steps[0]] };
     const put = await json('/v1/workflows/give-trig', { method: 'PUT', headers: giver.headers, body: JSON.stringify(wf) });
     assert(put.status === 200, `the agent saves it: ${put.status} ${JSON.stringify(put.body.error)}`);
-    const narrowed = await json('/v1/agents/wf-trig-giver/scopes', { method: 'PATCH', headers: auth, body: JSON.stringify({ scopes: ['workflow:read', 'workflow:write', 'memory:read'] }) });
+    const narrowed = await json('/v1/agents/wf-trig-giver/scopes', { method: 'PATCH', headers: auth, body: JSON.stringify({ scopes: ['workflow:read', 'workflow:write', 'memory:read', 'memory:read-as-owner'] }) });
     assert(narrowed.status === 200, `the owner takes work:request away: ${narrowed.status}`);
 
     await writeMem('wfgive.fire.1', 'go');

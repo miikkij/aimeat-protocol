@@ -17,9 +17,16 @@
  *   read; `services/memory-bin-sweep.ts` removes it once `memoryDeleteGraceDays` has passed. This
  *   node had no delete at all before 2026-09-03 — a value could be emptied, never removed — and the
  *   grace window is how that principle survives having one.
- * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreMemoryRecord()
+ * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreLevel() ·
+ *   lowerRestored() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-20 — restoreMemoryRecord asks the three visibility rules a write asks of a raise to
+ *     public (restoreLevel): the closed node's level, which lowers; the label's audience cap, which
+ *     refuses 409 LABEL_CAPS_AUDIENCE for every caller; and the publish gate, which refuses 403
+ *     PUBLISH_NOT_ALLOWED to a caller the node asks the owner about. An agent without publish:public
+ *     put a public record its owner had binned back in front of anonymous readers
+ *     (secaudit 2026-10, memory-bin.ts:restoreMemoryRecord:skips-publish-gate-and-cap).
  *   2026-10-16 — restoreMemoryRecord refuses a record whose grace window has closed (pastGraceWindow),
  *     with the same NOT_RESTORABLE answer, before the hourly sweep has removed its row (QA audit F05a-02).
  *   2026-10-15 — restoreMemoryRecord applies the write path's old-morsel-price rule
@@ -60,12 +67,19 @@ import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../u
 import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
 import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from './legacy-pacing-write.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
+import { memoryCapRefusal, memoryWriterAsk } from './memory-publish-gate.js';
+import { isRaiseToPublic } from './publish-gate.js';
+import { memoryTarget } from './classification/label-rows.js';
+import { closedNodeLevel } from './closed-node-level.js';
+import { CAS_ATTEMPTS } from './record-cas.js';
+import type { MemoryRecord } from '../storage/interface.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
 
 export interface MemoryBinRefusal {
   ok: false;
   code: 'NOT_FOUND' | 'NOT_RESTORABLE' | 'WRITE_CONFLICT' | 'AUTH_REQUIRED' | 'ACCESS_DENIED' | 'CONSENT_REQUIRED' | 'RESERVED_KEY' | 'SECRET_RECORD'
+    | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE'
     | LegacyPacingWriteRefusal['code'];
   message: string;
   /** What the door should answer. 404 for the two original codes, so an old caller reads the same. */
@@ -269,6 +283,76 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
 }
 
 /**
+ * The level a binned record may come back at, or the refusal to answer with.
+ *
+ * A RESTORE IS A WRITE, and this is the half that was missing. The bin is invisible to getMemory, so
+ * writing the same content at the same key counts as a raise from nothing to the level the record
+ * held, and the write path asks three things of such a raise (services/memory-write.ts): the closed
+ * node's level, the label's audience cap, and the publish gate. The restore asked none of them, so an
+ * agent holding memory:write put a public record its owner had binned back in front of anonymous
+ * readers, which the same agent's write of that content would have had held for the owner to approve
+ * (secaudit 2026-10, memory-bin.ts:restoreMemoryRecord:skips-publish-gate-and-cap).
+ *
+ * Each rule keeps the answer it gives on a write. The closed node LOWERS: on a node that serves its
+ * content to signed-in accounts only, a public record comes back for members, with no refusal, so the
+ * owner's restore still works. The label's cap REFUSES, for every caller and the owner in person
+ * included, because what it holds is the label and not the caller. The publish gate REFUSES the
+ * callers it asks the owner about, rather than putting the record back private: the two bin doors
+ * answer `restored: true` and nothing more, so a record put back at a level nobody asked for would be
+ * reported as the restore that was wanted. The record stays in the bin for the rest of its grace
+ * window, and the message says the two ways on: the owner puts it back in person, or the agent writes
+ * the content again, which files a request the owner approves.
+ */
+async function restoreLevel(
+  deps: MemoryBinDeps, req: MemoryBinRequest, found: string, visibility: string | undefined,
+): Promise<{ level: MemoryRecord['visibility'] | undefined } | MemoryBinRefusal> {
+  const level = visibility as MemoryRecord['visibility'] | undefined;
+  if (!level) return { level };
+  // The closed node first, as on a write: a record lowered to the signed-in level is no longer a
+  // raise to public, so the gate below is not asked about it.
+  const closed = closedNodeLevel(deps.config, level, 'members' as const);
+  const to = closed.level;
+  const capped = await memoryCapRefusal(deps, { principal: req.caller, roles: req.roles ?? [] },
+    [memoryTarget(found, req.key)], to, null, 'memory restore');
+  if (capped) return { ok: false, code: 'LABEL_CAPS_AUDIENCE', message: capped.message, status: capped.status };
+  // An operator naming another namespace skips the gate, as it skips the organism namespace rule in
+  // binRefusal: there is no owner session of that account here to ask, and the operator is the node.
+  const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
+  if (!operatorOverride && isRaiseToPublic(undefined, to)) {
+    const ask = memoryWriterAsk(deps, {
+      principal: req.caller, targetGaii: found, roles: req.roles ?? [], scopes: req.scopes ?? [],
+    });
+    if (ask.kind === 'refused') return { ok: false, code: 'PUBLISH_NOT_ALLOWED', message: ask.message, status: ask.status };
+    if (ask.kind === 'ask') {
+      return {
+        ok: false, code: 'PUBLISH_NOT_ALLOWED', status: 403,
+        message: `Putting "${req.key}" back makes it public again, and that is the account holder's decision or needs the publish:public permission. `
+          + 'It stays in the bin until its grace window ends. Ask your owner to put it back, or write the content again, '
+          + 'which files a request they can approve.',
+      };
+    }
+  }
+  return { level: to };
+}
+
+/**
+ * Store the record the restore just took out of the bin at `level`, when that is not the level it
+ * went in at (the closed node's lowering above). Only the level changes, and it is written on the
+ * version that was read, as the audience settle writes one (classification/audience-settle.ts).
+ */
+async function lowerRestored(deps: MemoryBinDeps, ownerGaii: string, key: string, level: MemoryRecord['visibility']): Promise<void> {
+  for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+    const full = await deps.storage.getMemory(ownerGaii, key);
+    if (!full || full.visibility === level) return;
+    const next = { ...full, key, visibility: level, groupId: undefined, workspaceRef: undefined, version: full.version + 1, updatedAt: new Date().toISOString() };
+    const stored = deps.storage.setMemoryIfVersion
+      ? await deps.storage.setMemoryIfVersion(next, full.version)
+      : await deps.storage.setMemory(next);
+    if (stored) return;
+  }
+}
+
+/**
  * Has the grace window of a record deleted at `deletedAt` closed? A grace of 0 is an immediate,
  * final delete, so the window is closed at once. An unreadable date or grace leaves the record
  * restorable: the sweep, not this check, is what removes rows.
@@ -307,9 +391,15 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
   // A restore writes the record back, so it answers to the write path's rule on the old morsel
   // price: a tool manifest or an offers document deleted with `price.morsels` in it stays in the
   // bin from 4.0.0, as the same document is refused on POST, PUT and PATCH (feature-list audit #205).
+  let level: MemoryRecord['visibility'] | undefined;
   if (found) {
     const legacy = legacyPacingWriteRefusal(req.key, binned);
     if (legacy) return { ok: false, code: legacy.code, message: legacy.message, status: legacy.status };
+    // Refuse before you write: the level the record would come back at is decided, and refused,
+    // before the tombstone is cleared (restoreLevel says what each rule answers and why).
+    const decided = await restoreLevel(deps, req, found, visibility);
+    if ('ok' in decided) return decided;
+    level = decided.level;
   }
   if (!found || !(await deps.storage.restoreMemory(found, req.key))) {
     return {
@@ -317,6 +407,7 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
       message: 'There is nothing of that name waiting to be put back. Either it was never deleted, or it has already been removed for good.',
     };
   }
-  emitRecordChange('memory', found, visibility);
+  if (level && level !== visibility) await lowerRestored(deps, found, req.key, level);
+  emitRecordChange('memory', found, level ?? visibility);
   return { ok: true, key: req.key, ownerGaii: found, restorableUntil: null, graceDays: deps.config.memoryDeleteGraceDays };
 }

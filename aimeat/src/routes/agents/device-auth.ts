@@ -2,8 +2,24 @@
  * @file src/routes/agents/device-auth.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
+ * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   v1.15.0 — 2026-10-20 — approveDeviceAuth and scopesExceedNodeMax move to
+ *     device-auth-approve.ts (max-file-lines). A move only: no behaviour changed with it.
+ *   v1.14.0 — 2026-10-20 — Same-owner auto-approval of an EXISTING agent is fenced two ways
+ *     (secaudit 2026-10, sibling-reapproval-takeover). An AGENT approver that names an agent which
+ *     already exists must be authorized over that agent (mayActOnAgent, or `registeredBy` naming
+ *     the approver), and the escalation filter is measured against the TARGET's held scopes as well
+ *     as the requested list. approveDeviceAuth takes the approving agent's own scopes and grants no
+ *     word outside them, the target's outside-wildcard scopes included. The 2026-09-01 work read
+ *     `agent:write` on the path that creates a NEW name and left re-approval of an existing sibling
+ *     open: any agent of the owner holding `agent:write` rotated a sibling's key, overwrote its
+ *     stored scopes and collected its ninety-day token and private key from the unauthenticated
+ *     device-token poll, with the sibling's `memory:write-reserved` and `secrets:manage` carried
+ *     into the grant. Every other route that changes a sibling is fenced: PATCH
+ *     /v1/agents/:name/scopes narrows only and needs `agent:permissions`, rekey needs the owner
+ *     role, delete reads `registeredBy`. Both refusals are fall-throughs: the row stays pending and
+ *     the owner approves in their profile, so a genuine reconnect still works.
  *   v1.13.0 — 2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.12.0 — 2026-10-18 — A new agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.11.3 — 2026-10-09 — A device-token poll on an expired row clears its credentials and deletes
@@ -82,252 +98,23 @@ import type { Router, Request } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface.js';
-import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
-import { validateAgentName, buildGAII, generateUserCode, localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
-import { executeHooks } from '../../services/hooks.js';
-import { recordAccountEvent } from '../../services/account-events.js';
-import { fireHook } from '../../utils/fire-hook.js';
-import { verifyJWT, issueJWT, generateSessionId } from '../../auth/jwt.js';
+import { validateAgentName, buildGAII, generateUserCode, localAccountName, isOwnerInPerson, mayActOnAgent } from '../../utils/gaii.js';
+import { verifyJWT } from '../../auth/jwt.js';
 import { credentialRevoked, optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
-import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
-import { emitToolListChanged } from '../../mcp/index.js';
-import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
-import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
-import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
-import { uncoveredScopes, scopeIsCovered, SCOPES_OUTSIDE_WILDCARD, exceedsCeiling } from '../../utils/scope-coverage.js';
-import { recordAgentScopeRequest } from '../../services/agent-refusals.js';
-import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
-
-/** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
-function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
-  return exceedsCeiling(config.maxAgentScopes, finalScopes);
-}
-
-/**
- * The APPROVE flow shared by the /verify consent submission and same-owner auto-approval:
- * registration hooks → create agent (or rotate keys on an existing one) → issue the agent
- * JWT → stash credentials on the device-auth record for the poll → auto-start onboarding.
- * Scope validation happens BEFORE this is called (the two callers differ in how).
- */
-async function approveDeviceAuth(
-  config: AimeatConfig,
-  storage: Storage,
-  request: DeviceAuthorizationRecord,
-  approvedBy: string,
-  finalScopes: string[],
-  userAgent: string | undefined,
-  /**
-   * Whether `finalScopes` is a real choice or the node default standing in for silence. Re-running
-   * device auth is a NORMAL event — a token expires, a machine is reinstalled — and it used to
-   * replace an existing agent's scopes wholesale either way. An agent that reconnected without
-   * naming any scopes was quietly cut down to config.defaultAgentScopes, losing in a refresh what
-   * the owner had granted in the editor. Silence is not a request to revoke.
-   */
-  scopesRequested = true,
-): Promise<{ ok: true; gaii: string; existing: boolean } | { ok: false; status: number; code: string; message: string }> {
-  // Pre-registration hook
-  const hookResult = await executeHooks(config, storage, 'pre_agent_registration', {
-    name: request.agentName,
-    owner: request.ownerName,
-    display_name: request.displayName,
-  });
-  if (!hookResult.allowed) {
-    return { ok: false, status: 403, code: 'HOOK_REJECTED', message: hookResult.reason ?? 'Agent registration denied by extension hook' };
-  }
-
-  // Check if agent already exists — if so, issue new JWT for existing agent
-  const gaii = buildGAII(request.agentName, request.ownerName, config.nodeId);
-  const existing = await storage.getAgent(gaii);
-  let keyPair: { privateKey: string; publicKey: string };
-  const now = new Date().toISOString();
-
-  /**
-   * What this approval actually grants, which for an EXISTING agent is not `finalScopes`.
-   *
-   * The token, the stored `defaultScopes` and the device-auth record must all say the same thing.
-   * Until 2026-08-14 only the storage write used the corrected list and the other two used
-   * `finalScopes`, so re-approval wrote the right scopes and issued a credential without them. It
-   * cost two capabilities, in both directions:
-   *
-   *   - A scope no wildcard carries never reached a running agent AT ALL. Re-approval is the only
-   *     path that mints the long-lived token (`agentJwtTtlSeconds`), and it was the path that
-   *     dropped it. Measured on aimeat.io on 2026-08-14: agent `postman#happydude500001` had
-   *     defaultScopes `["*","share:manage"]` and a ninety-day token whose claim read `["*"]`, so
-   *     `aimeat_share_create` answered SCOPE_DENIED for a scope its owner had granted.
-   *   - Re-approving with NO scopes at all issued the NODE DEFAULT rather than what the owner had
-   *     chosen, because `finalScopes` falls back to `config.defaultAgentScopes` when the approver
-   *     sends no array. Storage kept the owner's decision and the token silently narrowed to the
-   *     node's, which is the same shape as the 1.33.1 outage.
-   *
-   * `POST /v1/auth/refresh` mints from `defaultScopes` correctly, so the stored value was never
-   * wrong; it is a one-hour token and the connector does not auto-refresh, so that was not a way
-   * out for anyone.
-   */
-  let grantedScopes = finalScopes;
-
-  if (existing) {
-    // Existing agent: generate new keypair (rotate keys) and issue JWT
-    keyPair = await generateKeyPair();
-    const held = existing.defaultScopes ?? [];
-    // Nothing was asked for → keep what the owner already decided, rather than resetting to the
-    // node default. And a scope no wildcard carries survives either way: it cannot be expressed by
-    // the consent card's templates or by an agent's request, so re-approval is never the place it
-    // was meant to be dropped — the owner removes it in the editor, deliberately, as they added it.
-    const preserved = SCOPES_OUTSIDE_WILDCARD.filter(s => held.includes(s) && !finalScopes.includes(s));
-    grantedScopes = scopesRequested ? [...finalScopes, ...preserved] : held;
-    await storage.updateAgent(gaii, {
-      publicKey: keyPair.publicKey,
-      defaultScopes: grantedScopes,
-      lastSeen: now,
-    });
-    // Re-approval is the other door that changes what an agent may do, and an agent being
-    // re-approved is exactly the one likely to have a session open — an open MCP session AND an
-    // open tunnel, whose credential the node pinned at attach and will keep honouring until told.
-    emitToolListChanged(gaii);
-    getActiveConnectTunnelManager()?.notifyScopesChanged(gaii);
-  } else {
-    // New agent: create from scratch
-    keyPair = await generateKeyPair();
-
-    await storage.createAgent({
-      name: request.agentName,
-      owner: request.ownerName,
-      gaii,
-      displayName: request.displayName ?? request.agentName,
-      description: request.description,
-      capabilities: [],
-      defaultScopes: finalScopes,
-      publicKey: keyPair.publicKey,
-      trustScore: 50,
-      morselBalance: 0,
-      createdAt: now,
-      lastSeen: now,
-      mode: request.mode ?? 'interactive',
-      // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
-      ...agentListingTags(config),
-      ...newAgentClearance(config),
-      // Who asked for this agent: the owner's name when a person approved on the consent screen,
-      // the approving sibling's GAII when same-owner auto-approval did. The same value goes on the
-      // device-authorization record as `approvedBy`, and that record is swept when it expires — so
-      // without this line the answer to "where did this agent come from" survives half an hour.
-      // Written here and nowhere else: re-approval is an ordinary event, and letting a later
-      // approver take the entry over would move the right to delete this agent with it.
-      registeredBy: approvedBy,
-    });
-
-    // Post-registration hook
-    fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
-  }
-
-  // Issue long-lived JWT for the agent
-  const sessionId = generateSessionId();
-  const agentJwt = await issueJWT({
-    sub: gaii,
-    owner: request.ownerName,
-    node: config.nodeId,
-    roles: ['agent'],
-    scopes: grantedScopes,
-  }, config.agentJwtTtlSeconds, sessionId);
-
-  const expiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
-
-  // Track the session, which is what makes this credential REVOCABLE. The token has always carried
-  // a `jti` and requireAuth has always checked it against the session table, but this path wrote no
-  // row — and isSessionRevoked answers "not revoked" for a session it has never heard of. So the
-  // ninety-day bearer handed out here could be ended only by its exact hash, a string the owner
-  // never sees, and deleting the agent left it authenticating. POST /v1/auth/token has written this
-  // row since P3-7; device authorization is how real agents connect, and it was the path without it.
-  await storage.createSession({
-    sessionId,
-    gaii,
-    owner: request.ownerName,
-    issuedAt: now,
-    expiresAt,
-  });
-
-  // Store credentials + JWT for agent to poll
-  await storage.updateDeviceAuth(request.deviceCode, {
-    status: 'approved',
-    scopes: grantedScopes,
-    approvedBy,
-    agentCredentials: {
-      gaii,
-      privateKey: keyPair.privateKey,
-      publicKey: keyPair.publicKey,
-      token: agentJwt,
-      expires_at: expiresAt,
-    },
-  });
-  // What was asked for beside what was granted, kept after the device-auth row goes, for the card.
-  await recordAgentScopeRequest(storage, { gaii, requested: request.requestedScopes, granted: grantedScopes, approvedBy });
-  emitChange('agents');
-
-  // ── Auto-start Hello Integration onboarding ──
-  const onboardingSteps = createDefaultSteps(request.mode ?? 'interactive');
-  onboardingSteps[0].status = 'passed';
-  onboardingSteps[0].validatedAt = now;
-  onboardingSteps[0].validationMethod = 'automatic';
-  onboardingSteps[0].details = { createdAt: existing?.createdAt ?? now };
-
-  const detectedPlatform = detectPlatform(userAgent);
-  const platformStepDA = onboardingSteps.find(s => s.id === 'identify_platform');
-  if (detectedPlatform && platformStepDA) {
-    platformStepDA.status = 'passed';
-    platformStepDA.validatedAt = now;
-    platformStepDA.validationMethod = 'automatic';
-    platformStepDA.details = { platform: detectedPlatform.id, version: detectedPlatform.version };
-    await storage.updateAgent(gaii, {
-      platform: detectedPlatform.id,
-      platformVersion: detectedPlatform.version,
-      platformDetectedBy: detectedPlatform.detectedBy,
-    });
-  }
-
-  const existingOnboarding = await storage.getOnboarding(gaii);
-  if (!existingOnboarding) {
-    // Test task only when the agent's Hello Integration includes accept_test_task. The shared
-    // helper creates it 'active' (this path built its own 'queued' copy until 2026-08-24): the
-    // owner-approval gate guards real tasks, and the smoke test is not one.
-    await createOnboardingTestTask(storage, gaii, `${request.ownerName}@${config.nodeId}`, onboardingSteps);
-    await storage.createOnboarding({
-      agentGaii: gaii,
-      status: 'in_progress',
-      startedAt: now,
-      steps: onboardingSteps,
-      detectedPlatform: detectedPlatform?.id,
-    });
-    emitChange('agent-onboarding');
-  }
-
-  // The owner's own "what has happened". Approving an agent is a permission decision they made, and
-  // one of the few things they would want a durable record of without going looking for it. A
-  // RE-approval is not news — the same agent reconnecting after a token expiry is routine — so only
-  // a genuinely new agent gets a row.
-  if (!existing) {
-    void recordAccountEvent(storage, {
-      ownerGhii: `${request.ownerName}@${config.nodeId}`,
-      kind: 'agent_connected',
-      actorGaii: approvedBy,
-      subject: gaii,
-      link: '/v1/profile?tab=agents',
-      data: { name: request.agentName },
-    }, config);
-  }
-
-  return { ok: true, gaii, existing: !!existing };
-}
+import { uncoveredScopes, scopeIsCovered } from '../../utils/scope-coverage.js';
+import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
 
 /**
  * Same-owner auto-approval eligibility: the request must be authenticated (never anonymous)
  * as the SAME owner the registration is for — either the owner session itself, or one of
  * that owner's agents. App grants and ecosystem principals never qualify. An agent approver
- * additionally may not grant scopes beyond its own token's (checked by the caller).
+ * additionally may not grant scopes beyond its own token's, and may not re-approve an agent that
+ * already exists unless it is authorized over it (both checked by the caller).
  *
  * AN AGENT APPROVER MUST HOLD `agent:write`. This is the door that creates an agent — there is no
  * other, and `registeredBy` has named the creating agent all along — so it is where the permission
@@ -466,6 +253,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // are staged so the very first device-token poll returns them. Hard limits: never
     // cross-owner (a foreign or anonymous caller falls through to the normal pending flow),
     // an AGENT approver can only grant scopes its own token already holds (no escalation),
+    // an AGENT approver naming an agent that ALREADY EXISTS must be authorized over that agent,
     // and approvedBy records who approved. The cross-owner case keeps RFC 8628 semantics
     // untouched — Slice 1 forbids it anyway.
     let autoApproved = false;
@@ -474,6 +262,13 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // default, because there is no owner here to choose. The ceiling was checked above, before the
     // record was written.
     const autoScopes: string[] = requestedScopes ?? config.defaultAgentScopes;
+    // Whether this name is already an agent, and what that agent holds. A device-authorize on an
+    // existing name is a RE-APPROVAL: it rotates the agent's key, overwrites its stored scopes and
+    // mints a ninety-day token that the unauthenticated device-token poll hands to whoever started
+    // the request. So the two checks below need the target, not only the request.
+    const targetGaii = buildGAII(agent_name, ownerName, config.nodeId);
+    const existingTarget = await storage.getAgent(targetGaii);
+    const targetScopes: string[] = existingTarget?.defaultScopes ?? [];
     const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
       // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'
@@ -483,14 +278,34 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       // step: the requester then collects the sibling's JWT from the unauthenticated
       // /v1/agents/device-token poll. Coverage is decided in utils/scope-coverage.ts, so this
       // surface and the guard cannot disagree again. An OWNER approver may still grant anything.
+      //
+      // For an EXISTING agent the list to measure is not only what was asked for. The grant is
+      // built from what the TARGET holds (approveDeviceAuth keeps those scopes, and appends its
+      // outside-wildcard ones), so an approver whose request is a subset of its own token still
+      // walked away with everything the sibling had: measured on 2026-10-20, an approver holding
+      // `agent:write` and `memory:read` collected a sibling's token carrying
+      // `memory:write-reserved` and `secrets:manage`.
       const escalating = principal.kind === 'agent'
-        ? uncoveredScopes(principal.scopes, autoScopes)
+        ? uncoveredScopes(principal.scopes, [...new Set([...autoScopes, ...targetScopes])])
         : [];
+      // Re-approval changes an agent that already exists, and every other route that does so is
+      // fenced: PATCH /v1/agents/:name/scopes may only narrow and needs `agent:permissions`, rekey
+      // needs the owner role, delete reads `registeredBy`. mayActOnAgent is the one answer to "may
+      // this caller act on that agent": the agent itself, or its owner in person. `registeredBy`
+      // adds the deliberate case this route exists for, a crew-forge reconnecting the agent it made.
+      const mayActOnTarget = principal.kind !== 'agent' || !existingTarget
+        || mayActOnAgent(req.auth, targetGaii, config.nodeId)
+        || existingTarget.registeredBy === req.auth!.sub;
       if (!principal.mayApprove) {
         // An agent of this owner, but not one the owner allowed to make agents. Same landing as an
         // escalating request: the row stays pending and the owner decides, so nothing is lost —
         // only the settling-it-alone part is refused.
         autoApproveNote = `Making an agent needs the ${APPROVER_SCOPE} permission, which this one does not have. The owner can approve this agent in their profile under Agents.`;
+      } else if (!mayActOnTarget) {
+        // An agent of this owner, but not this agent and not the agent that registered it. Same
+        // landing as the two notes beside it: the row stays pending and the owner decides, so a
+        // genuine reconnect still goes through — only settling it alone is refused.
+        autoApproveNote = `An agent called ${agent_name} already exists, and only its owner can connect it again. The owner can approve this request in their profile under Agents.`;
       } else if (escalating.length > 0) {
         // No escalation via a sibling: fall through to the manual consent flow where the
         // OWNER decides — the request stays pending rather than failing the registration.
@@ -501,6 +316,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
           config, storage, authRequest, approvedByGaii, autoScopes,
           req.headers['user-agent'] as string | undefined,
           !!requestedScopes,
+          principal.kind === 'agent' ? principal.scopes : undefined,
         );
         if (!result.ok) {
           await storage.updateDeviceAuth(deviceCode, { status: 'denied' });

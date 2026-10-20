@@ -5,9 +5,12 @@
  * @description The words a workflow's steps cost the principal that saves or starts it
  *   (services/workflow/step-authority.ts): each kind of step costs what its own door asks, the owner
  *   in person passes as requireScope lets them, a check asks only about the records it reads and the
- *   model, a workflow that reads the owner's records costs memory:read, and a wildcard covers what it
- *   covers at every other door.
+ *   model, a workflow that reads the owner's records costs memory:read and memory:read-as-owner, and
+ *   a wildcard covers what it covers at every other door.
  * @version-history
+ *   v1.3.0 — 2026-10-20 — A step that reads owner records costs memory:read-as-owner too, which no
+ *     wildcard carries, for every caller but the owner in person and an app grant (secaudit 2026-10,
+ *     wf-step-read-skips-read-as-owner).
  *   v1.2.0 — 2026-09-25 — An agent step costs work:request for a workflow saved from 2026-09-25 on,
  *     and nothing for one saved before. The old line asserting that it cost nothing was the rule
  *     this change replaces.
@@ -42,14 +45,19 @@ describe('the words a step costs', () => {
 
     it('is asked of an agent holding only workflow:write, once per word', () => {
         const missing = missingStepScopes(def(['datapackage', 'ai', 'ai', undefined]), agent(['workflow:read', 'workflow:write']), 'save');
-        expect(words(missing)).toEqual(['ai:use', 'memory:read', 'memory:write', 'storage:write']);
+        expect(words(missing)).toEqual(['ai:use', 'memory:read', 'memory:read-as-owner', 'memory:write', 'storage:write']);
         expect(missing.find(m => m.scope === 'ai:use')?.step).toBe('s1');
     });
 
     it('is covered by the exact word, the domain wildcard and full access', () => {
         expect(missingStepScopes(def(['ai']), agent(['ai:use']), 'save')).toEqual([]);
         expect(missingStepScopes(def(['ai']), agent(['ai:*']), 'save')).toEqual([]);
-        expect(missingStepScopes(def(['datapackage', 'extension', 'trigger-geai']), agent(['*']), 'save')).toEqual([]);
+        expect(missingStepScopes(def(['datapackage', 'extension', 'trigger-geai']), agent(['*', 'memory:read-as-owner']), 'save')).toEqual([]);
+    });
+
+    it('is not covered by full access where the word sits outside every wildcard', () => {
+        // memory:read-as-owner is an own-tick word (utils/scope-coverage.ts), so "*" leaves it.
+        expect(words(missingStepScopes(def(['datapackage']), agent(['*']), 'save'))).toEqual(['memory:read-as-owner']);
     });
 
     it('costs ai:use for llm.approved, on a check as well as on a run', () => {
@@ -58,27 +66,28 @@ describe('the words a step costs', () => {
     });
 
     it('asks a check about what a check does: the records it reads, and nothing it dispatches', () => {
-        expect(words(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'signals-only'))).toEqual(['memory:read']);
+        expect(words(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'signals-only'))).toEqual(['memory:read', 'memory:read-as-owner']);
         expect(missingStepScopes(def(['human-input', 'trigger-geai']), agent(['workflow:write']), 'signals-only')).toEqual([]);
-        expect(words(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'full'))).toEqual(['ai:use', 'memory:read', 'memory:write', 'storage:write']);
+        expect(words(missingStepScopes(def(['datapackage', 'ai']), agent(['workflow:write']), 'full'))).toEqual(['ai:use', 'memory:read', 'memory:read-as-owner', 'memory:write', 'storage:write']);
     });
 });
 
-describe('a workflow that reads the owner\'s records costs memory:read', () => {
+describe('a workflow that reads the owner\'s records costs memory:read and memory:read-as-owner', () => {
     const step = (over: Record<string, unknown>) => ({ steps: [{ id: 'x', ...over }] as never });
     const leaf = { kind: 'deterministic', key: 'owner.record', op: 'json_field', path: 'secret' };
+    const reads = ['memory:read', 'memory:read-as-owner'];
 
     it('for a signal leaf, however deep it sits', () => {
         for (const signal of [leaf, { all: [leaf] }, { any: [{ all: [leaf] }] }, { when: leaf, then: leaf }]) {
             const d = step({ action: { kind: 'human-input' }, success_signal: signal });
-            expect(words(missingStepScopes(d, agent(['workflow:write']), 'save')), JSON.stringify(signal)).toEqual(['memory:read']);
+            expect(words(missingStepScopes(d, agent(['workflow:write']), 'save')), JSON.stringify(signal)).toEqual(reads);
         }
         const input = step({ action: { kind: 'human-input' }, required_to_function: leaf });
-        expect(words(missingStepScopes(input, agent(['workflow:write']), 'signals-only'))).toEqual(['memory:read']);
+        expect(words(missingStepScopes(input, agent(['workflow:write']), 'signals-only'))).toEqual(reads);
     });
 
     it('for an agent step, which inherits its offer\'s signals', () => {
-        expect(words(missingStepScopes(def([undefined]), agent(['workflow:write']), 'save'))).toEqual(['memory:read']);
+        expect(words(missingStepScopes(def([undefined]), agent(['workflow:write']), 'save'))).toEqual(reads);
     });
 
     it('for a key a step writes its answer to, which its signal reads back, and for keys an ai step reads', () => {
@@ -87,7 +96,7 @@ describe('a workflow that reads the owner\'s records costs memory:read', () => {
             { kind: 'extension', result_to_key: 'k' }, { kind: 'human-input', answer_to_key: 'k' },
         ]) {
             const missing = missingStepScopes(step({ action }), agent(['ai:use', 'ext:invoke']), 'save');
-            expect(words(missing), JSON.stringify(action)).toEqual(['memory:read']);
+            expect(words(missing), JSON.stringify(action)).toEqual(reads);
             expect(missing[0].kind).toBe('read');
         }
     });
@@ -99,8 +108,17 @@ describe('a workflow that reads the owner\'s records costs memory:read', () => {
 
     it('says which step reads', () => {
         const r = stepScopeRefusal(missingStepScopes(step({ action: { kind: 'human-input' }, success_signal: leaf }), agent([]), 'save'));
-        expect(r.needed).toEqual(['memory:read']);
+        expect(r.needed).toEqual(reads);
         expect(r.message).toContain('step "x" reads the owner\'s records');
+        expect(r.message).toContain('"memory:read-as-owner"');
+    });
+
+    it('but an app grant pays memory:read alone, because it already acts as the owner', () => {
+        const d = step({ action: { kind: 'human-input' }, success_signal: leaf });
+        expect(words(missingStepScopes(d, { roles: ['app'], scopes: [] }, 'save'))).toEqual(['memory:read']);
+        expect(missingStepScopes(d, { roles: ['app'], scopes: ['memory:read'] }, 'save')).toEqual([]);
+        // An ecosystem app is not an app grant: it pays the read-as-owner word like an agent.
+        expect(words(missingStepScopes(d, { roles: ['ecosystem'], scopes: ['memory:read'] }, 'save'))).toEqual(['memory:read-as-owner']);
     });
 });
 
@@ -112,15 +130,16 @@ describe('an agent step\'s word follows the rules the workflow was saved under',
 
     it('a workflow saved from 2026-09-25 on asks work:request, and says it is an agent step', () => {
         expect(WORKFLOW_AUTHORITY_VERSION).toBe(2);
-        const missing = missingStepScopes(agentStep(2), agent(['memory:read']), 'save');
+        const missing = missingStepScopes(agentStep(2), agent(['memory:read', 'memory:read-as-owner']), 'save');
         expect(words(missing)).toEqual(['work:request']);
         expect(stepScopeRefusal(missing).message).toContain('step "give" is an agent step');
-        expect(missingStepScopes(agentStep(2), agent(['memory:read', 'work:request']), 'full')).toEqual([]);
+        expect(missingStepScopes(agentStep(2), agent(['memory:read', 'memory:read-as-owner', 'work:request']), 'full')).toEqual([]);
     });
 
     it('a workflow saved before keeps running as it was saved: its agent step asks nothing more', () => {
-        expect(missingStepScopes(agentStep(1), agent(['memory:read']), 'full')).toEqual([]);
-        expect(missingStepScopes(agentStep(), agent(['memory:read']), 'full')).toEqual([]);
+        const held = ['memory:read', 'memory:read-as-owner'];
+        expect(missingStepScopes(agentStep(1), agent(held), 'full')).toEqual([]);
+        expect(missingStepScopes(agentStep(), agent(held), 'full')).toEqual([]);
     });
 });
 
@@ -149,7 +168,7 @@ describe('the refusal', () => {
         const r = stepScopeRefusal(missingStepScopes(def(['ai', 'datapackage']), agent([]), 'save'));
         expect(r.status).toBe(403);
         expect(r.code).toBe('SCOPE_DENIED');
-        expect(r.needed.sort()).toEqual(['ai:use', 'memory:read', 'memory:write', 'storage:write']);
+        expect(r.needed.sort()).toEqual(['ai:use', 'memory:read', 'memory:read-as-owner', 'memory:write', 'storage:write']);
         expect(r.message).toContain('"ai:use"');
         expect(r.message).toContain('step "s0"');
         expect(r.message).toContain('"storage:write"');

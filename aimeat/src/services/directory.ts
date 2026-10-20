@@ -9,8 +9,19 @@
  * @structure
  *   - DirectoryService: class that indexes GHII/organism entries and answers search queries
  *   - DirectoryEntry / DirectorySearchOpts / DirectorySearchResult / DirectoryStats: public types
+ *   - registerDirectoryNotifier() / notifyDirectoryChange(): the one refresh every write calls
+ *   - nodeDirectory(): the service this node runs, for a surface that is built without it
  *
  * @version-history
+ *   2026-10-20 — nodeDirectory(): the MCP tool aimeat_catalogue_directory reads this service instead
+ *     of listing every GHII itself, so both doors ask the same federation-consent opt-in
+ *     (secaudit 2026-10, mcp/catalogue.ts:aimeat_catalogue_directory:no-consent-opt-in).
+ *   2026-10-20 — registerDirectoryNotifier()/notifyDirectoryChange(): the refresh is part of the
+ *     state change instead of an optional callback one caller passed. A federation consent revoked
+ *     through aimeat_consent_revoke, or expired by the background job, left the person listed with
+ *     their display name, bio, city and coordinates until something else rebuilt the index
+ *     (secaudit 2026-10, consent-write:revoke-directory-refresh-optional). search() also drops an
+ *     entry whose federation consent is no longer active, so a stale index cannot serve one.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-16 — rebuildIndex batches owner-agents + consents (was O(owners×agents))
  *   v1.2.0 — 2026-09-08 — A person's location is read in the shape its own schema documents
@@ -113,6 +124,55 @@ function buildDirectorySemantic(entry: {
   return semantic;
 }
 
+/**
+ * The consent that puts a person in the directory: scope `federation`, active, and not past its
+ * expiry. The expiry is read here as well as the status, because a row is marked `expired` only when
+ * the background job next runs (services/consent.ts expireConsents).
+ */
+function isActiveFederationConsent(c: { scope: string; status: string; expires?: string | null }): boolean {
+  return c.scope === 'federation' && c.status === 'active' && (!c.expires || new Date(c.expires) > new Date());
+}
+
+/**
+ * The node's directory, for the services that change what belongs in it. Registered once at
+ * bootstrap (server-bootstrap/service-init.ts).
+ *
+ * A write that changes who is listed calls notifyDirectoryChange() itself, instead of depending on
+ * its caller to pass a callback: services/consent-write.ts and the consent expiry in
+ * services/consent.ts both reach the index through this, whichever door or job ran them.
+ */
+let directoryNotifier: (() => void) | null = null;
+
+/** Name the directory the node runs. The last registration wins, which is what a restart needs. */
+export function registerDirectoryNotifier(notify: () => void): void {
+    directoryNotifier = notify;
+}
+
+/** Tell the directory that who belongs in it has changed. Does nothing before bootstrap registers one. */
+export function notifyDirectoryChange(): void {
+    directoryNotifier?.();
+}
+
+/**
+ * The directory this node runs, for a surface that is not handed one when it is built. The MCP tool
+ * group is registered with the storage and the config alone (mcp/register-all.ts), so before this
+ * `aimeat_catalogue_directory` had its own listing over listGHIIs, with neither the federation
+ * consent this service asks for nor the profile keys it reads: two doors on one listing, two opt-in
+ * policies (secaudit 2026-10). A service registers itself when it is constructed, and the last one
+ * wins, as with the notifier above.
+ */
+let nodeDirectoryService: DirectoryService | null = null;
+
+/** Name the directory the node runs. The constructor calls it; the last registration wins. */
+function registerNodeDirectory(service: DirectoryService): void {
+    nodeDirectoryService = service;
+}
+
+/** The directory this node runs, or null before bootstrap has built one. */
+export function nodeDirectory(): DirectoryService | null {
+    return nodeDirectoryService;
+}
+
 /** Haversine formula — distance between two lat/lon points in km */
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth radius in km
@@ -126,11 +186,21 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 
 export class DirectoryService {
   private index = new Map<string, DirectoryEntry>();
+  /**
+   * Per listed person, the identity that holds the federation consent putting them there: their own
+   * GHII when they granted it, or the agent's GAII. Kept beside the index rather than on the entry,
+   * because an entry is served to anyone and an agent's GAII is not part of it. search() re-reads
+   * these, so an index that has not been rebuilt yet cannot serve a person who withdrew.
+   */
+  private consentHolders = new Map<string, string>();
   private lastUpdated = new Date().toISOString();
   private rebuildTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly DEBOUNCE_MS = 2000;  // 2s debounce for batch changes
 
-  constructor(private config: AimeatConfig, private storage: Storage) {}
+  constructor(private config: AimeatConfig, private storage: Storage) {
+    // The node's one directory, reachable by a surface that is built without it (nodeDirectory()).
+    registerNodeDirectory(this);
+  }
 
   /**
    * Notify the directory that data relevant to its index has changed.
@@ -169,6 +239,7 @@ export class DirectoryService {
     };
 
     const newIndex = new Map<string, DirectoryEntry>();
+    const newHolders = new Map<string, string>();
 
     const ghiis = await this.storage.listGHIIs();
     tracePhase('listGHIIs');
@@ -192,18 +263,18 @@ export class DirectoryService {
         if (agents.length === 0) continue;
 
         // Check for federation consent by the person, then on any of the owner's agents
-        const isFederation = (c: { scope: string; status: string }) => c.scope === 'federation' && c.status === 'active';
-        let hasFederationConsent = (consentsByAgent[ghii.ghii] ?? []).some(isFederation);
+        let hasFederationConsent = (consentsByAgent[ghii.ghii] ?? []).some(isActiveFederationConsent);
         let consentAgentGaii = hasFederationConsent ? agents[0].gaii : '';
+        // The identity the consent is filed under, which search() reads again before serving.
+        let consentHolder = hasFederationConsent ? ghii.ghii : '';
         for (const agent of agents) {
           if (hasFederationConsent) break;
           const consents = consentsByAgent[agent.gaii] ?? [];
-          const federationConsent = consents.find(
-            c => c.scope === 'federation' && c.status === 'active',
-          );
+          const federationConsent = consents.find(isActiveFederationConsent);
           if (federationConsent) {
             hasFederationConsent = true;
             consentAgentGaii = agent.gaii;
+            consentHolder = agent.gaii;
             break;
           }
         }
@@ -280,6 +351,7 @@ export class DirectoryService {
         };
 
         newIndex.set(ghii.ghii, entry);
+        newHolders.set(ghii.ghii, consentHolder);
       } catch (err) {
         logger.warn('Failed to index GHII for directory', { ghii: ghii.ghii, error: String(err) });
       }
@@ -321,6 +393,7 @@ export class DirectoryService {
     }
 
     this.index = newIndex;
+    this.consentHolders = newHolders;
     this.lastUpdated = new Date().toISOString();
     tracePhase('organismLoop');
     logger.info('Directory index rebuilt', { entries: newIndex.size });
@@ -385,11 +458,16 @@ export class DirectoryService {
       matched.push(entry);
     }
 
+    // The index is a cache of a decision each person makes, so the decision is read again before
+    // anyone is served: a person whose federation consent was revoked or has run out is dropped
+    // here and taken out of the index, whether or not a rebuild has happened yet.
+    const live = await this.stillConsented(matched);
+
     // Build facets from matched results
     const cityCounts = new Map<string, number>();
     const interestCounts = new Map<string, number>();
 
-    for (const entry of matched) {
+    for (const entry of live) {
       if (entry.city) {
         cityCounts.set(entry.city, (cityCounts.get(entry.city) ?? 0) + 1);
       }
@@ -410,13 +488,38 @@ export class DirectoryService {
 
     // Paginate
     const start = (page - 1) * perPage;
-    const entries = matched.slice(start, start + perPage);
+    const entries = live.slice(start, start + perPage);
 
     return {
       entries,
-      total: matched.length,
+      total: live.length,
       facets: { cities, interests },
     };
+  }
+
+  /**
+   * The people among `entries` whose federation consent is still active, in one query, with an
+   * organism entry kept as it is. A person who is no longer consented is removed from the index too,
+   * so the stats and the next search agree with this answer.
+   */
+  private async stillConsented(entries: DirectoryEntry[]): Promise<DirectoryEntry[]> {
+    const holders = new Map<string, string>();
+    for (const entry of entries) {
+      if (entry.entryType === 'organism') continue;
+      holders.set(entry.ghii, this.consentHolders.get(entry.ghii) ?? entry.ghii);
+    }
+    if (holders.size === 0) return entries;
+    const consents = await this.storage.listConsentsForAgents([...new Set(holders.values())], { status: 'active' });
+    const kept: DirectoryEntry[] = [];
+    for (const entry of entries) {
+      if (entry.entryType === 'organism') { kept.push(entry); continue; }
+      const holder = holders.get(entry.ghii)!;
+      if ((consents[holder] ?? []).some(isActiveFederationConsent)) { kept.push(entry); continue; }
+      this.index.delete(entry.ghii);
+      this.consentHolders.delete(entry.ghii);
+      logger.info('Directory entry dropped: the federation consent is no longer active', { ghii: entry.ghii });
+    }
+    return kept;
   }
 
   /** Get directory statistics */

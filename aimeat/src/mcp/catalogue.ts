@@ -10,6 +10,10 @@
  *   import { registerCatalogueTools } from './catalogue.js';
  *   registerCatalogueTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-20 — SECURITY: aimeat_catalogue_directory answers from the node's DirectoryService, so it
+ *     lists only people holding an active federation consent, as GET /v1/catalogue/directory does;
+ *     aimeat_catalogue_agents drops `unlisted` agents, as GET /v1/catalogue/agents does
+ *     (secaudit 2026-10, two doors on one listing with two opt-in policies).
  *   2026-10-19 — aimeat_catalogue_agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read per call.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-03-21 — Initial creation: 3 tools for agent directory, public boards, and people directory
@@ -26,6 +30,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { nodeDirectory } from '../services/directory.js';
+import { toolError } from './tool-error.js';
 import { logger } from '../utils/logger.js';
 
 export function registerCatalogueTools(
@@ -44,7 +50,10 @@ export function registerCatalogueTools(
         zodShapeFor('aimeat_catalogue_agents'),
         annotationsFor('aimeat_catalogue_agents'),
         async ({ search, category }) => {
-            const agents = await storage.listAgents();
+            // An agent tagged `unlisted` (the per-owner Secretary, for one) is out of the public
+            // directory, as it is on GET /v1/catalogue/agents. This door had not applied the rule,
+            // so the same listing hid an agent on REST and named it over MCP (secaudit 2026-10).
+            const agents = (await storage.listAgents()).filter(a => !(a.tags ?? []).includes('unlisted'));
 
             const q = search?.toLowerCase();
             const cat = category?.toLowerCase();
@@ -113,55 +122,26 @@ export function registerCatalogueTools(
         zodShapeFor('aimeat_catalogue_directory'),
         annotationsFor('aimeat_catalogue_directory'),
         async ({ city, interest }) => {
-            const ghiis = await storage.listGHIIs();
+            // ONE LISTING, ONE OPT-IN. GET /v1/catalogue/directory answers from the DirectoryService,
+            // which indexes a person only while they hold an active `federation` consent and reads
+            // their profile under `profile.<username>.location` and `.interests`. This tool had its
+            // own listing over listGHIIs: it published every GHII whose bare `profile.location` or
+            // `profile.interests` record was public, with their display name and bio, consent or no
+            // consent. So the same people directory had two doors and two opt-in policies, and the
+            // MCP one listed people the REST one kept out (secaudit 2026-10). It now reads the same
+            // service, which also drops a person whose consent was revoked before the index was
+            // rebuilt (directory.ts stillConsented).
+            const directory = nodeDirectory();
+            if (!directory) return { ...toolError('FEATURE_DISABLED', 'This node runs no people directory.') };
 
-            const cityQ = city?.toLowerCase();
-            const interestQ = interest?.toLowerCase();
-
-            // For each GHII, read their public location/interests from memory
-            const entries: Array<{
-                ghii: string;
-                display_name: string;
-                bio?: string;
-                city?: string;
-                interests: string[];
-            }> = [];
-
-            // Two IN queries for profile.location + profile.interests across every GHII (was
-            // getMemory per key PER owner). Records carry ownerGaii; same isLive semantics as getMemory.
-            const ghiiGaiis = ghiis.map(g => g.ghii);
-            const locRows = await storage.listMemoryForOwners(ghiiGaiis, { prefix: 'profile.location' });
-            const intRows = await storage.listMemoryForOwners(ghiiGaiis, { prefix: 'profile.interests' });
-            const locByGhii = new Map(locRows.filter(r => r.key === 'profile.location').map(r => [r.ownerGaii, r]));
-            const intByGhii = new Map(intRows.filter(r => r.key === 'profile.interests').map(r => [r.ownerGaii, r]));
-
-            for (const ghii of ghiis) {
-                // Read public profile location and interests memory keys
-                const locationRecord = locByGhii.get(ghii.ghii);
-                const interestsRecord = intByGhii.get(ghii.ghii);
-
-                // Skip profiles that haven't set public location/interests (not opted in to directory)
-                if (!locationRecord && !interestsRecord) continue;
-                if (locationRecord && locationRecord.visibility !== 'public') continue;
-                if (interestsRecord && interestsRecord.visibility !== 'public') continue;
-
-                const loc = locationRecord?.value as { city?: string } | undefined;
-                const interests: string[] = Array.isArray(interestsRecord?.value)
-                    ? interestsRecord!.value as string[]
-                    : [];
-
-                // Apply filters
-                if (cityQ && !loc?.city?.toLowerCase().includes(cityQ)) continue;
-                if (interestQ && !interests.some(i => i.toLowerCase().includes(interestQ))) continue;
-
-                entries.push({
-                    ghii: ghii.ghii,
-                    display_name: ghii.displayName,
-                    bio: ghii.bio,
-                    city: loc?.city,
-                    interests,
-                });
-            }
+            const result = await directory.search({ type: 'people', city, interest, perPage: 100 });
+            const entries = result.entries.map(e => ({
+                ghii: e.ghii,
+                display_name: e.displayName,
+                bio: e.bio,
+                city: e.city,
+                interests: e.interests,
+            }));
 
             return {
                 content: [{

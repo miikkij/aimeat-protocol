@@ -4503,6 +4503,24 @@
   "extpage.copyExample": "Copiar el ejemplo",
   "extpage.memoryArea": "Área de memoria",
   "extpage.memoryAreaSub": "La extensión escribe solo aquí; cualquiera puede leerla.",
+  "extpage.codeBy": "Quién escribió su código",
+  "extpage.codeByYou": "Tú",
+  "extpage.codeByNotRecorded": "Sin registrar",
+  "extpage.codeBySub.self": "Tú mismo publicaste el código de esta extensión.",
+  "extpage.codeBySub.agent": "Uno de tus agentes publicó el código de esta extensión.",
+  "extpage.codeBySub.ecosystem": "Una aplicación externa publicó el código de esta extensión.",
+  "extpage.codeBySub.unknown": "La extensión se instaló antes de que se guardara quién escribió el código.",
+  "extpage.unattended": "Cuando se ejecuta sola",
+  "extpage.unattendedWhen": "Un horario, una activación o un paso de un flujo de trabajo ejecuta la extensión cuando no hay nadie presente.",
+  "extpage.unattendedOwner": "Lee tus archivos con tus propios permisos. Incluye los archivos privados.",
+  "extpage.unattendedInstaller": "Lee solo los archivos que puede leer quien escribió el código. Tus archivos privados quedan fuera de su alcance.",
+  "extpage.unattendedInert.self": "Tú escribiste el código, así que la extensión lee con tus propios permisos con cualquiera de las dos respuestas. La respuesta empieza a aplicarse si más adelante uno de tus agentes publica el código.",
+  "extpage.unattendedInert.unknown": "No se guardó quién escribió el código, así que la extensión lee con tus propios permisos. La respuesta empieza a aplicarse la próxima vez que se publique el código.",
+  "extpage.readerAria": "Qué lee la extensión cuando se ejecuta sola",
+  "extpage.readerOwner": "Tú",
+  "extpage.readerInstaller": "Quien escribió el código",
+  "extpage.toastReaderOwner": "{name} ahora lee tus archivos con tus propios permisos cuando se ejecuta sola.",
+  "extpage.toastReaderInstaller": "{name} ahora lee solo lo que puede leer quien escribió el código.",
   "extpage.instances": "Instancias",
   "extpage.instancesSub": "Una instancia es la misma extensión con su propia configuración, por ejemplo una por cuenta.",
   "extpage.instancesNone": "Todavía ninguna.",
@@ -22468,6 +22486,22 @@
         "ex1": "Todo: una aplicación que vende algo o maneja datos personales. Puedes mostrar el día en que cambiaron sus condiciones.",
         "ex2": "1000: una aplicación de prueba que cambias a menudo. El registro de cada aplicación guarda sus 1000 entradas más recientes.",
         "tip": "Guarda todo salvo que tengas un motivo para borrar. Un límite borra las entradas para siempre, así que la página te pregunta antes de guardar. Para apartar entradas viejas sin borrarlas, usa Archivar las entradas anteriores a."
+      }
+    },
+    "extension": {
+      "unattended_reader": {
+        "title": "Cuando una extensión se ejecuta sola",
+        "short": "Con los permisos de quién lee la extensión tus archivos cuando no hay nadie presente. De forma predeterminada, con los tuyos.",
+        "what": "Una extensión puede ejecutarse sin ti: con un horario, al activarla o como paso de un flujo de trabajo. Entonces lee los archivos que tienes guardados. Con tus propios permisos lee todo lo que tú puedes leer, incluidos los archivos privados. Con la otra respuesta lee solo lo que puede leer quien escribió el código. Si el código lo escribió un agente tuyo, un archivo privado para el que ese agente no tiene permiso queda fuera de su alcance. La respuesta cubre solo las ejecuciones sin nadie presente. Una ejecución que inicias tú o una aplicación ya lee con los permisos de quien la inició.",
+        "range": "Dos respuestas: tus propios permisos, que es lo predeterminado, o los permisos de quien escribió el código. Toda extensión empieza con tus propios permisos, que es como funcionaban las extensiones antes de esta respuesta.",
+        "lowLabel": "Quien escribió el código",
+        "highLabel": "Tú",
+        "low": "Solo lo que ese agente o esa aplicación externa puede leer. Un archivo privado para el que no tiene permiso queda fuera de su alcance.",
+        "high": "Todo lo que tú puedes leer, incluidos los archivos privados. Esto es lo predeterminado.",
+        "ex1": "Un agente instaló una extensión de informes y la puso en un horario cada noche. Con tus propios permisos, la ejecución nocturna lee también tus archivos privados. Con la otra respuesta lee solo los archivos que ese agente puede leer.",
+        "ex2": "Tú escribiste la extensión. Las dos respuestas leen los mismos archivos, porque quien la escribió eres tú.",
+        "ex3": "La extensión se instaló antes de que se guardara quién escribió el código. Las dos respuestas leen con tus propios permisos, hasta que el código se publique de nuevo.",
+        "tip": "Limita la respuesta cuando el código lo escribió un agente y no quieres que sus ejecuciones sin nadie presente entren en tus archivos privados. Déjala en tus propios permisos cuando la extensión necesita todo lo que tú puedes leer, por ejemplo una copia de seguridad o un índice de búsqueda. Cambiar la respuesta nunca detiene una extensión."
       }
     },
     "workspace": {

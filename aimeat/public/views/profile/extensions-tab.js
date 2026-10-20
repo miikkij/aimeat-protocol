@@ -7,10 +7,14 @@
  *   handlers; the render is extensions/page.js (the page) and extensions/rows.js (a row and what
  *   opens under it). Loads the two lists and the two prompts from the node, a row's detail when it
  *   is opened, the scheduler's jobs once for the last runs, and the dependency map before a delete
- *   so the confirm can name the apps that would break.
+ *   so the confirm can name the apps that would break. An opened server extension of the owner's own
+ *   also loads what it reads when it runs with nobody present, which only the account holder in
+ *   person may read or change.
  * @structure ExtensionsTab
  * @usage <ExtensionsTab session={session} showToast={showToast} />
  * @version-history
+ *   v2.1.0 — 2026-10-20 — An opened extension of your own shows who wrote its code and what it reads
+ *     when it runs on its own, with the control that changes it (readers, setReader).
  *   2026-10-16 — The menu find opens one extension or cortex here (useOpenItem, js/open-item.js).
  *   v1.x — 2026-02 → 2026-08 — Cards: cortexes with bundled installs and a maturity badge, server
  *     extensions with an inline detail view; a copied prompt built in the browser.
@@ -47,6 +51,8 @@ export default function ExtensionsTab({ session, showToast }) {
   const [expanded, setExpanded] = useState(null);
   const [details, setDetails] = useState({});
   const [instances, setInstances] = useState({});
+  // Per extension name: the answer of /v1/extensions/:name/unattended-reader, or null while it loads.
+  const [readers, setReaders] = useState({});
   const [busy, setBusy] = useState(null);
   const [extFilter, setExtFilterState] = useState({ who: 'mine', state: '', kind: '', instances: false });
   const [cxFilter, setCxFilterState] = useState({ who: 'mine', part: '', pub: false });
@@ -88,6 +94,12 @@ export default function ExtensionsTab({ session, showToast }) {
       setDetails((m) => ({ ...m, ['ext:' + ext.name]: d && !d.error ? d : { error: d?.error?.message || t('profile.error') } }));
       if (inst) setInstances((m) => ({ ...m, [ext.name]: Array.isArray(inst) ? inst : [] }));
     } catch (e) { setDetails((m) => ({ ...m, ['ext:' + ext.name]: { error: e?.message || t('profile.error') } })); }
+    // Only the account holder in person reaches this door, and only for an extension they may
+    // manage; an agent session, an app grant and somebody else's extension get 403 or 404. The
+    // server's own answer decides, so the page asks and leaves the two lines out when it is refused.
+    v8Ext.getUnattendedReader(ext.name)
+      .then((r) => { if (r) setReaders((m) => ({ ...m, [ext.name]: r })); })
+      .catch((e) => swallowed('extensions: unattended reader', e));
   };
   const loadCortexDetail = async (cx) => {
     const d = await cortexService.getExtensionDetail(cx.name);
@@ -128,6 +140,21 @@ export default function ExtensionsTab({ session, showToast }) {
   };
   const activateExt = (ext) => withBusy('ext:' + ext.name, () => v8Ext.activateV8Extension(ext.name), x('toastActivated', { name: ext.name }));
   const deactivateExt = (ext) => withBusy('ext:' + ext.name, () => v8Ext.deactivateV8Extension(ext.name), x('toastDeactivated', { name: ext.name }));
+
+  /**
+   * What the extension reads when it runs with nobody present. The PATCH is followed by a read of the
+   * same door, so the lines say what the server holds and not what was asked for.
+   */
+  const setReader = async (ext, authority) => {
+    if (readers[ext.name]?.authority === authority) return;
+    setBusy('reader:' + ext.name);
+    try {
+      await v8Ext.setUnattendedReader(ext.name, authority);
+      const fresh = await v8Ext.getUnattendedReader(ext.name);
+      if (fresh) setReaders((m) => ({ ...m, [ext.name]: fresh }));
+      showToast?.(x(authority === 'installer' ? 'toastReaderInstaller' : 'toastReaderOwner', { name: ext.name }));
+    } catch (e) { fail(e); } finally { setBusy(null); }
+  };
 
   /** Who breaks if this goes: the dependency map's answer, so the confirm can say it. */
   const dependentsOf = async (kind, name) => {
@@ -227,13 +254,13 @@ export default function ExtensionsTab({ session, showToast }) {
   const ctx = {
     session: sess, nodeUrl: getNodeUrl(), showToast, ConfirmUI,
     extensions, cortexes, extPrompt, cortexPrompt, jobs,
-    expanded, details, instances, busy, test, newInstanceId, form, shown,
+    expanded, details, instances, readers, busy, test, newInstanceId, form, shown,
     extFilter, cxFilter, extQuery, cxQuery, extShown, cxShown,
     setExtFilter: (patch) => { setExtFilterState((f) => ({ ...f, ...patch })); setExtShown(20); },
     setCxFilter: (patch) => { setCxFilterState((f) => ({ ...f, ...patch })); setCxShown(20); },
     setExtQuery: (q) => { setExtQuery(q); setExtShown(20); }, setCxQuery: (q) => { setCxQuery(q); setCxShown(20); },
     setExtShown, setCxShown,
-    toggleExt, toggleCortex, activateExt, deactivateExt, removeExt, createInstance, deleteInstance, setNewInstanceId,
+    toggleExt, toggleCortex, activateExt, deactivateExt, removeExt, createInstance, deleteInstance, setNewInstanceId, setReader,
     toggleTest, setTestInput, runTest,
     activateCortex, deactivateCortex, toggleVisibility, removeCortex,
     setForm, setFormOpen, setFormFile, addFormFile, installFromForm,

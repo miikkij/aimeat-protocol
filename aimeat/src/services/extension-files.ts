@@ -9,13 +9,22 @@
  *   it either: it answers with `text`, so binary read through it is corrupt by construction.
  *
  *   Two rules make this safe to hand to sandboxed code:
- *     READ  — authorized as the CALLER, through the same authorizeRead() the /v1/pub route uses. An
- *             extension can read exactly what the person invoking it could read, never more.
+ *     READ  — authorized as the READER, through the same authorizeRead() the /v1/pub route uses. An
+ *             extension can read exactly what the principal behind the run could read, never more.
  *     WRITE — lands in the caller's own storage under a reserved `ext/{name}/` prefix. The result
  *             belongs to the person who paid for it and shows up in their files, and no extension
  *             can overwrite something they wrote themselves.
  *   Both are size-capped before any base64 crosses the QuickJS bridge, and a write goes through the
  *   ordinary per-file limit and storage quota.
+ *
+ *   THE READER AND THE NAMESPACE ARE TWO QUESTIONS. On an attended call they have one answer, the
+ *   caller, and `reader*` is left out. They part company with nobody present: a schedule, an
+ *   @activate job or a workflow step writes into the OWNER's namespace, because a produced file
+ *   needs one permanent address, while the authority behind the run belongs to whoever installed
+ *   the extension. Passing the namespace as the accessor made the owner's GHII the reader on every
+ *   unattended road, so an extension an agent installed read the owner's private files and reported
+ *   what it found, which that agent is refused on every attended path (secaudit 2026-10,
+ *   extension-system-run:files-read-as-owner-ghii).
  *
  *   THE PREFIX IS A PARAMETER, NOT A CONSTANT — and it defaults to the fence. A road may name a
  *   different key root ONLY when the road, not the guest, derives the key: that is what
@@ -26,7 +35,16 @@
  * @structure MAX_FILE_BYTES · parseRef · makeExtensionFiles (the ctx.files factory)
  * @usage const files = makeExtensionFiles({ config, storage, callerGaii, extName });
  *   const ctx: ExtensionCtx = { …, files };
+ *   // unattended: the owner's namespace, the installer's reach
+ *   makeExtensionFiles({ config, storage, extName, callerGaii: ownerGhii, callerOwner: ownerName,
+ *     readerGaii: installer.gaii, readerOwner: installer.owner,
+ *     readerRoles: installer.roles, readerScopes: installer.scopes });
  * @version-history
+ *   v1.5.0 — 2026-10-20 — `narrowedNote`: a refusal caused by the owner's own setting says so and
+ *     says where to change it, so a narrowing never reads as a fault (Jouni, 2026-10-20).
+ *   v1.4.0 — 2026-10-20 — `readerGaii`, `readerOwner`, `readerRoles` and `readerScopes`: a read is
+ *     authorized against the reader, which defaults to the caller, while the caller stays the
+ *     namespace for writes (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-07-26 — Initial: ctx.files.read/write so a capability can take a file REFERENCE
  *     instead of its bytes (image pipelines, MCP-safe handoff).
@@ -72,7 +90,10 @@ export const parseRef = parseFileRef;
 export function makeExtensionFiles(deps: {
     config: AimeatConfig;
     storage: Storage;
-    /** Whose storage is read and written, and whose access rights a read is judged against. */
+    /**
+     * The NAMESPACE: whose storage a write lands in, and what a bare reference resolves against.
+     * It is not the read authority — see `readerGaii`.
+     */
     callerGaii: string;
     callerOwner?: string;
     /**
@@ -81,6 +102,22 @@ export function makeExtensionFiles(deps: {
      */
     callerRoles?: string[];
     callerScopes?: string[];
+    /**
+     * The READ AUTHORITY: the principal `authorizeRead` and the classification reader judge a read
+     * against. Defaults to the caller, which is the answer on every attended road. An unattended
+     * road passes the principal that installed the extension, with that principal's scopes as they
+     * stand now, so the run reads what that principal could read and no more.
+     */
+    readerGaii?: string;
+    readerOwner?: string;
+    readerRoles?: string[];
+    readerScopes?: string[];
+    /**
+     * One sentence appended to a read refusal, naming the owner's own setting as the cause and where
+     * to change it. Passed only when the reach WAS narrowed by that setting, so an ordinary
+     * permission refusal never carries it.
+     */
+    narrowedNote?: string;
     extName: string;
     /**
      * The key root every write is forced under. Defaults to `ext/{extName}/`, which is the fence
@@ -95,12 +132,24 @@ export function makeExtensionFiles(deps: {
 } {
     const { config, storage, callerGaii, callerOwner, extName } = deps;
     const keyPrefix = deps.keyPrefix ?? `ext/${extName}/`;
+    // The read authority. Without `readerGaii` it is the caller, which is the attended road, where
+    // the namespace and the authority are the same principal. With it, the four reader fields are
+    // read as one identity: a missing role or scope list is empty rather than the caller's, so a
+    // half-filled reader is narrower than the caller and never wider.
+    const asCaller = deps.readerGaii === undefined;
+    const readerGaii = asCaller ? callerGaii : deps.readerGaii as string;
+    const readerOwner = (asCaller ? callerOwner : deps.readerOwner) ?? localAccountName(readerGaii);
     const reader = readerForCaller({ storage, config }, {
-        gaii: callerGaii,
-        owner: callerOwner ?? localAccountName(callerGaii),
-        roles: deps.callerRoles ?? ['operator'],
-        scopes: deps.callerScopes ?? [],
+        gaii: readerGaii,
+        owner: readerOwner,
+        roles: (asCaller ? deps.callerRoles : deps.readerRoles) ?? ['operator'],
+        scopes: (asCaller ? deps.callerScopes : deps.readerScopes) ?? [],
     });
+    // A refusal that is the owner's own setting says so, and says where the setting is. Without it
+    // the script reports "access denied" for a file the owner can plainly see, and nobody can tell
+    // that from a real permission problem (Jouni, 2026-10-20: a narrowing must never read as a
+    // fault). Empty on every attended road and whenever the reach was not narrowed.
+    const narrowedNote = deps.narrowedNote ? ` ${deps.narrowedNote}` : '';
 
     return {
         async read(ref) {
@@ -109,27 +158,28 @@ export function makeExtensionFiles(deps: {
             const file = await storage.getStorageFile(gaii, key);
             if (!file) return null;
 
-            // The extension reads AS the caller. A capability must never become a way to see a file
-            // the person invoking it could not open themselves.
+            // The extension reads AS THE READER. A capability must never become a way to see a file
+            // the principal behind the run could not open themselves. On an attended call that is
+            // the caller; with nobody present it is the principal that installed the extension.
             const decision = await authorizeRead(storage, config, {
                 ownerGaii: gaii,
-                accessorGaii: callerGaii,
+                accessorGaii: readerGaii,
                 resourceKey: `storage:${key}`,
                 visibility: file.visibility,
                 groupId: file.groupId,
                 workspaceRef: file.workspaceRef,
-                accessorSub: callerGaii,
-                accessorOwner: callerOwner,
+                accessorSub: readerGaii,
+                accessorOwner: readerOwner,
                 action: 'read',
             });
             if (!decision.allowed) {
-                throw new Error(`Access denied for ${gaii}/${key}: ${decision.reason ?? 'not permitted'}`);
+                throw new Error(`Access denied for ${gaii}/${key}: ${decision.reason ?? 'not permitted'}${narrowedNote}`);
             }
             // And the classification check, as the same caller (TARGET-082): a file this caller may
             // not see is refused by name, and a warning label rides along on the answer.
             const [shown] = await reader.show([file], () => fileTarget(gaii, key, file.workspaceRef));
             if (!shown) {
-                throw new ClassificationError('CLASSIFIED', 403, `${gaii}/${key} is classified, and whoever invoked this action may not read it.`);
+                throw new ClassificationError('CLASSIFIED', 403, `${gaii}/${key} is classified, and the principal this action runs for may not read it.${narrowedNote}`);
             }
             const warning = (shown as { classificationWarning?: ExtensionFileWarning }).classificationWarning;
             if (file.size > MAX_EXT_FILE_BYTES) {

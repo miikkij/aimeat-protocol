@@ -6,6 +6,10 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-10-20 — Phase 12 (secaudit 2026-10): who manages whose schedule, by the caller's KIND —
+ *     an ecosystem app manages only what it made, an agent manages no app-made schedule, and a
+ *     sibling agent still manages an agent-made one; and an `ai` schedule's output_visibility is
+ *     refused at create and at edit when it names an organism the owner is not a member of.
  *   2026-10-19 — 11b: a one-shot (max_runs 1) whose run fails is turned off, keeps lastRunError and
  *     shows no nextRunAt (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   2026-10-16 — 20b: a sibling without ai:use is refused editing and running another agent's ai
@@ -45,7 +49,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 }
 
 import * as ed from '@noble/ed25519';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -733,6 +737,215 @@ await test('33. A prompt change is refused for another owner\'s schedule, for an
         const r = await json(`/v1/schedules/${wf.body.data.schedule.id}`, { method: 'PATCH', headers: auth1, body: JSON.stringify({ prompt: 'x' }) });
         assert(r.status === 400 && r.body?.error?.code === 'NO_PROMPT', `workflow kind: ${r.status} ${JSON.stringify(r.body?.error)}`);
     }
+});
+
+console.log('\nPhase 12 -- Who manages whose schedule, and who an ai schedule\'s answer may be shown to');
+
+// secaudit 2026-10, canManageSchedule:createdByAgent-admits-ecosystem-and-app-made. `createdByAgent`
+// is set from `!isOwnerSession`, so it is true for a schedule made by an agent, by an app grant AND
+// by an ecosystem app. canManageSchedule read it as "an agent made this" and its fallback as "the
+// caller is an agent", so a connected ecosystem app deleted the owner's agents' schedules and an
+// agent edited an app's. The ruling (Q4, 2026-10-12): the owner manages everything, an agent
+// manages what AGENTS of that owner made, an app manages only its own grant's.
+const REDIRECT = 'http://localhost:9913/schedules-callback';
+
+/** An app-grant token for a freshly published app of `owner`, with the scopes named. */
+async function appGrantToken(ownerToken: string, ownerName: string, filename: string, scope: string): Promise<string> {
+    const html = `<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="${scope}"></head><body>sched</body></html>`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            filename, content: Buffer.from(html).toString('base64'),
+            name: `Sched ${filename}`, description: 'schedule manage-rule e2e probe', category: 'utility',
+        }),
+    });
+    assert(pub.status === 201, `publish ${filename}: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({
+        app: `${ownerName}/${filename}`, response_type: 'code', scope,
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
+    assert(!!m, `consent redirect expected, got ${res.status}`);
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ request_id: decodeURIComponent(m![1]) }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    });
+    assert(tok.body.ok === true, `app token: ${JSON.stringify(tok.body.error)}`);
+    return tok.body.data.access_token as string;
+}
+
+/** A connected ecosystem app (GEAI) of `owner`, through hello → approve → token, and its credential. */
+async function ecosystemToken(ownerToken: string, ownerName: string, app: string, scopes: string[]): Promise<string> {
+    const hello = await json('/v1/ecosystem-apps/hello', {
+        method: 'POST',
+        body: JSON.stringify({
+            owner: ownerName, app, display_name: `Eco ${app}`,
+            public_key: Buffer.from(`${app}-verification-key`).toString('base64'),
+            scopes, manifest: { app, scopes, capabilities: [{ id: 'noop' }] },
+        }),
+    });
+    assert(hello.body.ok === true, `eco hello: ${JSON.stringify(hello.body.error)}`);
+    const approve = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ action: 'approve', scopes }),
+    });
+    assert(approve.status === 200, `eco approve: ${approve.status} ${JSON.stringify(approve.body?.error)}`);
+    const tok = await json('/v1/ecosystem-apps/token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(typeof tok.body.access_token === 'string', `eco token: ${JSON.stringify(tok.body)}`);
+    return tok.body.access_token as string;
+}
+
+const ECO_SCOPES = ['memory:read', 'memory:write', 'task:write', 'workflow:read', 'workflow:write'];
+const MANAGE_SCOPES = ['task:write', 'workflow:read', 'workflow:write', 'memory:write'];
+
+await test('40. An ecosystem app is refused an agent-made schedule and keeps its own', async () => {
+    const ecoToken = await ecosystemToken(o1.ownerToken, o1.ownerName, 'schedeco', ECO_SCOPES);
+    const agentToken = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedecoagent', MANAGE_SCOPES);
+    const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+    const task = { kind: 'agent_task', cron: '0 2 * * *', target_agent: o1.agentName, task_template: { title: 'ECO_RULE' } };
+
+    const byAgent = await json('/v1/schedules', { method: 'POST', headers: as(agentToken), body: JSON.stringify({ ...task, display_name: 'Agent made' }) });
+    assert(byAgent.status === 201, `agent create: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
+    const agentMade = byAgent.body.data.schedule.id;
+
+    const byEco = await json('/v1/schedules', { method: 'POST', headers: as(ecoToken), body: JSON.stringify({ ...task, display_name: 'Eco made' }) });
+    assert(byEco.status === 201, `eco create: ${byEco.status} ${JSON.stringify(byEco.body?.error)}`);
+    const ecoMade = byEco.body.data.schedule.id;
+
+    // The refusal: the ecosystem app reaches neither the agent's edit nor its delete.
+    const ecoEdit = await json(`/v1/schedules/${agentMade}`, { method: 'PATCH', headers: as(ecoToken), body: JSON.stringify({ cron: '0 1 * * *' }) });
+    assert(ecoEdit.status === 403 && ecoEdit.body.error?.code === 'FORBIDDEN', `eco edited an agent's schedule: ${ecoEdit.status} ${JSON.stringify(ecoEdit.body?.error)}`);
+    const ecoDelete = await json(`/v1/schedules/${agentMade}`, { method: 'DELETE', headers: as(ecoToken) });
+    assert(ecoDelete.status === 403 && ecoDelete.body.error?.code === 'FORBIDDEN', `eco deleted an agent's schedule: ${ecoDelete.status} ${JSON.stringify(ecoDelete.body?.error)}`);
+    const still = await json(`/v1/schedules/${agentMade}`, { headers: auth1 });
+    assert(still.status === 200, `the agent's schedule is gone anyway: ${still.status}`);
+
+    // The positive control: it still manages the one it made itself.
+    const ownEdit = await json(`/v1/schedules/${ecoMade}`, { method: 'PATCH', headers: as(ecoToken), body: JSON.stringify({ display_name: 'Eco made, renamed' }) });
+    assert(ownEdit.status === 200, `eco cannot edit its own schedule: ${ownEdit.status} ${JSON.stringify(ownEdit.body?.error)}`);
+    const ownDelete = await json(`/v1/schedules/${ecoMade}`, { method: 'DELETE', headers: as(ecoToken) });
+    assert(ownDelete.status === 200, `eco cannot delete its own schedule: ${ownDelete.status} ${JSON.stringify(ownDelete.body?.error)}`);
+
+    // And an agent does not manage what the ecosystem app made, either.
+    const second = await json('/v1/schedules', { method: 'POST', headers: as(ecoToken), body: JSON.stringify({ ...task, display_name: 'Eco made again' }) });
+    assert(second.status === 201, `eco create 2: ${second.status}`);
+    const agentOnEco = await json(`/v1/schedules/${second.body.data.schedule.id}`, { method: 'DELETE', headers: as(agentToken) });
+    assert(agentOnEco.status === 403, `an agent deleted an ecosystem app's schedule: ${agentOnEco.status}`);
+    await json(`/v1/schedules/${second.body.data.schedule.id}`, { method: 'DELETE', headers: auth1 });
+    await json(`/v1/schedules/${agentMade}`, { method: 'DELETE', headers: auth1 });
+});
+
+await test('41. An agent is refused an app-made schedule, and a sibling agent still manages an agent-made one', async () => {
+    const appToken = await appGrantToken(o1.ownerToken, o1.ownerName, 'sched-grant.html', 'task:write workflow:write memory:write');
+    const agentToken = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedappagent', MANAGE_SCOPES);
+    const siblingToken = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedappsib', MANAGE_SCOPES);
+    const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+    const task = { kind: 'agent_task', cron: '0 2 * * *', target_agent: o1.agentName, task_template: { title: 'APP_RULE' } };
+
+    const byApp = await json('/v1/schedules', { method: 'POST', headers: as(appToken), body: JSON.stringify({ ...task, display_name: 'App made' }) });
+    assert(byApp.status === 201, `app create: ${byApp.status} ${JSON.stringify(byApp.body?.error)}`);
+    const appMade = byApp.body.data.schedule.id;
+    assert(typeof byApp.body.data.schedule.createdByApp === 'string', `the app's schedule records no grant: ${JSON.stringify(byApp.body.data.schedule)}`);
+
+    // The refusal: an app grant is limited to its own purpose, so the owner's agents do not reach it.
+    const edit = await json(`/v1/schedules/${appMade}`, { method: 'PATCH', headers: as(agentToken), body: JSON.stringify({ display_name: 'taken over' }) });
+    assert(edit.status === 403 && edit.body.error?.code === 'FORBIDDEN', `an agent edited an app's schedule: ${edit.status} ${JSON.stringify(edit.body?.error)}`);
+    const del = await json(`/v1/schedules/${appMade}`, { method: 'DELETE', headers: as(agentToken) });
+    assert(del.status === 403 && del.body.error?.code === 'FORBIDDEN', `an agent deleted an app's schedule: ${del.status}`);
+    const kept = await json(`/v1/schedules/${appMade}`, { headers: auth1 });
+    assert(kept.status === 200 && kept.body.data.schedule.displayName === 'App made', `the app's schedule was changed: ${JSON.stringify(kept.body.data?.schedule?.displayName)}`);
+
+    // The positive control: Q4 (2026-10-12) still holds between agents of the same owner.
+    const byAgent = await json('/v1/schedules', { method: 'POST', headers: as(agentToken), body: JSON.stringify({ ...task, display_name: 'Agent made, for a sibling' }) });
+    assert(byAgent.status === 201, `agent create: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
+    const agentMade = byAgent.body.data.schedule.id;
+    const sibEdit = await json(`/v1/schedules/${agentMade}`, { method: 'PATCH', headers: as(siblingToken), body: JSON.stringify({ display_name: 'Sibling renamed it' }) });
+    assert(sibEdit.status === 200, `a sibling agent cannot edit an agent-made schedule: ${sibEdit.status} ${JSON.stringify(sibEdit.body?.error)}`);
+    const sibDelete = await json(`/v1/schedules/${agentMade}`, { method: 'DELETE', headers: as(siblingToken) });
+    assert(sibDelete.status === 200, `a sibling agent cannot delete an agent-made schedule: ${sibDelete.status}`);
+
+    // And the owner still manages the app's, as they manage everything they own.
+    const ownerDelete = await json(`/v1/schedules/${appMade}`, { method: 'DELETE', headers: auth1 });
+    assert(ownerDelete.status === 200, `the owner cannot delete the app's schedule: ${ownerDelete.status}`);
+});
+
+// secaudit 2026-10, runAiJob:raw-setMemory-unvalidated-outputVisibility. The create door stored any
+// string as outputVisibility and the edit door replaced the input wholesale, so a schedule carried
+// `organism:<id>` for an organism the owner is not a member of and the fire wrote the model's answer
+// at that audience. The same write by hand is refused 400 NOT_ORGANISM_MEMBER.
+await test('42. An ai schedule may not be pointed at an organism the owner is not in, at create or at edit', async () => {
+    const foreign = await json('/v1/organisms', {
+        method: 'POST', headers: auth2,
+        body: JSON.stringify({ name: `SchedForeign${Date.now()}`, description: 'owner 1 is not a member' }),
+    });
+    assert(foreign.status === 201, `organism: ${foreign.status} ${JSON.stringify(foreign.body?.error)}`);
+    const orgId = (foreign.body.data.organism ?? foreign.body.data).id as string;
+    assert(!!orgId, `no organism id: ${JSON.stringify(foreign.body.data)}`);
+
+    const maker = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedvisbot', ['ai:use', 'task:write', 'workflow:read', 'workflow:write']);
+    const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+    const base = { kind: 'ai', cron: '0 9 * * *', prompt: 'Summarise the input.', input_keys: ['news.raw'] };
+
+    // The owner's own hand is refused the same audience, which is the rule this schedule walked around.
+    const direct = await json('/v1/memory', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({ key: `sched.vis.probe.${Date.now()}`, value: 'x', visibility: `organism:${orgId}` }),
+    });
+    assert(direct.status === 400 && direct.body.error?.code === 'NOT_ORGANISM_MEMBER',
+        `the direct write was allowed: ${direct.status} ${JSON.stringify(direct.body?.error)}`);
+
+    const refusedCreate = await json('/v1/schedules', {
+        method: 'POST', headers: as(maker),
+        body: JSON.stringify({ ...base, display_name: 'Foreign audience', output_key: 'sched.vis.out', output_visibility: `organism:${orgId}` }),
+    });
+    assert(refusedCreate.status === 400 && refusedCreate.body.error?.code === 'NOT_ORGANISM_MEMBER',
+        `create at a foreign organism: ${refusedCreate.status} ${JSON.stringify(refusedCreate.body?.error)}`);
+
+    const nonsense = await json('/v1/schedules', {
+        method: 'POST', headers: as(maker),
+        body: JSON.stringify({ ...base, display_name: 'Nonsense audience', output_visibility: 'everyone-on-earth' }),
+    });
+    assert(nonsense.status === 400 && nonsense.body.error?.code === 'INVALID_AI_JOB',
+        `a word that is not a visibility: ${nonsense.status} ${JSON.stringify(nonsense.body?.error)}`);
+
+    // The positive control: an ordinary visibility is stored and the schedule works.
+    const good = await json('/v1/schedules', {
+        method: 'POST', headers: as(maker),
+        body: JSON.stringify({ ...base, display_name: 'Own audience', output_key: 'sched.vis.out', output_visibility: 'owner' }),
+    });
+    assert(good.status === 201, `an ordinary visibility was refused: ${good.status} ${JSON.stringify(good.body?.error)}`);
+    const id = good.body.data.schedule.id;
+    assert(good.body.data.schedule.input.outputVisibility === 'owner', `stored: ${JSON.stringify(good.body.data.schedule.input)}`);
+
+    // The edit asks the same question, because an edit replaces the input wholesale.
+    const refusedEdit = await json(`/v1/schedules/${id}`, {
+        method: 'PATCH', headers: as(maker),
+        body: JSON.stringify({ input: { prompt: 'Summarise the input.', inputKeys: ['news.raw'], outputKey: 'sched.vis.out', outputVisibility: `organism:${orgId}` } }),
+    });
+    assert(refusedEdit.status === 400 && refusedEdit.body.error?.code === 'NOT_ORGANISM_MEMBER',
+        `edit to a foreign organism: ${refusedEdit.status} ${JSON.stringify(refusedEdit.body?.error)}`);
+    const stored = await json(`/v1/schedules/${id}`, { headers: auth1 });
+    assert(stored.body.data.schedule.input.outputVisibility === 'owner',
+        `the refused edit was stored: ${JSON.stringify(stored.body.data.schedule.input)}`);
+
+    // …and an edit that names an ordinary visibility still goes through.
+    const okEdit = await json(`/v1/schedules/${id}`, {
+        method: 'PATCH', headers: as(maker),
+        body: JSON.stringify({ input: { prompt: 'Summarise in one line.', inputKeys: ['news.raw'], outputKey: 'sched.vis.out', outputVisibility: 'private' } }),
+    });
+    assert(okEdit.status === 200, `an ordinary edit was refused: ${okEdit.status} ${JSON.stringify(okEdit.body?.error)}`);
+    await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
 });
 
 console.log('\nCleanup');

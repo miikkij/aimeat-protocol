@@ -1,0 +1,29 @@
+-- 0109_extension_unattended_read_authority.sql
+--
+-- Whose reach an extension's UNATTENDED file reads are judged against, which is THE OWNER'S CHOICE,
+-- per extension. Unattended means a schedule, an @activate job or a workflow step: nobody is present
+-- to be asked, so the answer is a setting the account holder made in advance.
+--
+-- NULL IS THE DEFAULT AND IT MEANS THE OWNER'S OWN REACH, which is the behaviour every extension on
+-- every node already has. So this migration changes nothing on its own, and that is the point of it.
+-- An owner's agent acts for that owner, and ext:write is the owner's own grant of the reach (Jouni,
+-- 2026-10-20), so closing the read by default would stop working extensions on nodes whose owners
+-- never asked for the narrower rule.
+--
+-- 'installer' narrows a run to "installedByPrincipal" (0108) with that principal's scopes as they
+-- stand at the run, so an agent reads unattended exactly what it reads attended. Only the account
+-- holder signed in in person can write the column (routes/extensions/unattended-reader.ts): an agent
+-- able to widen its own extension would undo the setting. Publishing new code leaves it alone
+-- (services/extension-upsert.ts).
+--
+-- What secaudit 2026-10 extension-system-run:files-read-as-owner-ghii buys, then, is visibility and
+-- a choice rather than a closed read: the extension's page names the principal that wrote its code,
+-- so the reach stops being invisible, and this column is the one control.
+--
+-- A SEPARATE FILE RATHER THAN A LINE IN 0108, although both land in the same commit: 0108 had
+-- already run against every database that had seen this branch, and the runner tracks applied
+-- migrations by filename, so an edited 0108 never re-runs. The E2E suite on the production backend
+-- is what said so, with `column "unattendedReadAuthority" does not exist`.
+--
+-- Mirrors the SQLite column added in schema-columns-extensions.ts.
+ALTER TABLE "Extension" ADD COLUMN IF NOT EXISTS "unattendedReadAuthority" TEXT;

@@ -21,6 +21,10 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-20 — aimeat_app_tool_invoke refuses an `action_id` whose capability the app's owner does
+ *     not own (CAPABILITY_NOT_OWNED_BY_APP), as its REST twin now does: the manifest names a bare id
+ *     in a node-wide registry, so another owner's capability ran here with the manifest's
+ *     lockedInput deciding the arguments (secaudit 2026-10).
  *   2026-10-18 — aimeat_exchange_work_deliver claims the work before it settles (claimWorkForDelivery),
  *     so two deliveries at the same moment charge once; the second is WORK_NOT_OPEN
  *     (wish-rahapolkujen-kilpatilanteet).
@@ -105,6 +109,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
+import { appToolBindingRefusal } from '../services/capability-invoke.js';
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
 async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
@@ -228,6 +233,14 @@ export function registerExchangeRunTools(
             if (!binding) return fail('TOOL_NOT_INVOKABLE: this tool has no capability binding to invoke');
             const cap = await storage.getCapability(binding);
             if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
+            // The manifest NAMES a capability; it does not confer one. Refused after the price is
+            // decided and before the pacing is charged, as on the REST twin
+            // (services/capability-invoke.ts appToolBindingRefusal; secaudit 2026-10).
+            const misbound = appToolBindingRefusal(cap, ownerName, `${ownerName}/${app}`, tool);
+            if (misbound) {
+                if (outcome.kind === 'settled') await outcome.refund();
+                return fail(`${misbound.code}: ${misbound.message}`);
+            }
 
             // A tool with no money price and no contract runs free in money but is paced: its pacing
             // amount is charged before the call, as on the REST twin (commerce/app-tool-catalog.ts).

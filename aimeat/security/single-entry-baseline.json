@@ -567,9 +567,9 @@
         "count": 1,
         "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
       },
-      "src/routes/agents/device-auth.ts": {
+      "src/routes/agents/device-auth-approve.ts": {
         "count": 1,
-        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time)."
+        "why": "The claims of a token being minted, not a caller. The role list stays literal so this mint can be diffed against the other mints (security.md: a role is granted, never inherited at mint time). The mint moved here from device-auth.ts on 2026-10-20 (max-file-lines)."
       },
       "src/routes/auth.ts": {
         "count": 1,

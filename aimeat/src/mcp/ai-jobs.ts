@@ -13,9 +13,20 @@
  *
  *   The tools are declared on THREE surfaces, and this is one of them. See the catalog entry
  *   (tool-catalog/definitions/ai-jobs.ts) for the other two and for the gates that keep them in step.
+ *
+ *   WHOSE JOBS THESE TOOLS SHOW. The lookup key is the OWNER's GHII, because a job started here
+ *   lands in the owner's namespace, so the key alone says nothing about who may read it. The
+ *   session's own principal is passed on as the viewer, and the service shows the caller only the
+ *   jobs it started, unless it reads as the owner (owner-scope-read.ts readsAsOwner: an app grant,
+ *   or an agent holding memory:read-as-owner). The REST routes need none of this because their key
+ *   IS the principal (resolveIdentity), and until this was added the two surfaces disagreed: the
+ *   same agent got 404 over REST and the owner's prompt over MCP.
  * @structure registerAiJobTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerAiJobTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — The three reads pass the session principal as the viewer, so an agent sees and stops
+ *     only the jobs it started unless it reads as the owner (secaudit 2026-10,
+ *     registerAiJobTools:jobs-keyed-by-owner-ghii).
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -37,9 +48,10 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { localAccountName } from '../utils/gaii.js';
 import { AiJobError, getActiveAiJobService } from '../services/ai-jobs/index.js';
-import type { AiJobState } from '../services/ai-jobs/types.js';
+import type { AiJobState, AiJobViewer } from '../services/ai-jobs/types.js';
 import { startedByOf } from '../services/ai-jobs/starter.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { readsAsOwner } from '../services/owner-scope-read.js';
 import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAiJobTools(
@@ -60,6 +72,9 @@ export function registerAiJobTools(
     // is the session caller. Taken once, at registration, as it was before the caller existed.
     const session = caller();
     const startedBy = startedByOf(session.auth, session.principal);
+    // Who may see which job under that owner GHII. `all` is the owner in person, an app grant of the
+    // owner, and an agent holding memory:read-as-owner; everybody else sees what they started.
+    const viewer: AiJobViewer = { principal: session.principal, all: readsAsOwner(session) };
 
     const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
     const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
@@ -118,6 +133,7 @@ export function registerAiJobTools(
                 const jobs = await service().listJobs(ownerGhii, {
                     ...(a.state ? { state: a.state as AiJobState | 'live' | 'all' } : {}),
                     ...(a.limit !== undefined ? { limit: a.limit } : {}),
+                    viewer,
                 });
                 return text({ jobs, count: jobs.length });
             } catch (e) {
@@ -134,9 +150,10 @@ export function registerAiJobTools(
         annotationsFor('aimeat_ai_job_get'),
         async (a) => {
             try {
-                const job = await service().getJob(ownerGhii, a.job_id);
+                const job = await service().getJob(ownerGhii, a.job_id, viewer);
                 // Not found and not-yours read the same, deliberately: whose jobs exist is not a
-                // stranger's business, and a different message would answer that question.
+                // stranger's business, and a different message would answer that question. A
+                // sibling agent's job and the owner's own job read the same way.
                 if (!job) return err('No such job.');
                 return text(job);
             } catch (e) {
@@ -153,7 +170,9 @@ export function registerAiJobTools(
         annotationsFor('aimeat_ai_job_cancel'),
         async (a) => {
             try {
-                return text(await service().cancelJob(ownerGhii, a.job_id));
+                // The viewer is checked before anything is aborted: a job this session did not start
+                // is refused with the same 404 a read answers, and it keeps running.
+                return text(await service().cancelJob(ownerGhii, a.job_id, viewer));
             } catch (e) {
                 return failed(e);
             }

@@ -2,6 +2,11 @@
  * @file e2e-mcp-catalogue.ts
  * @description E2E tests for MCP catalogue module — 3 tools: agent directory, public boards, people directory.
  * @version-history
+ *   2026-10-20 — Phase 4 asks the opt-in question both doors now ask: aimeat_catalogue_directory
+ *     answers from the same DirectoryService as GET /v1/catalogue/directory, so the two list the same
+ *     people, and an owner with a public profile and no federation consent is in neither. The old
+ *     tests 12 and 13 asserted the tool's own rule (a public `profile.location` record was enough),
+ *     which is the policy the fix removed (secaudit 2026-10).
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
 
@@ -401,40 +406,103 @@ await test('11. aimeat_catalogue_directory with interest filter returns array', 
     assert(Array.isArray(entries), 'result is array');
 });
 
-// The directory is an OPT-IN: it lists people whose profile.location is public, and the two tests
-// above assert only that the answer is an array. An array is what a broken filter returns too. The
-// gate is one line in the per-GHII loop, and nothing had ever asked it about somebody who did not
-// opt in — so publishing every owner on the node would have passed both.
+// ONE LISTING, ONE OPT-IN. The people directory has two doors: GET /v1/catalogue/directory and this
+// tool. The REST door answers from the DirectoryService, which lists a person only while they hold
+// an active `federation` consent. The tool had a listing of its own over listGHIIs, which asked only
+// whether a bare `profile.location` record was public, so it published people the REST door kept out
+// (secaudit 2026-10). The two tests below assert that the doors now answer the same people, with a
+// control who has everything but the consent. Tests 9 to 11 above assert only that the answer is an
+// array, which is what a broken filter returns too.
 let dirOwnerB = '';
+let dirOwnerBGhii = '';
+const dirOwnerAGhii = () => `${ownerName}@${NODE_ID}`;
 
-await test('12. Setup: A keeps a PRIVATE profile, B publishes one', async () => {
-    const priv = await json('/v1/memory', {
-        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ key: 'profile.location', value: { city: 'Tampere' }, visibility: 'private' }),
-    });
-    assert(priv.status === 200 || priv.status === 201, `A private profile: ${priv.status}`);
+/** The REST door's people, polled while the consent reaches the index (a 2 s debounce rebuild). */
+async function restDirectoryPeople(waitFor?: string): Promise<any[]> {
+    let entries: any[] = [];
+    for (let i = 0; i < 40; i++) {
+        const r = await json('/v1/catalogue/directory?type=people&per_page=50', {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(r.status === 200, `REST directory: ${r.status} ${JSON.stringify(r.body)}`);
+        entries = r.body.data.entries as any[];
+        if (!waitFor || entries.some(e => e.ghii === waitFor)) break;
+        await new Promise(res => setTimeout(res, 500));
+    }
+    return entries;
+}
+
+await test('12. Setup: A publishes a profile and never consents, B publishes one and consents', async () => {
+    // A is the control: a PUBLIC profile under the documented key, an agent (registered in the setup
+    // above), and no federation consent. Before the fix the tool listed A on the public profile alone.
+    // Both key shapes, because the two doors used to read different ones: the index reads
+    // `profile.<username>.location`, and the tool's own listing read the bare `profile.location`.
+    // A publishes both and consents to nothing, so neither door has an excuse to list them.
+    for (const key of [`profile.${ownerName}.location`, 'profile.location']) {
+        const aLoc = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ key, value: { city: 'Tampere' }, visibility: 'public', tags: ['profile', 'location'] }),
+        });
+        // 201, not 200: POST /v1/memory answers 200 only when it overwrote a key that existed.
+        assert(aLoc.status === 201, `A ${key}: ${aLoc.status} ${JSON.stringify(aLoc.body)}`);
+    }
 
     dirOwnerB = `catdir${Date.now()}`;
     const ownerB = await registerOwner(BASE, dirOwnerB);
+    dirOwnerBGhii = ownerB.ghii;
     const bAuth = { Authorization: `Bearer ${ownerB.token}` };
-    for (const [key, value] of [['profile.location', { city: 'Helsinki' }], ['profile.interests', ['music', 'sailing']]] as const) {
-        const w = await json('/v1/memory', { method: 'POST', headers: bAuth, body: JSON.stringify({ key, value, visibility: 'public' }) });
-        assert(w.status === 200 || w.status === 201, `B ${key}: ${w.status}`);
+    const bRecords = [
+        [`profile.${dirOwnerB}.location`, { city: 'Helsinki' }],
+        [`profile.${dirOwnerB}.interests`, ['music', 'sailing']],
+    ] as const;
+    for (const [key, value] of bRecords) {
+        const w = await json('/v1/memory', { method: 'POST', headers: bAuth, body: JSON.stringify({ key, value, visibility: 'public', tags: ['profile'] }) });
+        assert(w.status === 201, `B ${key}: ${w.status} ${JSON.stringify(w.body)}`);
     }
+    // The index reads a person only when their owner has an agent, and only while a federation
+    // consent is active. B has both; A has the agent and nothing else.
+    const bAgent = await json('/v1/agents', {
+        method: 'POST', headers: bAuth,
+        body: JSON.stringify({ name: 'catdirbot', owner: dirOwnerB, model: 'gpt-4o' }),
+    });
+    assert(bAgent.status === 201, `B agent: ${bAgent.status} ${JSON.stringify(bAgent.body)}`);
+    const consent = await json('/v1/consent', {
+        method: 'POST', headers: bAuth,
+        body: JSON.stringify({
+            data_pattern: 'profile.*', recipient: '*', scope: 'federation',
+            purpose: 'Be findable in this node\'s people directory',
+        }),
+    });
+    assert(consent.status === 201, `B consent: ${consent.status} ${JSON.stringify(consent.body)}`);
 });
 
-await test('13. The directory lists the owner who opted IN and not the one who did not', async () => {
+await test('13. Both doors list the owner who granted a federation consent', async () => {
+    const rest = await restDirectoryPeople(dirOwnerBGhii);
+    assert(rest.some(e => e.ghii === dirOwnerBGhii),
+        `the REST door must list the consented owner: ${JSON.stringify(rest.map(e => e.ghii))}`);
+
     const { body } = await mcpRpc('tools/call', { name: 'aimeat_catalogue_directory', arguments: {} }, 303);
     const entries = JSON.parse(body.result.content[0].text) as any[];
-
-    const b = entries.find(e => e.ghii === `${dirOwnerB}@${NODE_ID}`);
-    assert(!!b, `the opted-in owner must be listed: ${JSON.stringify(entries.map(e => e.ghii))}`);
+    const b = entries.find(e => e.ghii === dirOwnerBGhii);
+    assert(!!b, `the MCP door must list them too: ${JSON.stringify(entries.map(e => e.ghii))}`);
     assert(b.city === 'Helsinki', `and carry their public city: ${JSON.stringify(b)}`);
 
-    // The whole point: A's location is private, so A is not in the directory at all.
-    assert(!entries.some(e => e.ghii === `${ownerName}@${NODE_ID}`),
-        `an owner with a PRIVATE profile must not be listed: ${JSON.stringify(entries.map(e => e.ghii))}`);
-    assert(!JSON.stringify(entries).includes('Tampere'), 'and their private city must not appear anywhere in the answer');
+    const restPeople = rest.map(e => e.ghii).sort();
+    const mcpPeople = entries.map(e => e.ghii).sort();
+    assert(JSON.stringify(restPeople) === JSON.stringify(mcpPeople),
+        `the two doors list different people: REST ${JSON.stringify(restPeople)} vs MCP ${JSON.stringify(mcpPeople)}`);
+});
+
+await test('14. CONTROL: an owner who never consented is in neither door, public profile or not', async () => {
+    const rest = await restDirectoryPeople();
+    assert(!rest.some(e => e.ghii === dirOwnerAGhii()),
+        `the REST door listed an owner who never consented: ${JSON.stringify(rest.map(e => e.ghii))}`);
+
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_catalogue_directory', arguments: {} }, 304);
+    const entries = JSON.parse(body.result.content[0].text) as any[];
+    assert(!entries.some(e => e.ghii === dirOwnerAGhii()),
+        `the MCP door listed an owner who never consented: ${JSON.stringify(entries.map(e => e.ghii))}`);
+    assert(!JSON.stringify(entries).includes('Tampere'), 'and their city must not appear anywhere in the answer');
 });
 
 // ─── Summary ───

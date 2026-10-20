@@ -7,6 +7,8 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party made TO the
+ *     agent end with it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   2026-10-18 — setAgentScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
  *   2026-10-18 — clearance on create and read (migration 0107, plan doc-mvdipuyqraas L2). updateAgent passes it through.
  *   2026-10-16 — operatorAccountState({ claim: true }) takes a transaction-scoped advisory lock first, the
@@ -38,11 +40,12 @@
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
-import type { AgentRecord, GHIIRecord, GHIIPatch, OwnerRecord } from '../../../interface.js';
+import type { AgentRecord, GHIIRecord, GHIIPatch, GrantsToIdentityCleared, OwnerRecord } from '../../../interface.js';
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError, scopeListIs } from '../helpers.js';
 import { deleteOwnerCascade, cascadeDeleteIdentityData, settleDeletedAgentWorkDb } from './owner-cascade.js';
+import { clearGrantsToIdentityDb } from './grantee-erasure.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -255,10 +258,19 @@ export const identityMethods = {
         // agent's identity, because its owner is still here.
         await settleDeletedAgentWorkDb(this.db, gaii);
         await cascadeDeleteIdentityData(this.db, gaii);
+        // What OTHERS granted to this GAII, which no owner column can find (methods/grantee-erasure.ts).
+        await clearGrantsToIdentityDb(this.db, gaii);
         const r = await this.db.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
         return Number(r.numDeletedRows ?? 0) > 0;
       });
     } catch (err) { throw dbError('deleteAgent', err); }
+  },
+
+  /** @see AgentRepository.clearGrantsToIdentity */
+  async clearGrantsToIdentity(this: PostgresKyselyStorage, gaii: string): Promise<GrantsToIdentityCleared> {
+    try {
+      return await clearGrantsToIdentityDb(this.db, gaii);
+    } catch (err) { throw dbError('clearGrantsToIdentity', err); }
   },
 
   // ── GHIIs ──

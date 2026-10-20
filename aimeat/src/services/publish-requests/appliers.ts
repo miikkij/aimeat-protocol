@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.5.0 — 2026-10-20 — A consent to everyone (apply-consent.ts; secaudit 2026-10,
+ *     grantConsent:wildcard-recipient-skips-publish-gate).
  *   v1.4.0 — 2026-10-18 — Apps, the personal welcome page and a company's front page (apply-app.ts,
  *     apply-portfolio.ts, apply-company.ts).
  *   v1.3.0 — 2026-10-18 — Organisms, boards, user skills, cortex libraries and workspace shares (V4).
@@ -34,6 +36,7 @@ import { applyWorkspaceSharePublish } from './apply-workspace-share.js';
 import { applyAppPublish } from './apply-app.js';
 import { applyPortfolioPublish } from './apply-portfolio.js';
 import { applyCompanyPublish } from './apply-company.js';
+import { applyConsentPublish } from './apply-consent.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -50,4 +53,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   app: applyAppPublish,
   portfolio: applyPortfolioPublish,
   company: applyCompanyPublish,
+  consent: applyConsentPublish,
 };

@@ -5561,6 +5561,24 @@
   "extpage.copyExample": "Copy the example",
   "extpage.memoryArea": "Memory area",
   "extpage.memoryAreaSub": "The extension writes only here; anyone can read it.",
+  "extpage.codeBy": "Who wrote its code",
+  "extpage.codeByYou": "You",
+  "extpage.codeByNotRecorded": "Not recorded",
+  "extpage.codeBySub.self": "You published this extension's code yourself.",
+  "extpage.codeBySub.agent": "One of your agents published this extension's code.",
+  "extpage.codeBySub.ecosystem": "An outside app published this extension's code.",
+  "extpage.codeBySub.unknown": "The extension was installed before the writer of the code was kept.",
+  "extpage.unattended": "When it runs on its own",
+  "extpage.unattendedWhen": "A schedule, an activation or a step of a workflow runs the extension when nobody is present.",
+  "extpage.unattendedOwner": "It reads your files with your own permissions. Private files are included.",
+  "extpage.unattendedInstaller": "It reads only the files that whoever wrote its code may read. Your private files stay out of reach.",
+  "extpage.unattendedInert.self": "You wrote the code, so the extension reads with your own permissions whichever answer you pick. The answer starts to work if one of your agents publishes the code later.",
+  "extpage.unattendedInert.unknown": "The writer of the code was not kept, so the extension reads with your own permissions. The answer starts to work the next time the code is published.",
+  "extpage.readerAria": "What the extension reads when it runs on its own",
+  "extpage.readerOwner": "You",
+  "extpage.readerInstaller": "Whoever wrote its code",
+  "extpage.toastReaderOwner": "{name} now reads your files with your own permissions when it runs on its own.",
+  "extpage.toastReaderInstaller": "{name} now reads only what whoever wrote its code may read.",
   "extpage.instances": "Instances",
   "extpage.instancesSub": "An instance is the same extension with its own settings, for example one per account.",
   "extpage.instancesNone": "None yet.",
@@ -24687,6 +24705,22 @@
         "ex1": "Everything: an app that sells something or handles personal data. You can show the day its terms changed.",
         "ex2": "1,000: a test app that you change often. Each app's log keeps its newest 1,000 entries.",
         "tip": "Keep everything unless you have a reason to delete. A limit deletes entries for good, so the page asks you before it saves. To move old entries out of the way without deleting them, use Archive entries before."
+      }
+    },
+    "extension": {
+      "unattended_reader": {
+        "title": "When an extension runs on its own",
+        "short": "Whose permissions the extension reads your files with when nobody is present. Your own permissions by default.",
+        "what": "An extension can run without you: on a schedule, when it is activated, or as a step of a workflow. When it does, it reads your stored files. With your own permissions, it reads everything you can read, private files included. With the other answer, it reads only what whoever wrote its code can read. When an agent of yours wrote the code, a private file that agent has no permission for stays out of reach. The answer covers unattended runs only. A run you or an app started already reads with the permissions of whoever started it.",
+        "range": "Two answers: your own permissions, which is the default, or the permissions of whoever wrote the code. Every extension starts at your own permissions, which is what extensions did before this answer existed.",
+        "lowLabel": "Whoever wrote its code",
+        "highLabel": "You",
+        "low": "Only what that agent or outside app can read. A private file it has no permission for stays out of reach.",
+        "high": "Everything you can read, private files included. This is the default.",
+        "ex1": "An agent installed a reporting extension and put it on a nightly schedule. With your own permissions, the nightly run reads your private files too. With the other answer, it reads only the files that agent may read.",
+        "ex2": "You wrote the extension yourself. Both answers read the same files, because the writer is you.",
+        "ex3": "The extension was installed before the writer of the code was kept. Both answers read with your own permissions, until the code is published again.",
+        "tip": "Narrow it when an agent wrote the code and you do not want its unattended runs in your private files. Leave it at your own permissions when the extension needs everything you can read, for example a backup or a search index. Changing the answer never stops an extension from running."
       }
     },
     "workspace": {

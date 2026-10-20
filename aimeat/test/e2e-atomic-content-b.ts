@@ -145,7 +145,11 @@ await test('A workspace restored beside a workspace create in one organism: both
         schemas: {}, objects: [], images: [],
     };
     const restored = await afterRead(owner.ghii, regKey, async () => { created = (await provision('Created')).ws; },
-        () => restoreWorkspace(storage, config, { orgId, importerGaii: owner.ghii, importerOwner: owner.name, data: data as never, images: new Map() }));
+        () => restoreWorkspace(storage, config, {
+            orgId, importerGaii: owner.ghii, importerOwner: owner.name,
+            caller: { principal: owner.ghii, targetGaii: owner.ghii, owner: owner.name, roles: ['owner'], scopes: ['*'] },
+            data: data as never, images: new Map(),
+        }));
     const ids = (await registered()).map(w => w.id);
     assert(ids.includes(restored.ws) && ids.includes(created), `registry: ${JSON.stringify(ids)}, restored ${restored.ws}, created ${created}`);
 });

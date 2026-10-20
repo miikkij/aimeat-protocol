@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Who may read or write an `organism.{id}.*` key. Membership, the namespace role
  *   (meta = admin/creator write, a workspace's meta = its creator or an admin, shared = member,
- *   member.{owner} = self) and the consent layer, in one function that takes a caller rather than
- *   an Express request.
+ *   member.{owner} = self), the WORKSPACE role (viewer reads, contributor reads and writes, and it
+ *   is the member's own permission, not an agent-only one) and the consent layer, in one function
+ *   that takes a caller rather than an Express request.
  *
  *   WHY IT MOVED HERE. This rule lived entirely inside middleware/workspace-access.ts, which is
  *   RequestHandler-shaped, so only a road with a `req` could reach it. services/memory-write.ts —
@@ -27,6 +28,16 @@
  *   const refusal = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   2026-10-20 — A WORKSPACE ROLE IS A USER-LEVEL PERMISSION, so a member writing workspace CONTENT
+ *     passes the same role test in person as through an agent: the caller is the workspace's
+ *     registered creator, an organism manager, or holds an active `workspace-contributor` grant from
+ *     the creator; a `viewer` grant reads only, and a member with no grant neither reads nor writes
+ *     (Core 2026-11 COL-09, ruled by the developer on 2026-10-20). Until now isOwnerInPerson dropped
+ *     the consent step for a human, so the role test ran for agents alone and any active member wrote
+ *     any non-meta key of any workspace through POST /v1/memory, the draft and publish code paths and
+ *     the row append and delete routes, while the READ gate already applied the role to them: the
+ *     write was wider than the read (secaudit 2026-10, defect 1). The workspace's own meta namespace
+ *     keeps its stricter creator-or-manager rule and its ACCESS_DENIED answer.
  *   2026-10-13 — The caller carries the session's `scopes`, and a write-mode check takes `write`,
  *     what a write to a workspace's manifest record stores. The fenced-space rule reads both: a
  *     session that covers `organism:direct` writes a fenced space directly, and a change to a fenced
@@ -159,24 +170,34 @@ export async function checkOrganismNamespaceAccess(
     const ownMemberPrefix = `organism.${organismId}.member.${caller.owner}.`;
     const isOwnMemberNamespace = key.startsWith(ownMemberPrefix);
 
-    // A human owner-role session acting as an active member is the principal — it does not consent
-    // to itself. The consent layer governs AGENT access and cross-node sharing.
+    // A human owner-role session acting as an active member is the principal of the FLAT organism
+    // namespace — it does not consent to itself there. The consent layer governs AGENT access and
+    // cross-node sharing, and, for workspace content, the member's own role (see isWsContentWrite).
     const isHumanOwnerSession = isOwnerInPerson(caller);
 
-    // An AGENT of the workspace's own creator is that creator's tool, and likewise does not consent
-    // to itself. A cross-owner member's agent still needs a granted contributor role.
     const wsMatch = /^organism\.[^.]+\.w\.([^.]+)\./.exec(key);
     const wsId = wsMatch ? wsMatch[1] : null;
     // A write into the workspace's own meta namespace needs to know the creator whoever is asking,
     // except an org manager, who passes that rule whatever the registry says.
     const isWsMetaWrite = wsId !== null && mode === 'write' && key.startsWith(`organism.${organismId}.w.${wsId}.meta.`);
+    // A WRITE OF WORKSPACE CONTENT. The workspace role is a permission of the MEMBER, not a
+    // restriction on their agents: a grant gives the owner `viewer` (read) or `contributor` (read
+    // and write) and covers that owner's agents (Core 2026-11 COL-09). So the role test below runs
+    // for a member signed in as themselves exactly as it runs for an agent. Meta is left out: it has
+    // the stricter creator-or-manager rule further down, which stays the refusal a caller hears for
+    // a meta key.
+    const isWsContentWrite = wsId !== null && mode === 'write' && !isWsMetaWrite && !isOwnMemberNamespace;
     let wsCreator: string | null = null;
-    if (wsId && (!isHumanOwnerSession || (isWsMetaWrite && !isOrgManager))) {
+    if (wsId && (!isHumanOwnerSession || isWsContentWrite || (isWsMetaWrite && !isOrgManager))) {
         wsCreator = (await findWorkspaceRegistration(storage, organismId, wsId))?.creator ?? null;
     }
-    const isOwnWorkspaceAgent = !isHumanOwnerSession && wsCreator !== null && wsCreator === caller.owner;
+    // The workspace's own creator holds every right in it, and an agent of theirs is that creator's
+    // tool, so neither consents to itself. Every other member, in person or through an agent, holds
+    // the granted contributor role or nothing.
+    const isWorkspaceCreator = wsCreator !== null && wsCreator === caller.owner;
 
-    const needsConsent = !isOwnMemberNamespace && !isHumanOwnerSession && !isOwnWorkspaceAgent && !isOrgManager;
+    const needsConsent = !isOwnMemberNamespace && !isWorkspaceCreator && !isOrgManager
+        && !(isHumanOwnerSession && !isWsContentWrite);
 
     if (needsConsent) {
         let hasConsent = false;

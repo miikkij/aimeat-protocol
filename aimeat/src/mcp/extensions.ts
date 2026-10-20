@@ -11,6 +11,9 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   v2.10.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read with nobody
+ *     present. READ ONLY, because the write is the person's own decision and takes
+ *     requireOwnerPrincipal; the answer carries where they make it (Jouni, 2026-10-20).
  *   2026-10-16 — aimeat_extension_invoke runs services/extension-invoke.ts, the sequence
  *     POST /v1/ext/:extName/:actionId runs: the error text is redacted of credential-shaped text, the
  *     call duration and count are recorded, a version pin (name@version) resolves, the app membership
@@ -100,6 +103,7 @@ import { defineAppIam } from '../services/iam/define-app-iam.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { setExtensionConfig } from '../services/extension-config-set.js';
+import { readAuthorityOf, readAuthorityPayload } from '../services/extension-read-authority.js';
 import { toolError } from './tool-error.js';
 
 export function registerExtensionsTools(
@@ -511,6 +515,28 @@ export function registerExtensionsTools(
                 config: maskSecretFields(out.record.config, getExtSecretKeys(out.record)),
                 ...(hosts ? { network_hosts: hosts } : {}),
             }, null, 2) }] };
+        },
+    );
+
+    // ── aimeat_extension_unattended_reader: GET /v1/extensions/:name/unattended-reader ──
+    // READ ONLY, and there is no companion set tool on purpose: the write is the person's own
+    // decision about their own data and takes requireOwnerPrincipal, which no MCP session holds.
+    // The answer carries where they change it, so the agent can hand that to them in chat
+    // (routes/extensions/unattended-reader.ts says why read and write take different gates).
+    mcp.tool(
+        'aimeat_extension_unattended_reader',
+        descriptionFor('aimeat_extension_unattended_reader'),
+        zodShapeFor('aimeat_extension_unattended_reader'),
+        annotationsFor('aimeat_extension_unattended_reader'),
+        async ({ name }) => {
+            // readAuthorityOf, not storage.getExtension: the service owns this question on both
+            // surfaces, so neither reads the record for itself (pnpm check:shared-impl).
+            const found = await readAuthorityOf({ storage }, name);
+            if (!found || !(await canManageExtensionAs(storage, config, resolveCaller(), found.ext.installedBy, { action: 'read', subject: name }))) {
+                return { ...toolError('NOT_FOUND', `Extension "${name}" not found`) };
+            }
+            const payload = readAuthorityPayload(name, found.view);
+            return { content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] };
         },
     );
 

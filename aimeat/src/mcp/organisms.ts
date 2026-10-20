@@ -638,7 +638,10 @@ export function registerOrganismsTools(
             // read model — the REST route applies the same policy).
             if (!m || m.status !== 'active') return { content: [{ type: 'text' as const, text: 'Only an active member of the organism can export it.' }], isError: true };
             const { buffer, filename, workspaces, leftOut, truncated } = await exportOrganism(storage, config, {
-                orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString(),
+                orgId: organism_id, exporterGaii: `${ownerName}@${config.nodeId}`,
+                // Who is actually asking: the bundle READS as the owner, and deciding workspace
+                // access with that identity skipped the ecosystem data-area gate (secaudit 2026-10).
+                callerSub: caller().principal, exportedAt: new Date().toISOString(),
                 reader: readerForAgent({ storage, config }, agentGaii),
             });
             if (buffer.length > 1_500_000) return { content: [{ type: 'text' as const, text: `Organism too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.` }], isError: true };
@@ -654,7 +657,17 @@ export function registerOrganismsTools(
             const buf = Buffer.from(zip_base64, 'base64');
             if (!buf.length) return { content: [{ type: 'text' as const, text: 'zip_base64 is empty or invalid.' }], isError: true };
             try {
-                const result = await importOrganism(storage, config, { importerGaii: `${ownerName}@${config.nodeId}`, importerOwner: ownerName, zip: buf });
+                const session = caller();
+                const result = await importOrganism(storage, config, {
+                    importerGaii: `${ownerName}@${config.nodeId}`, importerOwner: ownerName,
+                    // The session's own facts: the restore applies the write rules the archive's
+                    // keys and levels would otherwise skip (secaudit 2026-10).
+                    caller: {
+                        principal: session.principal, targetGaii: `${ownerName}@${config.nodeId}`,
+                        owner: session.owner, roles: [...session.roles], scopes: [...session.scopes],
+                    },
+                    zip: buf,
+                });
                 emitResourceListChanged(agentGaii);
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
             } catch (e) {

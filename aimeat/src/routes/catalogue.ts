@@ -9,6 +9,10 @@
  * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
+ *   2026-10-20 — SECURITY: GET /v1/catalogue/knowledge runs the manifests through the caller's
+ *     classification reader (readerFor, presentMemories), the one GET /v1/knowledge/:id uses, so the
+ *     listing and the single read agree; the cached scan stays raw and shared and the reader runs per
+ *     request (secaudit 2026-10, catalogue.ts:GET-v1-catalogue-knowledge:no-classification-reader).
  *   2026-10-19 — GET /v1/catalogue/agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read per page.
  *   v1.1.0 — 2026-06-23 — Exclude `unlisted` agents from GET /v1/catalogue/agents (Secretary Phase 0).
  *   v1.2.0 — 2026-07-14 — Perf: GET /v1/catalogue/knowledge finds manifests via ONE listAllMemory key
@@ -39,6 +43,8 @@ import type { DirectoryService } from '../services/directory.js';
 import { actionPricingFromRequest, presentActionPricing } from '../services/action-pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
+import { readerFor } from '../services/classification/reader.js';
+import { presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
 import { logger } from '../utils/logger.js';
 
 /** Shape of a stored knowledge-package manifest value (memory record `value`). */
@@ -329,6 +335,23 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       manifests = manifests.filter(m => m.value.language === language);
     }
 
+    // THE CLASSIFICATION READER, the same one the single read uses. Every loader that hands stored
+    // content to a caller takes one (services/classification/reader.ts), and this one had none: the
+    // listing answered with the name, author, synthesis, tags and counts of a manifest that
+    // GET /v1/knowledge/:id answers 404 for, because that read runs the record through
+    // presentMemory(readerFor(...)) in routes/knowledge/helpers.ts findReadableManifest. The two
+    // diverged whenever classification was on for the publisher and the manifest's effective label
+    // hid it from AI or carried a reader audience while the record's visibility stayed public; an
+    // anonymous caller is read as an AI (reader.ts, decided 2026-09-30).
+    //
+    // THE CACHE. The cached entry above stays the RAW node-wide scan, shared by every caller, and
+    // the reader runs per request on top of it. The alternative, a cached listing keyed by the
+    // reader's identity, would hold one cached array per caller of a node-global list that
+    // federation peers and clients poll every 5-30 s, and the first cache miss would still pay for
+    // the scan. Per-request is also free where it has to be: with classification off, the code
+    // default, decideAll reads nothing and this is one array pass (reader.ts decideAll).
+    manifests = await presentMemories(readerFor({ storage, config }, req.auth), manifests);
+
     // Sort
     if (sort === 'recent') {
       manifests.sort((a, b) => (b.updatedAt || b.createdAt).localeCompare(a.updatedAt || a.createdAt));
@@ -341,8 +364,11 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
     const items = paged.map(m => {
       const v = m.value;
       const packageId = m.key.replace('packages/', '').replace('/manifest', '');
+      // A warning-classified manifest carries what the reader put on it, as GET /v1/knowledge/:id does.
+      const warning = classificationWarningOf(m);
       return {
         package_id: packageId,
+        ...(warning ? { classificationWarning: warning } : {}),
         name: v.name,
         author: v.author,
         content_type: v.content_type,

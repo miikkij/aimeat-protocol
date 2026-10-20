@@ -6,6 +6,9 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.10.0 — 2026-10-20 — extensions.unattendedReadAuthority for a fresh database (Jouni, 2026-10-20).
+ *   v1.9.0 — 2026-10-20 — extensions.installedByPrincipal for a fresh database
+ *     (schema-columns-extensions.ts adds it to an existing one).
  *   v1.8.0 — 2026-10-17 — apps.access for a fresh database (schema.ts adds it to an existing one).
  *   v1.7.0 — 2026-10-12 — apps.community for a fresh database (schema.ts adds it to an existing one).
  *   v1.6.0 — 2026-10-11 — Comments only: apps.manifest's old price.morsels and app_purchases.priceMorsels
@@ -39,6 +42,8 @@ export function applySchemaTables2(db: Database.Database): void {
       federation     TEXT NOT NULL DEFAULT '{}',
       instances      TEXT,
       installedBy    TEXT NOT NULL,
+      installedByPrincipal TEXT,
+      unattendedReadAuthority TEXT,
       installedAt    TEXT NOT NULL,
       activatedAt    TEXT
     );

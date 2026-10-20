@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-20 — The Knowledge System types move to types/knowledge.ts (pure extraction at
+ *     the 800-line limit). Their own history up to today stays in the lines below.
+ *   v1.13.0 — 2026-10-20 — ExtensionRecord.unattendedReadAuthority: the owner's per-extension choice
+ *     of whose reach an unattended file read is judged against, absent meaning the owner's own
+ *     (Jouni, 2026-10-20, on secaudit 2026-10 extension-system-run:files-read-as-owner-ghii).
  *   v1.12.0 — 2026-10-17 — KnowledgeSharing.audience and the entry visibilities 'members' and
  *     'organism:<id>' (plan doc-mvcn6c7e4e5q, V3.6; services/knowledge-audience.ts).
  *   v1.11.0 — 2026-10-13 — KnowledgeSharing.toll_morsels; morsel_price is its optional deprecated name
@@ -33,7 +38,9 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
-import type { AiProvenanceLevel } from '../../models/ai-provenance-schemas.js';
+// MemoryLinkRecord below names the same relation vocabulary a knowledge link uses, and the two must
+// not drift into two spellings. It stayed here and the vocabulary moved, so it reads it from there.
+import type { KnowledgeLinkRelation } from './knowledge.js';
 
 export interface PeeringRequestRecord {
   id: string;
@@ -457,6 +464,32 @@ export interface ExtensionRecord {
     configSchema?: Record<string, unknown>;  // JSON Schema for per-instance config
   };
   installedBy: string;
+  /**
+   * The PRINCIPAL that last wrote this extension's code, as `req.auth!.sub` gives it: a bare
+   * account name or the account's GHII for the account holder in person, and `agent#owner@node`
+   * for an agent or an ecosystem app. `installedBy` beside it is the bare ACCOUNT name, which
+   * cannot tell the two apart, so this is what names the AGENT to the owner on the extension's
+   * page, and what `unattendedReadAuthority: 'installer'` narrows an unattended read to
+   * (services/extension-system-run.ts). Absent on a record written before 2026-10-20.
+   */
+  installedByPrincipal?: string;
+  /**
+   * Whose reach an unattended run's FILE READS are judged against: a schedule, an @activate job or
+   * a workflow step, where nobody is present to be asked.
+   *
+   *   'owner' or absent — the account holder's own reach, which is what every extension on every
+   *     node has always had. ABSENT IS THE DEFAULT AND IT MEANS 'owner', so no deploy and no
+   *     migration changes what a working extension may read. An extension an agent installed reads
+   *     the owner's private files, because the owner's agent acts for the owner and `ext:write` is
+   *     the owner's own grant of that reach (Jouni, 2026-10-20).
+   *   'installer' — the reach of `installedByPrincipal` instead, with that principal's scopes as
+   *     they stand at the run, so an agent reads unattended exactly what it reads attended. The
+   *     owner chooses this per extension when they want the narrower behaviour.
+   *
+   * Only the account holder in person sets it (routes/extensions/unattended-reader.ts). An agent
+   * that could widen its own extension would make the setting theatre.
+   */
+  unattendedReadAuthority?: 'owner' | 'installer';
   installedAt: string;
   activatedAt?: string;
 }
@@ -676,90 +709,8 @@ export interface CortexExtensionRecord {
   activationArtifacts: CortexActivationArtifacts;
 }
 
-// ── Knowledge System types ──────────────────────────────────────────
-
-export type KnowledgeContentType =
-  | 'idea' | 'research' | 'plan' | 'dataset' | 'document'
-  | 'tutorial' | 'collection' | 'article' | 'story' | 'fiction';
-
-/** The four synthesis levels. Defined once, in the provenance record's frozen vocabulary — a
- *  knowledge package's `synthesis.level` and an AI provenance record's `level` are the SAME
- *  vocabulary, so they must not drift apart into two spellings (TARGET-058). */
-export type KnowledgeSynthesisLevel = AiProvenanceLevel;
-export type KnowledgeMaturity = 'draft' | 'review' | 'published';
-export type KnowledgeLinkRelation = 'related-to' | 'extends' | 'derived-from' | 'contradicts' | 'supersedes' | 'references';
-
-export interface KnowledgeReference {
-  url: string;
-  title: string;
-  accessed: string;           // ISO 8601
-  verified: boolean;
-  note?: string;
-}
-
-export interface KnowledgeEntryRelation {
-  key: string;                              // Target entry key within same package
-  relation: KnowledgeLinkRelation;          // How entries relate
-}
-
-export interface KnowledgeEntryDescriptor {
-  key: string;
-  title: string;
-  visibility: 'private' | 'owner' | 'group' | 'members' | `organism:${string}` | 'public';
-  schema?: string;
-  references?: KnowledgeReference[];        // Per-entry citations (independent knowledge unit)
-  related_entries?: KnowledgeEntryRelation[]; // Intra-package relationships
-}
-
-export interface KnowledgeLink {
-  target: string;
-  relation: KnowledgeLinkRelation;
-  description: string;
-  linked_at: string;          // ISO 8601
-}
-
-export interface KnowledgeSynthesis {
-  level: KnowledgeSynthesisLevel;
-  description: string;
-  model?: string;
-}
-
-export interface KnowledgeSharing {
-  catalog_listed: boolean;
-  allow_clone: boolean;
-  /** Who reads an unlisted package: 'owner' (default), 'members' or 'organism:<id>'. Listed is public. */
-  audience?: 'owner' | 'members' | `organism:${string}` | 'public';
-  license?: string;
-  /**
-   * The pacing amount in morsels; always 0 and never charged. A morsel is pacing, not a price
-   * (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
-   */
-  toll_morsels: number;
-  /**
-   * DEPRECATED name of toll_morsels, accepted on a write with the Deprecation headers and stored as
-   * toll_morsels; refused from MORSEL_PRICE_NAMES_REMOVED_IN (services/toll-morsels-names.ts). A
-   * manifest stored before 4.0.0 may still hold it, and the knowledge routes answer it as toll_morsels.
-   */
-  morsel_price?: number;
-}
-
-export interface KnowledgeManifest {
-  type: 'knowledge-package';
-  name: string;
-  version: string;
-  author: string;             // GHII of the package creator
-  created: string;            // ISO 8601
-  updated: string;            // ISO 8601
-  content_type: KnowledgeContentType;
-  tags: string[];
-  language: string;           // ISO 639-1
-  maturity: KnowledgeMaturity;
-  synthesis: KnowledgeSynthesis;
-  references: KnowledgeReference[];
-  entries: KnowledgeEntryDescriptor[];
-  links: KnowledgeLink[];
-  sharing: KnowledgeSharing;
-}
+// The Knowledge System types moved to types/knowledge.ts on 2026-10-20 (pure extraction at the
+// 800-line limit). storage/interface.ts re-exports both modules, so nothing that reads them changed.
 
 export interface MemoryLinkRecord {
   source: string;             // Source memory key

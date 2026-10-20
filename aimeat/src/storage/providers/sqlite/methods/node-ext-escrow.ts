@@ -8,6 +8,10 @@
  * @structure nodeExtEscrowMethods
  * @usage Object.assign(SqliteStorage.prototype, nodeExtEscrowMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-10-20 — extensions.unattendedReadAuthority is written, updated and deserialized, and
+ *     only 'installer' is carried up, as in the Postgres twin (Jouni, 2026-10-20).
+ *   v1.1.0 — 2026-10-20 — extensions.installedByPrincipal is written, updated and deserialized
+ *     (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.0.0 — 2026-10-05 — 15 methods (createExtension, getExtension, listExtensions, …) moved here from
  *     extensions-notify.ts; createExtensionInstance, getExtensionInstance, listExtensionInstances,
  *     updateExtensionInstance, deleteExtensionInstance, deleteExtensionInstancesByOwner,
@@ -27,15 +31,17 @@ export const nodeExtEscrowMethods = {
     try {
       this.db.prepare(
         `INSERT INTO extensions (name, version, description, author, status, requiredApis,
-         actions, config, limits, federation, instances, installedBy, installedAt, activatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         actions, config, limits, federation, instances, installedBy, installedByPrincipal,
+         unattendedReadAuthority, installedAt, activatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.name, record.version, record.description, record.author,
         record.status, JSON.stringify(record.requiredApis),
         JSON.stringify(record.actions), JSON.stringify(record.config),
         JSON.stringify(record.limits), JSON.stringify(record.federation),
         record.instances ? JSON.stringify(record.instances) : null,
-        record.installedBy, record.installedAt, record.activatedAt ?? null,
+        record.installedBy, record.installedByPrincipal ?? null,
+        record.unattendedReadAuthority ?? null, record.installedAt, record.activatedAt ?? null,
       );
       return record;
     } catch (err: unknown) {
@@ -73,14 +79,16 @@ export const nodeExtEscrowMethods = {
     this.db.prepare(
       `UPDATE extensions SET version = ?, description = ?, author = ?, status = ?,
        requiredApis = ?, actions = ?, config = ?, limits = ?, federation = ?,
-       instances = ?, installedBy = ?, installedAt = ?, activatedAt = ? WHERE name = ?`
+       instances = ?, installedBy = ?, installedByPrincipal = ?, unattendedReadAuthority = ?,
+       installedAt = ?, activatedAt = ? WHERE name = ?`
     ).run(
       updated.version, updated.description, updated.author, updated.status,
       JSON.stringify(updated.requiredApis), JSON.stringify(updated.actions),
       JSON.stringify(updated.config), JSON.stringify(updated.limits),
       JSON.stringify(updated.federation),
       updated.instances ? JSON.stringify(updated.instances) : null,
-      updated.installedBy, updated.installedAt, updated.activatedAt ?? null, name,
+      updated.installedBy, updated.installedByPrincipal ?? null,
+      updated.unattendedReadAuthority ?? null, updated.installedAt, updated.activatedAt ?? null, name,
     );
     return updated;
   },
@@ -105,6 +113,10 @@ export const nodeExtEscrowMethods = {
       installedBy: row.installedBy as string,
       installedAt: row.installedAt as string,
     };
+    if (row.installedByPrincipal) record.installedByPrincipal = row.installedByPrincipal as string;
+    // Only 'installer' is carried up, as in the Postgres twin: NULL and any other value read as the
+    // owner's own reach, which is the default, so an unknown string cannot change a run.
+    if (row.unattendedReadAuthority === 'installer') record.unattendedReadAuthority = 'installer';
     if (row.activatedAt) record.activatedAt = row.activatedAt as string;
     if (row.instances) record.instances = JSON.parse(row.instances as string);
     return record;

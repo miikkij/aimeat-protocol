@@ -8,6 +8,8 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.6.0 — 2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party
+ *     made TO the agent end with it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   v1.5.0 — 2026-10-18 — setAgentScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
  *   v1.4.0 — 2026-10-18 — clearance on create, update and read (migration 0107, plan doc-mvdipuyqraas L2).
  *   2026-10-16 — operatorAccountState takes { claim } and needs nothing for it: transactions are serialised
@@ -25,7 +27,7 @@
  *     revokeTokenIfAbsent, isTokenRevoked, cleanExpiredRevocations moved here from apps.ts so the file
  *     mirrors postgres-kysely/methods/identity.ts (secaudit 2026-10, M8).
  */
-import type { OwnerRecord, AgentRecord, GHIIRecord, GHIIPatch } from '../../../interface.js';
+import type { OwnerRecord, AgentRecord, GHIIRecord, GHIIPatch, GrantsToIdentityCleared } from '../../../interface.js';
 import { sameScopeList } from '../../../scope-list.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
@@ -36,6 +38,7 @@ import { pseudonymiseLedgerParty } from '../repos/ledger-erasure.js';
 import { deleteInstalledCortexes } from '../repos/cortex-erasure.js';
 import { deleteEcosystemApps } from '../repos/eco-app-erasure.js';
 import { deleteAccountCredentials } from '../repos/credential-erasure.js';
+import { clearGrantsToIdentity as clearGrantsToIdentityIn } from '../repos/grantee-erasure.js';
 import { erasedPartyPseudonym, erasedAccountParty } from '../../../erased-party.js';
 import type { SqliteStorage } from '../index.js';
 import { logger } from '../../../../utils/logger.js';
@@ -401,11 +404,18 @@ export const identityMethods = {
       settleDeletedAgentWork(this.db, gaii, id => this.resolveGhii(id));
       // Cascade delete all agent-related data
       this.cascadeDeleteAgentData(gaii);
+      // What OTHERS granted to this GAII, which no owner column can find (repos/grantee-erasure.ts).
+      clearGrantsToIdentityIn(this.db, gaii);
       // Delete the agent record itself
       const result = this.db.prepare('DELETE FROM agents WHERE gaii = ?').run(gaii);
       return result.changes > 0;
     });
     return txn();
+  },
+
+  /** @see AgentRepository.clearGrantsToIdentity */
+  async clearGrantsToIdentity(this: SqliteStorage, gaii: string): Promise<GrantsToIdentityCleared> {
+    return clearGrantsToIdentityIn(this.db, gaii);
   },
 
   async listAgents(this: SqliteStorage): Promise<AgentRecord[]> {

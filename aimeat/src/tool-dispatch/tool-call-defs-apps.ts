@@ -8,6 +8,8 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-20 -- The eight extension entries move to tool-call-defs-extensions.ts (pure
+ *     extraction at the 800-line ceiling, so the next extension tool had somewhere to go).
  *   2026-10-19 -- aimeat_app_draft_save and aimeat_app_draft_publish forward `version`, the display version (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 -- aimeat_app_draft_save forwards `notice`, what the draft changes.
  *   2026-10-16 -- aimeat_app_get answers an app behind an access code only to its owner, as the node's MCP tool does (QA audit W15).
@@ -69,7 +71,7 @@ import type { CommandDef } from '../services/iam/app-commands.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 import { appSettingsTools } from './tool-call-defs-apps-settings.js';
 import { DRAFT_NOTICE_PARAM, draftNoticeBody } from './tool-call-defs-app-draft-edit.js';
-import { installExtensionOverHttp, installCortexOverHttp, extensionDetailPath } from './extension-install.js';
+import { installCortexOverHttp } from './extension-install.js';
 
 /** What a caller states about one run, in the connector's own wire vocabulary. */
 export interface ProofAttachInput {
@@ -377,86 +379,8 @@ export const appTools: ConnectCliToolDefinition[] = [
             version: optionalNumber(input, 'version'),
         })}`),
     },
-    {
-        name: 'aimeat_extension_list',
-        description: 'List installed extensions.',
-        input: {},
-        handler: ({ client }) => client.get('/v1/extensions'),
-    },
-    {
-        name: 'aimeat_extension_invoke',
-        description: 'Invoke an extension action.',
-        input: {
-            extension_name: { type: 'string', description: 'Extension name. (`name` is accepted as the older spelling this tool used.)' },
-            name: { type: 'string', description: 'Older spelling of extension_name.' },
-            action_id: { type: 'string', required: true, description: 'Action identifier.' },
-            input: { type: 'object', description: 'Input parameters.' },
-            instance_id: { type: 'string', description: 'Which installed instance to invoke, when the extension has more than one.' },
-        },
-        // AN INSTANCE IS A PATH SEGMENT, NOT A QUERY PARAMETER. This appended `?instance_id=` to the
-        // extension-scoped route, which reads no query at all — so a fleet agent invoking a
-        // two-instance extension ran against the SHARED `ext:{name}` namespace, with the wrong
-        // config and the wrong wallet scope, and got ok back. The instance-scoped route has existed
-        // beside it throughout, and the connector-MCP door has always used it. Review item 6.3.
-        handler: ({ client }, input) => {
-            const ext = encodeURIComponent(optionalString(input, 'extension_name') ?? requiredString(input, 'name'));
-            const actionId = encodeURIComponent(requiredString(input, 'action_id'));
-            const instanceId = optionalString(input, 'instance_id');
-            return client.post(
-                instanceId ? `/v1/ext/${ext}/${encodeURIComponent(instanceId)}/${actionId}` : `/v1/ext/${ext}/${actionId}`,
-                optionalRecord(input, 'input') ?? {},
-            );
-        },
-    },
-    {
-        // The catalog's input is the contract (manifest YAML, scripts, update, activate). This entry
-        // declared its own `name` and an OBJECT manifest, and JSON-parsed the YAML a caller sends, so
-        // no real manifest ever left the process; and it posted update/activate to POST
-        // /v1/extensions, which reads neither. The logic is installExtensionOverHttp(), shared with the
-        // connector's MCP door.
-        name: 'aimeat_extension_install',
-        handler: ({ client }, input) => installExtensionOverHttp(client, {
-            manifest: optionalString(input, 'manifest'),
-            scripts: optionalRecord(input, 'scripts'),
-            update: optionalBoolean(input, 'update'),
-            activate: optionalBoolean(input, 'activate'),
-        }),
-    },
-    {
-        name: 'aimeat_extension_activate',
-        description: 'Activate an installed extension.',
-        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
-        handler: ({ client }, input) => client.post(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/activate`),
-    },
-    {
-        name: 'aimeat_extension_deactivate',
-        description: 'Deactivate an extension.',
-        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
-        handler: ({ client }, input) => client.post(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/deactivate`),
-    },
-    {
-        name: 'aimeat_extension_config_set',
-        description: 'Change config values of an installed extension in place.',
-        input: {
-            name: { type: 'string', required: true, description: 'Extension name.' },
-            config: { type: 'object', required: true, description: 'The fields to change: { "<field>": value }.' },
-        },
-        handler: ({ client }, input) => client.patch(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}/config`, {
-            config: optionalRecord(input, 'config'),
-        }),
-    },
-    {
-        name: 'aimeat_extension_delete',
-        description: 'Uninstall an extension.',
-        input: { name: { type: 'string', required: true, description: 'Extension name.' } },
-        handler: ({ client }, input) => client.delete(`/v1/extensions/${encodeURIComponent(requiredString(input, 'name'))}`),
-    },
-    {
-        // include_source reads ?full=true, which the route answers with the scripts only to the
-        // installer's own sessions holding ext:write, and refuses to anyone else.
-        name: 'aimeat_extension_get',
-        handler: ({ client }, input) => client.get(extensionDetailPath(requiredString(input, 'name'), optionalBoolean(input, 'include_source'))),
-    },
+    // The eight extension entries moved to tool-call-defs-extensions.ts on 2026-10-20 (pure
+    // extraction at the line ceiling). index.ts spreads both lists.
     {
         name: 'aimeat_cortex_list',
         description: 'List installed cortex models, or read one (name) with its source (include_source).',

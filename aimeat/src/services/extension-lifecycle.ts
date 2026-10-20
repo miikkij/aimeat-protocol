@@ -39,6 +39,9 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.9.0 — 2026-10-20 — writeExtensionRecord stamps `installedByPrincipal` with the actor of the
+ *     write, so an unattended run reads files as the principal that wrote the code and not as the
+ *     account name (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.8.0 — 2026-10-13 — activateExtension makes the extension's capability rows before it answers
  *     (capability-aggregator.ts aggregateExtensionNow), so an app tool bound to an action is callable
  *     at once.
@@ -152,6 +155,15 @@ export async function writeExtensionRecord(
     // every ordinary write those are the same principal, because managing an extension requires
     // being its installer; they part company when an operator writes on somebody else's behalf.
     const listingOwner = existing ? existing.installedBy : record.installedBy;
+
+    // WHO WROTE THIS CODE, as a principal and not as an account name. `installedBy` is the bare
+    // account name, so an install by the account holder in person and one by that person's agent
+    // read the same, and an unattended run that judged a file read against it gave the agent the
+    // owner's whole reach (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii). The
+    // actor of the write that produced the running code is the honest answer: an owner redeploying
+    // an agent's extension takes it back, and an agent redeploying the owner's narrows it to the
+    // agent. Set on every write, so the record never carries a principal older than its code.
+    record.installedByPrincipal = ctx.actor;
 
     if (!existing) {
         // Both ceilings, node-wide and per-owner, from services/install-quotas.ts. Only a new name

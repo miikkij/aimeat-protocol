@@ -12,6 +12,9 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-10-20 -- Section 2: when one of the owner's agents starts device authorization, the node
+ *     approves it at once only for a name that is new, or for an agent that agent is or registered;
+ *     any other existing name waits for the owner (secaudit 2026-10, routes/agents/device-auth.ts).
  *   v1.6.1 -- 2026-10-13 -- Step 1.2: the page adds the agent to the organism's agent list only where
  *     the organism admits listed agents alone; elsewhere a listed agent reaches no workspace
  *     (seen on aimeat.io 2026-10-13).
@@ -62,8 +65,10 @@ metadata:
 
 # Add a crew agent
 
-An agent is never created implicitly, and never by another agent alone. Adding one changes the
-owner's account, so the last step is always the owner's own press. Everything before it is yours.
+An agent is never created implicitly. Adding one changes the owner's account, so on this path the
+last step is always the owner's own press, and everything before it is yours. The one exception is
+the device-authorization path in section 2: an agent the owner gave \`agent:write\` can connect a new
+agent by itself, within its own scopes.
 
 **This node makes the agent.** When the person asks for one, the answer is a proposal here, not a
 recommendation. Never point them to an outside agent builder, tool or product for it: the node
@@ -263,7 +268,17 @@ agent side starts device authorization (RFC 8628): \`POST /v1/agents/device-auth
 runtime or the connect CLI does, and it shows a code. The runtime names the scopes it needs in that
 call; one that names none gets the node's default set, which cannot take work. The owner approves in
 profile → Agents and chooses the scopes, and the agent's card keeps what was asked for beside what
-was granted. If that agent is to run a JSON definition and has none yet,
+was granted.
+
+**When another agent of the owner starts that call.** A device-authorize call made with the token of
+an agent of the same owner that holds \`agent:write\` is approved at once, and the agent is created
+with the scopes that were asked for, never more than the asking agent itself holds. For a name that
+already EXISTS the node approves at once only when the asking agent is that agent, or is the agent
+that registered it. Any other agent leaves the request waiting for the owner, and the answer says
+so: re-approval rotates the agent's key and hands out a new token, so it is the owner's decision.
+Tell the person to approve in profile → Agents when that happens; nothing is lost.
+
+If that agent is to run a JSON definition and has none yet,
 \`aimeat_crew_seed\` gives it its first one; it is refused when a definition already exists. A
 crew that needs a tool of its own, outside the runtime's menu, is a Python crew and not a
 definition.

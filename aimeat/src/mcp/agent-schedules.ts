@@ -18,6 +18,8 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-20 — The write caller names the session's kind and roles, as the REST door does, so
+ *     canManageSchedule can tell an agent from an ecosystem app (secaudit 2026-10).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
  *   v1.5.0 — 2026-09-29 — aimeat_schedule_create takes kind 'refinery' (input { prefix }).
@@ -79,9 +81,19 @@ export function registerAgentScheduleTools(
    * This session in the terms services/schedule-write.ts speaks. An MCP session is an agent acting
    * for its owner and never an owner session, so the per-kind scope is checked rather than bypassed,
    * and everything these tools create is createdByAgent (the agent may manage its own schedules,
-   * the owner may manage all of them).
+   * the owner may manage all of them). The session's kind is named rather than assumed, as the REST
+   * door names it: canManageSchedule refuses an ecosystem app every schedule but its own, and
+   * reading the kind from one place is what keeps the two doors from drifting (secaudit 2026-10).
    */
-  const writeCaller: ScheduleWriteCaller = { owner, identity: agentGaii, isOwnerSession: false, scopes: sessionScopes };
+  const writeCaller = (): ScheduleWriteCaller => {
+    const session = caller();
+    return {
+      owner, identity: agentGaii, isOwnerSession: false, scopes: sessionScopes,
+      roles: [...session.roles],
+      isApp: session.kind === 'app',
+      isEcosystem: session.kind === 'ecosystem',
+    };
+  };
 
   // ── aimeat_schedule_create ──
   mcp.tool(
@@ -100,7 +112,7 @@ export function registerAgentScheduleTools(
       // the gate, the per-kind input checks, the record build, the store, and registering the job on
       // the live clock. The body field names below are the aliases the route already accepts, so
       // there is nothing to translate at the seam.
-      const out = await createScheduleRecord({ storage, config }, writeCaller, {
+      const out = await createScheduleRecord({ storage, config }, writeCaller(), {
         kind: a.kind,
         cron: a.cron,
         timezone: a.timezone,
@@ -157,7 +169,7 @@ export function registerAgentScheduleTools(
     async (a) => {
       // Same service as PATCH /v1/schedules/:id, which means an edit here is judged the way an edit
       // there is: only a schedule this agent created, and a cron expression that parses.
-      const out = await updateScheduleRecord({ storage, config }, writeCaller, a.schedule_id, {
+      const out = await updateScheduleRecord({ storage, config }, writeCaller(), a.schedule_id, {
         enabled: a.enabled,
         cron: a.cron,
         timezone: a.timezone,
@@ -176,7 +188,7 @@ export function registerAgentScheduleTools(
     zodShapeFor('aimeat_schedule_delete'),
     annotationsFor('aimeat_schedule_delete'),
     async (a) => {
-      const out = await deleteScheduleRecord({ storage, config }, writeCaller, a.schedule_id);
+      const out = await deleteScheduleRecord({ storage, config }, writeCaller(), a.schedule_id);
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       return text({ deleted: a.schedule_id });
     },
@@ -192,7 +204,7 @@ export function registerAgentScheduleTools(
     annotationsFor('aimeat_schedule_trigger'),
     async (a) => {
       // Same service as POST /v1/schedules/:id/trigger: same manage rule, same clock, same outcome.
-      const out = await triggerScheduleRecord({ storage, config }, writeCaller, a.schedule_id);
+      const out = await triggerScheduleRecord({ storage, config }, writeCaller(), a.schedule_id);
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       const { code, taskId, detail } = out.outcome;
       // The outcome is relayed whole, and `succeeded` is stated rather than left to be inferred:

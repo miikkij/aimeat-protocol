@@ -70,7 +70,10 @@ describe('the row spaces in a workspace export and import', () => {
   afterEach(() => { storage.close(); });
 
   const collect = (config = baseConfig, s: Storage = storage as unknown as Storage) =>
-    collectWorkspace(s, config, { orgId: ORG, ws: WS, exporterGaii: ALICE, exportedAt: at, isOrgManager: true, reader: passReader });
+    collectWorkspace(s, config, { orgId: ORG, ws: WS, exporterGaii: ALICE, callerSub: ALICE, exportedAt: at, isOrgManager: true, reader: passReader });
+
+  /** The importer's own facts: the owner in person, so the restore's write rules change nothing here. */
+  const IMPORTER = { principal: ALICE, targetGaii: ALICE, owner: 'alice', roles: ['owner'], scopes: ['*'] };
 
   it('the export carries every row of the row space, and truncated is empty', async () => {
     const { json } = await collect();
@@ -81,7 +84,7 @@ describe('the row spaces in a workspace export and import', () => {
 
   it('the import restores the rows into the new workspace, with their ids, bodies and index column', async () => {
     const { json } = await collect();
-    const result = await restoreWorkspace(storage as unknown as Storage, baseConfig, { orgId: ORG, importerGaii: ALICE, importerOwner: 'alice', data: json, images: new Map() });
+    const result = await restoreWorkspace(storage as unknown as Storage, baseConfig, { orgId: ORG, importerGaii: ALICE, importerOwner: 'alice', caller: IMPORTER, data: json, images: new Map() });
     expect(result.rows).toBe(3);
     const page = await storage.listWorkspaceRows({ organismId: ORG, wsId: result.ws, namespace: 'crm.mail', order: 'asc' });
     expect(page.rows.map((r) => r.rowId).sort()).toEqual(['r1', 'r2', 'r3']);
@@ -95,7 +98,7 @@ describe('the row spaces in a workspace export and import', () => {
     const { json } = await collect();
     const tight = { ...baseConfig, wsRowsMaxPerWorkspace: 2 } as AimeatConfig;
     const before = (await storage.listAllMemory({ prefix: `organism.${ORG}.w.`, limit: 1000 })).items.length;
-    await expect(restoreWorkspace(storage as unknown as Storage, tight, { orgId: ORG, importerGaii: ALICE, importerOwner: 'alice', data: json, images: new Map() }))
+    await expect(restoreWorkspace(storage as unknown as Storage, tight, { orgId: ORG, importerGaii: ALICE, importerOwner: 'alice', caller: IMPORTER, data: json, images: new Map() }))
       .rejects.toThrow(/limit is 2/);
     expect((await storage.listAllMemory({ prefix: `organism.${ORG}.w.`, limit: 1000 })).items.length).toBe(before);
   });

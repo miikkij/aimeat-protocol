@@ -16,6 +16,10 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-10-20 — The app-tool fulfilment refuses an `action_id` whose capability the seller does not
+ *     own (CAPABILITY_NOT_OWNED_BY_APP, the collect refunded), and carries the BUYER session's own
+ *     authority, read from the completing token, in place of the asserted `{ scopes: ['mcp:use'] }`
+ *     (secaudit 2026-10, capability-invoke.ts:mcp-source:server-slug-resolved-in-caller-reach).
  *   2026-10-18 — An ext-call whose split names its payees per call (dynamic) books no shares at the
  *     checkout: the seller's net rides on the pay token and is split when the paid call names its
  *     payees (sharesAtUse; Comicland v3 A-6). The payees were lost on this path.
@@ -277,7 +281,14 @@ export function appToolSellableResolver(): SellableResolver {
           if (!cap) {
             throw new CommerceError('CAPABILITY_NOT_FOUND', 404, `Backing capability not found: ${actionId}`);
           }
-          const { invokeCapability } = await import('../services/capability-invoke.js');
+          const { invokeCapability, appToolBindingRefusal, authorityFromToken } =
+            await import('../services/capability-invoke.js');
+          // The manifest NAMES a capability; it does not confer one. A throw here refunds the
+          // collect, so the buyer pays nothing for a tool bound to a capability its seller does not
+          // own (services/extension-purchase.ts has refused the same since the August 2026 audit
+          // H-17; this path checked nothing until secaudit 2026-10).
+          const misbound = appToolBindingRefusal(cap, sellerOwner, appRef, toolName);
+          if (misbound) throw new CommerceError(misbound.code, misbound.statusCode, misbound.message);
           const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
           // The checkout is the payment: this session collected the tool's declared price before
           // fulfillment ran. The capability then runs over the node's own HTTP surface and meets the
@@ -289,8 +300,12 @@ export function appToolSellableResolver(): SellableResolver {
             applyLockedInput(tool, (item.input ?? {}) as Record<string, unknown>),
             session.buyerIdentity, callerJwt ?? '', 'normal',
             mintInternalPass(`apptool:${sellerOwner}/${appId}`, toolName),
-            // The paid checkout is what authorises this call, so a remote MCP tool behind it runs.
-            { scopes: ['mcp:use'] },
+            // What the BUYER'S OWN session holds, read from the token that completes the checkout.
+            // This asserted `{ scopes: ['mcp:use'] }` on the reasoning that the purchase authorises
+            // the call, and that let an agent whose owner never gave it mcp:use cause a call on an
+            // attached MCP server, while the same agent is refused on POST /v1/mcp-servers/:id/call
+            // (secaudit 2026-10). A purchase pays for a call; it does not grant a permission.
+            await authorityFromToken(ctx.storage, callerJwt),
           );
           return { result: invoked.result };
         },

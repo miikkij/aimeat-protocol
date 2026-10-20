@@ -9,9 +9,15 @@
  *   have about X" and get back ranked, snippeted, organism-annotated hits to pick from.
  * @structure GET /v1/librarian/search?q=&limit= — requireAuth; the `own` search fans across the
  *   owner's full read surface (GHII + agents + ecosystem apps) for an owner session OR any grant
- *   carrying `memory:read`; otherwise it is scoped to the caller's own identity.
+ *   carrying `memory:read`, an ecosystem app excepted; otherwise it is scoped to the caller's own
+ *   identity. What the fan-out then SHOWS is decided by services/owner-scope-read.ts.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
+ *   2026-10-20 — Two refusals on the `own` fan-out (secaudit 2026-10). An ecosystem app never gets
+ *     it: its data-area allowlist (ecoMayReadKey, routes/memory/key.ts) is its fence, and the
+ *     fan-out walked around it. And the hits now pass ownerScopeView, so a caller that does not read
+ *     as the owner no longer sees the owner's or a sibling agent's private records; when records are
+ *     left out the answer carries READ_AS_OWNER_NOTE as `note`.
  *   2026-10-16 — GET /v1/librarian/search refuses an app grant without memory:read on the `own`
  *     scope (403 SCOPE_DENIED): its own identity is its owner's GHII, so the narrowing an agent gets
  *     handed it the owner's personal memory (QA audit F05b-01).
@@ -45,6 +51,7 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { callerOf } from '../middleware/caller.js';
 import { denyScope403 } from '../auth/deny.js';
 import { librarianSearch } from '../services/librarian.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 import { readerFor } from '../services/classification/reader.js';
 import { classifyNote, distributeNote } from '../services/notebook-classify.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
@@ -98,21 +105,31 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     // to read the owner's private surface lives in the GRANT, not in content classification (mirrors
     // discovery/sources/memory-source.ts). Without it, the search stays scoped to the caller's own id.
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
-    const fanOutOwner = isOwnerSession || scopeIsCovered(scopes, 'memory:read');
+    const caller = callerOf(req, config.nodeId, storage);
+    // NOT an ecosystem app. A GEAI is fenced to the data areas its owner granted, enforced per key by
+    // ecoMayReadKey on GET /v1/memory/:key and excluded from owner-scope broadening by the list route
+    // (routes/memory/crud.ts). This fan-out had no such line, so an app approved with the default
+    // scopes searched the owner's whole identity set and read private records as snippets, while the
+    // direct read of the same key answered 404 (secaudit 2026-10).
+    const fanOutOwner = isOwnerSession || (scopeIsCovered(scopes, 'memory:read') && caller.kind !== 'ecosystem');
+    // Who sees the private records of the OTHER identities in that set: the owner in person, an app
+    // grant, or an agent holding memory:read-as-owner (services/owner-scope-read.ts).
+    const readsAll = isOwnerSession || readsAsOwner(caller);
     const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
     // An app grant's own identity IS its owner's GHII, so "the caller's own records" are the owner's
     // whole personal memory: the narrowing that keeps an agent without memory:read inside its own
     // namespace keeps an app inside nothing. An app searches its owner's memory with memory:read,
     // as GET /v1/memory/search asks (QA audit F05b-01). A public search needs no word.
-    if (scope === 'own' && !fanOutOwner && callerOf(req, config.nodeId, storage).kind === 'app') {
+    if (scope === 'own' && !fanOutOwner && caller.kind === 'app') {
       denyScope403(req, res, ['memory:read'],
         'Searching the owner\'s memory needs the "memory:read" scope. Ask the owner to grant it, or search public content with scope=public.');
       return;
     }
 
-    const { hits, ownersSearched } = await librarianSearch(storage, config, {
+    const { hits, ownersSearched, omitted } = await librarianSearch(storage, config, {
       ownerName: req.auth!.owner as string,
       fanOutOwner,
+      readsAll,
       viewerGaii,
       query: q,
       limit,
@@ -126,6 +143,9 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       hits,
       total: hits.length,
       owners_searched: ownersSearched,
+      // What was left out, and the word that would show it: an agent reads the sentence and knows
+      // which permission to ask its owner for, instead of seeing a short answer with no reason.
+      ...(omitted > 0 ? { omitted, note: READ_AS_OWNER_NOTE } : {}),
     }, [
       { description: 'Read a hit in full', method: 'GET', url: '/v1/memory/{key}' },
     ]));

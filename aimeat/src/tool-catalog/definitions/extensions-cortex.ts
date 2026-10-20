@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   v1.8.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read when it runs with nobody present, and that only the person can change it (Jouni, 2026-10-20).
  *   v1.7.2 — 2026-10-18 — aimeat_cortex_install says it answers publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   v1.7.1 — 2026-10-09 — aimeat_extension_install says which config values an update keeps.
  *   v1.7.0 — 2026-10-09 — aimeat_extension_config_set: change an installed extension's config values
@@ -128,6 +129,20 @@ export const extensionsCortexTools = [
         input: {
             name: { type: 'string', required: true, description: 'Extension name.' },
             config: { type: 'object', required: true, description: 'The fields to change: { "<field>": value }, e.g. { "WAZUH_HOST": "wazuh.example.com:9200" }. A value is a string, a number or a boolean; an empty string clears a host field.', zod: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) },
+        },
+    },
+    {
+        name: 'aimeat_extension_unattended_reader',
+        description: 'What one installed extension may read when it runs with NOBODY PRESENT: on a schedule, on an @activate job, or as a workflow step. Answers which principal wrote its code (installed_by_kind: self, agent, ecosystem, or unknown for one installed before the node recorded it) and whose reach its file reads are judged against (authority: "owner" = your person\'s own reach, private files included, which is the default on every node; "installer" = only what the principal that wrote the code can read). Read it when your person asks what an extension can see, or before you put an extension action on a clock for them. YOU CANNOT CHANGE IT: it is their decision about their own data, and only they can make it, signed in in person. Tell them what this answers and send them to the Extensions section of their profile page; the answer carries that address in changed_at_url.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Extension Unattended Reader', readOnlyHint: true },
+        // The same word the rest of this group takes: it is a question about an extension this
+        // person installed, and the ownership check in the route is what fences it to theirs.
+        scope: 'ext:write',
+        surfaces: ['appdev'],
+        input: {
+            name: { type: 'string', required: true, description: 'Extension name.' },
         },
     },
     {

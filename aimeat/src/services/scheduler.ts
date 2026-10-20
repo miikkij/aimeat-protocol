@@ -112,7 +112,8 @@ import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';
-import { runAiJob, runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
+import { runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
+import { scheduleStorageFileRefusal } from './schedule-file-access.js';
 import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './scheduler-agent-task.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { claimCronFire } from './scheduler-fire-claim.js';
@@ -204,7 +205,7 @@ export class Scheduler {
     this.coreHandlers.set(id, fn);
   }
 
-  /** Register the executor of a schedule kind whose code imports what imports this file (refinery). */
+  /** Register the executor of a schedule kind whose code imports what imports this file (ai, refinery). */
   registerKindExecutor(kind: ScheduledJobRecord['type'], fn: (job: ScheduledJobRecord) => Promise<JobRunResult>): void {
     this.kindExecutors.set(kind, fn);
   }
@@ -621,15 +622,6 @@ export class Scheduler {
   }
 
   /**
-   * `ai` kind: gather predefined input memory keys, compose the prompt, run a
-   * server-side completion on the owner's OpenRouter key, and store the result
-   * to the owner's output key. Zero agent involvement; runs even when offline.
-   */
-  private async executeAiJob(job: ScheduledJobRecord): Promise<JobRunResult> {
-    return runAiJob(this.storage, this.config, job);
-  }
-
-  /**
    * `agent_task` kind: materialise an AgentTaskRecord into the target agent's
    * queue and wake it via the existing webhook/MCP/SSE fan-out. The schedule is
    * the parent (parentTaskId); offline agents pick it up on reconnect. Body in scheduler-agent-task.ts.
@@ -664,12 +656,13 @@ export class Scheduler {
   /**
    * `eco-capability` kind: invoke a connected ecosystem app's (GEAI) capability over the
    * connect-tunnel on each fire. `input` is `{ app, capability_id, input? }`; `ownerScope` is the
-   * owner GHII whose binding to drive. AIMEAT authenticates the owner as caller; the ecosystem
-   * enforces its OWN ACL. When the GEAI is offline at fire time the run is SKIPPED (not an error) so
-   * it does not hot-loop — the next scheduled fire retries.
+   * owner GHII whose binding to drive. The invoke frame names whoever made the schedule, asked at
+   * the fire (services/schedule-actor.ts), and the ecosystem enforces its OWN ACL on top. When the
+   * GEAI is offline at fire time the run is SKIPPED (not an error) so it does not hot-loop — the
+   * next scheduled fire retries.
    */
   private async executeEcoCapabilityJob(job: ScheduledJobRecord): Promise<JobRunResult> {
-    return runEcoCapabilityJob(this.config, job);
+    return runEcoCapabilityJob(this.storage, this.config, job);
   }
 
   /**
@@ -681,6 +674,11 @@ export class Scheduler {
    * produces one post rather than two.
    */
   private async executeConnectionsPublishJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    // A schedule a non-owner made may publish only a file its maker can read. The create and edit
+    // doors refuse one it cannot, and this asks again at the fire because a file's visibility can be
+    // narrowed after the schedule was saved (services/schedule-file-access.ts; secaudit 2026-10).
+    const refusal = await scheduleStorageFileRefusal(this.storage, this.config, job);
+    if (refusal) throw new Error(refusal);
     const { runConnectionsPublishJob } = await import('./connections/scheduled-publish-job.js');
     return runConnectionsPublishJob(this.storage, this.config, job);
   }
@@ -692,7 +690,9 @@ export class Scheduler {
       return { reads: [], writes: [] };
     }
     if (job.type === 'extension') return this.executeExtensionJob(job);
-    if (job.type === 'ai') return this.executeAiJob(job);
+    // 'ai' is a registered kind (services/scheduler-ai-job.ts), not a branch here: it writes its
+    // answer through the shared memory write service, which reaches this file, so the executor is
+    // handed in at boot the way the refinery's is.
     if (job.type === 'agent_task') return this.executeAgentTaskJob(job, trigger);
     if (job.type === 'workflow') return this.executeWorkflowJob(job);
     if (job.type === 'eco-capability') return this.executeEcoCapabilityJob(job);

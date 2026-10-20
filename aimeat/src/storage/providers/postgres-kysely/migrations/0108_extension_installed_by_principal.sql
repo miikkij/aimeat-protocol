@@ -1,0 +1,20 @@
+-- 0108_extension_installed_by_principal.sql
+--
+-- Which PRINCIPAL last wrote an extension's code.
+--
+-- "installedBy" holds the bare ACCOUNT name, so an install by the account holder in person and an
+-- install by one of that person's agents are the same value. An unattended run (a schedule, an
+-- @activate job, a workflow extension step, an AI job's on_done callback, the AI provider path and
+-- the app markdown path) built ctx.files with the owner's GHII as the reader identity, and
+-- authorizeRead admits every private file of the owner. An agent holding only ext:write and
+-- ext:invoke could therefore install an extension whose unattended action read the owner's private
+-- files and reported back what it read, which the same agent is refused on every attended path
+-- (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
+--
+-- The value is req.auth.sub as the install door has it: a bare account name or the account's GHII
+-- for the account holder in person, "agent#owner@node" for an agent or an ecosystem app. Writes
+-- keep using the owner's GHII as their namespace; only the read authority changes.
+-- NULL = a record written before 2026-10-20, read as the account holder in person.
+--
+-- Mirrors the SQLite column added in schema-columns-extensions.ts.
+ALTER TABLE "Extension" ADD COLUMN IF NOT EXISTS "installedByPrincipal" TEXT;

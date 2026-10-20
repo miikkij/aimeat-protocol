@@ -25,7 +25,26 @@
  *   WHAT A SYSTEM RUN DOES NOT GET: a wallet. Nobody's balance is available to spend when nobody is
  *   present, so `ctx.wallet` is the empty object it has always been on these roads, and a script that
  *   reaches for it gets `undefined` rather than someone else's money.
- * @structure SystemRunTarget · SystemRunPrincipal · runExtensionActionAsSystem
+ *
+ *   THE NAMESPACE IS NOT THE READ AUTHORITY. `storageOwnerGhii` says where a produced file lands,
+ *   and it is always the owner's, because a package made on a clock needs the same permanent
+ *   address as one made from the app. It used to be handed to `ctx.files` as the accessor as well,
+ *   and `authorizeRead` admits every private file of the account it names. So an agent holding only
+ *   `ext:write` and `ext:invoke` installed an extension whose unattended action read the owner's
+ *   private files and reported back what it found, while the same read through the attended invoke
+ *   and through `GET /v1/pub` was refused it (secaudit 2026-10,
+ *   extension-system-run:files-read-as-owner-ghii). The two questions are now separate, and which
+ *   principal answers the second one is THE OWNER'S CHOICE per extension
+ *   (`ExtensionRecord.unattendedReadAuthority`): 'owner' or absent keeps the reach every extension
+ *   has always had, and 'installer' narrows the run to the principal that wrote the code, with the
+ *   scopes that principal holds NOW.
+ *
+ *   THE DEFAULT IS THE OLD BEHAVIOUR, DELIBERATELY. Closing this read by default would stop working
+ *   extensions on nodes whose owners never asked for the narrower rule, and an owner's agent acts
+ *   for the owner: `ext:write` is that owner's own grant of the reach (Jouni, 2026-10-20). What the
+ *   finding costs instead is visibility — the extension's page names the principal that installed
+ *   it and what it may read unattended — plus one setting the owner can turn on.
+ * @structure unattendedExtensionReader · SystemRunTarget · SystemRunPrincipal · runExtensionActionAsSystem
  * @usage
  *   const out = await runExtensionActionAsSystem({ storage, config, emailService }, {
  *     extensionName, actionId, instanceId, input,
@@ -33,6 +52,12 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.7.0 — 2026-10-20 — The read authority is the owner's choice per extension, and its default is
+ *     the behaviour every node already has (Jouni, 2026-10-20). unattendedReader is renamed
+ *     unattendedExtensionReader: ai-jobs/starter.ts exports a different function under the old name.
+ *   v1.6.0 — 2026-10-20 — ctx.files reads as the principal that wrote the extension's code, not as
+ *     the owner whose namespace it writes into (secaudit 2026-10,
+ *     extension-system-run:files-read-as-owner-ghii).
  *   v1.5.1 — 2026-10-09 — Secret config is decrypted for the field it is bound to (SecretBinding;
  *     secrets audit 2026-10-09, 1.1).
  *   v1.5.0 — 2026-10-08 — ctx.workspace with the two row calls only, when the manifest declares
@@ -51,7 +76,9 @@
  *     the workflow engine gained an `extension` step and would otherwise have grown the second copy.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, ExtensionRecord } from '../storage/interface.js';
+import { isGEAI } from '../utils/gaii.js';
+import { saverAuthority } from './workflow/trigger-authority.js';
 import { executeExtensionAction } from './extension-runtime.js';
 import { trackMemoryAccess } from './extension-runtime-tracking.js';
 import type { ExtensionCtx } from './extension-runtime.js';
@@ -128,6 +155,55 @@ export interface SystemRunResult {
     writes: string[];
 }
 
+/** The principal an unattended run's file reads are judged against. */
+export interface UnattendedReader {
+    gaii: string;
+    owner: string;
+    roles: string[];
+    scopes: string[];
+}
+
+/**
+ * Who this run reads as.
+ *
+ * THE OWNER'S REACH IS THE DEFAULT, and it is what an absent setting means, so an extension that
+ * works today keeps working after this deploy and after the migration. `unattendedReadAuthority`
+ * reaches 'installer' only because the account holder in person set it there, and that is the whole
+ * consent: the owner saw which principal installed the extension and chose the narrower rule.
+ *
+ * With 'installer' the reach is `installedByPrincipal`, which is `req.auth!.sub` as the install door
+ * had it. A name with no `#` is the ACCOUNT — the account holder in person leaves `sub` as the bare
+ * name, and an app grant carries the account's own GHII — so it still reads as the account holder,
+ * because narrowing an extension the owner installed themselves would narrow it to the owner. A name
+ * with a `#` is an agent or an ecosystem app, and its scopes are asked again here rather than
+ * remembered, because the owner can narrow or remove it after the install; one that is gone reads
+ * with no scopes at all.
+ *
+ * A record written before 2026-10-20 carries no principal. Setting 'installer' on one reads as the
+ * account holder, which is what it already does: the field cannot be recovered afterwards, and the
+ * next write of the extension's code stamps the real principal
+ * (services/extension-lifecycle.ts). The extension's page says so, rather than reporting a narrowing
+ * that is not in force.
+ *
+ * KNOWN RESIDUAL: an app grant's `sub` is the account's GHII, so an extension installed through an
+ * app grant reads as the account holder even under 'installer'. Telling that apart needs the grant
+ * id on the record, which is a wider change than this one.
+ */
+export async function unattendedExtensionReader(
+    storage: Storage,
+    ext: Pick<ExtensionRecord, 'installedByPrincipal' | 'unattendedReadAuthority'>,
+    ownerName: string,
+    ownerGhii: string,
+): Promise<UnattendedReader> {
+    const asOwner = { gaii: ownerGhii, owner: ownerName, roles: ['owner'], scopes: ['*'] };
+    if (ext.unattendedReadAuthority !== 'installer') return asOwner;
+    const principal = (ext.installedByPrincipal ?? '').trim();
+    if (!principal.includes('#')) return asOwner;
+    const kind = isGEAI(principal) ? 'ecosystem' as const : 'agent' as const;
+    const now = await saverAuthority(storage, { kind, id: principal });
+    return { gaii: principal, owner: ownerName, roles: [kind], scopes: now.gone ? [] : now.scopes };
+}
+
 /**
  * Run one action with nobody present. Throws on every refusal rather than returning a shape the
  * caller has to remember to inspect: both roads treat a thrown error as a failed run that notifies
@@ -149,6 +225,9 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
 
     const encKey = getEncryptionKey(config);
     const extMemoryOwner = instanceId ? `ext:${ext.name}.${instanceId}` : `ext:${ext.name}`;
+    // Asked before the sandbox starts, and asked again on every run: the owner can narrow or remove
+    // an agent after it installed the extension, and the next run must see that.
+    const reader = await unattendedExtensionReader(storage, ext, ownerName, storageOwnerGhii);
 
     // An instance-scoped run gets the same bring-your-own-key config a live instance action would;
     // `type: 'secret'` fields are decrypted just before the VM (services/extension-secrets.ts).
@@ -187,10 +266,20 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         // calls stand on the organism naming this extension in the space (row-service.ts,
         // authorizeExtension) and on the manifest's workspace.rows, never on the owner's session.
         workspace: buildUnattendedExtensionWorkspace({ config, storage, ext, ownerGhii: storageOwnerGhii }).workspace,
+        // The owner's namespace for a write, and for a read whichever authority the owner chose. See
+        // the file header: handing the namespace in as the accessor was the whole defect, and which
+        // principal answers the read is `unattendedReadAuthority`.
         files: makeExtensionFiles({
             config, storage, extName: ext.name,
             callerGaii: storageOwnerGhii,
             callerOwner: ownerName,
+            readerGaii: reader.gaii,
+            readerOwner: reader.owner,
+            readerRoles: reader.roles,
+            readerScopes: reader.scopes,
+            ...(reader.gaii === storageOwnerGhii ? {} : {
+                narrowedNote: `This extension runs unattended with the reach of ${reader.gaii}, because you set it to read as its installer. Change it on the extension's page at /profile?tab=extensions.`,
+            }),
         }),
         // The deterministic producers live here, so this is the road ctx.datapackage exists for.
         // Owner namespace on both roads, and the producer block records WHICH unattended road it

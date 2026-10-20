@@ -48,7 +48,7 @@ vi.mock('../../src/services/ai-transcription.js', () => ({
 
 const { AiJobService } = await import('../../src/services/ai-jobs/service.js');
 const { startedByOf, jobReader, unattendedReader } = await import('../../src/services/ai-jobs/starter.js');
-const { runAiJob } = await import('../../src/services/scheduler-remote-jobs.js');
+const { runAiJob } = await import('../../src/services/scheduler-ai-job.js');
 
 const NODE = 'aimeat-local-001-dev';
 const OWNER = `alice@${NODE}`;
@@ -57,6 +57,9 @@ const AGENT = `claude#alice@${NODE}`;
 const config = {
     nodeId: NODE, aiJobSlots: 1, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
     aiJobMaxPromptBytes: 1_000_000, aiJobLogRetentionDays: 7, sttMaxMb: 1, classificationMode: 'off',
+    // The ceilings the shared memory write asks about, since the scheduled ai job writes through it.
+    memoryQuotaMb: 100, memoryMaxKeysPerAgent: 1000, memoryMaxValueSizeKb: 1024,
+    memoryOverageMorselsPerMbMonth: 0,
 } as unknown as AimeatConfig;
 
 /** An owner namespace in a map, the audio file's metadata, and a note of every memory write. */
@@ -70,6 +73,15 @@ function memoryStorage(): { storage: Storage; rows: Map<string, MemoryRecord> } 
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),
         getStorageFileMeta: async (owner: string, key: string) => owner === OWNER && key === 'voice/a.webm'
             ? { key, ownerGaii: owner, mimeType: 'audio/webm', size: 16 } : null,
+        // The scheduled ai job writes its answer through services/memory-write.ts since 2026-10-20,
+        // so the stub answers the few lookups that write makes beyond the rows above.
+        findApplicableSchema: async () => null,
+        countMemory: async () => rows.size,
+        sumMemoryBytes: async () => 0,
+        getGHIIByOwner: async () => null,
+        transaction: async <T>(fn: () => Promise<T>) => fn(),
+        getAgentsByOwner: async () => [],
+        getEcosystemAppsByOwner: async () => [],
     } as unknown as Storage;
     return { storage, rows };
 }

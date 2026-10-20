@@ -10,10 +10,12 @@
  *   `completeForOwner` already picks the key, enforces the daily budget and the per-app quota,
  *   records per-app usage and stamps provenance. What is new is the queue, the handle and the
  *   callback.
- * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · StartAiJobInput · AiJobError ·
- *   AiJobResultRead · AiJobStarter
+ * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · AiJobViewer · StartAiJobInput ·
+ *   AiJobError · AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.10.0 — 2026-10-20 — AiJobViewer: who is asking after a job, so a read or a cancel can be held to
+ *     the jobs that principal started (secaudit 2026-10, ai-jobs.ts:jobs-keyed-by-owner-ghii).
  *   v1.9.0 — 2026-10-19 — `finish_reason` and `truncated` on the record of a text job, so job get and
  *     waitFor say when an answer was cut (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.8.0 — 2026-10-18 — `result_version` on the record and `readResult` on AiJobStarter, so an
@@ -156,6 +158,25 @@ export interface AiJobStartedBy {
  * prompts would outgrow the 1024 kB a memory value may hold.
  */
 export type AiJobLogEntry = Omit<AiJobRecord, 'prompt' | 'input_keys' | 'system_prompt'>;
+
+/**
+ * Who is asking after a job, on a surface that looks the owner's namespace up rather than the
+ * caller's own. A live job record carries `prompt` and `system_prompt`, so a read is not a neutral
+ * act: an agent of the owner sees and stops only the jobs it started itself, which is what the REST
+ * routes already do by resolving the principal (routes/ai-jobs.ts). `all` is the owner in person, an
+ * app grant of the owner, and an agent holding `memory:read-as-owner`, the one word that lets a
+ * scoped agent read the owner's and its siblings' private records (services/owner-scope-read.ts).
+ *
+ * Omitting the viewer reads everything in the namespace. That is right for the callers whose key IS
+ * the principal (the REST routes) and for the node's own paths (restart reconciliation, log pruning,
+ * an extension's ctx.ai.result, which fences on the job's own extension instead).
+ */
+export interface AiJobViewer {
+    /** The principal asking: an agent's GAII, or the owner's GHII for the owner in person. */
+    principal: string;
+    /** True when this caller sees every job of the owner and of the owner's agents. */
+    all: boolean;
+}
 
 /** What a caller asks for. `owner` and `created_by` are resolved server-side and are never read
  *  from a request body — see the routes and services/ai-jobs/service.ts. */

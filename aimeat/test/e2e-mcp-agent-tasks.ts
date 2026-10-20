@@ -23,6 +23,8 @@
  *   block above it says why a second node is the only way to reach that state.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-tasks
  * @version-history
+ *   2026-10-20 — The feed case reads the deliverable's key in the entry and asserts the task title is
+ *     absent from it: the summary used to copy the title, which is private text (secaudit 2026-10).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.4.0 — 2026-10-04 — The first plan carries the nulls CrewAI sends for left-out optional fields;
  *     aimeat_task_decline ends the agent's own task as declined and refuses another agent's.
@@ -589,13 +591,22 @@ async function run() {
         // And the public feed. The fan-out posts it without waiting, so this polls rather than reads
         // once. The `limit` is unusual on purpose: the route caches per (category, limit) for ten
         // seconds, and a limit nothing else in this suite uses cannot be served a stale copy.
+        //
+        // The entry names the public DELIVERABLE, not the task title: the title is the task
+        // creator's private text and the assigned agent may change it, so copying it to the
+        // anonymous feed carried private text out (secaudit 2026-10,
+        // agent-task-fanout.ts:afterTaskCompleted:feed-copies-task-title).
         let onFeed = false;
+        let titleOnFeed = false;
         for (let i = 0; i < 20 && !onFeed; i++) {
             const feed = await json(`/v1/public/activity-feed?category=agents&limit=${37 + i}`);
-            onFeed = (feed.body?.data?.items ?? []).some((it: { summary?: string }) => (it.summary ?? '').includes(title));
+            const items = (feed.body?.data?.items ?? []) as Array<{ summary?: string }>;
+            onFeed = items.some(it => (it.summary ?? '').includes(key));
+            titleOnFeed ||= items.some(it => (it.summary ?? '').includes(title));
             if (!onFeed) await new Promise(res => setTimeout(res, 250));
         }
-        assert(onFeed, 'the public deliverable never reached the activity feed');
+        assert(onFeed === true, 'the public deliverable never reached the activity feed');
+        assert(titleOnFeed === false, 'the task title, which is the owner\'s private text, reached the public feed');
     });
 
     // ── Who wrote the message decides the label, not which door it came through ─────────────────

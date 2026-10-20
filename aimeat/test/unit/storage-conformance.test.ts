@@ -21,6 +21,10 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.22.0 -- 2026-10-20 -- deleteAgent clears the grants made TO the agent on every provider: the
+ *     consent whose recipient is its exact GAII (revoked), the organism and board that admit it, the
+ *     sharing group that holds it and `registeredBy` on the agent it registered; a sibling's keep
+ *     every one of those (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   2026-10-18 -- A held-names refusal now says how to decide, so the two CONFLICT checks match the
  *     code rather than the whole answer (plan doc-mvdipuyqraas, L5).
  *   2026-10-16 -- The header counts 73 repository interfaces (it said 44). What a list returns, compared as a
@@ -1044,6 +1048,78 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect.soft(await storage.getPrincipalProviderClient('fake', ghii), `${name}: the owner's app client went too`).toBeTruthy();
 
             await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+
+    // The other direction of the same rule: a grant another party made TO the agent. The per-identity
+    // cascade is keyed by an owner column and cannot see one, and a GAII is rebuilt from a name that
+    // registration releases for reuse, so each of these handed the next agent of that name a grant
+    // nobody gave it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
+    it('deleteAgent clears the grants made TO the agent, and leaves a sibling\'s alone', async () => {
+        for (const { name, storage } of provs) {
+            const node = 'aimeat-conformance-001';
+            const tag = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const owner = `cxgrant${tag}`, grantor = `cxgrantor${tag}`;
+            const { gaii } = await seedOwner(storage, owner);
+            const { ghii: grantorGhii } = await seedOwner(storage, grantor);
+            const sibling = `other#${owner}@${node}`;
+            const now = new Date().toISOString();
+            await storage.createAgent({
+                name: 'other', owner, gaii: sibling, publicKey: 'pk', trustScore: 50, morselBalance: 0,
+                capabilities: [], createdAt: now, lastSeen: now,
+            });
+            // An agent this one registered: `registeredBy` is the fence on agent-initiated deletion.
+            const registered = `child#${owner}@${node}`;
+            await storage.createAgent({
+                name: 'child', owner, gaii: registered, publicKey: 'pk', trustScore: 50, morselBalance: 0,
+                capabilities: [], createdAt: now, lastSeen: now, registeredBy: gaii,
+            });
+            // Two consents of the OTHER owner: one to this agent, one to its sibling.
+            const consents: Record<string, string> = {};
+            for (const target of [gaii, sibling]) {
+                const id = randomUUID();
+                consents[target] = id;
+                await storage.createConsent({
+                    id, ownerGaii: grantorGhii, dataPattern: 'private.*', recipient: target,
+                    purpose: 'testing', scope: 'local', expires: null, status: 'active', grantedAt: now, revokedAt: null,
+                });
+            }
+            const orgId = `org-${tag}`;
+            await storage.createOrganism({
+                id: orgId, name: 'Grant probe', description: 'x', type: 'team', interests: [],
+                creatorGhii: grantor, createdBy: grantor, owners: [grantor], admins: [], members: [grantor],
+                agentGaiis: [gaii, sibling], boardId: `board-${tag}`, joinPolicy: 'invite_only', maxMembers: 10,
+                visibility: 'private', agentAccess: 'listed',
+                moderationConfig: { flagsEnabled: false, autoHideThreshold: 0, appealsEnabled: false },
+                memoryNamespace: `organism.${orgId}`, createdAt: now, updatedAt: now,
+            });
+            await storage.createBoard({
+                id: `board-${tag}`, name: 'Grant probe board', visibility: 'shared', ownerGaii: grantorGhii,
+                allowedGaiis: [gaii, sibling], createdAt: now,
+            });
+            const groupId = randomUUID();
+            await storage.createSharingGroup({
+                id: groupId, name: 'grant probe group', ownerGaii: grantorGhii,
+                members: [gaii, sibling].map(identifier => ({
+                    identifier, identifierType: 'gaii' as const,
+                    permissions: { read: true, write: false }, addedAt: now, addedBy: grantorGhii,
+                })),
+                defaultPermissions: { read: true, write: false }, createdAt: now, updatedAt: now,
+            });
+
+            await storage.deleteAgent(gaii);
+
+            const org = await storage.getOrganism(orgId);
+            const board = await storage.getBoard(`board-${tag}`);
+            const group = await storage.getSharingGroup(groupId);
+            expect.soft((await storage.getConsent(consents[gaii]))?.status, `${name}: the consent to the deleted agent is still active`).toBe('revoked');
+            expect.soft((await storage.getConsent(consents[sibling]))?.status, `${name}: the sibling's consent was revoked too`).toBe('active');
+            expect.soft(org?.agentGaiis, `${name}: the organism still admits the deleted agent`).toEqual([sibling]);
+            expect.soft(board?.allowedGaiis, `${name}: the board still admits the deleted agent`).toEqual([sibling]);
+            expect.soft(group?.members.map(m => m.identifier), `${name}: the sharing group still holds the deleted agent`).toEqual([sibling]);
+            expect.soft((await storage.getAgent(registered))?.registeredBy ?? null, `${name}: registeredBy still names the deleted agent`).toBeNull();
+
+            for (const who of [owner, grantor]) await storage.deleteOwner(who);
         }
     }, 60_000);
 

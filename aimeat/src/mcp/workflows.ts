@@ -11,6 +11,10 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-20 — aimeat_workflow_save clears the workflow's open trigger refusal, as PUT
+ *     /v1/workflows/:id does: the refusal pins the definition it refused, and "Run as me" on it
+ *     answers DEFINITION_CHANGED once the definition is replaced (secaudit 2026-10,
+ *     wf-run-as-owner-not-bound-to-refused-snapshot).
  *   2026-10-15 — aimeat_workflow_run in signals-only mode reads its run by id (getRun), as the REST
  *     route does; the run list it searched leaves checks out since 2026-08-30, so it answered empty
  *     steps and no status (feature-list audit #87).
@@ -57,6 +61,7 @@ import {
   saveWorkflow, getWorkflow, listWorkflows, listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
 import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
+import { clearRefusal } from '../services/workflow/trigger-authority.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
@@ -135,6 +140,10 @@ export function registerWorkflowTools(
       if (!result.ok) return err(`Validation failed:\n- ${(result.errors ?? []).join('\n- ')}`);
       const scheduler = getActiveScheduler();
       if (scheduler) await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhii, agentGaii);
+      // This definition replaces the one an open refusal pinned, so that refusal is over, as on the
+      // REST save: the next refusal is told anew, and "Run as me" on the old one refuses
+      // DEFINITION_CHANGED (services/workflow/trigger-authority.ts).
+      await clearRefusal(storage, config.nodeId, ownerGhii, a.id);
       // `warnings`: saved, and something in the definition did nothing (costCapMorsels), said where
       // the AI that saved it reads the answer.
       return text({

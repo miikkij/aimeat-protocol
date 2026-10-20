@@ -32,6 +32,28 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-20 -- The workspace readers (listSkills, listSkillLibraryPlain,
+ *     resolveSkillRef) leave out a copy whose OWNER may not write that workspace's content
+ *     (writtenByWsWriters in skill-records.ts), before freshest-wins. Defence in depth for secaudit
+ *     2026-10: a package install wrote `organism.<id>.w.<ws>.skills.*` with a raw setMemory under
+ *     the installer's identity, so an owner who is not a member of the organism planted a skill
+ *     that the members' agents then loaded as instructions. The install is refused at its own check
+ *     now (package-memory-component.ts), and a copy that reaches storage by any other path is no
+ *     longer served. The cost is one access check per distinct copy OWNER per workspace, not per
+ *     record, so a list of twenty skills from two publishers pays two.
+ *   v1.11.0 -- 2026-10-20 -- A WORKSPACE SKILL IS WORKSPACE CONTENT, so publishSkill and deleteSkill
+ *     ask the workspace WRITE rule (checkOrganismNamespaceAccess in write mode on the skill's
+ *     manifest key) after the membership gate. Both authorized the write with mayReadWs /
+ *     canReadWorkspace, which is the READ decision, so a `viewer` grant passed it: another member's
+ *     agents load a workspace skill as their operating instructions, freshest-wins across owners let
+ *     a viewer's copy replace the creator's, and the delete removed every member's copies (secaudit
+ *     2026-10, defect 2). DECIDED with it: the delete no longer removes other owners' copies for
+ *     everyone who may write. The workspace's registered creator and an organism manager remove
+ *     every copy, which is what the workspace meta rule already says about who administers the
+ *     workspace; a contributor removes their own copies and gets NOT_FOUND when they hold none. The
+ *     session the rules decide on travels on SkillAccessor.caller (skill-types.ts), which the REST
+ *     route and the MCP tool already build; a code path that hands none over is read as a scoped
+ *     principal, the stricter of the two.
  *   v1.10.0 -- 2026-10-18 -- publishSkill and setSkillVisibility write the manifest on the version they
  *     read (setMemoryIfVersion / createMemoryIfAbsent) and make the write again on a fresh read when
  *     another writer came between, so two publishes at the same moment get two versions and two
@@ -70,9 +92,10 @@ import { recordAccountEvent } from './account-events.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
+import { assertWsSkillWrite, mayActOnEveryWsSkillCopy, wsWriteCaller } from './skill-workspace-gate.js';
 import { localAccountName } from '../utils/gaii.js';
 import { showSkillRecords } from './skill-reader.js';
-import { listAcrossOwners, freshestByKey } from './skill-records.js';
+import { listAcrossOwners, freshestByKey, writtenByWsWriters } from './skill-records.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
 import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
 import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
@@ -137,6 +160,9 @@ async function mayReadWs(
   return canReadWorkspace(storage, config, organism, a.sub, a.ownerName ?? undefined, a.gaii, ws);
 }
 
+// The WRITE rule for a workspace skill is services/skill-workspace-gate.ts: reading a workspace is
+// not writing it, and a workspace skill is workspace content (secaudit 2026-10, defect 2).
+
 // The visibility gate shared by resolve and list is mayReadSkill (skill-audience.ts), with the
 // organisation level; it was mayRead here until 2026-10-17.
 
@@ -196,8 +222,12 @@ export async function publishSkill(
       throw new SkillValidationError('BAD_FIELD', 'A workspace-scope publish requires organismId and workspaceId');
     }
     org = opts.organismId; ws = opts.workspaceId;
-    const gate = await mayReadWs(storage, config, org, ws, opts.accessor ?? { ownerName: opts.owner ?? null });
+    const accessor = opts.accessor ?? { ownerName: opts.owner ?? null };
+    const gate = await mayReadWs(storage, config, org, ws, accessor);
     if (!gate) throw new SkillAccessError('FORBIDDEN', `Not a member of workspace ${org}/${ws}`);
+    // mayReadWs is the READ decision, which a viewer grant passes. Writing the skill asks the
+    // workspace WRITE rule as well, before the first record is written.
+    await assertWsSkillWrite(storage, config, org, ws, name, accessor);
   }
   // An organisation level names an organism the publisher is in; refused before the first write.
   await assertSkillVisibility(storage, opts.scope, opts.visibility, opts.accessor ?? { ownerName: opts.owner ?? null, sub: opts.publisher });
@@ -354,19 +384,25 @@ export interface DeleteSkillOpts {
 }
 
 /** Delete a skill (manifest + all file records). Caller enforces node/user authorization;
- *  workspace scope is membership-gated here and removes EVERY member's copies. */
+ *  workspace scope is membership- and write-gated here. The workspace's creator and an organism
+ *  manager remove EVERY member's copies; a contributor removes their own. */
 export async function deleteSkill(
   storage: Storage, config: AimeatConfig, scope: SkillScope, name: string, opts: DeleteSkillOpts = {},
 ): Promise<boolean> {
   if (scope === 'workspace') {
     if (!opts.org || !opts.ws) return false;
-    const gate = await mayReadWs(storage, config, opts.org, opts.ws, opts.accessor ?? { ownerName: opts.owner ?? null });
+    const accessor = opts.accessor ?? { ownerName: opts.owner ?? null };
+    const gate = await mayReadWs(storage, config, opts.org, opts.ws, accessor);
     if (!gate) throw new SkillAccessError('FORBIDDEN', `Not a member of workspace ${opts.org}/${opts.ws}`);
+    // As on publish: reading the workspace is not writing it.
+    await assertWsSkillWrite(storage, config, opts.org, opts.ws, name, accessor);
+    const everyCopy = await mayActOnEveryWsSkillCopy(storage, config, opts.org, opts.ws, accessor);
+    const mine = wsWriteCaller(config, accessor).owner;
     const records = [
       ...await listAcrossOwners(storage, wsManifestKey(opts.org, opts.ws, name)),
       ...await listAcrossOwners(storage, wsFilePrefix(opts.org, opts.ws, name)),
       ...await listAcrossOwners(storage, wsVersionPrefix(opts.org, opts.ws, name)),
-    ];
+    ].filter(r => everyCopy || localAccountName(r.ownerGaii) === mine);
     if (records.length === 0) return false;
     for (const r of records) await storage.deleteMemory(r.ownerGaii, r.key);
     return true;
@@ -394,7 +430,9 @@ export async function listSkills(
     const gate = await mayReadWs(storage, config, wsTarget.org, wsTarget.ws, accessor);
     if (!gate) return [];
     const prefix = `organism.${wsTarget.org}.w.${wsTarget.ws}.skills.`;
-    const records = (await listAcrossOwners(storage, prefix)).filter(r => WS_MANIFEST_KEY_RE.test(r.key));
+    // A copy whose owner may not write this workspace's content is not one of its skills.
+    const records = await writtenByWsWriters({ storage, config }, wsTarget.org, wsTarget.ws,
+      (await listAcrossOwners(storage, prefix)).filter(r => WS_MANIFEST_KEY_RE.test(r.key)));
     // The check runs after freshest-wins, so a hidden newest copy never lets an older one through.
     return (await showSkillRecords({ storage, config }, accessor, [...freshestByKey(records).values()]))
       .map(r => toSummary(r, 'workspace', null, wsTarget.org, wsTarget.ws));
@@ -489,7 +527,9 @@ async function listSkillLibraryPlain(
       for (const [wsId, wsRecords] of byWs) {
         const gate = await mayReadWs(storage, config, m.organismId, wsId, accessor);
         if (!gate) continue;
-        for (const r of await showSkillRecords({ storage, config }, accessor, [...freshestByKey(wsRecords).values()])) {
+        // A copy whose owner may not write this workspace's content is not one of its skills.
+        const written = await writtenByWsWriters({ storage, config }, m.organismId, wsId, wsRecords);
+        for (const r of await showSkillRecords({ storage, config }, accessor, [...freshestByKey(written).values()])) {
           workspace.push(toSummary(r, 'workspace', null, m.organismId, wsId));
         }
       }
@@ -514,7 +554,9 @@ export async function resolveSkillRef(
     if (!await mayReadWs(storage, config, org!, ws!, accessor)) {
       throw new SkillAccessError('FORBIDDEN', `Not allowed to read skill: ${refStr}`);
     }
-    const copies = await listAcrossOwners(storage, wsManifestKey(org!, ws!, name));
+    // A copy whose owner may not write this workspace's content is not one of its skills.
+    const copies = await writtenByWsWriters({ storage, config }, org!, ws!,
+      await listAcrossOwners(storage, wsManifestKey(org!, ws!, name)));
     const freshest = freshestByKey(copies).get(wsManifestKey(org!, ws!, name));
     const [record] = freshest ? await showSkillRecords({ storage, config }, accessor, [freshest]) : [];
     if (!record) throw new SkillAccessError('NOT_FOUND', `Skill not found: ${refStr}`);
@@ -525,7 +567,8 @@ export async function resolveSkillRef(
     // Read the file records published alongside THIS manifest copy (same owner).
     const fileContents = opts.manifestOnly ? {} : await readFileBodies(storage, config, accessor,
       record.ownerGaii, summary.files.map(f => [f.path, wsFileKey(org!, ws!, name, f.path)]));
-    const versions = retainedVersions(await listAcrossOwners(storage, wsVersionPrefix(org!, ws!, name)), wsVersionPrefix(org!, ws!, name));
+    const versions = retainedVersions(await writtenByWsWriters({ storage, config }, org!, ws!,
+      await listAcrossOwners(storage, wsVersionPrefix(org!, ws!, name))), wsVersionPrefix(org!, ws!, name));
     return { ...summary, fileContents, versions };
   }
 

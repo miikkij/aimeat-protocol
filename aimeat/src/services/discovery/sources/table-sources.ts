@@ -17,10 +17,14 @@
  * @version-history
  *   v0.1.0 — 2026-06-23 — Phase 2: capabilities / apps / agent-task adapters (design doc 2026-06-23).
  *   v0.2.0 — 2026-08-19 — the apps source takes AppSummaryRecord — it reads identity and manifest, never content.
+ *   v0.3.0 — 2026-10-20 — The agent-tasks source asks who the caller is: the owner in person and an
+ *     app grant with task:read get the owner-wide list, an agent gets its own tasks only, anything
+ *     else gets none — the rule GET /v1/agents/:name/tasks already enforced (secaudit 2026-10).
  */
 import type { AimeatConfig } from '../../../config.js';
 import type { Storage, CapabilityRecord, AppSummaryRecord, AgentTaskRecord } from '../../../storage/interface.js';
 import { parseGaiiLoose } from '../../../utils/gaii.js';
+import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { normalizeTags, normalizeVisibility, parkedToVisibility, toFullOwner } from '../normalize.js';
 
@@ -122,7 +126,19 @@ export function createAgentTasksSource(storage: Storage, config: AimeatConfig): 
     async enumerate(ctx) {
       // Owner-only records: present in the owner's own scope, never in public or shared.
       if (ctx.scope !== 'own' || !ctx.caller.ownerName) return [];
-      const { tasks } = await storage.listAgentTasksByOwner(ghiiOf(ctx, config), { perPage: limitOf(ctx) });
+      // THE SAME RULE AS GET /v1/agents/:name/tasks (routes/agent-tasks/create-read.ts). The owner in
+      // person, and an app grant holding task:read, read the owner-wide list; an agent reads its own
+      // tasks and no sibling's; anything else reads none. Until 2026-10-20 the only tests here were
+      // the scope and a non-empty owner name, so one agent read every sibling agent's task title and
+      // description through /v1/discover and MCP aimeat_discover, while the direct route answered
+      // 403 to the same token (secaudit 2026-10).
+      const ownerWide = ctx.caller.isOwnerSession
+        || (ctx.caller.isApp && scopeIsCovered(ctx.caller.scopes, 'task:read'));
+      const isAgent = !ctx.caller.isOwnerSession && !ctx.caller.isApp && !ctx.caller.isEcosystem && !!ctx.caller.gaii;
+      if (!ownerWide && !isAgent) return [];
+      const { tasks } = ownerWide
+        ? await storage.listAgentTasksByOwner(ghiiOf(ctx, config), { perPage: limitOf(ctx) })
+        : await storage.listAgentTasks(ctx.caller.gaii, { perPage: limitOf(ctx) });
       // No native text search on tasks — apply the free-text query client-side over title/description.
       const q = ctx.filters.q?.trim().toLowerCase();
       const matched = q

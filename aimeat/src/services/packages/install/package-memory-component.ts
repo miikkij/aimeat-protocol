@@ -12,6 +12,17 @@
  *   owner's own hand, and pressing install is not the owner writing them. Each door that registers a
  *   component asks reservedKeysInComponent() for every component before it writes anything.
  *
+ *   TWO MORE PREFIXES ARE REFUSED THE SAME WAY, for the same reason: the entry key is the package
+ *   author's text, and these two prefixes are read as instructions rather than as data.
+ *   - `skills.` is the installer's skill registry. A bare skill name resolves `user:<owner>/<name>`
+ *     before `node:<name>`, so a record written here is served to the installer's AI as the node's
+ *     own guide. A package places a skill through a `skill` component, which refuses a node
+ *     built-in's name (package-skill-component.ts) and counts as code (packages:install-code).
+ *   - `organism.` is an organism's shared namespace, where membership decides who writes
+ *     (services/organism-namespace-access.ts), and a workspace is provisioned through its own
+ *     routes rather than by a package. POST /v1/memory refuses the same key to a caller that is not
+ *     an active member with write rights, and pressing install is not membership.
+ *
  *   The keys land in the OWNER's namespace whoever presses install, so the writing itself costs what
  *   the memory door asks for a write into it: memoryComponentWriteRefusal(), asked by the same doors
  *   at the same moment.
@@ -31,6 +42,20 @@
  *   const reserved = reservedKeysInComponent(comp.type, comp.content, registeredAs);
  *   if (reserved.length > 0) return refusal;   // before the first write
  * @version-history
+ *   v1.4.0 — 2026-10-20 — A memory component may write neither `skills.` nor `organism.` keys
+ *     (secaudit 2026-10, defects `component-registrar.ts:memory-component:organism-workspace-skill-
+ *     key-write` and `reservedKeysInComponent:skill-registry-keys-unguarded`). A non-member owner
+ *     installed a package whose entries wrote `organism.<id>.w.<ws>.skills.<name>.manifest` and
+ *     `.files.SKILL.md`, and the workspace skill readers then served that text to the organism's
+ *     members as their operating instructions, while POST /v1/memory refused the same key 403. A
+ *     memory component also wrote `skills.<a node built-in>.*`, which a `skill` component is
+ *     refused by name. WHICH OF THE TWO REMEDIES: `organism.` is refused outright rather than
+ *     measured with checkOrganismNamespaceAccess against the installing principal. The check stays
+ *     synchronous and caller-free, so all three registering paths (package-install.ts, this
+ *     registrar including its dry run, package-migrate.ts) keep asking the one check they already
+ *     ask, and the answer cannot differ between them; a workspace is provisioned through its own
+ *     routes, so nothing legitimate loses a road. A package that wants to seed an organism's
+ *     workspace writes it through the workspace routes after the install.
  *   v1.3.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 — 2026-09-30 — A skill component costs memory:write, what POST /v1/skills asks; an
  *     ecosystem app is refused it as it is a memory component.
@@ -63,10 +88,26 @@ export function memoryComponentEntries(content: string, registeredAs: string): M
     return parsed.entries ?? [{ key: registeredAs, value: parsed }];
 }
 
+/** The installer's skill registry (services/skills.ts): a skill arrives through a `skill` component. */
+const SKILL_REGISTRY_PREFIX = 'skills.';
+/** An organism's namespace (services/organism-namespace-access.ts): membership decides who writes there. */
+const ORGANISM_NAMESPACE_PREFIX = 'organism.';
+
+/** Why one key is refused, which is what the message says and the only thing it varies on. */
+type RefusedKind = 'trusted' | 'registry' | 'organism';
+
+function refusedKind(key: string): RefusedKind | null {
+    if (isReservedServerKey(key)) return 'trusted';
+    if (key.startsWith(SKILL_REGISTRY_PREFIX)) return 'registry';
+    if (key.startsWith(ORGANISM_NAMESPACE_PREFIX)) return 'organism';
+    return null;
+}
+
 /**
- * The keys this component would write that the node itself reads and trusts. Empty for every other
- * component type, and for a body the registrar cannot read as a list of entries: that refusal is the
- * registrar's to give, with its own reason.
+ * The keys this component would write that a package may not write: one the node itself reads and
+ * trusts, one in the installer's skill registry, and one in an organism's namespace (the file header
+ * says why each). Empty for every other component type, and for a body the registrar cannot read as
+ * a list of entries: that refusal is the registrar's to give, with its own reason.
  */
 export function reservedKeysInComponent(type: PackageComponentType, content: string, registeredAs: string): string[] {
     if (type !== 'memory') return [];
@@ -76,14 +117,29 @@ export function reservedKeysInComponent(type: PackageComponentType, content: str
     if (!Array.isArray(entries)) return [];
     return entries
         .map(e => (e && typeof e === 'object' ? (e as { key?: unknown }).key : undefined))
-        .filter((k): k is string => typeof k === 'string' && isReservedServerKey(k));
+        .filter((k): k is string => typeof k === 'string' && refusedKind(k) !== null);
 }
 
 /** The refusal, worded once for the three doors that give it: which component, and which keys. */
 export function reservedComponentMessage(componentId: string, keys: string[]): string {
-    const named = keys.map(k => `"${k}"`).join(', ');
-    return `Component "${componentId}" would write ${named}. This node reads ${keys.length === 1 ? 'that key' : 'those keys'} `
-        + 'to decide what it does, so a package cannot write them for the account that installs it.';
+    const named = (kind: RefusedKind) => keys.filter(k => refusedKind(k) === kind).map(k => `"${k}"`).join(', ');
+    const trusted = named('trusted');
+    const registry = named('registry');
+    const organism = named('organism');
+    const parts: string[] = [];
+    if (trusted) {
+        parts.push(`Component "${componentId}" would write ${trusted}. This node reads ${trusted.includes(',') ? 'those keys' : 'that key'} `
+            + 'to decide what it does, so a package cannot write them for the account that installs it.');
+    }
+    if (registry) {
+        parts.push(`Component "${componentId}" would write ${registry}, which is the skill registry of the account that installs it. `
+            + 'A package adds a skill through a skill component, which is refused when it carries the name of one of this node\'s own skills.');
+    }
+    if (organism) {
+        parts.push(`Component "${componentId}" would write ${organism}, which belongs to an organism and its members. `
+            + 'Installing a package is not membership, so a package cannot write there; the workspace routes do that after the install.');
+    }
+    return parts.join(' ');
 }
 
 /** Who registers the components, in the terms every install and migration door can supply. */

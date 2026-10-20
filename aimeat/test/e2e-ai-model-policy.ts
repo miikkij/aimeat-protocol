@@ -19,6 +19,9 @@
  *   - 1-11: the eleven cases of 09 section 2, in that order
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-model-policy.ts
  * @version-history
+ *   v1.3.0 — 2026-10-20 — Test 14: a scheduled ai job's answer goes through the shared memory write
+ *     service, so an output key naming a shared space that does not exist fails the run and stores
+ *     nothing, while an ordinary key still writes with its visibility and tags (secaudit 2026-10).
  *   v1.2.0 — 2026-10-12 — Test 13: policy-grant.html declares task:write in its aimeat-scopes meta and
  *     the grant that makes the schedule asks ai:use task:write, because node 4.0.0 asks task:write on
  *     POST /v1/schedules (REST scope gates); the grants of tests 9-12 still ask ai:use alone.
@@ -394,6 +397,44 @@ const toolJson = (r: any) => JSON.parse(r?.result?.content?.[0]?.text ?? '{}');
       assert(/no longer holds your permission/.test(JSON.stringify(second.body.data)),
         `a revoked app's schedule does not run: ${JSON.stringify(second.body.data?.outcome)} ${JSON.stringify(second.body.data?.reason ?? second.body.data?.schedule?.lastRunError)}`);
       await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth(a.token) });
+    });
+
+    await test('14. an ai schedule\'s answer is written through the memory rules, not straight to storage (secaudit 2026-10)', async () => {
+      // Until 2026-10-20 the fire stored the model's answer with a raw storage.setMemory, so no
+      // audience rule a memory write has was asked: no organism membership check, no publish gate,
+      // no label audience cap, and no organism namespace rule for an `organism.*` output key. The
+      // output key below names an organism that does not exist, which the namespace rule refuses
+      // and a raw write did not. Nothing is stored and the run is recorded as failed.
+      const orphan = `organism.no-such-organism-${Date.now()}.w.ws.answer`;
+      const bad = await json('/v1/schedules', { method: 'POST', headers: auth(a.token), body: JSON.stringify({
+        kind: 'ai', cron: '0 4 * * *', display_name: 'answer into a shared space that is not there',
+        prompt: 'Say one word.', model: 'stub/good-model', input_keys: [], output_key: orphan,
+      }) });
+      assert(bad.status === 201, `schedule ${bad.status}: ${JSON.stringify(bad.body?.error)}`);
+      const badId = bad.body.data.schedule?.id ?? bad.body.data.id;
+      const fired = await json(`/v1/schedules/${badId}/trigger`, { method: 'POST', headers: auth(a.token) });
+      assert(fired.status === 200, `trigger ${fired.status}: ${JSON.stringify(fired.body?.error)}`);
+      assert(fired.body.data.outcome === 'error', `the fire wrote it anyway: ${JSON.stringify(fired.body.data)}`);
+      const stored = await json(`/v1/memory/${encodeURIComponent(orphan)}`, { headers: auth(a.token) });
+      assert(stored.status === 404, `the answer landed in a space that does not exist: ${stored.status}`);
+
+      // The positive control: the same schedule with an ordinary key writes, as it always did.
+      const good = await json('/v1/schedules', { method: 'POST', headers: auth(a.token), body: JSON.stringify({
+        kind: 'ai', cron: '0 4 * * *', display_name: 'answer into the owner\'s own key',
+        prompt: 'Say one word.', model: 'stub/good-model', input_keys: [], output_key: 'policy-sched.plain',
+        output_visibility: 'owner',
+      }) });
+      assert(good.status === 201, `schedule ${good.status}: ${JSON.stringify(good.body?.error)}`);
+      const goodId = good.body.data.schedule?.id ?? good.body.data.id;
+      const ran = await json(`/v1/schedules/${goodId}/trigger`, { method: 'POST', headers: auth(a.token) });
+      assert(ran.status === 200 && ran.body.data.outcome === 'ran', `the ordinary fire failed: ${JSON.stringify(ran.body.data)}`);
+      const wrote = await json('/v1/memory/policy-sched.plain', { headers: auth(a.token) });
+      assert(wrote.status === 200, `the answer was not stored: ${wrote.status} ${JSON.stringify(wrote.body?.error)}`);
+      assert(wrote.body.data.visibility === 'owner', `the visibility the schedule named was not kept: ${wrote.body.data.visibility}`);
+      assert(Array.isArray(wrote.body.data.tags) && wrote.body.data.tags.includes('ai-output'), `the tags were lost: ${JSON.stringify(wrote.body.data.tags)}`);
+
+      await json(`/v1/schedules/${badId}`, { method: 'DELETE', headers: auth(a.token) });
+      await json(`/v1/schedules/${goodId}`, { method: 'DELETE', headers: auth(a.token) });
     });
   } finally {
     await stopServer(server);

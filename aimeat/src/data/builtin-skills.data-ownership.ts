@@ -27,6 +27,13 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-20 — Section 5: a restore passes the visibility rules a write passes, so putting a public
+ *     record back can answer PUBLISH_NOT_ALLOWED or LABEL_CAPS_AUDIENCE, or come back at members on a
+ *     closed node. Each is named, because an agent that cannot explain the refusal reads it as the
+ *     person's mistake (secaudit 2026-10, services/memory-bin.ts).
+ *   2026-10-20 — Section 6: erasure takes the person out of every group's member list, and a group
+ *     they alone own goes to one of its admins or members; when nobody is left, the operator seats
+ *     a new owner. Say both before they erase (secaudit 2026-10, services/owner-erasure.ts v1.12.0).
  *   2026-10-18 — An imported entry wider than its classification allows fails with LABEL_CAPS_AUDIENCE (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — A copy keeps the source's effective classification, its workspace's or organism's when higher (plan doc-mvdipuyqraas, L1.3).
  *   2026-10-18 — The rule underneath: on a node closed to strangers a public write is saved for the signed-in accounts (plan V1.6).
@@ -160,6 +167,15 @@ What an export leaves out, and why:
   \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
   holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
   amount (\`tollMorsels\`) instead.
+- A record that went into the bin PUBLIC comes back out through the same visibility rules a write
+  passes, so putting it back can be refused where deleting it was not. \`PUBLISH_NOT_ALLOWED\` means
+  this node asks the person before anything of theirs goes public and you are not one of the
+  principals it lets decide: the record stays in the bin for the rest of its window, and the two ways
+  on are the person restoring it themselves or you writing the content again, which files a request
+  they approve. \`LABEL_CAPS_AUDIENCE\` means its classification label does not allow that audience,
+  and that one refuses the person too. On a node closed to strangers a public record comes back at
+  \`members\` instead of public, with no refusal. Say which of these happened; none of them is a
+  mistake the person made.
 - Both act on your own records. With \`owner_scope: true\` they also reach a record another agent of
   the same person wrote, and a record stored under the person's own identity when you hold
   \`memory:write-as-owner\` (the permission a write with \`owner_scope\` needs). A \`NOT_FOUND\` that
@@ -227,9 +243,15 @@ let knowledge age, and you should offer them, not wait to be asked:
   they want to keep. Then erasure: \`DELETE /v1/owners/{name}\` from their own signed-in session,
   which no MCP tool and no page offers today. **It is immediate and has no window.** It removes the
   account, every agent, all their memory and files, consents, memberships, schedules, connections and
-  apps. What stays, under a pseudonym: finished work and disputes (the other party has a right to
-  them), other people's ledger lines and receipts, and AI provenance records. Their name becomes free
-  for someone else.
+  apps. It also takes their name out of every group's list of owners, admins and members, and takes
+  back what other people granted to them and to their agents. What stays, under a pseudonym: finished
+  work and disputes (the other party has a right to them), other people's ledger lines and receipts,
+  and AI provenance records. Their name becomes free for someone else.
+- **A group they alone own** cannot be left without an owner, and an erasure cannot ask. It goes to
+  the first admin, or else to the first member, and that person becomes its creator. When nobody at
+  all is left, nobody holds it and the people who run the node seat a new owner. Tell the person
+  which groups this will happen to before they erase, and say they can hand a group over first
+  (\`POST /v1/organisms/{id}/transfer\`) if they want to choose who gets it.
 - **Moving to another AIMEAT node.** There is no one-step move today: export here, import there
   (memory, organisms, apps, agents), connect their AI to the new node, and then erase here.
 

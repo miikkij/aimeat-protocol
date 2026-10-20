@@ -25,8 +25,17 @@
  *   Phase 11 401 and 403 on every door
  *   Phase 12 erasure: a name registered again inherits no action published in person, no work, no
  *            line in the other side's ledger, no cortex and no ecosystem app
+ *   Phase 13 another owner's agent, named by its whole identity
+ *   Phase 14 what a removal has to reach: the organism membership of an erased account, and the
+ *            grants another party made to a deleted agent's exact GAII
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
+ *   v1.14.0 — 2026-10-20 — Phase 14. 67: an erased account's organism membership and its entries in
+ *     owners/admins/members go, so the name registered again is refused the workspace list and the
+ *     creator/admin invitations list, with a non-member and a member who stayed as the two controls.
+ *     68: a deleted agent's grants go with it — another owner's consent to its exact GAII and an
+ *     organism that lists it — and both work again when they are made again (secaudit 2026-10,
+ *     eraseOwner:memberships-by-ghii-not-bare-name and agent-delete:gaii-keyed-grants-outlive-agent).
  *   2026-10-15 — Test 22: the 402 names the owner's balance and the fee. Test 22b: the porting path's
  *     pointer is in no agent's memory any more (a system namespace the agent's deletion leaves in place),
  *     which it asserted the other way (feature-list audit #35). Test 62's positive control agent holds
@@ -1618,6 +1627,143 @@ await test('66. The owner still reaches their own agent by its whole identity', 
         assert(r.status === 200 || (r.status === 404 && path.endsWith('/onboarding')),
             `A reading its own agent at ${path.replace(g, '<GAII>')}: ${r.status} ${JSON.stringify(r.body?.error)}`);
     }
+});
+
+// ─── Phase 14 — what a removal has to reach ───
+// Two sides of the same defect: a deleted name is released for reuse, so anything that NAMES the
+// erased account or the deleted agent is a grant the next holder of that name walks into. Phase 12
+// above covers what the erased party OWNED; these two cover what OTHERS gave it.
+console.log('Phase 14 — what a removal has to reach');
+
+await test('67. An erased account keeps no organism membership, so the name registered again is no member and no admin', async () => {
+    const host = await setupOwner('orghost');        // holds the organism
+    const victim = await setupOwner('orgadmin');     // the admin whose account is erased
+    const keeper = await setupOwner('orgkeep');      // a member who stays, the positive control
+    const stranger = await setupOwner('orgout');     // never a member, the negative control
+
+    const made = await json('/v1/organisms', {
+        method: 'POST', headers: auth(host.token),
+        body: JSON.stringify({ name: `Erasure probe ${Date.now().toString(36)}`, description: 'Membership after erasure', type: 'team', visibility: 'private' }),
+    });
+    assert(made.status === 201, `create organism ${made.status}: ${JSON.stringify(made.body?.error)}`);
+    const orgId = made.body.data.organism.id as string;
+
+    for (const [who, role] of [[victim, 'admin'], [keeper, 'member']] as const) {
+        const add = await json(`/v1/organisms/${orgId}/members`, {
+            method: 'POST', headers: auth(host.token), body: JSON.stringify({ ghii: who.name, role }),
+        });
+        assert(add.status === 201, `add ${role} ${add.status}: ${JSON.stringify(add.body?.error)}`);
+    }
+    // The admin reads both doors before the erasure, or the 403s below would prove nothing.
+    const wsBefore = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(victim.token) });
+    const invBefore = await json(`/v1/organisms/${orgId}/invitations`, { headers: auth(victim.token) });
+    assert(wsBefore.status === 200, `the admin lists workspaces before: ${wsBefore.status}`);
+    assert(invBefore.status === 200, `the admin lists invitations before: ${invBefore.status}`);
+
+    const erased = await json(`/v1/owners/${victim.name}`, { method: 'DELETE', headers: auth(victim.token) });
+    assert(erased.status === 200, `erase ${erased.status}: ${JSON.stringify(erased.body?.error)}`);
+    const log: string[] = erased.body.data?.deletion_log ?? [];
+    assert(log.some(e => e.startsWith('memberships:')), `the deletion log records the memberships: ${JSON.stringify(log)}`);
+
+    const again = await registerAgain(victim.name);
+    const ws = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(again.token) });
+    const inv = await json(`/v1/organisms/${orgId}/invitations`, { headers: auth(again.token) });
+    const wsOut = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(stranger.token) });
+    const invOut = await json(`/v1/organisms/${orgId}/invitations`, { headers: auth(stranger.token) });
+    const wsKeep = await json(`/v1/organisms/${orgId}/workspaces`, { headers: auth(keeper.token) });
+    const roster = await json(`/v1/organisms/${orgId}/members`, { headers: auth(host.token) });
+    const record = await json(`/v1/organisms/${orgId}`, { headers: auth(host.token) });
+
+    // Clean up before asserting, so one failing run leaves nothing behind.
+    await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth(host.token) });
+    for (const who of [again, host, keeper, stranger]) {
+        await json(`/v1/owners/${who.name}`, { method: 'DELETE', headers: auth(who.token) });
+    }
+
+    assert(ws.status === 403, `the new holder of the name listed the workspaces: ${ws.status} ${JSON.stringify(ws.body?.data ?? ws.body?.error)}`);
+    assert(inv.status === 403, `the new holder of the name listed the invitations: ${inv.status} ${JSON.stringify(inv.body?.data ?? inv.body?.error)}`);
+    assert(wsOut.status === 403 && invOut.status === 403, `the non-member control: ${wsOut.status}/${invOut.status}`);
+    assert(wsKeep.status === 200, `the member who stayed lost the workspaces: ${wsKeep.status} ${JSON.stringify(wsKeep.body?.error)}`);
+    const rows = (roster.body.data?.members ?? []) as Array<{ ghii?: string }>;
+    assert(!rows.some(m => m.ghii === victim.name), `a membership row survived the erasure: ${JSON.stringify(rows)}`);
+    const org = record.body.data?.organism ?? {};
+    for (const field of ['owners', 'admins', 'members'] as const) {
+        assert(!((org[field] ?? []) as string[]).includes(victim.name), `${field} still names the erased account: ${JSON.stringify(org[field])}`);
+    }
+});
+
+await test('68. A deleted agent takes its grants with it, so an agent re-created under the same name starts with none', async () => {
+    const x = await setupOwner('grantee');   // owns the agent and the organism
+    const y = await setupOwner('grantor');   // another owner, who grants to the agent by its exact GAII
+    const key = `acctdoor.grant.${Date.now().toString(36)}`;
+    const write = await json('/v1/memory', {
+        method: 'POST', headers: auth(y.token),
+        body: JSON.stringify({ key, value: { secret: 'the grantor\'s own record' }, visibility: 'private' }),
+    });
+    assert(write.status === 201, `the grantor's record ${write.status}: ${JSON.stringify(write.body?.error)}`);
+    const yGhii = `${y.name}@${NODE_ID}`;
+    const grant = () => json('/v1/consent', {
+        method: 'POST', headers: auth(y.token),
+        body: JSON.stringify({ data_pattern: key, recipient: `granted#${x.name}@${NODE_ID}`, purpose: 'testing', scope: 'local' }),
+    });
+
+    const words = ['memory:read', 'organism:read'];
+    let agent = await setupAgent(x, 'granted', words);
+    const firstGrant = await grant();
+    assert(firstGrant.status === 201, `consent ${firstGrant.status}: ${JSON.stringify(firstGrant.body?.error)}`);
+
+    // An organism that admits only the agents on its list, so the list is the whole of the agent's
+    // access and nothing it inherits from its owner's membership can stand in for it.
+    const made = await json('/v1/organisms', {
+        method: 'POST', headers: auth(x.token),
+        body: JSON.stringify({ name: `Agent grant probe ${Date.now().toString(36)}`, description: 'Grants after an agent is deleted', type: 'team', visibility: 'private' }),
+    });
+    assert(made.status === 201, `create organism ${made.status}: ${JSON.stringify(made.body?.error)}`);
+    const orgId = made.body.data.organism.id as string;
+    const listedOnly = await json(`/v1/organisms/${orgId}`, {
+        method: 'PUT', headers: auth(x.token), body: JSON.stringify({ agent_access: 'listed' }),
+    });
+    assert(listedOnly.status === 200 && listedOnly.body.data?.organism?.agentAccess === 'listed',
+        `agent_access listed ${listedOnly.status}: ${JSON.stringify(listedOnly.body?.error ?? listedOnly.body?.data?.organism?.agentAccess)}`);
+    const attach = () => json(`/v1/organisms/${orgId}/agents`, {
+        method: 'POST', headers: auth(x.token), body: JSON.stringify({ agent_gaii: `granted#${x.name}@${NODE_ID}` }),
+    });
+    const firstAttach = await attach();
+    assert(firstAttach.status === 201, `attach ${firstAttach.status}: ${JSON.stringify(firstAttach.body?.error)}`);
+
+    const readKey = `/v1/memory/${encodeURIComponent(yGhii)}/${encodeURIComponent(key)}`;
+    const orgRead = `/v1/organisms/${orgId}/workspaces`;
+    const beforeRead = await json(readKey, { headers: auth(agent.token) });
+    const beforeOrg = await json(orgRead, { headers: auth(agent.token) });
+    assert(beforeRead.status === 200, `the agent reads the granted record before: ${beforeRead.status} ${JSON.stringify(beforeRead.body?.error)}`);
+    assert(beforeOrg.status === 200, `the listed agent reads the organism before: ${beforeOrg.status} ${JSON.stringify(beforeOrg.body?.error)}`);
+
+    const gone = await json('/v1/agents/granted', { method: 'DELETE', headers: auth(x.token) });
+    assert(gone.status === 200, `delete agent ${gone.status}: ${JSON.stringify(gone.body?.error)}`);
+
+    // The same name again: the GAII is rebuilt from it, so on an unfixed node this agent walks into
+    // both grants without the grantor or the organism doing anything.
+    agent = await setupAgent(x, 'granted', words);
+    assert(agent.gaii === `granted#${x.name}@${NODE_ID}`, `the new agent's GAII: ${agent.gaii}`);
+    const afterRead = await json(readKey, { headers: auth(agent.token) });
+    const afterOrg = await json(orgRead, { headers: auth(agent.token) });
+
+    // Positive control: the grantor and the organism give it again, and both work.
+    const secondGrant = await grant();
+    const secondAttach = await attach();
+    const regranted = await json(readKey, { headers: auth(agent.token) });
+    const reattached = await json(orgRead, { headers: auth(agent.token) });
+
+    await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth(x.token) });
+    for (const who of [x, y]) await json(`/v1/owners/${who.name}`, { method: 'DELETE', headers: auth(who.token) });
+
+    assert(afterRead.status === 403, `the new agent read the grantor's record on the old consent: ${afterRead.status} ${JSON.stringify(afterRead.body?.data ?? afterRead.body?.error)}`);
+    assert(afterOrg.status === 403 && afterOrg.body.error?.code === 'AGENT_NOT_ADMITTED',
+        `the new agent was still on the organism's list: ${afterOrg.status} ${afterOrg.body.error?.code}`);
+    assert(secondGrant.status === 201 && secondAttach.status === 201,
+        `the grants could not be made again: consent ${secondGrant.status}, attach ${secondAttach.status}`);
+    assert(regranted.status === 200, `the re-made consent does not work: ${regranted.status} ${JSON.stringify(regranted.body?.error)}`);
+    assert(reattached.status === 200, `the re-made attachment does not work: ${reattached.status} ${JSON.stringify(reattached.body?.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

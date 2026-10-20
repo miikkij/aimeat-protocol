@@ -11,9 +11,17 @@
  *   through the consent guard — so a personal backup captures your content + anything you're granted.
  * @structure
  *   - WS_EXPORT_VERSION, WorkspaceExportJson
- *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, exportedAt }) -> { buffer, filename }
+ *   - exportWorkspace(storage, config, { orgId, ws, exporterGaii, callerSub, exportedAt }) -> { buffer, filename }
  * @usage import { exportWorkspace } from '../services/workspace-export.js';
  * @version-history
+ *   2026-10-20 -- `callerSub`, the CALLER's resolved principal, which is not always the identity the
+ *     export reads as: the organism bundle exports as the member's owner GHII. An ecosystem app is
+ *     held to its owner-granted read data-areas on the workspace manifest, the gate the live read
+ *     makes (workspace-access.ts Gate 3) and the owner identity skipped, so a GEAI exported
+ *     workspaces its data areas did not cover (secaudit 2026-10,
+ *     organism-export:owner-identity-drops-geai-data-area-gate). The bundle's records also pass the
+ *     credential mask, so a workspace share leaves with `has_password` and not its scrypt hash
+ *     (secaudit 2026-10, collectWorkspace:share-password-hash-unmasked).
  *   2026-10-16 -- The export reads every memory record of the workspace, page by page
  *     (storage/memory-pages.ts), up to EXPORT_RECORD_LIMIT (200 000), which is named in `truncated`
  *     when reached. It read one window of 10 000 in key order, so a larger workspace lost its tail,
@@ -49,7 +57,9 @@ import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
-import { localAccountName, localAccountOf } from '../utils/gaii.js';
+import { localAccountName, localAccountOf, isGEAI } from '../utils/gaii.js';
+import { ecoMayReadKey } from './ecosystem-access.js';
+import { shownMemoryValue } from './secret-records.js';
 import { workspaceMetaReader } from './workspace-meta.js';
 import { decideWorkspaceRead } from './workspace-access.js';
 import { memoryTarget, fileTarget } from './classification/labels.js';
@@ -113,9 +123,14 @@ const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 export async function collectWorkspace(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean; reader: ContentReader },
+  opts: {
+    orgId: string; ws: string; exporterGaii: string;
+    /** The CALLER's resolved principal, which `exporterGaii` is not on the organism bundle path. */
+    callerSub: string;
+    exportedAt: string; isOrgManager?: boolean; reader: ContentReader;
+  },
 ): Promise<{ json: WorkspaceExportJson; images: Map<string, Buffer> }> {
-  const { orgId, ws, exporterGaii, exportedAt, reader } = opts;
+  const { orgId, ws, exporterGaii, callerSub, exportedAt, reader } = opts;
   const root = `organism.${orgId}.w.${ws}`;
 
   // An owner-level exporter (GHII, no '#') who is an active member of the organism reads the whole
@@ -150,6 +165,15 @@ export async function collectWorkspace(
   const metaReader = workspaceMetaReader(storage, orgId, config.nodeId);
   const manifestRec = await metaReader.pick(ws, 'meta.manifest', items);
   const organism = await storage.getOrganism(orgId);
+  // SECURITY (secaudit 2026-10): an ecosystem app rides its owner's organism membership, so the one
+  // thing that makes the owner-granted read data-area bite is this check — Gate 3 of the live read
+  // (services/workspace-access.ts). It is asked HERE, on the caller's own principal, because the
+  // organism bundle reads as the member's owner GHII and that identity never reaches Gate 3: a GEAI
+  // exported workspaces its data areas did not cover, while the live read of the same workspace with
+  // the same token returned nothing. Before the isOrgManager shortcut, which is about the OWNER.
+  if (isGEAI(callerSub) && !(manifestRec && await ecoMayReadKey(storage, callerSub, manifestRec.key))) {
+    throw new WorkspaceNotReadableError(orgId, ws);
+  }
   const canReadWorkspace = opts.isOrgManager === true || (!!organism && (await decideWorkspaceRead(storage, config, organism,
     exporterGaii, localAccountOf(exporterGaii) ?? undefined, exporterGaii, ws, { manRec: manifestRec })).canRead);
   if (!canReadWorkspace) throw new WorkspaceNotReadableError(orgId, ws);
@@ -165,7 +189,13 @@ export async function collectWorkspace(
   // What stays behind is named in the bundle's `leftOut` (TARGET-082 review): the exporter is a
   // member who may see the keys, and a backup that is silently smaller than the workspace is wrong.
   const target = (r: MemoryRecord) => memoryTarget(r.ownerGaii, r.key);
-  const { kept: readable, leftOut } = await leaveMemories(reader, await reader.show(permitted, target), { kind: 'export', organismId: orgId });
+  const { kept, leftOut } = await leaveMemories(reader, await reader.show(permitted, target), { kind: 'export', organismId: orgId });
+  // A record that holds a credential leaves with the credential replaced, exactly as every other
+  // read door shows it (services/secret-records.ts). The workspace share record carries the scrypt
+  // hash of its password, and the bundle handed it to every member who could read the workspace
+  // (secaudit 2026-10, collectWorkspace:share-password-hash-unmasked). A restore of the masked
+  // record is a share no password opens, which is closed and not open.
+  const readable = kept.map(r => ({ ...r, value: shownMemoryValue(r.key, r.value) }));
 
   const out: WorkspaceExportJson = {
     aimeatWorkspaceExport: WS_EXPORT_VERSION, exportedAt,
@@ -252,7 +282,10 @@ export async function collectWorkspace(
 export async function exportWorkspace(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean; reader: ContentReader },
+  opts: {
+    orgId: string; ws: string; exporterGaii: string; callerSub: string;
+    exportedAt: string; isOrgManager?: boolean; reader: ContentReader;
+  },
 ): Promise<{ buffer: Buffer; filename: string; leftOut: LeftOut[]; truncated: ExportTruncation[] }> {
   const { json, images } = await collectWorkspace(storage, config, opts);
   const archive = new ZipArchive({ zlib: { level: 6 } });
