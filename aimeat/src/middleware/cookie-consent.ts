@@ -36,6 +36,8 @@
  *   - cookieConsentMiddleware(config): adds the snippet to text/html string bodies before </body>
  *   - buildStandaloneSnippetJs(config): self-loading IIFE for GET /v1/portal/cookie-consent.js
  * @version-history
+ *   v2.3.1 — 2026-10-20 — The library loads from an address with its revision (COOKIE_LIB_REV), so the
+ *     fixed copy that keeps an app's global `t` reaches browsers holding the cached one.
  *   v2.3.0 — 2026-10-19 — Load consent assets without blocking parsing, paint or DOMContentLoaded;
  *     preserve saved consent, catch initialization failures, and let the cookie mark retry a failure.
  *   v2.2.1 — 2026-10-18 — The cookie mark sits after the app-info mark too (--aimeat-mark-info-w).
@@ -63,6 +65,13 @@ type BannerConfig = Pick<AimeatConfig, 'cookieConsentCategories' | 'cookieConsen
 
 /** The attribute on the start script; services/app-serve-marks-strip.ts takes it out of a served copy. */
 export const COOKIE_BANNER_MARK = 'data-aimeat-cookie-banner';
+
+/**
+ * The revision of src/static/cookieconsent.umd.js, in the address the start script loads it from.
+ * The file is served with a one-day cache, so a changed file needs a new address to reach a browser
+ * that already holds the old one. Raise it whenever that file changes.
+ */
+export const COOKIE_LIB_REV = '3.1.0-a1';
 
 const CATEGORY_RE = /^[a-z][a-z0-9_-]{0,30}$/;
 
@@ -213,7 +222,7 @@ function startJs(runConfig: string, mark = false, assetBase = ''): string {
     + `if(!dom)d.addEventListener('DOMContentLoaded',function(){dom=true;run();},{once:true});`
     + `try{var link=d.createElement('link');link.rel='stylesheet';link.media='print';link.href=${asciiJson(assetBase + '/cookieconsent.css')};`
     + `link.onload=function(){if(failed)return;link.media='all';css=true;run();};link.onerror=function(){failure('Consent stylesheet could not load');};`
-    + `d.head.appendChild(link);if(!lib){var script=d.createElement('script');script.async=true;script.src=${asciiJson(assetBase + '/cookieconsent.umd.js')};`
+    + `d.head.appendChild(link);if(!lib){var script=d.createElement('script');script.async=true;script.src=${asciiJson(assetBase + '/cookieconsent.umd.js?v=' + COOKIE_LIB_REV)};`
     + `if(n)script.nonce=n;script.onload=function(){lib=!!(window.CookieConsent&&typeof window.CookieConsent.run==='function');`
     + `if(!lib){failure('Consent library did not initialize');return;}run();};script.onerror=function(){failure('Consent library could not load');};`
     + `d.head.appendChild(script);}run();}catch(error){failure(error);}})();`;

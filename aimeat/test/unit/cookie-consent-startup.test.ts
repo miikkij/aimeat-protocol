@@ -4,6 +4,7 @@
  *   Executes the generated loader and consent-gated owner tags with controlled DOM/asset events.
  *   A separate real-Chrome check verifies rendering, which this DOM harness cannot prove.
  * @version-history
+ *   v1.0.1 - 2026-10-20 - The library address may carry its revision (`?v=`).
  *   v1.0.0 - 2026-10-19 - Assert nonblocking assets, failure isolation and consent initialization.
  */
 import { runInNewContext } from 'node:vm';
@@ -87,7 +88,7 @@ function browser(ready = false) {
     if (!match) throw new Error(`Missing ${attribute} script`);
     execute(match[1]);
   };
-  const assets = () => document.head.children.filter(element => /cookieconsent\.(css|umd\.js)$/.test(element.href || element.src));
+  const assets = () => document.head.children.filter(element => /cookieconsent\.(css|umd\.js)(\?v=[\w.-]+)?$/.test(element.href || element.src));
   const asset = (kind: 'css' | 'script') => {
     const result = assets().find(element => kind === 'css' ? element.rel === 'stylesheet' : element.tagName === 'SCRIPT');
     expect(result, `${kind} must load through a dynamically created element`).toBeDefined();
