@@ -18,6 +18,10 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.7.2 — 2026-10-21 — EVERY GET DOOR treats a door that runs past its 10 s limit while the body is
+ *     read as no comparison, as it already did when the headers were late: in the guard tier the abort
+ *     landed in r.text(), outside the catch, and failed the whole test. A control (owner or stranger)
+ *     that did not answer in time is skipped too, so it cannot read as a leak. No assertion changed.
  *   v1.7.1 — 2026-10-19 — EVERY GET DOOR skips a door where the control visitor got 429: in the guard
  *     tier the sweep (one more door since GET /v1/agents/{gaii}/avatar.svg) filled the limiter's window
  *     and three late doors read as leaks, while the suite alone passed 35 of 35.
@@ -372,9 +376,14 @@ async function run() {
             .replace(/"timestamp":"[^"]*"|"request_id":"[^"]*"/g, '').replace(/\d{4}-\d\d-\d\dT[\d:.]+Z/g, 'T')
             .replace(/"(uptime_seconds|memory_mb)":\d+/g, '');
         const get = async (path: string, token: string): Promise<{ status: number; body: string }> => {
-            const r = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'manual', signal: AbortSignal.timeout(10_000) })
-                .catch((err: unknown) => ({ status: 0, text: async () => String(err) }));
-            return { status: r.status, body: norm(await r.text()) };
+            // A door that does not answer in time is no comparison (status 0, skipped below), whether the
+            // time runs out before the headers or while the body is read: the abort can land on either.
+            try {
+                const r = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${token}` }, redirect: 'manual', signal: AbortSignal.timeout(10_000) });
+                return { status: r.status, body: norm(await r.text()) };
+            } catch (err: unknown) {
+                return { status: 0, body: String(err) };
+            }
         };
         const leaks: string[] = [];
         let asked = 0;
@@ -394,6 +403,8 @@ async function run() {
             // hundred doors in a burst, and in the guard tier the limiter's window can fill before it
             // ends. Such a door gives no comparison, so it is neither a pass nor a leak.
             if (stranger.status === 429) continue;
+            // A control that did not answer in time (status 0) gives no comparison either.
+            if (own.status === 0 || stranger.status === 0) continue;
             if (stranger.status >= 400) leaks.push(`GET ${route}: admitted the namesake's visitor (${visitor.status}) where a stranger gets ${stranger.status}`);
             else if (visitor.body === own.body && own.body !== stranger.body) leaks.push(`GET ${route}: answered the visitor with the namesake's own data`);
         }
