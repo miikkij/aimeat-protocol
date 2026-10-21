@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-21 — registerAiImageTool takes the session's caller, for the publish gate on a public picture.
  *   2026-10-21 — ServerToolDeps.stateless reaches the chat surface's finder, which answers a
  *     2026-07-28 request without promising a list change it cannot keep.
  *   2026-10-21 — registerContentTools (aimeat_content_facts, _inspect, _correct, _scan, _classes,
@@ -266,7 +267,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAccountRightsTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);
-    registerAiImageTool(mcp, storage, config, agentGaii);
+    registerAiImageTool(mcp, storage, config, agentGaii, caller);
     registerSharingGroupTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAgentTaskTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);

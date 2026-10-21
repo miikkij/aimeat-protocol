@@ -9259,6 +9259,8 @@
   "notiftext.package_request_declined_by_agent.body": "Pyynnön teki {who}. Mitään ei asennettu eikä muutettu.",
   "notiftext.publish_request.title": "{who} pyytää lupaa tehdä julkiseksi: {what}",
   "notiftext.publish_request.body": "Julkinen tarkoittaa, että kuka tahansa voi lukea sen, myös kirjautumaton. Jos hyväksyt, se on heti julkinen. Jos hylkäät, se pysyy ennallaan.",
+  "notiftext.publish_request_with_part.title": "{who} pyytää lupaa tehdä julkiseksi: {what} ja sen kuva {part}",
+  "notiftext.publish_request_with_part.body": "Julkinen tarkoittaa, että kuka tahansa voi lukea ne, myös kirjautumaton. Jos hyväksyt, molemmat ovat heti julkisia. Jos hylkäät, molemmat pysyvät ennallaan.",
   "notiftext.publish_request_approved_by_agent.title": "{by} teki julkiseksi: {what}",
   "notiftext.publish_request_approved_by_agent.body": "Pyynnön teki {who}, ja {by} hyväksyi sen sinun nimissäsi.",
   "notiftext.publish_request_declined_by_agent.title": "{by} piti ennallaan: {what}",

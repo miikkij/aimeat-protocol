@@ -15,6 +15,10 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-21 — `public: true` asks the node's publish gate with the session's caller, as
+ *     aimeat_storage_upload does: an agent without publish:public gets the picture stored private and
+ *     a file request for its owner (`publish_request` in the result), whose approval makes it public
+ *     (secaudit 2026-10, ai-image public picture past the publish gate).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — `reference_images` and `mask`, read with readImageInputs as on POST /v1/ai/image; the
@@ -45,12 +49,15 @@ import { aiPayerOf } from '../services/agent-ai-keys.js';
 import { aiCallerOfPrincipal } from '../services/ai/caller-context.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { recordUrlFor } from '../services/ai-provenance-marks.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerAiImageTool(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's caller (services/caller-context.ts), for the publish gate on a picture made public. */
+    caller?: () => CallerContext,
 ): void {
     mcp.registerTool(
         'aimeat_image_generate',
@@ -80,6 +87,8 @@ export function registerAiImageTool(
                 const r = await generateForOwner(storage, config, gaii, {
                     prompt, size, storageKey: storage_key,
                     publicVisibility: isPublic === true, model, appId: app_id,
+                    // Making it public asks the node's publish gate, as aimeat_storage_upload does.
+                    ...(caller ? { publishGate: { caller: caller() } } : {}),
                     ...(agent ? { agent } : {}), caller: aiCallerOfPrincipal(getAgentGaii()).caller,
                     ...(provider ? { provider } : {}),
                     ...(fallback !== undefined ? { fallback } : {}),
@@ -111,9 +120,14 @@ export function registerAiImageTool(
                             // The record minted for the picture's bytes: the stored file names it, and
                             // a public picture's record resolves for anyone at record_url.
                             ...(r.provenance ? { provenance_id: r.provenance.id, record_url: recordUrlFor(config, r.provenance.id) } : {}),
+                            // Asked public by a caller the owner is asked about: stored private, with the request.
+                            ...(r.publishRequest ? { publish_request: r.publishRequest } : {}),
+                            ...(r.warnings?.length ? { warnings: r.warnings } : {}),
                             note: r.visibility === 'public'
                                 ? 'Stored and publicly readable, so the URL can be handed to a vision model or used in an app.'
-                                : 'Stored privately. Pass public: true if a model or a page has to fetch it by URL.',
+                                : r.publishRequest
+                                    ? 'Stored privately until your owner approves making it public; the URL loads for anyone once they do. publish_request.next_step says what to tell them.'
+                                    : 'Stored privately. Pass public: true if a model or a page has to fetch it by URL.',
                         }, null, 2),
                     }],
                 };

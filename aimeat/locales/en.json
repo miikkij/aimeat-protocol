@@ -9260,6 +9260,8 @@
   "notiftext.package_request_declined_by_agent.body": "{who} asked for it. Nothing was installed or changed.",
   "notiftext.publish_request.title": "{who} asks to make {what} public",
   "notiftext.publish_request.body": "Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.",
+  "notiftext.publish_request_with_part.title": "{who} asks to make {what} and its picture {part} public",
+  "notiftext.publish_request_with_part.body": "Public means anyone can read them, also people who are not signed in. If you approve, both are public at once. If you decline, both stay as they are.",
   "notiftext.publish_request_approved_by_agent.title": "{by} made {what} public",
   "notiftext.publish_request_approved_by_agent.body": "{who} asked for it, and {by} approved it in your name.",
   "notiftext.publish_request_declined_by_agent.title": "{by} kept {what} as it was",

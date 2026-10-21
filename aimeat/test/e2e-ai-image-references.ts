@@ -22,9 +22,19 @@
  *   - Phase 0: owners, providers, pictures in storage, an agent
  *   - Phase 1: what each provider receives
  *   - Phase 2: refusals, nothing sent
- *   - Phase 3: an agent over MCP, reusing a picture it made
+ *   - Phase 3: an agent over MCP, reusing a picture it made; 3d a public picture with the gate off
+ *   - Phase 4: the same node started again with AIMEAT_PUBLISH_GATE=agents: a public picture meets
+ *     the publish gate on REST and over MCP
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-image-references
  * @version-history
+ *   v1.1.0 — 2026-10-21 — 3d: with the gate off (the default) an agent's public picture is public at
+ *     once on REST and over MCP. Phase 4, on the same node started again with the publish gate on:
+ *     an agent without publish:public gets its public picture stored private, 202 with a file
+ *     request on REST and the request in the MCP answer, no stranger reads it, the signed
+ *     download_url loads it now, and the owner's approval makes it public; an agent holding
+ *     publish:public and the owner in person get a public picture at once; a private picture is
+ *     unchanged (secaudit 2026-10, ai-image public picture past the publish gate). 4f: a picture's
+ *     request with no record to join stands alone with its own notification and item, as before.
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-1, A-2).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -90,7 +100,9 @@ const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-image-refs-'));
 const DB_PATH = join(dbDir, 'image-refs.db');
 const PG_URL = process.env.AIMEAT_DB === 'postgres-kysely' ? (process.env.DATABASE_URL ?? '') : '';
 
-async function startNode(stub: FakeAiProvider): Promise<ChildProcess> {
+/** `extra` sets a node setting for one part of the suite: Phase 4 starts the same node on the same
+ *  database with AIMEAT_PUBLISH_GATE=agents; Phases 0-3 run on the default. */
+async function startNode(stub: FakeAiProvider, extra: Record<string, string> = {}): Promise<ChildProcess> {
     const target = PG_URL
         ? { port: PORT, baseUrl: BASE, dbType: 'postgres-kysely', dbPath: '', dbUrl: PG_URL, external: false }
         : { port: PORT, baseUrl: BASE, dbType: 'sqlite', dbPath: DB_PATH, dbUrl: '', external: false };
@@ -104,6 +116,7 @@ async function startNode(stub: FakeAiProvider): Promise<ChildProcess> {
         AIMEAT_OPENROUTER_INSTANCE_KEY: '',
         AIMEAT_AI_CATALOG_SOURCES: JSON.stringify({ modelsDev: closed, openRouter: closed, liteLlm: closed }),
         AIMEAT_AI_FIXED_BASEURL_OVERRIDES: JSON.stringify({ openai: `${stub.baseUrl}/openai`, openrouter: `${stub.baseUrl}/or` }),
+        ...extra,
     };
     const dbArgs = PG_URL ? ['--db', 'postgres-kysely', '--db-url', PG_URL] : ['--db', 'sqlite', '--db-path', DB_PATH];
     const child = spawn('node', [...nodeEntryArgs(), 'start', ...dbArgs], { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
@@ -123,7 +136,7 @@ async function stopNode(child: ChildProcess): Promise<void> {
     console.log('\n── Reference pictures and a mask on the image AI (Comicland v3 A-1, A-2) ──');
     const stub = await startFakeAiProvider(0);
     stub.setDefault('images', imageJson({ b64: ANSWER.toString('base64'), cost: 0.05 }));
-    const node = await startNode(stub);
+    let node = await startNode(stub);
 
     try {
         // ── Phase 0 ──
@@ -290,6 +303,98 @@ async function stopNode(child: ChildProcess): Promise<void> {
             const so = await openSession(BASE, other.token, 'image-refs-other');
             const r = await callTool(so, 'aimeat_image_generate', { prompt: 'x', provider: 'my-or', reference_images: [{ storage_key: made }] });
             assert(r.isError && /NOT_FOUND/.test(r.text), `expected NOT_FOUND, got ${r.text.slice(0, 200)}`);
+        });
+
+        // A public picture as a stranger reads it: 200 only once it is public.
+        const anonPicture = (url: string) => fetch(url.startsWith('http') ? url : `${BASE}${url}`);
+        const sameBytes = async (res: Response) => Buffer.from(await res.arrayBuffer()).equals(ANSWER);
+
+        await test('3d. Gate off (the code default): an agent\'s public picture is public at once, on REST and over MCP', async () => {
+            const r = await image(agent.token, { provider: 'my-or', public: true });
+            assert(r.status === 200 && r.body.data.visibility === 'public' && !r.body.data.publish_request, `REST: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data?.visibility)}`);
+            const anon = await anonPicture(r.body.data.url);
+            assert(anon.status === 200 && await sameBytes(anon), `anonymous read of the REST picture ${anon.status}`);
+            const m = await callTool(s, 'aimeat_image_generate', { prompt: 'The hero, waving.', provider: 'my-or', public: true });
+            assert(!m.isError && m.data.visibility === 'public' && !m.data.publish_request, `MCP: ${m.text.slice(0, 200)}`);
+            assert((await anonPicture(m.data.url)).status === 200, 'anonymous read of the MCP picture');
+        });
+
+        // ── Phase 4 ──
+        // The same node, started again with AIMEAT_PUBLISH_GATE=agents. A picture asked public by an
+        // agent without publish:public was stored public at once while every other public write of
+        // the same agent waited for the owner (secaudit 2026-10, ai-image public picture past the
+        // publish gate). It is stored private now, with a file request the owner approves.
+        console.log('\nPhase 4: the publish gate on (AIMEAT_PUBLISH_GATE=agents)');
+        await stopNode(node);
+        node = await startNode(stub, { AIMEAT_PUBLISH_GATE: 'agents' });
+        const publisher = await makeAgent(BASE, alice, ['ai:use', 'publish:public']);
+        const approve = (id: string) => json(`/v1/publish-requests/${id}/decision`, alice.token, { method: 'POST', body: JSON.stringify({ decision: 'approve' }) });
+
+        await test('4a. REST: an agent without publish:public gets a private picture, 202 with a file request; approval makes it public', async () => {
+            const r = await image(agent.token, { provider: 'my-or', public: true });
+            assert(r.status === 202, `expected 202, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data?.visibility)}`);
+            const d = r.body.data;
+            assert(d.visibility === 'private', `stored as ${d.visibility}`);
+            const pr = d.publish_request;
+            assert(pr && pr.kind === 'file' && pr.status === 'awaiting_owner' && typeof pr.approve_url === 'string', `request: ${JSON.stringify(pr)}`);
+            assert(typeof d.url === 'string' && d.url.startsWith('/v1/pub/'), `the url is the address the approval opens: ${d.url}`);
+            assert(r.body.meta?.provenance?.record?.attestation?.contentHash, 'the picture still has its provenance record');
+            assert(typeof d.usage?.cost_usd === 'number', `cost reported: ${JSON.stringify(d.usage)}`);
+            const before = await anonPicture(d.url);
+            assert(before.status !== 200, `anyone reads the picture before the owner approved: ${before.status}`);
+            const signed = await anonPicture(d.download_url);
+            assert(signed.status === 200 && await sameBytes(signed), `the signed download_url loads it now: ${signed.status}`);
+            const ok = await approve(pr.request_id);
+            assert(ok.status === 200 && ok.body.data.request.state === 'approved', `approve: ${ok.status} ${JSON.stringify(ok.body?.error ?? ok.body?.data)}`);
+            const after = await anonPicture(d.url);
+            assert(after.status === 200 && await sameBytes(after), `anonymous read after approval: ${after.status}`);
+        });
+
+        await test('4b. MCP: aimeat_image_generate by the same agent stores it private with a file request; approval makes it public', async () => {
+            const s4 = await openSession(BASE, agent.token, 'image-refs-gated');
+            const m = await callTool(s4, 'aimeat_image_generate', { prompt: 'The hero, waving.', provider: 'my-or', public: true });
+            assert(!m.isError, `refused: ${m.text.slice(0, 200)}`);
+            assert(m.data.visibility === 'private' && m.data.publish_request?.kind === 'file', `answer: ${m.text.slice(0, 300)}`);
+            assert(String(m.data.url).includes('/v1/pub/'), `the url is the address the approval opens: ${m.data.url}`);
+            assert((await anonPicture(m.data.url)).status !== 200, 'anyone reads the picture before the owner approved');
+            const ok = await approve(m.data.publish_request.request_id);
+            assert(ok.status === 200, `approve: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+            const after = await anonPicture(m.data.url);
+            assert(after.status === 200 && await sameBytes(after), `anonymous read after approval: ${after.status}`);
+        });
+
+        await test('4c. An agent holding publish:public gets a public picture at once, as its upload would be', async () => {
+            const r = await image(publisher.token, { provider: 'my-or', public: true });
+            assert(r.status === 200 && r.body.data.visibility === 'public' && !r.body.data.publish_request, `${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data?.visibility)}`);
+            assert((await anonPicture(r.body.data.url)).status === 200, 'anonymous read of the public picture');
+        });
+
+        await test('4d. The owner in person still gets a public picture at once, and nothing is asked', async () => {
+            const r = await image(alice.token, { provider: 'my-or', public: true });
+            assert(r.status === 200 && r.body.data.visibility === 'public' && !r.body.data.publish_request, `${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data?.visibility)}`);
+            const anon = await anonPicture(r.body.data.url);
+            assert(anon.status === 200 && await sameBytes(anon), `anonymous read ${anon.status}`);
+        });
+
+        await test('4f. A picture\'s request with no record to join stands alone, as before: its own notification and item, no link', async () => {
+            const r = await image(agent.token, { provider: 'my-or', public: true });
+            assert(r.status === 202, `expected 202, got ${r.status}`);
+            const id = r.body.data.publish_request.request_id;
+            const one = await json(`/v1/publish-requests/${id}`, alice.token);
+            assert(one.status === 200 && !one.body.data.request.part_of && !one.body.data.request.parts, `request: ${JSON.stringify(one.body?.data?.request ?? one.body?.error)}`);
+            const notifs = (await json('/v1/notifications?limit=200', alice.token)).body.data.notifications as any[];
+            const mine = notifs.filter(n => (n.actions ?? []).some((a: any) => String(a.endpoint ?? '').includes(`/v1/publish-requests/${id}/decision`)));
+            assert(mine.length === 1 && mine[0].i18n?.key === 'publish_request', `its own notification: ${JSON.stringify(mine.map(n => n.i18n))}`);
+            const items = (await json('/v1/open-items', alice.token)).body.data.items as any[];
+            assert(items.some(i => i.object?.type === 'publish-request' && i.object?.id === id), 'its own list item');
+            assert((await json(`/v1/publish-requests/${id}/decision`, alice.token, { method: 'POST', body: JSON.stringify({ decision: 'decline' }) })).status === 200, 'decline');
+            assert((await anonPicture(r.body.data.url)).status !== 200, 'a declined picture is readable');
+        });
+
+        await test('4e. A private picture is unchanged: 200, private, a download_url, no request', async () => {
+            const r = await image(agent.token, { provider: 'my-or' });
+            assert(r.status === 200 && r.body.data.visibility === 'private' && !r.body.data.publish_request, `${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data?.visibility)}`);
+            assert(typeof r.body.data.download_url === 'string' && r.body.data.url.startsWith('/v1/storage/'), `answer ${JSON.stringify(r.body.data)}`);
         });
     } finally {
         await stopNode(node);

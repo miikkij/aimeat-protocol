@@ -31,6 +31,11 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-21 — A request may be filed as a PART of another (`part_of` on the part, `parts` on the
+ *     parent; parts.ts): the part gets no item and no notification of its own, waits as long as the
+ *     parent, and the parent's item and notification name it. A parent that ends declined, expired or
+ *     outdated settles its waiting parts the same way. A request without a link is unchanged (the
+ *     picture of a gated public image job; the developer's one-press decision, 2026-10-21).
  *   2026-10-20 — memoryValueDigest() and settleRequestsForBinnedRecord(): a request binds the record's
  *     content digest beside its version (left out of the fingerprint), and a binned record settles
  *     every request still waiting on it `outdated` (secaudit 2026-10,
@@ -52,6 +57,7 @@ import { serialByKey } from '../../utils/serial-by-key.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { PUBLISH_REQUEST_DAYS, publishRequestExpired } from './policy.js';
+import { announcePart } from './parts.js';
 
 /** Where one request lives. The prefix is listable, so the owner's list finds them all. */
 export const PUBLISH_REQUEST_PREFIX = 'publish.requests.';
@@ -101,6 +107,11 @@ export interface PublishRequest {
   outcome: { reason?: string; url?: string } | null;
   item_id: string | null;
   fingerprint: string;
+  /** This request is part of another (parts.ts): the parent's id. It has no item or notification of
+   *  its own, and the parent's decision decides it too. Absent on every request filed alone. */
+  part_of?: string;
+  /** The ids of the requests filed as parts of this one. Absent when it has none. */
+  parts?: string[];
 }
 
 export type PublishRequestFail = { ok: false; status: number; code: string; message: string };
@@ -180,6 +191,8 @@ export function summarizePublishRequest(request: PublishRequest, now = Date.now(
     decided_at: request.decided_at,
     decided_by: request.decided_by,
     outcome: request.outcome,
+    ...(request.part_of ? { part_of: request.part_of } : {}),
+    ...(request.parts?.length ? { parts: request.parts } : {}),
   };
 }
 
@@ -221,7 +234,7 @@ function outcomeSentence(request: PublishRequest, state: PublishRequestState, by
 }
 
 /** The draft a door hands over: everything but the bookkeeping. */
-export type PublishRequestDraft = Pick<PublishRequest, 'kind' | 'target' | 'title' | 'name' | 'change' | 'requested_by'>;
+export type PublishRequestDraft = Pick<PublishRequest, 'kind' | 'target' | 'title' | 'name' | 'change' | 'requested_by' | 'part_of'>;
 
 /**
  * Put a request in front of the owner. Changes nothing about the target. Returns the standing
@@ -265,6 +278,23 @@ export async function filePublishRequest(
       fingerprint,
     };
     const who = requesterName(draft.requested_by);
+    // A part (parts.ts): filed under a parent that still waits, it gets no item and no notification of
+    // its own, waits exactly as long as the parent, and the parent's item and notification name it.
+    // A parent that is gone or decided leaves the part a request of its own, filed as any other.
+    delete request.part_of;
+    const parent = draft.part_of && draft.part_of !== request.id ? waiting.find(r => r.id === draft.part_of) : undefined;
+    if (parent) {
+      const part: PublishRequest = { ...request, part_of: parent.id, expires_at: parent.expires_at };
+      await putRequest(storage, ownerGhii, part);
+      const linked: PublishRequest = { ...parent, parts: [...(parent.parts ?? []), part.id] };
+      await putRequest(storage, ownerGhii, linked);
+      await announcePart(ctx, ownerGhii, requesterName(parent.requested_by), linked, part);
+      logger.info('Publish request filed as a part', {
+        event: 'publish.request_filed', owner: ownerGhii, id: part.id, kind: draft.kind,
+        by: draft.requested_by.principal, part_of: parent.id,
+      });
+      return { ok: true as const, request: part, alreadyWaiting: false };
+    }
     const item = await addItem(storage, ownerGhii, {
       title: `${who} asks to make ${draft.title} public`.slice(0, 200),
       kind: 'decision',
@@ -304,7 +334,7 @@ export async function filePublishRequest(
  */
 export async function settlePublishRequest(
   ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest, state: Exclude<PublishRequestState, 'awaiting_owner'>,
-  how: { by: string | null; outcome?: PublishRequest['outcome'] },
+  how: { by: string | null; outcome?: PublishRequest['outcome']; /** A part decided by its parent's decision (parts.ts). */ withParent?: boolean },
 ): Promise<PublishRequest> {
   const { storage } = ctx;
   const settled: PublishRequest = {
@@ -344,7 +374,8 @@ export async function settlePublishRequest(
     }
   }
 
-  if (how.by && how.by.includes('#') && (state === 'approved' || state === 'declined')) {
+  // A part decided with its parent is told to the owner once, by the parent's own notice.
+  if (how.by && how.by.includes('#') && (state === 'approved' || state === 'declined') && !how.withParent) {
     const agentName = how.by.split('#')[0];
     const asker = requesterName(request.requested_by);
     await notify(storage, ownerGhii, {
@@ -366,6 +397,20 @@ export async function settlePublishRequest(
   logger.info('Publish request settled', {
     event: 'publish.request_settled', owner: ownerGhii, id: request.id, state, by: how.by,
   });
+
+  // A part follows its parent when the parent ends without being made public: declined, expired or
+  // outdated, so nothing waits behind an item that is gone (parts.ts). An approval applies its parts
+  // in decide.ts, where each one is checked as its own request.
+  if (state !== 'approved') {
+    for (const id of request.parts ?? []) {
+      const part = await readPublishRequest(storage, ownerGhii, id);
+      if (!part || part.state !== 'awaiting_owner' || part.part_of !== request.id) continue;
+      await settlePublishRequest(ctx, ownerGhii, part, state, {
+        by: how.by, withParent: true,
+        ...(state === 'outdated' ? { outcome: { reason: `${request.title} it belongs to could not be made public` } } : {}),
+      });
+    }
+  }
   return settled;
 }
 

@@ -19,6 +19,9 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.2.0 — 2026-10-21 — Approving a request also applies its waiting parts (parts.ts), each checked
+ *     as its own request; declining it declines them (store.ts). A part decided on its own decides only
+ *     itself, and a request without parts is unchanged (the developer's one-press decision).
  *   v1.1.0 — 2026-10-18 — An approval is held to the label's audience cap again before the applier
  *     runs; a refused one is settled outdated and answered 409 LABEL_CAPS_AUDIENCE (cap-recheck.ts;
  *     plan doc-mvdipuyqraas, L3.3).
@@ -95,25 +98,46 @@ export async function decidePublishRequest(ctx: PublishStoreCtx, decider: Publis
     }
     const by = decider.caller.inPerson ? ownerGhii : decider.caller.principal;
     if (decision === 'decline') {
+      // A declined parent declines its waiting parts too (store.ts settlePublishRequest).
       const settled = await settlePublishRequest(ctx, ownerGhii, request, 'declined', { by });
       return { ok: true as const, decision, request: summarizePublishRequest(settled) };
     }
-    // The label's audience cap is asked again before anything is applied (plan doc-mvdipuyqraas,
-    // L3.3): a request never carries content past it, whoever approves.
-    const capped = await requestCapRefusal(ctx, ownerGhii, request, { principal: by, kind: decider.caller.kind === 'agent' ? 'ai' : 'human' });
-    if (capped) {
-      await settlePublishRequest(ctx, ownerGhii, request, 'outdated', { by, outcome: { reason: capped.message } });
-      return fail(409, 'LABEL_CAPS_AUDIENCE', `${capped.message} The request is closed; nothing was made public.`);
+    const kind = decider.caller.kind === 'agent' ? 'ai' as const : 'human' as const;
+    const out = await approveOne(ctx, ownerGhii, request, by, kind);
+    if (!out.ok) return out;
+    // One press decides the parts too (parts.ts): each waiting part is checked and applied as its own
+    // request, so a part whose content changed is settled outdated without undoing the parent.
+    for (const id of request.parts ?? []) {
+      const part = await readPublishRequest(ctx.storage, ownerGhii, id);
+      if (!part || part.state !== 'awaiting_owner' || part.part_of !== request.id) continue;
+      await approveOne(ctx, ownerGhii, part, by, kind, true);
     }
-    const applier = PUBLISH_APPLIERS[request.kind];
-    const applied = applier
-      ? await applier(ctx, ownerGhii, request)
-      : { ok: false as const, reason: 'this kind of content cannot be made public through a request on this node' };
-    if (!applied.ok) {
-      await settlePublishRequest(ctx, ownerGhii, request, 'outdated', { by, outcome: { reason: applied.reason } });
-      return fail(409, 'OUTDATED', `This can no longer be made public as asked: ${applied.reason}. Nothing was made public. ${requesterName(request.requested_by)} can ask again.`);
-    }
-    const settled = await settlePublishRequest(ctx, ownerGhii, request, 'approved', { by, outcome: applied.url ? { url: applied.url } : null });
-    return { ok: true as const, decision, request: summarizePublishRequest(settled) };
+    return { ok: true as const, decision, request: summarizePublishRequest(out.settled) };
   });
+}
+
+/**
+ * Apply one approved request: the label's audience cap again, then the applier of its kind. A refusal
+ * settles it outdated and answers why; `withParent` marks a part decided by its parent's press.
+ */
+async function approveOne(
+  ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest, by: string, kind: 'ai' | 'human', withParent = false,
+): Promise<{ ok: true; settled: PublishRequest } | PublishRequestFail> {
+  // The label's audience cap is asked again before anything is applied (plan doc-mvdipuyqraas,
+  // L3.3): a request never carries content past it, whoever approves.
+  const capped = await requestCapRefusal(ctx, ownerGhii, request, { principal: by, kind });
+  if (capped) {
+    await settlePublishRequest(ctx, ownerGhii, request, 'outdated', { by, withParent, outcome: { reason: capped.message } });
+    return fail(409, 'LABEL_CAPS_AUDIENCE', `${capped.message} The request is closed; nothing was made public.`);
+  }
+  const applier = PUBLISH_APPLIERS[request.kind];
+  const applied = applier
+    ? await applier(ctx, ownerGhii, request)
+    : { ok: false as const, reason: 'this kind of content cannot be made public through a request on this node' };
+  if (!applied.ok) {
+    await settlePublishRequest(ctx, ownerGhii, request, 'outdated', { by, withParent, outcome: { reason: applied.reason } });
+    return fail(409, 'OUTDATED', `This can no longer be made public as asked: ${applied.reason}. Nothing was made public. ${requesterName(request.requested_by)} can ask again.`);
+  }
+  const settled = await settlePublishRequest(ctx, ownerGhii, request, 'approved', { by, withParent, outcome: applied.url ? { url: applied.url } : null });
+  return { ok: true, settled };
 }

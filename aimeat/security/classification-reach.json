@@ -799,6 +799,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter."
     },
+    "src/services/ai-image.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-21 (secaudit 2026-10, the image publish gate), the node's own read: the metadata of the storage key the caller named, read only to see whether a public file already stands there before a gated caller is refused; no content is read and nothing is returned."
+    },
     "src/services/ai-inputs.ts": {
       "reads": {
         "getMemory": 1,
@@ -2168,6 +2174,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-21 (secaudit 2026-10, v67), the node's own read: when a request is filed, the record (or each knowledge entry) is read only to store a sha256 digest of its value on the request, which the approval compares; the value itself is returned to nobody."
+    },
+    "src/services/publish-requests/parts.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-21 (secaudit 2026-10, the image publish gate), the node's own read: the owner's notification records under the notification prefix, read only to find the parent request's notice and rewrite its title so it names the picture filed as its part. Nothing is returned to anyone."
     },
     "src/services/publish-requests/cap-recheck.ts": {
       "reads": {

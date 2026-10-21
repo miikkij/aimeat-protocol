@@ -21103,6 +21103,12 @@ paths:
         default is private. A private picture's answer also carries `download_url`, a signed address
         that loads without a sign-in for `download_expires_in_seconds` (an hour): its `url` needs
         storage:read, which an app holding only ai:use does not have, and an <img> sends no header.
+        `public: true` asks the node's publish gate as POST /v1/storage does: on a node whose gate
+        covers the caller (an agent without publish:public, or an app when the gate covers apps), the
+        picture is stored private and the answer is 202 with `publish_request`, a file request the
+        owner approves; `url` is then the public address the approval opens, and `download_url`
+        loads it now. A visitor from another node is refused 403 PUBLISH_NOT_ALLOWED before anything
+        is spent.
 
         `reference_images` are pictures the model works from, so a character, a place or a style
         stays the same from picture to picture. `mask` redraws part of the first reference: a PNG
@@ -21198,6 +21204,15 @@ paths:
                               daily_budget_usd: { type: number }
                               spent_today_usd: { type: number }
                               remaining_usd: { type: number }
+        '202':
+          description: >
+            The picture was generated and stored private, and making it public waits for the owner:
+            data carries the same fields as 200 with visibility private, download_url, and
+            `publish_request` (request_id, status awaiting_owner, kind file, approve_url, next_step).
+            `url` is the public address the owner's approval opens. A request that could not be
+            filed leaves the picture private with `warnings` (PUBLISH_NOT_ASKED) and answers 200.
+        '403':
+          description: The caller lacks ai:use; or PUBLISH_NOT_ALLOWED - public was asked by a caller with no owner on this node to ask (a visitor from another node), and nothing was spent
         '400':
           description: INVALID_BODY (including a reference that is not a picture, or a mask without references or not a PNG), FILES_TOO_LARGE, PROMPT_TOO_LONG, NO_IMAGE_MODEL when neither the owner nor the node has named one, or a role refusal (AI_ROLE_UNKNOWN, AI_ROLE_NOT_DECLARED, AI_ROLE_LACKS_CAPABILITY)
         '404':
@@ -75387,6 +75402,11 @@ paths:
         classification no longer allows the level (its label's maxAudience) is not made public either:
         409 LABEL_CAPS_AUDIENCE, settled outdated with the reason; no approval passes the cap. A settled
         request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED. Requires memory:write.
+        A request may have parts (`parts` on it, `part_of` on each part): the picture of an AI image
+        job asked public beside its answer's record. Approving the request also applies each part
+        still waiting, checked as its own request; declining it, or its ending expired or outdated,
+        settles its parts the same way. A part decided on its own decides only itself. A part has no
+        list item or notification of its own: the request's own name it.
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }

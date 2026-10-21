@@ -20,6 +20,16 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.12.0 — 2026-10-21 — 19e-19i: an image job's PICTURE meets the publish gate its record meets
+ *     (secaudit 2026-10, ai-image public picture past the publish gate). 19e on the default node: an
+ *     agent's public picture is public at once, as before. On the gated node: 19f an agent without
+ *     publish:public gets the picture private with a file request beside the record's request, no
+ *     stranger reads it, the url is the address the approval opens, and approving both makes both
+ *     public; 19g an agent holding publish:public and 19h the owner in person get a public picture at
+ *     once; 19i a private picture is unchanged. 19j-19m, one press (the developer's decision): the
+ *     picture's request is a part of the record's, with one item and one notification naming both;
+ *     approving the record alone makes both public, declining it declines both, and approving the
+ *     picture alone makes only the picture public.
  *   v1.11.0 — 2026-10-21 — Every use that worked before keeps working (the developer's rule for the
  *     round). The suite's node runs on the default setting again, and 19a-19c run at the end on the
  *     same node started again with AIMEAT_PUBLISH_GATE=agents; 19d: on the default node an agent's
@@ -1220,6 +1230,43 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(!(await publishRequestFor(gated.gaii, 'aijob.nogate.rest')), 'a request was filed on a node without the gate');
     });
 
+    // ── 19e-19i. A public image job's PICTURE meets the same gate as its record ──
+    // The record waited for the owner while the picture file was stored public at once, so anyone
+    // holding its address read it before the owner approved anything (secaudit 2026-10, ai-image
+    // public picture past the publish gate). Agents of owner c, whose provider makes pictures.
+    const imgAgent = await makeAgent(BASE, c, ['ai:use', 'memory:read', 'memory:write'], 'aijobimg');
+    const imgPublisher = await makeAgent(BASE, c, ['ai:use', 'memory:read', 'memory:write', 'publish:public'], 'aijobimgpub');
+    const imgAgentAsOwner: Owner = { name: c.name, gaii: imgAgent.gaii, token: imgAgent.token };
+    const imgPublisherAsOwner: Owner = { name: c.name, gaii: imgPublisher.gaii, token: imgPublisher.token };
+    /** The picture as a stranger reads it: 200 only once it is public. */
+    const anonPicture = (url: string) => fetch(`${BASE}${url}`);
+    const cRequests = async (): Promise<any[]> => {
+        const list = await json('/v1/publish-requests', { headers: auth(c.token) });
+        assert(list.status === 200, `publish requests ${list.status}: ${JSON.stringify(list.body?.error)}`);
+        return list.body.data.requests ?? [];
+    };
+    const fileRequestFor = async (key: string) => (await cRequests()).find((r: any) => r.kind === 'file' && r.target?.key === key && r.target?.owner === c.gaii);
+    const imageJob = async (who: Owner, resultKey: string) => {
+        fake.queue('images', imageJson({ b64: PNG.toString('base64'), cost: 0.04 }));
+        const r = await startJob(who, { op: 'image', prompt: 'A harbour at dawn.', result_key: resultKey, result_visibility: 'public' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(who, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const rec = await readMemory(who, resultKey);
+        assert(rec.status === 200, `result read ${rec.status}`);
+        return { done, rec: rec.body.data };
+    };
+
+    await test('19e. Default node (no publish gate): an agent\'s public image job stores a public picture at once, readable at its url', async () => {
+        const { done, rec } = await imageJob(imgAgentAsOwner, 'aijob.nogate.image');
+        assert(done.result_visibility === 'public', `the record: ${done.result_visibility}`);
+        const v = rec.value;
+        assert(typeof v.url === 'string' && v.url.startsWith('/v1/pub/'), `a public picture's url: ${v.url}`);
+        const anon = await anonPicture(v.url);
+        assert(anon.status === 200 && Buffer.from(await anon.arrayBuffer()).equals(PNG), `anonymous read of the picture ${anon.status}`);
+        assert(!(await fileRequestFor(v.storage_key)), 'a request was filed on a node without the gate');
+    });
+
     /** Run at the end, on the node started again with the publish gate on (see the call below case 24). */
     const gatedPart = async (): Promise<void> => {
     await test('19a. REST: an agent without publish:public asking for a public answer gets it private, with a request for the owner', async () => {
@@ -1267,6 +1314,134 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(!!done.provenance_id && own.body.data.ai_provenance_id === done.provenance_id,
             `provenance: job ${done.provenance_id}, record ${own.body.data.ai_provenance_id}`);
         assert(!(await publishRequestFor(e.gaii, 'aijob.gate.owner')), 'a request was filed for the owner\'s own public write');
+    });
+
+    await test('19f. Gate on: an agent\'s public image job stores the PICTURE private with a file request; approving both makes both public', async () => {
+        const { done, rec } = await imageJob(imgAgentAsOwner, 'aijob.gate.image');
+        assert(done.result_visibility === 'private', `the record waits too: ${done.result_visibility}`);
+        assert(done.cost_usd === 0.04 && !!done.provenance_id, `cost and provenance on the job: ${done.cost_usd} ${done.provenance_id}`);
+        const v = rec.value;
+        assert(typeof v.storage_key === 'string' && v.mime_type === 'image/png' && typeof v.model === 'string', `the record's fields: ${JSON.stringify(v)}`);
+        assert(typeof v.url === 'string' && v.url.startsWith('/v1/pub/'), `the url is the address the approval opens: ${v.url}`);
+        const before = await anonPicture(v.url);
+        assert(before.status !== 200, `anyone reads the picture before the owner approved: ${before.status}`);
+        const own = await fetch(`${BASE}/v1/storage/${v.storage_key}`, { headers: auth(c.token) });
+        assert(own.status === 200 && Buffer.from(await own.arrayBuffer()).equals(PNG), `the owner reads the private picture: ${own.status}`);
+        const fileReq = await fileRequestFor(v.storage_key);
+        assert(fileReq && fileReq.state === 'awaiting_owner' && fileReq.requested_by?.principal === imgAgent.gaii,
+            `a file request by the agent: ${JSON.stringify(fileReq)}`);
+        const recReq = (await cRequests()).find((r: any) => r.kind === 'memory' && r.target?.key === 'aijob.gate.image' && r.target?.namespace === imgAgent.gaii);
+        assert(recReq, 'the record\'s own request is filed as before');
+        const okFile = await json(`/v1/publish-requests/${fileReq.id}/decision`, { method: 'POST', headers: auth(c.token), body: JSON.stringify({ decision: 'approve' }) });
+        assert(okFile.status === 200 && okFile.body.data.request.state === 'approved', `approve the picture: ${okFile.status} ${JSON.stringify(okFile.body?.error ?? okFile.body?.data)}`);
+        const after = await anonPicture(v.url);
+        assert(after.status === 200 && Buffer.from(await after.arrayBuffer()).equals(PNG), `anonymous read after approval: ${after.status}`);
+        const okRec = await json(`/v1/publish-requests/${recReq.id}/decision`, { method: 'POST', headers: auth(c.token), body: JSON.stringify({ decision: 'approve' }) });
+        assert(okRec.status === 200, `approve the record: ${okRec.status} ${JSON.stringify(okRec.body?.error)}`);
+        const anonRec = await anonRead(imgAgent.gaii, 'aijob.gate.image');
+        assert(anonRec.status === 200 && anonRec.body.data.value.url === v.url, `the public record points at the public picture: ${anonRec.status}`);
+    });
+
+    await test('19g. Gate on: an agent holding publish:public gets a public picture at once, as its upload would be', async () => {
+        const { done, rec } = await imageJob(imgPublisherAsOwner, 'aijob.gate.image.pub');
+        assert(done.result_visibility === 'public', `the record: ${done.result_visibility}`);
+        const anon = await anonPicture(rec.value.url);
+        assert(anon.status === 200, `anonymous read of the picture ${anon.status}`);
+        assert(!(await fileRequestFor(rec.value.storage_key)), 'a request was filed for an agent holding publish:public');
+    });
+
+    await test('19h. Gate on: the owner in person still gets a public picture at once, and nothing is asked', async () => {
+        const { done, rec } = await imageJob(c, 'aijob.gate.image.owner');
+        assert(done.result_visibility === 'public', `the record: ${done.result_visibility}`);
+        const anon = await anonPicture(rec.value.url);
+        assert(anon.status === 200 && Buffer.from(await anon.arrayBuffer()).equals(PNG), `anonymous read of the picture ${anon.status}`);
+        assert(!(await fileRequestFor(rec.value.storage_key)), 'a request was filed for the owner\'s own picture');
+    });
+
+    await test('19i. Gate on: a private image job is unchanged, a private picture and no request', async () => {
+        fake.queue('images', imageJson({ b64: PNG.toString('base64'), cost: 0.04 }));
+        const r = await startJob(imgAgentAsOwner, { op: 'image', prompt: 'A harbour at dawn.', result_key: 'aijob.gate.image.private' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(imgAgentAsOwner, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const v = (await readMemory(imgAgentAsOwner, 'aijob.gate.image.private')).body.data.value;
+        assert(typeof v.url === 'string' && v.url.startsWith('/v1/storage/'), `a private picture loads through the owner route: ${v.url}`);
+        assert(!(await fileRequestFor(v.storage_key)), 'a request was filed for a private picture');
+    });
+
+    // ── 19j-19m. One press decides the record and its picture (the developer's decision, 2026-10-21) ──
+    const notifsFor = async (id: string): Promise<any[]> => {
+        const r = await json('/v1/notifications?limit=200', { headers: auth(c.token) });
+        assert(r.status === 200, `notifications ${r.status}`);
+        return (r.body.data.notifications ?? []).filter((n: any) => (n.actions ?? []).some((a: any) => String(a.endpoint ?? '').includes(`/v1/publish-requests/${id}/decision`)));
+    };
+    const itemsFor = async (id: string): Promise<any[]> => {
+        const r = await json('/v1/open-items', { headers: auth(c.token) });
+        assert(r.status === 200, `open items ${r.status}`);
+        return (r.body.data.items ?? []).filter((i: any) => i.object?.type === 'publish-request' && i.object?.id === id);
+    };
+    /** A gated public image job, and its two requests: the record's, and the picture's as its part. */
+    const linkedJob = async (resultKey: string) => {
+        const { rec } = await imageJob(imgAgentAsOwner, resultKey);
+        const v = rec.value;
+        const recReq = (await cRequests()).find((r: any) => r.kind === 'memory' && r.target?.key === resultKey && r.target?.namespace === imgAgent.gaii);
+        const fileReq = await fileRequestFor(v.storage_key);
+        assert(recReq && fileReq, `both requests: record ${!!recReq}, picture ${!!fileReq}`);
+        return { v, recReq, fileReq };
+    };
+    const decide = (id: string, decision: string) =>
+        json(`/v1/publish-requests/${id}/decision`, { method: 'POST', headers: auth(c.token), body: JSON.stringify({ decision }) });
+
+    await test('19j. The picture\'s request is a part of the record\'s: one item and one notification name both, the picture has none of its own', async () => {
+        const { v, recReq, fileReq } = await linkedJob('aijob.gate.image.linked');
+        assert(fileReq.part_of === recReq.id, `part_of: ${fileReq.part_of} (record request ${recReq.id})`);
+        assert(Array.isArray(recReq.parts) && recReq.parts.includes(fileReq.id), `parts: ${JSON.stringify(recReq.parts)}`);
+        assert(fileReq.expires_at === recReq.expires_at, 'the part waits as long as the record');
+        const recNotifs = await notifsFor(recReq.id);
+        assert(recNotifs.length === 1, `one notification for the record: ${recNotifs.length}`);
+        const n = recNotifs[0];
+        assert(n.i18n?.key === 'publish_request_with_part' && n.i18n?.vars?.part === v.storage_key && n.i18n?.vars?.what === 'aijob.gate.image.linked',
+            `the notification names the picture: ${JSON.stringify(n.i18n)}`);
+        assert(String(n.title).includes(v.storage_key), `the English title names the picture: ${n.title}`);
+        assert((await notifsFor(fileReq.id)).length === 0, 'the picture has a notification of its own');
+        const recItems = await itemsFor(recReq.id);
+        assert(recItems.length === 1 && String(recItems[0].title).includes(v.storage_key), `one item naming the picture: ${JSON.stringify(recItems.map((i: any) => i.title))}`);
+        assert((await itemsFor(fileReq.id)).length === 0, 'the picture has a list item of its own');
+    });
+
+    await test('19k. Approving the record\'s request alone makes the record AND its picture public', async () => {
+        const { v, recReq, fileReq } = await linkedJob('aijob.gate.image.both');
+        assert((await anonPicture(v.url)).status !== 200, 'the picture is readable before the approval');
+        const ok = await decide(recReq.id, 'approve');
+        assert(ok.status === 200 && ok.body.data.request.state === 'approved', `approve: ${ok.status} ${JSON.stringify(ok.body?.error ?? ok.body?.data)}`);
+        const anonRec = await anonRead(imgAgent.gaii, 'aijob.gate.image.both');
+        assert(anonRec.status === 200, `anonymous read of the record ${anonRec.status}`);
+        const pic = await anonPicture(v.url);
+        assert(pic.status === 200 && Buffer.from(await pic.arrayBuffer()).equals(PNG), `anonymous read of the picture ${pic.status}`);
+        const part = await fileRequestFor(v.storage_key);
+        assert(part?.id === fileReq.id && part.state === 'approved', `the picture's request: ${part?.state}`);
+    });
+
+    await test('19l. Declining the record\'s request declines its picture too: neither is readable', async () => {
+        const { v, recReq } = await linkedJob('aijob.gate.image.none');
+        const no = await decide(recReq.id, 'decline');
+        assert(no.status === 200 && no.body.data.request.state === 'declined', `decline: ${no.status} ${JSON.stringify(no.body?.error ?? no.body?.data)}`);
+        assert((await anonRead(imgAgent.gaii, 'aijob.gate.image.none')).status !== 200, 'the record is readable');
+        assert((await anonPicture(v.url)).status !== 200, 'the picture is readable');
+        const part = await fileRequestFor(v.storage_key);
+        assert(part?.state === 'declined', `the picture's request: ${part?.state}`);
+    });
+
+    await test('19m. Approving the picture\'s request alone makes only the picture public; the record still waits', async () => {
+        const { v, recReq, fileReq } = await linkedJob('aijob.gate.image.pic');
+        const ok = await decide(fileReq.id, 'approve');
+        assert(ok.status === 200 && ok.body.data.request.state === 'approved', `approve the picture: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+        assert((await anonPicture(v.url)).status === 200, 'the picture is not readable after its approval');
+        assert((await anonRead(imgAgent.gaii, 'aijob.gate.image.pic')).status !== 200, 'the record became readable');
+        const rec = (await cRequests()).find((r: any) => r.id === recReq.id);
+        assert(rec?.state === 'awaiting_owner', `the record's request: ${rec?.state}`);
+        assert((await decide(recReq.id, 'decline')).status === 200, 'the record can still be declined');
+        assert((await anonPicture(v.url)).status === 200, 'declining the record took back a picture the owner had approved');
     });
     };
 
