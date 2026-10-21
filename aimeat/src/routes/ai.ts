@@ -22,6 +22,11 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-10-21 — POST /v1/ai/image with public: true asks the node's publish gate as POST /v1/storage
+ *     does: a caller the owner is asked about gets the picture stored private (with its download_url)
+ *     and a file request, answered 202 with `publish_request`; the owner's approval makes it public.
+ *     The owner in person, a caller holding publish:public and a node with the gate off get a public
+ *     picture at once, as before (secaudit 2026-10, ai-image public picture past the publish gate).
  *   2026-10-20 — A private picture's download token names the stored file's version (createdAt), as
  *     every download token now must (services/download-token.ts).
  *   2026-10-18 — POST /v1/ai/settings merges into `openrouter.settings` on the record's version
@@ -104,6 +109,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { aiCallerOf } from './ai-policy.js';
+import { callerOf } from '../middleware/caller.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { aiCallLimit } from '../middleware/ai-call-limit.js';
 import { retryAfterOf } from '../services/account-limits.js';
@@ -412,6 +418,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const r = await generateForOwner(storage, config, gaii, {
           prompt: prompt ?? '', model, size, storageKey: storage_key,
           publicVisibility: isPublic === true, appId: app_id,
+          // A public picture asks the node's publish gate as POST /v1/storage asks it for the same
+          // bytes: a caller the owner is asked about gets it private, with a request (202 below).
+          publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
           ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId),
           ...(typeof provider === 'string' && provider ? { provider } : {}),
           ...(typeof fallback === 'boolean' ? { fallback } : {}),
@@ -427,7 +436,9 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         const download = r.visibility === 'private'
           ? await generateDownloadToken({ sub: gaii, key: r.storageKey, mimeType: r.mime, size: r.sizeBytes, version: r.createdAt }, IMAGE_DOWNLOAD_TTL_SECONDS)
           : null;
-        res.json(success(config.nodeId, {
+        // 202 when the picture was stored private and making it public waits for the owner, as the
+        // storage upload answers it.
+        res.status(r.publishRequest ? 202 : 200).json(success(config.nodeId, {
           storage_key: r.storageKey,
           mime_type: r.mime,
           size: r.sizeBytes,
@@ -435,6 +446,8 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           height: r.height,
           model: r.model,
           visibility: r.visibility,
+          ...(r.publishRequest ? { publish_request: r.publishRequest } : {}),
+          ...(r.warnings?.length ? { warnings: r.warnings } : {}),
           ...(download ? { download_url: `${config.baseUrl}/v1/download/${download}`, download_expires_in_seconds: IMAGE_DOWNLOAD_TTL_SECONDS } : {}),
           // The URL that loads for the audience the visibility implies — the service builds it
           // once. A public image handed back as /v1/storage/ answered 401 to everyone but the

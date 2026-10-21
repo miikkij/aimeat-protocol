@@ -22,6 +22,8 @@
  *   const raise = await fileRaiseAsk(ctx, ownerGaii, key, closed.visibility, gate);
  *   if (raise.kind === 'ask') { ...store at keptFileLevel(raise.existing)..., then fileFilePublishRequest(...) }
  * @version-history
+ *   v1.3.0 — 2026-10-21 — fileFilePublishRequest takes `partOf`: the request is filed as a part of a
+ *     waiting request (publish-requests/parts.ts).
  *   v1.2.0 — 2026-10-18 — fileCapRefusal: a file given a level wider than its label allows is refused
  *     with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.2).
  *   v1.1.0 — 2026-10-18 — closedFileLevel: on a node that shows its content to signed-in accounts
@@ -146,10 +148,14 @@ export type FilePublishFiled =
     | { ok: true; publishRequest: ReturnType<typeof publishRequestedBody> }
     | { ok: false; warning: { code: 'PUBLISH_NOT_ASKED'; message: string } };
 
-/** File the request for a file that was stored (or kept) at the level it had. */
+/**
+ * File the request for a file that was stored (or kept) at the level it had. `partOf` files it as a
+ * part of a waiting request (publish-requests/parts.ts): the picture of a gated public image job.
+ */
 export async function fileFilePublishRequest(
     ctx: PublishStoreCtx, requester: PublishRequester,
     file: Pick<StorageFileRecord, 'ownerGaii' | 'key' | 'createdAt' | 'size' | 'visibility'>,
+    partOf?: string,
 ): Promise<FilePublishFiled> {
     const filed = await fileAsk(ctx, ownerGhiiOf(file.ownerGaii), requester, {
         kind: 'file',
@@ -157,6 +163,7 @@ export async function fileFilePublishRequest(
         title: `the file ${file.key}`,
         name: file.key,
         change: { field: 'visibility', from: file.visibility, to: 'public' },
+        ...(partOf ? { part_of: partOf } : {}),
     });
     if (filed.ok) return { ok: true, publishRequest: publishRequestedBody(ctx, filed) };
     return { ok: false, warning: { code: 'PUBLISH_NOT_ASKED', message: `Stored as ${file.visibility}, not public: ${filed.message}` } };

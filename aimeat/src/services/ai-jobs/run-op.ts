@@ -21,6 +21,14 @@
  * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.8.0 — 2026-10-21 — An image job whose answer is asked public asks the publish gate for the
+ *     picture as the answer's record does, with the same writer (starter.ts jobWriter): an agent
+ *     without publish:public gets the picture stored private and a file request for the owner, whose
+ *     approval makes it public; a starter with nobody here to ask is refused before the provider is
+ *     paid. Before, the picture was public at once while its record waited (secaudit 2026-10, ai-image
+ *     public picture past the publish gate). The owner in person, a job with no starter, an agent
+ *     holding publish:public and a node with the gate off are unchanged. The picture's request is
+ *     handed back as `picturePublish` and filed by service.ts as a part of the record's request.
  *   v1.7.0 — 2026-10-19 — The text call passes `uncapped: true`, and the outcome carries `answer`
  *     { finish_reason, truncated } (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -41,9 +49,10 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai/completion.js';
 import { readAiFile } from '../ai-inputs.js';
-import { jobReader, jobCaller } from './starter.js';
+import { jobReader, jobCaller, jobWriter } from './starter.js';
+import { memoryWriterAsk } from '../memory-publish-gate.js';
 import { warningsNote } from '../classification/reader.js';
-import { generateForOwner } from '../ai-image.js';
+import { generateForOwner, type GenerateForOwnerResult } from '../ai-image.js';
 import { transcribeForOwner } from '../ai-transcription.js';
 import { aiPayerOf } from '../agent-ai-keys.js';
 import { aiOpOf } from './op.js';
@@ -71,6 +80,9 @@ export interface JobOpOutcome {
     /** A text answer only: why the provider stopped, and whether the answer was cut at a token limit.
      *  service.ts puts both on the job record. */
     answer?: { finish_reason: string | null; truncated: boolean };
+    /** An image stored private because making it public waits for the owner: its request is filed by
+     *  service.ts, as a part of the record's request when there is one (picture-request.ts). */
+    picturePublish?: GenerateForOwnerResult['pendingPublish'];
 }
 
 const MB = 1024 * 1024;
@@ -117,6 +129,13 @@ export async function runJobOp(
     const op = aiOpOf(job.op);
 
     if (op === 'image') {
+        // A picture asked to be public meets the publish gate the answer's record meets
+        // (service.ts writeResult), asked once with the same writer: an agent without publish:public
+        // gets the picture stored private and a request for the owner, as it gets the record. A
+        // starter with nobody here to ask is refused before the provider is paid.
+        const wantsPublic = job.result_visibility === 'public';
+        const ask = wantsPublic ? memoryWriterAsk({ storage, config }, jobWriter(job)) : null;
+        if (ask?.kind === 'refused') throw new AiJobError('PUBLISH_NOT_ALLOWED', ask.status, ask.message);
         const r = await generateForOwner(storage, config, payer, {
             ...common,
             // The job's start (POST /v1/ai/jobs, aimeat_ai_job_start) counted the AI call limit;
@@ -126,12 +145,16 @@ export async function runJobOp(
             ...(job.size ? { size: job.size } : {}),
             // A public result record that pointed at a private picture would answer 401 to every
             // reader it was made public for, so the picture follows the record's visibility.
-            publicVisibility: job.result_visibility === 'public',
+            publicVisibility: wantsPublic,
+            // The picture's request is filed by service.ts once the record's own request exists, as a
+            // part of it (publish-requests/parts.ts): one item, one notification, one press.
+            ...(ask?.kind === 'ask' ? { publishGate: { requester: ask.requester }, deferRequest: true } : {}),
         });
         return {
             value: { storage_key: r.storageKey, url: r.fetchUrl, mime_type: r.mime, model: r.model },
             parseJson: false,
             spend: { cost_usd: r.usage.costUsd, ...(r.provenance ? { provenance_id: r.provenance.id } : {}) },
+            ...(r.pendingPublish ? { picturePublish: r.pendingPublish } : {}),
         };
     }
 

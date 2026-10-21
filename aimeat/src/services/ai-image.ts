@@ -21,6 +21,15 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.11.0 -- 2026-10-21 -- `publishGate`: a picture asked to be public by a caller the node's publish
+ *     gate asks the owner about is stored private and files a request of kind 'file', as an upload of
+ *     the same bytes would (services/storage-file-publish.ts); the owner's approval makes it public.
+ *     The answer's `fetchUrl` is then the public address the approval opens, and `publishRequest`
+ *     says what waits. A caller with nobody to ask (a visitor) is refused 403 PUBLISH_NOT_ALLOWED
+ *     before anything is spent. Without `publishGate`, and for the owner in person, a caller holding
+ *     publish:public or a node with the gate off, the picture is public at once as before (secaudit
+ *     2026-10, ai-image public picture past the publish gate). `deferRequest` leaves the filing to the
+ *     caller (`pendingPublish`): the AI job files the picture as a part of its record's request.
  *   v2.10.1 -- 2026-10-20 -- The result carries the stored file's createdAt, the version a download
  *     token for the picture is bound to (services/download-token.ts).
  *   v2.10.0 -- 2026-10-18 -- Takes reference pictures and a mask (read by the caller with
@@ -59,7 +68,7 @@
  *     picture here and it is a developer's script rather than a capability of the node.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
+import type { Storage, AiProvenanceRecordRow, StorageFileRecord } from '../storage/interface.js';
 import {
   AiCompletionError, prepareAiCall, settleAiCall, planFor, recordFailedAttempts, type AiCallPlan,
 } from './ai/completion.js';
@@ -74,6 +83,11 @@ import type { CallerClass } from './ai/policy.js';
 import type { RequestLanguage } from './ai/ai-fix-words.js';
 import { logger } from '../utils/logger.js';
 import { requireAiCallTurn, type AiCallLimitMark } from './account-limits.js';
+import {
+  fileRaiseAsk, fileFilePublishRequest, type StoragePublishGate, type FilePublishFiled,
+} from './storage-file-publish.js';
+import { publishAskOf } from './publish-requests/ask.js';
+import type { PublishRequester } from './publish-requests/store.js';
 
 /**
  * Said when neither the call, the owner nor the node has named an image model. Lives in
@@ -94,6 +108,17 @@ export interface GenerateForOwnerOptions {
   storageKey?: string;
   /** Make the stored image publicly readable. Needed when a model has to fetch it back by URL. */
   publicVisibility?: boolean;
+  /**
+   * Ask the node's publish gate when `publicVisibility` makes the picture public, as an upload of the
+   * same bytes asks it (services/storage-file-publish.ts): the caller that asked, as the route's
+   * callerOf or the MCP session's caller(). A caller the node asks the owner about gets the picture
+   * stored private and a request of kind 'file'. The doors and the AI job set it; left unset, the
+   * picture is public as asked, which is the node's own work.
+   */
+  publishGate?: StoragePublishGate;
+  /** Store the picture private as the gate says but leave filing the request to the caller, which
+   *  gets `pendingPublish` back: the AI job files it as a part of its record's request. */
+  deferRequest?: boolean;
   /** App/source attribution — enables the app allowlist and per-app quota. */
   appId?: string;
   /** The owner's agent that asked, by bare name: its own key pays first and its cap applies. The
@@ -151,6 +176,32 @@ export interface GenerateForOwnerResult {
   referenceCount: number;
   /** With a mask: whether the provider's own mask parameter carried it, or the prompt (MaskMode). */
   maskMode?: MaskMode;
+  /** The picture was asked to be public and waits for the owner: it is stored private, and this is the
+   *  request the owner answers (publishRequestedBody). A door answers 202 with it. */
+  publishRequest?: Extract<FilePublishFiled, { ok: true }>['publishRequest'];
+  /** Why no request was filed for a picture stored private instead of public (PUBLISH_NOT_ASKED). */
+  warnings?: Array<Extract<FilePublishFiled, { ok: false }>['warning']>;
+  /** With `deferRequest`: the picture waits for a request the caller files (fileFilePublishRequest). */
+  pendingPublish?: { requester: PublishRequester; file: Pick<StorageFileRecord, 'ownerGaii' | 'key' | 'createdAt' | 'size' | 'visibility'> };
+}
+
+/**
+ * Who asks the owner to make the picture public, decided before anything is spent: null when the
+ * picture is not asked to be public or the caller may make it public on its own. A caller with nobody
+ * on this node to ask (a visitor, the anonymous identity) is refused here, unless the key it names
+ * holds a public file already, which keeping public asks nothing (mintPublishCarry's rule).
+ */
+async function publicPictureRequester(
+  storage: Storage, config: AimeatConfig, gaii: string, opts: GenerateForOwnerOptions,
+): Promise<PublishRequester | null> {
+  if (!opts.publicVisibility || !opts.publishGate) return null;
+  if ('requester' in opts.publishGate) return opts.publishGate.requester;
+  const ask = publishAskOf({ storage, config }, opts.publishGate.caller, opts.publishGate.app);
+  if (ask.kind === 'allowed') return null;
+  if (ask.kind === 'ask') return ask.requester;
+  const existing = opts.storageKey ? await storage.getStorageFileMeta(gaii, opts.storageKey) : null;
+  if (existing?.visibility === 'public') return null;
+  throw new AiCompletionError(ask.code, ask.status, ask.message);
 }
 
 /** `image/png` -> `png`, defaulting to png rather than guessing something exotic. */
@@ -191,6 +242,9 @@ export async function generateForOwner(
     throw new AiCompletionError('PROMPT_TOO_LONG', 400,
       `Prompt is ${prompt.length} characters; the limit is ${MAX_PROMPT_CHARS}.`);
   }
+  // A public picture by a caller with nobody here to ask is refused now, before the provider is paid;
+  // one the owner is asked about is stored private below and the request filed once it exists.
+  const requester = await publicPictureRequester(storage, config, gaii, opts);
   // POST /v1/ai/image and aimeat_image_generate both arrive here: one count per account, before any spend.
   requireAiCallTurn(config, gaii, opts.limit);
 
@@ -235,9 +289,16 @@ export async function generateForOwner(
 
   const key = opts.storageKey
     || `ai-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensionFor(result.mime)}`;
-  const visibility = opts.publicVisibility ? 'public' as const : 'private' as const;
+  // The publish gate, as an upload of these bytes meets it (services/storage-file-write.ts): a raise to
+  // public by a caller the owner is asked about stores the picture private and files a request once it
+  // exists. Keeping a public file at this key public asks nothing (fileRaiseAsk).
+  const raise = requester
+    ? await fileRaiseAsk({ storage, config }, gaii, key, 'public', { requester })
+    : { kind: 'none' as const };
+  const asked = raise.kind === 'ask' ? raise.requester : null;
+  const visibility = opts.publicVisibility && !asked ? 'public' as const : 'private' as const;
   const createdAt = new Date().toISOString();
-  await storage.createStorageFile({
+  const file = await storage.createStorageFile({
     key,
     ownerGaii: gaii,
     visibility,
@@ -266,6 +327,10 @@ export async function generateForOwner(
     await storage.setStorageFileProvenance(gaii, key, settled.provenance.id).catch((err: unknown) =>
       logger.warn(`[image] the picture was stored without its provenance link: ${String(err)}`, { key }));
   }
+  // The request the publish gate asked for, now that the picture it names exists. It names the bytes
+  // by the stored createdAt and size, which the provenance link above does not change (apply-file.ts).
+  const filed = asked && !opts.deferRequest ? await fileFilePublishRequest({ storage, config }, asked, file) : null;
+  const pending = asked && opts.deferRequest ? { requester: asked, file } : null;
 
   logger.info(`[image] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} `
     + `bytes=${result.data.length} cost=$${costUsd.toFixed(6)} day_total=$${settled.usage.total_cost_usd.toFixed(4)}`);
@@ -274,7 +339,10 @@ export async function generateForOwner(
   const spent = settled.usage.total_cost_usd;
   return {
     storageKey: key,
-    fetchUrl: imageFetchUrl(visibility, gaii, key),
+    // A picture that waits for the owner's approval answers the public address the approval opens,
+    // so a record or a page that keeps it loads it once approved; until then it answers only those
+    // who may read the owner's private files.
+    fetchUrl: imageFetchUrl(filed?.ok || pending ? 'public' : visibility, gaii, key),
     mime: result.mime,
     sizeBytes: result.data.length,
     createdAt,
@@ -293,5 +361,8 @@ export async function generateForOwner(
     route: { ...route, attempts: route.attempts.map(a => a.ok ? { ...a, costUsd } : a) },
     referenceCount: opts.references?.length ?? 0,
     ...(result.maskMode ? { maskMode: result.maskMode } : {}),
+    ...(filed?.ok ? { publishRequest: filed.publishRequest } : {}),
+    ...(filed && !filed.ok ? { warnings: [filed.warning] } : {}),
+    ...(pending ? { pendingPublish: pending } : {}),
   };
 }

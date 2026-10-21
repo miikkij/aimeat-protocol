@@ -22,6 +22,9 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.15.0 — 2026-10-21 — A gated image job's private picture gets its publish request after the
+ *     answer's record is written, as a part of the record's request (picture-request.ts), so one press
+ *     decides both; on its own when the record asked nothing, failed or the job was cancelled.
  *   v1.14.0 — 2026-10-21 — Every use that worked before keeps working (the developer's rule for the
  *     round): the answer's write starts no trigger or recipe (`noTriggers`), as before; what the
  *     write would refuse and the start can know (organism key, archived record, a schema lock that
@@ -102,7 +105,8 @@ import { warningsNote } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
 import { fireOnDone } from './on-done.js';
 import { aiOpOf, aiOpRefusal } from './op.js';
-import { runJobOp, assertAudioInReach } from './run-op.js';
+import { runJobOp, assertAudioInReach, type JobOpOutcome } from './run-op.js';
+import { fileJobPictureRequest } from './picture-request.js';
 import { takeAiCall } from '../account-limits.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
@@ -416,6 +420,14 @@ export class AiJobService implements AiJobStarter {
             return;
         }
 
+        // A picture stored private while making it public waits for the owner (picture-request.ts):
+        // its request is filed once, as a part of the record's request or on its own.
+        let picture: JobOpOutcome['picturePublish'];
+        const filePicture = async (recordRequestId?: string) => {
+            const pending = picture;
+            picture = undefined;
+            await fileJobPictureRequest({ storage: this.storage, config: this.config }, pending, recordRequestId);
+        };
         try {
             entry.job = { ...entry.job, state: 'running', started_at: new Date().toISOString() };
             await writeJob(this.storage, entry.job);
@@ -433,6 +445,7 @@ export class AiJobService implements AiJobStarter {
             // cancelled call is not a free call, and a record that dropped them would make the spend
             // charts disagree with the usage row that is already written.
             const spend = outcome.spend;
+            picture = outcome.picturePublish;
             // What the call itself read (a transcription's audio) joins what the prompt held.
             if (outcome.warnings?.length) {
                 const had = entry.job.classification_warnings ?? [];
@@ -444,11 +457,13 @@ export class AiJobService implements AiJobStarter {
             if (outcome.answer) entry.job = { ...entry.job, ...outcome.answer };
 
             if (entry.controller.signal.aborted) {
+                await filePicture();
                 await this.finish(jobId, { state: 'cancelled', ...spend });
                 return;
             }
 
             const written = await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
+            await filePicture(written.requestId);
             // Before the callback, so readResult already hands the answer to the on_done action.
             // Stored too, not only kept in this process: a restart during on_done folds the stored
             // record into the log, and ctx.ai.result reads the answer from there. The visibility is
@@ -475,6 +490,8 @@ export class AiJobService implements AiJobStarter {
 
             await this.finish(jobId, { state: 'done', ...spend });
         } catch (err) {
+            // The picture exists and stays private: its request is still the owner's to answer.
+            await filePicture();
             if (entry.controller.signal.aborted) {
                 await this.finish(jobId, { state: 'cancelled' });
                 return;
@@ -501,7 +518,7 @@ export class AiJobService implements AiJobStarter {
      *  Answers with the value stored, the version it was stored at and the visibility it got. */
     private async writeResult(
         job: AiJobRecord, answer: unknown, parseJson: boolean, provenanceId?: string,
-    ): Promise<{ value: unknown; version: number; visibility: AiJobRecord['result_visibility'] }> {
+    ): Promise<{ value: unknown; version: number; visibility: AiJobRecord['result_visibility']; requestId?: string }> {
         let value: unknown = answer;
         if (parseJson) {
             // Parsed HERE when the job asked for JSON, so a malformed answer fails at the job rather
@@ -545,7 +562,13 @@ export class AiJobService implements AiJobStarter {
                 // read the substance on this path, so `humanInvolvement: 'none'` stands untouched.
                 ...(provenanceId ? { declaredProvenanceId: provenanceId } : {}),
             });
-            if (written.ok) return { value, version: written.record.version, visibility: written.record.visibility };
+            if (written.ok) {
+                return {
+                    value, version: written.record.version, visibility: written.record.visibility,
+                    // The record's own publish request, which a picture's request joins as a part.
+                    ...(written.publishRequest ? { requestId: written.publishRequest.request_id } : {}),
+                };
+            }
             if (written.code === 'VERSION_CONFLICT') continue;
             throw new AiJobError(written.code, written.status, written.message);
         }
