@@ -15,11 +15,12 @@
  *   another path, https, a non-loopback host on another port, and the token request on a different
  *   port from the one the code was issued for.
  * @structure
- *   - Phase 0: an operator, an owner, the owner's agent, a client registered with the two portless
- *     loopback addresses and one https address
+ *   - Phase 0: an operator, an owner, a second owner, the owner's agent, a client registered with
+ *     the two portless loopback addresses and one https address
  *   - Phase 1: GET /v1/mcp/authorize accepts any port on a registered loopback address
- *   - Phase 2: POST /v1/mcp/authorize-consent sends the code to the ported address; POST /v1/mcp/token
- *     redeems it with that address and refuses another port
+ *   - Phase 2: POST /v1/mcp/authorize-consent refuses the second owner (403) and sends the owner's
+ *     code to the ported address; POST /v1/mcp/token redeems it with that address and refuses
+ *     another port
  *   - Phase 3: the refusals: other host, other path, https loopback, non-loopback port
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-oauth-loopback
  * @version-history
@@ -65,6 +66,7 @@ const short = (v: unknown) => JSON.stringify(v).slice(0, 240);
 const stamp = Date.now().toString(36).slice(-5);
 
 let owner: RegisteredOwner;
+let stranger: RegisteredOwner;
 let agent: McpAgent;
 let clientId = '';
 let clientSecret = '';
@@ -77,11 +79,11 @@ function authorize(redirectUri: string, pkce: McpPkce = mcpPkce(BASE)) {
     return json(`/v1/mcp/authorize?${q}`);
 }
 
-function consent(redirectUri: string, pkce: McpPkce) {
+function consent(redirectUri: string, pkce: McpPkce, ownerToken = owner.token) {
     return json('/v1/mcp/authorize-consent', {
         method: 'POST',
         body: JSON.stringify({
-            client_id: clientId, gaii: agent.gaii, owner_token: owner.token, state: 'loop',
+            client_id: clientId, gaii: agent.gaii, owner_token: ownerToken, state: 'loop',
             redirect_uri: redirectUri, ...authorizeParams(pkce),
         }),
     });
@@ -108,6 +110,7 @@ console.log('\nPhase 0 — an owner, an agent, a client with portless loopback r
 await test('setup: operator, owner, agent, registered client', async () => {
     await registerOwner(BASE, `loopop${stamp}`);         // the first owner is the operator
     owner = await registerOwner(BASE, `loop${stamp}`);
+    stranger = await registerOwner(BASE, `loopx${stamp}`);
     agent = await makeAgent(BASE, owner, ['memory:read']);
     const reg = await json('/v1/mcp/register', {
         method: 'POST',
@@ -137,6 +140,12 @@ console.log('\nPhase 2 — consent and token on the port the client chose');
 const PORTED = 'http://localhost:62067/callback';
 const pkce = mcpPkce(BASE);
 let code = '';
+
+await test('another owner cannot approve this owner\'s agent on the ported address: 403, and no code', async () => {
+    const r = await consent(PORTED, mcpPkce(BASE), stranger.token);
+    assert(r.status === 403 && r.body.error === 'access_denied', `a second owner approved: ${r.status} ${short(r.body)}`);
+    assert(!('code' in r.body) && !('redirect_url' in r.body), `a code leaked: ${short(r.body)}`);
+});
 
 await test('consent sends the code to the ported address, port included', async () => {
     const r = await consent(PORTED, pkce);
