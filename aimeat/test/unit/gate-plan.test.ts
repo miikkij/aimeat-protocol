@@ -6,6 +6,8 @@
  * must retain changed suites, shared security code must select the guard tier, and a storage,
  * identity, door or runner change must select the PostgreSQL legs without being asked.
  * @version-history
+ *   2026-10-21 -- The purpose tier is selected wherever the guard tier is, on the same backends; red on
+ *     the planner before the change (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
  *   2026-10-18 -- aimeat-crewai, the offer and signal schemas and the shape allowlist select the Python
  *     parity tests; an unrelated change does not.
  *   2026-10-17 -- A changed suite or test/version-aware-suites.txt selects the version-aware suite list check.
@@ -128,5 +130,20 @@ describe('PostgreSQL runs by itself for storage, identity, door and runner chang
     });
     it('--postgres still forces the legs for any change', () => {
         expect(plan('aimeat/src/services/board-ttl.ts', '--postgres')).toContain('guard tier, Postgres');
+    });
+});
+
+describe('the purpose tier runs wherever the guard tier runs (docs/pitfalls.md §126)', { timeout: 30_000 }, () => {
+    it('a server source change selects it on SQLite, and on Postgres when the legs run', () => {
+        const sqlite = plan('aimeat/src/services/board-ttl.ts');
+        expect(sqlite).toContain('purpose tier, SQLite');
+        expect(sqlite).not.toContain('purpose tier, Postgres');
+        expect(plan('aimeat/src/routes/memory/crud.ts')).toContain('purpose tier, Postgres');
+        expect(plan('aimeat/src/services/board-ttl.ts', '--postgres')).toContain('purpose tier, Postgres');
+    });
+    it('a change that skips the guard tier skips it too, and says so', () => {
+        const output = plan('docs/example.md');
+        expect(output).not.toContain('purpose tier, SQLite');
+        expect(output).toContain('skipped: guard and purpose tiers');
     });
 });
