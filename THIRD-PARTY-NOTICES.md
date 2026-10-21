@@ -102,7 +102,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 493 npm packages that travel inside the `aimeat` package. Build and test
+The 490 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -118,7 +118,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.53 | Apache-2.0 |
 | [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.21 | Apache-2.0 |
 | [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.14 | Apache-2.0 |
-| [@cbor-extract/cbor-extract-win32-x64](https://github.com/kriszyp/cbor-extract#readme) | 2.2.2 | MIT |
 | [@cfworker/json-schema](https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md) | 4.1.1 | MIT |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
@@ -248,7 +247,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [call-bind](https://github.com/ljharb/call-bind#readme) | 1.0.9 | MIT |
 | [call-bound](https://github.com/ljharb/call-bound#readme) | 1.0.4 | MIT |
 | [camelcase](https://github.com/sindresorhus/camelcase#readme) | 5.3.1 | MIT |
-| [cbor-extract](https://github.com/kriszyp/cbor-extract#readme) | 2.2.2 | MIT |
 | [cbor-x](https://github.com/kriszyp/cbor-x#readme) | 1.6.8 | MIT |
 | [chalk](https://github.com/chalk/chalk#readme) | 4.1.2 | MIT |
 | [chance](http://chancejs.com) | 1.1.13 | MIT |
@@ -422,7 +420,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
 | [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
-| [node-gyp-build-optional-packages](https://github.com/prebuild/node-gyp-build) | 5.1.1 | MIT |
 | [nodemailer](https://nodemailer.com/) | 10.0.13 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
@@ -3814,7 +3811,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### cbor-extract 2.2.2, cbor-x 1.6.8
+### cbor-x 1.6.8
 
 ```text
 MIT License
@@ -9074,32 +9071,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
-
-### node-gyp-build-optional-packages 5.1.1
-
-```text
-The MIT License (MIT)
-
-Copyright (c) 2017 Mathias Buus
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 ```
 
 ### nodemailer 10.0.13
