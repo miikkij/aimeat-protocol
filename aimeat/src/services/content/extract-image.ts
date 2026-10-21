@@ -15,9 +15,11 @@
  *
  *   A failure in exifr is recorded in `errors.exif` and the picture still gets its format and its
  *   size from the IHDR chunk or from sniffImage (services/openrouter.ts).
- * @structure readImageFacts · pngHeader · isoOf · textOf
+ * @structure readImageFacts · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
  * @usage const { facts, digitalSourceType, software, errors } = await readImageFacts(bytes, 'image/png');
  * @version-history
+ *   v1.1.0 — 2026-10-21 — WebP: its EXIF and XMP chunks are read (webpMetadataAsJpeg), and a WebP with
+ *     neither gets no error. 349 of 1157 pictures on aimeat.io were WebP and all got "Unknown file format".
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import exifr from 'exifr';
@@ -97,6 +99,40 @@ function compact<T extends object>(o: T): T {
   return o;
 }
 
+/** One JPEG APP1 segment: its marker, its length (the two length bytes included) and its payload. */
+function app1(payload: Buffer): Buffer | null {
+  if (payload.length + 2 > 0xffff) return null;
+  const head = Buffer.from([0xff, 0xe1, 0, 0]);
+  head.writeUInt16BE(payload.length + 2, 2);
+  return Buffer.concat([head, payload]);
+}
+
+/**
+ * A WebP's EXIF and XMP chunks as a JPEG holding only those segments, which exifr reads; null when
+ * the WebP carries neither. RIFF chunks: a four-character id, a little-endian size, the data, padded
+ * to an even length.
+ */
+export function webpMetadataAsJpeg(webp: Buffer): Buffer | null {
+  const segments: Buffer[] = [];
+  for (let at = 12; at + 8 <= webp.length;) {
+    const id = webp.toString('latin1', at, at + 4);
+    const size = webp.readUInt32LE(at + 4);
+    const data = webp.subarray(at + 8, Math.min(webp.length, at + 8 + size));
+    if (id === 'EXIF') {
+      // Some writers keep the JPEG "Exif\0\0" prefix in the chunk, others start at the TIFF header.
+      const tiff = data.toString('latin1', 0, 6) === 'Exif\0\0' ? data.subarray(6) : data;
+      const seg = app1(Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]));
+      if (seg) segments.push(seg);
+    } else if (id === 'XMP ') {
+      const seg = app1(Buffer.concat([Buffer.from('http://ns.adobe.com/xap/1.0/\0', 'latin1'), data]));
+      if (seg) segments.push(seg);
+    }
+    at += 8 + size + (size % 2);
+  }
+  if (!segments.length) return null;
+  return Buffer.concat([Buffer.from([0xff, 0xd8]), ...segments, Buffer.from([0xff, 0xd9])]);
+}
+
 /**
  * The facts a picture carries about itself.
  * @param {Buffer} bytes - The file.
@@ -112,8 +148,12 @@ export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
   const format = (mime.startsWith('image/') ? mime.slice(6) : sniff.mime?.slice(6)) || undefined;
 
   let out: Record<string, Seg> = {};
-  try {
-    const parsed: unknown = await exifr.parse(bytes, {
+  // exifr does not read WebP. Its EXIF and XMP chunks are handed over as a JPEG that holds only
+  // those two segments; a WebP that has neither is read for its size only, with no error.
+  const isWebp = bytes.length >= 12 && bytes.toString('latin1', 0, 4) === 'RIFF' && bytes.toString('latin1', 8, 12) === 'WEBP';
+  const source = isWebp ? webpMetadataAsJpeg(bytes) : bytes;
+  if (source) try {
+    const parsed: unknown = await exifr.parse(source, {
       tiff: true, ifd0: true, exif: true, gps: true, iptc: true, xmp: true, icc: true, ihdr: true,
       mergeOutput: false, reviveValues: false, translateValues: false, translateKeys: true,
     } as never);

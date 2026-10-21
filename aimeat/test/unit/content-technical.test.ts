@@ -322,4 +322,43 @@ describe('measureText', () => {
     expect(measureText('one two\r\nthree', 'file')).toEqual({ chars: 14, words: 3, lines: 2, from: 'file' });
     expect(measureText('äö 😀', 'model')).toEqual({ chars: 4, words: 2, lines: 1, from: 'model' });
   });
+
+  it('measures a text of tens of megabytes without overflowing the stack', () => {
+    const big = '{"h":[' + '1,'.repeat(15_000_000) + '1]}';
+    const m = measureText(big, 'file');
+    expect(m.chars).toBe(big.length);
+    expect(m.words).toBe(1);
+    expect(m.lines).toBe(1);
+  });
+});
+
+/** A RIFF WebP with only the chunks given: enough for the metadata reader, not a picture to show. */
+function webp(chunks: Array<[string, Buffer]>): Buffer {
+  const body = chunks.map(([id, data]) => {
+    const head = Buffer.alloc(8);
+    head.write(id, 0, 'latin1');
+    head.writeUInt32LE(data.length, 4);
+    return Buffer.concat([head, data, data.length % 2 ? Buffer.alloc(1) : Buffer.alloc(0)]);
+  });
+  const riff = Buffer.alloc(12);
+  riff.write('RIFF', 0, 'latin1');
+  riff.writeUInt32LE(4 + body.reduce((n, b) => n + b.length, 0), 4);
+  riff.write('WEBP', 8, 'latin1');
+  return Buffer.concat([riff, ...body]);
+}
+
+describe('readTechnicalFacts: WebP', () => {
+  it('reads the AI mark in a WebP\'s XMP chunk', async () => {
+    const t = (await readTechnicalFacts({ config, storage }, { bytes: webp([['XMP ', Buffer.from(aiXmp(), 'utf8')]]), mimeType: 'image/webp', filename: 'made.webp', ffprobePath: 'ffprobe' })).technical;
+    expect(t.kind).toBe('image');
+    expect(t.errors?.exif).toBeUndefined();
+    expect(t.ai.verdict).toBe('ai-generated');
+    expect(t.ai.sources.some((s) => s.from === 'iptc')).toBe(true);
+  });
+
+  it('gives a WebP without metadata no error', async () => {
+    const t = (await readTechnicalFacts({ config, storage }, { bytes: webp([['VP8L', Buffer.alloc(10)]]), mimeType: 'image/webp', filename: 'plain.webp', ffprobePath: 'ffprobe' })).technical;
+    expect(t.errors?.exif).toBeUndefined();
+    expect(t.ai.verdict).toBe('unknown');
+  });
 });
