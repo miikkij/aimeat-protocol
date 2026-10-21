@@ -34,7 +34,7 @@ Every request runs as exactly one **principal**. Get the principal + its trust t
 
 ---
 
-## 2. The nineteen invariants (the DNA: every change must preserve these)
+## 2. The twenty invariants (the DNA: every change must preserve these)
 
 ### 1. Authorize against the *resolved* identity, never a client-supplied id
 Ask the caller object. On a route, `callerOf(req, config.nodeId, storage)` (`src/middleware/caller.ts`)
@@ -459,6 +459,33 @@ carry no session id, grants that name the principal as GRANTEE not owner, member
 arrays keyed by bare name, subscriptions, caches, issued share references, peer replicas) and reach
 each one, or re-check authority at use time. A GAII is rebuilt from a name, so a grant left behind
 rebinds to the next holder of that name.
+
+### 20. A fix makes a use safe; it never removes the use
+
+Every use that worked before a security fix keeps working after it: unchanged, through a one-press
+consent the owner gives where they already are, or through a once-only step that keeps state that
+existed at the update. A behaviour changes only where a confirmed hole requires it. Removing a
+designed capability is a design decision for the developer, never a fix (Jouni, 2026-10-21).
+
+The October 2026 audit's second wave fixed 21 confirmed holes and removed more than a dozen designed
+uses in the same change, with every suite green: "bring your own key" through a shared extension,
+the first use of a key by the owner's own apps and chat AI, the owner's agents reading the owner's
+packages, published apps that needed a new word, the App Catalog popups in anonymous mode, old
+app-made schedules, visitors during a network outage. Each fix proved the attack was refused; none
+proved the path's users still worked (`docs/pitfalls.md` §126).
+
+What AIMEAT is for, which a fix keeps: people own their data and their secrets; extensions are a
+service other accounts call, made safe by transparency (readable source, declared secrets and
+addresses, a one-press approval that shows what goes where and why); the owner's agents and apps act
+for the owner and never read less than another account's agent; a published app's permissions
+change only when its author republishes it; anonymous mode and visitors without registration are
+supported; what exists at the update keeps working; the docs and prompts are the instructions people
+followed; a refusal the owner cannot answer is a break.
+
+*Check:* for each new refusal, a test that the legitimate use still works (green before and after the
+fix) beside the fail-first test of the attack. Before a security round goes to main: a
+capability-loss review and a behaviour-change list the developer approves
+(`.claude/skills/security-audit/AIMEAT-PURPOSE.md`).
 
 ## 3. Security posture: one codebase, localhost-flexible → public-strict
 
