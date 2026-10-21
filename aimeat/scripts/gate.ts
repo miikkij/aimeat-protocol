@@ -16,6 +16,8 @@
  *     guard tier    when a change touches server source (anything under src/ but src/static), the
  *                   dependency manifests or the E2E machinery (runner, helpers, fixtures); on
  *                   SQLite, and on PostgreSQL too when the Postgres legs run; --full forces it
+ *     purpose tier  whenever the guard tier runs, on the same backends: the suites that prove a
+ *                   designed use still works (test/run-e2e-ci.ts PURPOSE_SUITES)
  *     Python parity the aimeat-crewai offer and signal tests (tests/test_node_schema_parity.py,
  *                   tests/test_offers.py) through uv on Python 3.12, when the package, the offer and
  *                   signal schemas or the shape allowlist changed; --full forces it. No uv fails.
@@ -38,6 +40,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-10-21 -- The purpose tier runs wherever the guard tier runs (pnpm test:e2e:purpose:*), so a fix
+ *     that removes a designed use turns the gate red (docs/pitfalls.md §126).
  *   2026-10-18 -- The Python parity tests run when aimeat-crewai, the offer or signal schemas or the
  *     shape allowlist changed (scripts/python-parity-test.ts; Jouni's yes to the pytest in the gate).
  *   2026-10-17 -- A changed suite (or the list itself) runs test/unit/version-aware-suites.test.ts, which
@@ -211,6 +215,11 @@ function plan(files: string[], mergeBase: string): Step[] {
         const why = FULL ? '--full' : guarded.slice(0, 4).join(', ') + (guarded.length > 4 ? ', …' : '');
         steps.push({ name: 'guard tier, SQLite', cmd: ['pnpm', '-s', 'test:e2e:guards:sqlite'], why });
         if (POSTGRES) steps.push({ name: 'guard tier, Postgres', cmd: ['pnpm', '-s', 'test:e2e:guards:postgres-kysely'], why: postgresReason ?? '' });
+        // The purpose tier runs wherever the guard tier does: the guard tier proves a hole is closed,
+        // this one that a designed use still works (docs/pitfalls.md §126, wish
+        // wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
+        steps.push({ name: 'purpose tier, SQLite', cmd: ['pnpm', '-s', 'test:e2e:purpose:sqlite'], why });
+        if (POSTGRES) steps.push({ name: 'purpose tier, Postgres', cmd: ['pnpm', '-s', 'test:e2e:purpose:postgres-kysely'], why: postgresReason ?? '' });
     }
 
     // The unit files with a PostgreSQL half run it against the Postgres test database whenever the
@@ -257,7 +266,7 @@ async function main(): Promise<void> {
     const skipped: string[] = [];
     if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
     if (!FULL && !files.some(f => PYTHON_PARITY.test(f))) skipped.push('Python parity tests (no aimeat-crewai, offer schema or shape-allowlist change)');
-    if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard tier (no server source, dependency or E2E machinery changed)');
+    if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard and purpose tiers (no server source, dependency or E2E machinery changed)');
     if (postgresWhy(files) === null) skipped.push('PostgreSQL legs (no storage, identity, door or runner change; --postgres forces them)');
     for (const s of skipped) console.log(`  · skipped: ${s}`);
     console.log('');

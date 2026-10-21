@@ -10,7 +10,11 @@
  *   node --import tsx test/run-e2e-ci.ts --guards
  *   node --import tsx test/run-e2e-ci.ts --tests-file=<path>   (one suite name a line)
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
+ *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-21 -- PURPOSE_SUITES and --purpose: the purpose tier, eleven suites that prove what AIMEAT
+ *     is for still works, five of them new (test/e2e-purpose-*.ts); pnpm gate runs it with the guard
+ *     tier, and a skipped test in it is red as in the guard tier (docs/pitfalls.md §126).
  *   2026-10-21 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
  *     own node on 40451, against the sandbox's decision and completion stand-ins.
  *   2026-10-20 -- e2e-mcp-modern.ts joins the list (not the guard tier): MCP 2026-07-28 on the
@@ -1463,6 +1467,12 @@ const ALL_SUITES = [
     'test/e2e-memory-bin-purge.ts',
     'test/e2e-docsign-caller-refusals.ts',
     'test/e2e-docsign-validation.ts',
+    // The purpose suites (PURPOSE_SUITES below): a designed use of AIMEAT, end to end, named in each title.
+    'test/e2e-purpose-shared-extensions.ts',
+    'test/e2e-purpose-owner-reach.ts',
+    'test/e2e-purpose-visitors.ts',
+    'test/e2e-purpose-update-keeps.ts',
+    'test/e2e-purpose-agent-work.ts',
 ];
 
 /**
@@ -1701,6 +1711,44 @@ const GUARD_SUITES = [
     'test/e2e-concurrency.ts',              // parallel spending, work and posting never double-spend or lose a write
 ];
 
+/**
+ * THE PURPOSE TIER: the suites that prove what AIMEAT is FOR still works. `--purpose` runs them, and
+ * pnpm gate runs them whenever it runs the guard tier, on the same backends and the same
+ * production-settings lane.
+ *
+ * WHY A SECOND TIER. The guard tier asks one question, "is a hole closed?", and every suite in it
+ * asserts a refusal. The October 2026 audit's second wave fixed 21 holes and in the same change
+ * removed more than a dozen designed uses (bring your own key through a shared extension, the owner's
+ * agents reading the owner's packages, the App Catalog popups in anonymous mode, old app-made
+ * schedules), with both tiers green, because no suite that the gate ran asserted the use. This tier
+ * asks the other question: does the use still work? (docs/pitfalls.md §126, security DNA invariant 20,
+ * .claude/skills/security-audit/AIMEAT-PURPOSE.md.)
+ *
+ * WHAT BELONGS HERE. A suite whose tests each name one designed use in plain words and fail when the
+ * use is removed, proved once by disabling the use in source and seeing red. A new designed
+ * capability adds its purpose test here in the change that ships it. A suite already in GUARD_SUITES
+ * is not listed again (the gate runs both tiers, and a suite in both would run twice); the guard
+ * suites that also prove a use are named in docs/coding-guidelines/testing-requirements.md (Rule 1c).
+ * A suite joins the way a guard suite does: alone, on a freshly deleted database, in the
+ * production-settings lane, three consecutive identical green runs on BOTH backends. A skipped test
+ * here is red, as in the guard tier: a purpose test that did not run proved nothing.
+ */
+const PURPOSE_SUITES = [
+    // Written for the tier (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni), 2026-10-21.
+    'test/e2e-purpose-shared-extensions.ts', // another account calls an extension, pays its way, and brings its own key; the author never sees it
+    'test/e2e-purpose-owner-reach.ts',       // the owner's agents and apps read and write the owner's data, never less than a stranger's agent
+    'test/e2e-purpose-visitors.ts',          // visitors without registration, and anonymous mode on a node of its own
+    'test/e2e-purpose-update-keeps.ts',      // a published app that reads data packages keeps working after the update's keep step
+    'test/e2e-purpose-agent-work.ts',        // an agent's schedule, workflow and delegated task do their work
+    // Existing suites chosen because they prove a designed use end to end, each green on this lane.
+    'test/e2e-secrets-approvals.ts',         // the owner's apps, chat AI and unattended runs make a key's first use; one press for another account's extension; old code keeps its first use (23 to 25)
+    'test/e2e-scheduled-ext-files.ts',       // a schedule's extension writes the owner's file; one press re-allows a refused agent; an app schedule made before the update keeps firing (23b to 23d)
+    'test/e2e-ext-visitor-actions.ts',       // a reader without an account runs a public extension action
+    'test/e2e-workflow-extension-step.ts',   // a workflow's extension step runs with no agent online; an agent's run finishes (13c); a run started before the update finishes (13e)
+    'test/e2e-app-scope-allowance.ts',       // a published app keeps working across 3.x to 4.0 without its author republishing it
+    'test/e2e-rest-scope-keep-working.ts',   // the agents and ecosystem apps that existed at 4.0 keep their routes
+];
+
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone
 // reading this a year from now needs to tell a file that was judged and left out from one nobody
 // ever noticed, and the list above cannot make that distinction on its own.
@@ -1792,10 +1840,30 @@ function guardSuites(): string[] {
     return [...GUARD_SUITES];
 }
 
+/**
+ * PURPOSE_SUITES, held against ALL_SUITES and against GUARD_SUITES. A name ALL_SUITES does not know
+ * would run nothing; a name the guard tier also lists would run twice in one gate.
+ */
+function purposeSuites(): string[] {
+    const known = new Set(ALL_SUITES);
+    const guards = new Set(GUARD_SUITES);
+    const missing = PURPOSE_SUITES.filter(s => !known.has(s));
+    const doubled = PURPOSE_SUITES.filter(s => guards.has(s));
+    if (missing.length > 0 || doubled.length > 0) {
+        for (const s of missing) console.error(`PURPOSE_SUITES names a suite ALL_SUITES does not: ${s}`);
+        for (const s of doubled) console.error(`PURPOSE_SUITES names a guard suite, which the gate already runs: ${s}`);
+        console.error('Re-point the entry, or take it out deliberately and say why in the commit.\n');
+        process.exit(1);
+    }
+    console.log(`\nPurpose tier: ${PURPOSE_SUITES.length} suites that prove what AIMEAT is for still works. A failure here is a designed use gone.`);
+    return [...PURPOSE_SUITES];
+}
+
 // ── Parse CLI args ──
 function parseArgs(): string[] {
     const args = process.argv.slice(2);
     if (args.includes('--guards')) return guardSuites();
+    if (args.includes('--purpose')) return purposeSuites();
     const tests: string[] = [];
     // `--tests-file=<path>`: one suite name a line, read as if each were a `--test=`. pnpm gate passes
     // the suites a change touched this way when there are too many for one command line: Windows
@@ -2077,7 +2145,8 @@ async function main() {
         // reports its own restart failures as NOT RUN rows; one that still rejects (a fault in the
         // runner itself) has its suites reported NOT RUN here, and the summary is printed for every
         // lane either way (QA audit P1-09).
-        const guards = new Set(GUARD_SUITES.map(g => basename(g, '.ts')));
+        // A purpose suite is held to the guard tier's verdict: a skipped test in it is red.
+        const guards = new Set([...GUARD_SUITES, ...PURPOSE_SUITES].map(g => basename(g, '.ts')));
         const laneOpts = { session: RUN_SESSION, isGuard: (n: string) => guards.has(n) };
         const settled = await Promise.allSettled(lanes.map((s, k) => runLane(k, targets[k], s, lanes.length === 1, laneOpts)));
         results = settled.flatMap((s, k): SuiteResult[] => {
@@ -2093,7 +2162,7 @@ async function main() {
     // Reported in the order the suites were asked for, whichever lane ran them.
     const order = new Map(suites.map((s, i) => [basename(s, '.ts'), i]));
     results.sort((a, b) => (order.get(a.name) ?? 0) - (order.get(b.name) ?? 0));
-    const guardNames = new Set(GUARD_SUITES.map(g => basename(g, '.ts')));
+    const guardNames = new Set([...GUARD_SUITES, ...PURPOSE_SUITES].map(g => basename(g, '.ts')));
     const verdicts = new Map(results.map(r => [r.name, classify(r, { guard: guardNames.has(r.name) })]));
     const anyFailed = [...verdicts.values()].some(v => v.red);
     const wallMs = Date.now() - wall0;

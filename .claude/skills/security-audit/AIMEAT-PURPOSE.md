@@ -82,3 +82,8 @@ one of them is wrong even when it closes the hole.
    only when everything is green, the full E2E sweep on both backends once, before the push. The
    purpose suites (wish `wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni`) run in
    the gate on every change that reaches `src/`.
+
+**The purpose tier** is the automated form of the list above: `PURPOSE_SUITES` in
+`aimeat/test/run-e2e-ci.ts` (`pnpm test:e2e:purpose:sqlite`, `:postgres-kysely`), which `pnpm gate`
+runs wherever it runs the guard tier. A red purpose test is a designed use gone; what belongs in the
+tier is `docs/coding-guidelines/testing-requirements.md` Rule 1c.
