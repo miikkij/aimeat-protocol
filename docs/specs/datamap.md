@@ -135,6 +135,15 @@ The app's own list entry carries a summary (`spec`, `form`, `summary`, `heldRows
 `rowsWithoutWhy`, `missing`, `docKey`, `at`), so a list of apps shows where each one's data is
 without reading every map.
 
+## An extension's secrets are on the extension, not in this map
+
+A data map describes an app. Where an extension sends a person's vault secret is declared on the
+extension itself, in its manifest's `uses_secrets: [{ name, hosts, why }]`, and read publicly with
+it: `GET /v1/extensions/{name}` and the MCP tool `aimeat_extension_get` answer `uses_secrets`. An AI
+reading an app whose data leaves through such an extension states it in the app's map as a row of
+kind `secret`, `where: external-service`, owner `person`, and in `leaves`, and names the extension
+and its declared hosts there; the declaration on the extension is the source for both.
+
 ## Versions
 
 `/2` replaced `/1` on 2026-08-25: `/1` described key families and their compliance columns and never

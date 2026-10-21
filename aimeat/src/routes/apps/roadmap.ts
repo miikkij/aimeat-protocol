@@ -16,6 +16,8 @@
  *   GET /roadmap · POST /roadmap · DELETE /roadmap/:entryId · PATCH /roadmap
  * @usage registerRoadmapRoutes(router, config, storage, appTarget);
  * @version-history
+ *   2026-10-21 — signedIn asks isAnonymousPrincipal, so the minted anonymous token counts as signed out
+ *     (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.2 — 2026-09-24 — POST renders the code the service's 409 carries: WISH_LIMIT_REACHED when
  *     the author already holds their share of open wishes (A6-16), CAPACITY_EXCEEDED when the list
  *     is full.
@@ -32,6 +34,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { accountOf } from '../../services/app-members.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -65,7 +68,7 @@ export function registerRoadmapRoutes(
      * anonymous flag is what separates a visitor from a person (invariant 6).
      */
     const signedIn = (req: import('express').Request): boolean =>
-        Boolean(req.auth) && req.auth?.anonymous !== true;
+        Boolean(req.auth) && !isAnonymousPrincipal(req.auth);
 
     /**
      * Is this caller inside the build? The owner, or somebody holding a rung.

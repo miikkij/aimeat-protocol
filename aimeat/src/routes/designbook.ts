@@ -14,6 +14,8 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-21 — isSignedIn asks isAnonymousPrincipal, so the minted anonymous token sees no part in
+ *     proposal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.8.0 — 2026-10-17 — SECURITY: a part in proposal is not previewed for the anonymous internet.
  *     The preview opens it for a signed-in caller or a frame holding the token the list and the
  *     detail read hand out as `preview_url` (an hour, one part); every part in those reads carries
@@ -56,6 +58,7 @@ import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
@@ -105,7 +108,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   /** Whether this request carries a REAL authenticated principal (the global optionalAuth()
    *  already validated any presented token, so this reads the normalized value, never a raw
    *  header). Anonymous-mode sessions count as signed out here. */
-  const isSignedIn = (req: Request) => !!req.auth && !req.auth.anonymous;
+  const isSignedIn = (req: Request) => !!req.auth && !isAnonymousPrincipal(req.auth);
 
   /** Where a frame shows each part. A published part's address is public; a part in proposal only
    *  reaches a signed-in reader's list, and its address carries a token naming it, because the

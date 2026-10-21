@@ -75,6 +75,9 @@
  *     answer (aimeat-soc: the response action after the human decision).
  *   v1.18.0 — 2026-10-05 — WorkflowRun.aiCaller: who the run's AI calls run as, decided at its start
  *     (services/workflow/ai-caller.ts; secaudit 2026-10, AI-3).
+ *   v1.20.0 — 2026-10-20 — WorkflowRun.principal, the principal the run answers to, asked again before
+ *     every dispatch, and refusal.stoppedBefore for a run refused in flight
+ *     (services/workflow/dispatch-authority.ts; secaudit 2026-10, v64).
  */
 import { z } from 'zod';
 import { SignalSchema, type Signal } from './workflow-signals.js';
@@ -562,7 +565,15 @@ export interface WorkflowRun {
     saver: WorkflowSaver; saverName: string; missing: string[]; gone: boolean;
     attempts: number; lastAttemptAt: string;
     ranAsOwner?: { runId: string; at: string };
+    /** Set when the run had started and was refused in flight: the step that was not dispatched. */
+    stoppedBefore?: string;
   };
+  /**
+   * The principal the run answers to, asked again before every step is dispatched: the principal that
+   * started it, or for a trigger's run the workflow's saver. Absent on a run started before
+   * 2026-10-20, whose saver stands in (services/workflow/dispatch-authority.ts).
+   */
+  principal?: WorkflowSaver;
   steps: Record<string, WorkflowRunStep>;
   /**
    * Who the run's AI calls run as (services/workflow/ai-caller.ts), decided when it starts: the

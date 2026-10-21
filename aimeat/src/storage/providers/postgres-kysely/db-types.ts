@@ -1444,6 +1444,7 @@ export interface Secret {
   usedBy: Generated<string>;
   hosts: Generated<string>;
   hostBinding: string | null;
+  approvals: Generated<string>;
 }
 
 export interface DependencyEdge {

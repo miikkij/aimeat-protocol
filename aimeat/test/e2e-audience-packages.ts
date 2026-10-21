@@ -8,12 +8,26 @@
  *   catalogue or listing; and naming an organism the writer is not in is 400 NOT_ORGANISM_MEMBER with
  *   nothing written. Owner A makes an organism, B joins it, C does not; C has an organism of its own,
  *   which A is not in.
+ *
+ *   The owner's own principals on a private data package (secaudit 2026-10 v41, standing ruling 5):
+ *   an agent with memory:write only and an app grant without storage:read get 403 on the descriptor,
+ *   the versions, the rows and the OData feed; an agent and an app grant with storage:read, the owner
+ *   in person, the MCP export and an extension of the owner read it; a public package stays open.
+ *
+ *   What worked before keeps working (capability-loss review 2026-10-21): the owner's agent without
+ *   storage:read reads the owner's members and organism packages; the MCP export refuses as REST does;
+ *   an earlier version answers on its own audience, so an organism member and a node account keep the
+ *   earlier organism and members versions after the newest goes public, and a private one stays closed.
  * @version-history
+ *   v1.2.0 — 2026-10-21 — D12 to D15: the uses that worked before (capability-loss review of v41 and v42).
+ *   v1.1.0 — 2026-10-20 — D5 to D11: the owner's own principals on a private data package (secaudit 2026-10 v41).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.6 to V3.8).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=audience-packages
 
+import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 let passed = 0, failed = 0;
@@ -252,6 +266,202 @@ await test('D4. Naming an organism A is not in is 400 NOT_ORGANISM_MEMBER, and n
     assert(!(mine.body.data?.packages ?? []).some((p: any) => p.name === name), `a refused package was stored: ${show(mine)}`);
     const read = await json(`/v1/datapackages/${A.name}/${name}`, { headers: auth(A.token) });
     assert(read.status === 404, `the refused package reads: ${show(read)}`);
+});
+
+// ── A data package's own owner: the owner in person and the owner's principals (secaudit 2026-10 v41) ──
+// Standing ruling 5 (2026-10-20): the owner in person always reads their own packages; the owner's
+// agent, app grant or ecosystem app reads a non-public one only with storage:read, the word GET
+// /v1/datapackages and /v1/pub ask for the same bytes. Before the fix any token carrying the owner's
+// name read every row of a private package through the read routes and the OData feed.
+console.log('\nData packages: the owner\'s own principals (v41)');
+
+const dPriv = `audprivdata${stamp}`, dPub = `audpubdata${stamp}`;
+const ODATA_FORBIDDEN = 'Forbidden';
+let narrowAgent: Awaited<ReturnType<typeof makeAgent>>;
+let readerAgent: Awaited<ReturnType<typeof makeAgent>>;
+const APP_FILE = `audgrant${stamp}.html`;
+const REDIRECT = 'http://localhost:9911/callback';
+const codeVerifier = randomBytes(32).toString('base64url');
+const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+/** The authorize, consent and token steps of an app grant on A's app, holding exactly `scope`. */
+async function grantAppToken(scope: string): Promise<string> {
+    const q = new URLSearchParams({
+        app: `${A.name}/${APP_FILE}`, response_type: 'code', scope,
+        redirect_uri: REDIRECT, code_challenge: codeChallenge, code_challenge_method: 'S256',
+    });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ request_id: rid }) });
+    assert(con.status === 200, `consent (${scope}): ${show(con)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: codeVerifier, redirect_uri: REDIRECT }) });
+    assert(tok.status === 200 && typeof tok.body.data?.access_token === 'string', `token (${scope}): ${show(tok)}`);
+    return tok.body.data.access_token as string;
+}
+/** Every read surface of one package for one bearer: descriptor, versions, rows and the three OData routes. */
+async function readAll(token: string, name: string) {
+    const h = { headers: auth(token) };
+    return {
+        descriptor: await json(`/v1/datapackages/${A.name}/${name}`, h),
+        versions: await json(`/v1/datapackages/${A.name}/${name}/versions`, h),
+        rows: await json(`/v1/datapackages/${A.name}/${name}/rows/items`, h),
+        service: await json(`/v1/odata/${A.name}/${name}`, h),
+        metadata: await json(`/v1/odata/${A.name}/${name}/$metadata`, h),
+        entitySet: await json(`/v1/odata/${A.name}/${name}/items`, h),
+    };
+}
+
+await test('D5. Setup: A publishes a private and a public data package; an agent with memory:write only and one with storage:read', async () => {
+    const p = await publishData(A.token, dPriv, 'private');
+    assert(p.status === 201, `private publish: ${show(p)}`);
+    const q = await publishData(A.token, dPub, 'public');
+    assert(q.status === 201, `public publish: ${show(q)}`);
+    narrowAgent = await makeAgent(BASE, A, ['memory:write']);
+    readerAgent = await makeAgent(BASE, A, ['storage:read']);
+});
+
+await test('D6. The agent with memory:write only is refused every read route and the OData feed of the private package (403, no row)', async () => {
+    const r = await readAll(narrowAgent.token, dPriv);
+    for (const [route, ans] of Object.entries(r)) {
+        assert(ans.status === 403, `${route}: expected 403, got ${show(ans)}`);
+        assert(!JSON.stringify(ans.body).includes('"label":"one"'), `${route}: a private row leaked in the refusal`);
+    }
+    for (const route of ['descriptor', 'versions', 'rows'] as const) {
+        assert(r[route].body.error?.code === 'SCOPE_DENIED', `${route}: ${show(r[route])}`);
+    }
+    for (const route of ['service', 'entitySet'] as const) {
+        assert(r[route].body.error?.code === ODATA_FORBIDDEN, `${route}: ${show(r[route])}`);
+    }
+    // A package that does not exist stays 404 for the same agent: the 403 says only what is missing.
+    const none = await json(`/v1/datapackages/${A.name}/nosuch${stamp}/rows/items`, { headers: auth(narrowAgent.token) });
+    assert(none.status === 404, `a missing package: ${show(none)}`);
+});
+
+await test('D7. The same agent still reads the public package on every route (the control)', async () => {
+    const r = await readAll(narrowAgent.token, dPub);
+    for (const [route, ans] of Object.entries(r)) assert(ans.status === 200, `${route}: ${show(ans)}`);
+    assert(r.rows.body.data.total === 2, `rows: ${show(r.rows)}`);
+});
+
+await test('D8. The agent with storage:read and the owner in person read the private package on every route', async () => {
+    for (const [who, token] of [['storage:read agent', readerAgent.token], ['owner', A.token]] as const) {
+        const r = await readAll(token, dPriv);
+        for (const [route, ans] of Object.entries(r)) assert(ans.status === 200, `${who} ${route}: ${show(ans)}`);
+        assert(r.rows.body.data.total === 2, `${who} rows: ${show(r.rows)}`);
+        assert(Array.isArray(r.entitySet.body.value) && r.entitySet.body.value.length === 2, `${who} OData rows: ${show(r.entitySet)}`);
+    }
+});
+
+await test('D9. aimeat_datapackage_export by the storage:read agent returns the private rows', async () => {
+    const s = await openSession(BASE, readerAgent.token);
+    const m = await callTool(s, 'aimeat_datapackage_export', { ref: `pkg:${A.name}/${dPriv}`, resource: 'items', format: 'json' });
+    assert(!m.isError && m.data?.total === 2, `export: ${m.text.slice(0, 300)}`);
+});
+
+await test('D10. An app grant without storage:read is refused the private rows (403); one with storage:read reads them', async () => {
+    const app = await json('/v1/apps', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>grant</body></html>').toString('base64'), name: 'Aud Grant', description: 'grant fixture', category: 'utility' }) });
+    assert(app.status === 201, `app: ${show(app)}`);
+    const narrow = await grantAppToken('memory:read');
+    const n = await json(`/v1/datapackages/${A.name}/${dPriv}/rows/items`, { headers: auth(narrow) });
+    assert(n.status === 403 && n.body.error?.code === 'SCOPE_DENIED', `memory:read grant: ${show(n)}`);
+    const f = await json(`/v1/odata/${A.name}/${dPriv}/items`, { headers: auth(narrow) });
+    assert(f.status === 403, `memory:read grant on the feed: ${show(f)}`);
+    const wide = await grantAppToken('storage:read');
+    const w = await json(`/v1/datapackages/${A.name}/${dPriv}/rows/items`, { headers: auth(wide) });
+    assert(w.status === 200 && w.body.data.total === 2, `storage:read grant: ${show(w)}`);
+});
+
+await test('D11. An extension of A reads A\'s private package as A, as before (ctx.datapackage.open and rows)', async () => {
+    const ext = `audreadext${stamp}`;
+    const manifest = JSON.stringify({
+        metadata: { name: ext, version: '1.0.0', description: 'reads a private data package', author: 'e2e' },
+        actions: [{ id: 'read', method: 'POST', path: '/read', script: 'read' }],
+        limits: { timeout_ms: 10000, max_api_calls: 8 },
+    });
+    const scripts = { read: `export default async function(ctx, input){
+        var d = await ctx.datapackage.open(input.ref);
+        var r = await ctx.datapackage.rows(input.ref, 'items');
+        return { opened: !!d, total: r ? r.total : -1 };
+    }` };
+    const inst = await json('/v1/extensions', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ manifest, scripts }) });
+    assert(inst.status === 201, `install: ${show(inst)}`);
+    const act = await json(`/v1/extensions/${ext}/activate`, { method: 'POST', headers: auth(A.token) });
+    assert(act.status === 200, `activate: ${show(act)}`);
+    const r = await json(`/v1/ext/${ext}/read`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ref: `pkg:${A.name}/${dPriv}` }) });
+    assert(r.status === 200 && r.body.data?.opened === true && r.body.data?.total === 2, `extension read: ${show(r)}`);
+    await json(`/v1/extensions/${ext}`, { method: 'DELETE', headers: auth(A.token) });
+});
+
+// ── Capability-loss review 2026-10-21: what worked before keeps working ───────────────────────
+console.log('\nData packages: the uses that worked before (capability-loss review)');
+
+await test('D12. The agent with memory:write only still reads its owner\'s members and organism packages (rows and feed); the private one stays 403', async () => {
+    for (const name of [dMembers, dOrg]) {
+        const rows = await json(`/v1/datapackages/${A.name}/${name}/rows/items`, { headers: auth(narrowAgent.token) });
+        assert(rows.status === 200 && rows.body.data.total === 2, `${name} rows: ${show(rows)}`);
+        const feed = await json(`/v1/odata/${A.name}/${name}/items`, { headers: auth(narrowAgent.token) });
+        assert(feed.status === 200 && feed.body.value?.length === 2, `${name} feed: ${show(feed)}`);
+    }
+    const priv = await json(`/v1/datapackages/${A.name}/${dPriv}/rows/items`, { headers: auth(narrowAgent.token) });
+    assert(priv.status === 403 && priv.body.error?.code === 'SCOPE_DENIED', `private: ${show(priv)}`);
+});
+
+await test('D13. aimeat_datapackage_export by the memory:write agent on the private package answers SCOPE_DENIED naming storage:read, as REST does', async () => {
+    const s = await openSession(BASE, narrowAgent.token);
+    const m = await callTool(s, 'aimeat_datapackage_export', { ref: `pkg:${A.name}/${dPriv}`, resource: 'items', format: 'json' });
+    assert(m.isError && m.text.startsWith('SCOPE_DENIED') && m.text.includes('storage:read'), `export: ${m.text.slice(0, 300)}`);
+    assert(!m.text.includes('"label"'), 'a private row leaked in the refusal');
+});
+
+/** Publish rows as `name` at `visibility` as the owner in person, and answer the content hash. `status`
+ *  is 201 for new bytes and 200 for bytes already stored (a re-publish under another audience). */
+async function version(name: string, rows: Array<Record<string, unknown>>, visibility: string, status = 201): Promise<string> {
+    const r = await json('/v1/datapackages', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name, changes: 'a version', visibility, resources: [{ name: 'items', rows }] }) });
+    assert(r.status === status, `publish ${name} ${visibility}: ${show(r)}`);
+    return r.body.data.content_hash as string;
+}
+const pinnedRows = (token: string | undefined, name: string, hash: string) =>
+    json(`/v1/datapackages/${A.name}/${name}/rows/items?version=${encodeURIComponent(hash)}`, token ? { headers: auth(token) } : {});
+const listed = async (token: string | undefined, name: string) =>
+    ((await json(`/v1/datapackages/${A.name}/${name}/versions`, token ? { headers: auth(token) } : {})).body.data?.versions ?? []).map((v: any) => v.contentHash);
+
+await test('D14. An earlier organism version stays open to an organism member after the newest goes public; outsiders and anonymous get 404', async () => {
+    const name = `audverorg${stamp}`;
+    const h1 = await version(name, [{ id: 1, label: 'ORG-ONLY' }], `organism:${orgId}`);
+    const h2 = await version(name, [{ id: 1, label: 'OPEN' }], 'public');
+    const b = await pinnedRows(B.token, name, h1);
+    assert(b.status === 200 && JSON.stringify(b.body.data.rows).includes('ORG-ONLY'), `B (member) on version 1: ${show(b)}`);
+    assert((await listed(B.token, name)).includes(h1), 'B lists version 1');
+    for (const [who, token] of [['C (outside)', C.token], ['anonymous', undefined]] as const) {
+        const r = await pinnedRows(token, name, h1);
+        assert(r.status === 404, `${who} on version 1: ${show(r)}`);
+        const hashes = await listed(token, name);
+        assert(hashes.includes(h2) && !hashes.includes(h1), `${who} versions: ${JSON.stringify(hashes)}`);
+    }
+});
+
+await test('D15. A version re-published at members (same bytes) answers on members once the newest goes public: C reads it, anonymous does not; a private one stays closed', async () => {
+    const name = `audvermem${stamp}`;
+    const rows = [{ id: 1, label: 'MEMBERS-ONLY' }];
+    const h1 = await version(name, rows, 'private');
+    const again = await version(name, rows, 'members', 200);
+    assert(again === h1, 'the same bytes are the same version');
+    await version(name, [{ id: 1, label: 'OPEN' }], 'public');
+    const c = await pinnedRows(C.token, name, h1);
+    assert(c.status === 200 && JSON.stringify(c.body.data.rows).includes('MEMBERS-ONLY'), `C on version 1: ${show(c)}`);
+    assert((await pinnedRows(undefined, name, h1)).status === 404, 'anonymous on version 1');
+
+    const priv = `audverpriv${stamp}`;
+    const p1 = await version(priv, [{ id: 1, label: 'SECRET' }], 'private');
+    await version(priv, [{ id: 1, label: 'OPEN' }], 'public');
+    // Another account and anonymous: 404, as a missing version. The owner's agent without storage:read: 403 naming the word.
+    for (const [who, token, status] of [['C', C.token, 404], ['anonymous', undefined, 404], ['A\'s memory:write agent', narrowAgent.token, 403]] as const) {
+        const r = await pinnedRows(token, priv, p1);
+        assert(r.status === status, `${who} on the private version 1: ${show(r)}`);
+        assert(!JSON.stringify(r.body).includes('SECRET'), `${who}: the private row leaked`);
+    }
+    const own = await pinnedRows(A.token, priv, p1);
+    assert(own.status === 200 && JSON.stringify(own.body.data.rows).includes('SECRET'), `the owner on the private version 1: ${show(own)}`);
 });
 
 await test('Cleanup', async () => {

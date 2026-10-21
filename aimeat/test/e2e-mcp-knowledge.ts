@@ -4,6 +4,13 @@
  *   Tests knowledge package listing, reading, entry contribution, links, and the
  *   knowledge resource template.
  * @version-history
+ *   2026-10-21 — Test 20b: what the visibility rule left out is named with memory:read-as-owner on
+ *     aimeat_knowledge_get, _links, _list (a second text part, the array kept) and the resource; no
+ *     note for the agent's own shadowed package or for an agent holding the word (capability-loss review).
+ *   2026-10-20 — Phase 7 (tests 19 to 22): the owner's and a sibling agent's private packages are not
+ *     read by an agent without memory:read-as-owner, the owner's hidden copy does not shadow the
+ *     agent's own package, the read tools need memory:read, and memory:read-as-owner still reads both
+ *     (secaudit 2026-10, v56).
  *   v1.0.0 — 2026-03-21 — Initial creation
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: the manifest index line is written once per
  *     entry and through the shared memory write, and the reserved-package refusal is covered.
@@ -49,7 +56,8 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
-import { ownerSignIn } from './helpers/owner-login.js';
+import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool, mcpRpc as mcpRpcOn } from './helpers/mcp-session.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -661,6 +669,114 @@ await test('18. aimeat_memory_delete with owner_scope removes an entry of the ow
     const gone = await json(`/v1/memory/${encodeURIComponent(entryKey)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(gone.status === 404, `the owner reads the entry as gone, got ${gone.status}`);
 });
+
+// ─── Phase 7: the owner's and sibling agents' private packages (secaudit 2026-10, v56) ───
+// The knowledge tools read the owner's identity set with no visibility rule and no scope, so any
+// agent of the owner, with any scope, read their private manifests and entry values. They now apply
+// memory:read-as-owner (services/owner-scope-read.ts) before the GHII-first dedupe, and declare
+// memory:read like aimeat_memory_read.
+console.log('\nPhase 7 — Private packages of the owner and of a sibling agent');
+{
+    const stamp = Date.now().toString(36);
+    const o = await registerOwner(BASE, `mcpkwlv56${stamp}`);
+    const manifest = (name: string) => ({
+        type: 'knowledge-package', name, version: '1.0.0', author: o.name, content_type: 'document',
+        tags: [], entries: [], sharing: { catalog_listed: false, allow_clone: false },
+    });
+    const put = async (bearer: string, key: string, value: unknown, tags: string[] = []) => {
+        const r = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${bearer}` },
+            body: JSON.stringify({ key, value, visibility: 'private', tags }),
+        });
+        assert(r.status === 201, `write ${key}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    };
+    const full = await makeAgent(BASE, o, ['*'], `v56full${stamp.slice(-4)}`);
+    const narrow = await makeAgent(BASE, o, ['profile:read'], `v56narrow${stamp.slice(-4)}`);
+    const sibling = await makeAgent(BASE, o, ['*'], `v56sib${stamp.slice(-4)}`);
+    const asOwner = await makeAgent(BASE, o, ['*', 'memory:read-as-owner'], `v56asown${stamp.slice(-4)}`);
+    const own = `v56own${stamp}`, sib = `v56sib${stamp}`, shadow = `v56shadow${stamp}`;
+
+    await put(o.token, `packages/${own}/manifest`, manifest('Owner Private'), ['knowledge-package']);
+    await put(o.token, `packages/${own}/secret`, 'owner-private-v56');
+    await put(sibling.token, `packages/${sib}/manifest`, manifest('Sibling Private'), ['knowledge-package']);
+    await put(sibling.token, `packages/${sib}/secret`, 'sibling-private-v56');
+    await put(o.token, `packages/${shadow}/manifest`, manifest('Owner Shadow'), ['knowledge-package']);
+    await put(full.token, `packages/${shadow}/manifest`, manifest('Agent Own'), ['knowledge-package']);
+    await put(full.token, `packages/${shadow}/mine`, 'agent-own-v56');
+
+    const fullS = await openSession(BASE, full.token, 'v56-full');
+    const narrowS = await openSession(BASE, narrow.token, 'v56-narrow');
+    const asOwnerS = await openSession(BASE, asOwner.token, 'v56-asowner');
+
+    await test('19. An agent without memory:read-as-owner gets neither the owner\'s nor a sibling\'s private package', async () => {
+        for (const id of [own, sib]) {
+            const r = await callTool(fullS, 'aimeat_knowledge_get', { package_id: id });
+            assert(r.isError && /Package not found/.test(r.text), `aimeat_knowledge_get ${id} answered: ${r.text.slice(0, 200)}`);
+            const links = await callTool(fullS, 'aimeat_knowledge_links', { package_id: id });
+            assert(links.isError && /Package not found/.test(links.text), `aimeat_knowledge_links ${id} answered: ${links.text.slice(0, 200)}`);
+        }
+        const list = await callTool(fullS, 'aimeat_knowledge_list', {});
+        assert(!list.isError, `list refused: ${list.text.slice(0, 200)}`);
+        const ids = (list.data as any[]).map(p => p.package_id);
+        assert(!ids.includes(own) && !ids.includes(sib), `the list names a private package: ${JSON.stringify(ids)}`);
+        const res = await mcpRpcOn(fullS, 'resources/read', { uri: `aimeat://knowledge/${encodeURIComponent(own)}` });
+        const text = res?.result?.contents?.[0]?.text ?? JSON.stringify(res?.error ?? res);
+        assert(!text.includes('Owner Private'), `the resource answered the owner's private manifest: ${String(text).slice(0, 200)}`);
+    });
+
+    await test('20. The owner\'s hidden copy does not shadow the agent\'s own package of the same id', async () => {
+        const r = await callTool(fullS, 'aimeat_knowledge_get', { package_id: shadow });
+        assert(!r.isError, `the agent's own package was refused: ${r.text.slice(0, 200)}`);
+        assert(r.data.manifest?.name === 'Agent Own', `the manifest is not the agent's own: ${r.data.manifest?.name}`);
+        assert((r.data.entries as any[]).some(e => e.value === 'agent-own-v56'), `the agent's own entry is missing: ${JSON.stringify(r.data.entries)}`);
+    });
+
+    // Capability-loss review (2026-10-21): the refusal in test 19 is right, and it gave no reason, so
+    // the agent could not tell a missing package from one it may not read, or ask its owner for the
+    // permission that shows it. Every answer that left something out now says so.
+    await test('20b. What the visibility rule left out is named, with the permission that shows it', async () => {
+        const words = 'memory:read-as-owner';
+        for (const id of [own, sib]) {
+            const r = await callTool(fullS, 'aimeat_knowledge_get', { package_id: id });
+            assert(r.isError && r.text.includes(words), `aimeat_knowledge_get ${id} gave no reason: ${r.text.slice(0, 300)}`);
+            const links = await callTool(fullS, 'aimeat_knowledge_links', { package_id: id });
+            assert(links.isError && links.text.includes(words), `aimeat_knowledge_links ${id} gave no reason: ${links.text.slice(0, 300)}`);
+        }
+        const res = await mcpRpcOn(fullS, 'resources/read', { uri: `aimeat://knowledge/${encodeURIComponent(own)}` });
+        const resText = String(res?.result?.contents?.[0]?.text ?? '');
+        assert(resText.includes(words), `the resource gave no reason: ${resText.slice(0, 300)}`);
+        // The list keeps its shape (a JSON array in the first part) and says how many were left out.
+        const list = await mcpRpcOn(fullS, 'tools/call', { name: 'aimeat_knowledge_list', arguments: {} });
+        const parts = (list?.result?.content ?? []) as Array<{ text: string }>;
+        assert(Array.isArray(JSON.parse(parts[0]?.text ?? 'null')), `the list's first part is not the array: ${parts[0]?.text?.slice(0, 200)}`);
+        assert(parts.slice(1).some(p => p.text.includes(words) && /\d+ package/.test(p.text)), `the list gave no reason: ${JSON.stringify(parts.slice(1))}`);
+        // The agent's own package beside a hidden owner copy of the same id is not "left out".
+        const shadowed = await callTool(fullS, 'aimeat_knowledge_get', { package_id: shadow });
+        assert(!shadowed.isError && shadowed.data.note === undefined, `the agent's own package carries a note: ${shadowed.text.slice(0, 300)}`);
+        // Nothing is left out for an agent holding the word, so it gets no note.
+        const asOwnerList = await mcpRpcOn(asOwnerS, 'tools/call', { name: 'aimeat_knowledge_list', arguments: {} });
+        assert((asOwnerList?.result?.content ?? []).length === 1, `memory:read-as-owner got a note: ${JSON.stringify(asOwnerList?.result?.content?.slice(1))}`);
+    });
+
+    await test('21. An agent with no memory scope cannot use the knowledge read tools', async () => {
+        for (const [name, args] of [['aimeat_knowledge_get', { package_id: own }], ['aimeat_knowledge_list', {}], ['aimeat_knowledge_links', { package_id: own }]] as const) {
+            const r = await callTool(narrowS, name, args as Record<string, unknown>);
+            assert(r.isError, `${name} answered an agent without memory:read: ${r.text.slice(0, 200)}`);
+            assert(!r.text.includes('owner-private-v56') && !r.text.includes('Owner Private'), `${name} leaked: ${r.text.slice(0, 200)}`);
+        }
+    });
+
+    await test('22. An agent holding memory:read-as-owner reads both private packages (positive control)', async () => {
+        const a = await callTool(asOwnerS, 'aimeat_knowledge_get', { package_id: own });
+        assert(!a.isError && (a.data.entries as any[]).some(e => e.value === 'owner-private-v56'), `owner package: ${a.text.slice(0, 200)}`);
+        const b = await callTool(asOwnerS, 'aimeat_knowledge_get', { package_id: sib });
+        assert(!b.isError && (b.data.entries as any[]).some(e => e.value === 'sibling-private-v56'), `sibling package: ${b.text.slice(0, 200)}`);
+        const ids = ((await callTool(asOwnerS, 'aimeat_knowledge_list', {})).data as any[]).map(p => p.package_id);
+        assert(ids.includes(own) && ids.includes(sib), `the list misses a package: ${JSON.stringify(ids)}`);
+    });
+
+    await json(`/v1/owners/${o.name}`, { method: 'DELETE', headers: { Authorization: `Bearer ${o.token}` } });
+}
 
 await test('Delete owner (cascade)', async () => {
     const { status } = await json(`/v1/owners/${ownerName}`, {

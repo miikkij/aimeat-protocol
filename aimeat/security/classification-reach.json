@@ -807,6 +807,12 @@
       },
       "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
     },
+    "src/services/ai-jobs/result-precheck.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-21 (secaudit 2026-10), the node's own read: whether the record at an AI job's result_key exists and is archived, before the job's answer is written over it. Nothing read is handed to a caller."
+    },
     "src/services/ai-jobs/run-op.ts": {
       "reads": {
         "getStorageFileMeta": 1
@@ -2157,6 +2163,12 @@
       },
       "why": "Reviewed 2026-10-18 (plan doc-mvcn6c7e4e5q, V4.3), the node's own read: the approved record is read only to compare its version and visibility with the request before making it public; its value goes back into the same record and is returned to nobody."
     },
+    "src/services/publish-requests/ask.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-21 (secaudit 2026-10, v67), the node's own read: when a request is filed, the record (or each knowledge entry) is read only to store a sha256 digest of its value on the request, which the approval compares; the value itself is returned to nobody."
+    },
     "src/services/publish-requests/cap-recheck.ts": {
       "reads": {
         "getMemory": 1,
@@ -2201,6 +2213,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-13, the node's own reads: the two run-once markers under the node's system identity that say each half of the 4.0.x keep-working scope grant (principals, published apps) has run, and the earlier steps' run records, read for the agent ids they name. No content is shown to anyone. 2026-10-18: the two markers are read by services/once-only-step.ts; the run records stay here."
+    },
+    "src/services/schedule-extension-keep.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-21 (secaudit 2026-10, restore round), the node's own read: the once-only list of kept app extension schedules under the node's system identity, read at a fire to decide whether the schedule still runs. Nothing read is returned to anyone."
     },
     "src/services/schedule-write.ts": {
       "reads": {
@@ -2436,9 +2454,15 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Export-out and the data package step pass leave; the other reads are read-to-update and the fresh clear. 2026-10-08: the extension step's input_from read passes the system reader's show() before the value enters the owner's own extension, and the saver needs memory:read for it (step-authority.ts)."
     },
+    "src/services/workflow/engine-resume.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-21 (secaudit 2026-10, v64), the node's own read: the boot resume moved out of engine.ts unchanged; it reads workflow run records, the engine's internal state machine."
+    },
     "src/services/workflow/engine.ts": {
       "reads": {
-        "getMemory": 10
+        "getMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Workflow run records: the internal state machine."
     },

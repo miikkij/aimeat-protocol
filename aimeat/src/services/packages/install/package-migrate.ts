@@ -29,7 +29,9 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
- *   v1.7.1 — 2026-10-05 — The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
+ *   v1.7.2 — 2026-10-21 — A replaced extension of byte-identical code keeps the old-code first-use
+ *     mark (services/extension-first-use-keep.ts).
+ *   v1.7.1 — 2026-10-05 —The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.7.0 — 2026-10-02 — A target version that can do more than the install was approved for needs the
  *     owner, or an agent holding packages:install-code: without it the refusal names the word and the
  *     doors file a request. A finished migration records the new approval (package-approvals.ts, T7).
@@ -67,6 +69,7 @@ import { approvedItems, codeInstallRefusal, recordApproval } from './package-app
 import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
+import { carryFirstUseKeep, keepsPreAuditFirstUse } from '../../extension-first-use-keep.js';
 
 export const MIGRATION_ACTIONS = ['replace', 'skip', 'custom', 'install_new'] as const;
 export type MigrationAction = (typeof MIGRATION_ACTIONS)[number];
@@ -435,8 +438,8 @@ export async function applyInstanceMigration(
                 // siblings throw NAME_TAKEN rather than overwrite.
                 // An extension's config is the owner's (the install config, secrets included), so it is
                 // read before the delete and carried into the replacement.
-                const previousConfig = existing?.type === 'extension'
-                    ? (await storage.getExtension(registeredAs))?.config : undefined;
+                const previousExtension = existing?.type === 'extension' ? await storage.getExtension(registeredAs) : null;
+                const previousConfig = previousExtension?.config;
                 if (existing) await deleteComponent(storage, existing.type, registeredAs, ownerGhii, pkgRef);
 
                 const result = await registerComponent(storage, {
@@ -470,6 +473,14 @@ export async function applyInstanceMigration(
                     // only honest answer, and the instance keeps no entry claiming it is there.
                     failedComponents.push({ componentId: compId, error: result.error ?? 'registration failed' });
                     break;
+                }
+
+                // A reinstall of byte-identical extension code keeps the old-code first-use mark the
+                // replaced record carried; changed code does not (services/extension-first-use-keep.ts).
+                if (previousExtension && keepsPreAuditFirstUse(previousExtension.config)) {
+                    const fresh = await storage.getExtension(registeredAs);
+                    const kept = fresh ? carryFirstUseKeep(fresh.config ?? {}, fresh.actions, previousExtension) : null;
+                    if (fresh && kept && keepsPreAuditFirstUse(kept)) await storage.updateExtension(registeredAs, { config: kept });
                 }
 
                 newInstalledComponents.push({

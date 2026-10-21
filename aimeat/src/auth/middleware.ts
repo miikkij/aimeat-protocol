@@ -16,6 +16,10 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-20 — credentialRevoked and its four storage questions move unchanged to
+ *     ./credential-revoked.ts (max-file-lines), re-exported here; there it asks a SEVENTH question
+ *     (./visitor-peer.ts): a visitor's session counts only while its home peer is an active peer that
+ *     may still sign people in here (secaudit 2026-10, federated-visitor-not-bound-to-live-peer).
  *   2026-10-20 — credentialRevoked asks a SIXTH question (./agent-alive.ts agentGone): an agent-role
  *     credential counts only while its agent record is there and is not newer than the credential.
  *     An MCP OAuth access token carries no session id, so deleting the agent revoked nothing of it.
@@ -123,12 +127,11 @@ import { isForeignPrincipal, setThisNodeId } from '../utils/gaii.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppGrantRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403, denyScope403, denyInvalidToken } from './deny.js';
 import { mcpTokenOnRestVerdict, MCP_TOKEN_ON_REST_MESSAGE } from './mcp-token-on-rest.js';
-import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
-import { agentGone } from './agent-alive.js';
+import { credentialRevoked } from './credential-revoked.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
@@ -247,104 +250,10 @@ declare global {
   }
 }
 
-/**
- * Has this token's session been ended? True only for a token that names a session the store has and
- * has marked revoked; a token with no `jti`, or one naming a session nobody tracked, is unaffected.
- */
-async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
-  const storage = sessionStorage();
-  if (!verified.sessionId || !storage) return false;
-  return storage.isSessionRevoked(verified.sessionId);
-}
-
-/**
- * An app grant's ACCESS token carries no session id, so the check above cannot see it: revoking the
- * grant cleared the refresh token and nothing else, and the 15-minute access token kept reading and
- * writing the owner's memory until it expired on its own. The owner is told otherwise in as many
- * words — locales/en.json `profile.apps.revokeConfirm`: "It loses access immediately."
- *
- * The other two credential families are already answered per request: a PAT is resolved from storage
- * on every call, and owner/agent sessions go through sessionRevoked(). This is the third family, and
- * it was the only one where the button and the behaviour disagreed.
- *
- * One keyed read per app-token request, uncached for the same reason sessionRevoked() is: the row is
- * written by whoever pressed Revoke, and "immediately" is the promise being kept. A grant that has
- * disappeared counts as revoked — an app whose grant row is gone has nothing to act for. Returns the
- * grant while it stands, null for a token that names none, and false for a revoked or missing one.
- */
-async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord | null | false> {
-  const storage = sessionStorage();
-  if (!verified.app_grant || !storage) return null;
-  const grant = await storage.getAppGrant(verified.app_grant);
-  return !grant || grant.revoked === true ? false : grant;
-}
-
-/**
- * Does the ACCOUNT this credential acts for refuse it? Every principal family — owner session, agent,
- * ecosystem app, app grant, MCP OAuth token — carries the bare local owner name in `owner`, so one
- * read answers for all of them (auth/credential-age.ts ownerRefuses): no account holds the name, the
- * account is deactivated (BR-04), or the account was made after the credential, because the name was
- * released and registered again. An app grant's tokens are minted from the grant, a refreshed one
- * long after it, so for them the grant's creation is the credential's. Uncached for the same reason
- * the session check is: an IdP saying "this person left" means now.
- *
- * Federated principals are excluded: their `owner` is their home GHII, an account of a DIFFERENT
- * node that this owners table does not hold, and their home node refuses the attestation instead
- * (federation-auth.ts). So are an anonymous identity and a token that names no owner.
- */
-async function accountRefuses(verified: VerifiedToken, grant: AppGrantRecord | null): Promise<boolean> {
-  const storage = sessionStorage();
-  if (isForeignPrincipal(verified) || verified.anonymous || !verified.owner || !storage) return false;
-  const owner = await storage.getOwner(verified.owner);
-  return ownerRefuses(owner, grant ? recordIssuedAt(grant.createdAt) : tokenIssuedAt(verified));
-}
-
-/**
- * Is the ecosystem app this token names gone? An app acts under `eco:<app>#<owner>@<node>`, built
- * from the account name, and the name is released for reuse. So a token counts only while its app
- * record is there and active, and only when the record is not newer than the token: a record made
- * later is a later connection that reuses the identity, and the older token is not its credential.
- * One keyed read per ecosystem request, uncached for the same reason as the checks above.
- */
-async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
-  const storage = sessionStorage();
-  if (!verified.roles.includes('ecosystem') || !storage) return false;
-  const app = await storage.getEcosystemApp(verified.sub);
-  if (!app || app.status !== 'active') return true;
-  return madeAfter(app.createdAt, tokenIssuedAt(verified));
-}
-
-/**
- * Is this credential dead? Six ways a JWT stops being one, and an endpoint that asks fewer than
- * six questions is one the revoked keep opening:
- *   - the exact token was revoked          (POST /v1/auth/revoke)
- *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
- *   - its app grant was revoked            (the owner pressed Revoke on the app)
- *   - its ecosystem app is gone            (disconnected, or its account deleted)
- *   - its agent is gone                    (deleted, or registered again under the released name)
- *   - the account it acts for refuses it   (deleted, deactivated as BR-04 asks, or newer than the
- *                                           credential because the name was registered again)
- *
- * Exported because verifying a JWT is not only Express's job. The WebSocket upgrade for the connect
- * tunnel (src/index-start.ts) cannot run middleware on a raw socket, so it verified the token by
- * hand — and asked none of these. A bearer revoked on every HTTP route still opened a tunnel and
- * received the on-connect backlog plus live pushes until its own exp. Any future door that verifies
- * a token itself calls this rather than writing the rule out a fourth time.
- */
-export async function credentialRevoked(token: string, verified: VerifiedToken): Promise<boolean> {
-  if (await isRevoked(token)) return true;
-  if (await sessionRevoked(verified)) return true;
-  const grant = await standingAppGrant(verified);
-  if (grant === false) return true;
-  if (await ecosystemAppGone(verified)) return true;
-  // The agent question (./agent-alive.ts). It reads storage only for an agent-role credential, and
-  // it is what ends an MCP OAuth access token, which carries no session row for the delete to reach.
-  if (await agentGone(sessionStorage(), verified)) return true;
-  // The account question: a credential dies with its account even when the token itself was never
-  // revoked. An MCP OAuth token carries no session row at all, and the erasure deletes the session
-  // rows of the account on Postgres, so this is the check that ends those tokens.
-  return accountRefuses(verified, grant);
-}
+// credentialRevoked(), the per-request check of whether a verified JWT is still a credential, and
+// the questions it asks live in ./credential-revoked.ts, moved there unchanged when this file reached
+// the 800-line ceiling. Re-exported so every existing import of it still resolves here.
+export { credentialRevoked };
 
 /**
  * Optional auth middleware — parses JWT if present, does not reject if absent.

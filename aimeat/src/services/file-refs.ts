@@ -27,6 +27,8 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.1.1 — 2026-10-20 — A handle names the file version it was minted for (createdAt), so it stops
+ *     serving once the key holds another version (secaudit 2026-10, token-not-bound-to-file-version).
  *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
  *   v1.0.0 — 2026-07-26 — Initial: shared file-reference resolution so an agent can read a file it
  *     does not own (owner-uploaded PDFs, DM attachments, task attachments) through one guard.
@@ -184,8 +186,9 @@ export async function handleFromResolved(
 
     const file = resolved.file;
     const ttl = resolved.ownerGaii === accessorGaii ? OWN_HANDLE_TTL_SECONDS : FOREIGN_HANDLE_TTL_SECONDS;
+    // Bound to this version of the file: a write under the key after the mint is not served by it.
     const token = await generateDownloadToken(
-        { sub: file.ownerGaii, key: file.key, mimeType: file.mimeType, size: file.size },
+        { sub: file.ownerGaii, key: file.key, mimeType: file.mimeType, size: file.size, version: file.createdAt },
         ttl,
     );
     return {

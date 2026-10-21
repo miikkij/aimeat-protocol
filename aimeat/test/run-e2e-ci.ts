@@ -38,6 +38,9 @@
  *   2026-10-18 -- e2e-closed-node-levels.ts joins the list (not the guard tier): a public write on a node closed to strangers lands at the signed-in level, and the new-app feed.
  *   2026-10-20 -- e2e-consent-publish-gate.ts joins the list (not the guard tier): a consent whose
  *     recipient is `*` meets the publish gate, on a node that has it on (secaudit 2026-10).
+ *   2026-10-20 -- e2e-publish-request-bin-takeover.ts joins the list (not the guard tier): a memory
+ *     publish request publishes only the content it was filed for, across a bin and a re-create, on
+ *     its own node with the publish gate on, port 40482 (secaudit 2026-10).
  *   2026-10-20 -- e2e-public-feed-exposure.ts joins the list (not the guard tier): what reaches the
  *     anonymous activity feed, and the publish gate in front of a restore, on its own node with the
  *     publish gate on, port 40497 (secaudit 2026-10).
@@ -470,6 +473,12 @@ const ALL_SUITES = [
     // reachable because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS — so the header that arrives is
     // the header the node actually built, which is the only way to prove the resolution at all.
     'test/e2e-secrets.ts',
+    // Whose vault an extension may read, and who may make the first use that binds a secret's host
+    // (secaudit 2026-10, v58 and v59). Its receiver is on 127.0.0.1:40674 (E2E_SECRETS_AUTHORITY_PORT).
+    'test/e2e-secrets-authority.ts',
+    // The old uses of a vault secret work again (declared uses_secrets), the holes stay closed, and the
+    // owner allows a refused first use with one press. Receiver on 127.0.0.1:40675 (E2E_SECRETS_APPROVALS_PORT).
+    'test/e2e-secrets-approvals.ts',
     'test/e2e-apps.ts',
     // An app listed to the community: signed-in members and their agents see it, the anonymous
     // catalogue does not.
@@ -520,6 +529,9 @@ const ALL_SUITES = [
     // the public activity feed (a share that opens nothing, a task's private title) and what a
     // restore puts back.
     'test/e2e-public-feed-exposure.ts',
+    // Self-spawns its own node with the publish gate on and anonymous mode, port 40482: a memory
+    // publish request publishes only the content it was filed for, across a bin and a re-create.
+    'test/e2e-publish-request-bin-takeover.ts',
     'test/e2e-app-grants.ts',
     'test/e2e-app-grants-tasks.ts',
     'test/e2e-app-members.ts',

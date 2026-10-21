@@ -52,6 +52,8 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.7.1 — 2026-10-21 — The ctx it builds says `unattended: true`, so the code writer decides a
+ *     vault secret's first host (secaudit 2026-10, v59).
  *   v1.7.0 — 2026-10-20 — The read authority is the owner's choice per extension, and its default is
  *     the behaviour every node already has (Jouni, 2026-10-20). unattendedReader is renamed
  *     unattendedExtensionReader: ai-jobs/starter.ts exports a different function under the old name.
@@ -256,6 +258,8 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         // session here, so there is no list of words anybody granted. A script deciding what an
         // unattended run may do reads the 'operator' role, which says exactly that.
         caller: { gaii: callerGaii, owner: ownerName, roles: ['operator'], scopes: [] },
+        // Nobody is present: the extension's code writer decides a vault secret's first host.
+        unattended: true,
         extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey, { extension: ext.name }),
         instance: instanceCtx,
         logPrefix: `[ext:${ext.name}:${logLabel}]`,

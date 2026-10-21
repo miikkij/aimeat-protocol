@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-21 — Section 4: a delete settles the record's waiting publish requests `outdated`, and an
+ *     approval is refused when the record's content changed after the request (secaudit 2026-10,
+ *     services/memory-bin.ts, services/publish-requests/apply-memory.ts).
  *   2026-10-20 — Section 5: a restore passes the visibility rules a write passes, so putting a public
  *     record back can answer PUBLISH_NOT_ALLOWED or LABEL_CAPS_AUDIENCE, or come back at members on a
  *     closed node. Each is named, because an agent that cannot explain the refusal reads it as the
@@ -176,6 +179,11 @@ What an export leaves out, and why:
   and that one refuses the person too. On a node closed to strangers a public record comes back at
   \`members\` instead of public, with no refusal. Say which of these happened; none of them is a
   mistake the person made.
+- Deleting a record that waits for the person's approval to go public ends that request: it is
+  settled \`outdated\`, the one who asked is told, and a restore does not bring it back. To make the
+  record public after that, write it again as public; for an agent without \`publish:public\` that
+  files a new request. An approval publishes only the content the request was made for: when the
+  record's value changed after the request, the approval is refused and nothing goes public.
 - Both act on your own records. With \`owner_scope: true\` they also reach a record another agent of
   the same person wrote, and a record stored under the person's own identity when you hold
   \`memory:write-as-owner\` (the permission a write with \`owner_scope\` needs). A \`NOT_FOUND\` that

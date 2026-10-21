@@ -13,6 +13,12 @@
  * @version-history
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09: A6-1, 573704db10ed).
  *   v1.1.0 — 2026-09-29 — assembleJobPrompt takes a classification reader (TARGET-082).
+ *   v1.2.0 — 2026-10-20 — The stub storage answers createMemoryIfAbsent, setMemoryIfVersion and
+ *     getAiProvenance, and notes the first two as writes: an AI job's answer goes through the shared
+ *     memory write on the version it read since secaudit 2026-10
+ *     (ai-jobs/service.ts:writeResult:raw-write-caller-chosen-visibility). "still runs a job over the
+ *     owner's own records" failed because the setup no longer matched production; the assertion is
+ *     unchanged.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
@@ -84,6 +90,17 @@ function watchedStorage(seed: Record<string, unknown> = {}, schedules: Scheduled
     w.storage = {
         getMemory: async (owner: string, key: string) => { w.reads.push(`${owner}::${key}`); return rows.get(`${owner}::${key}`) ?? null; },
         setMemory: async (r: MemoryRecord) => { w.writes.push(`${r.ownerGaii}::${r.key}`); rows.set(`${r.ownerGaii}::${r.key}`, r); return r; },
+        // An AI job writes its answer through services/memory-write.ts on the version it read, as
+        // both storage providers support: create-if-absent for a new key, set-if-version otherwise.
+        createMemoryIfAbsent: async (r: MemoryRecord) => {
+            if (rows.has(`${r.ownerGaii}::${r.key}`)) return null;
+            w.writes.push(`${r.ownerGaii}::${r.key}`); rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+        },
+        setMemoryIfVersion: async (r: MemoryRecord, v: number) => {
+            if (rows.get(`${r.ownerGaii}::${r.key}`)?.version !== v) return null;
+            w.writes.push(`${r.ownerGaii}::${r.key}`); rows.set(`${r.ownerGaii}::${r.key}`, r); return r;
+        },
+        getAiProvenance: async () => null,
         deleteMemory: async (owner: string, key: string) => rows.delete(`${owner}::${key}`),
         listMemory: async (owner: string, opts: { prefix?: string } = {}) => [...rows.values()]
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),

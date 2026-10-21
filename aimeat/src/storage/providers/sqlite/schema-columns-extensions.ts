@@ -7,7 +7,9 @@
  *   which ctx.fetch reads to decide where a secret may go. Called by initializeSchema at the point
  *   where these ALTERs always ran.
  * @version-history
- *   v1.2.0 — 2026-10-20 — extensions.unattendedReadAuthority: the owner's choice of that reach, NULL
+ *   v1.3.0 — 2026-10-21 — secrets.approvals: the first uses the owner allowed or has yet to answer.
+ *     Mirrors Postgres migration 0110.
+ *   v1.2.0 — 2026-10-20 —extensions.unattendedReadAuthority: the owner's choice of that reach, NULL
  *     meaning their own, which is every node's current behaviour (Jouni, 2026-10-20).
  *   v1.1.0 — 2026-10-20 — extensions.installedByPrincipal: which PRINCIPAL last wrote the extension's
  *     code, so an unattended run judges its file reads against that principal and not against the
@@ -44,4 +46,7 @@ export function applyExtensionColumns(safeAddColumn: SafeAddColumn): void {
   // Who bound it and how: the owner setting the host, or the principal and extension of its first
   // use. JSON, null until bound. Mirrors Postgres 0099.
   safeAddColumn('secrets', 'hostBinding', 'TEXT');
+  // Which extensions the owner allowed to send the secret to which host, and the requests waiting
+  // for an answer. JSON list, '[]' when none. Mirrors Postgres 0110.
+  safeAddColumn('secrets', 'approvals', "TEXT NOT NULL DEFAULT '[]'");
 }

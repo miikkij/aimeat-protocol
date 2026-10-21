@@ -35,6 +35,9 @@
  *   const words = await appAllowanceWords(storage, 'alice/notes.html');
  *   const asked = withAllowance(requested, words);
  * @version-history
+ *   v1.3.0 — 2026-10-21 — keepWorkingAppsOnce takes `rules`: only a word that a call found by one of
+ *     those rules needs (services/app-on-done-keep-migration.ts gives ext:invoke for an AI job's
+ *     on_done and not for an undeclared extension call).
  *   v1.2.0 — 2026-10-20 — keepWorkingAppsOnce takes `only` and a change-log reason, and adds to an app
  *     that already has an allowance the words it lacks, never one its owner removed
  *     (services/app-storage-read-keep-migration.ts).
@@ -80,6 +83,8 @@ export interface KeepWorkingAppsOptions {
   only?: readonly string[];
   /** The reason written in the app's change log. */
   reason?: string;
+  /** Only a word some call found by one of these rules needs (ScopeNeed.rule), not the same word for another call. */
+  rules?: readonly string[];
 }
 
 /**
@@ -122,10 +127,12 @@ export async function keepWorkingAppsOnce(
         if (text !== null) libs.push({ source: ref.path, text });
       }
       const needs = undeclaredScopeNeeds(html, libs);
+      const ruled = (n: { rule?: string }) => !opts.rules || (n.rule !== undefined && opts.rules.includes(n.rule));
       const missing = needs.missing.filter(w =>
-        (!opts.only || opts.only.includes(w)) && !had?.words.includes(w) && !had?.removed.includes(w));
+        (!opts.only || opts.only.includes(w)) && !had?.words.includes(w) && !had?.removed.includes(w)
+        && needs.needs.some(n => n.word === w && ruled(n)));
       if (!missing.length) continue;
-      const evidence = needs.evidence.filter(e => missing.includes(e.word))
+      const evidence = (opts.rules ? needs.needs.filter(ruled) : needs.evidence).filter(e => missing.includes(e.word))
         .map(e => ({ word: e.word, source: e.source, evidence: e.evidence.slice(0, 240) }));
       await writeAllowance(storage, {
         spec: SPEC, appId, words: [...(had?.words ?? []), ...missing], removed: had?.removed ?? [],

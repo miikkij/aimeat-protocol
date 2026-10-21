@@ -15,6 +15,9 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.7.0 — 2026-10-20 — DiscoveryContext.organismCaller: the session asking, for the organism read
+ *     rule on the own scope (organismReadableRecords). Without it the memory source keeps no organism
+ *     record for anyone but the owner in person and an app grant (secaudit 2026-10, the v57 shape).
  *   v0.6.0 — 2026-10-20 — DiscoveryContext.caller carries the principal kind (isApp, isEcosystem):
  *     a source cannot otherwise tell an app grant, whose identity is the owner's GHII, from an agent
  *     with a namespace of its own (secaudit 2026-10).
@@ -33,6 +36,7 @@
  *   v0.1.0 — 2026-06-23 — Phase 0: initial contract (design doc 2026-06-23-master-directory-discovery).
  */
 import type { ContentReader } from '../classification/reader.js';
+import type { OrganismListCaller } from '../organism-namespace-access.js';
 
 /** The taxonomy an LLM filters on. Extend here + add an llms.txt word when a new kind ships (§7.3). */
 export type DiscoveryType =
@@ -130,6 +134,9 @@ export interface DiscoveryContext {
     /** Granted read-scopes — used to filter an agent's view of the owner set (design §11.3). */
     scopes: string[];
   };
+  /** The session asking, as the organism read rule takes it (services/organism-namespace-access.ts):
+   *  callerOf on REST, the session's caller() on MCP. The own scope asks it of every organism key. */
+  organismCaller?: OrganismListCaller;
   scope: 'own' | 'public' | 'shared';
   filters: DiscoveryFilters;
   nodeId: string;

@@ -17,6 +17,7 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   2026-10-21 — The owner-free check and the pacing ask isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.10.0 — 2026-10-20 — Both invoke paths refuse an `action_id` whose capability the app's owner
  *     does not own (CAPABILITY_NOT_OWNED_BY_APP, 403), on the metered path after the price is
  *     decided and on the free path before the pacing is charged. The manifest names a bare id in a
@@ -67,6 +68,7 @@ import type { Storage, AppRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
 import { appToolBindingRefusal } from '../services/capability-invoke.js';
 import { resolveIdentity, callerPrincipal, localAccountName } from '../utils/gaii.js';
@@ -252,7 +254,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     // Asked BEFORE checking whether a right exists, deliberately: an owner calling their own tool is
     // free whether or not they ever bought a contract against themselves, and pre-filtering on "do
     // they hold something" is exactly how that rule went missing here while three other doors had it.
-    if (req.auth && !req.auth.anonymous) {
+    if (req.auth && !isAnonymousPrincipal(req.auth)) {
       const callerGaii = resolveIdentity(req.auth, config.nodeId);
       // The capability runs as the owner, as it always has. The metered call names the app, so an
       // app's spending is attributable instead of arriving as its owner's own.
@@ -397,7 +399,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       // chargePacing (part burns, the operator keeps its share, the rest goes to the app owner), and
       // given back when the call fails. The app owner's own principals use it free.
       const paced = await paceFreeToolUse({
-        config, storage, caller: callerPrincipal(req.auth!, config.nodeId), anonymous: !!req.auth!.anonymous,
+        config, storage, caller: callerPrincipal(req.auth!, config.nodeId), anonymous: isAnonymousPrincipal(req.auth),
         ownerName, appId: filename, tool, capRef: cap.source?.ref,
       });
       if (paced.kind === 'anonymous') {

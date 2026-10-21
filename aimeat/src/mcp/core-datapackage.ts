@@ -27,6 +27,10 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-20 — aimeat_datapackage_export reads as the session caller, with its roles and current
+ *     scopes, so the store asks storage:read of an agent reading its owner's private package
+ *     (secaudit 2026-10 v41) and opens a pinned earlier version on its own audience (v42). A refusal
+ *     for the missing word answers SCOPE_DENIED as REST does, not NOT_FOUND.
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, a publish that would make
  *     the package public lands at 'members' and the answer carries `warnings` PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   2026-10-18 — aimeat_datapackage_publish asks the publish gate as POST /v1/datapackages does: a
@@ -42,7 +46,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
@@ -51,7 +55,9 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { emitChange } from '../services/event-bus.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
-import { publishPackage, openPackage, readRows } from '../services/datapackage/store.js';
+import { publishPackage, openPackage, readRows, parseRef } from '../services/datapackage/store.js';
+import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE, type DatapackageReader } from '../services/datapackage/audience.js';
+import { scopeDeniedText } from './scope-denied-answer.js';
 import { toCsv } from '../services/datapackage/table.js';
 import type { TableSchema } from '../services/datapackage/contract.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -90,8 +96,20 @@ export function registerCoreDataPackageTools(
 ): void {
     const agentGaii = getAgentGaii();
     const store = { storage, config };
-    /** This session as a reader: an agent of this node, so a package's audience decides (plan V3.8). */
-    const reader = { sub: agentGaii, owner: localAccountName(agentGaii) };
+
+    /**
+     * The refusal REST gives (GET /v1/datapackages/..., 403 SCOPE_DENIED naming storage:read) when this
+     * session acts for the package's owner, lacks storage:read, and the owner can open what it asked
+     * for. Null otherwise, so a missing package stays NOT_FOUND. The tool's catalog scope is storage:read
+     * and the session gate refuses it first while scopes are enforced (AIMEAT_MCP_ENFORCE_SCOPES); this
+     * is the answer on a node that turned enforcement off.
+     */
+    const scopeRefusal = async (ref: string, reader: DatapackageReader) => {
+        const parsed = parseRef(ref, config.nodeId);
+        if (!parsed || !lacksPackageReadScope(parsed.ownerGhii, reader)) return null;
+        if (!(await openPackage(store, ref, config.nodeId, ownerAuthOf(parsed.ownerGhii)))) return null;
+        return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_datapackage_export', [DATAPACKAGE_READ_SCOPE], { baseUrl: config.baseUrl, agentGaii }) }], isError: true as const };
+    };
 
     // ── aimeat_datapackage_publish ──
     mcp.registerTool(
@@ -187,8 +205,12 @@ export function registerCoreDataPackageTools(
             annotations: annotationsFor('aimeat_datapackage_export'),
         },
         async ({ ref, resource, format, limit, offset, select }) => {
+            // This session as a reader, with its roles and its current scopes: an agent of the owner
+            // reads a private package of its owner only with storage:read, and every other package
+            // on its audience (secaudit 2026-10 v41).
+            const reader = caller().auth;
             const opened = await openPackage(store, ref, config.nodeId, reader);
-            if (!opened) return errContent({ code: 'NOT_FOUND', message: `No such data package: ${ref}` });
+            if (!opened) return (await scopeRefusal(ref, reader)) ?? errContent({ code: 'NOT_FOUND', message: `No such data package: ${ref}` });
             const res = opened.descriptor.resources.find(r => r.name === resource);
             if (!res) {
                 return errContent({
@@ -228,7 +250,7 @@ export function registerCoreDataPackageTools(
             const page = await readRows(store, ref, config.nodeId, resource, {
                 offset: offset ?? 0, limit: limit ?? 500, ...(select?.length ? { select } : {}),
             }, reader);
-            if (!page) return errContent({ code: 'NOT_FOUND', message: `Could not read ${resource} of ${ref}` });
+            if (!page) return (await scopeRefusal(ref, reader)) ?? errContent({ code: 'NOT_FOUND', message: `Could not read ${resource} of ${ref}` });
             const truncated = page.total > page.rows.length + (offset ?? 0);
             const body = format === 'csv'
                 ? { format: 'csv', csv: toCsv(page.rows, page.schema).toString('utf8') }

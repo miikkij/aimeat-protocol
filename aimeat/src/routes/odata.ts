@@ -29,6 +29,10 @@
  *   - GET /v1/odata/:owner/:name/:resource  the entity set
  * @usage app.use(odataRouter(config, storage))
  * @version-history
+ *   2026-10-20 -- The feed reads with the caller's whole auth (roles and scopes): an agent, app grant or
+ *     ecosystem app of the owner reads a private package only with storage:read, and gets 403
+ *     Forbidden naming the word without it (secaudit 2026-10 v41, standing ruling 5). A pinned earlier
+ *     version opens on its own audience (secaudit 2026-10 v42, in the store).
  *   2026-10-19 -- Entity-set and error bodies go through sendODataJson: the same content type and body,
  *     set as a header before the send, plus `X-Content-Type-Options: nosniff` (CodeQL 1743).
  *   2026-10-17 — The feed reads with the caller's auth: a package published members, organism:<id> or
@@ -41,7 +45,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { openPackage, readAllRows } from '../services/datapackage/store.js';
+import { openPackage, readAllRows, parseRef } from '../services/datapackage/store.js';
+import { lacksPackageReadScope, ownerAuthOf } from '../services/datapackage/audience.js';
 import { toCsdl, parseQuery, applyQueryPaged, nextLinkFor, edmName, ODATA_SUPPORTED } from '../services/datapackage/odata.js';
 import type { Descriptor } from '../services/datapackage/contract.js';
 
@@ -83,6 +88,22 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
             ? `@${req.query.version.trim()}` : '';
         return `pkg:${req.params.owner}/${req.params.name}${v}`;
     };
+    /**
+     * A package this caller may not open. A principal of the package's owner (agent, app grant,
+     * ecosystem app) without storage:read, on a package its owner can open, gets 403 naming the word,
+     * as GET /v1/datapackages/... does (secaudit 2026-10 v41); anyone else gets 404, as a missing
+     * package does.
+     */
+    const notOpened = async (req: Request, res: Response, ref: string): Promise<void> => {
+        const parsed = parseRef(ref, config.nodeId);
+        if (parsed && lacksPackageReadScope(parsed.ownerGhii, req.auth)
+            && await openPackage(store, ref, config.nodeId, ownerAuthOf(parsed.ownerGhii))) {
+            odataError(res, 403, 'Forbidden',
+                'Reading a private data package of your owner, or a private earlier version of one, needs the "storage:read" scope. Ask the owner to grant it.');
+            return;
+        }
+        odataError(res, 404, 'NotFound', `No such data package: ${ref}`);
+    };
     const serviceRoot = (req: Request): string =>
         `${config.baseUrl.replace(/\/+$/, '')}/v1/odata/${encodeURIComponent(req.params.owner as string)}`
         + `/${encodeURIComponent(req.params.name as string)}`;
@@ -90,7 +111,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
     /** The service document: which entity sets this feed offers. What Excel reads first. */
     router.get('/v1/odata/:owner/:name', async (req, res) => {
         const opened = await openPackage(store, refOf(req), config.nodeId, req.auth);
-        if (!opened) { odataError(res, 404, 'NotFound', `No such data package: ${refOf(req)}`); return; }
+        if (!opened) { await notOpened(req, res, refOf(req)); return; }
         odataHeaders(res, !!req.query.version);
         res.type('application/json;odata.metadata=minimal').send(JSON.stringify({
             '@odata.context': `${serviceRoot(req)}/$metadata`,
@@ -106,7 +127,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
      */
     router.get('/v1/odata/:owner/:name/\\$metadata', async (req, res) => {
         const opened = await openPackage(store, refOf(req), config.nodeId, req.auth);
-        if (!opened) { odataError(res, 404, 'NotFound', `No such data package: ${refOf(req)}`); return; }
+        if (!opened) { await notOpened(req, res, refOf(req)); return; }
         odataHeaders(res, !!req.query.version);
         res.type('application/xml; charset=utf-8')
             .send(toCsdl(opened.descriptor, namespaceFor(opened.descriptor)));
@@ -116,7 +137,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/odata/:owner/:name/:resource', async (req, res) => {
         const ref = refOf(req);
         const opened = await openPackage(store, ref, config.nodeId, req.auth);
-        if (!opened) { odataError(res, 404, 'NotFound', `No such data package: ${ref}`); return; }
+        if (!opened) { await notOpened(req, res, ref); return; }
 
         // The client addresses the set by the name the METADATA published, which may differ from the
         // descriptor's own field-legal-but-not-CSDL-legal name.

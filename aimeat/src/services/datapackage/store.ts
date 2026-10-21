@@ -28,6 +28,14 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-10-21 — The descriptor file of a new version carries the version's audience as a tag, and an
+ *     earlier version is opened and listed on that audience (capability-loss review of v42: an
+ *     organism or members reader keeps the earlier versions after the newest goes public).
+ *   2026-10-20 — openPackage, readRows and readAllRows take a DatapackageReader (roles and scopes too):
+ *     a principal of the owner other than the owner in person reads a non-public package only with
+ *     storage:read (secaudit 2026-10 v41). A pinned earlier version opens to a reader who does not
+ *     read as the owner only at the tier its files were stored at, and listVersions takes the reader
+ *     and leaves out the versions it cannot open (secaudit 2026-10 v42).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, a version that would make
  *     the package public (named or by the default) is published at 'members' (plan V1.6).
  *   2026-10-18 — A version published without a visibility takes visibility.datapackage_default (code
@@ -71,9 +79,10 @@ import {
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
 import { linkSourceImages } from './images.js';
 import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
-import type { AudienceAuth } from '../audience.js';
 import { checkAudienceWrite } from '../audience-write.js';
-import { DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable } from './audience.js';
+import {
+    DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable, versionOpenTo, withAudienceTag, type DatapackageReader,
+} from './audience.js';
 import { writeLatest, upsertCatalogueEntry, setVersionAudience, readPointer } from './version-audience.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { closedNodeLevel } from '../closed-node-level.js';
@@ -336,6 +345,9 @@ export async function publishPackage(
         data: descriptorBytes,
         mimeType: 'application/json; charset=utf-8',
         visibility: fileVisibility,
+        // The version's own audience, which an earlier version is read on once the pointer moves on
+        // (./audience.ts versionOpenTo). A tag, so the descriptor's bytes stay the version's identity.
+        tags: withAudienceTag([], visibility),
         // The descriptor file names its record, so GET /v1/pub serves its marks and the by-hash
         // lookup of the bytes a reader downloaded finds it.
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
@@ -503,7 +515,7 @@ export interface OpenedPackage { descriptor: Descriptor; descriptorUrl: string; 
  * which is what makes pinning worth anything.
  */
 export async function openPackage(
-    deps: StoreDeps, ref: string, nodeId: string, reader?: AudienceAuth | null,
+    deps: StoreDeps, ref: string, nodeId: string, reader?: DatapackageReader | null,
 ): Promise<OpenedPackage | null> {
     const parsed = parseRef(ref, nodeId);
     if (!parsed) return null;
@@ -525,6 +537,9 @@ export async function openPackage(
     }
     const file = await deps.storage.getStorageFile(ownerGhii, descriptorKey(name, hash));
     if (!file) return null;
+    // A pinned earlier version keeps the tier it was stored at: the pointer's audience covers the
+    // version it names, and approving one version public opens no other (./audience.ts).
+    if (!(await versionOpenTo(deps.storage, ownerGhii, reader, pointer, hash, file))) return null;
     return {
         descriptor: JSON.parse(file.data.toString('utf8')) as Descriptor,
         descriptorUrl: publicUrl(deps.config.baseUrl, ownerGhii, descriptorKey(name, hash)),
@@ -536,7 +551,7 @@ export async function openPackage(
  *  whole table into somebody's context because it happened to fit. */
 export async function readRows(
     deps: StoreDeps, ref: string, nodeId: string, resource: string, opts: { offset?: number; limit?: number; select?: string[] } = {},
-    reader?: AudienceAuth | null,
+    reader?: DatapackageReader | null,
 ): Promise<{ rows: Array<Record<string, unknown>>; total: number; schema: TableSchema } | null> {
     const loaded = await loadResourceRows(deps, ref, nodeId, resource, reader);
     if (!loaded) return null;
@@ -560,7 +575,7 @@ export async function readRows(
  * so this reads nothing more than a windowed read does.
  */
 export async function readAllRows(
-    deps: StoreDeps, ref: string, nodeId: string, resource: string, reader?: AudienceAuth | null,
+    deps: StoreDeps, ref: string, nodeId: string, resource: string, reader?: DatapackageReader | null,
 ): Promise<{ rows: Array<Record<string, unknown>>; total: number; schema: TableSchema } | null> {
     const loaded = await loadResourceRows(deps, ref, nodeId, resource, reader);
     if (!loaded) return null;
@@ -569,7 +584,7 @@ export async function readAllRows(
 
 /** The parsed CSV of one resource of one package version, with the resource's descriptor entry. */
 async function loadResourceRows(
-    deps: StoreDeps, ref: string, nodeId: string, resource: string, reader?: AudienceAuth | null,
+    deps: StoreDeps, ref: string, nodeId: string, resource: string, reader?: DatapackageReader | null,
 ): Promise<{ all: Array<Record<string, unknown>>; res: DescriptorResource } | null> {
     const parsed = parseRef(ref, nodeId);
     const opened = await openPackage(deps, ref, nodeId, reader);
@@ -622,10 +637,17 @@ export interface VersionEntry {
  *
  * Each descriptor is read, which is one small GET per version. That is what makes `changes` and
  * `rowCount` available, and it is bounded by the owner's retention policy rather than by time.
+ *
+ * The list is the `reader`'s: a version that reader may not open (an earlier one stored narrower than
+ * the pointer's tier, ./audience.ts versionOpenTo) is left out, hash, explanation and row count
+ * included. The caller has already decided the reader may read the package at all (openPackage).
  */
-export async function listVersions(deps: StoreDeps, ownerGhii: string, name: string): Promise<VersionEntry[]> {
+export async function listVersions(
+    deps: StoreDeps, ownerGhii: string, name: string, reader: DatapackageReader | null | undefined,
+): Promise<VersionEntry[]> {
     const root = `${packageKeyRoot(name)}/`;
-    const currentHash = (await readLatestPointer(deps, ownerGhii, name))?.contentHash ?? '';
+    const pointer = await readLatestPointer(deps, ownerGhii, name);
+    const currentHash = pointer?.contentHash ?? '';
     const files = (await deps.storage.listStorageFiles(ownerGhii))
         .filter(f => f.key.startsWith(root) && f.key.endsWith('/datapackage.json'));
 
@@ -633,6 +655,7 @@ export async function listVersions(deps: StoreDeps, ownerGhii: string, name: str
     for (const f of files) {
         const hash = f.key.slice(root.length).split('/')[0];
         if (!/^[a-f0-9]{64}$/.test(hash)) continue;
+        if (!(await versionOpenTo(deps.storage, ownerGhii, reader, pointer ?? undefined, hash, f))) continue;
         const body = await deps.storage.getStorageFile(ownerGhii, f.key);
         if (!body) continue;
         let descriptor: Descriptor;

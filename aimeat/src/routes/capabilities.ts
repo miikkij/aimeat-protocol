@@ -10,6 +10,8 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   2026-10-21 — The list's anonymous branch asks isAnonymousPrincipal, so the minted anonymous token sees
+ *     public active capabilities only (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.6.1 — 2026-10-16 — The list's policy no longer carries `publishers`: the setting behind it was enforced nowhere (QA audit D8-05).
  *   2026-10-16 — POST, PUT and DELETE /v1/capabilities admit the owner's agent holding capability:write, the
  *     word aimeat_capabilities_create/_update/_delete declare, and POST/DELETE /:id/vouch admit the owner's
@@ -58,6 +60,7 @@ import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityFilter, CapabilityRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -215,7 +218,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     // Anonymous callers (incl. the shared anonymous identity injected by global optionalAuth in
     // anonymous mode — req.auth is TRUTHY then) see only PUBLIC + active capabilities. Testing
     // `!req.auth` alone leaked owner-marked-private rows (ownerGhii, webhookUrl) to the anon internet.
-    if (!req.auth || req.auth.anonymous) {
+    if (!req.auth || isAnonymousPrincipal(req.auth)) {
       filters.visibility = 'public';
       if (!filters.status) filters.status = 'active';
     } else if (!(await isOperatorCaller(storage, req.auth))) {

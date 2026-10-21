@@ -80,7 +80,7 @@ beforeAll(async () => {
     confirm.initConfirmTokenKeys(privateKey, publicKey);
 
     const ghii = `${OWNER}@${NODE}`;
-    kinds.push(['download', await download.generateDownloadToken({ sub: ghii, key: 'files/a.png', mimeType: 'image/png', size: 1 })]);
+    kinds.push(['download', await download.generateDownloadToken({ sub: ghii, key: 'files/a.png', mimeType: 'image/png', size: 1, version: '2026-10-20T00:00:00.000Z' })]);
     kinds.push(['share', await share.generateShareToken({ org: 'org-1', ws: 'ws-1', pwv: 'v1' })]);
     kinds.push(['draft preview', await draft.generateDraftToken({ sub: OWNER, filename: 'a.html' })]);
     kinds.push(['frame grant', await draft.generateFrameToken({ sub: OWNER, filename: 'a.html', origin: 'https://x.example' })]);

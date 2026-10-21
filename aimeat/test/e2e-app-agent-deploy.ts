@@ -9,6 +9,11 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.5.0 — 2026-10-20 — Phase 2b: a deploy task asks the shared start decision. A task:write-only
+ *     sibling's deploy onto a task-runner holding connections:use, and onto one set to taskStart
+ *     'confirm', each gets a queued task (the first notifies the owner); onto a plain task-runner it
+ *     still starts at once with the auto-start marker (secaudit 2026-10,
+ *     app-agent-deploy.ts:createAppAgentTask:mode-only-auto-activation).
  *   v1.4.0 — 2026-10-20 — Phase 4b: a device-authorize naming an agent that ALREADY EXISTS. An
  *     approver holding agent:write plus one ordinary scope, and a second holding the wildcard, are
  *     both refused the auto-approval, the device-token poll yields no credential, and the sibling's
@@ -318,6 +323,60 @@ async function main() {
             method: 'POST', headers: { Authorization: `Bearer ${owner1Token}` }, body: JSON.stringify({}),
         });
         assert(r.status === 404 && r.body.error?.code === 'AGENT_NOT_DECLARED', `${r.status} ${r.body.error?.code}`);
+    });
+
+    // ── Phase 2b: the deploy task asks the same start decision every task create asks ──
+    // secaudit 2026-10 (app-agent-deploy.ts:createAppAgentTask:mode-only-auto-activation): the deploy
+    // task started on any task-runner runner by its mode alone, so a sibling agent holding only
+    // task:write started work on a runner the permission floor or the owner's 'Ask me first' holds.
+    console.log('\nPhase 2b: the start decision on a deploy task (permission floor, the owner\'s setting)');
+    const RUN_FLOOR = 'runfloor', RUN_CONF = 'runconf';
+    let deployer = { gaii: '', token: '' };
+    const deployAs = (token: string, runner: string) => json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/deploy`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ runner_agent: runner }),
+    });
+    await test('setup: a task-runner holding connections:use, a task-runner set to ask first, and a task:write-only sibling', async () => {
+        await registerAgent(owner1Token, owner1, RUN_FLOOR, 'task-runner', ['task:read', 'task:write', 'connections:use']);
+        await registerAgent(owner1Token, owner1, RUN_CONF, 'task-runner', ['task:read', 'task:write']);
+        const set = await json(`/v1/agents/${RUN_CONF}/task-start`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${owner1Token}` }, body: JSON.stringify({ task_start: 'confirm' }),
+        });
+        assert(set.status === 200, `task-start confirm: ${set.status} ${JSON.stringify(set.body.error)}`);
+        const d = await registerAgent(owner1Token, owner1, 'deployer', 'interactive', ['task:read', 'task:write']);
+        deployer = { gaii: d.gaii, token: d.token };
+    });
+
+    await test('SECURITY: a deploy onto a runner holding a floor permission waits for the owner (queued, not started)', async () => {
+        const r = await deployAs(deployer.token, RUN_FLOOR);
+        assert(r.status === 201, `deploy: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.body.data.task_status === 'queued' && r.body.data.auto_activated === false,
+            `the floor holds the task: ${r.body.data.task_status} auto=${r.body.data.auto_activated}`);
+        const t = await json(`/v1/agents/${RUN_FLOOR}/tasks/${r.body.data.task_id}`, { headers: { Authorization: `Bearer ${owner1Token}` } });
+        assert(t.status === 200 && t.body.data.task.status === 'queued', `the owner reads it queued: ${t.status} ${t.body.data?.task?.status}`);
+        let notices: any[] = [];
+        for (let i = 0; i < 20 && notices.length === 0; i++) {
+            const n = await json('/v1/notifications?limit=200', { headers: { Authorization: `Bearer ${owner1Token}` } });
+            notices = (n.body?.data?.notifications ?? []).filter((x: any) => String(x.link ?? '').includes(r.body.data.task_id));
+            if (!notices.length) await new Promise(res => setTimeout(res, 100));
+        }
+        assert(notices.some(n => n.type === 'task_waiting'), `the owner is told the task waits: ${JSON.stringify(notices.map(n => n.type))}`);
+    });
+
+    await test('SECURITY: a deploy onto a runner whose owner set "Ask me first" waits for the owner', async () => {
+        const r = await deployAs(deployer.token, RUN_CONF);
+        assert(r.status === 201, `deploy: ${r.status} ${JSON.stringify(r.body.error)}`);
+        assert(r.body.data.task_status === 'queued' && r.body.data.auto_activated === false,
+            `the setting holds the task: ${r.body.data.task_status} auto=${r.body.data.auto_activated}`);
+    });
+
+    await test('POSITIVE CONTROL: the same sibling\'s deploy onto a plain task-runner still starts at once, marked as started on its own', async () => {
+        const r = await deployAs(deployer.token, RUNNER);
+        assert(r.status === 201 && r.body.data.task_status === 'active' && r.body.data.auto_activated === true,
+            `plain task-runner: ${r.status} ${r.body.data?.task_status} auto=${r.body.data?.auto_activated}`);
+        const ev = await json(`/v1/agents/${RUNNER}/tasks/${r.body.data.task_id}/events`, { headers: { Authorization: `Bearer ${owner1Token}` } });
+        const events = (ev.body?.data?.events ?? []) as any[];
+        assert(ev.status === 200 && events.some(e => e.type === 'started' && e.details?.started_by === 'start-setting'),
+            `the started event carries the auto-start marker: ${ev.status} ${JSON.stringify(events.map(e => [e.type, e.details]))}`);
     });
 
     console.log('\nPhase 3: Status + undeploy');

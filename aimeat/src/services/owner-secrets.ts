@@ -36,7 +36,15 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
- *   v1.2.0 — 2026-10-09 — The owner may set a secret's host when storing it (putOwnerSecret `host`,
+ *   v1.3.1 — 2026-10-21 — A first-use decision may name the other account's extension that asked
+ *     (`foreign`), and secretForeignExtensionMessage words that refusal (secaudit 2026-10, v58 as
+ *     amended by Jouni: the caller's vault serves any extension, toward a bound host only).
+ *   v1.3.0 — 2026-10-20 — resolveSecretForHeaders takes `ownerGhii: null` for a call that may read no
+ *     vault (another owner's extension, secaudit 2026-10 v58), and asks `firstUse()` before a vault
+ *     secret with no host is bound: only the owner in person or a secrets:manage holder may choose
+ *     that host (ruling 6; secaudit 2026-10 v59). A refused first use is the 'host' refusal with
+ *     `firstUse`, worded by secretFirstUseMessage; nothing is bound or sent.
+ *   v1.2.0 — 2026-10-09 —The owner may set a secret's host when storing it (putOwnerSecret `host`,
  *     normalizeSecretHost). A first use records who made it and through which extension (`hostBinding`,
  *     on the list). The extension's shared secret map is bound to the host of its first use as well,
  *     under a binding row per value (sharedBindingName). resolveSecretForHeaders answers the values
@@ -53,7 +61,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import type { SecretBinding, SecretRecord } from '../storage/types/secrets.js';
+import type { SecretApproval, SecretBinding, SecretRecord } from '../storage/types/secrets.js';
 import { createHmac } from 'node:crypto';
 import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 import { logger } from '../utils/logger.js';
@@ -89,6 +97,11 @@ export interface SecretSummary {
   /** Who bound it and how: `set` when stored with a host, `first-use` naming the principal and the
    *  extension whose call bound it. Null while unbound. */
   hostBinding: SecretBinding | null;
+  /** The extensions the owner allowed to send it to a host, and the requests still waiting
+   *  (an entry without `approvedAt`): services/secret-approvals.ts. */
+  approvals: SecretApproval[];
+  /** When an extension last sent it, through a bound host or an approval; null when none has. */
+  lastUsedAt: string | null;
 }
 
 /** A refusal the caller turns into an HTTP status or a tool error, with the words already written. */
@@ -119,7 +132,20 @@ export function toSummary(record: SecretRecord, now = Date.now()): SecretSummary
     usedBy: recentUsers(record, now),
     hosts: record.hosts ?? [],
     hostBinding: record.hostBinding ?? null,
+    approvals: record.approvals ?? [],
+    lastUsedAt: lastUse(record),
   };
+}
+
+/** When any extension last sent this secret (the newest use stamp), or null when none has. */
+function lastUse(record: SecretRecord): string | null {
+  const times = Object.values(record.usedBy ?? {}).filter(t => Number.isFinite(Date.parse(t)));
+  return times.length ? times.reduce((a, b) => (Date.parse(a) >= Date.parse(b) ? a : b)) : null;
+}
+
+/** An extension's `why`, as it reads after "to": a leading "to " and a closing full stop dropped. */
+export function purposeText(why: string): string {
+  return why.trim().replace(/^to\s+/i, '').replace(/[.\s]+$/, '');
 }
 
 /**
@@ -182,8 +208,9 @@ export async function putOwnerSecret(
         + 'passwords, not documents: nothing here can read a value back to tell you what it became.',
     };
   }
-  // The owner may name the host now. Without it the first use chooses, and the first use is made by
-  // whichever of the owner's agents or apps calls first (secrets audit 2026-10-09, item 10).
+  // The owner may name the host now. Without it the first use chooses (secrets audit 2026-10-09,
+  // item 10), and only the owner in person or a secrets:manage holder may make that first use
+  // (ruling 6, resolveSecretForHeaders below).
   const host = opts.host === undefined || opts.host === null ? null : normalizeSecretHost(opts.host);
   if (opts.host !== undefined && opts.host !== null && !host) {
     return {
@@ -215,6 +242,57 @@ export async function putOwnerSecret(
     hostBinding: host ? { how: 'set', by: opts.by ?? ownerGhii, at: now } : null,
   });
   return { ok: true, data: toSummary(stored) };
+}
+
+/**
+ * Set or change the address a secret may be sent to, without typing the value again: the Access
+ * page's address field, PATCH /v1/secrets/:name, aimeat_secret_host_set. A host binds it now; null or
+ * an empty string unbinds it, so its next first use binds again. The approvals stay as they are.
+ * Changing or removing an address the secret already has is the account holder's in person; anyone
+ * else may only give a secret with no address its first one (secaudit 2026-10, R62).
+ */
+export async function setOwnerSecretHost(
+  storage: Storage,
+  ownerGhii: string,
+  name: unknown,
+  rawHost: unknown,
+  by: string,
+  /** The account holder signed in: only they change or remove an address a secret already has. */
+  opts: { inPerson: boolean },
+): Promise<{ ok: true; data: SecretSummary } | SecretRefusal> {
+  if (typeof name !== 'string' || !SECRET_NAME_RE.test(name)) {
+    return { ok: false, status: 400, code: 'INVALID_SECRET_NAME', message: 'A secret name is letters, digits, underscore and hyphen, 1 to 64 characters.' };
+  }
+  const clearing = rawHost === null || rawHost === '';
+  const host = clearing ? null : normalizeSecretHost(rawHost);
+  if (!clearing && !host) {
+    return {
+      ok: false, status: 400, code: 'INVALID_SECRET_HOST',
+      message: 'host is the address a secret may be sent to, written as a host name or host:port, for example '
+        + 'api.example.com or api.example.com:8443: no https://, no path. Send null to remove the address. Nothing was changed.',
+    };
+  }
+  const missing = { ok: false as const, status: 404, code: 'SECRET_NOT_FOUND', message: `You hold no secret called ${name}.` };
+  const inPersonOnly = (what: string) => ({
+    ok: false as const, status: 403, code: 'IN_PERSON_ONLY',
+    message: `Only the account holder, signed in, can ${what} a secret's address. An agent allowed to manage the secrets may `
+      + 'give a secret its first address when it has none, and nothing more. Nothing was changed. Ask the owner to change it '
+      + 'on the Access page under Secrets.',
+  });
+  const binding: SecretBinding = { how: 'set', by, at: new Date().toISOString() };
+  if (!opts.inPerson) {
+    // Ruling 6 gives a secrets:manage holder the FIRST address and nothing more (secaudit 2026-10, R62):
+    // the bind is conditional on the secret having none, so a race cannot move an address either.
+    if (!host) return inPersonOnly('remove');
+    const bound = await storage.bindSecretHost(ownerGhii, name, host, binding);
+    if (!bound.length) return missing;
+    if (!bound.includes(host) || bound.length > 1) return inPersonOnly('change');
+    const now = await storage.getSecret(ownerGhii, name);
+    return now ? { ok: true, data: toSummary(now) } : missing;
+  }
+  const updated = await storage.setSecretHosts(ownerGhii, name, host ? [host] : [], host ? binding : null);
+  if (!updated) return missing;
+  return { ok: true, data: toSummary(updated) };
 }
 
 /** Remove one. `false` when this owner holds no secret of that name — never another owner's. */
@@ -317,10 +395,25 @@ export function extensionConfigSecrets(extConfig: Record<string, unknown> | unde
   }
 }
 
-/** Why a resolution was refused: no such secret, or a secret bound to another host. */
+/**
+ * Why a resolution was refused: no such secret, or a secret bound to another host. `firstUse` marks
+ * the host refusal of a secret with no host yet, whose first use the deciding principal may not make
+ * (secaudit 2026-10, v59); `by` names that principal.
+ */
 export type SecretResolutionRefusal =
   | { ok: false; reason: 'unknown'; headerName: string; secretName: string }
-  | { ok: false; reason: 'host'; headerName: string; secretName: string; boundTo: string[]; host: string };
+  | { ok: false; reason: 'host'; headerName: string; secretName: string; boundTo: string[]; host: string; firstUse?: { by: string; foreign?: ForeignExtension } };
+
+/** The extension another account installed, named in a refused first use (secaudit 2026-10, v58). */
+export type ForeignExtension = { extension: string; installer: string };
+
+/**
+ * Whether the principal behind this call may choose the first host of a vault secret that has none
+ * (ruling 6, 2026-10-20): the owner in person, or a principal holding `secrets:manage`. `by` is the
+ * deciding principal, which the binding records. The caller of resolveSecretForHeaders answers it,
+ * because only the caller knows whether the run is attended (services/extension-secret-authority.ts).
+ */
+export type FirstUseDecision = { allowed: boolean; by: string; foreign?: ForeignExtension };
 
 /** The header that names this secret, so a refusal can say which one. */
 function headerNaming(headers: Record<string, string> | undefined, secretName: string): string {
@@ -332,8 +425,40 @@ function headerNaming(headers: Record<string, string> | undefined, secretName: s
 export function secretHostMessage(headerName: string, secretName: string, boundTo: string[], host: string): string {
   return `The header "${headerName}" asks for the secret ${secretName}, which may be sent only to `
     + `${boundTo.join(', ') || 'the host it is first used with'}, and this call goes to ${host || 'an address that does not parse'}. `
-    + 'Nothing was sent. To use it with a different host, store the value again on the Access page under Secrets, '
-    + 'or with aimeat_secret_set; the next call then binds it to its host.';
+    + 'Nothing was sent. To use it with a different host, change its address on the Access page under Secrets, '
+    + 'or with aimeat_secret_host_set.';
+}
+
+/** The sentence that tells the person how to allow a refused first use: one press, or the address. */
+function allowSentence(allowUrl: string | undefined): string {
+  return allowUrl
+    ? `The owner can allow this with one press at ${allowUrl}, or set the secret's address on the Access page under Secrets.`
+    : 'The owner can set the secret\'s address on the Access page under Secrets.';
+}
+
+/**
+ * What a refused first use says (secaudit 2026-10, v59). The secret has no host yet, so this call
+ * would choose where the owner's credential goes, and the principal behind it may not make that
+ * choice. It names the secret, the header, the host and the principal, never a value, and gives the
+ * address where the owner allows it (services/secret-approvals.ts).
+ */
+export function secretFirstUseMessage(headerName: string, secretName: string, host: string, by: string, allowUrl?: string): string {
+  return `The header "${headerName}" asks for the secret ${secretName}, which has no host yet, so this call would `
+    + `choose where it may be sent (${host || 'an address that does not parse'}). Only the account holder signed in, `
+    + `an agent allowed to manage the secrets, or an extension that declares this host for this secret may make that choice, `
+    + `and ${by} may not. Nothing was sent. ${allowSentence(allowUrl)} The owner can also make the first call in person.`;
+}
+
+/**
+ * What a refused first use through ANOTHER account's extension says (secaudit 2026-10, v58). That
+ * extension's script chose the address, so it never binds the caller's secret, whoever the caller
+ * is. The owner allows it with one press, or by setting the secret's address themselves.
+ */
+export function secretForeignExtensionMessage(secretName: string, host: string, foreign: ForeignExtension, why?: string, allowUrl?: string): string {
+  const purpose = why ? `, to ${purposeText(why)}` : '';
+  return `The extension "${foreign.extension}" by ${foreign.installer} wants to send your secret ${secretName} to `
+    + `${host || 'an address that does not parse'}${purpose}. The secret has no address set yet, and an extension another `
+    + `account installed cannot choose one. Nothing was sent. ${allowSentence(allowUrl)}`;
 }
 
 /** What a refused resolution says, and where the caller can go to fix it. */
@@ -363,10 +488,25 @@ export function secretUnknownMessage(headerName: string, secretName: string): st
 export async function resolveSecretForHeaders(deps: {
   storage: Storage;
   config: AimeatConfig;
-  /** The owner GHII behind whichever principal is calling. */
-  ownerGhii: string;
-  /** The principal making the call (an agent's GAII, the owner's GHII): recorded with a first use. */
+  /**
+   * The owner GHII whose vault this call may read, or null when it may read none. Null skips the
+   * vault entirely, so the answer for a name the caller holds is the same as for one they do not.
+   * ctx.fetch passes the caller's owner for every extension (secaudit 2026-10, v58 as amended
+   * 2026-10-21): what another account's extension may not do is choose a first host, which
+   * `firstUse` answers.
+   */
+  ownerGhii: string | null;
+  /** The principal making the call (an agent's GAII, the owner's GHII). */
   principal?: string;
+  /**
+   * Asked only when a vault secret with no host would be bound by this call, after every name has
+   * resolved, once per such secret: may this call choose `host` for it (ruling 6, and the
+   * extension's declared uses)? A refusal binds nothing and sends nothing; an allowed first use is
+   * recorded with the decision's `by`.
+   */
+  firstUse: (secretName: string, host: string) => Promise<FirstUseDecision>;
+  /** The extension and the account that installed it, for the approvals the owner gave on a secret. */
+  approvedFor?: { extension: string; installer: string };
   /** The extension's manifest config, secrets already decrypted by the road that built the context. */
   extConfig: Record<string, unknown> | undefined;
   /** Which extension is asking, for the usedBy stamp. */
@@ -396,8 +536,8 @@ export async function resolveSecretForHeaders(deps: {
   for (const name of names) {
     // The person's own vault wins over the operator's shared map: a credential belonging to the
     // human must never be shadowed by one somebody else set for everyone on the node.
-    const record = await storage.getSecret(ownerGhii, name);
-    if (record && key) {
+    const record = ownerGhii ? await storage.getSecret(ownerGhii, name) : null;
+    if (ownerGhii && record && key) {
       let plain = '';
       try {
         plain = decrypt(record.ciphertext, key);
@@ -411,6 +551,13 @@ export async function resolveSecretForHeaders(deps: {
         });
       }
       if (plain) {
+        // THE OWNER'S OWN ANSWER FIRST. An approval the owner gave in person lets this extension,
+        // installed by this account, send this secret to this host, whatever the secret's own
+        // address says, and binds nothing (services/secret-approvals.ts).
+        const approved = deps.approvedFor && host
+          && (record.approvals ?? []).some(a => !!a.approvedAt && a.extension === deps.approvedFor!.extension
+            && a.installer === deps.approvedFor!.installer && a.host === host);
+        if (approved) { resolved.set(name, plain); fromVault.push(name); continue; }
         // THE HOST. The address comes from the extension's script, so without this any extension a
         // person ran could send their credential to its author. The first use binds the host;
         // every later call must go there. Storing the value again clears the binding. Checked
@@ -449,11 +596,30 @@ export async function resolveSecretForHeaders(deps: {
   // THE CALL IS ACCEPTED: every name resolved, every bound secret goes where it is bound. Only now
   // is a first use bound to this host. The store answers the hosts the secret ended up bound to, so
   // a concurrent first use that bound it elsewhere a moment ago is still refused here.
+  // WHO MAY CHOOSE THE HOST (ruling 6, secaudit 2026-10 v59). A vault secret with no host is bound
+  // to whatever host this call goes to, and the script that chose the address may have been
+  // written by an agent that holds ext:write but not secrets:manage. So the first use is a decision
+  // only the owner in person or a secrets:manage holder may make; anyone else is refused here,
+  // before anything is bound or sent. A secret that already has a host is not asked about.
+  // Asked per secret, because the extension's declared hosts are per secret.
+  const at = new Date().toISOString();
+  const decidedBy = new Map<string, string>();
+  for (const name of ownerGhii ? toBind : []) {
+    const decision = await deps.firstUse(name, host);
+    if (!decision.allowed) {
+      return {
+        ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: [], host,
+        firstUse: { by: decision.by, ...(decision.foreign ? { foreign: decision.foreign } : {}) },
+      };
+    }
+    decidedBy.set(name, decision.by);
+  }
   const firstUse: SecretBinding = {
-    how: 'first-use', by: deps.principal ?? ownerGhii, extension: extName, at: new Date().toISOString(),
+    how: 'first-use', by: deps.principal ?? ownerGhii ?? '', extension: extName, at,
   };
   for (const name of toBind) {
-    const bound = await storage.bindSecretHost(ownerGhii, name, host, firstUse);
+    if (!ownerGhii) break;
+    const bound = await storage.bindSecretHost(ownerGhii, name, host, { ...firstUse, by: decidedBy.get(name) ?? firstUse.by });
     if (!bound.includes(host)) {
       return { ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: bound, host };
     }
@@ -472,7 +638,7 @@ export async function resolveSecretForHeaders(deps: {
   }
 
   // Fire-and-forget: the call must not wait on bookkeeping, and a lost stamp costs a line on a list.
-  if (fromVault.length) {
+  if (fromVault.length && ownerGhii) {
     const at = new Date().toISOString();
     for (const name of fromVault) {
       void storage.noteSecretUse(ownerGhii, name, extName, at).catch(err => {

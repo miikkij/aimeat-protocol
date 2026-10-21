@@ -7,6 +7,12 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-overview).
  * @version-history
+ *   v1.3.1 — 2026-10-21 — An agent of the owner without memory:read gets 403 on the overview (the
+ *     suite's first second-principal refusal; its denial-coverage exemption is removed).
+ *   v1.3.0 — 2026-10-20 — +the owner-scope sections read as the caller may: over REST and MCP an
+ *     agent without memory:read-as-owner gets no private learned pitfall or template record of its
+ *     owner or a sibling, and still gets the sibling's owner-visibility entry and the owner's proposal
+ *     store; an agent with the word and the owner in person get every record (secaudit 2026-10, v56 shape).
  *   v1.2.0 — 2026-09-13 — +the overview's learned section under ?model=: every active entry the
  *     caller can read (own and other owners' shared), critical first, the named model's entries
  *     first inside a severity, a private entry of another owner never; the drill-down names a door
@@ -20,6 +26,7 @@
  */
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool, type McpAgent } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -435,6 +442,98 @@ await test('templates REST: seed manifest → list/get with source app → cross
     assert(ds === 200, `delete ${ds}`);
     const { body: after } = await json('/v1/appdev/templates', { headers: { Authorization: `Bearer ${tokenA}` } });
     assert(!after.data.templates.some((t: any) => t.id === 'ui-test-template'), 'template survived delete');
+});
+
+// ── The owner-scope sections read as the caller may (secaudit 2026-10, the v56 shape) ──
+// The learned-pitfall and template-proposal sections read the owner's GHII and every agent of the
+// owner. Until 2026-10-20 they applied no visibility rule, so an agent without memory:read-as-owner
+// read its owner's and its siblings' private records here, as the MCP knowledge tools did (v56).
+const OV_PREFIX = `ovpriv${stamp}`;
+const ovKeys = {
+    ownerPrivPitfall: `packages/appdev-pitfalls/data/${OV_PREFIX}-owner-priv`,
+    sibPrivPitfall: `packages/appdev-pitfalls/data/${OV_PREFIX}-sib-priv`,
+    sibOwnerPitfall: `packages/appdev-pitfalls/data/${OV_PREFIX}-sib-owner`,
+    sibPrivTemplate: `template.catalog.${OV_PREFIX}-sib-tpl.manifest`,
+    ghiiTemplate: `template.catalog.${OV_PREFIX}-ghii-tpl.manifest`,
+};
+let ovPlain: McpAgent;
+let ovAsOwner: McpAgent;
+const overviewKeys = (d: any): string[] => [
+    ...(d.pitfalls_learned?.items ?? []).map((e: any) => e.key),
+    ...(d.template_proposals?.items ?? []).map((t: any) => `template.catalog.${t.id}.manifest`),
+];
+
+await test('Setup: the owner and a sibling agent keep private, owner-visibility and proposal-store records', async () => {
+    const owner = { name: ownerA, token: tokenA };
+    const sibling = await makeAgent(BASE, owner, ['memory:read', 'memory:write'], `ovsib${stamp}`);
+    ovPlain = await makeAgent(BASE, owner, ['memory:read'], `ovplain${stamp}`);
+    ovAsOwner = await makeAgent(BASE, owner, ['memory:read', 'memory:read-as-owner'], `ovasown${stamp}`);
+    const pitfall = (slug: string) => ({
+        title: `Overview ${slug}`, symptom: `symptom of ${slug}`, resolution: `resolution of ${slug}`,
+        model: 'goose', category: 'data', slug, applies_to: ['app'], severity: 'critical', status: 'active',
+        reported_by: 'overview-e2e', created: new Date().toISOString(), updated: new Date().toISOString(),
+    });
+    const write = async (token: string, key: string, value: unknown, visibility: string, tags: string[]) => {
+        const { status, body } = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ key, value, visibility, tags }),
+        });
+        // Every key here is new, so the write creates it.
+        assert(status === 201, `seed ${key}: ${status} ${JSON.stringify(body?.error)}`);
+    };
+    const pitfallTags = ['knowledge-entry', 'pitfall', 'model:goose'];
+    await write(tokenA, ovKeys.ownerPrivPitfall, pitfall(`${OV_PREFIX}-owner-priv`), 'private', pitfallTags);
+    await write(sibling.token, ovKeys.sibPrivPitfall, pitfall(`${OV_PREFIX}-sib-priv`), 'private', pitfallTags);
+    await write(sibling.token, ovKeys.sibOwnerPitfall, pitfall(`${OV_PREFIX}-sib-owner`), 'owner', pitfallTags);
+    await write(sibling.token, ovKeys.sibPrivTemplate, { id: `${OV_PREFIX}-sib-tpl`, title: 'sibling private template', tier: 'T1' }, 'private', ['template']);
+    // The proposal store: proposeTemplate writes every proposal under the owner's GHII, private.
+    await write(tokenA, ovKeys.ghiiTemplate, { id: `${OV_PREFIX}-ghii-tpl`, title: 'proposal store template', tier: 'T1' }, 'private', ['template', 'template-proposal']);
+});
+
+const OV_SECTIONS = 'pitfalls_learned,template_proposals';
+
+await test('REST: an agent of the owner without memory:read is refused the overview', async () => {
+    const noRead = await makeAgent(BASE, { name: ownerA, token: tokenA }, ['memory:write'], `ovnoread${stamp}`);
+    const { status, body } = await json(`/v1/appdev/overview?sections=${OV_SECTIONS}`, { headers: { Authorization: `Bearer ${noRead.token}` } });
+    assert(status === 403, `an agent without memory:read: ${status} ${JSON.stringify(body?.error)}`);
+});
+
+await test('REST: an agent without memory:read-as-owner gets no private record of its owner or a sibling', async () => {
+    const { status, body } = await json(`/v1/appdev/overview?sections=${OV_SECTIONS}`, { headers: { Authorization: `Bearer ${ovPlain.token}` } });
+    assert(status === 200, `overview ${status}: ${JSON.stringify(body?.error)}`);
+    const keys = overviewKeys(body.data);
+    for (const k of [ovKeys.ownerPrivPitfall, ovKeys.sibPrivPitfall, ovKeys.sibPrivTemplate]) {
+        assert(!keys.includes(k), `the overview handed a plain agent ${k}: ${JSON.stringify(keys)}`);
+    }
+    // A filter, not a ban: the sibling's owner-visibility entry and the proposal store stay.
+    assert(keys.includes(ovKeys.sibOwnerPitfall), `the sibling's owner-visibility entry is missing: ${JSON.stringify(keys)}`);
+    assert(keys.includes(ovKeys.ghiiTemplate), `the owner's proposal store is missing: ${JSON.stringify(keys)}`);
+});
+
+await test('MCP aimeat_appdev_overview: the same agent gets no private record of its owner or a sibling', async () => {
+    const s = await openSession(BASE, ovPlain.token, 'ov-plain');
+    const r = await callTool(s, 'aimeat_appdev_overview', { sections: OV_SECTIONS.split(',') });
+    assert(!r.isError, `overview tool: ${r.text.slice(0, 300)}`);
+    const keys = overviewKeys(r.data);
+    for (const k of [ovKeys.ownerPrivPitfall, ovKeys.sibPrivPitfall, ovKeys.sibPrivTemplate]) {
+        assert(!keys.includes(k), `the MCP overview handed a plain agent ${k}: ${JSON.stringify(keys)}`);
+    }
+    assert(keys.includes(ovKeys.sibOwnerPitfall) && keys.includes(ovKeys.ghiiTemplate), `the visible records are missing: ${JSON.stringify(keys)}`);
+});
+
+await test('REST and MCP: an agent holding memory:read-as-owner, and the owner in person, read every record', async () => {
+    const all = [ovKeys.ownerPrivPitfall, ovKeys.sibPrivPitfall, ovKeys.sibOwnerPitfall, ovKeys.sibPrivTemplate, ovKeys.ghiiTemplate];
+    const rest = await json(`/v1/appdev/overview?sections=${OV_SECTIONS}`, { headers: { Authorization: `Bearer ${ovAsOwner.token}` } });
+    assert(rest.status === 200, `overview ${rest.status}`);
+    const s = await openSession(BASE, ovAsOwner.token, 'ov-asowner');
+    const mcp = await callTool(s, 'aimeat_appdev_overview', { sections: OV_SECTIONS.split(',') });
+    assert(!mcp.isError, `overview tool: ${mcp.text.slice(0, 300)}`);
+    const owner = await json(`/v1/appdev/overview?sections=${OV_SECTIONS}`, { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(owner.status === 200, `owner overview ${owner.status}`);
+    for (const [who, d] of [['read-as-owner REST', rest.body.data], ['read-as-owner MCP', mcp.data], ['owner in person', owner.body.data]] as const) {
+        const keys = overviewKeys(d);
+        for (const k of all) assert(keys.includes(k), `${who} lost ${k}: ${JSON.stringify(keys)}`);
+    }
 });
 
 console.log('\n' + '─'.repeat(40));

@@ -13,7 +13,11 @@
  * @structure LIVING_PACKS: LibraryPack[]
  * @usage Imported by ./sdk.ts (registry assembly). Do not import directly.
  * @version-history
- *   v1.5.1 — 2026-10-13 — The aiDoc says a page with triggers or sources declares ext:invoke, which node 4.0
+ *   v1.5.3 — 2026-10-21 — The aiDoc: a host on the operator's list binds by itself; one only on the
+ *     person's own allowlist asks once. Additive.
+ *   v1.5.2 — 2026-10-21 —The aiDoc says to store a key "for host X", and who makes the first use of one
+ *     stored without a host. Additive.
+ *   v1.5.1 — 2026-10-13 —The aiDoc says a page with triggers or sources declares ext:invoke, which node 4.0
  *     asks on every living-hooks delivery. Additive.
  *   v1.5.0 — 2026-09-19 — aimeat-living 0.8.0: the ninth node type, `decide`, with a worked example
  *     of a support ticket moved by the decision model, and what the builder sends and declares.
@@ -192,9 +196,13 @@ export const LIVING_PACKS: LibraryPack[] = [
       'and the node fills the placeholder from the signed-in owner\'s vault on the way out: the record',
       'holds the name, the browser never sees the value, and a name the owner has not stored fails as',
       'SECRET_UNKNOWN naming it. The gear dialogs list the owner\'s stored names to pick from. Tell the',
-      'person the NAME and where it goes — "store it as NAME on your Access page, section 04 Secrets, or',
-      'ask your AI" (an agent with secrets:manage stores it with aimeat_secret_set) — and never put a',
-      'field for the key itself in the document.',
+      'person the NAME and the HOST the trigger or source calls — "store it as NAME for host api.example.com',
+      'on your Access page, Secrets section, or ask your AI" (an agent with secrets:manage stores it with',
+      'aimeat_secret_set { name, value, host }) — and never put a field for the key itself in the document.',
+      'A key stored without a host is bound by its first use. To a host on the operator\'s node-wide list',
+      'that use binds by itself; to a host only on the person\'s own allowlist, only the owner signed in or an',
+      'agent with secrets:manage makes it, and any other first use is refused with SECRET_HOST and names a',
+      'page where the owner allows it with one press, once per key and host.',
       'ON THE SCREEN, each value, control and source carries a small gear with an arrow going IN, and each',
       'machine and trigger a gear with the arrow going OUT. The dialogs behind them are generated from the',
       'record: the exact answer a URL must give for THIS node\'s path, the POST that writes the value into a',

@@ -23,6 +23,9 @@
  * @structure WORKFLOW_DECISIONS_SKILL_ENTRY
  * @usage import { WORKFLOW_DECISIONS_SKILL_ENTRY } from './builtin-skills.workflow-decisions.js';
  * @version-history
+ *   2026-10-21 — Section 4: a run is asked about its principal before every step, the one after an
+ *     answer included, and ends `refused` with `refusal.stoppedBefore` when that principal is gone or
+ *     narrowed (secaudit 2026-10, v64, services/workflow/dispatch-authority.ts).
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
  */
 /** The shape of a BuiltinSkill, named here rather than imported so this file closes no import cycle
@@ -143,6 +146,14 @@ restart it, raise its timeout or change the definition to get it moving. Read th
 remind the person of the question and the deadline, and leave it to them. When the person no longer
 wants the decision, they can cancel the run on the workflows page
 (\`POST /v1/workflows/{id}/runs/{runId}/cancel\`).
+
+A run answers to the agent or app that started it (for a trigger's run, the one that saved the
+workflow), and the node asks it again before it starts each step, the step after an answer included.
+When that agent or app was removed or lost a permission the next step needs, the run ends
+\`refused\`: its open steps are skipped, a question still waiting goes with them (an answer then gets
+409 \`WORKFLOW_STEP_NOT_WAITING\`), and \`refusal.stoppedBefore\` names the step that did not start. The
+person's answer is kept on the run. Tell the person, and point them to the ways on in skill
+\`diagnose-a-workflow\`, step 6.
 
 ## The rule underneath
 

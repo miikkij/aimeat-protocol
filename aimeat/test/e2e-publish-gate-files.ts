@@ -21,6 +21,10 @@
  *     - gate off (the code default): the same agent's uploads, bulk and copy are public at once;
  *     - a refusal: the asker cannot decide its own request (403 OWN_REQUEST).
  * @version-history
+ *   v1.1.0 — 2026-10-20 — A presigned upload URL does not outlive its agent: deleted (or registered
+ *     again under the released name) after the mint, the PUT is refused 401 and nothing is stored; an
+ *     agent that lost publish:public after the mint gets a private file and a request (202), as its
+ *     inline write does (secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: stored files and the memory batch routes).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-gate-files
@@ -312,6 +316,70 @@ await test('The owner in person bulk-writes public at once', async () => {
     const key = `pgf.bulk.owner.${stamp}`;
     const b = await call('/v1/memory/bulk', { token: A.token, body: { entries: [{ key, value: { n: 1 }, visibility: 'public' }] } });
     assert(b.status === 200 && !b.body.data.publish_requests, `owner bulk: ${b.status} ${JSON.stringify(b.body.error ?? b.body.data)}`);
+});
+
+// ── A presigned URL does not outlive its agent or the permission it was minted with ──
+// secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck. The PUT verified the signed token alone:
+// an agent the owner deleted wrote through a URL it minted earlier, under its deleted GAII, as public;
+// and an agent that lost publish:public after the mint still made the file public.
+const mintPublic = (token: string, key: string) =>
+    call('/v1/storage', { token, body: { key, mode: 'presigned', mime_type: 'text/plain', visibility: 'public' } });
+
+await test('Control: an agent that still holds publish:public PUTs a public presigned upload, stored public (200)', async () => {
+    const key = `pgf-live-${stamp}.txt`;
+    const m = await mintPublic(publisher.token, key);
+    assert(m.status === 200, `mint: ${m.status} ${JSON.stringify(m.body.error)}`);
+    const put = await putBytes(m.body.data.upload_url, Buffer.from('still allowed'));
+    assert(put.status === 200 && put.body.visibility === 'public' && !put.body.publish_request, `put: ${put.status} ${JSON.stringify(put.body)}`);
+    assert((await anonFile(publisher.gaii, key)).status === 200, 'anonymous reads it');
+});
+
+await test('An agent deleted after the mint: the PUT is refused 401 and nothing is stored', async () => {
+    const doomed = await makeAgent(BASE, A, [...WORDS, 'publish:public']);
+    const key = `pgf-gone-${stamp}.txt`;
+    const m = await mintPublic(doomed.token, key);
+    assert(m.status === 200, `mint: ${m.status} ${JSON.stringify(m.body.error)}`);
+    const del = await call(`/v1/agents/${doomed.name}`, { token: A.token, method: 'DELETE' });
+    assert(del.status === 200, `delete: ${del.status} ${JSON.stringify(del.body.error)}`);
+    const put = await putBytes(m.body.data.upload_url, Buffer.from('written after the delete'));
+    assert(put.status === 401 && put.body.error === 'TOKEN_INVALID', `put: ${put.status} ${JSON.stringify(put.body)}`);
+    assert(/no longer exists/i.test(String(put.body.message)), `the refusal says why: ${put.body.message}`);
+    assert((await anonFile(doomed.gaii, key)).status === 404, 'nothing is served at the public address');
+    // The owner reads everything their agents hold, so this is the read that would find the file.
+    const own = await call(`/v1/pub/${encodeURIComponent(doomed.gaii)}/${key}`, { token: A.token });
+    assert(own.status === 404, `nothing is stored under the deleted agent: ${own.status}`);
+});
+
+await test('An agent re-registered under the deleted name is a new principal: the old URL stays refused', async () => {
+    const name = `pgfre${stamp.toString(36).slice(-5)}`;
+    const first = await makeAgent(BASE, A, [...WORDS, 'publish:public'], name);
+    const m = await mintPublic(first.token, `pgf-reborn-${stamp}.txt`);
+    assert(m.status === 200, `mint: ${m.status}`);
+    assert((await call(`/v1/agents/${name}`, { token: A.token, method: 'DELETE' })).status === 200, 'delete');
+    await new Promise(r => setTimeout(r, 5));
+    await makeAgent(BASE, A, [...WORDS, 'publish:public'], name);
+    const put = await putBytes(m.body.data.upload_url, Buffer.from('the old URL of a released name'));
+    assert(put.status === 401, `put: ${put.status} ${JSON.stringify(put.body)}`);
+});
+
+await test('An agent that lost publish:public after the mint: the PUT stores it private with a request (202)', async () => {
+    const narrowed = await makeAgent(BASE, A, [...WORDS, 'publish:public']);
+    const key = `pgf-narrowed-${stamp}.txt`;
+    const m = await mintPublic(narrowed.token, key);
+    assert(m.status === 200, `mint: ${m.status} ${JSON.stringify(m.body.error)}`);
+    const p = await call(`/v1/agents/${narrowed.name}/scopes`, { token: A.token, method: 'PATCH', body: { scopes: WORDS } });
+    assert(p.status === 200, `narrow: ${p.status} ${JSON.stringify(p.body.error)}`);
+    const put = await putBytes(m.body.data.upload_url, Buffer.from('written after the narrowing'));
+    assert(put.status === 202 && put.body.visibility === 'private' && put.body.publish_request?.kind === 'file', `put: ${put.status} ${JSON.stringify(put.body)}`);
+    assert((await anonFile(narrowed.gaii, key)).status !== 200, 'anonymous does not read it');
+});
+
+await test('Control: the owner in person PUTs a public presigned upload, stored public at once', async () => {
+    const key = `pgf-owner-pre-${stamp}.txt`;
+    const m = await mintPublic(A.token, key);
+    assert(m.status === 200, `mint: ${m.status} ${JSON.stringify(m.body.error)}`);
+    const put = await putBytes(m.body.data.upload_url, Buffer.from('the owner in person'));
+    assert(put.status === 200 && put.body.visibility === 'public', `put: ${put.status} ${JSON.stringify(put.body)}`);
 });
 
 await test('Cleanup: the gate back to off', async () => {

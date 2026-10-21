@@ -14,6 +14,9 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-20 — SECURITY: aimeat_appdev_pitfall_list reads the owner-scope learned entries through the
+ *     session's view (readsAsOwner): an agent without memory:read-as-owner listed its owner's and its
+ *     siblings' private entries (secaudit 2026-10, the v56 shape).
  *   2026-10-06 — The list is services/appdev-kb.ts pitfallIndex(), which GET /v1/appdev/pitfalls/index
  *     answers with too, and takes the catalog's schema (secaudit 2026-10 follow-up, Part B).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -52,6 +55,7 @@ import { getSoftwareVersion } from '../utils/version.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { readsAsOwner } from '../services/owner-scope-read.js';
 
 export { PITFALL_PACKAGE_ID };
 
@@ -119,7 +123,11 @@ export function registerAppdevPitfallTools(
             // The merge, filter and page is services/appdev-kb.ts pitfallIndex(), which
             // GET /v1/appdev/pitfalls/index answers with too. Learned entries are user-written memory
             // records, so what this agent is shown is the classification reader's decision.
-            const index = await pitfallIndex(storage, config, readerForAgent({ storage, config }, agentGaii, sessionScopes), query);
+            // The owner-scope entries read as this agent may (memory:read-as-owner), as
+            // GET /v1/appdev/pitfalls/index reads them (secaudit 2026-10, v56 shape).
+            const c = caller();
+            const index = await pitfallIndex(storage, config, readerForAgent({ storage, config }, agentGaii, sessionScopes), query,
+                { principal: c.principal, readsAll: readsAsOwner(c) });
             return { content: [{ type: 'text' as const, text: JSON.stringify(index, null, 2) }] };
         },
     );

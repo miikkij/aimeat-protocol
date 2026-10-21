@@ -14,6 +14,9 @@
  *   below passes at all.
  * @usage cd aimeat && pnpm exec vitest run test/unit/flag-review-visitor.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-20 — The visitor's home is registered as a live peer: since the credential check
+ *     binds a visitor to its live peer, a visitor with none answers 401 before the route is reached
+ *     (secaudit 2026-10, federated-visitor-not-bound-to-live-peer). The route's 403 is still what is asserted.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F13-03).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -31,9 +34,11 @@ import type { AimeatConfig } from '../../src/config.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
 import { initNodeKeys, initRevocationStorage, issueJWT } from '../../src/auth/jwt.js';
 import { initSessionAuth } from '../../src/auth/middleware.js';
+import { registerVisitorPeers } from '../../src/auth/visitor-peer.js';
 import { flagsRouter } from '../../src/routes/flags.js';
 
 const NODE = 'aimeat-unit-001-flags';
+const ELSEWHERE = 'aimeat-unit-002-elsewhere';
 const ADMIN = 'aino';
 const ORG = 'org-flagvisit';
 const STAMP = '2026-10-16T00:00:00.000Z';
@@ -57,11 +62,16 @@ async function review(id: string, token: string): Promise<{ status: number; body
 
 beforeAll(async () => {
     storage = new SqliteStorage(':memory:') as unknown as Storage;
-    const config = { nodeId: NODE, baseUrl: 'https://node.test' } as AimeatConfig;
+    const config = { nodeId: NODE, baseUrl: 'https://node.test', federationAuthPolicy: 'all_peers' } as AimeatConfig;
     const keys = await generateKeyPair();
     await initNodeKeys(keys.publicKey, keys.privateKey);
     initRevocationStorage(storage, NODE);
     initSessionAuth(storage, config);
+    // The visitor's home is a live peer that may sign people in here, so the visitor reaches the route
+    // and the refusal asserted below is the route's, not the credential check's (auth/visitor-peer.ts).
+    registerVisitorPeers(new Map([[ELSEWHERE, {
+        nodeId: ELSEWHERE, status: 'active', tier: 'member', allowFederatedAuth: true, federationAuthScopes: [],
+    }]]), NODE);
 
     const ownerKeys = await generateKeyPair();
     await storage.createOwner({ name: ADMIN, displayName: ADMIN, publicKey: ownerKeys.publicKey, roles: ['owner'], createdAt: STAMP } as never);

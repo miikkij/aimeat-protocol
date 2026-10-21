@@ -9,9 +9,9 @@
  *   Recognition is by scope `kind` ("deploy-app-agent" / "undeploy-app-agent"), never by title.
  *   Shared contract: crewaimeat Internal workspace, plan doc "Agent-Bundled Apps — self-hosted".
  * @structure
- *   - createAppAgentTask() — build + persist the deploy/undeploy task (auto-activation for
- *     task-runner mode agents, started event, realtime tunnel delivery — mirrors POST
- *     /v1/agents/:name/tasks so the fleet daemon picks it up identically)
+ *   - createAppAgentTask() — build + persist the deploy/undeploy task (the shared start decision,
+ *     started event, realtime tunnel delivery — mirrors POST /v1/agents/:name/tasks so the fleet
+ *     daemon picks it up identically)
  *   - deployAppAgent() — app lookup, declared-agent check, runner lookup, then createAppAgentTask;
  *     answers the view POST .../agents/:agentName/deploy|undeploy sends
  *   - appAgentInstances() — hosted instances of an app's bundled agent with their public offers
@@ -22,6 +22,12 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-20 — createAppAgentTask asks the shared start decision (decideTaskStart over startFactsOf)
+ *     in place of the runner's mode alone: a runner holding a permission-floor scope or set to
+ *     taskStart 'confirm' gets a queued deploy task, the auto-start event carries the marker, a
+ *     waiting task notifies the owner unless they asked in person, the push id is per transition, and
+ *     the answer's note says why it waits (secaudit 2026-10,
+ *     app-agent-deploy.ts:createAppAgentTask:mode-only-auto-activation).
  *   2026-10-15 — The principal comment says an install set gives its owner and proposes too (feature-list audit #90).
  *   v1.4.0 — 2026-10-11 — An instance's public offers carry `toll_morsels` (the pacing amount) and the old
  *     `price` as its deprecated mirror: a morsel is pacing, never a price.
@@ -49,7 +55,10 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-paci
 import { buildGAII, validateAgentName, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { proposeBundledAgent } from './app-agent-propose.js';
-import type { ProposerPrincipal } from './agent-proposals.js';
+import { proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
+import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from './agent-task-rules.js';
+import { startFactsOf } from './scope-auto-narrow.js';
+import { notifyTaskWaiting, waitReason } from './task-start-notice.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
 export const DEFAULT_APP_AGENT_RUNNER = 'crew-forge';
@@ -85,6 +94,8 @@ export interface AppAgentTaskInput {
   /** The owner's own runner agent (crew-forge) the task is assigned to. */
   runner: AgentRecord;
   organismId?: string;
+  /** The owner asked in person, so a task that waits needs no notification beside the answer. */
+  requestedInPerson?: boolean;
 }
 
 /**
@@ -98,7 +109,7 @@ export async function createAppAgentTask(
   storage: Storage,
   config: AimeatConfig,
   input: AppAgentTaskInput,
-): Promise<{ task: AgentTaskRecord; autoActivated: boolean }> {
+): Promise<{ task: AgentTaskRecord; autoActivated: boolean; decision: TaskStartDecision }> {
   const { kind, appId, agentName, ownerName, runner, organismId } = input;
   const now = new Date().toISOString();
   const verb = kind === 'deploy-app-agent' ? 'Deploy' : 'Undeploy';
@@ -113,12 +124,15 @@ export async function createAppAgentTask(
     scope.push({ name: 'organism_id', value: organismId, type: 'text', description: 'Organism the deployed agent should serve' });
   }
 
-  // Task-runner mode = the owner pre-authorized this agent's daemon to start work without
-  // per-task gating, so the deploy is one click end-to-end. Other modes keep the standard
-  // queued → owner-start gate.
-  // A stopped runner starts nothing: the task waits in the queue and starts with the agent
-  // (services/agent-stop.ts releaseWaitingTasks).
-  const autoActivated = runner.mode === 'task-runner' && !runner.stoppedAt;
+  // The shared start decision (services/agent-task-rules.ts), the one the task-create route and the
+  // scheduler ask: a stopped runner waits for its own start, a runner holding a permission-floor scope
+  // waits for the owner in person, a runner whose owner set taskStart 'confirm' waits for the owner's
+  // OK, and only then does task-runner mode start the task at once (the one-click deploy). The deploy
+  // task names no start policy of its own, so the caller cannot loosen the runner's setting here.
+  // This replaced a mode-only test that started a deploy past the floor and the owner's setting
+  // (secaudit 2026-10, app-agent-deploy.ts:createAppAgentTask:mode-only-auto-activation).
+  const decision = decideTaskStart(await startFactsOf({ storage, config }, runner));
+  const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, 'queued');
 
   const task: AgentTaskRecord = {
     id: randomUUID(),
@@ -141,7 +155,7 @@ export async function createAppAgentTask(
       technicalChecks: [],
     },
     todos: [],
-    status: autoActivated ? 'active' : 'queued',
+    status: effectiveStatus,
     createdAt: now,
     updatedAt: now,
     lastEventAt: autoActivated ? now : undefined,
@@ -149,23 +163,33 @@ export async function createAppAgentTask(
 
   const created = await storage.createAgentTask(task);
 
+  // The same 'started' event the task-create route writes, with the marker that lets a plan which
+  // later declares an effect send the task back to wait (statusAfterProposal).
   if (autoActivated) {
     await storage.appendTaskEvent({
       id: randomUUID(),
       taskId: task.id,
       type: 'started',
-      message: 'Task auto-activated (agent mode: task-runner)',
+      ...autoStartEvent(decision),
       timestamp: now,
     });
   }
 
   // Realtime push down the connector tunnel (zero round-trip when the daemon is online;
   // replayed via backlog-on-connect when offline) + MCP resource nudge for polling daemons.
-  emitDelivery({ target: runner.gaii, kind: 'task_assigned', id: task.id, payload: created });
+  // The delivery id is per transition (taskWakeId), so the push the owner's Start sends later for a
+  // waiting task is not skipped as one the runner already acknowledged.
+  emitDelivery({ target: runner.gaii, kind: 'task_assigned', id: taskWakeId(task.id, task.status, now), payload: created });
   try { emitResourceUpdated(runner.gaii, `aimeat://agents/${runner.name}/tasks`); } catch (err) { logger.warn('createAppAgentTask: MCP not connected', { error: String(err) }); }
   emitChange('agent-tasks', `${ownerName}@${config.nodeId}`);
 
-  return { task: created, autoActivated };
+  // A task that waits for the owner is told to them, unless the owner asked in person (their answer
+  // already says it waits) or the runner is stopped (a Start button would answer AGENT_STOPPED).
+  if (!autoActivated && !input.requestedInPerson && decision.waitsBecause !== 'stopped') {
+    void notifyTaskWaiting(storage, created, decision);
+  }
+
+  return { task: created, autoActivated, decision };
 }
 
 /**
@@ -295,8 +319,9 @@ export async function deployAppAgent(
   const organismId = typeof args.organismId === 'string' && args.organismId.length > 0
     ? args.organismId : undefined;
 
-  const { task, autoActivated } = await createAppAgentTask(storage, config, {
+  const { task, autoActivated, decision } = await createAppAgentTask(storage, config, {
     kind, appId: ctx.appId, agentName: args.agentName, ownerName: args.callerOwner, runner, organismId,
+    requestedInPerson: args.principal ? proposerIsOwnerSession(args.principal) : false,
   });
 
   const deployedName = deployedAgentName(args.agentName, ctx.appId);
@@ -313,7 +338,8 @@ export async function deployAppAgent(
       runner_agent: runner.name,
       note: autoActivated
         ? 'Task is active — the runner daemon picks it up immediately.'
-        : `Task is queued — start it from the Tasks tab (runner "${runner.name}" is not in task-runner mode).`,
+        : `Task is queued. ${waitReason(runner.displayName || runner.name, decision)}`
+          + (decision.waitsBecause === 'stopped' ? '' : ' Start it from the Tasks tab.'),
     },
     links: [
       { description: 'Deployment status', method: 'GET', url: `/v1/apps/${encodeURIComponent(ctx.app.ownerName)}/${encodeURIComponent(ctx.app.filename)}/agents/${encodeURIComponent(args.agentName)}/status` },

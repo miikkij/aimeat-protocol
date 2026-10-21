@@ -11,8 +11,12 @@
  *   "since when do I hold this" is a different question from "when did the value last change". The
  *   same reason `usedBy` is carried forward: rotating a key does not forget who was using it.
  * @structure secretMethods — listSecrets · getSecret · setSecret · createSecretIfAbsent ·
- *   bindSecretHost · deleteSecret · noteSecretUse · deleteSecretsByOwner
+ *   bindSecretHost · setSecretHosts · swapSecretApprovals · deleteSecret · noteSecretUse ·
+ *   deleteSecretsByOwner
  * @version-history
+ *   v1.3.1 — 2026-10-21 — An approvals column that does not parse is logged before it reads as none.
+ *   v1.3.0 — 2026-10-21 — approvals column (migration 0110); setSecretHosts and swapSecretApprovals
+ *     (secaudit 2026-10, v58 and v59 follow-up).
  *   v1.2.0 — 2026-10-09 — hostBinding column (migration 0099); setSecret writes the hosts and
  *     hostBinding it is given; bindSecretHost records the binding; createSecretIfAbsent (ON CONFLICT DO NOTHING)
  *     (secrets audit 2026-10-09, item 10).
@@ -21,7 +25,8 @@
  */
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
-import type { SecretBinding, SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
+import { logger } from '../../../../utils/logger.js';
+import type { SecretApproval, SecretBinding, SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
 
 /**
  * Only `db` is used here, so the `this` type names that field rather than the whole storage class.
@@ -70,6 +75,19 @@ function parseBinding(raw: unknown): SecretBinding | null {
   }
 }
 
+/** The approvals, or none. A malformed column reads as none: an approval only ever widens, so
+ *  losing one refuses a call, which the owner can answer again. */
+function parseApprovals(raw: unknown): SecretApproval[] {
+  if (typeof raw !== 'string' || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((a): a is SecretApproval => !!a && typeof a === 'object') : [];
+  } catch (err) {
+    logger.warn('secrets: the approvals column does not parse; read as none', { error: (err as Error).message });
+    return [];
+  }
+}
+
 function toRecord(r: Record<string, unknown>): SecretRecord {
   return {
     ownerGaii: r.ownerGaii as string,
@@ -80,10 +98,12 @@ function toRecord(r: Record<string, unknown>): SecretRecord {
     usedBy: parseUsedBy(r.usedBy),
     hosts: parseHosts(r.hosts),
     hostBinding: parseBinding(r.hostBinding),
+    approvals: parseApprovals(r.approvals),
   };
 }
 
 const bindingText = (b: SecretBinding | null | undefined): string | null => (b ? JSON.stringify(b) : null);
+const approvalsText = (a: SecretApproval[] | undefined): string => JSON.stringify(a ?? []);
 
 export const secretMethods = {
   async listSecrets(this: Db, ownerGaii: string): Promise<SecretRecord[]> {
@@ -112,18 +132,20 @@ export const secretMethods = {
       // the host it names, or to none until its first use.
       hosts: record.hosts ?? [],
       hostBinding: record.hostBinding ?? null,
+      // …and the extensions it was allowed to go to: they were allowed for the old value.
+      approvals: record.approvals ?? [],
     };
     const hosts = JSON.stringify(stored.hosts);
     if (prior) {
       await this.db.updateTable('Secret')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .set({ ciphertext: stored.ciphertext, updatedAt: stored.updatedAt, hosts, hostBinding: bindingText(stored.hostBinding) } as any)
+        .set({ ciphertext: stored.ciphertext, updatedAt: stored.updatedAt, hosts, hostBinding: bindingText(stored.hostBinding), approvals: approvalsText(stored.approvals) } as any)
         .where('ownerGaii', '=', stored.ownerGaii).where('name', '=', stored.name).execute();
     } else {
       await this.db.insertInto('Secret').values({
         ownerGaii: stored.ownerGaii, name: stored.name, ciphertext: stored.ciphertext,
         setAt: stored.setAt, updatedAt: stored.updatedAt, usedBy: JSON.stringify(stored.usedBy ?? {}),
-        hosts, hostBinding: bindingText(stored.hostBinding),
+        hosts, hostBinding: bindingText(stored.hostBinding), approvals: approvalsText(stored.approvals),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).execute();
     }
@@ -135,9 +157,30 @@ export const secretMethods = {
       ownerGaii: record.ownerGaii, name: record.name, ciphertext: record.ciphertext,
       setAt: record.setAt, updatedAt: record.updatedAt, usedBy: JSON.stringify(record.usedBy ?? {}),
       hosts: JSON.stringify(record.hosts ?? []), hostBinding: bindingText(record.hostBinding),
+      approvals: approvalsText(record.approvals),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).onConflict(oc => oc.columns(['ownerGaii', 'name']).doNothing()).executeTakeFirst();
     return Number(r.numInsertedOrUpdatedRows ?? 0) > 0;
+  },
+
+  async setSecretHosts(this: Db, ownerGaii: string, name: string, hosts: string[], binding: SecretBinding | null): Promise<SecretRecord | null> {
+    await this.db.updateTable('Secret')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set({ hosts: JSON.stringify(hosts), hostBinding: bindingText(binding) } as any)
+      .where('ownerGaii', '=', ownerGaii).where('name', '=', name).execute();
+    const r = await this.db.selectFrom('Secret').selectAll()
+      .where('ownerGaii', '=', ownerGaii).where('name', '=', name).executeTakeFirst();
+    return r ? toRecord(r as unknown as Record<string, unknown>) : null;
+  },
+
+  async swapSecretApprovals(this: Db, ownerGaii: string, name: string, expected: SecretApproval[], next: SecretApproval[]): Promise<boolean> {
+    // Text compare: the stored text is what approvalsText wrote, so the expected list matches byte for byte.
+    const r = await this.db.updateTable('Secret')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .set({ approvals: approvalsText(next) } as any)
+      .where('ownerGaii', '=', ownerGaii).where('name', '=', name)
+      .where('approvals', '=', approvalsText(expected)).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
   },
 
   async bindSecretHost(this: Db, ownerGaii: string, name: string, host: string, binding?: SecretBinding): Promise<string[]> {

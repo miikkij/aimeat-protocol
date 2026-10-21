@@ -202,7 +202,7 @@ const res = await ctx.fetch('https://api.example.com/v1/prices', {
 });
 ```
 
-Three rules, and each one closes a way the value could leak back:
+Six rules, and each one closes a way the value could leak back:
 
 - **Header values only.** A placeholder in the URL, the body, or a header NAME is left exactly as it
   arrived. Substituting into any of those would put the value where the script or the far end can
@@ -211,7 +211,34 @@ Three rules, and each one closes a way the value could leak back:
   owner GHII, so the owner at a screen, their agent and their granted app all reach one vault; a
   `secrets` field in the manifest is the operator's shared fallback for a key everyone on the node
   should be able to use, and the person's own entry always wins. A name in neither refuses with
-  `SECRET_UNKNOWN`, names the secret and the header, and sends nothing.
+  `SECRET_UNKNOWN`, names the secret and the header, and sends nothing. The caller's vault serves
+  every extension the caller runs, another account's included: a shared extension serves each user
+  with that user's own key (bring your own key), and it holds nobody else's. The shared `secrets`
+  field is never the answer for a multi-user service, because it would make the installer hold
+  everyone's keys.
+- **A secret goes only where its owner allowed.** A secret with a bound host goes through any
+  extension to that host and no other (`SECRET_HOST` for anything else). A secret with no host is
+  never bound through an extension another account installed, whoever calls: the script that chose
+  the address is someone else's, so the call is refused with `SECRET_HOST`, naming the extension, its
+  installer and the host, and the owner allows it by setting the secret's address (secaudit 2026-10,
+  v58 as Jouni amended it on 2026-10-21; `src/services/extension-secret-authority.ts`).
+- **Through the caller's own account's extension, a secret with no host is bound on first use.** A
+  first use to a host the manifest declares for that secret in `uses_secrets: [{ name, hosts, why }]`
+  binds whoever calls (the owner's app, their chat agent, a schedule) when the code's writer is
+  trusted: the owner, an app grant of theirs, an agent holding `secrets:manage`, or a record from
+  before writers were recorded (`src/services/extension-secret-uses.ts`). Otherwise only a principal
+  that may create the secret makes that use: the owner in person or a `secrets:manage` holder; in
+  an unattended run, the principal that wrote the extension's code (ruling 6, 2026-10-20).
+  living-hooks counts as the caller's own here: a host on the operator's node-wide allowlist binds
+  by itself, and a host only on the caller's own list (which an app granted memory:write can change)
+  asks once per secret and host. An own-account extension whose code was installed before these
+  rules keeps the old first use, binding to the host its script names whoever calls, until its code
+  is written again (`src/services/extension-first-use-keep.ts`; Jouni, 2026-10-21).
+- **Every refused first use asks the owner.** It files a question on the secret, rings the bell
+  with an Allow button, and names `/v1/secret-allow?secret=&extension=&host=` in the `SECRET_HOST`
+  text. The owner, signed in, allows that extension (installed by that account) to send that secret
+  to that host; the approval is kept on the secret, binds nothing, and is withdrawn on the Access
+  page (`src/services/secret-approvals.ts`, 2026-10-21).
 - **Never resolve a secret inside a script.** A script that resolves its own secret HOLDS it, in a
   variable, for the length of the call, and every extension wanting the same thing would have to
   write the same code and get it right. What a script still decides is which headers may leave at

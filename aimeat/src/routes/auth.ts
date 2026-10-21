@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-10-21 — The bearer refresh asks isAnonymousPrincipal: the minted anonymous token carries no
+ *     anonymous claim and was renewed as an agent session (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-16 — POST /v1/auth/refresh answers 403 OWNER_REFRESH_USES_COOKIE to an owner bearer (an
  *     owner JWT or an owner-level access token) without the refresh cookie. It minted a new one-hour
  *     token from the owner record's roles, so an owner-level token of an operator's account came back
@@ -98,6 +100,7 @@ import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
@@ -469,7 +472,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // (2) Bearer-based refresh (agents and ecosystem apps; an owner bearer is refused below).
-    if (!req.auth || req.auth.anonymous) {
+    if (!req.auth || isAnonymousPrincipal(req.auth)) {
       res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
       return;
     }

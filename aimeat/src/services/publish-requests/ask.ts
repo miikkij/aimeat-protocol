@@ -20,15 +20,19 @@
  *   ... store at the level it had ...
  *   if (ask.kind === 'ask') { const filed = await fileAsk(ctx, caller.owner, ask.requester, draft); ... 202 }
  * @version-history
+ *   2026-10-20 — fileAsk binds the content digest of a memory record (`target.digest`) and of each
+ *     named knowledge entry (`target.entry_digests`) beside the versions (secaudit 2026-10,
+ *     apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import { callerPrincipal } from '../../utils/gaii.js';
 import type { CallerContext } from '../caller-context.js';
 import { publishGateDecision } from '../publish-gate.js';
 import {
-  filePublishRequest, approveUrl,
+  filePublishRequest, approveUrl, memoryValueDigest,
   type PublishRequest, type PublishRequestDraft, type PublishRequester, type PublishStoreCtx,
 } from './store.js';
+import { logger } from '../../utils/logger.js';
 
 export type PublishAsk =
   | { kind: 'allowed' }
@@ -55,11 +59,46 @@ export function publishAskOf(ctx: PublishStoreCtx, caller: CallerContext, app?: 
   return { kind: 'ask', requester: { principal, kind: d.ask, sub: caller.auth.sub } };
 }
 
-/** File the request, after the door stored the content at the level it was allowed to set. */
-export function fileAsk(
+/**
+ * The content digests a memory or knowledge request binds beside the versions it names, read from the
+ * records as they stand at filing. A record whose version is no longer the one named gets no digest:
+ * the version check refuses that request on approval anyway.
+ */
+async function contentBinding(ctx: PublishStoreCtx, target: PublishRequestDraft['target'], kind: PublishRequestDraft['kind']): Promise<Record<string, string>> {
+  const ns = String(target.namespace ?? '');
+  if (!ns) return {};
+  if (kind === 'memory') {
+    const record = await ctx.storage.getMemory(ns, String(target.key ?? ''));
+    return record && record.version === Number(target.version) ? { digest: memoryValueDigest(record.value) } : {};
+  }
+  if (kind === 'knowledge') {
+    let entries: Record<string, unknown>;
+    try {
+      entries = JSON.parse(String(target.entries ?? '{}')) as Record<string, unknown>;
+    } catch (err) {
+      logger.warn('Publish request: the entry list of a knowledge request does not parse at filing', { error: String(err) });
+      return {};
+    }
+    const digests: Record<string, string> = {};
+    for (const [key, version] of Object.entries(entries ?? {})) {
+      const record = await ctx.storage.getMemory(ns, key);
+      if (record && record.version === Number(version)) digests[key] = memoryValueDigest(record.value);
+    }
+    return { entry_digests: JSON.stringify(digests) };
+  }
+  return {};
+}
+
+/**
+ * File the request, after the door stored the content at the level it was allowed to set. A memory
+ * or knowledge request also binds the digest of the content it names, so an approval publishes only
+ * the content that was there when it was asked (apply-memory.ts, apply-knowledge.ts).
+ */
+export async function fileAsk(
   ctx: PublishStoreCtx, owner: string, requester: PublishRequester, draft: Omit<PublishRequestDraft, 'requested_by'>,
 ): ReturnType<typeof filePublishRequest> {
-  return filePublishRequest(ctx, accountGhii(owner, ctx.config.nodeId), { ...draft, requested_by: requester });
+  const target = { ...draft.target, ...await contentBinding(ctx, draft.target, draft.kind) };
+  return filePublishRequest(ctx, accountGhii(owner, ctx.config.nodeId), { ...draft, target, requested_by: requester });
 }
 
 /** What a door answers for a filed request, the same on REST and on MCP. */

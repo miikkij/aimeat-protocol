@@ -19,7 +19,9 @@
  *   services/owner-secrets.js — the module is not there. Every assertion below is new behaviour.
  * @usage pnpm test -- owner-secrets
  * @version-history
- *   v1.3.0 — 2026-10-09 — The summary carries `hostBinding` (who bound the secret to its host).
+ *   v1.4.0 — 2026-10-20 — The resolver asks who may make a first use and binds nothing on a refusal
+ *     (ruling 6, secaudit 2026-10 v59), and reads no vault when given none (v58).
+ *   v1.3.0 — 2026-10-09 —The summary carries `hostBinding` (who bound the secret to its host).
  *   v1.2.0 — 2026-09-24 — The host binding is made only once the call is accepted: not when a later
  *     name refuses it (7d6c102099f3), not before ctx.fetch has checked the address (919ef5f56d69).
  *     Against an in-memory store; both failed on the old code first.
@@ -121,7 +123,8 @@ describe('the summary — what a caller may know', () => {
         expect(JSON.stringify(s)).not.toContain(record({}).ciphertext);
         // `hosts` names where the value may go, which the owner needs to see; it carries no value.
         // `hostBinding` names who bound it there (secrets audit 2026-10-09, item 10); no value either.
-        expect(Object.keys(s).sort()).toEqual(['hostBinding', 'hosts', 'name', 'setAt', 'updatedAt', 'usedBy']);
+        // `approvals` names the extensions the owner allowed, and the requests waiting (2026-10-21).
+        expect(Object.keys(s).sort()).toEqual(['approvals', 'hostBinding', 'hosts', 'lastUsedAt', 'name', 'setAt', 'updatedAt', 'usedBy']);
         expect(s.hosts).toEqual(['api.example.com']);
         expect(s.hostBinding).toBeNull();
     });
@@ -246,6 +249,7 @@ describe('the host binding — made only once the call is accepted', () => {
         (await listOwnerSecrets(storage as never, owner)).find(s => s.name === name)?.hosts;
     const resolve = (storage: SqliteStorage, headers: Record<string, string>, url: string) => resolveSecretForHeaders({
         storage: storage as never, config: cfg, ownerGhii: owner, extConfig: {}, extName: 'probe', headers, url,
+        firstUse: async () => ({ allowed: true, by: owner }),
     });
 
     it('binds nothing when a later name in the same call refuses it', async () => {
@@ -269,5 +273,60 @@ describe('the host binding — made only once the call is accepted', () => {
         await expect(ctx.fetch('http://169.254.169.254/latest/meta-data/', { headers: { Authorization: 'Bearer {{secret:SECOND}}' } }))
             .rejects.toThrow(/Fetch blocked/);
         expect(await hostsOf(storage, 'SECOND')).toEqual([]);
+    });
+
+    // Ruling 6 (secaudit 2026-10, v59): the first host of an unbound vault secret is chosen only by a
+    // principal that may create the secret. The resolver asks; a refusal binds nothing.
+    it('a refused first use binds nothing and names the deciding principal', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'THIRD', 'third-value')).ok).toBe(true);
+        const agent = `helper#alice@${cfg.nodeId}`;
+        const out = await resolveSecretForHeaders({
+            storage: storage as never, config: cfg, ownerGhii: owner, extConfig: {}, extName: 'probe',
+            headers: { 'X-Key': '{{secret:THIRD}}' }, url: 'https://agent-chosen.example/x',
+            firstUse: async () => ({ allowed: false, by: agent }),
+        });
+        expect(out).toMatchObject({ ok: false, reason: 'host', secretName: 'THIRD', boundTo: [], firstUse: { by: agent } });
+        expect(await hostsOf(storage, 'THIRD')).toEqual([]);
+    });
+
+    it('a secret that already has a host is sent there without asking who decides', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'FOURTH', 'fourth-value', { host: 'api.example.com' })).ok).toBe(true);
+        const out = await resolveSecretForHeaders({
+            storage: storage as never, config: cfg, ownerGhii: owner, extConfig: {}, extName: 'probe',
+            headers: { 'X-Key': '{{secret:FOURTH}}' }, url: 'https://api.example.com/x',
+            firstUse: async () => { throw new Error('asked about a secret that is already bound'); },
+        });
+        expect(out).toMatchObject({ ok: true });
+    });
+
+    // secaudit 2026-10, v58 as amended 2026-10-21: a refused first use through another account's
+    // extension carries that extension and its installer to the message, and binds nothing.
+    it('a first use refused for another account\'s extension names it and binds nothing', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'SIXTH', 'sixth-value')).ok).toBe(true);
+        const foreign = { extension: 'author-probe', installer: 'mallory' };
+        const out = await resolveSecretForHeaders({
+            storage: storage as never, config: cfg, ownerGhii: owner, extConfig: {}, extName: 'author-probe',
+            headers: { 'X-Key': '{{secret:SIXTH}}' }, url: 'https://author.example/x',
+            firstUse: async () => ({ allowed: false, by: 'mallory', foreign }),
+        });
+        expect(out).toMatchObject({ ok: false, reason: 'host', secretName: 'SIXTH', host: 'author.example', firstUse: { by: 'mallory', foreign } });
+        expect(await hostsOf(storage, 'SIXTH')).toEqual([]);
+    });
+
+    // A null owner reads no vault at all, so a held name refuses exactly as an unheld one.
+    it('ownerGhii null reads no vault: a held name refuses exactly as an unheld one', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'FIFTH', 'fifth-value')).ok).toBe(true);
+        const ask = (name: string) => resolveSecretForHeaders({
+            storage: storage as never, config: cfg, ownerGhii: null, extConfig: {}, extName: 'probe',
+            headers: { 'X-Key': `{{secret:${name}}}` }, url: 'https://author.example/x',
+            firstUse: async () => ({ allowed: true, by: owner }),
+        });
+        expect(await ask('FIFTH')).toEqual({ ok: false, reason: 'unknown', headerName: 'X-Key', secretName: 'FIFTH' });
+        expect(await ask('NEVER_SET')).toEqual({ ok: false, reason: 'unknown', headerName: 'X-Key', secretName: 'NEVER_SET' });
+        expect(await hostsOf(storage, 'FIFTH')).toEqual([]);
     });
 });

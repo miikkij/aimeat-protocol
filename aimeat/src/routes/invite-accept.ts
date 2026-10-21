@@ -24,6 +24,8 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-10-21 — The viewer verdict and the accepting account ask isAnonymousPrincipal, so the minted
+ *     anonymous token never accepts as the anonymous account (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-15 — A refusal from an extension bound to pre_owner_registration answers 403 and leaves the invitation
  *     usable (feature-list audit 89).
  *   v1.4.0 — 2026-10-05 — An account made from an invitation link starts with its email unverified,
@@ -51,6 +53,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { optionalAuth, isOwnerPrincipal } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
@@ -126,7 +129,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     // Signed-in visitor: report whether accepting as THIS account is allowed (verified email matches),
     // so the page shows the mismatch warning up front. Never leak the account's email — only a verdict.
     let viewer: { owner: string; email_matches: boolean; has_verified_email: boolean } | undefined;
-    if (req.auth && req.auth.anonymous !== true) {
+    if (req.auth && !isAnonymousPrincipal(req.auth)) {
       const owner = req.auth.owner as string;
       const g = await storage.getGHII(`${owner}@${config.nodeId}`);
       const hash = g?.emailVerifiedAt ? g.emailHash : undefined;
@@ -184,7 +187,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     if (organismId && !organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
 
     // Who is accepting: a real (non-anonymous) session, else create a fresh account from the register form.
-    const authed = req.auth && req.auth.anonymous !== true ? (req.auth.owner as string) : null;
+    const authed = req.auth && !isAnonymousPrincipal(req.auth) ? (req.auth.owner as string) : null;
     let ownerName: string;
     let createdAccount = false;
     if (authed) {

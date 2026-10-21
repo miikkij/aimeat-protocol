@@ -27,6 +27,8 @@
  *   const a = parseAudience(app.access);          // { level: 'organism', organismId } | ...
  *   if (!(await audienceAllows(storage, a, req.auth))) → refuse
  * @version-history
+ *   v1.0.2 — 2026-10-21 — isNodeAccount asks isAnonymousPrincipal, so the minted anonymous token is no
+ *     account of this node (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.1 — 2026-10-17 — The organism id grammar is utils/visibility-words.ts ORGANISM_ID_RE, which
  *     the request schemas and the tool catalog validate with too (V3.2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.0).
@@ -34,6 +36,7 @@
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { agentBarred } from './organism-agent-access.js';
 import { ORGANISM_ID_RE } from '../utils/visibility-words.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 export type AudienceLevel = 'private' | 'members' | 'organism' | 'public';
 
@@ -68,7 +71,7 @@ export function formatAudience(a: Audience): string {
 
 /** Signed in on THIS node: not the shared anonymous identity, not a session from another node. */
 export function isNodeAccount(auth: AudienceAuth | null | undefined): boolean {
-  return !!auth && auth.anonymous !== true && auth.federated !== true && typeof auth.owner === 'string' && auth.owner.length > 0;
+  return !!auth && !isAnonymousPrincipal(auth) && auth.federated !== true && typeof auth.owner === 'string' && auth.owner.length > 0;
 }
 
 /**

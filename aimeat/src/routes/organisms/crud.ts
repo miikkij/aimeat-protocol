@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-21 — The member filter's self test asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-18 — POST /v1/organisms and PUT /v1/organisms/:id ask the publish gate: a public organism
  *     by an agent without publish:public is made private (or keeps its level) and the answer is 202
  *     with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -61,6 +62,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { requireAuth, requireRole, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
@@ -150,7 +152,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     // The operator half asks isOperatorCaller, as the MCP tools do: the operator's agent holding
     // operator:admin passes too. A list read writes no operator trail.
     const operator = !!auth && await isOperatorCaller(storage, auth);
-    const selfOrOperator = operator || (!!auth && !auth.anonymous && auth.owner === memberBare);
+    const selfOrOperator = operator || (!!auth && !isAnonymousPrincipal(auth) && auth.owner === memberBare);
     // Browsing without a member filter shows what the directory shows: 'public' and 'listed'. The
     // caller's ?visibility= went to storage unchecked before, so ?visibility=private answered every
     // private organism of the node to an anonymous caller. Only an operator browses past that.

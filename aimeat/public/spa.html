@@ -1162,6 +1162,9 @@
       // The owner allows what their agent asked for with one press (services/permission-ask.ts).
       // A spaRoute in routes/portal.ts too, or F5 is a 404.
       '/v1/allow':       () => import('/views/agent-allow.js' + B),
+      // The owner allows an extension to send one of their secrets to one address (services/secret-approvals.ts).
+      // A spaRoute in routes/portal.ts too, or F5 is a 404.
+      '/v1/secret-allow': () => import('/views/secret-allow.js' + B),
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),

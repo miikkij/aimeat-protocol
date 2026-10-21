@@ -6,6 +6,7 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   2026-10-21 -- The hello-page funnel marker asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.17.0 -- 2026-10-15 -- Mounts /v1/prompts/places/sections (where things are on this node's own
  *     pages, routes/prompts-places.ts).
  *   v1.16.0 -- 2026-10-14 -- Mounts GET /v1/prompts/home-ideas, the ideas the home offers (prompts-home-ideas.ts).
@@ -46,6 +47,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -393,7 +395,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const prompt = buildHelloMcpPrompt(config, { lang });
     // Onboarding funnel: a signed-in owner fetching this prompt = the hello page was opened.
     // The route stays public; the marker only exists for authenticated owners.
-    if (req.auth && !req.auth.anonymous && req.auth.owner) {
+    if (req.auth && !isAnonymousPrincipal(req.auth) && req.auth.owner) {
       void import('../services/onboarding-funnel.js')
         .then(m => m.recordHelloPageOpened(storage, config, req.auth!.owner))
         .catch(err => logger.warn('hello-mcp: funnel marker failed', { error: String(err) }));

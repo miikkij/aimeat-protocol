@@ -24,10 +24,24 @@
  * @structure
  *   - OrganismAccessCaller — the principal, its owner name and its roles
  *   - checkOrganismNamespaceAccess() — a refusal, or null when the access is allowed
+ *   - organismReadableRecords() — the records of a listing the caller may read under the same rule
  * @usage
  *   const refusal = await checkOrganismNamespaceAccess({ storage, config }, caller, key, 'write');
  *   if (refusal) return { ok: false, ...refusal };
+ *   const shown = await organismReadableRecords({ storage, config }, callerContext, records);
  * @version-history
+ *   2026-10-21 — organismReadableRecords keeps the records of an organism that no longer exists in the
+ *     listing, as the owner-scope reads returned them before 2026-10-20: there is no organism whose
+ *     rule could refuse them. A barred agent of a live organism still loses that organism's records.
+ *   2026-10-21 — organismReadableRecords reads storage through listingReads():the organism, the
+ *     account, the membership, the owner's agents and each accessor's active consents once per
+ *     listing instead of once per flat key. 1000 shared keys of one organism, an agent of a plain
+ *     member with a consent: Postgres 11.2 → 0.04 ms a key (11 s → 41 ms a listing), SQLite 0.47 →
+ *     0.02 ms; a creator's agent: Postgres 2.8 → 0.01 ms, SQLite 0.16 → 0.004 ms. The decisions are
+ *     the same: checkOrganismNamespaceAccess still decides every key (capability-loss review).
+ *   2026-10-20 — organismReadableRecords(): the read rule for a listing, which the owner-scope read
+ *     and list paths of the memory route and the MCP memory tools ask. They returned organism records
+ *     to an agent the organism does not admit (secaudit 2026-10, v57).
  *   2026-10-20 — A WORKSPACE ROLE IS A USER-LEVEL PERMISSION, so a member writing workspace CONTENT
  *     passes the same role test in person as through an agent: the caller is the workspace's
  *     registered creator, an organism manager, or holds an active `workspace-contributor` grant from
@@ -64,11 +78,14 @@
  *     findWorkspaceRegistration (services/workspace-meta.ts), which the consent step now shares.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, ConsentRecord } from '../storage/interface.js';
+import { matchesRecipient } from '../storage/consent-recipient.js';
+import { consentMatchPattern } from '../storage/pattern-utils.js';
 import { findWorkspaceRegistration } from './workspace-meta.js';
 import { agentBarred, agentBarredMessage, attachedAsParticipant } from './organism-agent-access.js';
-import { isOwnerInPerson } from '../utils/gaii.js';
+import { isOwnerInPerson, parseGaiiLoose } from '../utils/gaii.js';
 import { fencedSpaceRefusal, type ManifestWrite } from './fenced-space.js';
+import type { CallerContext } from './caller-context.js';
 
 /** The session asking, in the terms this rule decides on. */
 export interface OrganismAccessCaller {
@@ -276,4 +293,110 @@ export async function checkOrganismNamespaceAccess(
     }
 
     return null;
+}
+
+/** The caller of organismReadableRecords: the session's CallerContext (services/caller-context.ts). */
+export type OrganismListCaller = Pick<CallerContext, 'kind' | 'inPerson' | 'principalView'>;
+
+/**
+ * The records of a listing this caller may read under the organism rule: every key outside the
+ * `organism.` namespace, and each organism key checkOrganismNamespaceAccess admits in read mode.
+ * Order is kept.
+ *
+ * WHY. The rule ran as Express middleware on the `:key` memory routes only, so an agent an organism
+ * with agentAccess 'listed' did not admit was refused GET /v1/memory/:key and read the same record
+ * through GET /v1/memory?owner_scope=true, aimeat_memory_read and aimeat_memory_list (secaudit
+ * 2026-10, v57). The owner-scope read and list paths ask this.
+ *
+ * WHO IS EXEMPT. The owner in person and an app grant of the owner: both read the owner's records as
+ * the owner does (services/owner-scope-read.ts readsAsOwner), and an organism the owner left, or one
+ * that was deleted, must not hide the owner's own records from their own listing.
+ *
+ * AN ORGANISM THAT NO LONGER EXISTS has no rule to apply, so its records stay in the listing, as they
+ * did before this function: the owner-scope reads returned them, and v57 is about an organism that
+ * does not admit the caller, not about one that is gone.
+ *
+ * ONE CHECK PER DECISION. An organism a caller is barred from ('listed' without this agent) refuses
+ * all its keys after one organism read. A workspace key's answer is the same for every
+ * key of that workspace, so it is asked once per workspace. A key of the flat namespace (shared,
+ * meta, member.{owner}) is asked on its own, because a consent there matches the key itself.
+ *
+ * ONE STORAGE READ PER FACT. Each flat key is still decided by checkOrganismNamespaceAccess, the one
+ * rule, but over listingReads(): the organism, the account, the membership, the owner's agents and
+ * each accessor's active consents are read once per listing, not once per key. Measured 2026-10-21
+ * on 1000 shared keys of one organism, for an agent of a plain member: 11.2 ms a key on Postgres
+ * (11 s for the listing) and 0.47 ms on SQLite before; see the version history for after.
+ */
+export async function organismReadableRecords<T extends { key: string }>(
+    deps: { storage: Storage; config: AimeatConfig },
+    caller: OrganismListCaller,
+    records: readonly T[],
+): Promise<T[]> {
+    if (caller.inPerson || caller.kind === 'app') return [...records];
+    if (!records.some(r => r.key.startsWith('organism.'))) return [...records];
+    deps = { ...deps, storage: listingReads(deps.storage) };
+    const organisms = new Map<string, 'gone' | 'barred' | 'open'>();
+    const decided = new Map<string, boolean>();
+    const out: T[] = [];
+    for (const record of records) {
+        const org = /^organism\.([^.]+)\./.exec(record.key);
+        if (!org) { out.push(record); continue; }
+        let state = organisms.get(org[1]);
+        if (state === undefined) {
+            const organism = await deps.storage.getOrganism(org[1]);
+            state = !organism ? 'gone' : agentBarred(organism, caller.principalView.principal) ? 'barred' : 'open';
+            organisms.set(org[1], state);
+        }
+        if (state === 'gone') { out.push(record); continue; }
+        if (state === 'barred') continue;
+        const group = /^organism\.[^.]+\.w\.[^.]+\./.exec(record.key)?.[0] ?? record.key;
+        let admitted = decided.get(group);
+        if (admitted === undefined) {
+            admitted = !(await checkOrganismNamespaceAccess(deps, caller.principalView, record.key, 'read'));
+            decided.set(group, admitted);
+        }
+        if (admitted) out.push(record);
+    }
+    return out;
+}
+
+/**
+ * The storage the organism rule reads, for the length of ONE listing: the reads it repeats per key
+ * are answered once and kept, everything else passes through untouched. It holds nothing between
+ * calls, so a revoked consent or a removed member counts from the next listing on.
+ *
+ * findMatchingConsents is answered from the accessor's active consents, read once, with the same
+ * matchers the providers use (matchesRecipient, consentMatchPattern) and the same expiry test. The
+ * providers also mark an expired row while they read; here an expired row is only left out, and
+ * the next provider read marks it.
+ */
+function listingReads(storage: Storage): Storage {
+    const kept = new Map<string, Promise<unknown>>();
+    const once = <R>(key: string, read: () => Promise<R>): Promise<R> => {
+        if (!kept.has(key)) kept.set(key, read());
+        return kept.get(key) as Promise<R>;
+    };
+    const activeConsents = (owner: string) => once(`consents\u0000${owner}`, () => storage.listConsents(owner, { status: 'active' }));
+    const reads: Partial<Record<keyof Storage, unknown>> = {
+        getOrganism: (id: string) => once(`organism\u0000${id}`, () => storage.getOrganism(id)),
+        getGHIIByOwner: (owner: string) => once(`ghii\u0000${owner}`, () => storage.getGHIIByOwner(owner)),
+        getMembership: (id: string, owner: string) => once(`membership\u0000${id}\u0000${owner}`, () => storage.getMembership(id, owner)),
+        getAgentsByOwner: (owner: string) => once(`agents\u0000${owner}`, () => storage.getAgentsByOwner(owner)),
+        listConsents: (owner: string, opts?: { status?: 'active' | 'revoked' | 'expired'; recipient?: string }) =>
+            opts?.status === 'active' && opts.recipient === undefined ? activeConsents(owner) : storage.listConsents(owner, opts),
+        findMatchingConsents: async (owner: string, key: string, accessorGaii: string): Promise<ConsentRecord[]> => {
+            const now = new Date().toISOString();
+            const accessor = parseGaiiLoose(accessorGaii);
+            return (await activeConsents(owner)).filter(c => !(c.expires && c.expires < now)
+                && matchesRecipient(c.recipient, accessorGaii, accessor.owner, accessor.node)
+                && consentMatchPattern(c.dataPattern, key));
+        },
+    };
+    return new Proxy(storage, {
+        get(target, prop, receiver) {
+            if (typeof prop === 'string' && prop in reads) return reads[prop as keyof Storage];
+            const value = Reflect.get(target, prop, receiver) as unknown;
+            return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+        },
+    });
 }

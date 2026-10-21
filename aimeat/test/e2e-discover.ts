@@ -7,6 +7,9 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.4.0 — 2026-10-20 — The own scope asks the organism read rule: an agent that a 'listed' organism
+ *     does not admit sees none of its records on GET /v1/discover or MCP aimeat_discover; a listed
+ *     agent and the owner in person still do (secaudit 2026-10, the v57 shape).
  *   v0.3.0 — 2026-10-20 — The §11.3 pair asserted the hole: "an agent WITH memory:read sees the full
  *     owner set" required a private owner record to reach a `memory:read` agent, which the 2026-10-15
  *     ruling (memory:read-as-owner, services/owner-scope-read.ts) took away from every direct memory
@@ -39,6 +42,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 async function setupOwner(label: string) {
@@ -438,6 +442,53 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         const asOwner = await discover('scope=own&type=material&per_page=100', a.token);
         assert(hasId(asOwner.body.data.entries, bTask) && hasId(asOwner.body.data.entries, cTask),
             'the owner in person still reads both tasks');
+    });
+
+    // An organism set to admit only the agents its owners listed refuses every other agent on
+    // GET /v1/memory/:key. The own scope applied no organism rule, so an unlisted agent of the
+    // organism's creator listed that organism's records with an excerpt of each value, on REST and on
+    // MCP aimeat_discover (secaudit 2026-10, the v57 shape).
+    await test('an agent the organism does not list sees none of its records in the own scope (REST and MCP); a listed agent and the owner do', async () => {
+        const term = `qorglisted${stamp}`;
+        const o = await json('/v1/organisms', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ name: 'Disc Listed Org', description: 'x', type: 'project', join_policy: 'approval_required', visibility: 'private' }) });
+        assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body.error)}`);
+        const orgId = o.body.data.organism.id as string;
+        const key = `organism.${orgId}.shared.discprobe`;
+        await putMem(a.token, key, { title: `Listed org note ${term}`, text: `only admitted agents may read ${term}` }, 'members');
+        const unlisted = await connectAgent(a.token, a.name, `orgunlisted${stamp}`, ['memory:read']);
+        // Control: before the organism narrows its agents, the same agent finds the record.
+        const before = await discover(`scope=own&q=${term}&per_page=100`, unlisted.token);
+        assert(before.status === 200 && hasId(before.body.data.entries, key), `control: the agent did not find the record before the setting: ${JSON.stringify((before.body.data?.entries ?? []).map((e: any) => e.id))}`);
+        const set = await json(`/v1/organisms/${orgId}`, { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ agent_access: 'listed' }) });
+        assert(set.status === 200, `agent_access listed ${set.status}: ${JSON.stringify(set.body.error)}`);
+        const keyRoute = await json(`/v1/memory/${encodeURIComponent(key)}?owner_scope=true`, { headers: auth(unlisted.token) });
+        assert(keyRoute.status === 403, `control: the key route answered an unlisted agent ${keyRoute.status}`);
+
+        for (const query of [`scope=own&q=${term}&per_page=100`, 'scope=own&per_page=100']) {
+            const r = await discover(query, unlisted.token);
+            assert(r.status === 200, `status ${r.status}`);
+            assert(!hasId(r.body.data.entries, key) && !JSON.stringify(r.body.data.entries).includes(term),
+                `an unlisted agent got the organism record (${query}): ${JSON.stringify(r.body.data.entries.map((e: any) => e.id))}`);
+        }
+        const mcpUnlisted = await makeAgent(BASE, a, ['memory:read'], `orgmcpun${stamp}`);
+        const sUn = await openSession(BASE, mcpUnlisted.token, 'disc-unlisted');
+        const mUn = await callTool(sUn, 'aimeat_discover', { q: term, scope: 'own', limit: 100 });
+        assert(!mUn.isError && !mUn.text.includes(term), `MCP aimeat_discover handed an unlisted agent the record: ${mUn.text.slice(0, 300)}`);
+
+        // Positive controls: a listed agent (REST and MCP) and the owner in person.
+        const listed = await connectAgent(a.token, a.name, `orglisted${stamp}`, ['memory:read']);
+        const mcpListed = await makeAgent(BASE, a, ['memory:read'], `orgmcpls${stamp}`);
+        for (const gaii of [listed.gaii, mcpListed.gaii]) {
+            const add = await json(`/v1/organisms/${orgId}/agents`, { method: 'POST', headers: auth(a.token), body: JSON.stringify({ agent_gaii: gaii }) });
+            assert(add.status === 201, `list ${gaii}: ${add.status} ${JSON.stringify(add.body.error)}`);
+        }
+        const rl = await discover(`scope=own&q=${term}&per_page=100`, listed.token);
+        assert(hasId(rl.body.data.entries, key), `a listed agent lost the record: ${JSON.stringify(rl.body.data.entries.map((e: any) => e.id))}`);
+        const sLs = await openSession(BASE, mcpListed.token, 'disc-listed');
+        const mLs = await callTool(sLs, 'aimeat_discover', { q: term, scope: 'own', limit: 100 });
+        assert(!mLs.isError && mLs.text.includes(term),`MCP aimeat_discover lost the record for a listed agent: ${mLs.text.slice(0, 300)}`);
+        const ro = await discover(`scope=own&q=${term}&per_page=100`, a.token);
+        assert(hasId(ro.body.data.entries, key), 'the owner in person still finds the organism record');
     });
 
     // ── §6 / Phase 3: scope=shared per-workspace gating (the security-critical path) ──

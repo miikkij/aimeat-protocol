@@ -27,7 +27,8 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
- *   v1.29.0 -- 2026-10-03 -- The page's start (components/PageStart.js: the first prompt asks the person's AI what each key may do, its button opens the keys) and the title's question mark, concept.scope (guidance part B).
+ *   v1.30.0 -- 2026-10-21 -- The add form takes the address a secret may be sent to (optional).
+ *   v1.29.0 -- 2026-10-03 --The page's start (components/PageStart.js: the first prompt asks the person's AI what each key may do, its button opens the keys) and the title's question mark, concept.scope (guidance part B).
  *   v1.28.0 -- 2026-10-02 -- The question mark that explains a key's level: access.scopes on the level Field group (components/HelpTip.js).
  *   v1.27.0 --2026-09-26 -- Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): the frame is SettingsPage, the sections Section (the two forms
@@ -385,8 +386,10 @@ function secretFold(ctx) {
           value=${f.name} placeholder=${x('secrets.namePlaceholder')} onInput=${(v) => ctx.setSecretForm({ name: v })} />
         <${TextField} label=${x('secrets.value')} hint=${x('secrets.valueHint')} type="password" autoComplete="new-password" spellCheck=${false}
           value=${f.value} placeholder=${x('secrets.valuePlaceholder')} onInput=${(v) => ctx.setSecretForm({ value: v })} />
+        <${TextField} label=${x('secrets.host')} hint=${x('secrets.hostHint')} maxLength=${253} autoComplete="off" spellCheck=${false}
+          value=${f.host} placeholder=${x('secrets.hostPlaceholder')} onInput=${(v) => ctx.setSecretForm({ host: v })} />
         <${FormActions}>
-          <${Loud} control disabled=${!ready || busy} onClick=${() => ctx.writeSecret(f.name.trim(), f.value, false)}>${busy ? x('secrets.saving') : x('secrets.save')}<//>
+          <${Loud} control disabled=${!ready || busy} onClick=${() => ctx.writeSecret(f.name.trim(), f.value, false, f.host)}>${busy ? x('secrets.saving') : x('secrets.save')}<//>
           <${Action} small soft onClick=${() => ctx.toggleSecretForm(false)}>${x('cancel')}<//>
           ${msg(ctx.secretMsg)}
         <//>

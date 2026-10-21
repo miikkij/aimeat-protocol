@@ -19,6 +19,7 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   2026-10-21 — include=own asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-16 — A session a completion has claimed reads as ACP status in_progress (QA audit S8-04).
  *   v1.7.0 — 2026-10-11 — Money only (ruling D4): the feed lists money prices and never the currency
  *     "MORSEL"; a checkout opens in a money currency (the request's `currency`, else the first one
@@ -55,6 +56,7 @@ import { listPricedAppTools, listOwnCallableAppTools } from '../commerce/app-too
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { callerOf } from '../middleware/caller.js';
 import { error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { agentAttribution } from '../services/visibility/attribution.js';
 import {
@@ -256,7 +258,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
     const include = typeof req.query.include === 'string' ? req.query.include.split(',') : [];
     // The anonymous identity anonymous mode injects is no caller: callerOf refuses it (v1.0.1), and
     // asking anyway answered 500 to every anonymous ?include=own on such a node.
-    const caller = include.includes('own') && req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
+    const caller = include.includes('own') && req.auth && !isAnonymousPrincipal(req.auth) ? callerOf(req, config.nodeId, storage) : null;
     const ownerGhii = caller && caller.kind !== 'anonymous' && !caller.visitor ? caller.ownerGhii : null;
     if (!config.commerceEnabled && !ownerGhii) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Commerce is disabled on this node')); return;

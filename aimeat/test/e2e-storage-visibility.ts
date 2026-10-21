@@ -6,6 +6,15 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   2026-10-21 — Test 66 asserts the old TTL again: a handle asked for with no credential lives the
+ *     owner's hour (3600 s) with anonymous mode off, as before 2026-10-20, and the foreign 900 s with
+ *     it on (the shared anonymous principal is a stranger, as it always was). Test 67: a
+ *     download URL minted before the version binding (no `ver`) is still served until it expires;
+ *     a URL minted now still stops at a re-upload.
+ *   2026-10-20 — Tests 64-66: a download handle serves only the file version it was minted for (an
+ *     anonymous handle for a public file refuses the private re-upload, an owner's handle refuses a
+ *     re-upload of the same length), and a handle asked for with no credential takes the foreign TTL
+ *     (secaudit 2026-10, GET-v1-download:token-not-bound-to-file-version).
  *   2026-10-16 — Tests 31b-31f: a missing chunk, a checksum mismatch, another principal on the three
  *     session routes, a chunk past what the upload declared, and the open-session and declared-size
  *     ceilings (QA audit F05b-02).
@@ -87,6 +96,9 @@ async function rawFetch(path: string, opts: RequestInit = {}, retries = 5): Prom
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { SignJWT } from 'jose';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -1316,6 +1328,112 @@ await test('60. A re-upload is a new versioned address and a new ETag; the old E
     const stale = await rawFetch(first.body.data.embed_url, { headers: { 'If-None-Match': etag1! } });
     assert(stale.status === 200 && await stale.text() === 'second version, same length', `old ETag after re-upload: ${stale.status}`);
     assert(stale.headers.get('etag') !== etag1, 'and a new ETag');
+});
+
+// ─── Phase 14: a download handle is bound to the file version it was minted for ───
+// secaudit 2026-10, GET-v1-download:token-not-bound-to-file-version. A handle took the owner and the
+// key and served whatever the key held at fetch time, so a handle an anonymous reader took for a
+// PUBLIC file served the owner's later PRIVATE re-upload under the same key for the rest of its TTL.
+console.log('\nPhase 14 — A download handle serves the version it was minted for');
+
+const ownerUpload = (key: string, text: string, visibility: string) => json('/v1/storage', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ key, data: Buffer.from(text).toString('base64'), mime_type: 'text/plain', visibility }),
+});
+const localPath = (url: string) => url.replace(/^https?:\/\/[^/]+/, '');
+
+await test('64. An anonymous handle for a public file serves it, and refuses the private re-upload under the same key', async () => {
+    const key = `ver-bound-${Date.now()}.txt`;
+    const first = await ownerUpload(key, 'first', 'public');
+    assert(first.status === 201, `first upload: ${first.status} ${JSON.stringify(first.body)}`);
+    const ownerGaii = first.body.data.owner_gaii as string;
+
+    const h = await json(`/v1/pub/${encodeURIComponent(ownerGaii)}/${encodeURIComponent(key)}?mode=handle`);
+    assert(h.status === 200 && typeof h.body.data?.download_url === 'string', `anonymous handle: ${h.status} ${JSON.stringify(h.body)}`);
+    const url = localPath(h.body.data.download_url as string);
+    // The positive control: the version the handle was minted for is served, more than once.
+    for (let i = 0; i < 2; i++) {
+        const ok = await rawFetch(url);
+        assert(ok.status === 200 && await ok.text() === 'first', `the unchanged file through the handle: ${ok.status}`);
+    }
+
+    await sleep(5);
+    const again = await ownerUpload(key, 'second-private', 'private');
+    assert(again.status === 201 && again.body.data.visibility === 'private', `private re-upload: ${again.status}`);
+    // Control: the public address no longer serves it to an anonymous reader.
+    assert((await rawFetch(`/v1/pub/${encodeURIComponent(ownerGaii)}/${encodeURIComponent(key)}`)).status === 404, 'the public address refuses the private file');
+
+    const stale = await rawFetch(url);
+    const body = await stale.text();
+    assert(stale.status === 404, `the old handle must not serve the new version, got ${stale.status}`);
+    assert(!body.includes('second-private'), 'and none of its bytes');
+    assert(/new download URL/i.test(body), `the refusal says what to do: ${body.slice(0, 200)}`);
+});
+
+await test('65. The owner\'s own handle stops at a re-upload too, and a new handle serves the new bytes', async () => {
+    const key = `ver-own-${Date.now()}.txt`;
+    assert((await ownerUpload(key, 'version one', 'private')).status === 201, 'first upload');
+    const h1 = await json(`/v1/storage/${encodeURIComponent(key)}?mode=handle`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(h1.status === 200, `handle: ${h1.status}`);
+    await sleep(5);
+    // Same length on purpose: the version is the write, not only the size.
+    assert((await ownerUpload(key, 'version two', 'private')).status === 201, 'second upload');
+    const old = await rawFetch(localPath(h1.body.data.download_url as string));
+    assert(old.status === 404, `the handle of version one after version two: ${old.status}`);
+    const h2 = await json(`/v1/storage/${encodeURIComponent(key)}?mode=handle`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const fresh = await rawFetch(localPath(h2.body.data.download_url as string));
+    assert(fresh.status === 200 && await fresh.text() === 'version two', `a new handle serves the new bytes: ${fresh.status}`);
+});
+
+await test('66. A handle for a public file asked for with no credential lives as long as before, and the owner\'s own an hour', async () => {
+    // Restored 2026-10-21: the round of 2026-10-20 shortened the no-credential handle to 900 s on a
+    // node with anonymous mode OFF (production's setting), which no confirmed hole asks for; the
+    // version binding of tests 64 and 65 is what closes the hole. The old TTLs: with anonymous mode
+    // off the request carries no principal and the handle takes the owner's hour; with it on the
+    // request arrives as the shared anonymous principal, a stranger, and takes the foreign 900 s.
+    const anonymousMode = (await json('/v1/auth/anonymous', { method: 'POST', body: '{}' })).status === 200;
+    const key = `ver-ttl-${Date.now()}.txt`;
+    const up = await ownerUpload(key, 'ttl', 'public');
+    const ownerGaii = up.body.data.owner_gaii as string;
+    const anon = await json(`/v1/pub/${encodeURIComponent(ownerGaii)}/${encodeURIComponent(key)}?mode=handle`);
+    const expected = anonymousMode ? 900 : 3600;
+    assert(anon.status === 200 && anon.body.data.expires_in_seconds === expected,
+        `no-credential handle TTL with anonymous mode ${anonymousMode ? 'on' : 'off'}: ${anon.body.data?.expires_in_seconds}, expected ${expected}`);
+    const own = await json(`/v1/pub/${encodeURIComponent(ownerGaii)}/${encodeURIComponent(key)}?mode=handle`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(own.status === 200 && own.body.data.expires_in_seconds === 3600, `the owner's handle TTL: ${own.body.data?.expires_in_seconds}`);
+});
+
+await test('67. A download URL made before the version binding (no version in it) is served until it expires, as before', async () => {
+    // Such a URL can only be made by the node key, so the test signs it with the node's own key, read
+    // from the database the server under test uses, in the shape generateDownloadToken had before `ver`.
+    const key = `ver-legacy-${Date.now()}.txt`;
+    const up = await ownerUpload(key, 'made before the upgrade', 'private');
+    assert(up.status === 201, `upload: ${up.status}`);
+    const ownerGaii = up.body.data.owner_gaii as string;
+    const provider = (process.env.AIMEAT_DB ?? '') as StorageProvider;
+    const dbUrl = serverDbUrl();
+    const sqlitePath = pinnedSqlitePath();
+    assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+    const storage = await createStorage({ provider, sqlitePath, dbUrl });
+    const nodeKey = await storage.getNodeKey();
+    assert(!!nodeKey?.privateKey, 'the node key is not readable from this process');
+    const pub = Buffer.from(nodeKey!.publicKey, 'base64').toString('base64url');
+    const signKey = await crypto.subtle.importKey('jwk',
+        { kty: 'OKP', crv: 'Ed25519', x: pub, d: Buffer.from(nodeKey!.privateKey, 'base64').toString('base64url') },
+        { name: 'Ed25519' }, false, ['sign']);
+    const legacy = await new SignJWT({ typ: 'download', key, mimeType: 'text/plain', size: Buffer.byteLength('made before the upgrade') })
+        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' }).setSubject(ownerGaii).setIssuedAt().setExpirationTime('3600s')
+        .sign(signKey);
+    for (let i = 0; i < 2; i++) {
+        const got = await rawFetch(`/v1/download/${legacy}`);
+        const text = await got.text();
+        assert(got.status === 200 && text === 'made before the upgrade', `the older download URL: ${got.status} ${text.slice(0, 200)}`);
+    }
+    // The hole stays closed for every URL made now: it names its version, and a re-upload ends it.
+    const h = await json(`/v1/storage/${encodeURIComponent(key)}?mode=handle`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    await sleep(5);
+    assert((await ownerUpload(key, 'made after the upgrade!', 'private')).status === 201, 're-upload');
+    assert((await rawFetch(localPath(h.body.data.download_url as string))).status === 404, 'a URL made now stops at the re-upload');
 });
 
 // ─── Cleanup ───

@@ -7,6 +7,8 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-21 — visitorOrSignIn asks isAnonymousPrincipal, so the minted anonymous token runs a public
+ *     action as a visitor (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.18.0 — 2026-10-18 — A caller with no sign-in runs an action the manifest marks `public`, as a
  *     visitor, counted per client address on the catalogue limit; every other unsigned call still
  *     answers 401 (Comicland v3 A-7).
@@ -55,6 +57,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { EXT_HASH_REFERENCE_JS } from '../../services/extension-runtime.js';
 
 /** The published hash, evaluated here so the served example is produced BY the served source. */
@@ -141,7 +144,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
    */
   const visitorLimit = rateLimit(() => ({ ...config.rateLimits.catalogue, keyBy: 'ip' }));
   const visitorOrSignIn = (instanced: boolean) => async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    if (req.auth && !req.auth.anonymous) { next(); return; }
+    if (req.auth && !isAnonymousPrincipal(req.auth)) { next(); return; }
     const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
     const action = resolved.ok ? resolved.ext.actions.find(a => a.id === req.params.actionId) : undefined;
     if (!action?.public) { next(); return; }

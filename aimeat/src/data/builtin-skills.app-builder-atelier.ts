@@ -13,7 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
- *   v1.33.0 — 2026-10-17 — Step 1 asks the data map and waits for a yes on a scenario with named
+ *   v1.33.1 — 2026-10-21 — A key is stored "for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   v1.33.0 — 2026-10-17 —Step 1 asks the data map and waits for a yes on a scenario with named
  *     people before building; team data goes to one organism workspace (services/build-data-map-step.ts).
  *   v1.32.1 — 2026-10-11 — The price parts show a 'morsels' amount as pacing, never as a price
  *     (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa, kit 0.66.2 money-units.js).
@@ -458,9 +459,10 @@ moved under you says so.
 - A field for an API key. A key for an outside service is NAMED, in an extension's header or in
   a living document's trigger or source \`headers\`, as \`{{secret:NAME}}\`; the node fills it
   from the signed-in person's vault on the way out and a missing name fails by name. The page
-  tells the person the name and where it goes (the Secrets section of their Access page, or their
-  own AI with \`aimeat_secret_set\`), and the living document's gear dialogs pick from the
-  stored names.
+  tells the person the name and the host to store it for ("store NAME for host api.example.com",
+  in the Secrets section of their Access page, or through their own AI with
+  \`aimeat_secret_set { name, value, host }\`), and the living document's gear dialogs pick from
+  the stored names.
 - Hand-written ARIA, focus management or animation code — the components carry them, and a
   hand-rolled control is an accessibility regression, not a shortcut.
 - A copied component. When one is nearly what you need, customise it through the four doors above

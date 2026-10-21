@@ -20,6 +20,24 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.11.0 — 2026-10-21 — Every use that worked before keeps working (the developer's rule for the
+ *     round). The suite's node runs on the default setting again, and 19a-19c run at the end on the
+ *     same node started again with AIMEAT_PUBLISH_GATE=agents; 19d: on the default node an agent's
+ *     public answer is public at once, as before. 22a-22b: an app without ext:invoke in its
+ *     aimeat-scopes is refused on_done with words for its author and still starts plain jobs; an app
+ *     that declares it binds on_done. 23: a job's answer starts no memory.write workflow trigger,
+ *     while the owner's write of the same pattern does. 24a-24b: a schema lock that cannot take a
+ *     text answer refuses the start before the provider is called; one that can takes the answer.
+ *   v1.10.0 — 2026-10-20 — The node runs with AIMEAT_PUBLISH_GATE=agents. 19a-19c: an agent without
+ *     publish:public asking for a public answer over REST and over MCP gets it stored private, not
+ *     readable anonymously, with a publish request filed and the job saying private; the owner in
+ *     person still writes public (secaudit 2026-10, writeResult:raw-write-caller-chosen-visibility).
+ *     20a-20b: a non-member's job naming an `organism.*` result key is refused 403 at the start, as
+ *     POST /v1/memory refuses the same key, and nothing is written; the organism's creator still lands
+ *     an answer there (record v66). 21a-21c: on_done from an agent holding ai:use without ext:invoke
+ *     is refused 403 SCOPE_DENIED over REST and MCP and the action never runs; with ext:invoke it
+ *     runs (secaudit 2026-10, assertCallbackAllowed:on-done-asks-no-ext-invoke). Case 5 stays the
+ *     control that ctx.ai.start's on_done still works.
  *   v1.9.0 — 2026-10-20 — 18a-18g: over MCP an agent sees and stops only the jobs it started. A
  *     second agent holding only ai:use is shown neither its owner's job nor its sibling's, gets "No
  *     such job." for both and cannot cancel either, while the sibling's job keeps running; the
@@ -66,6 +84,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, imageJson, transcriptionJson, providerStatus, type FakeAiProvider } from './helpers/fake-ai-provider.js';
@@ -180,7 +199,9 @@ function cleanDbFile(): void {
     }
 }
 
-async function startServer(): Promise<ChildProcess> {
+/** `extra` sets a node setting for one part of the suite: the gated part (case 19) starts the same
+ *  node on the same database with AIMEAT_PUBLISH_GATE=agents; every other case runs on the default. */
+async function startServer(extra: Record<string, string> = {}): Promise<ChildProcess> {
     const env: Record<string, string | undefined> = {
         ...process.env,
         AIMEAT_PORT: PORT,
@@ -201,6 +222,7 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_AI_JOB_MAX_QUEUED_PER_OWNER: String(MAX_QUEUED_PER_OWNER),
         AIMEAT_AI_JOB_MAX_CHAIN: String(MAX_CHAIN),
         AIMEAT_AI_JOB_MAX_PROMPT_BYTES: String(MAX_PROMPT_BYTES),
+        ...extra,
     };
     const child = spawn('node', [...nodeEntryArgs(), 'start', ...dbArgs],
         { env: env as NodeJS.ProcessEnv, stdio: ['ignore', 'pipe', 'pipe'], cwd: process.cwd() });
@@ -324,6 +346,59 @@ async function installExtension(owner: Owner, name: string, actionId: string, sc
     assert(r.status === 201, `install ${name}: ${r.status} ${JSON.stringify(r.body?.error)}`);
     const act = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(owner.token) });
     assert(act.status === 200, `activate ${name}: ${act.status} ${JSON.stringify(act.body?.error)}`);
+}
+
+// ── apps and workflows used by cases 22 and 23 ────────────────────────────────
+
+const REDIRECT = 'http://localhost:9912/callback';
+
+/** Publish an app whose code starts a job, with the aimeat-scopes it declares. */
+async function publishApp(owner: Owner, filename: string, scopes: string, code: string): Promise<void> {
+    const html = `<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="${scopes}"></head><body><script>${code}</script></body></html>`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename, content: Buffer.from(html).toString('base64'), name: `Jobs ${filename}`, description: 'ai jobs e2e probe', category: 'utility' }),
+    });
+    assert(pub.status === 201, `publish ${filename} ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+}
+
+/** An app-grant token for a published app, through the sign-in the SDK makes (authorize, consent, token). */
+async function appGrantToken(owner: Owner, filename: string, scope: string): Promise<string> {
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({ app: `${owner.name}/${filename}`, response_type: 'code', scope,
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
+    assert(!!m, `consent redirect expected, got ${res.status}`);
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ request_id: decodeURIComponent(m![1]) }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    });
+    assert(tok.body.ok === true, `app token: ${JSON.stringify(tok.body.error)}`);
+    return tok.body.data.access_token as string;
+}
+
+/** A workflow a memory.write on `pattern` starts, which parks at one human-input step. */
+const gateWorkflow = (pattern: string) => ({
+    title: { en_US: 'On answer' }, description: { en_US: 'one human gate, held open' },
+    trigger: { kind: 'event', on: 'memory.write', match: { key: pattern } }, on_step_fail: 'inspect', vars: [],
+    steps: [{
+        id: 'gate', description: { en_US: 'Look at what arrived' }, required_to_function: 'none',
+        action: {
+            kind: 'human-input',
+            question: { header: 'Answer', prompt: 'Handle it?', options: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }] },
+            answer_to_key: 'aijobwf.{run}.decision',
+        },
+    }],
+});
+async function workflowRuns(owner: Owner, id: string): Promise<any[]> {
+    const r = await json(`/v1/workflows/${id}/runs`, { headers: auth(owner.token) });
+    assert(r.status === 200, `runs of ${id}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    return r.body.data.runs as any[];
 }
 
 // The three callback shapes the design names, each as small as it can be.
@@ -1115,6 +1190,244 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
             await sleep(200);
         }
     });
+
+    // ── 19. A public answer is asked about like any other memory write ──
+    // The answer used to be stored with a raw storage write at whatever visibility the caller asked,
+    // so an agent the publish gate holds to its owner's approval made its job's answer public at
+    // once, readable by anyone, with no request filed (secaudit 2026-10, v50). It goes through the
+    // shared memory write now, as the agent that started the job. 19d runs here, on the node's
+    // default setting (no publish gate); 19a-19c run at the end of the suite, on the same node
+    // started again with AIMEAT_PUBLISH_GATE=agents.
+    releaseHeld();
+    const e = await setupOwner('e');
+    await pointAtStub(e);
+    const gated = await makeAgent(BASE, e, ['ai:use', 'memory:read', 'memory:write'], 'aijobgated');
+    const gatedAsOwner: Owner = { name: e.name, gaii: gated.gaii, token: gated.token };
+    const anonRead = (ns: string, key: string) => json(`/v1/memory/${encodeURIComponent(ns)}/${encodeURIComponent(key)}`);
+    const publishRequestFor = async (ns: string, key: string) => {
+        const list = await json('/v1/publish-requests', { headers: auth(e.token) });
+        assert(list.status === 200, `publish requests ${list.status}: ${JSON.stringify(list.body?.error)}`);
+        return (list.body.data.requests ?? []).find((r: any) => r.kind === 'memory' && r.target?.key === key && r.target?.namespace === ns);
+    };
+
+    await test('19d. Default node (no publish gate): the same agent\'s public answer is public at once, as it always was', async () => {
+        const r = await startJob(gatedAsOwner, { prompt: 'Say hello.', result_key: 'aijob.nogate.rest', result_visibility: 'public' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(gatedAsOwner, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done' && done.result_visibility === 'public', `job: ${done.state} ${done.result_visibility} ${JSON.stringify(done.error)}`);
+        const anon = await anonRead(gated.gaii, 'aijob.nogate.rest');
+        assert(anon.status === 200 && anon.body.data.value === STUB_CONTENT, `anonymous read ${anon.status}`);
+        assert(!(await publishRequestFor(gated.gaii, 'aijob.nogate.rest')), 'a request was filed on a node without the gate');
+    });
+
+    /** Run at the end, on the node started again with the publish gate on (see the call below case 24). */
+    const gatedPart = async (): Promise<void> => {
+    await test('19a. REST: an agent without publish:public asking for a public answer gets it private, with a request for the owner', async () => {
+        const r = await startJob(gatedAsOwner, { prompt: 'Say hello.', result_key: 'aijob.gate.rest', result_visibility: 'public' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(gatedAsOwner, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        assert(done.result_visibility === 'private', `the job says what was stored: ${done.result_visibility}`);
+        const anon = await anonRead(gated.gaii, 'aijob.gate.rest');
+        assert(anon.status !== 200, `anyone reads the answer: ${anon.status} ${JSON.stringify(anon.body?.data?.visibility)}`);
+        const own = await readMemory(gatedAsOwner, 'aijob.gate.rest');
+        assert(own.status === 200 && own.body.data.visibility === 'private' && own.body.data.value === STUB_CONTENT,
+            `the agent's own read: ${own.status} ${own.body?.data?.visibility}`);
+        // The completion's observed provenance record is carried onto the answer, not re-minted.
+        assert(!!done.provenance_id && own.body.data.ai_provenance_id === done.provenance_id,
+            `provenance: job ${done.provenance_id}, record ${own.body.data.ai_provenance_id}`);
+        assert(await publishRequestFor(gated.gaii, 'aijob.gate.rest'), 'no publish request was filed for the answer');
+    });
+
+    await test('19b. MCP: the same agent\'s aimeat_ai_job_start lands the answer private in the owner\'s namespace, with a request', async () => {
+        const s = await openSession(BASE, gated.token, 'aijob-gated');
+        const started = await callTool(s, 'aimeat_ai_job_start', { prompt: 'Say hello.', result_key: 'aijob.gate.mcp', result_visibility: 'public' });
+        assert(!started.isError, `start: ${started.text}`);
+        const done = await waitForState(e, started.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        assert(done.result_visibility === 'private', `the job says what was stored: ${done.result_visibility}`);
+        const anon = await anonRead(e.gaii, 'aijob.gate.mcp');
+        assert(anon.status !== 200, `anyone reads the answer: ${anon.status} ${JSON.stringify(anon.body?.data?.visibility)}`);
+        const own = await readMemory(e, 'aijob.gate.mcp');
+        assert(own.status === 200 && own.body.data.visibility === 'private', `the owner's read: ${own.status} ${own.body?.data?.visibility}`);
+        assert(done.result_version === own.body.data.version, `result_version ${done.result_version} names the stored version ${own.body.data.version}`);
+        assert(!!done.provenance_id && own.body.data.ai_provenance_id === done.provenance_id,
+            `provenance: job ${done.provenance_id}, record ${own.body.data.ai_provenance_id}`);
+        assert(await publishRequestFor(e.gaii, 'aijob.gate.mcp'), 'no publish request was filed for the answer');
+    });
+
+    await test('19c. Control: the owner in person still writes a public answer at once, and nothing is asked', async () => {
+        const r = await startJob(e, { prompt: 'Say hello.', result_key: 'aijob.gate.owner', result_visibility: 'public' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(e, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done' && done.result_visibility === 'public', `job: ${done.state} ${done.result_visibility} ${JSON.stringify(done.error)}`);
+        const anon = await anonRead(e.gaii, 'aijob.gate.owner');
+        assert(anon.status === 200 && anon.body.data.value === STUB_CONTENT, `anonymous read ${anon.status}`);
+        const own = await readMemory(e, 'aijob.gate.owner');
+        assert(!!done.provenance_id && own.body.data.ai_provenance_id === done.provenance_id,
+            `provenance: job ${done.provenance_id}, record ${own.body.data.ai_provenance_id}`);
+        assert(!(await publishRequestFor(e.gaii, 'aijob.gate.owner')), 'a request was filed for the owner\'s own public write');
+    });
+    };
+
+    // ── 20. An organism key is held to the organism namespace rule ──
+    // The raw write skipped it, so a non-member's job stored a copy at a workspace key the memory
+    // route refuses it with 403, and the workspace read then served that copy (record v66).
+    let orgId = '';
+    await test('20a. A non-member\'s job naming an organism.* result key is refused 403 at the start, as POST /v1/memory is', async () => {
+        const o = await json('/v1/organisms', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ name: `AI jobs ${Date.now()}`, description: 'x', type: 'project', join_policy: 'invite', visibility: 'private' }) });
+        assert(o.status === 201, `organism ${o.status}: ${JSON.stringify(o.body?.error)}`);
+        orgId = o.body.data.organism.id;
+        const key = `organism.${orgId}.shared.aijob`;
+        const control = await json('/v1/memory', { method: 'POST', headers: auth(b.token), body: JSON.stringify({ key, value: 'x', visibility: 'private' }) });
+        assert(control.status === 403, `the memory route lets the non-member write: ${control.status}`);
+        const seenBefore = completionsSeen;
+        const r = await startJob(b, { prompt: 'Overwrite the shared record.', result_key: key });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        assert(/member/i.test(r.body.error.message ?? ''), `message: ${r.body.error.message}`);
+        await sleep(300);
+        assert(completionsSeen === seenBefore, 'the provider was called for a refused job');
+        const stored = await readMemory(b, key);
+        assert(stored.status !== 200, `the non-member's copy exists: ${stored.status}`);
+    });
+
+    await test('20b. Control: the organism\'s creator lands a job\'s answer at a shared organism key', async () => {
+        const key = `organism.${orgId}.shared.aijob.creator`;
+        const r = await startJob(a, { prompt: 'Write the shared note.', result_key: key });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(a, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const stored = await readMemory(a, key);
+        assert(stored.status === 200 && stored.body.data.value === STUB_CONTENT, `the creator's record ${stored.status}`);
+    });
+
+    // ── 21. on_done costs ext:invoke ──
+    // Binding an extension action as on_done makes it run unattended in the owner's name when the
+    // answer lands. Running that action directly needs ext:invoke; through on_done ai:use alone was
+    // enough (secaudit 2026-10, v53). ctx.ai.start from an extension (case 5's chain) needs nothing.
+    await installExtension(e, 'aijobinvoke', 'mark', SCRIPT_MARK);
+    const aiOnly = await makeAgent(BASE, e, ['ai:use'], 'aijobaionly');
+    const aiOnlyAsOwner: Owner = { name: e.name, gaii: aiOnly.gaii, token: aiOnly.token };
+    const marker = () => json('/v1/memory/ext:aijobinvoke/callback.ran');
+
+    await test('21a. REST: an agent with ai:use and no ext:invoke is refused 403 SCOPE_DENIED for on_done, and the action never runs', async () => {
+        const direct = await json('/v1/ext/aijobinvoke/mark', { method: 'POST', headers: auth(aiOnly.token), body: '{}' });
+        assert(direct.status === 403, `control: the direct invoke answered ${direct.status}`);
+        const r = await startJob(aiOnlyAsOwner, { prompt: 'x', result_key: 'aijob.invoke.rest', on_done: { extension: 'aijobinvoke', action: 'mark' } });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        assert(r.body.error.code === 'SCOPE_DENIED' && r.body.error.message.includes('ext:invoke'), `error: ${JSON.stringify(r.body.error)}`);
+        await sleep(500);
+        assert((await marker()).status === 404, 'the action ran');
+    });
+
+    await test('21b. MCP: aimeat_ai_job_start with on_done is refused the same way', async () => {
+        const s = await openSession(BASE, aiOnly.token, 'aijob-aionly');
+        const r = await callTool(s, 'aimeat_ai_job_start', { prompt: 'x', result_key: 'aijob.invoke.mcp', on_done: { extension: 'aijobinvoke', action: 'mark' } });
+        assert(r.isError, `the start was accepted: ${r.text.slice(0, 200)}`);
+        assert(r.text.includes('SCOPE_DENIED') && r.text.includes('ext:invoke'), `answer: ${r.text.slice(0, 200)}`);
+        await sleep(500);
+        assert((await marker()).status === 404, 'the action ran');
+        // The same agent without on_done still starts a job: only the callback costs the word.
+        const plain = await callTool(s, 'aimeat_ai_job_start', { prompt: 'x', result_key: 'aijob.invoke.plain' });
+        assert(!plain.isError, `a plain start: ${plain.text.slice(0, 200)}`);
+        await waitForState(e, plain.data.job_id, ['done', 'failed']);
+    });
+
+    await test('21c. Control: an agent holding ai:use and ext:invoke binds on_done, and the action runs', async () => {
+        const both = await makeAgent(BASE, e, ['ai:use', 'ext:invoke'], 'aijobinvoker');
+        const r = await startJob({ name: e.name, gaii: both.gaii, token: both.token }, {
+            prompt: 'call me back', result_key: 'aijob.invoke.ok', on_done: { extension: 'aijobinvoke', action: 'mark' },
+        });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState({ name: e.name, gaii: both.gaii, token: both.token }, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const mark = await marker();
+        assert(mark.status === 200 && mark.body.data.value.job_id === r.body.data.job_id, `the callback's record ${mark.status}`);
+    });
+
+    // ── 22. A published app that binds on_done ──
+    // An app grant holds what the app's aimeat-scopes asks for, and its owner cannot add a word. An
+    // app that declares ext:invoke keeps binding on_done; one that does not is told what its author
+    // declares. An app published before the change keeps the word by itself
+    // (services/app-on-done-keep-migration.ts, test/unit/app-on-done-keep.test.ts).
+    const appCode = "AIMEAT.ai.job.start({ prompt: 'x', result_key: 'k', on_done: { extension: 'aijobinvoke', action: 'mark' } })";
+    await test('22a. An app whose aimeat-scopes lacks ext:invoke is refused on_done with words for its author, and the action never runs', async () => {
+        await publishApp(e, 'jobnocb.html', 'ai:use', appCode);
+        const token = await appGrantToken(e, 'jobnocb.html', 'ai:use');
+        const before = (await marker()).body?.data?.value?.job_id;
+        const r = await json('/v1/ai/jobs', { method: 'POST', headers: auth(token), body: JSON.stringify({
+            prompt: 'x', result_key: 'aijob.app.nocb', on_done: { extension: 'aijobinvoke', action: 'mark' },
+        }) });
+        assert(r.status === 403 && r.body.error.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.error.message.includes('aimeat-scopes') && !/ask the owner/i.test(r.body.error.message), `message: ${r.body.error.message}`);
+        await sleep(500);
+        assert((await marker()).body?.data?.value?.job_id === before, 'the action ran');
+        // Without on_done the same app still starts its job.
+        const plain = await json('/v1/ai/jobs', { method: 'POST', headers: auth(token), body: JSON.stringify({ prompt: 'x', result_key: 'aijob.app.plain' }) });
+        assert(plain.status === 202, `a plain start ${plain.status}: ${JSON.stringify(plain.body?.error)}`);
+        await waitForState(e, plain.body.data.job_id, ['done', 'failed']);
+    });
+
+    await test('22b. Control: an app that declares ext:invoke binds on_done, and the action runs', async () => {
+        await publishApp(e, 'jobcb.html', 'ai:use ext:invoke', appCode);
+        const token = await appGrantToken(e, 'jobcb.html', 'ai:use ext:invoke');
+        const r = await json('/v1/ai/jobs', { method: 'POST', headers: auth(token), body: JSON.stringify({
+            prompt: 'call me back', result_key: 'aijob.app.cb', on_done: { extension: 'aijobinvoke', action: 'mark' },
+        }) });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(e, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        const mark = await marker();
+        assert(mark.status === 200 && mark.body.data.value.job_id === r.body.data.job_id, `the callback's record ${mark.status}`);
+    });
+
+    // ── 23. An answer starts nothing else ──
+    // The answer is written through the shared memory write now, which starts workflow triggers and
+    // ecosystem recipes for a person's write. A job's answer never did, and still does not.
+    await test('23. A job\'s answer does not start a memory.write workflow trigger; the same key written by the owner does', async () => {
+        const s = await json('/v1/workflows/aijob-on-answer', { method: 'PUT', headers: auth(e.token), body: JSON.stringify(gateWorkflow('aijob.trig.*')) });
+        assert(s.status === 200, `save ${s.status}: ${JSON.stringify(s.body?.error)}`);
+        const r = await startJob(e, { prompt: 'x', result_key: 'aijob.trig.answer' });
+        assert(r.status === 202, `start ${r.status}`);
+        const done = await waitForState(e, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        await sleep(2500);
+        assert((await workflowRuns(e, 'aijob-on-answer')).length === 0, 'the answer started a workflow run');
+        const w = await json('/v1/memory', { method: 'POST', headers: auth(e.token), body: JSON.stringify({ key: 'aijob.trig.direct', value: 'go', visibility: 'private' }) });
+        assert(w.status === 201, `write ${w.status}`);
+        const began = Date.now();
+        let runs = await workflowRuns(e, 'aijob-on-answer');
+        while (runs.length === 0 && Date.now() - began < 5000) { await sleep(200); runs = await workflowRuns(e, 'aijob-on-answer'); }
+        assert(runs.length === 1 && runs[0].vars?.event_key === 'aijob.trig.direct', `control: ${JSON.stringify(runs.map((x: any) => x.vars?.event_key))}`);
+        for (const run of runs) await json(`/v1/workflows/aijob-on-answer/runs/${run.runId}/cancel`, { method: 'POST', headers: auth(e.token) });
+    });
+
+    // ── 24. What the write would refuse is refused before the model is paid ──
+    await test('24a. A schema lock that cannot take a text answer refuses the start 422, and the provider hears nothing', async () => {
+        const lock = await json(`/v1/memory/${encodeURIComponent('aijob.locked.object')}/schema`, { method: 'PUT', headers: auth(e.token), body: JSON.stringify({ schema: { type: 'object' }, apply_to: 'exact' }) });
+        assert(lock.status === 200 || lock.status === 201, `lock ${lock.status}: ${JSON.stringify(lock.body?.error)}`);
+        const seen = completionsSeen;
+        const r = await startJob(e, { prompt: 'x', result_key: 'aijob.locked.object' });
+        assert(r.status === 422 && r.body.error.code === 'SCHEMA_VALIDATION_FAILED', `expected 422, got ${r.status}: ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        await sleep(300);
+        assert(completionsSeen === seen, 'the provider was called for a refused job');
+    });
+
+    await test('24b. Control: a schema lock that takes a string lets the text job land its answer', async () => {
+        const lock = await json(`/v1/memory/${encodeURIComponent('aijob.locked.string')}/schema`, { method: 'PUT', headers: auth(e.token), body: JSON.stringify({ schema: { type: 'string' }, apply_to: 'exact' }) });
+        assert(lock.status === 200 || lock.status === 201, `lock ${lock.status}: ${JSON.stringify(lock.body?.error)}`);
+        const r = await startJob(e, { prompt: 'x', result_key: 'aijob.locked.string' });
+        assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const done = await waitForState(e, r.body.data.job_id, ['done', 'failed']);
+        assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
+        assert((await readMemory(e, 'aijob.locked.string')).body.data.value === STUB_CONTENT, 'the answer landed');
+    });
+
+    // ── 19a-19c: the same node, started again with the publish gate on ──
+    releaseHeld();
+    await stopServer(server);
+    server = await startServer({ AIMEAT_PUBLISH_GATE: 'agents' });
+    await gatedPart();
 
     // ── cleanup ──
     releaseHeld();

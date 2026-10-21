@@ -10,6 +10,12 @@
  *   things mocked: what reached them and what storage was asked to write are the evidence.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-op.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-20 — The stub storage and config answer what the shared memory write reads
+ *     (services/memory-write.ts), because a job's answer is written through it now (secaudit 2026-10,
+ *     ai-jobs/service.ts:writeResult:raw-write-caller-chosen-visibility): create-if-absent and
+ *     set-if-version, which both storage providers implement, the schema, count, byte, account and
+ *     provenance lookups, a transaction, and the memory ceilings. The five landing cases failed
+ *     because the setup no longer matched production; their assertions are unchanged.
  *   v1.2.0 — 2026-10-19 — A text job calls the completion service with `uncapped: true` and keeps
  *     finish_reason and truncated on its record; the completion mock returns both, as the service
  *     does (wish ai-jobs-run-uncapped-and-report-a-cut-answer).
@@ -72,6 +78,9 @@ const AUDIO_KEY = 'voice/note.webm';
 const config = {
     nodeId: NODE, aiJobSlots: 1, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
     aiJobMaxPromptBytes: 1_000_000, aiJobLogRetentionDays: 7, sttMaxMb: 1,
+    // The ceilings the shared memory write asks about, since the job's answer is written through it.
+    memoryQuotaMb: 100, memoryMaxKeysPerAgent: 1000, memoryMaxValueSizeKb: 1024,
+    memoryOverageMorselsPerMbMonth: 0,
 } as unknown as AimeatConfig;
 
 interface Watched { storage: Storage; writes: Array<{ key: string; value: unknown }>; fileReads: string[] }
@@ -89,9 +98,22 @@ function watchedStorage(files: Record<string, { size: number; mime?: string }> =
             data: withData ? Buffer.alloc(f.size, 1) : Buffer.alloc(0), createdAt: new Date().toISOString(),
         } as StorageFileRecord;
     };
+    const land = (r: MemoryRecord) => { w.writes.push({ key: r.key, value: r.value }); rows.set(`${r.ownerGaii}::${r.key}`, r); return r; };
     w.storage = {
         getMemory: async (owner: string, key: string) => rows.get(`${owner}::${key}`) ?? null,
-        setMemory: async (r: MemoryRecord) => { w.writes.push({ key: r.key, value: r.value }); rows.set(`${r.ownerGaii}::${r.key}`, r); return r; },
+        setMemory: async (r: MemoryRecord) => land(r),
+        // The answer is written through services/memory-write.ts on the version read, as both
+        // storage providers support: create-if-absent for a new key, set-if-version for an update.
+        createMemoryIfAbsent: async (r: MemoryRecord) => (rows.has(`${r.ownerGaii}::${r.key}`) ? null : land(r)),
+        setMemoryIfVersion: async (r: MemoryRecord, v: number) => (rows.get(`${r.ownerGaii}::${r.key}`)?.version === v ? land(r) : null),
+        // The lookups that shared write makes beyond the rows above: no schema lock, the key and
+        // byte counts for its ceilings, no account record, no provenance row to attach.
+        findApplicableSchema: async () => null,
+        countMemory: async () => rows.size,
+        sumMemoryBytes: async () => 0,
+        getGHIIByOwner: async () => null,
+        getAiProvenance: async () => null,
+        transaction: async <T>(fn: () => Promise<T>) => fn(),
         deleteMemory: async (owner: string, key: string) => rows.delete(`${owner}::${key}`),
         listMemory: async (owner: string, opts: { prefix?: string } = {}) => [...rows.values()]
             .filter(r => r.ownerGaii === owner && r.key.startsWith(opts.prefix ?? '')),

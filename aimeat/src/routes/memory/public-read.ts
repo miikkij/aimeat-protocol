@@ -16,6 +16,8 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   2026-10-21 — The anonymous reader asks isAnonymousPrincipal, so the minted anonymous token reads as
+ *     the anonymous internet (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-17 — An 'organism:<id>' record is read by that organism's active members and their
  *     admitted agents (audienceAllows through authorizeRead); a signed-in reader outside it gets 403
  *     NOT_ORGANISM_MEMBER, an anonymous one the miss a members record gives (plan doc-mvcn6c7e4e5q, V3.2).
@@ -32,6 +34,7 @@
  */
 import type { Router } from 'express';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { refuseClassified } from '../../middleware/refusals.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
@@ -78,7 +81,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
 
     // The reader, resolved: an OWNER session carries a bare `sub`, while memberships, group shares
     // and consent grants are keyed under the resolved identity (see the non-public branch below).
-    const isAnonymousReader = !req.auth?.sub || req.auth.anonymous === true;
+    const isAnonymousReader = !req.auth?.sub || isAnonymousPrincipal(req.auth);
     const accessorGaii = isAnonymousReader ? 'anonymous' : resolve(req);
     /** An organism's record goes to a reader outside that organism only when its label lets it leave. */
     const keptInside = async (via: string): Promise<boolean> => {
@@ -125,7 +128,7 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       // anonymous-mode shared identity: global optionalAuth injects a truthy req.auth (anonymous:
       // true) for unauthenticated visitors, so a bare req.auth truthiness gate would leak members
       // records to everyone. Anonymous behaves like other non-public records: a miss.
-      if (!req.auth || req.auth.anonymous === true) { miss(); return; }
+      if (!req.auth || isAnonymousPrincipal(req.auth)) { miss(); return; }
       if (refuseWithoutReadWord()) return;
       await authorizeRead(storage, config, {
         ownerGaii: stored.ownerGaii,

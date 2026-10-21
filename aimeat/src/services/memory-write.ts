@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.21.0 — 2026-10-21 — `noTriggers`: an AI job's answer, now written here, starts no Tracked Response, connector
+ *     push, workflow trigger, ecosystem push or recipe, as before it was (secaudit 2026-10, ai-jobs/service.ts).
  *   v1.20.0 — 2026-10-18 — A `gatePublic` write that would raise the record past its label's audience
  *     cap is refused with 409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.2).
  *   v1.19.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a `gatePublic`
@@ -233,6 +235,8 @@ export interface MemoryWriteInput {
      * document on the exchange market (decision 11.6), the node's own pitfall knowledge base.
      */
     gatePublic?: boolean;
+    /** Start nothing else: no Tracked Response, connector push, workflow trigger, ecosystem push or recipe (an AI job's answer). */
+    noTriggers?: boolean;
 }
 
 /**
@@ -656,7 +660,7 @@ export async function writeMemoryRecord(
     //    runs here rather than in each caller's tail — which is where it used to live, on one door
     //    only. A caller that cannot offer an optional piece (a node with no peers has no replication
     //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
-    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal);
+    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal, input.noTriggers);
 
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));
@@ -729,6 +733,7 @@ export async function afterMemoryWrite(
      * write — records nothing rather than a placeholder, which would be worse than silence.
      */
     writerPrincipal?: string,
+    noTriggers?: boolean,
 ): Promise<AfterMemoryWriteReport> {
     const { storage, config } = deps;
 
@@ -754,7 +759,7 @@ export async function afterMemoryWrite(
 
     // Memory Contracts: a write to a watched key fires Tracked Response evaluation. The subscriber
     // gates on the track registry, so a write nobody watches does no work.
-    emitMemoryWritten(gaii, key, existed ? 'updated' : 'created');
+    if (!noTriggers) emitMemoryWritten(gaii, key, existed ? 'updated' : 'created');
 
     // An app-tool manifest / agent offers doc IS the source of truth for its EXCHANGE listing —
     // reprice a tool and the market follows, with no separate listing step. Its report is carried out
@@ -768,16 +773,16 @@ export async function afterMemoryWrite(
 
     // A write to an owner key may start a workflow. The engine matches the owner-GHII namespace, so
     // an agent-namespace write does not fire owner-keyed triggers.
-    getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
+    if (!noTriggers) getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
         .catch(e => logger.error('workflow event trigger (memory.write) failed', { key, error: String(e) }));
 
     // Push memory.write to any subscribed ecosystem app of this owner.
-    emitEcosystemMemoryWrite(storage, config, gaii, key)
+    if (!noTriggers) emitEcosystemMemoryWrite(storage, config, gaii, key)
         .catch(e => logger.error('ecosystem outbound (memory.write) failed', { key, error: String(e) }));
 
     // When a connected app publishes on a key matching an enabled recipe's glob, materialise an
     // agent task for each configured agent.
-    runAutomationRecipesForWrite(storage, config, gaii, key)
+    if (!noTriggers) runAutomationRecipesForWrite(storage, config, gaii, key)
         .catch(e => logger.error('ecosystem automation recipe trigger failed', { key, error: String(e) }));
 
     // Activation: the third way an account first produces something durable is its AGENT writing

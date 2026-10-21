@@ -11,6 +11,12 @@
  * @structure TaskWake · runAgentTaskJob(storage, wake, job, trigger) · materialiseAgentTask(storage, wake, args)
  * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
  * @version-history
+ *   v1.2.1 — 2026-10-21 — The check is services/schedule-fire-refusal.ts: an app's schedule from before
+ *     2026-10-05 runs as the account, as it did, and an agent's missing task:write is noted so the owner
+ *     is asked (capability-loss review).
+ *   v1.2.0 — 2026-10-20 — runAgentTaskJob asks the schedule's maker at the fire (scheduleFireRefusal):
+ *     a deleted maker, or one that no longer holds task:write, puts no task in the target's queue, and
+ *     the run log says why (secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker).
  *   v1.1.0 — 2026-10-18 — TaskWake carries the node's config, and both paths read the agent through
  *     startFactsOf (services/scope-auto-narrow.ts): a `*` agent whose record is ready is narrowed to
  *     what it used before its scheduled task is decided, instead of the task waiting for the owner.
@@ -24,6 +30,7 @@ import { emitChange, emitDelivery } from './event-bus.js';
 import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
 import { isStopped } from './agent-stop-rules.js';
 import { startFactsOf } from './scope-auto-narrow.js';
+import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import type { JobTrigger, JobRunResult } from './scheduler-types.js';
@@ -64,6 +71,14 @@ export async function runAgentTaskJob(
   };
   const tmpl = cfg.taskTemplate;
   if (!tmpl?.title) throw new Error(`agent_task job "${job.id}" missing taskTemplate.title`);
+
+  // As whoever made the schedule, asked now (services/schedule-actor.ts), as the ai kind asks: a maker
+  // that is gone (a deleted agent, a revoked app grant, a disconnected ecosystem app), or that is not
+  // the owner in person and no longer holds task:write, puts no task in the queue. The thrown sentence
+  // is the run's error in the run log. Before the stopped-agent skip, so a gone maker reads as the
+  // reason and not as a skipped run (secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker).
+  const refused = await scheduleFireRefusal(storage, job, { nodeId: wake.config.nodeId, baseUrl: wake.config.baseUrl });
+  if (refused) throw new Error(refused);
 
   // A STOPPED AGENT'S RUN IS SKIPPED, NOT QUEUED (Jouni, 2026-10-11). An agent stopped for a week with
   // an hourly schedule must not find 168 runs waiting when it is started. Before the overlap guard,

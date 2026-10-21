@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-21 — The access-code exemption and the paced-app 401 ask isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-20 — An app open is recorded, and a watermark names, the resolved caller (resolveIdentity):
  *     an owner session's `sub` is the bare account name, which filed the owner's own opens outside
  *     their per-owner usage rows.
@@ -106,6 +107,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { captureAppScreenshot } from '../../services/screenshot-capture.js';
 import { storeAppScreenshot, clearAppScreenshot, type AppScreenshotGate } from '../../services/app-screenshot-store.js';
 import { listAppVersionsView } from '../../services/app-versions.js';
@@ -548,7 +550,7 @@ export function registerReadRoutes(
             let codeExempt = false;
             if (req.auth) {
                 const { owner: viewerOwner } = await canonicalOwner(req);
-                codeExempt = (viewerOwner === app.ownerName && !req.auth.anonymous && callerOf(req, config.nodeId, storage).has('app:write'))
+                codeExempt = (viewerOwner === app.ownerName && !isAnonymousPrincipal(req.auth) && callerOf(req, config.nodeId, storage).has('app:write'))
                     || await operatorReads();
             }
             if (!codeExempt) {
@@ -573,7 +575,7 @@ export function registerReadRoutes(
         if (appIsPaced(config, current.manifest)) {
             // The anonymous identity (AIMEAT_ANONYMOUS_MODE) carries a req.auth, and it can hold no
             // licence, so it gets the 401 that tells a caller to sign in (secaudit 2026-10-10 C1).
-            if (!req.auth || req.auth.anonymous) {
+            if (!req.auth || isAnonymousPrincipal(req.auth)) {
                 res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED',
                     'This app has a pacing amount. Sign in and take it first via POST /v1/app-store/purchase'));
                 return;

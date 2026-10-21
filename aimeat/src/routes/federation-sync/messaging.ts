@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-20 — The attachment download token names the stored file's version (createdAt), as every
+ *     download token now must (services/download-token.ts).
  *   2026-10-18 — Replicate compares the timestamps against the stored record and writes the replica on
  *     the version it compared (createMemoryIfAbsent / setMemoryIfVersion), reading again on a conflict;
  *     the conflict copy and its notice follow the stored write.
@@ -712,7 +714,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         }
 
         const token = await generateDownloadToken(
-            { sub: owner_ghii, key: storage_key, mimeType: file.mimeType, size: file.size },
+            { sub: owner_ghii, key: storage_key, mimeType: file.mimeType, size: file.size, version: file.createdAt },
             300,
         );
         res.json(success(config.nodeId, {

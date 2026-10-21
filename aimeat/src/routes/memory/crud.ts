@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-20 — SECURITY: GET /v1/memory with owner_scope or ?agent= asks the organism read rule
+ *     (organismReadableRecords) on the meta and value paths and the count, as GET /v1/memory/:key does,
+ *     and so does GET /v1/memory/search with ?agent=.
+ *     An agent a 'listed' organism does not admit listed that organism's records with their values
+ *     (secaudit 2026-10, v57).
  *   2026-10-18 — POST /v1/memory without a visibility takes the node's starting level,
  *     visibility.memory_default (code default private; plan doc-mvcn6c7e4e5q, V5.1).
  *   2026-10-18 — POST /v1/memory asks the publish gate: a public write by an agent without
@@ -89,6 +94,7 @@ import { warningField } from '../../services/classification-exits.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { provenanceWriteEcho } from '../../services/ai-provenance-echo.js';
 import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
+import { organismReadableRecords } from '../../services/organism-namespace-access.js';
 import { callerOf } from '../../middleware/caller.js';
 import { listMemoryMetaFor, searchMemoryRecords } from '../../services/memory-query.js';
 import { memoryVisibilityDefault } from '../../services/content-defaults.js';
@@ -328,6 +334,14 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // below including the count (memory:read-as-owner, feature-list audit #42).
     const restricted = (ownerScope || !!agentParam) && !readsAsOwner(callerOf(req, config.nodeId, storage));
     const self = resolveIdentity(req.auth!, config.nodeId);
+    // The organism rule GET /v1/memory/:key applies (workspace-access middleware), on the same
+    // records when they come from the owner scope or a sibling: an agent an organism does not admit
+    // reads none of its keys here either (secaudit 2026-10, v57). The owner in person and an app
+    // grant are exempt inside organismReadableRecords.
+    const listCaller = callerOf(req, config.nodeId, storage);
+    const organismRuled = (ownerScope || !!agentParam) && !listCaller.inPerson && listCaller.kind !== 'app';
+    const organismView = <T extends { key: string }>(rows: T[]): Promise<T[]> =>
+      organismRuled ? organismReadableRecords({ storage, config }, listCaller, rows) : Promise.resolve(rows);
 
     const prefix = req.query.prefix as string | undefined;
     const visibility = req.query.visibility as string | undefined;
@@ -360,7 +374,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // server-side (no record values loaded or transferred) for the common no-filter case (e.g. a
     // profile stats bar "🧠 N Muistit"). Tag/maxFlags filters fall through to the list-based count
     // below (countMemory supports prefix + visibility only).
-    if (req.query.count === 'true' && !tags?.length && maxFlags === undefined && !restricted) {
+    if (req.query.count === 'true' && !tags?.length && maxFlags === undefined && !restricted && !organismRuled) {
       // Cached per identity-set + filter (60s, dashboard TTL): the profile stats bar polls this on
       // every load / live-update; a COUNT(DISTINCT key) is cheap but recurs constantly. Invalidated
       // by the `domain:memory` tag (memory writes broadcast `emitChange('memory')`) so a write drops
@@ -397,12 +411,12 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const reader = readerFor({ storage, config }, req.auth);
     if (metaOnly) {
       // The listing aimeat_memory_list reads too (services/memory-query.ts).
-      const allMeta = ownerScopeView(await reader.show(
+      const allMeta = await organismView(ownerScopeView(await reader.show(
         await listMemoryMetaFor({ storage, config }, {
           ownerScopeOf: (ownerScope && !agentParam) ? req.auth!.owner : null, gaii,
           prefix, visibility, tags, maxFlags, archived,
         }),
-        r => memoryTarget(r.ownerGaii, r.key)), self, !restricted);
+        r => memoryTarget(r.ownerGaii, r.key)), self, !restricted));
       // A count is a count of what MATCHES, never of what was returned — so it is answered before
       // the limit is applied, or `?count=true&limit=10` would report ten for a keyspace of a thousand.
       if (req.query.count === 'true') {
@@ -462,7 +476,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       loaded = await storage.listMemory(gaii, { prefix, visibility, tags, maxFlags, archived });
     }
     // The one presentation of memory values: the classification reader plus the credential mask.
-    const allRecords = await presentMemories(reader, ownerScopeView(loaded, self, !restricted));
+    const allRecords = await presentMemories(reader, await organismView(ownerScopeView(loaded, self, !restricted)));
 
     // ?count=true with tag/maxFlags filters — count from the materialized list (rare path). Before
     // the limit, like the meta path: a count answers "how many are there", not "how many did I ask for".
@@ -588,8 +602,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // every REST caller that exists keeps the answer it has always had.
     const includeVersions = req.query.include_versions !== 'false';
     // ?agent= naming a sibling: without memory:read-as-owner only what visibility admits (audit #42).
-    const all: MemoryRecord[] = ownerScopeView(found, resolveIdentity(req.auth!, config.nodeId),
-      !agentParam || readsAsOwner(callerOf(req, config.nodeId, storage)));
+    const searchCaller = callerOf(req, config.nodeId, storage);
+    const visible: MemoryRecord[] = ownerScopeView(found, resolveIdentity(req.auth!, config.nodeId),
+      !agentParam || readsAsOwner(searchCaller));
+    // A sibling's organism records pass the organism read rule too, as on the listing (v57).
+    const all = agentParam ? await organismReadableRecords({ storage, config }, searchCaller, visible) : visible;
     const kept = includeVersions ? all : all.filter(r => !isVersionKey(r.key));
     // Typed against the stored value, then presented: the classification reader plus the credential
     // mask (TARGET-082). A hit this reader may not see is not in the answer or the total.

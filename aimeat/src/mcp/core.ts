@@ -14,6 +14,7 @@
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The three work tools moved to mcp/core-work.ts (pure extraction, max-file-lines).
+ *   2026-10-20 — SECURITY: aimeat_memory_read and aimeat_memory_list with owner_scope ask the organism read rule (organismReadableRecords), and aimeat_discover hands it the session's caller (organismCaller) for its own scope; an agent a 'listed' organism does not admit read its records here (secaudit 2026-10, v57).
  *   2026-10-19 — aimeat_agent_profile and aimeat_agents_list carry `avatar` (and the profile `avatar_problem`), as GET /v1/agents/:gaii and GET /v1/agents do (services/agent-avatar.ts).
  *   2026-10-18 — aimeat_agents_list answers `invites_people` per agent, as GET /v1/agents does (services/agent-invites.ts).
  *   2026-10-18 — aimeat_memory_write without a visibility takes visibility.memory_default (plan V5.1).
@@ -169,6 +170,7 @@ import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';
+import { organismReadableRecords } from '../services/organism-namespace-access.js';
 import { listMemoryMetaFor } from '../services/memory-query.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
@@ -335,6 +337,7 @@ export function registerCoreTools(
                     isEcosystem: false,
                     scopes: agent?.defaultScopes ?? [],
                 },
+                organismCaller: caller(),   // the organism read rule on the own scope (secaudit 2026-10, v57 shape)
                 scope: (scope ?? 'own') as 'own' | 'public' | 'shared',
                 reader: readerForAgent({ storage, config }, agentGaii),
                 filters: {
@@ -451,6 +454,8 @@ export function registerCoreTools(
                 // Without memory:read-as-owner only what visibility admits a same-owner reader (audit #42).
                 if (stored && !ownerScopeView([stored], agentGaii, readsAsOwner(caller())).length) stored = null;
             }
+            // The organism rule GET /v1/memory/:key applies, on both branches (secaudit 2026-10, v57).
+            if (stored && !(await organismReadableRecords({ storage, config }, caller(), [stored])).length) stored = null;
             // The one presentation of a memory value (classification reader + credential mask). A
             // record this agent may not see answers as an absent one, on the hint below as well.
             const record = stored ? await presentMemory(reader, stored) : null;
@@ -466,7 +471,7 @@ export function registerCoreTools(
                     ? await getOwnerScopeMemory(storage, config.nodeId, localAccountName(agentGaii), key)
                     : null;
                 const elsewhere = found && ownerScopeView([found], agentGaii, readsAsOwner(caller())).length
-                    ? await presentMemory(reader, found) : null;
+                    && (await organismReadableRecords({ storage, config }, caller(), [found])).length ? await presentMemory(reader, found) : null;
                 if (elsewhere) {
                     return {
                         content: [{
@@ -614,9 +619,10 @@ export function registerCoreTools(
                 }
                 // The owner-scope listing GET /v1/memory?owner_scope=true reads (services/memory-query.ts):
                 // the owner's GHII, every agent and every ecosystem app in one query, one row per key.
-                entries = ownerScopeView(
+                // The organism rule too, as GET /v1/memory?owner_scope=true (secaudit 2026-10, v57).
+                entries = await organismReadableRecords({ storage, config }, caller(), ownerScopeView(
                     await listMemoryMetaFor({ storage, config }, { ownerScopeOf: localAccountName(agentGaii), gaii: agentGaii, prefix, visibility, tags }),
-                    agentGaii, readsAsOwner(caller()));
+                    agentGaii, readsAsOwner(caller())));
             } else {
                 entries = await listMemoryMetaFor({ storage, config }, { ownerScopeOf: null, gaii: agentGaii, prefix, visibility, tags });
             }

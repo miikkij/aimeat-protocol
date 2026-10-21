@@ -10,6 +10,10 @@
  *   import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
  *   await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
  * @version-history
+ *   v1.2.0 — 2026-10-20 — An agent the mint allowed to publish (no `publish_ask` in the token) is asked
+ *     the publish gate again from its current record (uploadPublishGate), so a raise to public by an
+ *     agent that lost publish:public after the mint is stored at its kept level with a request
+ *     (secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck).
  *   v1.1.0 — 2026-10-18 — A token carrying `publish_ask` (the mint asked the publish gate) hands that
  *     requester to the write: a file that lands as a raise to public is stored at the level it had and
  *     the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -22,6 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { writeStorageFile } from '../services/storage-file-write.js';
 import { requesterFromMeta } from '../services/storage-file-publish.js';
+import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
@@ -53,7 +58,7 @@ export function declaredFromMeta(meta: Record<string, unknown>): DeclaredProvena
 
 export async function handleStorageUpload(
     res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer,
+    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer, actorIsAgent = false,
 ): Promise<void> {
     // tags + workspace_refs ride in the token meta (PRESIGNED_META_KEYS.storage). Dropping them here
     // is how a presigned upload of a workspace-shared file would land as an untagged private one —
@@ -63,6 +68,10 @@ export async function handleStorageUpload(
         : undefined;
     // The requester the mint asked the publish gate about, from the SIGNED token (never the client).
     const requester = requesterFromMeta(meta.publish_ask);
+    // An agent the mint did not ask about (it held publish:public then) is asked again here, with the
+    // grant its record holds NOW: a permission the owner withdrew inside the token's hour applies to
+    // this upload, as it does to the same agent's inline write (services/publish-requests/upload-gate.ts).
+    const liveGate = !requester && actorIsAgent ? await uploadPublishGate(storage, config.nodeId, actor) : undefined;
 
     // The key fence, the two size ceilings, the account-wide quota, the record shape, the overage
     // charge and the change events are services/storage-file-write.ts, shared with POST /v1/storage
@@ -88,7 +97,7 @@ export async function handleStorageUpload(
                 ...(typeof meta.ai_provenance_id === 'string' ? { declaredId: meta.ai_provenance_id } : {}),
                 ...(meta.ai_provenance !== undefined ? { declared: declaredFromMeta(meta) } : {}),
             },
-            ...(requester ? { publishGate: { requester } } : {}),
+            ...(requester ? { publishGate: { requester } } : liveGate ? { publishGate: liveGate } : {}),
         },
     );
     if (!written.ok) {

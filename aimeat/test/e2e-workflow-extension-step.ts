@@ -20,6 +20,14 @@
  *       is refused at save too — the second because such a step would green on any return at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflow-extension-step
  * @version-history
+ *   v1.3.0 -- 2026-10-21 -- Test 13e: a run with no recorded principal (started before 2026-10-20) is
+ *     not asked again; the owner's run of a workflow its deleted agent saved dispatches as before.
+ *   v1.2.0 -- 2026-10-20 -- Tests 13a to 13d (secaudit 2026-10, v64): an agent saves and starts a run
+ *     whose extension step waits behind a human-input step; the owner deletes the agent (13a) or takes
+ *     ext:invoke away (13b), answers, and the step is not dispatched: the run ends refused, the result
+ *     record is never written, and the owner is told once. 13c and 13d are the controls: an agent that
+ *     keeps its permissions, and "Run as me" on the refused run. 13a and 13b asserted the hole closed:
+ *     with the dispatch check commented out both failed (the step ran green as the owner GHII).
  *   v1.1.0 -- 2026-09-15 -- 6b asserts the bridge's refusal of an undefined argument (3cc14fae6)
  *     instead of the file it used to write under the key "undefined". It had pinned that defect on
  *     purpose and kept the nightly sweep red on both backends once the defect was fixed.
@@ -56,6 +64,24 @@ async function setupOwner(label: string) {
   return { name, gaii: `${name}@${NODE_ID}`, token: tok.body.data.token as string };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+
+/** An agent of `who` holding exactly `scopes`, signed in with its own key. */
+async function mintAgent(who: { name: string; token: string }, name: string, scopes: string[]): Promise<{ name: string; token: string }> {
+  const reg = await json('/v1/agents', { method: 'POST', headers: auth(who.token), body: JSON.stringify({ name, owner: who.name, capabilities: ['memory'], scopes }) });
+  assert(reg.status === 201, `create ${name}: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+  const gaii = reg.body.data.agent.gaii as string;
+  const timestamp = new Date().toISOString();
+  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
+  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature: sig }) });
+  assert(tok.body.ok === true, `token for ${name}: ${JSON.stringify(tok.body.error)}`);
+  return { name, token: tok.body.data.token as string };
+}
 
 console.log('\n=== Workflow extension step E2E (TARGET-063 A3) ===\n');
 
@@ -779,8 +805,143 @@ await test('12c. A datapackage step with no changes is refused at SAVE', async (
   assert(r.status === 400, `expected 400, got ${r.status}`);
 });
 
+// ── v64: a run in flight is asked again before every dispatch ─────────────────────────────────────
+// An agent saves and starts a run whose extension step waits behind a human-input step. Before the
+// owner answers, the owner deletes the agent or takes a permission away. The answer advances the run,
+// and the extension step must not be dispatched on the owner's authority: the run ends refused, the
+// step's result record is never written, and the owner is told once. Before the fix the step ran as
+// the owner with the operator role after its agent was gone (secaudit 2026-10, v64).
+const HELD_WORDS = ['workflow:read', 'workflow:write', 'ext:invoke', 'memory:read', 'memory:read-as-owner'];
+const heldDef = (resultKey: string) => ({
+  title: { en_US: 'Held extension step' }, description: { en_US: 'v64' }, trigger: { kind: 'manual' }, vars: [],
+  on_step_fail: 'inspect',
+  steps: [
+    { id: 'gate', description: { en_US: 'Ask the owner' }, required_to_function: 'none',
+      action: { kind: 'human-input', question: { prompt: 'Go?', options: [{ id: 'go', label: 'Go' }] } } },
+    { id: 'act', after: ['gate'], description: { en_US: 'Run the probe' }, required_to_function: 'none',
+      success_signal: { kind: 'deterministic', key: resultKey, op: 'json_field', path: 'gaii', nonempty: true },
+      action: { kind: 'extension', extension: EXT, action: 'probe', input: {}, result_to_key: resultKey } },
+  ],
+});
+/** The agent saves the held workflow and starts it; the run parks at the owner's question. */
+async function agentStartsHeld(agent: { token: string }, wfId: string, resultKey: string): Promise<string> {
+  const save = await json(`/v1/workflows/${wfId}`, { method: 'PUT', headers: auth(agent.token), body: JSON.stringify(heldDef(resultKey)) });
+  assert(save.status === 200, `agent save ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+  const r = await json(`/v1/workflows/${wfId}/run`, { method: 'POST', headers: auth(agent.token), body: JSON.stringify({ mode: 'full' }) });
+  assert(r.status === 200, `agent run ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const runId = r.body.data.run?.runId ?? r.body.data.runId;
+  const run = (await json(`/v1/workflows/${wfId}/runs/${runId}`, { headers: auth(owner.token) })).body.data;
+  assert(run.status === 'waiting-step' && run.steps.gate.state === 'waiting-human' && run.steps.act.state === 'pending',
+    `the run waits at the question: ${run.status} gate=${run.steps?.gate?.state} act=${run.steps?.act?.state}`);
+  return runId;
+}
+const answerGate = (wfId: string, runId: string) =>
+  json(`/v1/workflows/${wfId}/runs/${runId}/steps/gate/answer`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ picks: ['go'] }) });
+const stoppedNotifs = async (runId: string): Promise<any[]> => {
+  const { body } = await json('/v1/notifications', { headers: auth(owner.token) });
+  return ((body.data?.notifications ?? []) as any[]).filter(n => n.type === 'workflow_run_refused'
+    && (n.actions ?? []).some((a: any) => String(a.endpoint ?? '').includes(runId)));
+};
+let deletedRun = '';
+
+await test('13a. v64: the agent that started a run is deleted while a step waits: the step is NOT dispatched, the run ends refused, the owner is told once', async () => {
+  const agent = await mintAgent(owner, `wfx-held-del${Date.now()}`, HELD_WORDS);
+  deletedRun = await agentStartsHeld(agent, 'held-del-wf', 'held.del.result');
+  const del = await json(`/v1/agents/${agent.name}`, { method: 'DELETE', headers: auth(owner.token) });
+  assert(del.status === 200, `owner deletes the agent: ${del.status} ${JSON.stringify(del.body?.error)}`);
+
+  const ans = await answerGate('held-del-wf', deletedRun);
+  assert(ans.status === 200, `the owner's answer is taken: ${ans.status} ${JSON.stringify(ans.body?.error)}`);
+  await sleep(600); // an extension dispatch would have answered by now
+  const run = (await json(`/v1/workflows/held-del-wf/runs/${deletedRun}`, { headers: auth(owner.token) })).body.data;
+  assert(run.status === 'refused', `the run ends refused, got ${run.status} (act ${run.steps?.act?.state})`);
+  assert(run.steps.act.state === 'skipped' && !run.steps.act.startedAt, `the extension step never started: ${JSON.stringify(run.steps.act)}`);
+  assert(run.steps.gate.state === 'green', `the owner's answer still counts: ${run.steps.gate.state}`);
+  assert(run.refusal?.gone === true && run.refusal?.stoppedBefore === 'act', `the refusal names the gone agent and the step: ${JSON.stringify(run.refusal)}`);
+  assert(/Stopped before step "act"/.test(run.reason ?? '') && /no longer connected/.test(run.reason ?? ''), `the reason says it in words: ${run.reason}`);
+  assert(run.principal?.kind === 'agent', `the run records the principal it answers to: ${JSON.stringify(run.principal)}`);
+  const rec = await json('/v1/memory/held.del.result', { headers: auth(owner.token) });
+  assert(rec.status === 404, `the extension's result was never written as the owner: ${rec.status} ${JSON.stringify(rec.body?.data?.value ?? '')}`);
+  const told = await stoppedNotifs(deletedRun);
+  assert(told.length === 1, `one notification for the stopped run, got ${told.length}`);
+  assert(/stopped before step act/.test(told[0].title) && told[0].i18n?.key === 'workflow_run_stopped_gone',
+    `the notification says which step stopped: ${told[0].title} ${JSON.stringify(told[0].i18n)}`);
+  assert(told[0].actions.some((a: any) => a.id === 'run-as-me') && told[0].actions.some((a: any) => a.id === 'approve-again'), 'with the two ways on');
+});
+
+await test('13b. v64: the agent loses ext:invoke while a step waits: the step is NOT dispatched and the run ends refused naming the word', async () => {
+  const agent = await mintAgent(owner, `wfx-held-nar${Date.now()}`, HELD_WORDS);
+  const runId = await agentStartsHeld(agent, 'held-narrow-wf', 'held.narrow.result');
+  const narrow = await json(`/v1/agents/${agent.name}/scopes`, { method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ scopes: HELD_WORDS.filter(w => w !== 'ext:invoke') }) });
+  assert(narrow.status === 200, `owner narrows the agent: ${narrow.status} ${JSON.stringify(narrow.body?.error)}`);
+
+  const ans = await answerGate('held-narrow-wf', runId);
+  assert(ans.status === 200, `the owner's answer is taken: ${ans.status}`);
+  await sleep(600);
+  const run = (await json(`/v1/workflows/held-narrow-wf/runs/${runId}`, { headers: auth(owner.token) })).body.data;
+  assert(run.status === 'refused' && run.steps.act.state === 'skipped' && !run.steps.act.startedAt,
+    `refused before the extension step: ${run.status} ${JSON.stringify(run.steps?.act)}`);
+  assert(run.refusal?.gone === false && (run.refusal?.missing ?? []).includes('ext:invoke') && run.refusal?.stoppedBefore === 'act',
+    `the refusal names the missing word: ${JSON.stringify(run.refusal)}`);
+  assert((await json('/v1/memory/held.narrow.result', { headers: auth(owner.token) })).status === 404, 'the extension never ran');
+  assert((await stoppedNotifs(runId)).length === 1, 'the owner is told once');
+});
+
+await test('13c. v64 control: an agent that keeps its permissions gets its held step dispatched as before', async () => {
+  const agent = await mintAgent(owner, `wfx-held-ok${Date.now()}`, HELD_WORDS);
+  const runId = await agentStartsHeld(agent, 'held-ok-wf', 'held.ok.result');
+  assert((await answerGate('held-ok-wf', runId)).status === 200, 'answered');
+  const run = await settle('held-ok-wf', runId, owner.token);
+  assert(run.status === 'done' && run.steps.act.state === 'green', `the agent's run finishes: ${run.status} act=${run.steps?.act?.state}`);
+  assert(!run.refusal, 'no refusal on it');
+  assert((await json('/v1/memory/held.ok.result', { headers: auth(owner.token) })).status === 200, 'the extension wrote its result');
+});
+
+await test('13d. v64 control: "Run as me" on the refused run starts it as the owner in person, and its held step is dispatched', async () => {
+  assert(deletedRun !== '', 'needs 13a');
+  const press = await json(`/v1/workflows/held-del-wf/runs/${deletedRun}/run-as-owner`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+  assert(press.status === 200, `run as me: ${press.status} ${JSON.stringify(press.body?.error)}`);
+  const runId = press.body.data.runId as string;
+  const parked = (await json(`/v1/workflows/held-del-wf/runs/${runId}`, { headers: auth(owner.token) })).body.data;
+  assert(parked.principal?.kind === 'owner', `the owner's run answers to the owner: ${JSON.stringify(parked.principal)}`);
+  assert((await answerGate('held-del-wf', runId)).status === 200, 'answered');
+  const run = await settle('held-del-wf', runId, owner.token);
+  assert(run.status === 'done' && run.steps.act.state === 'green', `the owner's run of the deleted agent's workflow finishes: ${run.status} act=${run.steps?.act?.state}`);
+  assert((await json('/v1/memory/held.del.result', { headers: auth(owner.token) })).status === 200, 'the extension ran for the owner');
+});
+
+await test('13e. A run started before runs recorded their principal is not asked again: the owner\'s run of a deleted agent\'s workflow dispatches as before', async () => {
+  // A run in flight at the upgrade carries no `principal`. The saver used to stand in for it, so a run
+  // the OWNER started in person was refused at its next step once the agent that saved the workflow
+  // was gone. Nothing over HTTP writes the old shape: the field is taken off the stored run here.
+  const agent = await mintAgent(owner, `wfx-held-old${Date.now()}`, HELD_WORDS);
+  const save = await json('/v1/workflows/held-old-wf', { method: 'PUT', headers: auth(agent.token), body: JSON.stringify(heldDef('held.old.result')) });
+  assert(save.status === 200, `agent save ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+  const started = await json('/v1/workflows/held-old-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  assert(started.status === 200, `owner run ${started.status}: ${JSON.stringify(started.body?.error)}`);
+  const runId = (started.body.data.run?.runId ?? started.body.data.runId) as string;
+
+  const provider = (process.env.AIMEAT_DB ?? '') as StorageProvider;
+  const dbUrl = serverDbUrl();
+  const sqlitePath = pinnedSqlitePath();
+  assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+  const storage = await createStorage({ provider, sqlitePath, dbUrl });
+  const rec = await storage.getMemory(owner.gaii, `workflows.run.held-old-wf.${runId}`);
+  assert(!!rec, 'the stored run record');
+  const { principal: _dropped, ...older } = rec!.value as Record<string, unknown>;
+  await storage.setMemory({ ...rec!, value: older, version: rec!.version + 1, updatedAt: new Date().toISOString() });
+
+  const del = await json(`/v1/agents/${agent.name}`, { method: 'DELETE', headers: auth(owner.token) });
+  assert(del.status === 200, `owner deletes the agent: ${del.status}`);
+  assert((await answerGate('held-old-wf', runId)).status === 200, 'answered');
+  const run = await settle('held-old-wf', runId, owner.token);
+  assert(run.status === 'done' && run.steps.act.state === 'green', `the older run dispatches as before: ${run.status} act=${run.steps?.act?.state} ${run.reason ?? ''}`);
+  assert(!run.refusal, `no refusal on it: ${JSON.stringify(run.refusal)}`);
+  assert((await json('/v1/memory/held.old.result', { headers: auth(owner.token) })).status === 200, 'the extension wrote its result');
+});
+
 await test('Cleanup', async () => {
-  for (const id of ['prod-wf', 'empty-wf', 'throw-wf', 'probe-wf', 'gone-wf']) {
+  for (const id of ['prod-wf', 'empty-wf', 'throw-wf', 'probe-wf', 'gone-wf', 'held-del-wf', 'held-narrow-wf', 'held-ok-wf', 'held-old-wf']) {
     await json(`/v1/workflows/${id}`, { method: 'DELETE', headers: auth(owner.token) });
   }
   await json(`/v1/extensions/${EXT}`, { method: 'DELETE', headers: auth(owner.token) });

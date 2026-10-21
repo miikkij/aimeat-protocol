@@ -35,6 +35,8 @@
  * @structure cardUri / jwksUri / nodeKeyUri · registerAgentCardRoutes(router, config, storage)
  * @usage registerAgentCardRoutes(router, config, storage);
  * @version-history
+ *   2026-10-21 — isSameOwnerReader asks isAnonymousPrincipal, so the minted anonymous token (which
+ *     carries no anonymous claim) never reads an extended card (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.2.0 — 2026-10-19 — The public card (and /card/info's public half) carries `iconUrl`, the absolute
  *     address of the agent's avatar, when it has one (services/agent-avatar.ts).
  *   v1.1.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -48,6 +50,7 @@ import type { Router, Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isValidGAII, isForeignPrincipal } from '../../utils/gaii.js';
 import {
   readCardJws, verifyCardJws, publicCardProjection, signWithNodeKey, jwkThumbprint, base64KeyToJwkX,
@@ -81,7 +84,7 @@ export function nodeKeyUri(baseUrl: string): string {
  */
 function isSameOwnerReader(req: Request, agent: AgentRecord): boolean {
   const auth = req.auth;
-  if (!auth || auth.anonymous || isForeignPrincipal(auth)) return false;
+  if (!auth || isAnonymousPrincipal(auth) || isForeignPrincipal(auth)) return false;
   return auth.owner === agent.owner;
 }
 

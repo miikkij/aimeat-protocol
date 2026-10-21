@@ -8,6 +8,8 @@
  * @structure requireOperatorPrincipal(storage, scope) · requireOperator(storage)
  * @usage const operator = [requireAuth(), requireOperator(storage)]; then spread `...operator` into a route.
  * @version-history
+ *   v1.0.2 — 2026-10-20 — The 401 asks isAnonymousPrincipal, so it refuses the minted anonymous token
+ *     too (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.1 — 2026-10-07 — requireOperatorPrincipal refuses the anonymous identity with 401 (code scanning alert 1702).
  *   v1.0.0 — 2026-10-05 — Moved from auth/middleware.ts (max-file-lines), with requireOperator added
  *     the same day (secaudit 2026-10, C2).
@@ -18,6 +20,7 @@ import { isForeignPrincipal } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { OPERATOR_ORGANISM_REPAIR_SCOPE, OPERATOR_ADMIN_SCOPE } from '../utils/scope-coverage.js';
 import { deny401, deny403, denyScope403 } from './deny.js';
+import { isAnonymousPrincipal } from './anonymous-principal.js';
 import { askOperator } from '../services/operator-principal.js';
 
 /**
@@ -51,7 +54,7 @@ import { askOperator } from '../services/operator-principal.js';
  */
 export function requireOperatorPrincipal(storage: Storage, scope: string = OPERATOR_ORGANISM_REPAIR_SCOPE) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth || req.auth.anonymous) {
+    if (!req.auth || isAnonymousPrincipal(req.auth)) {
       deny401(req, res, 'Authentication required');
       return;
     }

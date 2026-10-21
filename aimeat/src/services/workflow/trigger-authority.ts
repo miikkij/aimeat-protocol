@@ -23,12 +23,20 @@
  *   "Run as me" is bound to the definition the refusal pinned (`defSnapshot`). The owner approves one
  *   object, not a workflow id, so a save that replaced the definition after the refusal is refused
  *   with DEFINITION_CHANGED and nothing starts.
+ *
+ *   A run already going is asked again before every step it dispatches (dispatch-authority.ts). A run
+ *   refused that way is opened here as the workflow's refusal, with the same notification naming the
+ *   step that did not start (openInFlightRefusal).
  * @structure saverOfDef(def) · saverAuthority(storage, saver) · refuseTriggerStart(deps, ownerGhii, def) ·
+ *   openInFlightRefusal(deps, ownerGhii, run, now, missing, stepId) ·
  *   clearRefusal(storage, nodeId, ownerGhii, workflowId) · runRefusedAsOwner(deps, start, …)
  * @usage
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   v1.4.0 — 2026-10-20 — openInFlightRefusal: a run refused before a step is dispatched becomes the
+ *     workflow's open refusal and the owner is told once, with "Run as me" and "Approve again" and the
+ *     step named (secaudit 2026-10, v64).
  *   v1.3.0 — 2026-10-20 — runRefusedAsOwner compares the current definition with the one the refusal
  *     pinned and answers DEFINITION_CHANGED when they differ, starting nothing: the press started the
  *     CURRENT definition by id, so a save by another principal after the refusal spent the owner's
@@ -223,11 +231,9 @@ async function recordRefusal(
   return { runId: run.runId, reason };
 }
 
-/** The one notification of a refusal episode, with the owner's two ways on. */
-async function tellOwner(storage: Storage, ownerGhii: string, def: WorkflowDef, runId: string, now: SaverNow, missing: string[]): Promise<void> {
-  const name = loc(def.title) || def.id;
-  const words = missing.join(', ');
-  const actions: NotifAction[] = [
+/** The owner's two ways on from a refusal: start it once as themself, or approve the permissions again. */
+function refusalActions(def: WorkflowDef, runId: string, now: SaverNow): NotifAction[] {
+  return [
     {
       id: 'run-as-me', label: 'Run as me', kind: 'api', method: 'POST', style: 'primary',
       endpoint: `/v1/workflows/${encodeURIComponent(def.id)}/runs/${encodeURIComponent(runId)}/run-as-owner`,
@@ -235,6 +241,45 @@ async function tellOwner(storage: Storage, ownerGhii: string, def: WorkflowDef, 
     },
     { id: 'approve-again', label: 'Approve again', kind: 'navigate', link: now.approveLink, i18n: { key: 'workflow_run_refused.approve_again' } },
   ];
+}
+
+/**
+ * A run refused in flight (dispatch-authority.ts): its record is already saved as `refused`. It
+ * becomes the workflow's open refusal, so a trigger start refused next counts on it rather than
+ * telling the owner a second time, and the owner is told once, naming the step that did not start.
+ */
+export async function openInFlightRefusal(
+  deps: TriggerAuthorityDeps, ownerGhii: string, run: WorkflowRun, now: SaverNow, missing: string[], stepId: string,
+): Promise<void> {
+  await editOpen(deps.storage, deps.config.nodeId, entries => [
+    ...entries.filter(e => !(e.ownerGhii === ownerGhii && e.workflowId === run.workflowId)),
+    { ownerGhii, workflowId: run.workflowId, runId: run.runId },
+  ]);
+  emitChange('workflows');
+  await tellOwner(deps.storage, ownerGhii, run.defSnapshot, run.runId, now, missing, stepId);
+}
+
+/**
+ * The one notification of a refusal episode, with the owner's two ways on. `stoppedBefore` names the
+ * step a run refused in flight did not start; absent, the run did not start at all.
+ */
+async function tellOwner(storage: Storage, ownerGhii: string, def: WorkflowDef, runId: string, now: SaverNow, missing: string[], stoppedBefore?: string): Promise<void> {
+  const name = loc(def.title) || def.id;
+  const words = missing.join(', ');
+  if (stoppedBefore !== undefined) {
+    await notify(storage, ownerGhii, {
+      type: 'workflow_run_refused',
+      title: `Workflow "${name}" stopped before step ${stoppedBefore}`,
+      body: now.gone
+        ? `The run acts for ${now.name}, which is no longer connected to your account. Run it once as yourself, or save the workflow again yourself.`
+        : `The run acts for ${now.name}, which no longer holds every permission the step needs: ${words}. Run it once as yourself, or approve the permissions again.`,
+      link: '/v1/profile?tab=workflows',
+      actions: refusalActions(def, runId, now),
+      i18n: { key: now.gone ? 'workflow_run_stopped_gone' : 'workflow_run_stopped', vars: { name, saver: now.name, missing: words, step: stoppedBefore } },
+    });
+    return;
+  }
+  const actions = refusalActions(def, runId, now);
   await notify(storage, ownerGhii, {
     type: 'workflow_run_refused',
     title: `Workflow "${name}" did not start`,

@@ -6,6 +6,9 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-21 — A changed action script drops the old-code first-use mark (services/extension-first-use-keep.ts).
+ *   2026-10-21 — The list and GET /v1/extensions/:name answer `uses_secrets` (services/extension-secret-uses.ts).
+ *   2026-10-21 — ?full=true asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.10.1 — 2026-10-20 — GET /v1/extensions/:name leaves out unattendedReadAuthority too: it is served with its meaning on GET /v1/extensions/:name/unattended-reader (Jouni, 2026-10-20).
  *   v1.10.0 — 2026-10-20 — GET /v1/extensions/:name leaves out installedByPrincipal: the door is optionalAuth, and the field names the owner's agent (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.9.1 — 2026-10-05 — POST /v1/extensions drops its unused owner-role variable, so no hand-written owner test is left here (secaudit 2026-10, C4).
@@ -38,6 +41,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireAnyScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { logger } from '../../utils/logger.js';
@@ -46,6 +50,8 @@ import {
 } from '../../services/extension-lifecycle.js';
 import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
 import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
+import { usesSecretsOf } from '../../services/extension-secret-uses.js';
+import { withoutFirstUseKeep } from '../../services/extension-first-use-keep.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../../services/dependency-map.js';
 import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
@@ -99,6 +105,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           federation: ext.federation,
           instances: ext.instances ?? null,
           workspace: workspaceDeclarationOf(ext),
+          // Which of the caller's vault secrets the scripts send where, and why: public, like the source.
+          uses_secrets: usesSecretsOf(ext.config),
           installedAt: ext.installedAt,
           activatedAt: ext.activatedAt,
         })),
@@ -318,7 +326,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // can introspect what they installed without leaking scripts publicly.
       const wantFull = req.query.full === 'true';
       if (wantFull) {
-        if (!req.auth || req.auth.anonymous) {
+        if (!req.auth || isAnonymousPrincipal(req.auth)) {
           res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Script content requires authentication'));
           return;
         }
@@ -343,6 +351,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           // What the manifest declared under `workspace:`, so an app author can see whether the
           // extension may act on the caller's organism workspace without reading its config.
           workspace: workspaceDeclarationOf(ext),
+          // Which of the caller's vault secrets the scripts send where, and why: public, like the source.
+          uses_secrets: usesSecretsOf(ext.config),
           // The kept versions, newest first; `/v1/ext/<name>@<version>/<action>` runs one of them.
           versions: (await listVersions(storage, 'extension', name)).map(v => ({ version: v.version, created_at: v.createdAt })),
           // Never return secret config values (or the internal __secretKeys marker) — masked instead.
@@ -497,7 +507,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      const updated = await storage.updateExtension(name, { actions: updatedActions, version });
+      // Changed code falls under the first-use rules: the mark old code keeps goes with it
+      // (services/extension-first-use-keep.ts).
+      const updated = await storage.updateExtension(name, { actions: updatedActions, version, config: withoutFirstUseKeep(ext.config ?? {}) });
       if (updated) {
         await snapshotExtensionVersion(storage, updated, resolveIdentity(req.auth!, config.nodeId))
           .catch(err => logger.warn('PATCH action script: version not kept', { name, version, error: String(err) }));

@@ -17,6 +17,8 @@
  * @structure secretTools[] — the shell handler table, registered by tool-call.ts
  * @usage import { secretTools } from './tool-call-defs-secrets.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-21 -- aimeat_secret_host_set (PATCH) and aimeat_secret_approval_withdraw (DELETE
+ *     .../approvals).
  *   v1.1.0 -- 2026-10-09 -- aimeat_secret_set forwards the optional `host` (secrets audit 2026-10-09,
  *     item 10).
  *   v1.0.0 -- 2026-09-06 -- Initial. The owner's secrets vault on the fleet door.
@@ -40,6 +42,29 @@ export const secretTools: ConnectCliToolDefinition[] = [
                 `/v1/secrets/${encodeURIComponent(requiredString(input, 'name'))}`,
                 { value: requiredString(input, 'value'), ...(host !== undefined ? { host } : {}) },
             );
+        },
+    },
+    {
+        name: 'aimeat_secret_host_set',
+        // An empty host removes the address: PATCH reads null as "remove".
+        handler: ({ client }, input) => {
+            if (typeof input.host !== 'string') throw new Error('Missing required string field: host');
+            const host = input.host.trim();
+            return client.patch(
+                `/v1/secrets/${encodeURIComponent(requiredString(input, 'name'))}`,
+                { host: host === '' ? null : host },
+            );
+        },
+    },
+    {
+        name: 'aimeat_secret_approval_withdraw',
+        handler: ({ client }, input) => {
+            const q = new URLSearchParams({
+                extension: requiredString(input, 'extension'),
+                installer: requiredString(input, 'installer'),
+                host: requiredString(input, 'host'),
+            });
+            return client.delete(`/v1/secrets/${encodeURIComponent(requiredString(input, 'name'))}/approvals?${q.toString()}`);
         },
     },
     {

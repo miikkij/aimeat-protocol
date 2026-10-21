@@ -23,7 +23,11 @@
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
- *   v2.2.0 — 2026-09-16 — MCP SERVERS, section 04, and the sections after it move one number down.
+ *   v2.3.0 — 2026-10-21 — A secret takes an address on add and on replace, and its panel sets, changes
+ *     or removes the address without the value and withdraws what the person allowed an extension
+ *     (PATCH /v1/secrets/:name, DELETE /v1/secrets/:name/approvals). It reloads on aimeat-live-update,
+ *     so a question an extension's call filed shows up without a reload.
+ *   v2.2.0 — 2026-09-16 —MCP SERVERS, section 04, and the sections after it move one number down.
  *     The page reads how many are attached, for the section count and the rail.
  *   v2.1.0 — 2026-09-06 — SECRETS, section 04. The owner's vault said in the page's own register:
  *     the list with what each secret is used by, one write-only field to add a secret and the same
@@ -50,7 +54,7 @@ const FIRST_KEYS = 12;
 /** What the vault accepts as a name, and how much value it carries. Both are the route's own. */
 const SECRET_NAME = /^[A-Za-z0-9_-]{1,64}$/;
 const SECRET_MAX_BYTES = 4096;
-const EMPTY_SECRET = { open: false, name: '', value: '' };
+const EMPTY_SECRET = { open: false, name: '', value: '', host: '' };
 /** The value's size as the server counts it: bytes, not characters. */
 const byteLength = (s) => (typeof TextEncoder === 'function' ? new TextEncoder().encode(s).length : String(s).length);
 /** The rights a scoped token may be given, in the order the form lists them. */
@@ -99,6 +103,7 @@ export default function AccessTab({ session, showToast }) {
   const [secretMsg, setSecretMsg] = useState(null);
   const [replaceName, setReplaceName] = useState(null);
   const [replaceValue, setReplaceValue] = useState('');
+  const [hostDraft, setHostDraft] = useState('');
 
   const toast = (m, isErr) => showToast?.(m, !!isErr);
   const isOperator = (session?.roles || []).includes('operator');
@@ -350,9 +355,11 @@ export default function AccessTab({ session, showToast }) {
     setSecretMsg(null);
     if (next) setReplaceName(null);
   };
-  const openReplace = (name) => {
+  /** Open or close one secret's panel; its address field starts at the address the secret has. */
+  const openReplace = (name, host) => {
     setReplaceName((cur) => (cur === name ? null : name));
     setReplaceValue('');
+    setHostDraft(host || '');
     setSecretMsg(null);
   };
 
@@ -365,14 +372,18 @@ export default function AccessTab({ session, showToast }) {
     return null;
   };
 
-  /** Add or replace: one call either way, because replacing a secret is writing it again. */
-  const writeSecret = async (name, value, replacing) => {
+  /**
+   * Add or replace: one call either way, because replacing a secret is writing it again. The address
+   * goes with it when one is written, so a replaced value keeps the address the person sees.
+   */
+  const writeSecret = async (name, value, replacing, host) => {
     const flash = flashFor(setSecretMsg);
     const bad = secretRefusal(name, value, !replacing);
     if (bad) { flash(bad, true); return; }
     setBusy('secret:' + name);
     try {
-      const r = await apiPut('/v1/secrets/' + encodeURIComponent(name), { value });
+      const where = (host || '').trim();
+      const r = await apiPut('/v1/secrets/' + encodeURIComponent(name), where ? { value, host: where } : { value });
       if (r?.ok === false) throw r;
       // The value leaves this browser and is forgotten here as well: nothing holds it after this.
       if (replacing) { setReplaceName(null); setReplaceValue(''); } else setSecretFormState(EMPTY_SECRET);
@@ -380,6 +391,35 @@ export default function AccessTab({ session, showToast }) {
       await loadSecrets();
     } catch (e) { flash(errText(e, x('secrets.failed')), true); }
     setBusy(false);
+  };
+
+  /** Set, change or remove the address, without the value (PATCH /v1/secrets/:name). Empty removes it. */
+  const saveSecretHost = async (name, host) => {
+    const flash = flashFor(setSecretMsg);
+    const where = (host || '').trim();
+    setBusy('secret:' + name);
+    try {
+      const r = await apiPatch('/v1/secrets/' + encodeURIComponent(name), { host: where || null });
+      if (r?.ok === false) throw r;
+      toast(where ? x('secrets.hostSaved', { name, host: where }) : x('secrets.hostCleared', { name }));
+      await loadSecrets();
+    } catch (e) { flash(errText(e, x('secrets.hostFailed')), true); }
+    setBusy(false);
+  };
+
+  /** Withdraw what the person allowed an extension, or drop a question still waiting. */
+  const withdrawApproval = (name, a) => {
+    confirm(x('secrets.confirmWithdraw', { extension: a.extension, name, host: a.host }), async () => {
+      setBusy('secret:' + name);
+      try {
+        const q = new URLSearchParams({ extension: a.extension, installer: a.installer, host: a.host });
+        const r = await apiDelete('/v1/secrets/' + encodeURIComponent(name) + '/approvals?' + q.toString());
+        if (r?.ok === false) throw r;
+        toast(x('secrets.withdrawn', { extension: a.extension }));
+        await loadSecrets();
+      } catch (e) { toast(errText(e, x('secrets.withdrawFailed')), true); }
+      setBusy(false);
+    }, { danger: true });
   };
 
   const deleteSecret = (row) => {
@@ -398,8 +438,8 @@ export default function AccessTab({ session, showToast }) {
 
   const ctx = {
     session, ov, failed, rows, basePackage, baseHolders, fed, filter, openKey, shownKeys, form, created, formMsg, spendDraft, fedInput, keyShown, busy,
-    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, mcpCount,
-    setSecretForm, toggleSecretForm, openReplace, setReplaceValue, writeSecret, deleteSecret,
+    secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, hostDraft, mcpCount,
+    setSecretForm, toggleSecretForm, openReplace, setReplaceValue, setHostDraft, writeSecret, deleteSecret, saveSecretHost, withdrawApproval,
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,
     load, setFilter, toggleKey, showMoreKeys, setSpendDraft, revokeKey, takeAway, setSpendCap, revokeUnused, signOutOthers, addPasskeyNow,
     toggleFedAll, addFedNode, removeFedNode, setFedInput, setKeyShown, setForm, toggleForm, toggleScope, clearCreated, createToken,

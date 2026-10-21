@@ -29,6 +29,9 @@
  *   const bad = checkScheduleGate({ kind, cron, timezone }, caller);
  *   if (bad) return renderRefusal(bad);   // each door renders its own way
  * @version-history
+ *   2026-10-20 — The `extension` kind asks `ext:invoke`, the word POST /v1/ext/:ext/:action asks, on
+ *     create, edit and run; the fire asks the maker again (services/scheduler-extension-job.ts)
+ *     (secaudit 2026-10, SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke).
  *   2026-10-20 — The `eco-capability` kind asks `work:request`, the word POST /v1/capabilities/:id/invoke
  *     requires, on create, edit and run (secaudit 2026-10, runEcoCapabilityJob:owner-caller-no-scope-no-maker-check).
  *   2026-10-16 — scheduleKindScopeRefusal(): the per-kind scope as its own check, so editing and
@@ -51,6 +54,11 @@ export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' 
  * all — which is what the tool's own scope says.
  */
 export const SCHEDULE_KIND_SCOPE: Partial<Record<ScheduleKind, string | readonly string[]>> = {
+    // Running an installed extension's action with the input the schedule stores. POST
+    // /v1/ext/:ext/:action, aimeat_extension_invoke and the workflow extension step ask this word,
+    // so a task:write-only principal must not reach the same action through a schedule
+    // (secaudit 2026-10, SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke).
+    extension: 'ext:invoke',
     ai: 'ai:use',
     agent_task: 'task:write',
     // Invoking a connected ecosystem app's capability, which is what this kind does on every fire.

@@ -9,6 +9,8 @@
  *   policy on a long base64-like value in well under a second, and skips a rule whose label was
  *   retired.
  * @version-history
+ *   v1.1.1 — 2026-10-21 — The two control patterns get a 1000 ms budget; at 20 ms they timed out under
+ *     the gate's parallel unit run and failed it twice. The catastrophic case keeps 20 ms.
  *   v1.1.0 — 2026-09-30 — One scope's slow rules stop costing the node once the scope has used its
  *     minute of regex time (TARGET-082 second review, S4).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 review).
@@ -46,8 +48,11 @@ describe('the regex safety check', () => {
     const t0 = performance.now();
     expect(testWithin(/(a+)+$/, `${'a'.repeat(40)}b`, 20)).toBeNull();
     expect(performance.now() - t0).toBeLessThan(1000);
-    expect(testWithin(/b$/, 'aab', 20)).toBe(true);
-    expect(testWithin(/c$/, 'aab', 20)).toBe(false);
+    // The two controls get a budget a loaded machine can meet: under `pnpm gate`'s parallel unit run
+    // a 20 ms budget timed out even for /b$/ and the control read null. The catastrophic case above
+    // keeps its 20 ms; the controls only prove an ordinary pattern answers true and false.
+    expect(testWithin(/b$/, 'aab', 1000)).toBe(true);
+    expect(testWithin(/c$/, 'aab', 1000)).toBe(false);
   });
 });
 

@@ -5,7 +5,8 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
- *   v1.14.0 — 2026-10-18 — An action may say `public: true`: it answers a caller without an account.
+ *   v1.15.0 — 2026-10-21 — `uses_secrets: [{ name, hosts, why }]`, stored as `config.__usesSecrets`.
+ *   v1.14.0 — 2026-10-18 —An action may say `public: true`: it answers a caller without an account.
  *     Refused with a price or a pacing toll (Comicland v3 A-7).
  *   v1.13.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). `commercial.payMorsels` is deprecated and read as pacing; accepted until
@@ -68,6 +69,7 @@ import { MONEY_CURRENCIES } from '../commerce/money.js';
 import { WORKSPACE_DECLARATION_KEY, type WorkspaceDeclaration } from './extension-workspace-declaration.js';
 import { CAPABILITY_DECLARATION_KEY, NETWORK_HOSTS_KEY, parseCapabilityDeclaration } from './extension-capability-declaration.js';
 import { NETWORK_HOST_FIELDS_KEY, hostRefusal, parseNetworkDeclaration } from './extension-network-hosts.js';
+import { USES_SECRETS_KEY, parseUsesSecrets } from './extension-secret-uses.js';
 import { localAccountName } from '../utils/gaii.js';
 import { EXTENSION_FETCH_MAX_BYTES_CEILING } from '../utils/read-capped.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
@@ -604,6 +606,9 @@ export function buildExtensionRecordFromManifest(
   // the scripts' text (services/extension-capability-declaration.ts).
   const capabilityDecl = parseCapabilityDeclaration(manifest.capabilities);
   if (!capabilityDecl.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: capabilityDecl.message };
+  // `uses_secrets: [{ name, hosts, why }]`: which vault secrets the scripts send where (extension-secret-uses.ts).
+  const usesSecrets = parseUsesSecrets(manifest.uses_secrets);
+  if (!usesSecrets.ok) return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: usesSecrets.message };
 
   for (const [scriptKey, scriptContent] of Object.entries(scripts)) {
     const sizeKb = Buffer.byteLength(scriptContent, 'utf8') / 1024;
@@ -746,6 +751,7 @@ export function buildExtensionRecordFromManifest(
       ...(capabilityDecl.list ? { [CAPABILITY_DECLARATION_KEY]: capabilityDecl.list } : {}),
       ...(network.hosts ? { [NETWORK_HOSTS_KEY]: network.hosts } : {}),
       ...(network.hostFields ? { [NETWORK_HOST_FIELDS_KEY]: network.hostFields } : {}),
+      ...(usesSecrets.uses.length ? { [USES_SECRETS_KEY]: usesSecrets.uses } : {}),
       // Record which config fields are `type: 'secret'` so the route can encrypt their values
       // at rest and the runtime can decrypt before the VM (the descriptor type is otherwise
       // lost by the flatten above). See services/extension-secrets.ts.

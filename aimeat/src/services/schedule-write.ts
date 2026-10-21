@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-21 — triggerScheduleRecord: the app or ecosystem app that made an `extension` schedule on
+ *     the once-only keep list (services/schedule-extension-keep.ts) may run it now without ext:invoke,
+ *     as its fire runs; an edit by that app still asks the word.
  *   2026-10-20 — Four refusals from secaudit 2026-10, all on the same rule (a schedule acts as its
  *     maker, and a maker reaches no further through a schedule than it reaches directly):
  *     canManageSchedule names the caller's kind, so an ecosystem app manages only what it made and
@@ -82,6 +85,7 @@ import { organismVisibilityRefusal } from './organism-visibility.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { scheduleFileDenial } from './schedule-file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
+import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
@@ -685,9 +689,15 @@ export async function triggerScheduleRecord(
     if (!canManageSchedule(caller, ownerScope, job)) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Not allowed to trigger this schedule' };
     }
-    // Running it now spends what the schedule drives, so the caller holds that word (F08a-02).
+    // Running it now spends what the schedule drives, so the caller holds that word (F08a-02). One
+    // exception: the app (or ecosystem app) that made an `extension` schedule on the once-only keep
+    // list runs it now as its fire runs it (services/schedule-extension-keep.ts). canManageSchedule
+    // above has already said the caller is that app.
     const scopeRefusal = scheduleKindScopeRefusal(job.type, caller, 'run');
-    if (scopeRefusal) return { ok: false, ...scopeRefusal };
+    const keptForThisApp = !!scopeRefusal && job.type === 'extension'
+        && (caller.isApp || !!caller.appGrant || caller.isEcosystem === true)
+        && await isKeptExtensionSchedule(storage, config.nodeId, job.id);
+    if (scopeRefusal && !keptForThisApp) return { ok: false, ...scopeRefusal };
     const scheduler = deps.scheduler ?? getActiveScheduler();
     if (!scheduler) {
         return {

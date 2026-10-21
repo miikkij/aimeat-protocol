@@ -5,6 +5,9 @@
  * @description The pattern half of the schema lock rule (services/schema-lock-rule.ts) and the
  *   per-kind scope on editing and running a schedule (services/schedule-gate.ts), without a node.
  * @version-history
+ *   2026-10-20 — The `extension` kind asks ext:invoke, so the "kind with no word" example is `core`,
+ *     and a case covers ext:invoke on create, edit and run (secaudit 2026-10,
+ *     SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke).
  *   2026-10-16 — Initial (QA audit S2-04, F05a-01, F08a-02).
  */
 import { describe, it, expect } from 'vitest';
@@ -85,6 +88,15 @@ describe('scheduleKindScopeRefusal', () => {
     it('admits a caller holding the word, the owner in person, and a kind with no word', () => {
         expect(scheduleKindScopeRefusal('ai', { isOwnerSession: false, scopes: ['ai:use'] }, 'run')).toBeNull();
         expect(scheduleKindScopeRefusal('ai', { isOwnerSession: true, scopes: [] }, 'edit')).toBeNull();
-        expect(scheduleKindScopeRefusal('extension', agent, 'run')).toBeNull();
+        // Every user kind has a word since 2026-10-20; `core` (a node job, not in SCHEDULE_KIND_SCOPE)
+        // stands for a kind with none.
+        expect(scheduleKindScopeRefusal('core', agent, 'run')).toBeNull();
+    });
+    it('refuses creating, editing and running an extension schedule without ext:invoke, and admits it with the word', () => {
+        expect(scheduleKindScopeRefusal('extension', agent, 'create')?.code).toBe('SCOPE_DENIED');
+        expect(scheduleKindScopeRefusal('extension', agent, 'edit')?.code).toBe('SCOPE_DENIED');
+        expect(scheduleKindScopeRefusal('extension', agent, 'run')?.message).toMatch(/^Running a "extension" schedule requires the "ext:invoke" scope/);
+        expect(scheduleKindScopeRefusal('extension', { isOwnerSession: false, scopes: [...agent.scopes, 'ext:invoke'] }, 'run')).toBeNull();
+        expect(scheduleKindScopeRefusal('extension', { isOwnerSession: true, scopes: [] }, 'run')).toBeNull();
     });
 });

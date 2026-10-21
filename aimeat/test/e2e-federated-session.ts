@@ -41,6 +41,15 @@
  *   500, the verified:false pin, per-peer scopes) · 9 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-session
  * @version-history
+ *   v1.6.0 — 2026-10-21 — Two uses that worked before the 2026-10-20 round keep working: a sign-in
+ *     consent whose end time does not parse still signs the person in (8b, SQLite only: the Postgres
+ *     column is a timestamp and cannot hold one), and pull, push-home and list-home still reach a home
+ *     peer the heartbeat marked degraded, offline or unreachable (6b).
+ *   v1.5.0 — 2026-10-20 — Phase 8b: this node's verify endpoint refuses a sign-in consent past its end
+ *     time (secaudit 2026-10, auth-consent-expiry-unchecked). Phase 8c and the cleanup: a visitor
+ *     session already open follows its home peer, narrowed with the peer's scopes, ended when
+ *     federated sign-in is switched off and when the peer is emergency-removed, push-home included
+ *     (secaudit 2026-10, federated-visitor-not-bound-to-live-peer). Each asserts the hole closed.
  *   v1.4.0 — 2026-10-01 — An attestation naming another `home_node` than the peer that signed it is
  *     refused (401 INVALID_ATTESTATION); this suite had asserted it as believed, and used it to mint
  *     the dead-home session. That session is now the live one with its home peer moved to a dead
@@ -67,6 +76,9 @@ import { AddressInfo } from 'node:net';
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
 import { registerOwner } from './helpers/owner-login.js';
+import { audienceProof } from '../src/services/signed-node-request.js';
+import { createStorage } from '../src/storage/storage-factory.js';
+import { pinnedSqlitePath } from './helpers/server-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -617,6 +629,35 @@ async function run() {
             + 'over the three fields WITHOUT the signature, in that order');
     });
 
+    // ─── Phase 6b: a home peer the heartbeat marked down is still the visitor's home ───
+    // The heartbeat sets degraded, offline and unreachable after missed pings and active again when
+    // the peer answers. The visitor's session survives those (auth/visitor-peer.ts), and the three
+    // visitor routes still dial the approved peer's URL, as they did before 2026-10-20.
+    await test('pull, push-home and list-home still reach a home peer the heartbeat marked degraded, offline or unreachable', async () => {
+        const key = `degraded.${stamp}`;
+        const setStatus = async (status: string) => {
+            const r = await json(`/v1/federation/peers/${homeNodeId}`, {
+                method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ status }),
+            });
+            assert(r.status === 200 && r.body.data.status === status, `set the peer ${status}: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.status)}`);
+        };
+        doorMode = 'ok';
+        try {
+            for (const status of ['degraded', 'offline', 'unreachable']) {
+                await setStatus(status);
+                const pull = await json('/v1/memory/pull', { method: 'POST', headers: { Authorization: `Bearer ${writerToken}` }, body: JSON.stringify({ key }) });
+                assert(pull.status === 200 && pull.body.data?.pulled === true, `pull with the peer ${status}: ${pull.status} ${JSON.stringify(pull.body.error)}`);
+                const push = await json('/v1/memory/push-home', { method: 'POST', headers: { Authorization: `Bearer ${writerToken}` }, body: JSON.stringify({ key }) });
+                assert(push.status === 200 && push.body.data?.pushed === true, `push-home with the peer ${status}: ${push.status} ${JSON.stringify(push.body.error)}`);
+                const list = await json('/v1/memory/list-home', { method: 'POST', headers: { Authorization: `Bearer ${writerToken}` }, body: JSON.stringify({}) });
+                assert(list.status === 200 && list.body.data?.total === 2, `list-home with the peer ${status}: ${list.status} ${JSON.stringify(list.body.error)}`);
+            }
+        } finally {
+            await setStatus('active');
+        }
+        await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${writerToken}` } });
+    });
+
     // ─── Phase 7: What the three doors refuse ───
     console.log('Phase 7 — The doors\' refusals');
 
@@ -879,6 +920,128 @@ async function run() {
             `the peer's own list wins over federationDefaultScopes, got ${JSON.stringify(c.scopes)}`);
     });
 
+    // ─── Phase 8b: This node's own verify endpoint, for a person whose home is here ───
+    // secaudit 2026-10, federation-auth.ts:verify:auth-consent-expiry-unchecked. The fake home node is
+    // an active peer with a key this suite holds, so it can ask THIS node to vouch for one of its own
+    // people. A sign-in consent that ended at its expires time was honoured until the consent-expiry
+    // job marked the row, up to ten minutes later and never with the consent layer off.
+    console.log('Phase 8b — The verify endpoint and an ended sign-in consent');
+
+    const localPerson = await registerOwner(BASE, `fedv43${stamp}`);
+    /** Ask this node, as the fake home node (an active peer), to vouch for `localPerson`. */
+    const verifyAsPeer = async () => {
+        const timestamp = new Date().toISOString();
+        const signed = JSON.stringify({ purpose: 'federation-auth-verify', username: localPerson.name, requesting_node: homeNodeId, timestamp });
+        const signature = await signMsg(homeKeys.privateKey, signed);
+        const proof = await audienceProof(homeKeys.privateKey, signed, NODE_ID);
+        return json('/v1/federation/auth/verify', {
+            method: 'POST',
+            body: JSON.stringify({ username: localPerson.name, password: localPerson.password, requesting_node: homeNodeId, timestamp, signature, ...proof }),
+        });
+    };
+    const grantAuthConsent = async (expires: string) => {
+        const r = await json('/v1/consent', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${localPerson.token}` },
+            body: JSON.stringify({ data_pattern: '_identity', recipient: `node:${homeNodeId}`, scope: 'auth', purpose: 'federation_login', expires }),
+        });
+        assert(r.status === 201, `grant the auth consent: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        return r.body.data?.id ?? r.body.data?.consent?.id;
+    };
+
+    await test('a sign-in consent past its end time is no consent: verify answers 401 FEDERATION_AUTH_FAILED', async () => {
+        await grantAuthConsent(new Date(Date.now() + 1500).toISOString());
+        await new Promise(r => setTimeout(r, 2500));
+        const listed = await json('/v1/consent', { headers: { Authorization: `Bearer ${localPerson.token}` } });
+        const rows = (listed.body.data?.consents ?? listed.body.data?.items ?? listed.body.data ?? []) as Array<{ scope?: string; status?: string }>;
+        assert(Array.isArray(rows) && rows.some(c => c.scope === 'auth' && c.status === 'active'),
+            `the row must still read active, so this is the window before the expiry job: ${JSON.stringify(listed.body.data).slice(0, 300)}`);
+        const r = await verifyAsPeer();
+        assert(r.status === 401 && r.body.error?.code === 'FEDERATION_AUTH_FAILED',
+            `an ended consent must not sign anybody in: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    });
+
+    await test('a sign-in consent whose end time does not parse still signs the person in, as before the end-time check', async () => {
+        // Only SQLite can hold such a row: the Postgres column is TIMESTAMP(3), and no write route
+        // accepts one (ConsentCreateSchema asks for a datetime). Written behind the server's back.
+        const provider = process.env.AIMEAT_DB ?? '';
+        if (provider !== 'sqlite') { console.log(`    (skipped on ${provider || 'this backend'}: the column cannot hold an unparseable time)`); return; }
+        const sqlitePath = pinnedSqlitePath();
+        assert(!!sqlitePath, 'the SQLite file of the server under test is not named');
+        const storage = await createStorage({ provider: 'sqlite', sqlitePath });
+        await storage.createConsent({
+            id: `fedv15-${stamp}`, ownerGaii: `${localPerson.name}@${NODE_ID}`, dataPattern: '_identity',
+            recipient: `node:${homeNodeId}`, purpose: 'federation_login', scope: 'auth', expires: 'not-a-date',
+            status: 'active', grantedAt: new Date().toISOString(), revokedAt: null,
+        });
+        const r = await verifyAsPeer();
+        assert(r.status === 200 && r.body.data?.verified === true,
+            `an end time nobody can read is no end: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        await storage.updateConsent(`fedv15-${stamp}`, { status: 'revoked', revokedAt: new Date().toISOString() });
+    });
+
+    await test('a sign-in consent that ends in the future still signs the person in (positive control)', async () => {
+        await grantAuthConsent(new Date(Date.now() + 3600_000).toISOString());
+        const r = await verifyAsPeer();
+        assert(r.status === 200 && r.body.data?.verified === true,
+            `a live consent and the right password: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    });
+
+    // ─── Phase 8c: A visitor session lives only as long as its peer allows it ───
+    // secaudit 2026-10, credentialRevoked:federated-visitor-not-bound-to-live-peer. The peer's scope
+    // list, the node's federated sign-in policy and the peer itself were read only at the mint, and a
+    // visitor token carries no session id, so an operator who narrowed or removed the peer left every
+    // visitor token minted on its word working, with its minted scopes, for up to an hour.
+    console.log('Phase 8c — The visitor session follows its home peer');
+
+    await test('narrowing the peer\'s scopes narrows a visitor session already open: 403 SCOPE_DENIED', async () => {
+        // The peer holds ['catalogue:read'] since the test above; fedToken was minted with
+        // memory:read and catalogue:read, writerToken with memory:write besides.
+        for (const [label, token] of [['fedToken', fedToken], ['writerToken', writerToken]] as const) {
+            const r = await json('/v1/memory', { headers: { Authorization: `Bearer ${token}` } });
+            assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED',
+                `${label} after the peer was narrowed to catalogue:read: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data).slice(0, 200)}`);
+        }
+    });
+
+    await test('widening the peer again restores the session, and never beyond what the token was minted with', async () => {
+        const put = await json(`/v1/federation/peers/${homeNodeId}`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ federation_auth_scopes: ['memory:read', 'memory:write', 'catalogue:read'] }),
+        });
+        assert(put.status === 200, `widen the peer: ${put.status} ${JSON.stringify(put.body)}`);
+        const read = await json('/v1/memory', { headers: { Authorization: `Bearer ${fedToken}` } });
+        assert(read.status === 200, `memory:read is back for the memory:read visitor: ${read.status} ${JSON.stringify(read.body.error)}`);
+        const key = `visitor.widen.${stamp}`;
+        const write = await json('/v1/memory', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${fedToken}` },
+            body: JSON.stringify({ key, value: { widened: true } }),
+        });
+        assert(write.status === 403, `a wider peer list must not widen a memory:read token: ${write.status} ${JSON.stringify(write.body.error ?? write.body.data)}`);
+    });
+
+    await test('switching federated sign-in off ends visitor sessions at once: 401, and on again they work', async () => {
+        const setPolicy = async (value: string) => {
+            const r = await json('/v1/admin/config', {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${ownerToken}` },
+                body: JSON.stringify({ changes: [{ path: 'federation.auth_policy', value }] }),
+            });
+            assert(r.status === 200, `set federation.auth_policy=${value}: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+        };
+        await setPolicy('disabled');
+        try {
+            const off = await json('/v1/memory', { headers: { Authorization: `Bearer ${fedToken}` } });
+            assert(off.status === 401, `a visitor session with federated sign-in off: ${off.status} ${JSON.stringify(off.body.error ?? off.body.data).slice(0, 200)}`);
+        } finally {
+            await setPolicy('all_peers');
+        }
+        const on = await json('/v1/memory', { headers: { Authorization: `Bearer ${fedToken}` } });
+        assert(on.status === 200, `the same session with federated sign-in on again: ${on.status} ${JSON.stringify(on.body.error)}`);
+    });
+
     // ─── Phase 9: Cleanup ───
     console.log('Phase 9 — Cleanup');
 
@@ -891,7 +1054,26 @@ async function run() {
             headers: { Authorization: `Bearer ${fedToken}` },
         });
         assert(delRecord.status === 403, `a memory:read visitor cannot delete: ${delRecord.status} ${JSON.stringify(delRecord.body)}`);
-        for (const id of [homeNodeId, deadNodeId]) {
+
+        // secaudit 2026-10, federated-visitor-not-bound-to-live-peer: the emergency de-peer ends the
+        // visitor sessions minted on the peer's word at once, on every route, push-home included.
+        const gone = await json(`/v1/federation/peers/${homeNodeId}?emergency=true`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(gone.status === 200, `emergency de-peer: ${gone.status} ${JSON.stringify(gone.body)}`);
+        const read = await json('/v1/memory', { headers: { Authorization: `Bearer ${fedToken}` } });
+        assert(read.status === 401, `a visitor of an emergency-removed peer: ${read.status} ${JSON.stringify(read.body.error ?? read.body.data).slice(0, 200)}`);
+        const sent = replicateBodies.length;
+        const push = await json('/v1/memory/push-home', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${writerToken}` },
+            body: JSON.stringify({ key: PULL_KEY }),
+        });
+        assert(push.status === 401, `push-home for a visitor of an emergency-removed peer: ${push.status} ${JSON.stringify(push.body.error ?? push.body.data).slice(0, 200)}`);
+        assert(replicateBodies.length === sent, 'nothing may be sent to the removed peer');
+
+        for (const id of [deadNodeId]) {
             const del = await json(`/v1/federation/peers/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${ownerToken}` },

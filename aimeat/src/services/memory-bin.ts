@@ -21,6 +21,10 @@
  *   lowerRestored() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-20 — deleteMemoryRecord settles every publish request still waiting on the binned record
+ *     `outdated` (settleRequestsForBinnedRecord): an agent binned its record, wrote it again at
+ *     version 1 with other content, and the owner's approval of the old request published that
+ *     (secaudit 2026-10, apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover).
  *   2026-10-20 — restoreMemoryRecord asks the three visibility rules a write asks of a raise to
  *     public (restoreLevel): the closed node's level, which lowers; the label's audience cap, which
  *     refuses 409 LABEL_CAPS_AUDIENCE for every caller; and the publish gate, which refuses 403
@@ -62,7 +66,8 @@ import { emitRecordChange } from './event-bus.js';
 import { checkDeleteGuard } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { isServiceOwnedKey, isReservedServerKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
-import { isGEAI, localAccountOf } from '../utils/gaii.js';
+import { isGEAI, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
+import { settleRequestsForBinnedRecord } from './publish-requests/store.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
 import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
 import { legacyPacingWriteRefusal, type LegacyPacingWriteRefusal } from './legacy-pacing-write.js';
@@ -275,6 +280,10 @@ export async function deleteMemoryRecord(deps: MemoryBinDeps, req: MemoryBinRequ
   // Only the extension delete recorded one, so the count stayed 0 for every delete made over REST
   // or MCP (feature-list audit #50).
   recordMemoryTouch({ ownerGaii: found, key: req.key, writerPrincipal: req.caller, kind: 'delete' });
+  // A publish request still waiting on this record is settled `outdated` now: what the owner was
+  // asked about is gone, and a write at the same key afterwards starts again at version 1, so the old
+  // request must not publish it (secaudit 2026-10, apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover).
+  await settleRequestsForBinnedRecord(deps, ownerGhiiOf(found), found, req.key);
   const graceDays = deps.config.memoryDeleteGraceDays;
   return {
     ok: true, key: req.key, ownerGaii: found, graceDays,

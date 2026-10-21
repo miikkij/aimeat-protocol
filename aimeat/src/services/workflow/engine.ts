@@ -113,6 +113,10 @@
  *     `workspace.rows` trigger starts from the row service's bus event; with `coalesce` an event whose
  *     start meets a live run waits, and one more run starts when that run ends. StartRunOpts and
  *     StartRunResult moved to engine-types.ts (max-file-lines), exported from here as before.
+ *   v1.22.0 — 2026-10-20 — startRun records the principal the run answers to, and tick asks it again
+ *     before every dispatch: gone, or short of a word the step costs, and the step is not dispatched
+ *     and the run ends refused (dispatch-authority.ts; secaudit 2026-10, v64). resumeInflight's body
+ *     moved unchanged to engine-resume.ts (max-file-lines).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -141,10 +145,12 @@ import {
 import { writeResult, settleAnswer, type ResultWrite } from './engine-answer.js';
 import { validateHumanAnswer, applyHumanAnswer, sweepHumanStep } from './engine-human.js';
 import {
-  spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen, clearOpenCalls,
+  spendsAi, capUsd, admitAiStep, stopWhenNoRoomComes, pinCostEstimates, aiCallAnswered, aiCallOpen,
   currentCallOpen,
 } from './run-cost.js';
 import { refuseTriggerStart, clearRefusal } from './trigger-authority.js';
+import { runPrincipalAtStart, dispatchGate } from './dispatch-authority.js';
+import { resumeRuns } from './engine-resume.js';
 import { aiCallerForStart } from './ai-caller.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep,
@@ -290,6 +296,8 @@ export class WorkflowEngine {
       runId, workflowId, defSnapshot: def, resolved: v.resolved, vars,
       mode: opts.mode, keyPrefix: opts.mode === 'full-sandbox' ? `wf-test.${runId}.` : '',
       status: 'running', steps, startedAt: now, aiCaller: await aiCallerForStart(this.storage, def, opts.caller),
+      // Asked again before every dispatch (dispatch-authority.ts): the starter, or the trigger's saver.
+      principal: runPrincipalAtStart(def, opts.caller, ownerGhii),
     };
 
     if (opts.mode === 'signals-only') {
@@ -331,6 +339,9 @@ export class WorkflowEngine {
     let dispatchedAny = false;
     let mutated = false;
     let stopped = false;
+    // The run's principal is asked again before each dispatch, resolved once for this tick.
+    const gate = dispatchGate(this.storage, run);
+    let refused = false;
     // ai steps waiting for room under the cost cap: no model call answers inside one tick, so they
     // wait for the rest of it, and their signals are not asked again in a later pass.
     const waiting = new Set<string>();
@@ -385,6 +396,8 @@ export class WorkflowEngine {
         // cost fits beside what the run has spent and what its open model calls hold; otherwise it
         // stays pending, and after the pass the run stops if no call is open (run-cost.ts).
         if (spendsAi(step) && admitAiStep(run, step.id) === 'wait') { waiting.add(step.id); continue; }
+        // Gone, or short of a word this step costs, and the step is not dispatched: the run ends refused.
+        if (await gate.refuses(step, now)) { refused = true; mutated = true; break; }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
         const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok, cost, call, write) => this.onPushTerminal(o, w, rid, s, ok, cost, call, write));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
@@ -393,13 +406,14 @@ export class WorkflowEngine {
         await maybeAlertAgentOffline(this.stepDeps(), ownerGhii, run, step);
       }
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
-      if (!advancedTerminal) break;
+      if (refused || !advancedTerminal) break;
     }
     // ai steps left waiting with no model call open get no room back: the run stops at its cap.
-    if (stopWhenNoRoomComes(run, [...waiting], now)) { stopped = true; mutated = true; }
+    if (!refused && stopWhenNoRoomComes(run, [...waiting], now)) { stopped = true; mutated = true; }
 
-    // A run stopped at its cost cap already carries its status, end and reason (run-cost.ts).
-    const outcome = stopped ? 'stopped' : runOutcome(run.steps);
+    // A run stopped at its cost cap, or refused before a dispatch, already carries its status, end
+    // and reason (run-cost.ts, dispatch-authority.ts).
+    const outcome = refused ? 'refused' : stopped ? 'stopped' : runOutcome(run.steps);
     if (outcome === 'done' || outcome === 'partial') {
       run.status = outcome; run.endedAt = new Date().toISOString();
     } else if (outcome === 'running') {
@@ -407,6 +421,7 @@ export class WorkflowEngine {
       run.status = aiCallOpen(run) || Object.values(run.steps).some(s => s.state === 'dispatched' || s.state === 'waiting-human') ? 'waiting-step' : 'running';
     }
     await this.persist(ownerGhii, run);
+    await gate.tell({ storage: this.storage, config: this.config }, ownerGhii);
     if (mutated || dispatchedAny || outcome !== 'running') emitChange('workflows');
   }
 
@@ -632,35 +647,13 @@ export class WorkflowEngine {
    * fire-and-forget onTaskTerminal ran), leaving the step stuck `dispatched`. Re-check each
    * dispatched step's tasks and advance any that already finished — otherwise the watchdog would
    * wrongly TIME OUT a step whose task actually succeeded. Remaining in-flight runs are then carried
-   * by live task events + the watchdog.
+   * by live task events + the watchdog. The body is engine-resume.ts resumeRuns (moved 2026-10-20).
    */
   async resumeInflight(): Promise<void> {
-    const active = await readActiveRuns(this.storage, this.config.nodeId);
-    if (!active.length) return;
-    logger.info(`WorkflowEngine: re-syncing ${active.length} in-flight run(s) after restart`);
-    for (const a of active) {
-      try {
-        await this.withLock(a.runId, async () => {
-          const held = (await this.storage.getMemory(a.ownerGhii, runKey(a.workflowId, a.runId)))?.value as WorkflowRun | undefined;
-          if (held && clearOpenCalls(held)) await this.persist(a.ownerGhii, held);
-        });
-        const rec = await this.storage.getMemory(a.ownerGhii, runKey(a.workflowId, a.runId));
-        if (!rec) continue;
-        const run = rec.value as WorkflowRun;
-        for (const [, rs] of Object.entries(run.steps)) {
-          if (rs.state !== 'dispatched') continue;
-          for (const tid of rs.taskIds ?? []) {
-            const task = await this.storage.getAgentTask(tid);
-            if (task && isTerminalTaskStatus(task.status)) {
-              await this.onTaskTerminal(task, task.status as 'done' | 'failed' | 'declined'); // advances the run (re-checks all step tasks)
-              break;
-            }
-          }
-        }
-      } catch (err) {
-        logger.error('resumeInflight re-sync failed', { runId: a.runId, error: String(err) });
-      }
-    }
+    return resumeRuns({
+      storage: this.storage, nodeId: this.config.nodeId, readActiveRuns, withLock: (id, fn) => this.withLock(id, fn),
+      persist: (o, r) => this.persist(o, r), onTaskTerminal: (t, s) => this.onTaskTerminal(t, s),
+    });
   }
 
   // ── helpers ──────────────────────────────────────────────────────────────────────

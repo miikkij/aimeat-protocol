@@ -7,8 +7,12 @@
  *   methods table for table, including the rule that replacing a secret keeps its `setAt` and its
  *   `usedBy`: a rotation is not a new secret and does not forget who was using the old one.
  * @structure secretMethods — listSecrets · getSecret · setSecret · createSecretIfAbsent ·
- *   bindSecretHost · deleteSecret · noteSecretUse · deleteSecretsByOwner
+ *   bindSecretHost · setSecretHosts · swapSecretApprovals · deleteSecret · noteSecretUse ·
+ *   deleteSecretsByOwner
  * @version-history
+ *   v1.3.1 — 2026-10-21 — An approvals column that does not parse is logged before it reads as none.
+ *   v1.3.0 — 2026-10-21 — approvals column; setSecretHosts and swapSecretApprovals. Mirrors Postgres
+ *     0110 (secaudit 2026-10, v58 and v59 follow-up).
  *   v1.2.0 — 2026-10-09 — hostBinding column; setSecret writes the hosts and hostBinding it is given;
  *     bindSecretHost records the binding; createSecretIfAbsent (INSERT OR IGNORE). Mirrors Postgres
  *     0099 (secrets audit 2026-10-09, item 10).
@@ -16,7 +20,8 @@
  *   v1.0.0 — 2026-09-06 — Initial.
  */
 import type Database from 'better-sqlite3';
-import type { SecretBinding, SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
+import { logger } from '../../../../utils/logger.js';
+import type { SecretApproval, SecretBinding, SecretRecord, SecretUseStamps } from '../../../types/secrets.js';
 
 /**
  * Only `db` is used here, so the `this` type names that field rather than the whole storage class.
@@ -65,6 +70,19 @@ function parseBinding(raw: unknown): SecretBinding | null {
   }
 }
 
+/** The approvals, or none. A malformed column reads as none: an approval only ever widens, so
+ *  losing one refuses a call, which the owner can answer again. */
+function parseApprovals(raw: unknown): SecretApproval[] {
+  if (typeof raw !== 'string' || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((a): a is SecretApproval => !!a && typeof a === 'object') : [];
+  } catch (err) {
+    logger.warn('secrets: the approvals column does not parse; read as none', { error: (err as Error).message });
+    return [];
+  }
+}
+
 function toRecord(row: Record<string, unknown>): SecretRecord {
   return {
     ownerGaii: row.ownerGaii as string,
@@ -75,10 +93,12 @@ function toRecord(row: Record<string, unknown>): SecretRecord {
     usedBy: parseUsedBy(row.usedBy),
     hosts: parseHosts(row.hosts),
     hostBinding: parseBinding(row.hostBinding),
+    approvals: parseApprovals(row.approvals),
   };
 }
 
 const bindingText = (b: SecretBinding | null | undefined): string | null => (b ? JSON.stringify(b) : null);
+const approvalsText = (a: SecretApproval[] | undefined): string => JSON.stringify(a ?? []);
 
 export const secretMethods = {
   async listSecrets(this: Db, ownerGaii: string): Promise<SecretRecord[]> {
@@ -105,25 +125,42 @@ export const secretMethods = {
       // the host it names, or to none until its first use.
       hosts: record.hosts ?? [],
       hostBinding: record.hostBinding ?? null,
+      // …and the extensions it was allowed to go to: they were allowed for the old value.
+      approvals: record.approvals ?? [],
     };
     const hosts = JSON.stringify(stored.hosts);
     if (prior) {
-      this.db.prepare('UPDATE secrets SET ciphertext = ?, updatedAt = ?, hosts = ?, hostBinding = ? WHERE ownerGaii = ? AND name = ?')
-        .run(stored.ciphertext, stored.updatedAt, hosts, bindingText(stored.hostBinding), stored.ownerGaii, stored.name);
+      this.db.prepare('UPDATE secrets SET ciphertext = ?, updatedAt = ?, hosts = ?, hostBinding = ?, approvals = ? WHERE ownerGaii = ? AND name = ?')
+        .run(stored.ciphertext, stored.updatedAt, hosts, bindingText(stored.hostBinding), approvalsText(stored.approvals), stored.ownerGaii, stored.name);
     } else {
       this.db.prepare(
-        'INSERT INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts, hostBinding) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts, hostBinding, approvals) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       ).run(stored.ownerGaii, stored.name, stored.ciphertext, stored.setAt, stored.updatedAt,
-        JSON.stringify(stored.usedBy ?? {}), hosts, bindingText(stored.hostBinding));
+        JSON.stringify(stored.usedBy ?? {}), hosts, bindingText(stored.hostBinding), approvalsText(stored.approvals));
     }
     return stored;
   },
 
   async createSecretIfAbsent(this: Db, record: SecretRecord): Promise<boolean> {
     const r = this.db.prepare(
-      'INSERT OR IGNORE INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts, hostBinding) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT OR IGNORE INTO secrets (ownerGaii, name, ciphertext, setAt, updatedAt, usedBy, hosts, hostBinding, approvals) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(record.ownerGaii, record.name, record.ciphertext, record.setAt, record.updatedAt,
-      JSON.stringify(record.usedBy ?? {}), JSON.stringify(record.hosts ?? []), bindingText(record.hostBinding));
+      JSON.stringify(record.usedBy ?? {}), JSON.stringify(record.hosts ?? []), bindingText(record.hostBinding), approvalsText(record.approvals));
+    return Number(r.changes ?? 0) > 0;
+  },
+
+  async setSecretHosts(this: Db, ownerGaii: string, name: string, hosts: string[], binding: SecretBinding | null): Promise<SecretRecord | null> {
+    this.db.prepare('UPDATE secrets SET hosts = ?, hostBinding = ? WHERE ownerGaii = ? AND name = ?')
+      .run(JSON.stringify(hosts), bindingText(binding), ownerGaii, name);
+    const row = this.db.prepare('SELECT * FROM secrets WHERE ownerGaii = ? AND name = ?')
+      .get(ownerGaii, name) as Record<string, unknown> | undefined;
+    return row ? toRecord(row) : null;
+  },
+
+  async swapSecretApprovals(this: Db, ownerGaii: string, name: string, expected: SecretApproval[], next: SecretApproval[]): Promise<boolean> {
+    // The stored text is what approvalsText wrote, so the expected list serializes to the same bytes.
+    const r = this.db.prepare('UPDATE secrets SET approvals = ? WHERE ownerGaii = ? AND name = ? AND approvals = ?')
+      .run(approvalsText(next), ownerGaii, name, approvalsText(expected));
     return Number(r.changes ?? 0) > 0;
   },
 

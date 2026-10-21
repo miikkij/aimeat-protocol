@@ -16,6 +16,8 @@
  * @structure runRefineryJob
  * @usage registered by the Scheduler for job.type === 'refinery'
  * @version-history
+ *   2026-10-20 — A fire that meets a batch another principal started, and the schedule's maker may
+ *     not see, is skipped without that run's id (runs.ts BATCH_BUSY, secaudit 2026-10, v60).
  *   v1.1.0 — 2026-10-05 — Who it fires as is services/schedule-actor.ts: an app's schedule runs as
  *     that app, with its grant's scopes and its app reference, and stops when the grant goes. It ran
  *     as the owner with every scope (secaudit 2026-10, AI-2).
@@ -27,6 +29,7 @@ import type { JobRunResult } from '../scheduler.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { startRun } from './runs.js';
+import { RefineryError } from './pipeline.js';
 import { REFINERY_PREFIX_RE, REFINERY_RUN_SCOPES } from './schedule-input.js';
 import { scheduleActor } from '../schedule-actor.js';
 
@@ -44,10 +47,21 @@ export async function runRefineryJob(storage: Storage, config: AimeatConfig, job
     const missing = REFINERY_RUN_SCOPES.filter((s) => !scopeIsCovered(actor.scopes, s));
     if (missing.length) throw new Error(`what made this schedule no longer holds ${missing.join(', ')}`);
   }
-  const { run, done, already } = startRun({ storage, config }, {
-    ownerGhii, owner: localAccountName(ownerGhii), principal: actor.principal, roles: actor.roles, scopes: actor.scopes,
-    isOwner: actor.isOwner, ...(actor.appRef ? { appRef: actor.appRef } : {}),
-  }, prefix, { by: `schedule ${job.displayName || job.id}` });
+  let started: ReturnType<typeof startRun>;
+  try {
+    started = startRun({ storage, config }, {
+      ownerGhii, owner: localAccountName(ownerGhii), principal: actor.principal, roles: actor.roles, scopes: actor.scopes,
+      isOwner: actor.isOwner, ...(actor.appRef ? { appRef: actor.appRef } : {}),
+    }, prefix, { by: `schedule ${job.displayName || job.id}` });
+  } catch (e) {
+    // Another principal's batch of this definition is running, one this schedule's maker may not
+    // see: skipped like any busy start, without that run's id (runs.ts BATCH_BUSY).
+    if (e instanceof RefineryError && e.code === 'BATCH_BUSY') {
+      return { reads: [], writes: [], skipped: true, skipReason: `a batch of ${prefix} was already running` };
+    }
+    throw e;
+  }
+  const { run, done, already } = started;
   if (already) return { reads: [], writes: [], skipped: true, skipReason: `a batch of ${prefix} was already running (${run.id})` };
   const finished = await done;
   if (finished.status === 'failed') throw new Error(finished.error ?? 'the batch failed');

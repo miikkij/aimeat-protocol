@@ -6,6 +6,7 @@
  *   owner-scope memory lookup (GHII + all agents). Extracted from src/routes/knowledge.ts so the
  *   split route-group modules can share them. Extracted to satisfy max-file-lines.
  * @version-history
+ *   2026-10-21 — signedIn asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — findOwnerScopeMemory batches the agent scan into one listMemoryForOwners
  *   v1.1.1 — 2026-09-29 — TARGET-082 V4: findOwnerScopeMemory is documented as the unchecked
@@ -21,6 +22,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { resolveIdentity, isOwnerInPerson, isForeignPrincipal, isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isNodeAccount } from '../../services/audience.js';
 import { packageAudienceOf, knowledgeAudienceAllows } from '../../services/knowledge-audience.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -81,7 +83,7 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
       const allAgents = await storage.listAgents();
       record = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' }))[0];
     }
-    const signedIn = !!req.auth && !req.auth.anonymous;
+    const signedIn = !!req.auth && !isAnonymousPrincipal(req.auth);
     if (!record && signedIn) {
       const found = await findOwnerScopeMemory(req, manifestKey);
       if (found) { record = found.record; own = true; }

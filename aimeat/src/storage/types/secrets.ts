@@ -28,7 +28,10 @@
  *
  * @structure SecretRecord · SecretUseStamps · SecretRepository
  * @version-history
- *   v1.2.0 — 2026-10-09 — `hostBinding` (who bound a secret to its host, and how); setSecret writes
+ *   v1.3.0 — 2026-10-21 — `approvals` (SecretApproval): the first uses the owner allowed or has yet to
+ *     answer; setSecretHosts (the owner sets or changes the address without the value) and
+ *     swapSecretApprovals (compare-and-swap on the list). Postgres 0110.
+ *   v1.2.0 — 2026-10-09 —`hostBinding` (who bound a secret to its host, and how); setSecret writes
  *     the hosts and hostBinding it is given; createSecretIfAbsent, for the binding rows of an extension's
  *     shared secret map (services/owner-secrets.ts; secrets audit 2026-10-09, item 10).
  *   v1.1.0 — 2026-09-16 — `hosts` and bindSecretHost: a secret is bound to the host of its first
@@ -69,6 +72,34 @@ export interface SecretRecord {
    * (`first-use`). Null until bound; cleared with the hosts when the value is stored again.
    */
   hostBinding?: SecretBinding | null;
+  /**
+   * Which extensions the owner allowed to send this secret to which host, and the requests still
+   * waiting for the owner's answer (an entry without `approvedAt`). An approved entry lets that
+   * extension, installed by that account, send this secret to that host, whatever `hosts` says; the
+   * secret's other uses are unaffected. Storing the value again empties it, as it empties `hosts`.
+   */
+  approvals?: SecretApproval[];
+}
+
+/**
+ * One approval on a secret (SecretRecord.approvals): a first use the node refused, filed for the
+ * owner to answer, and the owner's answer once given (secaudit 2026-10, v58 and v59 follow-up).
+ */
+export interface SecretApproval {
+  /** The extension whose call asked. */
+  extension: string;
+  /** The account that installed it when it asked. A reinstall by another account is a new question. */
+  installer: string;
+  /** Where the call would send the secret, `host[:port]`. */
+  host: string;
+  /** Why, from the extension's own `uses_secrets` declaration, when it gave one. */
+  why?: string;
+  /** When the refused call filed it, and which principal made that call. */
+  requestedAt: string;
+  requestedBy: string;
+  /** When the owner, signed in in person, allowed it. Absent while it waits. */
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 /** Who bound a secret to its host (SecretRecord.hostBinding). */
@@ -113,6 +144,17 @@ export interface SecretRepository {
    * both.
    */
   bindSecretHost(ownerGaii: string, name: string, host: string, binding?: SecretBinding): Promise<string[]>;
+  /**
+   * Set the hosts and the binding record outright, without touching the value: the owner choosing
+   * or changing a secret's address. An empty list unbinds it. Null when the row is gone.
+   */
+  setSecretHosts(ownerGaii: string, name: string, hosts: string[], binding: SecretBinding | null): Promise<SecretRecord | null>;
+  /**
+   * Replace the approvals list only if it still is `expected` (compare-and-swap on the stored
+   * list), and say whether it did. A concurrent change makes it answer false, and the caller reads
+   * again.
+   */
+  swapSecretApprovals(ownerGaii: string, name: string, expected: SecretApproval[], next: SecretApproval[]): Promise<boolean>;
   /** Every secret this owner holds, gone. Called by the owner-deletion cascade. */
   deleteSecretsByOwner(ownerGaii: string): Promise<number>;
 }

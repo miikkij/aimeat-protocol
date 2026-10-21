@@ -9,7 +9,8 @@
  *   which the whole site and the app catalogue draw from one place, so a theme reaches all of them.
  *
  *   Named options, each one a meaning:
- *   - Action: `small` (the Settings size), `soft` (a softer way on, lower-case words), `row` (at the
+ *   - Action: `control` (a box as tall as the control cut, a touch target), `small` (the Settings
+ *     size), `soft` (a softer way on, lower-case words), `row` (at the
  *     end of a dense row), `tone` = 'danger' (it removes or revokes) | 'more' (show more of a list,
  *     open a thing by its name) | 'text' (a plain grey word) | 'quiet' | 'back' | 'notice' | 'jump' |
  *     'plain' (a grey word in the page's own letters, no line: the old app catalogue's "▶ toggle") |
@@ -32,7 +33,9 @@
  *        html`<${Action} small copy=${ref} copiedLabel=${t('x.copied')}>${t('x.copyRef')}<//>`
  *        html`<${Actions}>…<//>`
  * @version-history
- *   v1.14.0 — 2026-09-27 — Action tone 'file' (.og-crumb-link--file): a link to a file in the
+ *   v1.15.0 — 2026-10-21 — Action `control`: the action link in a box as tall as the control cut
+ *     (44px, poster.css .poster-action--control), a touch target on a phone. Additive.
+ *   v1.14.0 — 2026-09-27 —Action tone 'file' (.og-crumb-link--file): a link to a file in the
  *     typewriter face (the old app catalogue's .od-link), appcat parity (sections-d); additive,
  *     crumb-trail.css.
  *   v1.13.0 — 2026-09-27 — Actions `tight`: the parts 8px apart (the old detail's skill picker row);
@@ -113,7 +116,7 @@ function Press({ cls, href, newTab, noReferrer, download, onClick, disabled, tit
 }
 
 /** The action link: an underlined word. */
-export function Action({ small, soft, row, tone, copy, copiedLabel, copiedTitle, onCopied, onClick, title, children, ...rest }) {
+export function Action({ small, soft, row, control, tone, copy, copiedLabel, copiedTitle, onCopied, onClick, title, children, ...rest }) {
     const [copied, run] = useCopy(copy, onCopied, onClick);
     // tone 'link' (added by page group G7): a coral word inside a sentence or a fact's value, in the
     // words' own letters (the crumb link, .og-crumb-link; formerly CopyButton className="og-crumb-link").
@@ -127,7 +130,7 @@ export function Action({ small, soft, row, tone, copy, copiedLabel, copiedTitle,
       // smaller, underlined only under the pointer: a link to a file (the old catalogue's odps.yaml, .od-link).
       : tone === 'file' ? cx('og-crumb-link', 'og-crumb-link--file', copied && 'copied')
       : tone === 'link' || tone === 'dashed' ? cx('og-crumb-link', tone === 'dashed' && 'og-crumb-link--dashed', copied && 'copied') : cx('poster-action', small && 'poster-action--small', soft && 'poster-action--lower',
-        row && 'poster-action--row', TONES.has(tone) && `poster-action--${tone}`, copied && 'copied',
+        row && 'poster-action--row', control && 'poster-action--control', TONES.has(tone) && `poster-action--${tone}`, copied && 'copied',
         rest.pressed && 'is-on');
     return html`<${Press} ...${rest} cls=${cls} title=${(copied && copiedTitle) || title}
         onClick=${copy !== undefined && copy !== null ? run : onClick}>${copied ? (copiedLabel || t('common.copied')) : children}<//>`;

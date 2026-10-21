@@ -30,30 +30,41 @@
  * @structure
  *   - GET    /v1/secrets           — names, times, and which extensions used each one lately
  *   - PUT    /v1/secrets/:name     — set or replace. Same call either way. Optional `host` binds it now.
+ *   - PATCH  /v1/secrets/:name     — set, change or remove the address, without the value
  *   - DELETE /v1/secrets/:name     — remove one
+ *   - GET    /v1/secrets/:name/approval?extension=&host= — a waiting request (in person only)
+ *   - POST   /v1/secrets/:name/approvals            — allow it (in person only)
+ *   - POST   /v1/secrets/:name/approvals/decline    — say no to it (in person only)
+ *   - DELETE /v1/secrets/:name/approvals?extension=&installer=&host= — withdraw one
  * @usage app.use(secretsRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-21 — PATCH sets the address without the value; the approvals routes answer a
+ *     refused first use (services/secret-approvals.ts; secaudit 2026-10, v58 and v59 follow-up).
  *   v1.1.0 — 2026-10-09 — PUT takes an optional `host` (host or host:port): the secret goes only there
  *     from its first call on, and the list records who set it. Without it the first use binds, and
  *     the list names its principal and extension (secrets audit 2026-10-09, item 10).
  *   v1.0.0 — 2026-09-06 — Initial. The owner's secrets vault.
  */
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { callerOf } from '../middleware/caller.js';
 import { emitChange } from '../services/event-bus.js';
 import { ownerCoordinate, resolveIdentity } from '../utils/gaii.js';
 import { SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
-import { listOwnerSecrets, putOwnerSecret, deleteOwnerSecret } from '../services/owner-secrets.js';
+import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner-secrets.js';
+import {
+  listOwnerSecretsWithUses, readApprovalRequest, approveSecretUse, declineSecretUse, withdrawSecretApproval,
+} from '../services/secret-approvals.js';
 
 export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const gate = [requireAuth(), requireScope(SECRETS_MANAGE_SCOPE)];
 
   router.get('/v1/secrets', ...gate, async (req, res) => {
-    const secrets = await listOwnerSecrets(storage, ownerCoordinate(req.auth!, config.nodeId));
+    const secrets = await listOwnerSecretsWithUses(storage, ownerCoordinate(req.auth!, config.nodeId));
     res.json(success(config.nodeId, { secrets, count: secrets.length }, [
       { description: 'Store or replace one', method: 'PUT', url: '/v1/secrets/{name}' },
     ]));
@@ -70,6 +81,79 @@ export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
     // every open stream on the node with the news that SOMEBODY set a credential.
     emitChange('secrets', ownerGhii);
     res.json(success(config.nodeId, r.data));
+  });
+
+  // The address, without the value: set it, change it, or send null to remove it (2026-10-21).
+  router.patch('/v1/secrets/:name', ...gate, async (req, res) => {
+    const ownerGhii = ownerCoordinate(req.auth!, config.nodeId);
+    if (!req.body || !('host' in req.body)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send { "host": "api.example.com" } to set the address, or { "host": null } to remove it.'));
+      return;
+    }
+    // Changing or removing an existing address is the account holder's in person (secaudit 2026-10, R62).
+    const r = await setOwnerSecretHost(storage, ownerGhii, req.params.name as string, req.body.host, resolveIdentity(req.auth!, config.nodeId),
+      { inPerson: callerOf(req, config.nodeId, storage).inPerson });
+    if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
+    emitChange('secrets', ownerGhii);
+    res.json(success(config.nodeId, r.data));
+  });
+
+  // ── Approvals: the owner answers a refused first use (services/secret-approvals.ts) ──
+  // Reading the question and answering it are the account holder's in person: an approval decides
+  // where the person's credential goes, and no agent, app or visitor answers that for them.
+  const inPerson = (req: Request, res: Response): string | null => {
+    if (!callerOf(req, config.nodeId, storage).inPerson) {
+      res.status(403).json(error(config.nodeId, 'IN_PERSON_ONLY',
+        'Only the account holder, signed in, answers where a secret may be sent. Open this page while signed in to your own account.'));
+      return null;
+    }
+    return ownerCoordinate(req.auth!, config.nodeId);
+  };
+  const keyOf = (src: Record<string, unknown> | undefined) => ({
+    extension: typeof src?.extension === 'string' ? src.extension : '',
+    host: typeof src?.host === 'string' ? src.host.toLowerCase() : '',
+  });
+
+  // The vault's own gate first (an owner session passes it), then the in-person test, so an app grant
+  // or an agent is refused at the scope and again here.
+  router.get('/v1/secrets/:name/approval', ...gate, async (req, res) => {
+    const ownerGhii = inPerson(req, res);
+    if (!ownerGhii) return;
+    const k = keyOf(req.query as Record<string, unknown>);
+    const view = await readApprovalRequest(storage, ownerGhii, req.params.name as string, k.extension, k.host);
+    if (!view) { res.status(404).json(error(config.nodeId, 'APPROVAL_NOT_FOUND', 'Nothing about this extension and host is waiting on this secret.')); return; }
+    res.json(success(config.nodeId, view));
+  });
+
+  router.post('/v1/secrets/:name/approvals', ...gate, async (req, res) => {
+    const ownerGhii = inPerson(req, res);
+    if (!ownerGhii) return;
+    const k = keyOf(req.body);
+    const r = await approveSecretUse(storage, ownerGhii, req.params.name as string, k.extension, k.host, resolveIdentity(req.auth!, config.nodeId));
+    if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
+    res.json(success(config.nodeId, { approval: r.approval }));
+  });
+
+  router.post('/v1/secrets/:name/approvals/decline', ...gate, async (req, res) => {
+    const ownerGhii = inPerson(req, res);
+    if (!ownerGhii) return;
+    const k = keyOf(req.body);
+    const declined = await declineSecretUse(storage, ownerGhii, req.params.name as string, k.extension, k.host);
+    res.json(success(config.nodeId, { declined }));
+  });
+
+  // Withdraw an approval, or drop a waiting request: a narrowing, so secrets:manage is enough.
+  router.delete('/v1/secrets/:name/approvals', ...gate, async (req, res) => {
+    const ownerGhii = ownerCoordinate(req.auth!, config.nodeId);
+    const q = req.query as Record<string, unknown>;
+    const k = { ...keyOf(q), installer: typeof q.installer === 'string' ? q.installer : '' };
+    if (!k.extension || !k.host || !k.installer) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the approval with extension, installer and host.'));
+      return;
+    }
+    const withdrawn = await withdrawSecretApproval(storage, ownerGhii, req.params.name as string, k);
+    if (!withdrawn) { res.status(404).json(error(config.nodeId, 'APPROVAL_NOT_FOUND', 'No approval for that extension, installer and host on this secret.')); return; }
+    res.json(success(config.nodeId, { withdrawn: true }));
   });
 
   router.delete('/v1/secrets/:name', ...gate, async (req, res) => {

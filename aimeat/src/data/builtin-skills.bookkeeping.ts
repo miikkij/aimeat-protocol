@@ -27,6 +27,11 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-10-21 — Section 5: only a PRIVATE package needs storage:read for the person's agent or app,
+ *     not every non-public one (the restore round of secaudit 2026-10 v41).
+ *   2026-10-21 — Section 5: the person's agent or app reads a non-public package only with
+ *     storage:read, and a pinned earlier version keeps the level it was published at (secaudit 2026-10
+ *     v41 and v42, routes/odata.ts, services/datapackage/store.ts).
  *   v1.0.1 — 2026-10-15 — Fiscal years: the overlap check is per company (feature-list audit #148).
  *   2026-10-15 — The OData passage says a table over 5 000 rows is paged with @odata.nextLink (feature-list audit #151, #193).
  *   v1.0.0 — 2026-10-12 — Initial (docs audit phase 5a).
@@ -148,6 +153,12 @@ programs read it:
   carries \`@odata.nextLink\` to the next one, and the clients follow it by themselves.
   **It needs no sign-in**: it is as open as the package.
   Never publish anything private there, and tell the person that before you publish.
+- A package that is not public is read with a sign-in. A PRIVATE package, the person's own and
+  published for nobody else, is read by an agent or an app of the person, through the feed or
+  \`aimeat_datapackage_export\`, only with \`storage:read\`; without it the feed
+  answers 403 naming that permission, and you ask the person for it. An earlier version named with
+  \`?version=\` opens only at the level it was published at: a version published for members before
+  the package went public stays for members.
 
 ## How it goes stale
 

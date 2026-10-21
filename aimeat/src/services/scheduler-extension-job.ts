@@ -33,11 +33,17 @@
  *                         also backfills the jobs stored before the stamp existed. The refusal names
  *                         the repair rather than only the missing field.
  *   v1.3.2 — 2026-09-26 — The owner's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.4.0 — 2026-10-20 — The maker is asked at the fire (scheduleFireRefusal): a deleted maker, or one
+ *     that no longer holds ext:invoke, does not run the action, and the run log says why (secaudit
+ *     2026-10, SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke).
+ *   v1.4.1 — 2026-10-21 — The check is services/schedule-fire-refusal.ts, which keeps an app's older
+ *     schedules firing and offers the owner Allow for an agent's missing word (capability-loss review).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { runExtensionActionAsSystem } from './extension-system-run.js';
+import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import type { EmailService } from './email.js';
 
 /**
@@ -66,6 +72,16 @@ export async function runExtensionJob(
     throw new Error(`Extension job "${job.id}" has no owner scope — reinstall or reactivate extension "${job.extensionName}" to re-register it`);
   }
   const ownerGhii = ownerScope.includes('@') ? ownerScope : `${ownerName}@${config.nodeId}`;
+
+  // As whoever made the schedule, asked now (services/schedule-actor.ts): a maker that is gone, or
+  // that is not the owner in person and no longer holds ext:invoke, does not run the action. The
+  // create, edit and run-now paths ask ext:invoke of the caller; this covers a later narrowing or
+  // deletion and a schedule stored before those paths asked (secaudit 2026-10,
+  // SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke). An owner's schedule and a manifest
+  // schedule carry no non-owner maker, so they run as before; so do an app's schedule from before
+  // 2026-10-05 and one the keep step kept (services/schedule-fire-refusal.ts).
+  const refused = await scheduleFireRefusal(storage, job, { nodeId: config.nodeId, baseUrl: config.baseUrl });
+  if (refused) throw new Error(refused);
 
   const out = await runExtensionActionAsSystem({ storage, config, emailService }, {
     extensionName: job.extensionName,

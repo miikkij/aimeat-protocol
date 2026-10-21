@@ -18,6 +18,9 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-viewer.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, jobs-keyed-by-owner-ghii).
+ *   v1.0.1 — 2026-10-21 — The stub storage and config answer the result-key checks a start makes
+ *     before any cost (services/ai-jobs/result-precheck.ts). The suite failed to start because its
+ *     setup no longer matched production; no assertion changed.
  */
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
@@ -42,6 +45,7 @@ const AGENT_B = `codex#alice@${NODE}`;
 const config = {
     nodeId: NODE, aiJobSlots: 1, aiJobMaxChain: 3, aiJobMaxQueued: 10, aiJobMaxQueuedPerOwner: 10,
     aiJobMaxPromptBytes: 1_000_000, aiJobLogRetentionDays: 7, sttMaxMb: 1,
+    memoryQuotaMb: 100, memoryMaxKeysPerAgent: 1000, memoryMaxValueSizeKb: 1024, memoryOverageMorselsPerMbMonth: 0,
 } as unknown as AimeatConfig;
 
 /** One in-memory namespace per owner, which is all the job store asks of storage. */
@@ -57,6 +61,11 @@ function memoryStorage(): Storage {
         getAgentsByOwner: async () => [],
         getEcosystemAppsByOwner: async () => [],
         getAgent: async () => null,
+        // What the start reads about the result key before any cost (services/ai-jobs/result-precheck.ts):
+        // no schema lock, the key count and the bytes for the ceilings.
+        findApplicableSchema: async () => null,
+        countMemory: async () => rows.size,
+        sumMemoryBytes: async () => 0,
     } as unknown as Storage;
 }
 

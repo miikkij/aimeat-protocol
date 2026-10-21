@@ -19,6 +19,8 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-21 — The reader and isAnonymous ask isAnonymousPrincipal: the minted anonymous token read the
+ *     skills kept for this node's members (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, POST /v1/skills and PATCH
  *     /v1/skills/:name store a user skill asked as public at 'members' with the warning
  *     PUBLIC_IS_SIGNED_IN_HERE, before the publish gate (services/skill-publish-gate.ts closedSkillLevel, plan V1.6).
@@ -61,6 +63,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, localAccountName, isForeignPrincipal } from '../utils/gaii.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SkillValidationError } from '../services/skill-md.js';
@@ -91,7 +94,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     const auth = req.auth as (typeof req.auth & { anonymous?: boolean }) | undefined;
     // A session from another node reads what an anonymous caller reads: 'members' means this node's
     // accounts, and a visitor holds none here (plan doc-mvcn6c7e4e5q, V0.6).
-    if (!auth || auth.anonymous === true || isForeignPrincipal(auth)) return { ownerName: null, reader: readerFor({ storage, config }, null) };
+    if (!auth || isAnonymousPrincipal(auth) || isForeignPrincipal(auth)) return { ownerName: null, reader: readerFor({ storage, config }, null) };
     return {
       ownerName: (auth.owner as string) ?? null,
       // The operator in person, or the operator's agent holding operator:admin (the MCP answer).
@@ -113,7 +116,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
 
   /** Anon-mode injects a truthy shared identity — never treat it as an owner/agent. */
   function isAnonymous(req: Express.Request): boolean {
-    return (req.auth as { anonymous?: boolean } | undefined)?.anonymous === true;
+    return isAnonymousPrincipal(req.auth);
   }
 
   function sendSkillError(res: Response, err: unknown): void {

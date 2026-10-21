@@ -23,6 +23,8 @@
  *   - the wallet signing endpoints                    routes/docsign-wallet.ts, mounted here
  * @usage router.use(docsignRouter(config, storage));
  * @version-history
+ *   2026-10-21 — POST /v1/docsign/validate asks isAnonymousPrincipal: a stored file is read as a signed-in
+ *     caller, which the minted anonymous token is not (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-15 — POST /requests/:id/sign hands the credential origin (req.auth.via) to signRequest, so a personal access token cannot sign with method "session" (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Mounts docsignWalletRouter: signing with an EU Digital Identity Wallet
@@ -35,6 +37,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { callerOf } from '../middleware/caller.js';
@@ -182,7 +185,7 @@ export function docsignRouter(config: AimeatConfig, storage: Storage): Router {
         if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.message)); return; }
         const d = parsed.data;
         const needsAuth = !!(d.storage_key || d.document_storage_key);
-        if (needsAuth && (!req.auth || req.auth.anonymous)) {
+        if (needsAuth && (!req.auth || isAnonymousPrincipal(req.auth))) {
           res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'A stored file is read as you: sign in, or send the file itself.')); return;
         }
         input = {
@@ -193,7 +196,7 @@ export function docsignRouter(config: AimeatConfig, storage: Storage): Router {
           online: d.online !== false,
         };
       }
-      const caller = req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
+      const caller = req.auth && !isAnonymousPrincipal(req.auth) ? callerOf(req, config.nodeId, storage) : null;
       const result = await validateDocument(ctx, caller, input);
       res.json(success(config.nodeId, result, [
         { description: 'Who signed this document on this node', method: 'GET', url: `/v1/docsign/lookup/${result.report.document.sha256}` },

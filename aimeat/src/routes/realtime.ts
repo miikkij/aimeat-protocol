@@ -12,6 +12,8 @@
  *   - additional room listing/lookup routes over realtimeManager
  *
  * @version-history
+ *   2026-10-21 — The TURN caller asks isAnonymousPrincipal, so the minted anonymous token gets no TURN
+ *     credential (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.3.1 — 2026-10-20 — A room's creator is the resolved caller, on create and on the close check,
  *     so its Yjs snapshots are filed under the GHII and never under the bare account name. Rooms live
  *     in memory only, so no stored room carries the old spelling.
@@ -30,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import type { RealtimeManager } from '../services/realtime-manager.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -212,7 +215,7 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
     // TURN server: an expiring credential derived per caller from AIMEAT_TURN_SECRET, or the
     // deprecated static pair. requireAuth() already refuses the anonymous identity; the null caller
     // keeps the TURN entry out if this route is ever mounted without it. A visitor gets none either.
-    const caller = req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
+    const caller = req.auth && !isAnonymousPrincipal(req.auth) ? callerOf(req, config.nodeId, storage) : null;
     const turn = turnEntryFor(config, caller, Date.now());
     if (turn) iceServers.push(turn);
 

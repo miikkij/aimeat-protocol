@@ -25,12 +25,20 @@
  *   nothing (services/protected-resource.ts appScopesOf). Every rule names a word an app grant can
  *   hold (routes/app-grant-vocabulary.ts): a gate that also takes a word no app is granted names the
  *   app's word, as checkout completion names contract:spend with commerce:buy as its alternative.
- * @structure ScopeNeed · SCOPE_NEED_WORDS · scanScopeNeeds(sources) · cortexLibRefs(html) · undeclaredScopeNeeds(html, libs) ·
+ * @structure ScopeNeed · SCOPE_NEED_WORDS · AI_JOB_ON_DONE_RULE · DATAPACKAGE_READ_RULE · scanScopeNeeds(sources) · cortexLibRefs(html) · undeclaredScopeNeeds(html, libs) ·
  *   undeclaredScopeFindings(html, loadLib)
  * @usage
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   v1.2.1 — 2026-10-21 — A data package read (AIMEAT.datapackage.open, rows, versions, exportAs, list,
+ *     or a /v1/datapackages/... or /v1/odata/... path) needs storage:read, rule 'datapackage-read': the
+ *     owner's private packages ask it of an app since secaudit 2026-10 v41
+ *     (services/app-datapackage-read-keep-migration.ts keeps it for the apps published before).
+ *   v1.2.0 — 2026-10-21 — An AI job that names an `on_done` action needs ext:invoke (onDoneNeeds,
+ *     rule 'ai-job-on-done'), which the start asks of an app since secaudit 2026-10; a need carries
+ *     the rule that found it, so the once-only step for it (services/app-on-done-keep-migration.ts)
+ *     gives the word for that call and no other.
  *   v1.1.0 — 2026-10-20 — A GET /v1/pub call needs storage:read, also when the path is only in a regex
  *     (S3-03 gated it on 2026-10-16 after the keep-working step was written; found on originalmiskate.com).
  *   v1.0.2 — 2026-10-17 — A realtime room made with createRoom() or a POST to /v1/realtime/rooms needs social:write (pitfall-list round).
@@ -44,6 +52,8 @@ import { appScopesOf } from './protected-resource.js';
 /** One word the code needs, the text that shows it, and where that text is. */
 export interface ScopeNeed {
   word: string;
+  /** Set on a need a once-only step gives by itself: 'ai-job-on-done' (services/app-on-done-keep-migration.ts). */
+  rule?: string;
   /** Words that pass the same gate (an app grant: contract:spend for commerce:buy). */
   alternatives?: string[];
   /** The matched text, trimmed to a line. */
@@ -55,7 +65,14 @@ export interface ScopeNeed {
 /** A string literal (or a template interpolation) that STARTS with the path: a call, not a sentence. */
 const LIT = String.raw`(?:['"\x60]|\})`;
 
-interface Rule { word: string; alternatives?: string[]; re: RegExp }
+interface Rule { word: string; alternatives?: string[]; re: RegExp; rule?: string }
+
+/**
+ * A data package read (services/datapackage/audience.ts): a signed-in app reads its owner's PRIVATE
+ * package only with storage:read since secaudit 2026-10 v41. The once-only step for it
+ * (services/app-datapackage-read-keep-migration.ts) gives the word for these calls and no other.
+ */
+export const DATAPACKAGE_READ_RULE = 'datapackage-read';
 
 /** Calls whose word does not depend on the HTTP method. */
 const RULES: Rule[] = [
@@ -106,6 +123,11 @@ const RULES: Rule[] = [
   // finds an image address in a document, so the escaped form of a regex counts as well.
   { word: 'storage:read', re: new RegExp(`${LIT}/v1/pub(?:/|['"\\x60])`, 'g') },
   { word: 'storage:read', re: /\\{1,2}\/v1\\{1,2}\/pub\\{1,2}\//g },
+  // A data package read (DATAPACKAGE_READ_RULE): the SDK's read methods, and the read routes and the
+  // OData feed by path. POST /v1/datapackages and /validate publish and check, and ask storage:write,
+  // so the bare path and /validate are not reads.
+  { word: 'storage:read', rule: DATAPACKAGE_READ_RULE, re: /\bAIMEAT\.datapackage\.(?:open|get|rows|versions|exportAs|list)\s*\(/g },
+  { word: 'storage:read', rule: DATAPACKAGE_READ_RULE, re: new RegExp(`${LIT}/v1/(?:datapackages/(?!validate\\b)|odata/)`, 'g') },
 ];
 
 /** The text around a match, on one line, for the owner to read. */
@@ -142,6 +164,22 @@ function scheduleNeeds(text: string, source: string): ScopeNeed[] {
   return out;
 }
 
+/**
+ * An AI job that names an extension action as its `on_done` (POST /v1/ai/jobs, AIMEAT.ai.job.start):
+ * the action runs unattended when the answer lands, which needs ext:invoke of a caller that is not
+ * the owner in person (services/ai-jobs/starter.ts, secaudit 2026-10). It counts only in code that
+ * starts a job, and only where `on_done` is written as a property name.
+ */
+export const AI_JOB_ON_DONE_RULE = 'ai-job-on-done';
+function onDoneNeeds(text: string, source: string): ScopeNeed[] {
+  if (!/\bAIMEAT\.ai\.job\.start\s*\(/.test(text) && !new RegExp(`${LIT}/v1/ai/jobs['"\\x60]`).test(text)) return [];
+  const out: ScopeNeed[] = [];
+  for (const m of text.matchAll(/['"\x60]?\bon_done['"\x60]?\s*:/g)) {
+    out.push({ word: 'ext:invoke', rule: AI_JOB_ON_DONE_RULE, evidence: excerpt(text, m.index ?? 0, m[0].length), source });
+  }
+  return out;
+}
+
 /** Every need the texts show. One entry per word and source; the first evidence is kept. */
 export function scanScopeNeeds(sources: ReadonlyArray<{ source: string; text: string }>): ScopeNeed[] {
   const seen = new Map<string, ScopeNeed>();
@@ -150,14 +188,16 @@ export function scanScopeNeeds(sources: ReadonlyArray<{ source: string; text: st
     for (const rule of RULES) {
       for (const m of text.matchAll(rule.re)) {
         found.push({
-          word: rule.word, ...(rule.alternatives ? { alternatives: rule.alternatives } : {}),
+          word: rule.word, ...(rule.rule ? { rule: rule.rule } : {}), ...(rule.alternatives ? { alternatives: rule.alternatives } : {}),
           evidence: excerpt(text, m.index ?? 0, m[0].length), source,
         });
       }
     }
     found.push(...scheduleNeeds(text, source));
+    found.push(...onDoneNeeds(text, source));
     for (const need of found) {
-      const key = `${need.word}|${need.source}`;
+      // The rule is part of the key, so an on_done need is kept beside another call that needs the same word.
+      const key = `${need.word}|${need.rule ?? ''}|${need.source}`;
       if (!seen.has(key)) seen.set(key, need);
     }
   }
