@@ -1459,6 +1459,8 @@ const ALL_SUITES = [
     'test/e2e-mcp-package-tools.ts',
     // QA audit 2026-10, W29: the refusals and rows chapters 3.2 and 3.4 of the audit found untested.
     'test/e2e-oauth-consent-refusals.ts',
+    // Claude Code could not sign in to aimeat.io: a loopback redirect on a run-time port (RFC 8252 §7.3).
+    'test/e2e-mcp-oauth-loopback.ts',
     'test/e2e-session-forgery.ts',
     'test/e2e-scope-ceiling.ts',
     'test/e2e-flag-review.ts',

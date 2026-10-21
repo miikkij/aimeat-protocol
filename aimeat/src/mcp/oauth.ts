@@ -12,6 +12,10 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.8.1 — 2026-10-22 — authorize and authorize-consent accept a registered loopback redirect on
+ *     any port (RFC 8252 §7.3, mcp/oauth-redirect.ts). Claude Code's metadata document lists
+ *     `http://localhost/callback` and sends an ephemeral port, so every Claude Code sign-in was
+ *     refused with `redirect_uri not registered`. The token step still compares exactly.
  *   v1.8.0 — 2026-10-15 — GET /v1/mcp/approval-check is removed: unauthenticated, called by no page,
  *     and it told anybody whether a client was approved for an agent. The stored approval records the
  *     agent's own scopes instead of 'aimeat:full' (feature-list audit 2).
@@ -55,6 +59,7 @@ import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
 import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
+import { redirectUriRegistered } from './oauth-redirect.js';
 import {
     hasUnknownResource, mcpOAuthLaxLive, mcpResourceOf, noteLaxUse, pkceRefusal, resourceRefusal, resourceValues,
 } from './oauth-binding.js';
@@ -192,8 +197,9 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // authorization code delivered to any address at all. Registering none now means none may be
         // used, which is the same sentence the registration made. A client with no redirect_uri at
         // all still works: that is the signature path below, which answers with the code as JSON.
+        // A loopback redirect matches on any port (RFC 8252 §7.3, mcp/oauth-redirect.ts).
         const allowedRedirects = client ? client.redirectUris : viaUrl!.redirectUris;
-        if (redirectUri && !allowedRedirects.includes(redirectUri)) {
+        if (redirectUri && !redirectUriRegistered(allowedRedirects, redirectUri)) {
             res.status(400).json({
                 error: 'invalid_request',
                 error_description: allowedRedirects.length
@@ -338,11 +344,11 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         // used — see the authorize step for why the `length > 0` escape that stood here was the
         // whole allowlist's off switch.
         const finalRedirect = redirect_uri ?? client?.redirectUris[0] ?? viaUrl?.redirectUris[0];
-        if (viaUrl && finalRedirect && !viaUrl.redirectUris.includes(finalRedirect)) {
+        if (viaUrl && finalRedirect && !redirectUriRegistered(viaUrl.redirectUris, finalRedirect)) {
             res.status(400).json({ error: 'invalid_request', error_description: 'redirect_uri is not one this client\'s metadata document lists' });
             return;
         }
-        if (client && finalRedirect && !client.redirectUris.includes(finalRedirect)) {
+        if (client && finalRedirect && !redirectUriRegistered(client.redirectUris, finalRedirect)) {
             res.status(400).json({
                 error: 'invalid_request',
                 error_description: client.redirectUris.length
