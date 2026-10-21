@@ -23,6 +23,7 @@
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-21 — PROBE_SETUP conversation ids for the four aimeat_dm_group_* tools that take one (group chat).
  *   2026-10-09 — PROBE_SETUP entry for aimeat_docsign_lookup (a 64-hex SHA-256).
  *   2026-10-06 — PROBE_SETUP entries for seven tools that run their dispatch definition on the
  *     connector now (secaudit 2026-10 follow-up, Part B).
@@ -75,6 +76,10 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_dm_thread: { conversation_id: 'conv-probe-0001' },
   aimeat_dm_thread_as_owner: { conversation_id: 'conv-probe-0001' },
   aimeat_dm_archive_as_owner: { conversation_ids: ['conv-probe-0001'] },
+  aimeat_dm_group_get: { conversation_id: 'conv-probe-0001' },
+  aimeat_dm_group_members: { conversation_id: 'conv-probe-0001', add: ['someone'] },
+  aimeat_dm_group_leave: { conversation_id: 'conv-probe-0001' },
+  aimeat_dm_group_answer: { conversation_id: 'conv-probe-0001', accept: true },
   // A document's SHA-256 is 64 hex characters on the catalog schema; the generic 'probe' is not one.
   aimeat_docsign_lookup: { sha256: 'a'.repeat(64) },
   aimeat_datamap_get: { app: 'someone/thing.html' },

@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.41.0 -- 2026-10-21 -- Group chats: the six aimeat_dm_group_* tools and how a group is written in.
  *   v1.40.0 -- 2026-10-20 -- Content classes: read a file's facts before the file, the aimeat_content_*
  *     tools (aimeat_content_correct when the person says a class or a field is wrong), the model steps
  *     off by default, skill aimeat-content-classes.
@@ -173,6 +174,13 @@ prompt you sent). **Threading: when a message is about a task, pass \`linked_tas
 sharing it is grouped into that task's one conversation thread. Only omit it (or pass \`thread_id\` to
 reply) for ad-hoc, task-less chat. Don't start a fresh thread per question — clarifications about the
 same task belong in the same thread.**
+
+**Group chats — several people in one conversation.** \`aimeat_dm_group_create\` (members, a name,
+the first message; \`as_owner\` opens it in your owner's name with messages:send-as-owner) ·
+\`aimeat_dm_group_get\` · \`aimeat_dm_group_members\` (the manager adds and removes) ·
+\`aimeat_dm_group_leave\` · \`aimeat_dm_group_invitations\` · \`aimeat_dm_group_answer\`. Write in a
+group with \`aimeat_dm_send\` and its conversation_id, read it with \`aimeat_dm_thread\`. A person whose
+contacts accept you joins at once; anybody else is invited, so say so when you report the group.
 
 **Workflows — declared, ordered agent pipelines.** \`aimeat_workflow_save\` (create/update; pass the
 whole descriptor) · \`aimeat_workflow_get\` (list, or one workflow's derived blueprint + recent runs) ·

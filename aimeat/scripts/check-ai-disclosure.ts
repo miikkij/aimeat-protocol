@@ -30,6 +30,7 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.8.1 — 2026-10-21 — aimeat_dm_group_create joins AI_PROVENANCE_REQUIRED (group chat).
  *   v1.8.0 — 2026-10-16 — Assertion 8, label views (lib/check-ai-label-views.ts): every view that shows
  *     content a record describes draws AiLabel, and the routes that decide or carry the label still do.
  *   v1.7.2 — 2026-10-09 — aimeat_docsign_request_create reviewed without provenance (a signing request's label).
@@ -280,6 +281,8 @@ const AI_PROVENANCE_REQUIRED = [
   // model-touched output, and the descriptor carries the resulting record id in aimeat.
   'aimeat_datapackage_publish',
   'aimeat_dm_ask',
+  // A group chat's first message is read by every member, as a direct message is (group chat, 2026-10-21).
+  'aimeat_dm_group_create',
   'aimeat_dm_send',
   'aimeat_dm_send_as_owner',
   'aimeat_exchange_work_deliver',

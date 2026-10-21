@@ -13,6 +13,10 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName, { agentThreads }) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   v1.7.0 — 2026-10-21 — Group chat. The group memberships are read once (groupsOf) for the whole list.
+ *     A group row is not hidden because its last writer is a pending contact, and a group the reader is
+ *     in without any message of it in their mailbox gets an empty row (withEmptyGroupRows), so a person
+ *     who accepted an invitation sees the group at once.
  *   v1.6.0 — 2026-10-17 — The owner's row whose last message one of their agents sent in their name
  *     carries sentByAgent and sentByAgentName, so the list says which agent instead of "You".
  *   v1.5.1 — 2026-09-26 — The owner comparisons take account names from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so a visitor never counts as the local namesake (secaudit 2026-09, F-1).
@@ -36,7 +40,7 @@
  *     it still sees the address, tagged `groupAlias` so the client renders a thread, not a principal.
  *   v1.0.0 — 2026-07-16 — Phase 3: batch the owner + per-agent conversations fan-out into one call.
  */
-import type { Storage } from '../../storage/interface.js';
+import type { ConversationRecord, Storage } from '../../storage/interface.js';
 import type { ConversationSummary } from '../../storage/repositories/direct-message.repository.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { localAccountName } from '../../utils/gaii.js';
@@ -123,6 +127,27 @@ export function mergeAgentThreads(own: OwnerConversation[], agentConvs: OwnerCon
   return [...own.map(c => byId.get(c.conversationId)!), ...alone];
 }
 
+/**
+ * A row for every group the reader is in and holds no message of yet.
+ *
+ * The list is built from the copies in a mailbox, and a member who joins later holds no copy until
+ * somebody writes again (a new member does not get the history, by ruling). Without this row a person
+ * who accepted an invitation saw nothing happen, and could not open the group to write the first
+ * message themselves. A named thread (support) is left out: it always holds the message that opened it.
+ */
+export function withEmptyGroupRows(rows: OwnerConversation[], groups: Map<string, ConversationRecord>): OwnerConversation[] {
+  const present = new Set(rows.map(r => r.conversationId));
+  const empty: OwnerConversation[] = [];
+  for (const g of groups.values()) {
+    if (present.has(g.id) || g.alias) continue;
+    empty.push({
+      conversationId: g.id, peerGhii: `group:${g.id}`, subject: g.subject, lastMessage: '', lastDirection: 'inbound',
+      lastSenderGhii: g.createdBy, messageCount: 0, unread: 0, updatedAt: g.updatedAt,
+    });
+  }
+  return empty.length ? [...rows, ...empty] : rows;
+}
+
 export class MessagingDbService {
   constructor(private readonly storage: Storage) {}
 
@@ -147,8 +172,13 @@ export class MessagingDbService {
         this.batchConversations(agentThreads ? [ownerGhii, ...agents.map(a => a.gaii)] : [ownerGhii]),
       ]);
 
+      // Every group the owner or one of their agents is in, read once for the whole list.
+      const groups = await this.groupsOf(ownerGhii, agents.map(a => a.gaii));
       const hidden = new Set(contacts.filter(c => c.state === 'pending' || c.state === 'blocked').map(c => c.contactId));
-      const own = (byOwner[ownerGhii] ?? []).filter(c => !hidden.has(c.peerGhii))
+      // A pending contact hides a 1:1 thread, which is the first-contact gate. A GROUP thread is not
+      // hidden that way: joining it answered the gate, and its rows name whoever wrote last, who may be
+      // a member this person never accepted one to one.
+      const own = withEmptyGroupRows((byOwner[ownerGhii] ?? []).filter(c => !hidden.has(c.peerGhii) || groups.has(c.conversationId)), groups)
         // The owner's last message here was sent in their name by one of their agents: the row says
         // which, where it read "You: ..." (services/message-send-as-owner.ts).
         .map(c => (c.lastDirection === 'outbound' && c.lastSentByAgent
@@ -165,7 +195,7 @@ export class MessagingDbService {
           agentConvs.push({ ...c, viaAgent: a.gaii });
         }
       }
-      const named = await this.nameGroupThreads(ownerGhii, mergeAgentThreads(own, agentConvs), agents.map(a => a.gaii));
+      const named = this.nameGroupThreads(ownerGhii, mergeAgentThreads(own, agentConvs), groups);
       // Sections, archive, rules and folds: what the owner decided about their own list. The same
       // answer for the page and for anyone reading in the owner's name.
       const organize = await readInboxOrganize(this.storage, ownerGhii);
@@ -190,30 +220,10 @@ export class MessagingDbService {
    *     genuinely who they wrote to. `groupAlias` tells the client to render it as a thread and not
    *     to ask whether an address is online.
    *
-   * ONE query per identity for the whole group membership, so this costs nothing per row.
-   *
-   * The membership lookup is an exact match on the participant string, and a thread an AGENT opened
-   * lists the agent, not the person. So the owner's own row in their agent's support thread matched
-   * nothing here: it was never recognised as a group at all, and the inbox showed the thread's address
-   * where a name belongs. Asking under the agents' identities as well is what finds it, and the
-   * thread is recognised for what it is.
+   * The membership comes from groupsOf, read once for the whole list.
    */
-  private async nameGroupThreads(readerGhii: string, rows: OwnerConversation[], agentGaiis: string[] = []): Promise<OwnerConversation[]> {
-    if (!rows.length) return rows;
-    const lookup = async (identity: string) => this.storage.listConversationsForParticipant(identity)
-      .catch(err => { logger.warn('nameGroupThreads: continuing without group identity', { error: String(err) }); return []; });
-    const [own, viaAgents] = await Promise.all([
-      lookup(readerGhii),
-      Promise.all(agentGaiis.map(async gaii => ({ groups: await lookup(gaii) }))),
-    ]);
-    if (!own.length && !viaAgents.some(a => a.groups.length)) return rows;
-
-    // The reader's own membership wins: if they are named in the thread themselves, they are not in it
-    // through an agent.
-    const byId = new Map(own.map(g => [g.id, g] as const));
-    for (const { groups } of viaAgents) {
-      for (const g of groups) if (!byId.has(g.id)) byId.set(g.id, g);
-    }
+  private nameGroupThreads(readerGhii: string, rows: OwnerConversation[], byId: Map<string, ConversationRecord>): OwnerConversation[] {
+    if (!rows.length || !byId.size) return rows;
     return rows.map(row => {
       const convo = byId.get(row.conversationId);
       if (!convo) return row;
@@ -240,6 +250,27 @@ export class MessagingDbService {
         subject: row.subject ?? convo.subject,
       };
     });
+  }
+
+  /**
+   * Every group thread the reader or one of their agents is in, by id. ONE query per identity.
+   *
+   * The membership lookup is an exact match on the participant string, and a thread an AGENT opened
+   * lists the agent, not the person. So the owner's own row in their agent's support thread matched
+   * nothing: it was never recognised as a group at all, and the inbox showed the thread's address
+   * where a name belongs. Asking under the agents' identities as well is what finds it. The reader's
+   * own membership wins: if they are named in the thread themselves, they are not in it through an
+   * agent.
+   */
+  private async groupsOf(readerGhii: string, agentGaiis: string[]): Promise<Map<string, ConversationRecord>> {
+    const lookup = async (identity: string) => this.storage.listConversationsForParticipant(identity)
+      .catch(err => { logger.warn('groupsOf: continuing without group identity', { error: String(err) }); return [] as ConversationRecord[]; });
+    const [own, viaAgents] = await Promise.all([lookup(readerGhii), Promise.all(agentGaiis.map(lookup))]);
+    const byId = new Map(own.map(g => [g.id, g] as const));
+    for (const groups of viaAgents) {
+      for (const g of groups) if (!byId.has(g.id)) byId.set(g.id, g);
+    }
+    return byId;
   }
 
   /** ONE batched read of every mailbox's conversations (fan-out→IN); falls back to a per-owner

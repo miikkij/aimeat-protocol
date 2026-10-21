@@ -12,6 +12,8 @@
  * @structure ListPanel · rowIds
  * @usage <ListPanel requests conversations activeConv peerDisplay accept block openConversation openFolds toggleFold org />
  * @version-history
+ *   v1.10.0 — 2026-10-21 — Group chat: the group invitations (`groupInvitations`) over the requests, and
+ *     a Groups section whose rows carry the group's name, its member count and who wrote last.
  *   v1.9.0 — 2026-10-19 — A row's mark and a group's heading carry the agent peer's own avatar (`peerAvatar`):
  *     `mark.avatar` and ConversationGroup `avatar`, null for a person or an agent without one.
  *   v1.8.0 — 2026-10-17 — The preview names the agent: "Your agent X:" when one of yours sent the last
@@ -45,6 +47,7 @@ import {
   ConversationGroup, ConversationRow, ConversationFold,
 } from '/components/ConversationList.js';
 import { peerName, isAgentPeer, subThreadLabel, groupConversations, stampShort, stampFull } from './helpers.js';
+import { isChatGroup } from './group-chat.js';
 
 const DAY_MS = 86_400_000;
 
@@ -53,7 +56,7 @@ export function rowIds(c) {
   return [c.conversationId, ...(c.folded || []).map(f => f.conversationId)];
 }
 
-export function ListPanel({ requests, conversations, activeConv, peerDisplay, peerAvatar, accept, block, openConversation, openFolds = {}, toggleFold, org }) {
+export function ListPanel({ requests, conversations, activeConv, peerDisplay, peerAvatar, accept, block, openConversation, openFolds = {}, toggleFold, org, groupInvitations }) {
   /** An agent peer's own avatar or null (inbox-tab.js peerAvatar); ConversationList draws it in the identicon's place. */
   const avatarFor = (id) => (peerAvatar ? peerAvatar(id) : null);
   const selecting = !!org?.selecting;
@@ -80,6 +83,8 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
    * `labelPeer` = inside an opened fold.
    */
   const convRow = (c, nested, labelPeer) => {
+    // A group chat is named by its name and drawn with its own picture; whoever wrote last is in the preview.
+    if (isChatGroup(c) && !labelPeer) return groupRow(c);
     const sub = subThreadLabel(c.peerGhii);
     // An agent-owned conversation the owner aggregates (a DM the agent sent from its own inbox) — labelled
     // "via <agent>" and read-only. The `viaAgent` tag comes from the conversation list aggregation.
@@ -120,6 +125,26 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
       selecting=${selecting} selected=${selecting && isSelected(c)}
       onOpen=${() => (selecting ? org.toggleSelected(rowIds(c)) : openConversation(c))}
       archive=${selecting || labelPeer ? null : { label: archiveWord, ariaLabel: `${archiveWord}: ${label}`, restore: back, onClick: () => org.archive(rowIds(c), back) }} />`;
+  };
+
+  /** One group chat: its name, its member count, and the last message with who wrote it. */
+  const groupRow = (c) => {
+    const back = c.section === 'archive';
+    const archiveWord = back ? t('inbox.org.restoreConv') : t('inbox.org.archiveConv');
+    const name = c.subject || t('inbox.group.untitled');
+    const who = c.lastMessage ? (c.lastDirection === 'outbound' && !c.sentByAgent ? t('inbox.youPrefix') : `${peerDisplay(c.lastSenderGhii)}:`) : '';
+    return html`<${ConversationRow} key=${c.conversationId}
+      title=${name}
+      mark=${{ picture: c.groupAlias }}
+      date=${c.updatedAt ? stampShort(c.updatedAt) : ''} dateTitle=${c.updatedAt ? stampFull(c.updatedAt) : ''}
+      chips=${[t('inbox.group.members', { count: String(c.participants?.length || 0) })]}
+      preview=${c.lastMessage ? `${who} ${c.lastMessage}` : t('inbox.group.noMessagesYet')}
+      why=${c.archived ? whyArchived(c) : null}
+      unread=${c.unread || 0}
+      active=${!selecting && activeConv?.conversationId === c.conversationId}
+      selecting=${selecting} selected=${selecting && isSelected(c)}
+      onOpen=${() => (selecting ? org.toggleSelected(rowIds(c)) : openConversation(c))}
+      archive=${selecting ? null : { label: archiveWord, ariaLabel: `${archiveWord}: ${name}`, restore: back, onClick: () => org.archive(rowIds(c), back) }} />`;
   };
 
   /**
@@ -189,10 +214,12 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
       onToggle=${() => org.toggleCollapsed(key, closedByDefault)}>${open ? body(rows) : null}<//>`;
   };
 
-  const people = [], agents = [], archive = [];
+  const people = [], agents = [], archive = [], chats = [];
   const groups = new Map();
   for (const c of conversations) {
     if (c.section === 'archive') archive.push(c);
+    // A group chat has a section of its own: filed under a person, it read as that person's conversation.
+    else if (isChatGroup(c) && c.section !== 'group') chats.push(c);
     else if (c.section === 'agents') agents.push(c);
     else if (c.section === 'group' && c.group) {
       if (!groups.has(c.group)) groups.set(c.group, []);
@@ -208,6 +235,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
 
   return html`
     <${ConversationList} selecting=${selecting} empty=${conversations.length ? null : t('inbox.noConversations')}>
+      ${groupInvitations || null}
       ${requests.length > 0 ? html`
         <${ConversationRequests} label=${t('inbox.requests')} count=${requests.length}>
           ${requests.map(r => html`<${ConversationRequest} key=${r.contactId} picture=${r.contactId}
@@ -226,6 +254,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, pe
           : html`<${Action} tone="quiet" onClick=${() => org.startSelecting()}>${t('inbox.org.select')}<//>`}
         <//>` : null}
 
+      ${section('chats', t('inbox.group.section'), chats, (r) => r.map(c => anyRow(c, false)))}
       ${section('people', t('inbox.org.sectionPeople'), people, peopleBody)}
       ${section('agents', t('inbox.org.sectionAgents'), agents, agentsBody)}
       ${[...groups.entries()].map(([name, rows]) => section(`g:${name}`, name, rows, (r) => r.map(c => anyRow(c, false))))}

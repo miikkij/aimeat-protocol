@@ -192,9 +192,15 @@ from .mcp_client import (
 from .messaging import (
     AimeatMessagingError,
     ServeClient,
+    answer_group_invitation,
     answers_from_dm,
     ask,
     build_question,
+    change_group_members,
+    group_invitations,
+    group_members,
+    leave_group,
+    open_group,
     read_answers,
     serve_client,
 )
@@ -361,6 +367,13 @@ __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arri
     "read_answers",
     "answers_from_dm",
     "AimeatMessagingError",
+    # Group chat (unreleased)
+    "open_group",
+    "group_members",
+    "change_group_members",
+    "leave_group",
+    "group_invitations",
+    "answer_group_invitation",
     # Usage telemetry — per-LLM-call -> node ledger (0.16.0)
     "install_usage_telemetry",
     "usage_run",

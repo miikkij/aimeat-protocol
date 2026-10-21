@@ -22,6 +22,9 @@ uses). Mirrors the node contract in aimeat/src/models/message-schemas.ts (the no
 mismatch).
 
 Changelog:
+  unreleased -- 2026-10-21 -- Group chat: open_group(), group_members(), change_group_members(),
+    leave_group(), group_invitations() and answer_group_invitation() over /v1/messages/groups
+    (a node release after 4.1.2).
   unreleased -- 2026-10-08 -- ask() takes ai_provenance and ai_provenance_id and returns the
     ai_provenance_id the node recorded. POST /v1/messages stripped both until node 3.25 (aiprov D5),
     so a REST crew could not say how its question was made.
@@ -206,6 +209,81 @@ def answers_from_dm(api: Any, event: Mapping[str, Any]) -> dict[str, Any] | None
         return None
     conv = event.get("conversationId")
     return read_answers(api, conv) if conv else None
+
+
+def _group_call(api: Any, method: str, path: str, payload: Mapping[str, Any] | None, what: str) -> dict[str, Any]:
+    resp = api.post(path, json=dict(payload or {})) if method == "post" else api.get(path)
+    if getattr(resp, "status_code", 0) >= 300:
+        raise AimeatMessagingError(f"{what} failed: {getattr(resp, 'status_code', '?')} {_body_text(resp)}")
+    return _json(resp).get("data") or {}
+
+
+def _as_owner(payload: dict[str, Any], as_owner: bool) -> dict[str, Any]:
+    if as_owner:
+        payload["as_owner"] = True
+    return payload
+
+
+def open_group(
+    api: Any,
+    members: Sequence[str],
+    subject: str,
+    body: str,
+    *,
+    as_owner: bool = False,
+    ai_provenance: Mapping[str, Any] | None = None,
+    ai_provenance_id: str | None = None,
+) -> dict[str, Any]:
+    """Open a group chat with `members` (account names, owner@node, agent#owner@node) of the node, and
+    send its first message. A person whose contacts accept you joins at once; anybody else is invited
+    and sees the group only after accepting. Returns the group (conversation_id, subject, manager,
+    participants, invited) and `members`, one {identity, result} per name given, where result is
+    "added", "invited" or "refused" (with code and message). Write in the group afterwards with
+    POST /v1/messages and the conversation_id. `as_owner=True` opens it in your owner's name and needs
+    the messages:send-as-owner scope. Mirrors POST /v1/messages/groups (the node wins on a mismatch)."""
+    if not members:
+        raise AimeatMessagingError("open_group() needs at least one member")
+    payload: dict[str, Any] = {"members": list(members), "subject": subject, "body": body}
+    if ai_provenance:
+        payload["ai_provenance"] = dict(ai_provenance)
+    if ai_provenance_id:
+        payload["ai_provenance_id"] = ai_provenance_id
+    return _group_call(api, "post", "/v1/messages/groups", _as_owner(payload, as_owner), "open group")
+
+
+def group_members(api: Any, conversation_id: str) -> dict[str, Any]:
+    """Who is in a group you are in: subject, manager, participants, invited, you_manage."""
+    return _group_call(api, "get", f"/v1/messages/groups/{conversation_id}", None, "read group")
+
+
+def change_group_members(
+    api: Any, conversation_id: str, *, add: Sequence[str] = (), remove: Sequence[str] = (), as_owner: bool = False,
+) -> dict[str, Any]:
+    """Add or remove members. Only the group's manager may; adding follows the rule of open_group()."""
+    if not add and not remove:
+        raise AimeatMessagingError("change_group_members() needs somebody to add or remove")
+    payload: dict[str, Any] = {}
+    if add:
+        payload["add"] = list(add)
+    if remove:
+        payload["remove"] = list(remove)
+    return _group_call(api, "post", f"/v1/messages/groups/{conversation_id}/members", _as_owner(payload, as_owner), "change members")
+
+
+def leave_group(api: Any, conversation_id: str, *, as_owner: bool = False) -> dict[str, Any]:
+    """Leave a group. When the manager leaves, the next person in it manages it."""
+    return _group_call(api, "post", f"/v1/messages/groups/{conversation_id}/leave", _as_owner({}, as_owner), "leave group")
+
+
+def group_invitations(api: Any) -> list[dict[str, Any]]:
+    """The group chats you are invited to and have not answered."""
+    return list(_group_call(api, "get", "/v1/messages/groups/invitations", None, "list invitations").get("invitations") or [])
+
+
+def answer_group_invitation(api: Any, conversation_id: str, accept: bool, *, as_owner: bool = False) -> dict[str, Any]:
+    """Accept (True) or decline (False) an invitation. After accepting you get what is written from then on."""
+    payload: dict[str, Any] = {"accept": bool(accept)}
+    return _group_call(api, "post", f"/v1/messages/groups/{conversation_id}/invitation", _as_owner(payload, as_owner), "answer invitation")
 
 
 def _json(resp: Any) -> dict[str, Any]:

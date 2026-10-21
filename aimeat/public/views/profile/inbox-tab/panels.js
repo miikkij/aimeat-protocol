@@ -7,6 +7,8 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.19.0 — 2026-10-21 — A group chat's head shows the group's name, its picture and its members, with
+ *     a Members door that opens the members strip under the head (`groupDoor`, `groupStrip`, ./group-chat.js).
  *   v2.18.0 — 2026-10-19 — The thread head shows an agent peer's own avatar in the identicon's place when it has one (`peerAvatar`, AgentAvatar).
  *   v2.17.0 — 2026-10-17 — A message's side follows who sent it: mine (myself, or my agent in my name) on
  *     the right, my agent's own message on the left under its name. A conversation my agent takes part
@@ -97,6 +99,7 @@ import { Meter, Tinted } from '/components/Figure.js';
 import { KebabMenu } from '../shared.js';
 import { MessageBubble, CommandBar, CommandFill, SchedulePanel, PollBuilder } from './components.js';
 import { ThreadReadAloud } from './read-aloud.js';
+import { isChatGroup } from './group-chat.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, dayKey, dayLabel, trackStateLabel, trackStatusTone, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
 
@@ -107,8 +110,11 @@ export function ThreadPanel({
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
   threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds, archiveItem, peerAvatar,
+  groupDoor, groupStrip,
 }) {
   let lastDay = '';
+  // A group chat is named by its name and its members, not by whoever opened it (./group-chat.js).
+  const chatGroup = isChatGroup(activeConv);
   // An agent peer with its own avatar: the head shows it in the identicon's place (PaneHead `before`).
   const peerAv = avatarOf(peerAvatar?.(activeConv.peerGhii));
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
@@ -141,19 +147,21 @@ export function ThreadPanel({
   const peerIsAgent = isAgentPeer(activeConv.peerGhii);
   const peerAgentName = peerIsAgent ? subThreadLabel(activeConv.peerGhii) : null;
   const peerIsMyAgent = peerIsAgent && ownerDisplayName(ownerKeyOf(activeConv.peerGhii)) === getSession()?.owner;
-  const address = `${activeConv.peerGhii}${activeConv.groupAlias && activeConv.groupAlias !== activeConv.peerGhii
+  const address = chatGroup ? (activeConv.participants || []).map(peerDisplay).join(', ') : `${activeConv.peerGhii}${activeConv.groupAlias && activeConv.groupAlias !== activeConv.peerGhii
     ? ` · ${t('inbox.viaAddress')} ${activeConv.groupAlias}` : ''}${activeConv.participants?.length
     ? ` · ${t('inbox.groupParticipants', { count: String(activeConv.participants.length) })}` : ''}`;
   return html`
     <${Pane}>
-      <${PaneHead} picture=${peerAv ? null : activeConv.peerGhii} before=${peerAv ? html`<${AgentAvatar} avatar=${peerAv} />` : null} name=${peerDisplay(activeConv.peerGhii)} nameTitle=${activeConv.peerGhii}
+      <${PaneHead} picture=${peerAv ? null : (chatGroup ? activeConv.groupAlias : activeConv.peerGhii)} before=${peerAv ? html`<${AgentAvatar} avatar=${peerAv} />` : null}
+        name=${chatGroup ? (activeConv.subject || t('inbox.group.untitled')) : peerDisplay(activeConv.peerGhii)} nameTitle=${chatGroup ? null : activeConv.peerGhii}
         presence=${activeConv.groupAlias ? null : activeConv.peerGhii}
-        subject=${activeConv.subject || null}
+        subject=${chatGroup ? null : (activeConv.subject || null)}
         via=${viaAgentName ? t('inbox.agentTakesPart', { agent: viaAgentName }) : null}
         address=${address}>
         ${/* Two doors and the rest behind "…": the head used to carry six buttons, four of them for
               settings and second-order actions, on the row that names who you are talking to. */''}
         <${ThreadReadAloud} thread=${thread} peerLabelText=${peerDisplay(activeConv.peerGhii)} convId=${activeConv.conversationId} />
+        ${groupDoor ? html`<${PaneDoor} mark=${groupDoor.mark} label=${groupDoor.label} title=${groupDoor.label} pressed=${groupDoor.pressed} onClick=${groupDoor.onClick} />` : null}
         <${PaneDoor} label=${t('inbox.ai.replyWithAi')} title=${t('inbox.ai.replyWithAi')} onClick=${openConversationAi} />
         <${KebabMenu} label=${t('inbox.cover.more') || 'More'} trigger="…" items=${[
           { label: t('inbox.notebook.toNotebook'), onClick: openConversationNotebook },
@@ -163,6 +171,7 @@ export function ThreadPanel({
           archiveItem || null,
         ]} />
       <//>
+      ${groupStrip || null}
       <${Thread} scrollRef=${msgsRef}>
         ${thread.length === 0 ? html`<${Note} kind="quiet">${t('inbox.noThread')}<//>` : null}
         ${(!threadAll && (activeConv.messageCount || 0) > thread.length) ? html`

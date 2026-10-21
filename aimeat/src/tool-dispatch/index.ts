@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.14.0 -- 2026-10-21 -- dmGroupCliTools: the six aimeat_dm_group_* tools (group chat).
  *   v1.13.0 -- 2026-10-20 -- contentCliTools: aimeat_content_facts, _inspect, _scan, _classes and _settings
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.12.0 -- 2026-10-20 -- extensionTools: the extension entries move out of tool-call-defs-apps.ts,
@@ -64,6 +65,7 @@ import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
 import { exposureCliTools } from './tool-call-defs-exposure.js';
 import { publishCliTools } from './tool-call-defs-publish.js';
 import { accountRightsCliTools } from './tool-call-defs-account-rights.js';
+import { dmGroupCliTools } from './tool-call-defs-dm-groups.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -111,6 +113,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...exposureCliTools,
     ...publishCliTools,
     ...accountRightsCliTools,
+    ...dmGroupCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

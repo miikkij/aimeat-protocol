@@ -35,6 +35,7 @@
  *   2026-10-18 — registerPublishRequestTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   2026-10-18 — registerAccountRightsTools: aimeat_adult_status, aimeat_subscription_list,
  *     aimeat_subscription_cancel, aimeat_provenance_embed (Comicland v3 A-3, A-5, A-8).
+ *   2026-10-21 — registerDmGroupTools: the six aimeat_dm_group_* tools (group chat).
  *   2026-10-17 — registerExposureTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   2026-10-16 — registerExtensionsTools receives getToken: aimeat_extension_invoke gives an action's
  *     ctx.buy the session's bearer, as POST /v1/ext/:extName/:actionId does (QA audit D2-05).
@@ -126,6 +127,7 @@ import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
 import { registerVisibilityTools } from './visibility.js';
 import { registerExposureTools } from './exposure.js';
+import { registerDmGroupTools } from './dm-groups.js';
 import { registerPublishRequestTools } from './publish-requests.js';
 import { registerAccountRightsTools } from './account-rights.js';
 import { registerAppManageTool } from './app-manage.js';
@@ -283,6 +285,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // The v2 task handle, beside the dashboard work item registered above. Both stay.
     registerAgentV2TaskTools(mcp, storage, config, agentGaii, owner, caller);
     registerDmMessageTools(mcp, storage, config, agentGaii, peers, scopes, caller);
+    registerDmGroupTools(mcp, storage, config, peers, caller);
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii, caller);
     registerContactTools(mcp, storage, config, agentGaii, scopes, caller);

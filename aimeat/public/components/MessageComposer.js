@@ -27,6 +27,8 @@
  *          sending=${sending} onSend=${(recipient, markdown, files, reset) => …} draftKey=${'aimeat.inbox.draft.' + convId} />`
  *   Remount it (a `key` per conversation) so a draft never leaks between threads.
  * @version-history
+ *   v1.0.1 — 2026-10-21 — clearDraft cancels a save still waiting: a message sent within 400 ms of the
+ *     last keystroke came back as the draft of its conversation.
  *   v1.0.0 — 2026-09-26 — Moved out of views/profile/inbox-tab/components.js (Composer) with every
  *     behaviour unchanged, and loadToastUI and bigEditorHeight with it from inbox-tab/helpers.js. Put
  *     back main's layout the previous branch lost: the field on a line of its own over the whole
@@ -112,7 +114,11 @@ export function MessageComposer({
       try { if (text && text.trim()) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
     }, 400);
   };
-  const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
+  // A save still waiting would write the sent text back as a draft 400 ms later, so it is cancelled first.
+  const clearDraft = () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
+  };
 
   // A pasted / dropped image is added to the SAME file-attachment queue as the 📎 button (uploaded to
   // storage + rendered as an image on the message) — never base64-inlined into the body, which would

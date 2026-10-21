@@ -58332,6 +58332,172 @@ paths:
   # Direct Messages (human↔human GHII messaging + federation)
   # ============================================================
 
+  /v1/messages/groups:
+    post:
+      operationId: createGroupConversation
+      summary: Open a group chat with its first message
+      description: >-
+        Opens a group conversation with the people (and agents) named in `members` and sends its first
+        message. Members live on this node. A member whose contact book already accepts the caller's
+        account joins at once; anybody else is INVITED and sees nothing of the group until they accept
+        (POST /v1/messages/groups/{conversationId}/invitation). Each name comes back in `members` with
+        `result` added, invited, or refused with `code` (INVALID_IDENTITY, NOT_FOUND,
+        CROSS_NODE_UNSUPPORTED, BLOCKED); the group opens as long as one other member is added or
+        invited, else 400 NO_MEMBERS. The caller manages the group. Messages are then sent with POST
+        /v1/messages and `conversation_id`, and read with GET /v1/messages/conversations/{id}; a member
+        who joins later receives what is written from then on, not the history. `as_owner: true` lets
+        an agent open the group in its owner's name (needs `messages:send-as-owner`); the first message
+        then names the agent. The account's send limit applies (429 RATE_LIMITED with Retry-After). The
+        aimeat_dm_group_create MCP tool calls the same service.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [members, subject, body]
+              properties:
+                members: { type: array, minItems: 1, maxItems: 63, items: { type: string, maxLength: 256 }, description: 'Account names, people (owner@node), agents (agent#owner@node) or apps.' }
+                subject: { type: string, minLength: 1, maxLength: 200, description: "The group's name, shown in every member's list." }
+                body: { type: string, maxLength: 200000, description: 'The first message (GFM markdown).' }
+                as_owner: { type: boolean }
+                ai_provenance: { type: object, additionalProperties: true }
+                ai_provenance_id: { type: string }
+      responses:
+        '201':
+          description: "{ conversation_id, subject, manager, participants, invited, you_manage, message_id, delivered_to, members: [{ identity, result, code?, message? }], ai_provenance_id?, reply_with }"
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/AimeatError' }
+  /v1/messages/groups/invitations:
+    get:
+      operationId: listGroupInvitations
+      summary: Group chats the caller is invited to and has not answered
+      description: >-
+        A person sees their own invitations and their agents'; an agent sees its own. Each carries the
+        group's name, who invited, who is invited from this mailbox, and the current members. Needs
+        `messages:read`.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: "{ invitations: [{ conversation_id, subject, invited_by, invitees, participants, updated_at }] }"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/messages/groups/{conversationId}:
+    get:
+      operationId: getGroupConversation
+      summary: The members of a group chat, for a member
+      description: >-
+        The group's name, its manager, its members, its open invitations and whether the caller manages
+        it. Anybody who is not a member gets 404, the same as for a group that does not exist. Needs
+        `messages:read`.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: "{ conversation_id, subject, manager, participants, invited, you_manage }"
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/messages/groups/{conversationId}/members:
+    post:
+      operationId: changeGroupMembers
+      summary: The manager adds and removes members
+      description: >-
+        Only the group's manager (the account that opened it, or the one it passed to) may. Adding
+        follows the rule of opening: a person whose contacts accept the manager joins, anybody else is
+        invited. Removing takes away a member or an open invitation; the manager cannot be removed and
+        leaves instead. A thread opened through a named address (support@operators) answers 400
+        NOT_A_GROUP. 403 NOT_THE_MANAGER for any other member, 403 NOT_A_PARTICIPANT for a stranger.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                add: { type: array, maxItems: 63, items: { type: string, maxLength: 256 } }
+                remove: { type: array, maxItems: 63, items: { type: string, maxLength: 256 } }
+                as_owner: { type: boolean }
+      responses:
+        '200':
+          description: "{ conversation_id, subject, manager, participants, invited, you_manage, members: [{ identity, result, code?, message? }] }"
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/messages/groups/{conversationId}/leave:
+    post:
+      operationId: leaveGroupConversation
+      summary: Leave a group chat
+      description: >-
+        A person leaves with their agents; an agent leaves alone. When the manager's account leaves, the
+        next person still in the group manages it, and `manager` names who.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                as_owner: { type: boolean }
+      responses:
+        '200':
+          description: "{ conversation_id, left: true, manager }"
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/messages/groups/{conversationId}/invitation:
+    post:
+      operationId: answerGroupInvitation
+      summary: Accept or decline an invitation to a group chat
+      description: >-
+        A person answers for themselves and for their own agents; an agent answers for itself. After
+        accepting, the caller receives what is written from then on. 404 NOT_INVITED when there is no
+        open invitation for the caller.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: conversationId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [accept]
+              properties:
+                accept: { type: boolean }
+                as_owner: { type: boolean }
+      responses:
+        '200':
+          description: "{ conversation_id, accepted, joined, and when accepted the group: subject, manager, participants, invited, you_manage }"
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/messages/as-owner:
     post:
       operationId: sendDirectMessageAsOwner

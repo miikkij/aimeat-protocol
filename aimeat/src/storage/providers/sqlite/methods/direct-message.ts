@@ -11,10 +11,13 @@
  *   v1.0.0 — 2026-10-05 — 30 methods (createDirectMessage, getDirectMessage, getDirectMessagesByIds, …) moved
  *     here from messaging.ts so the file mirrors postgres-kysely/methods/direct-message.ts (secaudit 2026-10,
  *     M8).
+ *   v1.1.0 — 2026-10-21 — listConversationsInvitingMailbox, and updateConversation takes ConversationUpdate
+ *     (group chat invitations).
  */
 import type {
   DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats,
 } from '../../../interface.js';
+import type { ConversationUpdate } from '../../../repositories/direct-message.repository.js';
 import type { SqliteStorage } from '../index.js';
 import * as directMessageRepo from '../repos/direct-message.js';
 
@@ -122,12 +125,16 @@ export const directMessageMethods = {
     return directMessageRepo.getConversation(this.db, id);
   },
 
-  async updateConversation(this: SqliteStorage, id: string, updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>): Promise<ConversationRecord | null> {
+  async updateConversation(this: SqliteStorage, id: string, updates: ConversationUpdate): Promise<ConversationRecord | null> {
     return directMessageRepo.updateConversation(this.db, id, updates);
   },
 
   async listConversationsForParticipant(this: SqliteStorage, identity: string): Promise<ConversationRecord[]> {
     return directMessageRepo.listConversationsForParticipant(this.db, identity);
+  },
+
+  async listConversationsInvitingMailbox(this: SqliteStorage, mailboxGhii: string, opts?: { limit?: number }): Promise<ConversationRecord[]> {
+    return directMessageRepo.listConversationsInvitingMailbox(this.db, mailboxGhii, opts);
   },
 
   async getContact(this: SqliteStorage, ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null> {

@@ -8,9 +8,12 @@
  * @structure send / listInbox / listConversations / getConversation / markConversationRead /
  *   markRead / deleteMessage / listRequests / acceptRequest / blockContact / listContacts /
  *   uploadAttachment / attachmentUrl / transcribeAttachment / getOrganize / updateOrganize /
- *   archiveConversations
+ *   archiveConversations / createGroup / getGroup / changeGroupMembers / leaveGroup /
+ *   listGroupInvitations / answerGroupInvitation
  * @usage import * as messages from '/js/services/messages.js';
  * @version-history
+ *   v1.7.0 -- 2026-10-21 -- Group chat: createGroup, getGroup, changeGroupMembers, leaveGroup,
+ *     listGroupInvitations and answerGroupInvitation over /v1/messages/groups.
  *   v1.6.0 -- 2026-10-08 -- send() takes aiProvenanceId and sends it as ai_provenance_id (aiprov D17).
  *   v1.5.0 -- 2026-09-13 -- getOrganize / updateOrganize / archiveConversations: the owner's archive
  *     and the rules for their Messages list (/v1/messages/organize).
@@ -145,6 +148,38 @@ export async function blockContact(contactId) {
 export async function listContacts(state) {
   const r = await apiGet(`/v1/messages/contacts${state ? `?state=${enc(state)}` : ''}`);
   return r?.data?.contacts || [];
+}
+
+// ── Group chat (/v1/messages/groups) ──
+
+/** Open a group with its first message. Answers { ok, data: { conversation_id, participants, invited, members: [{ identity, result }] } }. */
+export async function createGroup({ members, subject, body } = /** @type {{ members?: string[], subject?: string, body?: string }} */ ({})) {
+  return api('/v1/messages/groups', { method: 'POST', body: JSON.stringify({ members, subject, body }) });
+}
+
+/** The members of a group, for a member: { subject, manager, participants, invited, you_manage }. */
+export async function getGroup(conversationId) {
+  const r = await apiGet(`/v1/messages/groups/${enc(conversationId)}`);
+  return r?.data || null;
+}
+
+/** The manager adds and removes members. */
+export async function changeGroupMembers(conversationId, { add, remove } = /** @type {{ add?: string[], remove?: string[] }} */ ({})) {
+  return api(`/v1/messages/groups/${enc(conversationId)}/members`, { method: 'POST', body: JSON.stringify({ add, remove }) });
+}
+
+export async function leaveGroup(conversationId) {
+  return api(`/v1/messages/groups/${enc(conversationId)}/leave`, { method: 'POST', body: '{}' });
+}
+
+/** Group chats the owner (or one of their agents) is invited to and has not answered. */
+export async function listGroupInvitations() {
+  const r = await apiGet('/v1/messages/groups/invitations');
+  return r?.data?.invitations || [];
+}
+
+export async function answerGroupInvitation(conversationId, accept) {
+  return api(`/v1/messages/groups/${enc(conversationId)}/invitation`, { method: 'POST', body: JSON.stringify({ accept: !!accept }) });
 }
 
 const mb = (bytes) => (bytes / (1024 * 1024)).toFixed(1);

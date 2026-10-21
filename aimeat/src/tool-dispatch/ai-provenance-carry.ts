@@ -57,6 +57,7 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.6 — 2026-10-21 — aimeat_dm_group_create: recorded-by-route, POST /v1/messages/groups.
  *   v1.3.5 — 2026-10-08 — aimeat_storage_upload: recorded-by-route, POST /v1/storage.
  *   v1.3.6 — 2026-10-08 — aimeat_board_post, aimeat_board_reply, aimeat_dm_ask, aimeat_dm_send,
  *     aimeat_dm_broadcast, aimeat_dm_send_as_owner, aimeat_message_send and aimeat_task_complete:
@@ -176,6 +177,8 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   aimeat_dm_send: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
   aimeat_dm_broadcast: { kind: 'recorded-by-route', route: 'POST /v1/messages/broadcast' },
   aimeat_dm_send_as_owner: { kind: 'recorded-by-route', route: 'POST /v1/messages' },
+  // services/conversation-group-open.ts records the first message's declaration, as a send does.
+  aimeat_dm_group_create: { kind: 'recorded-by-route', route: 'POST /v1/messages/groups' },
   // The route records the declaration and attaches an id from the body, refuses a declaration the
   // caller may not make before it settles, and embeds the record in the work it answers (aiprov D2).
   aimeat_exchange_work_deliver: { kind: 'recorded-by-route', route: 'POST /v1/exchange/work/:id/deliver' },
