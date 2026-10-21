@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<!--
+  @file front-start.fi.html
+  @description The Finnish "accelerate your AI" front page: this is a demo site, connect your
+    own AI and run agents even on your own computer, registration is free, the five levels and
+    how they match McKinsey's four, and the two ways to an AIMEAT of your own. Composed in
+    Finnish, not translated (aimeat-writing skill); the English sibling is front-start.html.
+    Same skeleton, same /front-start.css and /front-start.js. Served at / for Finnish readers
+    when AIMEAT_FRONT_PAGE=start, and reachable at /front-start.fi.html either way.
+  @version-history
+    v1.0.0 - 2026-10-21 - Initial: the canvas design Jouni approved on 2026-10-21.
+-->
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIMEAT · Kiihdytä tekoälysi</title>
+  <meta name="description" content="aimeat.io on ilmainen demosivusto. Liitä oma tekoälysi, anna agenttien tehdä työtä ja katso, kuinka paljon tekoäly nopeuttaa omaa työtäsi. Rekisteröinti ei vaadi mitään." />
+  <link rel="stylesheet" href="/lib/aimeat-fonts.css">
+  <link rel="stylesheet" href="/front-start.css">
+  <script src="/front-start.js" defer></script>
+</head>
+<body>
+
+  <div class="fs-banner"><strong>Tämä on demosivusto.</strong> Täällä kokeilet, kuinka paljon tekoäly nopeuttaa omaa työtäsi.</div>
+
+  <header class="fs-top">
+    <div class="fs-wrap">
+      <a class="fs-brand" href="/" aria-label="AIMEAT, etusivu">AIME<span class="heart">&#9829;</span><span class="brand-at">AT</span></a>
+      <nav class="fs-nav" aria-label="Päävalikko">
+        <a href="https://experience-center.apps.aimeat.io">Experience Center</a>
+        <a href="/v1/publicworkspaceviewer?org=d0d999ef-712b-408b-91e9-e074cfac3bae&amp;ws=ws-mvcjbdt2c03&amp;type=pages&amp;id=doc-mvckn9b3mub7&amp;view=page">Tarina</a>
+        <a href="/v1/portal">Koko näkymä</a>
+        <a id="fs-enter" href="/v1/portal">Kirjaudu</a>
+        <a class="fs-lang" href="/front-start.html" lang="en" hreflang="en">EN</a>
+        <a class="fs-btn fs-btn--cream" href="/v1/connect-your-ai">Aloita ilmaiseksi</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="fs-hero">
+    <div class="fs-wrap">
+      <div class="fs-hero-text">
+        <p class="fs-mono">Ilmainen demo · avoin lähdekoodi</p>
+        <h1>Kiihdytä tekoälysi. <span>Nouse tasolle 5.</span></h1>
+        <p class="fs-hero-lead">Liitä oma tekoälysi tähän sivustoon. Se saa muistin, työkalut ja agentit, jotka tekevät työtä puolestasi. Agentit voivat toimia myös omalla koneellasi, turvallisesti ja sinun luvillasi.</p>
+        <div class="fs-ctas">
+          <a class="fs-btn fs-btn--lg fs-btn--sun" href="/v1/connect-your-ai">Aloita ilmaiseksi</a>
+          <a class="fs-btn fs-btn--lg fs-btn--ghost-light" href="https://experience-center.apps.aimeat.io">Kokeile Experience Centerissä</a>
+        </div>
+        <ul class="fs-ticks">
+          <li>Rekisteröinti ei vaadi mitään</li>
+          <li>Täysin ilmainen</li>
+          <li>Tietosi ovat sinun</li>
+        </ul>
+      </div>
+      <div class="fs-ladder" role="img" aria-label="Viisi tasoa: aloitat tasolta 1 ja nouset tasolle 5">
+        <div class="fs-steps" aria-hidden="true">
+          <div class="fs-step">1</div><div class="fs-step">2</div><div class="fs-step">3</div><div class="fs-step">4</div><div class="fs-step">5</div>
+        </div>
+        <div class="fs-ladder-legend" aria-hidden="true"><span>Aloitat tästä</span><span>Tavoite</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tasot" class="fs-wrap fs-section fs-section--first">
+    <div class="fs-head">
+      <h2 class="fs-h2">Viisi tasoa. Missä sinä olet nyt?</h2>
+      <p class="fs-lead">Jokainen taso tuo tekoälyllesi uuden kyvyn. Valitse taso, niin näet, mitä voit pyytää sen jälkeen.</p>
+    </div>
+    <div class="fs-levels" role="group" aria-label="Valitse taso">
+      <button type="button" class="fs-level" aria-pressed="true" data-n="1" data-mck="Vastaa McKinseyn tasoa 1 (13x)" data-example="Tiivistä tämä kokousmuistio kolmeen kohtaan.">
+        <span class="fs-level-n">1</span><span class="fs-level-name">Hallittu pääsy</span>
+        <span class="fs-level-body">Käytät hyväksyttyä tekoälyä, ja tietosi pysyvät suojassa. Tekoäly avustaa yksittäisissä tehtävissä.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="2" data-mck="Vastaa McKinseyn tasoa 1 (13x)" data-example="Muista, että asiakkaani haluaa raportin aina perjantaisin.">
+        <span class="fs-level-n">2</span><span class="fs-level-name">Osaava käyttö</span>
+        <span class="fs-level-body">Kerrot asian kerran, ja jokainen tekoälysi tietää sen. Toimivat ohjeet jaetaan muille.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="3" data-mck="Vastaa McKinseyn tasoa 2 (14x)" data-example="Tee sivu, jolla kerään ilmoittautumiset ensi viikon tapahtumaan.">
+        <span class="fs-level-n">3</span><span class="fs-level-name">Integroitu</span>
+        <span class="fs-level-body">Tekoäly lukee tietojasi suoraan sinun oikeuksillasi. Se rakentaa sovelluksen tai raportin yhdestä pyynnöstä.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="4" data-mck="Vastaa McKinseyn tasoa 2 (14x)" data-example="Hae joka aamu uudet tarjouspyynnöt ja kerro, mitkä sopivat meille.">
+        <span class="fs-level-n">4</span><span class="fs-level-name">Agentit töissä</span>
+        <span class="fs-level-body">Agentti tekee rajatun työn itse, omalla tunnuksellaan. Sinä hyväksyt päätökset.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="5" data-mck="Avaa McKinseyn tasot 3 ja 4 (20x ja 31x)" data-example="Kokoa kaksi agenttia ja tiimini tekemään kuukausikatsaus. Minä hyväksyn sen ennen julkaisua.">
+        <span class="fs-level-n">5</span><span class="fs-level-name">AI-natiivi</span>
+        <span class="fs-level-body">Ihmiset ja agentit tekevät työtä rinnakkain. Jokainen teko on jäljitettävissä.</span>
+      </button>
+    </div>
+    <div class="fs-try" aria-live="polite">
+      <div class="fs-try-side">
+        <span class="fs-mono">Taso <span id="fs-try-n">1</span>: kokeile chatissa</span>
+        <a id="fs-try-mck" href="#mckinsey">Vastaa McKinseyn tasoa 1 (13x)</a>
+      </div>
+      <p class="fs-try-quote" id="fs-try-quote">”Tiivistä tämä kokousmuistio kolmeen kohtaan.”</p>
+    </div>
+  </section>
+
+  <section id="mckinsey" class="fs-wrap fs-section">
+    <div class="fs-head">
+      <p class="fs-mono fs-kicker-red">Sama polku tutkimuksessa</p>
+      <h2 class="fs-h2">McKinsey: tekoälyn arvo kasvaa neljässä tasossa</h2>
+      <p class="fs-lead">McKinsey tutki 471 pääomasijoittajien omistamaa yhtiötä 31 toimialalla. Se jakoi tekoälyn tuoman arvon neljään tasoon. Kerroin on yhtiön arvo suhteessa liikevaihtoon, mediaani.</p>
+    </div>
+    <div class="fs-mck">
+      <div class="fs-mck-card">
+        <span class="fs-mck-tag">McKinsey taso 1</span><span class="fs-mck-x">13x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-13"></span></div>
+        <span class="fs-mck-name">Kokeilut</span>
+        <span class="fs-mck-body">Irrallisia kokeiluja ja henkilökohtaisia työkaluja. Tekoäly ei ole työnkuluissa.</span>
+        <span class="fs-chip">AIMEAT-tasot 1–2</span>
+      </div>
+      <div class="fs-mck-card">
+        <span class="fs-mck-tag">McKinsey taso 2</span><span class="fs-mck-x">14x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-14"></span></div>
+        <span class="fs-mck-name">Toiminnan tehostus</span>
+        <span class="fs-mck-body">Tekoäly on työnkuluissa. Tuottavuus ja kate paranevat.</span>
+        <span class="fs-chip">AIMEAT-tasot 3–4</span>
+      </div>
+      <div class="fs-mck-card fs-mck-card--dark">
+        <span class="fs-mck-tag">McKinsey taso 3</span><span class="fs-mck-x">20x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-20"></span></div>
+        <span class="fs-mck-name">Tuote muuttuu</span>
+        <span class="fs-mck-body">Tekoäly on osa tuotetta tai palvelua. Se alkaa näkyä myynnissä.</span>
+        <span class="fs-chip">AIMEAT-taso 5 avaa tämän</span>
+      </div>
+      <div class="fs-mck-card fs-mck-card--dark">
+        <span class="fs-mck-tag">McKinsey taso 4</span><span class="fs-mck-x">31x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-31"></span></div>
+        <span class="fs-mck-name">Uusi liiketoiminta</span>
+        <span class="fs-mck-body">Yritys rakentaa uusia tekoälypalveluja ja datatuotteita.</span>
+        <span class="fs-chip">AIMEAT-taso 5 avaa tämän</span>
+      </div>
+    </div>
+    <div class="fs-two">
+      <div class="fs-note">
+        <h3>Tuottavuus yksin ei nosta arvoa</h3>
+        <p>Tasojen 1 ja 2 ero on pieni: 13x ja 14x. Arvo nousee, kun tekoäly muuttaa sitä, mitä yritys myy. AIMEATin tasot 1–4 ovat pohja. Taso 5 avaa McKinseyn tasot 3 ja 4.</p>
+      </div>
+      <div class="fs-note">
+        <h3>Meidän näkemyksemme: erillistä AI-tiimiä ei tarvita</h3>
+        <p>McKinseyn mukaan suurin este on osaajapula, ja taso 4 vaatii erilliset tekoälytiimit. Kun ihmiset ja agentit toimivat samalla alustalla, tekoäly on jokaisen tiimin sisällä. Uusia palveluja voi rakentaa nykyisellä väellä.</p>
+      </div>
+    </div>
+    <h3 class="fs-h3">Mitä alustan pitää antaa jokaisella askeleella</h3>
+    <ol class="fs-path">
+      <li><span class="fs-path-step">0 → 1</span><span class="fs-path-need"><strong>Tarvitaan:</strong> tieto pysyy yrityksellä, ja työkalut on hyväksytty.</span><span class="fs-path-give"><strong>AIMEAT antaa:</strong> oman AIMEATin yrityksen omassa ympäristössä. Yritys valitsee tekoälyn toimittajan ja käyttää omaa avaintaan.</span></li>
+      <li><span class="fs-path-step">1 → 2</span><span class="fs-path-need"><strong>Tarvitaan:</strong> yhteinen tieto ja jaetut ohjeet.</span><span class="fs-path-give"><strong>AIMEAT antaa:</strong> yhteiset työtilat, joihin ihmiset kokoavat päätökset, ohjeet ja toimivat käyttötavat. Valmiit sovelluspohjat.</span></li>
+      <li><span class="fs-path-step">2 → 3</span><span class="fs-path-need"><strong>Tarvitaan:</strong> tekoäly lukee yrityksen tietoa suoraan.</span><span class="fs-path-give"><strong>AIMEAT antaa:</strong> mikä tahansa tekoäly liittyy yhdellä yhteydellä (MCP). Se lukee ja kirjoittaa käyttäjän oikeuksilla.</span></li>
+      <li><span class="fs-path-step">3 → 4</span><span class="fs-path-need"><strong>Tarvitaan:</strong> agentit toimivat itse rajatulla alueella.</span><span class="fs-path-give"><strong>AIMEAT antaa:</strong> jokaisella agentilla on oma tunnus ja omat oikeudet. Sinä päätät, toimiiko agentti itse, tekeekö se luonnoksen vai kysyykö se ensin. Työ voi alkaa ajastettuna tai tapahtumasta.</span></li>
+      <li><span class="fs-path-step">4 → 5</span><span class="fs-path-need"><strong>Tarvitaan:</strong> luottamus perustuu jäljitettävyyteen.</span><span class="fs-path-give"><strong>AIMEAT antaa:</strong> jokaisesta sisällöstä näkyy, tekikö sen ihminen vai tekoäly, millä mallilla ja mistä lähteistä. Päätökset kirjataan, ja agentin työ näkyy jälkikäteen.</span></li>
+    </ol>
+    <p class="fs-source">Lähde: McKinsey, <a href="https://www.mckinsey.com/capabilities/business-building/our-insights/beyond-productivity-how-ai-creates-value-in-private-equity" rel="noopener">Beyond productivity: How AI creates value in private equity</a>. Tasojen kytkentä AIMEATin tasoihin on meidän tulkintamme.</p>
+  </section>
+
+  <section class="fs-wrap fs-section">
+    <h2 class="fs-h2">Kolme askelta, ja tekoälysi on töissä</h2>
+    <ol class="fs-cards3">
+      <li class="fs-card"><span class="fs-card-n">01</span><h3>Luo tunnus</h3><p>Ei lomakkeita, ei maksukorttia, ei sitoumusta. Tunnus syntyy, kun aloitat.</p></li>
+      <li class="fs-card"><span class="fs-card-n">02</span><h3>Liitä tekoälysi</h3><p>Claude, ChatGPT, Codex, Cursor ja VS Code liittyvät yhdellä yhteydellä. Jos tekoälysi ei osaa sitä, saat valmiin kehotteen, jonka liität chattiin.</p></li>
+      <li class="fs-card"><span class="fs-card-n">03</span><h3>Pyydä chatissa</h3><p>Teet työn samassa chatissa kuin ennenkin. Uutta käyttöliittymää ei tarvitse opetella.</p></li>
+    </ol>
+  </section>
+
+  <section class="fs-wrap fs-section">
+    <div class="fs-agents">
+      <div class="fs-agents-text">
+        <h2>Agentit toimivat jopa omalla koneellasi</h2>
+        <p>Agentti on tekoäly, joka tekee työn itsenäisesti. Voit ajaa sen omalla koneellasi, ja se tekee työtä sinun tiedoillasi. Sinä päätät, mitä se saa tehdä.</p>
+      </div>
+      <ul class="fs-checks">
+        <li>Sinä hyväksyt jokaisen agentin, ennen kuin se pääsee töihin.</li>
+        <li>Sinä valitset, mitä se saa lukea ja kirjoittaa.</li>
+        <li>Näet jokaisen teon, ja jokainen teko on merkitty.</li>
+        <li>Pysäytät tai poistat agentin milloin tahansa.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="fs-wrap fs-section">
+    <div class="fs-head">
+      <h2 class="fs-h2">Haluatko oman AIMEATin?</h2>
+      <p class="fs-lead">Demo on yhteinen kaikille. Oma AIMEAT on vain sinun tai yrityksesi. Vaikka me katoaisimme huomenna, ympäristö jää sinulle.</p>
+    </div>
+    <div class="fs-own">
+      <div class="fs-own-card">
+        <h3>Osta meiltä</h3>
+        <p>Me pystytämme oman instanssin sinulle ja pidämme sen ajan tasalla. Sinä omistat tiedot.</p>
+        <div class="fs-grow"></div>
+        <a class="fs-btn fs-btn--ink" href="/v1/pricing">Katso hinnat</a>
+      </div>
+      <div class="fs-own-card">
+        <h3>Asenna itse</h3>
+        <p>Lähdekoodi on avoin GitHubissa. Anna tekoälysi asentaa se: liitä tämä kehote chattiin.</p>
+        <div class="fs-prompt" id="fs-prompt">Asenna AIMEAT koneelleni osoitteen github.com/<wbr>miikkij/<wbr><span class="fs-nowrap">aimeat-protocol</span> ohjeilla ja kerro, kun se on käynnissä.</div>
+        <div class="fs-grow"></div>
+        <div class="fs-row">
+          <button type="button" class="fs-btn fs-btn--ink" id="fs-copy">Kopioi kehote</button>
+          <a class="fs-btn fs-btn--ghost" href="https://github.com/miikkij/aimeat-protocol" rel="noopener">Avaa GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fs-wrap fs-section fs-section--last">
+    <h2 class="fs-h2">Tutustu lisää</h2>
+    <div class="fs-more">
+      <a href="https://experience-center.apps.aimeat.io"><span class="fs-more-title">Experience Center</span><span class="fs-more-body">Opettele koko ekosysteemi kokeillen, askel kerrallaan.</span><span class="fs-more-go">Avaa →</span></a>
+      <a href="/v1/publicworkspaceviewer?org=d0d999ef-712b-408b-91e9-e074cfac3bae&amp;ws=ws-mvcjbdt2c03&amp;type=pages&amp;id=doc-mvckn9b3mub7&amp;view=page"><span class="fs-more-title">Ovi on auki</span><span class="fs-more-body">Tarina kuudessa luvussa: miksi tekoälysi kannattaa tuoda saman katon alle.</span><span class="fs-more-go">Lue tarina →</span></a>
+      <a href="/v1/portal"><span class="fs-more-title">Koko näkymä</span><span class="fs-more-body">Kaikki, mitä täällä on: sovellukset, taulut, agentit ja mitä juuri nyt tapahtuu.</span><span class="fs-more-go">Avaa koko näkymä →</span></a>
+      <a href="/v1/everything"><span class="fs-more-title">Kaikki ominaisuudet</span><span class="fs-more-body">Kaikki, mitä AIMEAT osaa, yhdellä sivulla.</span><span class="fs-more-go">Katso ominaisuudet →</span></a>
+      <a href="/v1/changelog"><span class="fs-more-title">Muutosloki</span><span class="fs-more-body">Mitä on tehty ja milloin, uusin ensin.</span><span class="fs-more-go">Lue muutosloki →</span></a>
+    </div>
+  </section>
+
+  <footer class="fs-foot">
+    <div class="fs-wrap">
+      <span>AIMEAT · avoin lähdekoodi · demosivusto</span>
+      <span class="fs-foot-links"><a href="/v1/everything">Kaikki ominaisuudet</a><a href="/v1/changelog">Muutosloki</a><a href="/v1/transparency">AI-läpinäkyvyys</a><a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a></span>
+      <span>Tekoäly luonnosteli tekstit, ihminen hyväksyi ne.</span>
+    </div>
+  </footer>
+
+</body>
+</html>

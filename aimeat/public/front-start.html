@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<!--
+  @file front-start.html
+  @description The English "accelerate your AI" front page: this is a demo site, connect your
+    own AI and run agents even on your own computer, registration is free, the five levels and
+    how they match McKinsey's four, and the two ways to an AIMEAT of your own. The Finnish
+    sibling is front-start.fi.html. Same skeleton, same /front-start.css and /front-start.js.
+    Served at / when AIMEAT_FRONT_PAGE=start, and reachable at /front-start.html either way.
+  @version-history
+    v1.0.0 - 2026-10-21 - Initial: the canvas design Jouni approved on 2026-10-21.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIMEAT · Accelerate your AI</title>
+  <meta name="description" content="aimeat.io is a free demo site. Connect your own AI, let agents do the work, and see how much faster AI makes your own work. Signing up asks for nothing." />
+  <link rel="stylesheet" href="/lib/aimeat-fonts.css">
+  <link rel="stylesheet" href="/front-start.css">
+  <script src="/front-start.js" defer></script>
+</head>
+<body>
+
+  <div class="fs-banner"><strong>This is a demo site.</strong> Here you find out how much faster AI makes your own work.</div>
+
+  <header class="fs-top">
+    <div class="fs-wrap">
+      <a class="fs-brand" href="/" aria-label="AIMEAT, front page">AIME<span class="heart">&#9829;</span><span class="brand-at">AT</span></a>
+      <nav class="fs-nav" aria-label="Main menu">
+        <a href="https://experience-center.apps.aimeat.io">Experience Center</a>
+        <a href="/v1/publicworkspaceviewer?org=d0d999ef-712b-408b-91e9-e074cfac3bae&amp;ws=ws-mvcjbdt2c03&amp;type=pages&amp;id=doc-mvckn9b3mub7&amp;view=page">The story</a>
+        <a href="/v1/portal">Everything here</a>
+        <a id="fs-enter" href="/v1/portal">Sign in</a>
+        <a class="fs-lang" href="/front-start.fi.html" lang="fi" hreflang="fi">FI</a>
+        <a class="fs-btn fs-btn--cream" href="/v1/connect-your-ai">Start free</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="fs-hero">
+    <div class="fs-wrap">
+      <div class="fs-hero-text">
+        <p class="fs-mono">Free demo · open source</p>
+        <h1>Accelerate your AI. <span>Reach level 5.</span></h1>
+        <p class="fs-hero-lead">Connect your own AI to this site. It gets a memory, tools and agents that do the work for you. The agents can also run on your own computer, safely and with your permission.</p>
+        <div class="fs-ctas">
+          <a class="fs-btn fs-btn--lg fs-btn--sun" href="/v1/connect-your-ai">Start free</a>
+          <a class="fs-btn fs-btn--lg fs-btn--ghost-light" href="https://experience-center.apps.aimeat.io">Try the Experience Center</a>
+        </div>
+        <ul class="fs-ticks">
+          <li>Signing up asks for nothing</li>
+          <li>Completely free</li>
+          <li>Your data stays yours</li>
+        </ul>
+      </div>
+      <div class="fs-ladder" role="img" aria-label="Five levels: you start at level 1 and rise to level 5">
+        <div class="fs-steps" aria-hidden="true">
+          <div class="fs-step">1</div><div class="fs-step">2</div><div class="fs-step">3</div><div class="fs-step">4</div><div class="fs-step">5</div>
+        </div>
+        <div class="fs-ladder-legend" aria-hidden="true"><span>You start here</span><span>The goal</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="levels" class="fs-wrap fs-section fs-section--first">
+    <div class="fs-head">
+      <h2 class="fs-h2">Five levels. Where are you now?</h2>
+      <p class="fs-lead">Each level gives your AI a new ability. Pick a level to see what you can ask for once you are there.</p>
+    </div>
+    <div class="fs-levels" role="group" aria-label="Pick a level">
+      <button type="button" class="fs-level" aria-pressed="true" data-n="1" data-mck="Matches McKinsey level 1 (13x)" data-example="Sum up these meeting notes in three points.">
+        <span class="fs-level-n">1</span><span class="fs-level-name">Managed access</span>
+        <span class="fs-level-body">You use an approved AI, and your data stays protected. The AI helps with single tasks.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="2" data-mck="Matches McKinsey level 1 (13x)" data-example="Remember that my client always wants the report on Fridays.">
+        <span class="fs-level-n">2</span><span class="fs-level-name">Skilled use</span>
+        <span class="fs-level-body">Say it once, and every one of your AIs knows it. Instructions that work are shared with others.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="3" data-mck="Matches McKinsey level 2 (14x)" data-example="Make a page where people sign up for next week's event.">
+        <span class="fs-level-n">3</span><span class="fs-level-name">Integrated</span>
+        <span class="fs-level-body">The AI reads your data directly, with your permissions. It builds an app or a report from one request.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="4" data-mck="Matches McKinsey level 2 (14x)" data-example="Every morning, fetch the new requests for quotes and tell me which ones fit us.">
+        <span class="fs-level-n">4</span><span class="fs-level-name">Agents at work</span>
+        <span class="fs-level-body">An agent does a defined job on its own, under its own identity. You approve the decisions.</span>
+      </button>
+      <button type="button" class="fs-level" aria-pressed="false" data-n="5" data-mck="Opens McKinsey levels 3 and 4 (20x and 31x)" data-example="Put two agents and my team on the monthly review. I approve it before it goes out.">
+        <span class="fs-level-n">5</span><span class="fs-level-name">AI-native</span>
+        <span class="fs-level-body">People and agents work side by side. Every action can be traced.</span>
+      </button>
+    </div>
+    <div class="fs-try" aria-live="polite">
+      <div class="fs-try-side">
+        <span class="fs-mono">Level <span id="fs-try-n">1</span>: try it in chat</span>
+        <a id="fs-try-mck" href="#mckinsey">Matches McKinsey level 1 (13x)</a>
+      </div>
+      <p class="fs-try-quote" id="fs-try-quote">“Sum up these meeting notes in three points.”</p>
+    </div>
+  </section>
+
+  <section id="mckinsey" class="fs-wrap fs-section">
+    <div class="fs-head">
+      <p class="fs-mono fs-kicker-red">The same path in research</p>
+      <h2 class="fs-h2">McKinsey: the value of AI grows in four levels</h2>
+      <p class="fs-lead">McKinsey studied 471 companies owned by private equity, across 31 industries. It sorted the value AI brings into four levels. The multiple is the company's value over its revenue, as a median.</p>
+    </div>
+    <div class="fs-mck">
+      <div class="fs-mck-card">
+        <span class="fs-mck-tag">McKinsey level 1</span><span class="fs-mck-x">13x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-13"></span></div>
+        <span class="fs-mck-name">Experiments</span>
+        <span class="fs-mck-body">Separate trials and personal tools. AI is not part of the workflows.</span>
+        <span class="fs-chip">AIMEAT levels 1–2</span>
+      </div>
+      <div class="fs-mck-card">
+        <span class="fs-mck-tag">McKinsey level 2</span><span class="fs-mck-x">14x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-14"></span></div>
+        <span class="fs-mck-name">Efficiency</span>
+        <span class="fs-mck-body">AI is in the workflows. Productivity and margin improve.</span>
+        <span class="fs-chip">AIMEAT levels 3–4</span>
+      </div>
+      <div class="fs-mck-card fs-mck-card--dark">
+        <span class="fs-mck-tag">McKinsey level 3</span><span class="fs-mck-x">20x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-20"></span></div>
+        <span class="fs-mck-name">The product changes</span>
+        <span class="fs-mck-body">AI is part of the product or the service. It starts to show in sales.</span>
+        <span class="fs-chip">AIMEAT level 5 opens this</span>
+      </div>
+      <div class="fs-mck-card fs-mck-card--dark">
+        <span class="fs-mck-tag">McKinsey level 4</span><span class="fs-mck-x">31x</span>
+        <div class="fs-bar" aria-hidden="true"><span class="fs-bar-31"></span></div>
+        <span class="fs-mck-name">New business</span>
+        <span class="fs-mck-body">The company builds new AI services and data products.</span>
+        <span class="fs-chip">AIMEAT level 5 opens this</span>
+      </div>
+    </div>
+    <div class="fs-two">
+      <div class="fs-note">
+        <h3>Productivity alone does not raise value</h3>
+        <p>Levels 1 and 2 are close: 13x and 14x. Value rises when AI changes what the company sells. AIMEAT levels 1 to 4 are the base. Level 5 opens McKinsey levels 3 and 4.</p>
+      </div>
+      <div class="fs-note">
+        <h3>Our view: you do not need a separate AI team</h3>
+        <p>McKinsey names the shortage of skilled people as the biggest obstacle, and says level 4 needs separate AI teams. When people and agents work on the same platform, AI is inside every team. You can build new services with the people you already have.</p>
+      </div>
+    </div>
+    <h3 class="fs-h3">What the platform must give at each step</h3>
+    <ol class="fs-path">
+      <li><span class="fs-path-step">0 → 1</span><span class="fs-path-need"><strong>Needed:</strong> the data stays with the company, and the tools are approved.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> an AIMEAT of your own, in the company's own environment. The company picks its AI provider and uses its own key.</span></li>
+      <li><span class="fs-path-step">1 → 2</span><span class="fs-path-need"><strong>Needed:</strong> shared knowledge and shared instructions.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> shared workspaces where people collect decisions, instructions and ways of working that work. Ready-made app templates.</span></li>
+      <li><span class="fs-path-step">2 → 3</span><span class="fs-path-need"><strong>Needed:</strong> the AI reads the company's data directly.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> any AI connects with one connection (MCP). It reads and writes with the user's permissions.</span></li>
+      <li><span class="fs-path-step">3 → 4</span><span class="fs-path-need"><strong>Needed:</strong> agents act on their own in a defined area.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> every agent has its own identity and its own permissions. You decide whether an agent acts on its own, writes a draft or asks first. Work can start on a schedule or from an event.</span></li>
+      <li><span class="fs-path-step">4 → 5</span><span class="fs-path-need"><strong>Needed:</strong> trust that rests on traceability.</span><span class="fs-path-give"><strong>AIMEAT gives:</strong> every piece of content shows whether a person or an AI made it, with which model and from which sources. Decisions are recorded, and an agent's work stays visible afterwards.</span></li>
+    </ol>
+    <p class="fs-source">Source: McKinsey, <a href="https://www.mckinsey.com/capabilities/business-building/our-insights/beyond-productivity-how-ai-creates-value-in-private-equity" rel="noopener">Beyond productivity: How AI creates value in private equity</a>. Matching the levels to AIMEAT's levels is our own reading.</p>
+  </section>
+
+  <section class="fs-wrap fs-section">
+    <h2 class="fs-h2">Three steps, and your AI is at work</h2>
+    <ol class="fs-cards3">
+      <li class="fs-card"><span class="fs-card-n">01</span><h3>Create an account</h3><p>No forms, no card, no commitment. The account appears when you start.</p></li>
+      <li class="fs-card"><span class="fs-card-n">02</span><h3>Connect your AI</h3><p>Claude, ChatGPT, Codex, Cursor and VS Code connect with one connection. If your AI cannot, you get a ready-made prompt to paste into the chat.</p></li>
+      <li class="fs-card"><span class="fs-card-n">03</span><h3>Ask in the chat</h3><p>You work in the same chat as before. There is no new interface to learn.</p></li>
+    </ol>
+  </section>
+
+  <section class="fs-wrap fs-section">
+    <div class="fs-agents">
+      <div class="fs-agents-text">
+        <h2>Agents can even run on your own computer</h2>
+        <p>An agent is an AI that does the work on its own. You can run it on your own computer, and it works with your data. You decide what it may do.</p>
+      </div>
+      <ul class="fs-checks">
+        <li>You approve every agent before it starts work.</li>
+        <li>You choose what it may read and write.</li>
+        <li>You see every action, and every action is labelled.</li>
+        <li>You stop or remove an agent at any time.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="fs-wrap fs-section">
+    <div class="fs-head">
+      <h2 class="fs-h2">Want an AIMEAT of your own?</h2>
+      <p class="fs-lead">The demo is shared by everyone. Your own AIMEAT belongs to you or your company alone. Even if we disappeared tomorrow, the environment would stay with you.</p>
+    </div>
+    <div class="fs-own">
+      <div class="fs-own-card">
+        <h3>Buy from us</h3>
+        <p>We set up an instance of your own and keep it up to date. You own the data.</p>
+        <div class="fs-grow"></div>
+        <a class="fs-btn fs-btn--ink" href="/v1/pricing">See prices</a>
+      </div>
+      <div class="fs-own-card">
+        <h3>Install it yourself</h3>
+        <p>The source code is open on GitHub. Let your AI install it: paste this prompt into the chat.</p>
+        <div class="fs-prompt" id="fs-prompt">Install AIMEAT on my computer following the instructions at github.com/<wbr>miikkij/<wbr><span class="fs-nowrap">aimeat-protocol</span>, and tell me when it is running.</div>
+        <div class="fs-grow"></div>
+        <div class="fs-row">
+          <button type="button" class="fs-btn fs-btn--ink" id="fs-copy">Copy the prompt</button>
+          <a class="fs-btn fs-btn--ghost" href="https://github.com/miikkij/aimeat-protocol" rel="noopener">Open GitHub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fs-wrap fs-section fs-section--last">
+    <h2 class="fs-h2">Find out more</h2>
+    <div class="fs-more">
+      <a href="https://experience-center.apps.aimeat.io"><span class="fs-more-title">Experience Center</span><span class="fs-more-body">Learn the whole ecosystem by trying it, one step at a time.</span><span class="fs-more-go">Open →</span></a>
+      <a href="/v1/publicworkspaceviewer?org=d0d999ef-712b-408b-91e9-e074cfac3bae&amp;ws=ws-mvcjbdt2c03&amp;type=pages&amp;id=doc-mvckn9b3mub7&amp;view=page"><span class="fs-more-title">The door is open</span><span class="fs-more-body">A story in six chapters: why your AIs belong under one roof.</span><span class="fs-more-go">Read the story →</span></a>
+      <a href="/v1/portal"><span class="fs-more-title">Everything here</span><span class="fs-more-body">All that is here: apps, boards, agents and what is happening right now.</span><span class="fs-more-go">Open the full view →</span></a>
+      <a href="/v1/everything"><span class="fs-more-title">All features</span><span class="fs-more-body">Everything AIMEAT can do, on one page.</span><span class="fs-more-go">See the features →</span></a>
+      <a href="/v1/changelog"><span class="fs-more-title">Changelog</span><span class="fs-more-body">What has been done and when, newest first.</span><span class="fs-more-go">Read the changelog →</span></a>
+    </div>
+  </section>
+
+  <footer class="fs-foot">
+    <div class="fs-wrap">
+      <span>AIMEAT · open source · demo site</span>
+      <span class="fs-foot-links"><a href="/v1/everything">All features</a><a href="/v1/changelog">Changelog</a><a href="/v1/transparency">AI transparency</a><a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a></span>
+      <span>An AI drafted the text on this page, and a person approved it.</span>
+    </div>
+  </footer>
+
+</body>
+</html>

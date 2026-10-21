@@ -493,11 +493,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // DIRECTORY is always served; only outbound signing is gated.
     webBotAuthSign: process.env.AIMEAT_WEB_BOT_AUTH_SIGN === 'true',
     // The root's front page for browsers. 'demo' serves the static showroom (front-demo.html),
-    // 'os' the static OS page (front-os.html); anything else stays on the SPA landing, so a
-    // typo cannot take the front door down.
-    frontPage: (['demo', 'os'].includes(process.env.AIMEAT_FRONT_PAGE?.trim().toLowerCase() ?? '')
+    // 'os' the static OS page (front-os.html), 'start' the "accelerate your AI" page
+    // (front-start.html); anything else stays on the SPA landing, so a typo cannot take the
+    // front page down.
+    frontPage: (['demo', 'os', 'start'].includes(process.env.AIMEAT_FRONT_PAGE?.trim().toLowerCase() ?? '')
       ? process.env.AIMEAT_FRONT_PAGE!.trim().toLowerCase()
-      : 'classic') as 'classic' | 'demo' | 'os',
+      : 'classic') as 'classic' | 'demo' | 'os' | 'start',
     // The "aimeat.io · publish your own app" badge on served apps. 'off' removes it node-wide;
     // anything else keeps it, so a typo cannot take the attribution off aimeat.io.
     appBadge: (process.env.AIMEAT_APP_BADGE?.trim().toLowerCase() === 'off' ? 'off' : 'aimeat') as 'aimeat' | 'off',

@@ -44,11 +44,12 @@ export interface SitePresenceConfig extends SeoConfig {
   /**
    * Which front page the root serves to a browser: 'classic' is the SPA landing, 'demo' is the
    * static showroom page (public/front-demo.html) and 'os' is the static OS page
-   * (public/front-os.html), each with a .fi sibling by language. One switch, so a new front can
-   * be staged, flipped on, and flipped back without touching anything else. The static pages
-   * stay directly reachable at their own paths either way.
+   * (public/front-os.html) and 'start' is the "accelerate your AI" page (public/front-start.html),
+   * each with a .fi sibling by language. One switch, so a new front can be staged, flipped on,
+   * and flipped back without touching anything else. The static pages stay directly reachable
+   * at their own paths either way.
    */
-  frontPage: 'classic' | 'demo' | 'os';
+  frontPage: 'classic' | 'demo' | 'os' | 'start';
   /**
    * The "aimeat.io · Publish your own app for free" badge on every served app: 'aimeat' keeps it (the
    * default, a deliberate attribution mark), 'off' removes it node-wide. The owner's per-app switch
