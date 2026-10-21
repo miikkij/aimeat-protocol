@@ -4,6 +4,30 @@
     {
       "date": "2026-10-21",
       "kind": "feature",
+      "id": "2026-10-21-your-files-say-what-they-are",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "operator",
+        "developer"
+      ],
+      "title": {
+        "en": "Your files say what they are",
+        "fi": "Tiedostosi kertovat, mitä ne ovat"
+      },
+      "summary": {
+        "en": "Every file you store is read for its details, and on request sorted and its fields picked out.",
+        "fi": "Tallentamastasi tiedostosta luetaan sen tiedot, ja pyynnöstä se luokitellaan ja sen kentät poimitaan."
+      },
+      "body": {
+        "en": "When you store a file, the node reads what it says about itself, with no AI: a PDF's title, author, pages and signatures; a picture's size, camera, time and location; a video's length and format. It also reads whether the file says it was made with AI, from its IPTC or C2PA mark, and whether that mark is missing. Your AI reads these details before it opens the file again. When you turn them on in your Data Wallet, AI steps also describe the file, sort it into content classes such as invoice, contract or photo, and pick out each class's fields: an invoice's seller, total, VAT, due date and reference. The fields are kept in JSON-LD, and the classes form an OWL ontology you can download. Open a file's preview to see what was read, which model decided what and how sure it was, and to correct a class or a field yourself, or let your AI correct it. A corrected value stays when the file is read again. The AI steps are off until you turn them on, because they use your AI allowance.",
+        "fi": "Kun tallennat tiedoston, solmu lukee, mitä se kertoo itsestään, ilman tekoälyä: PDF:n otsikon, tekijän, sivumäärän ja allekirjoitukset, kuvan koon, kameran, ajan ja paikan sekä videon keston ja muodon. Se lukee myös, kertooko tiedosto olevansa tekoälyn tekemä IPTC- tai C2PA-merkinnällä, ja puuttuuko merkintä. Tekoälysi lukee nämä tiedot ennen kuin se avaa tiedoston uudelleen. Kun kytket ne päälle Datalompakossa, tekoäly myös kuvailee tiedoston, sijoittaa sen sisältöluokkiin, kuten lasku, sopimus tai valokuva, ja poimii luokan kentät: laskusta myyjän, summan, arvonlisäveron, eräpäivän ja viitenumeron. Kentät tallentuvat JSON-LD-muodossa, ja luokista muodostuu OWL-ontologia, jonka voit ladata. Avaa tiedoston esikatselu, niin näet, mitä luettiin, mikä malli päätti mitä ja kuinka varma se oli. Voit korjata luokan tai kentän itse tai antaa tekoälysi korjata sen. Korjattu arvo säilyy, kun tiedosto luetaan uudelleen. Tekoälyvaiheet ovat pois päältä, kunnes kytket ne päälle, koska ne käyttävät tekoälykiintiötäsi."
+      }
+    },
+    {
+      "date": "2026-10-21",
+      "kind": "feature",
       "id": "2026-10-21-ai-clients-on-the-newest-mcp-version-connect-directly",
       "highlight": false,
       "audience": [
