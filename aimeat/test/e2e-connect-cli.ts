@@ -32,6 +32,9 @@
  *   AIMEAT_PORT=<a free port> AIMEAT_DB_PATH=test/.test-e2e-cli.db \
  *     node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connect-cli
  * @version-history
+ *   2026-10-21 — The cleanup signs the owner in again before deleting it: the setup's token lasts
+ *     900 s and the suite ran 974 s in the full postgres sweep, so the delete answered 401 (the
+ *     setup no longer matched the run's length; nothing in the product changed).
  *   2026-10-17 — `aimeat validate` with the removed MongoDB backend: the message now comes from the
  *     setting-value check ("The MongoDB backend was removed"), which the nightly sweep showed red.
  *   2026-10-16 — `aimeat backup` and `aimeat restore` against this node: no token, a bad token and a
@@ -1027,8 +1030,10 @@ await test('an unknown top-level subcommand prints the help and exits 1', async 
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete the owner and remove every temp directory', async () => {
+  // A fresh sign-in: the token from the setup lasts AIMEAT_ACCESS_TTL (900 s), and under the full
+  // sweep's load this suite ran 974 s on postgres-kysely (2026-10-21), so the delete got 401.
   const { status } = await json(`/v1/owners/${encodeURIComponent(OWNER)}`, {
-    method: 'DELETE', ...auth(acc.ownerToken),
+    method: 'DELETE', ...auth(await ownerToken(BASE, OWNER)),
   });
   assert(status === 200, `owner delete status ${status}`);
   if (operatorPat) {
