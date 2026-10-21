@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-21 — The switch grows a fourth value: AIMEAT_FRONT_PAGE=start serves the
+ *     "accelerate your AI" page (public/front-start.html, .fi sibling), same rules as demo.
  *   2026-10-17 — A node set to signed-in content access answers GET / without the operator's
  *     template, the front page passages and the live page body, and the JSON bootstrap says
  *     `content_access` (plan doc-mvcn6c7e4e5q V1).
@@ -273,13 +275,13 @@ export function bootstrapRouter(
         res.type('text/html').send(injectCspNonce(customHtml, res.locals.cspNonce as string | undefined));
         return;
       }
-      // The static front pages, behind one switch (AIMEAT_FRONT_PAGE=demo|os). Finnish readers
-      // get the Finnish sibling; the ?lang override beats the header so each page's own EN/FI
-      // links work. Falls through to the SPA when the file is missing, so a broken deploy shows
-      // the classic front rather than nothing.
-      if (config.frontPage === 'demo' || config.frontPage === 'os') {
+      // The static front pages, behind one switch (AIMEAT_FRONT_PAGE=demo|os|start). Finnish
+      // readers get the Finnish sibling; the ?lang override beats the header so each page's own
+      // EN/FI links work. Falls through to the SPA when the file is missing, so a broken deploy
+      // shows the classic front rather than nothing.
+      if (config.frontPage !== 'classic') {
         res.vary('Accept-Language');
-        const base = config.frontPage === 'os' ? 'front-os' : 'front-demo';
+        const base = `front-${config.frontPage}`;
         const langParam = typeof _req.query.lang === 'string' ? _req.query.lang.toLowerCase() : '';
         const wantsFi = langParam === 'fi'
           || (langParam === '' && /^fi\b/i.test((_req.headers['accept-language'] as string | undefined) ?? ''));
