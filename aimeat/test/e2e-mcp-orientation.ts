@@ -24,6 +24,8 @@
  *     Automation area had reached 28 292 characters and failed the size bound in the nightly sweep).
  *   2026-10-03 — Test 2 bounds the END of the agent surface line by the measured cut (2 052); the
  *     core alone now runs past the old start bound of 1 900.
+ *   2026-10-21 — 17m: the refusal's list is checked for "start" first and ai.temperature in it, not
+ *     for the two next to each other; the content class explanations come between them.
  *   2026-10-02 — 17l/17m: the setting explanations (tier "settings"), on MCP and REST, in three languages.
  *   2026-10-01 — 17j/17k: the feature map in parts (tier "features"), on MCP and REST, and the
  *     handbook's screen-only list.
@@ -636,7 +638,9 @@ async function main() {
 
         await test('17m. FAILURE: a setting the explanations do not have is an error that lists the terms, on both doors', async () => {
             const { body } = await v1('tools/call', { name: 'aimeat_handbook_get', arguments: { tier: 'settings/ai.no_such_setting' } }, 426);
-            assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /start, ai\.temperature/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
+            // The list starts with "start" and names the terms; their order follows the locale file, so
+            // the test does not hold one term next to another (the content.* terms of 2026-10-21 came first).
+            assert(body.result?.isError === true && /NOT_FOUND/.test(toolText(body)) && /They have: start, /.test(toolText(body)) && /\bai\.temperature\b/.test(toolText(body)), `MCP: ${toolText(body).slice(0, 160)}`);
             const r = await json('/v1/prompts/settings/sections/ai.no_such_setting');
             assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND' && /ai\.temperature/.test(r.body.error?.message ?? ''), `REST: ${r.status}`);
         });
