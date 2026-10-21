@@ -4,6 +4,28 @@
     {
       "date": "2026-10-21",
       "kind": "feature",
+      "id": "2026-10-21-a-new-front-page-accelerate-your-ai",
+      "highlight": true,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "A new front page: accelerate your AI",
+        "fi": "Uusi etusivu: kiihdytä tekoälysi"
+      },
+      "summary": {
+        "en": "The front page says in one screen what this site is, what you get and how to start for free.",
+        "fi": "Etusivu kertoo yhdellä silmäyksellä, mikä tämä sivusto on, mitä saat ja miten aloitat ilmaiseksi."
+      },
+      "body": {
+        "en": "aimeat.io has a new front page. It says that this is a demo site where you find out how much faster AI makes your own work, that signing up asks for nothing and is free, and that agents can even run on your own computer, with your permission. Five levels show the path from a single chat to people and agents working side by side; pick one to see what you can ask for there. The page also shows how the five levels match McKinsey's four levels of AI value, and what the platform gives at each step. For an AIMEAT of your own, buy an instance from us or let your AI install the open source from GitHub. The earlier front page is still one press away, at Everything here, with the Experience Center, the story, all features and this changelog linked at the bottom. An operator chooses the page with AIMEAT_FRONT_PAGE=start.",
+        "fi": "aimeat.io:lla on uusi etusivu. Se kertoo, että tämä on demosivusto, jolla kokeilet, kuinka paljon tekoäly nopeuttaa omaa työtäsi. Rekisteröinti ei vaadi mitään ja on ilmainen, ja agentit voivat toimia jopa omalla koneellasi sinun luvallasi. Viisi tasoa näyttää polun yksittäisestä chatista siihen, että ihmiset ja agentit tekevät työtä rinnakkain. Valitse taso, niin näet, mitä voit pyytää siellä. Sivu näyttää myös, miten viisi tasoa vastaavat McKinseyn neljää tekoälyn arvon tasoa ja mitä alusta antaa jokaisella askeleella. Oman AIMEATin voit ostaa meiltä tai antaa tekoälysi asentaa sen avoimena lähdekoodina GitHubista. Aiempi etusivu on yhä yhden painalluksen päässä kohdassa Koko näkymä. Sivun lopussa on linkit Experience Centeriin, tarinaan, kaikkiin ominaisuuksiin ja tähän muutoslokiin. Ylläpitäjä valitsee sivun asetuksella AIMEAT_FRONT_PAGE=start."
+      }
+    },
+    {
+      "date": "2026-10-21",
+      "kind": "feature",
       "id": "2026-10-21-your-files-say-what-they-are",
       "highlight": true,
       "audience": [
