@@ -7,6 +7,8 @@
  *   one that does not, and a reconnect reuses the era it answered instead of probing again. Two real
  *   far sides on loopback, both built from the SDK v2 server package.
  * @version-history
+ *   v1.1.0 -- 2026-10-21 -- A probe that dies on the network falls back to the 2025 handshake, and a
+ *     server that cannot be reached still fails (incident mcp-client-invoke, 2026-10-21).
  *   v1.0.0 -- 2026-10-20 -- Initial (MCP SDK v2 migration step 9).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -29,15 +31,21 @@ function factory(): McpServer {
 }
 
 /** A far side on loopback that counts the server/discover probes it receives. */
-async function farSide(fetchHandler: (r: Request) => Promise<Response>): Promise<{ server: http.Server; url: string; probes: () => number }> {
+async function farSide(fetchHandler: (r: Request) => Promise<Response>, opts: { resetProbes?: number } = {}): Promise<{ server: http.Server; url: string; probes: () => number }> {
     let probes = 0;
+    let toReset = opts.resetProbes ?? 0;
     const node = toNodeHandler({ fetch: fetchHandler });
     const server = http.createServer(async (req, res) => {
         const chunks: Buffer[] = [];
         for await (const c of req) chunks.push(c as Buffer);
         const raw = Buffer.concat(chunks).toString('utf8');
         const body = raw ? JSON.parse(raw) : undefined;
-        if (body?.method === 'server/discover') probes++;
+        if (body?.method === 'server/discover') {
+            probes++;
+            // A reset socket under load, as the gate's parallel run saw it: the probe dies on the
+            // network with "fetch failed", and the server itself is fine.
+            if (toReset > 0) { toReset--; req.socket.destroy(); return; }
+        }
         await node(req as unknown as NodeIncomingMessageLike, res, body);
     });
     await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
@@ -51,6 +59,7 @@ const record = (id: string, url: string): McpServerRecord => ({
 
 let modernSide: Awaited<ReturnType<typeof farSide>>;
 let legacySide: Awaited<ReturnType<typeof farSide>>;
+let flakySide: Awaited<ReturnType<typeof farSide>>;
 
 beforeAll(async () => {
     // Serves 2026-07-28 and, statelessly, the 2025 revisions: the SDK handler's default.
@@ -59,10 +68,13 @@ beforeAll(async () => {
     // Serves only the 2025 revisions, the way a server on an older SDK does.
     const legacyOnly = legacyStatelessFallback(async () => factory());
     legacySide = await farSide((r) => legacyOnly(r));
+    // Serves both eras, and resets the connection of the first version probe it receives.
+    const flaky = createMcpHandler(async () => factory());
+    flakySide = await farSide((r) => flaky.fetch(r), { resetProbes: 1 });
 });
 
 afterAll(async () => {
-    for (const s of [modernSide, legacySide]) {
+    for (const s of [modernSide, legacySide, flakySide]) {
         s.server.closeAllConnections();
         await new Promise<void>((r) => s.server.close(() => r()));
     }
@@ -100,6 +112,33 @@ describe('the MCP client negotiates the revision with a Streamable HTTP server',
         await pool.closeAll();
         await pool.acquire(server, null, 'node');
         expect(legacySide.probes()).toBe(probesAfterFirst);
+        await pool.closeAll();
+    });
+
+    it('connects with the 2025 handshake when the version probe dies on the network, keeps no verdict, and asks again next time', async () => {
+        const pool = new McpClientPool();
+        const server = record('flaky-side', flakySide.url);
+        const client = await pool.acquire(server, null, 'node');
+        expect(flakySide.probes()).toBe(1);
+        expect(client.getNegotiatedProtocolVersion()).not.toBe('2026-07-28');
+        const r = await client.callTool({ name: 'echo', arguments: { text: 'still here' } });
+        expect(JSON.stringify(r.content)).toContain('still here');
+        expect(pool.eraOf(server.id, 'node')).toBeUndefined();
+
+        await pool.closeAll();
+        const again = await pool.acquire(server, null, 'node');
+        expect(flakySide.probes()).toBe(2);
+        expect(again.getNegotiatedProtocolVersion()).toBe('2026-07-28');
+        await pool.closeAll();
+    });
+
+    it('still fails when the server cannot be reached at all', async () => {
+        const pool = new McpClientPool();
+        const closed = http.createServer();
+        await new Promise<void>((r) => closed.listen(0, '127.0.0.1', () => r()));
+        const port = (closed.address() as AddressInfo).port;
+        await new Promise<void>((r) => closed.close(() => r()));
+        await expect(pool.acquire(record('gone-side', `http://127.0.0.1:${port}/mcp`), null, 'node')).rejects.toThrow();
         await pool.closeAll();
     });
 

@@ -25,6 +25,9 @@
  * @structure McpClientPool — acquire · invalidate · eraOf · closeAll · size
  * @usage const client = await pool.acquire(server, credential, identity);
  * @version-history
+ *   v1.3.1 — 2026-10-21 — A failed version probe (SDK EraNegotiationFailed) is answered with one
+ *     more connect on the 2025 handshake, instead of failing the call: a single reset socket during
+ *     the probe made the server unreachable at once (incident mcp-client-invoke, 2026-10-21).
  *   v1.3.0 — 2026-10-20 — A Streamable HTTP server (kind http or aimeat) is connected with version
  *     negotiation: 2026-07-28 when it serves it, the 2025 handshake when not; the era it answered is
  *     kept per server and identity for an hour, so a reconnect skips the probe. stdio and SSE keep
@@ -35,7 +38,7 @@
  *   v1.1.0 — 2026-09-17 — The node id reaches the transport, for the loop-brake header.
  *   v1.0.0 — 2026-09-16 — Phase 1 of the MCP proxy.
  */
-import { Client, type PriorDiscovery } from '@modelcontextprotocol/client';
+import { Client, SdkError, SdkErrorCode, type PriorDiscovery } from '@modelcontextprotocol/client';
 import type { McpServerRecord, McpServerCredential } from '../../models/mcp-server-schemas.js';
 import type { AimeatConfig } from '../../config.js';
 import { buildTransport, MCP_CONNECT_TIMEOUT_MS } from './transport.js';
@@ -50,6 +53,15 @@ const SWEEP_MS = 30_000;
 const PRIOR_TTL_MS = 60 * 60_000;
 /** The transports that negotiate the MCP revision: Streamable HTTP, to any server or to a peer node. */
 const NEGOTIATING_KINDS = new Set<McpServerRecord['transport']['kind']>(['http', 'aimeat']);
+
+/**
+ * Whether a connect failed in the version probe itself (the SDK's EraNegotiationFailed: the probe
+ * request died on the network, or the server answered it with nothing usable), rather than on a
+ * refused credential, a timeout or the server's own refusal, which keep their own errors.
+ */
+function isProbeFailure(err: unknown): boolean {
+  return err instanceof SdkError && err.code === SdkErrorCode.EraNegotiationFailed;
+}
 
 interface Entry {
   client: Client;
@@ -94,31 +106,44 @@ export class McpClientPool {
     }
 
     const negotiates = NEGOTIATING_KINDS.has(server.transport.kind);
-    const client = new Client(
+    // A Streamable HTTP server is asked whether it speaks 2026-07-28 (server/discover) and the
+    // handshake falls back to initialize when it does not. stdio and the old SSE transport keep the
+    // plain 2025 handshake (decision 2026-10-20, MCP migration plan step 9).
+    const newClient = (negotiate: boolean) => new Client(
       { name: 'aimeat', version: '1.0.0' },
-      // A Streamable HTTP server is asked whether it speaks 2026-07-28 (server/discover) and the
-      // handshake falls back to initialize when it does not. stdio and the old SSE transport keep the
-      // plain 2025 handshake (decision 2026-10-20, MCP migration plan step 9).
-      { capabilities: {}, ...(negotiates ? { versionNegotiation: { mode: 'auto' as const } } : {}) },
+      { capabilities: {}, ...(negotiate ? { versionNegotiation: { mode: 'auto' as const } } : {}) },
     );
+    // The transport's env and headers are sealed at rest (transport-secrets.ts) and opened only
+    // here, for the connect. Without a config there is no key, and a sealed value is left out.
+    const openTransport = () => buildTransport(
+      { ...server, transport: openTransportSecrets(server.transport, config ?? { encryptionKey: null, totpSecretEncryptionKey: null }, server.id) },
+      credential, config,
+    );
+    let client = newClient(negotiates);
     const connecting = (async () => {
-      // The transport's env and headers are sealed at rest (transport-secrets.ts) and opened only
-      // here, for the connect. Without a config there is no key, and a sealed value is left out.
-      const opened = { ...server, transport: openTransportSecrets(server.transport, config ?? { encryptionKey: null, totpSecretEncryptionKey: null }, server.id) };
-      const transport = buildTransport(opened, credential, config);
       const known = negotiates ? this.priors.get(key) : undefined;
       const prior = known && Date.now() - known.at < PRIOR_TTL_MS ? known.prior : undefined;
       try {
-        await client.connect(transport, { timeout: MCP_CONNECT_TIMEOUT_MS, ...(prior ? { prior } : {}) });
+        await client.connect(openTransport(), { timeout: MCP_CONNECT_TIMEOUT_MS, ...(prior ? { prior } : {}) });
+        if (negotiates) this.rememberEra(key, client);
       } catch (err) {
         // A verdict that no longer holds (the server changed revision) must not fail every later
         // connect: forget it, and the next connect asks again.
         this.priors.delete(key);
-        throw err;
+        if (!negotiates || !isProbeFailure(err)) throw err;
+        // THE PROBE FAILED, NOT THE SERVER. One server/discover request that dies on the network
+        // (a reset socket under load) failed the whole connect, where the 2025 handshake alone would
+        // have been tried (incident 2026-10-21, mcp-client-invoke red in 2 of 4 gate runs). Connect
+        // once more the way this pool did before negotiation existed. A real outage fails here as it
+        // always did, and no verdict is kept, so the next connect asks the version again.
+        logger.warn('mcp-client: the version probe failed, connecting with the 2025 handshake', { server: server.id, error: (err as Error).message });
+        // The client never connected; closing it releases what the failed probe left open.
+        await client.close().catch((closeErr) => logger.debug('mcp-client: closing the client of a failed probe failed', { server: server.id, error: String(closeErr) }));
+        client = newClient(false);
+        await client.connect(openTransport(), { timeout: MCP_CONNECT_TIMEOUT_MS });
       }
-      if (negotiates) this.rememberEra(key, client);
       const entry = this.entries.get(key);
-      if (entry) entry.connecting = null;
+      if (entry) { entry.client = client; entry.connecting = null; }
       return client;
     })();
 
