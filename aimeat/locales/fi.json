@@ -11871,6 +11871,7 @@
     "cfgOpt_site_front_page_classic": "Klassinen",
     "cfgOpt_site_front_page_demo": "Demo",
     "cfgOpt_site_front_page_os": "OS-sivu",
+    "cfgOpt_site_front_page_start": "Kiihdytä tekoälysi",
     "cfgOpt_site_app_badge_aimeat": "Merkki näkyy",
     "cfgOpt_site_app_badge_off": "Ei merkkiä",
     "cfgOpt_extensions_install_role_operator": "Vain operaattorit",
