@@ -356,6 +356,15 @@ describe('readTechnicalFacts: WebP', () => {
     expect(t.ai.sources.some((s) => s.from === 'iptc')).toBe(true);
   });
 
+  it('reads an SVG\'s size, title and the AI mark in its metadata, with no error', async () => {
+    const svg = '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><title>Tasomalli</title>'
+      + `<metadata>${aiXmp()}</metadata><rect width="10" height="10"/></svg>`;
+    const t = (await readTechnicalFacts({ config, storage }, { bytes: Buffer.from(svg, 'utf8'), mimeType: 'image/svg+xml', filename: 'm.svg', ffprobePath: 'ffprobe' })).technical;
+    expect(t.errors?.exif).toBeUndefined();
+    expect(t.image).toMatchObject({ format: 'svg+xml', width: 640, height: 360, title: 'Tasomalli' });
+    expect(t.ai.verdict).toBe('ai-generated');
+  });
+
   it('gives a WebP without metadata no error', async () => {
     const t = (await readTechnicalFacts({ config, storage }, { bytes: webp([['VP8L', Buffer.alloc(10)]]), mimeType: 'image/webp', filename: 'plain.webp', ffprobePath: 'ffprobe' })).technical;
     expect(t.errors?.exif).toBeUndefined();

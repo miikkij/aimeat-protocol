@@ -15,9 +15,11 @@
  *
  *   A failure in exifr is recorded in `errors.exif` and the picture still gets its format and its
  *   size from the IHDR chunk or from sniffImage (services/openrouter.ts).
- * @structure readImageFacts · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
+ * @structure readImageFacts · readSvgFacts · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
  * @usage const { facts, digitalSourceType, software, errors } = await readImageFacts(bytes, 'image/png');
  * @version-history
+ *   v1.2.0 — 2026-10-21 — SVG: its size, title and the XMP in <metadata> are read (readSvgFacts), with no
+ *     exifr and no error. The other 112 pictures with "Unknown file format" on aimeat.io were SVG.
  *   v1.1.0 — 2026-10-21 — WebP: its EXIF and XMP chunks are read (webpMetadataAsJpeg), and a WebP with
  *     neither gets no error. 349 of 1157 pictures on aimeat.io were WebP and all got "Unknown file format".
  *   v1.0.0 — 2026-10-20 — Initial.
@@ -99,6 +101,38 @@ function compact<T extends object>(o: T): T {
   return o;
 }
 
+/** A length attribute of the <svg> element as a number of pixels; a percent or an em has none. */
+function svgLength(v: string | undefined): number | undefined {
+  const m = v ? /^\s*([\d.]+)\s*(px)?\s*$/i.exec(v) : null;
+  return m ? Math.round(Number(m[1])) : undefined;
+}
+
+/**
+ * What an SVG says about itself: its size (width and height, else the viewBox), its <title>, and
+ * the IPTC DigitalSourceType and dc:title an XMP packet in its <metadata> carries.
+ */
+export function readSvgFacts(svg: string): { facts: ImageFacts; digitalSourceType?: string; software?: string; errors: Record<string, string> } {
+  const facts: ImageFacts = { format: 'svg+xml' };
+  const root = /<svg\b([^>]*)>/i.exec(svg)?.[1] ?? '';
+  const attr = (name: string) => new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, 'i').exec(root)?.[1];
+  let width = svgLength(attr('width'));
+  let height = svgLength(attr('height'));
+  const box = attr('viewBox')?.trim().split(/[\s,]+/).map(Number);
+  if ((!width || !height) && box?.length === 4 && box.every(Number.isFinite)) { width = width ?? Math.round(box[2]); height = height ?? Math.round(box[3]); }
+  if (width) facts.width = width;
+  if (height) facts.height = height;
+  const title = /<title[^>]*>([^<]{1,300})<\/title>/i.exec(svg)?.[1]?.trim();
+  if (title) facts.title = title;
+  const meta = /<metadata[^>]*>([\s\S]*?)<\/metadata>/i.exec(svg)?.[1] ?? '';
+  const dst = /DigitalSourceType(?:\s*=\s*["']([^"']+)["']|>\s*([^<\s]+)\s*<)/i.exec(meta);
+  const tool = /CreatorTool(?:\s*=\s*["']([^"']+)["']|>\s*([^<]+?)\s*<)/i.exec(meta);
+  return {
+    facts, errors: {},
+    ...(dst ? { digitalSourceType: (dst[1] ?? dst[2]).trim() } : {}),
+    ...(tool ? { software: (tool[1] ?? tool[2]).trim() } : {}),
+  };
+}
+
 /** One JPEG APP1 segment: its marker, its length (the two length bytes included) and its payload. */
 function app1(payload: Buffer): Buffer | null {
   if (payload.length + 2 > 0xffff) return null;
@@ -144,6 +178,10 @@ export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
 }> {
   const errors: Record<string, string> = {};
   const mime = (mimeType || '').toLowerCase().split(';')[0].trim();
+  // An SVG is XML, which exifr does not read: its size, title and any XMP in <metadata> are read here.
+  if (mime === 'image/svg+xml' || /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(bytes.toString('utf8', 0, 2048))) {
+    return readSvgFacts(bytes.toString('utf8'));
+  }
   const sniff = sniffImage(bytes);
   const format = (mime.startsWith('image/') ? mime.slice(6) : sniff.mime?.slice(6)) || undefined;
 
