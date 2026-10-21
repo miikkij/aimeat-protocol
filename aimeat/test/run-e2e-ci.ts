@@ -1372,6 +1372,8 @@ const ALL_SUITES = [
     'test/e2e-messages.ts',
     'test/e2e-agent-dm.ts',
     'test/e2e-dm-send-as-owner.ts',
+    // Group chat: open, invite, join, members, leave (wish-ryhm-keskustelu-viestit-puolelle).
+    'test/e2e-group-chat.ts',
     'test/e2e-dm-delete-as-owner.ts',
     'test/e2e-dm-read-as-owner.ts',
     'test/e2e-inbox-organize.ts',

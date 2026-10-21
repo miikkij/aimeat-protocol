@@ -7,6 +7,8 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.6.0 -- 2026-10-21 -- Group chat: updateConversation takes `invited` and `createdBy` (ConversationUpdate),
+ *     and listConversationsInvitingMailbox lists the threads a mailbox is invited to.
  *   v1.5.0 -- 2026-09-13 -- ConversationSummary carries lastForeignAt, unreadToOwner and the opener (openedBy /
  *     openedTo / openedAt), for the Messages list's archive and rules (services/inbox-organize/).
  *   v1.5.0 -- 2026-10-17 -- ConversationSummary carries lastSentByAgent / lastSentByAgentName, read off
@@ -76,6 +78,9 @@ export type ConversationSummary = {
   openedTo?: string;
   openedAt?: string;
 };
+
+/** The fields of a group thread that change after it is opened. */
+export type ConversationUpdate = Partial<Pick<ConversationRecord, 'participants' | 'invited' | 'createdBy' | 'subject' | 'alias'>>;
 
 export interface DirectMessageRepository {
   // ── Messages ──
@@ -155,10 +160,14 @@ export interface DirectMessageRepository {
   // returning null means "this is an ordinary two-party thread", never "not found".
   createConversation(record: ConversationRecord): Promise<ConversationRecord>;
   getConversation(id: string): Promise<ConversationRecord | null>;
-  /** Replace the membership and/or subject. Bumps updatedAt. Returns null when there is no row. */
-  updateConversation(id: string, updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>): Promise<ConversationRecord | null>;
+  /** Replace the membership, the invitations, the manager and/or subject. Bumps updatedAt. Returns
+   *  null when there is no row. */
+  updateConversation(id: string, updates: ConversationUpdate): Promise<ConversationRecord | null>;
   /** Every group thread `identity` is a participant of, newest first. */
   listConversationsForParticipant(identity: string): Promise<ConversationRecord[]>;
+  /** The group threads with an open invitation for `mailboxGhii` or one of its agents, newest first,
+   *  at most `limit` (default 100). */
+  listConversationsInvitingMailbox(mailboxGhii: string, opts?: { limit?: number }): Promise<ConversationRecord[]>;
 
   // ── Delivery telemetry (operator dashboard; no content/identities) ──
   appendMessageDeliveryLog(log: MessageDeliveryLog): Promise<void>;

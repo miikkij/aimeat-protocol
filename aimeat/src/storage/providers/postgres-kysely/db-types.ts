@@ -1219,6 +1219,8 @@ export interface Conversation {
   createdAt: Generated<Timestamp>;
   createdBy: string;
   id: string;
+  /** Invited people who have not answered yet (migration 0111). NULL is nobody. */
+  invited: Json | null;
   kind: Generated<string>;
   participants: Json;
   /** The one party to this thread on ANOTHER node. Not a participant: membership stays node-local. */

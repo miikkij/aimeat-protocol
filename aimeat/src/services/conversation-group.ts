@@ -26,11 +26,17 @@
  *   - sendGroupMessage() — one message, one copy per participant mailbox
  *   - fanOutToParticipants() — the shared write: one copy per mailbox, notify, wake the agents
  *   - setParticipants() — replace the membership (a support thread re-resolves its operators)
+ *   - emitGroupChange() — the live `messages` event, to the thread's own mailboxes only
  *   - threadAddressFor() — the address a group's copies carry
+ *   A person's own groups (create, members, leave, invitations) are in conversation-group-manage.ts.
  * @usage
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.5.0 — 2026-10-21 — Group chat. createGroupConversation takes `invited` (people who have not
+ *     answered yet), and they count towards the floor and the ceiling. The live `messages` event goes
+ *     to the mailboxes of the thread's participants and invitees (emitGroupChange), where it had gone
+ *     to every stream on the node.
  *   v1.4.0 — 2026-10-17 — sentByAgent / sentByAgentName: a message an agent sends in its owner's name
  *     says so on every participant's copy (services/message-send-as-owner.ts).
  *   v1.3.0 — 2026-09-24 — SECURITY (audit A5-3): sendGroupMessage asks the account's send limit
@@ -103,6 +109,8 @@ export interface CreateGroupInput {
   id?: string;
   /** The one party on another node. NOT a participant — see ConversationRecord.remote. */
   remote?: ConversationRecord['remote'];
+  /** People invited who have not answered yet. NOT participants — see ConversationRecord.invited. */
+  invited?: string[];
 }
 
 export type CreateGroupResult =
@@ -129,9 +137,12 @@ export type CreateGroupResult =
 export async function createGroupConversation(ctx: DeliveryCtx, input: CreateGroupInput): Promise<CreateGroupResult> {
   const { config, storage } = ctx;
   const participants = [...new Set([input.createdBy, ...input.participants].map(p => p.trim()).filter(Boolean))];
+  const invited = [...new Set((input.invited ?? []).map(p => p.trim()).filter(p => p && !participants.includes(p)))];
 
+  // An invitee counts towards the floor: a group of its creator and two invitations is a group
+  // waiting for its answers, not a mistake.
   const floor = input.alias ? 1 : 2;
-  if (participants.length < floor) {
+  if (participants.length + invited.length < floor) {
     return {
       ok: false, code: 'TOO_FEW_PARTICIPANTS',
       message: floor === 1
@@ -139,10 +150,10 @@ export async function createGroupConversation(ctx: DeliveryCtx, input: CreateGro
         : 'A conversation needs at least two participants',
     };
   }
-  if (participants.length > MAX_GROUP_PARTICIPANTS) {
+  if (participants.length + invited.length > MAX_GROUP_PARTICIPANTS) {
     return { ok: false, code: 'TOO_MANY_PARTICIPANTS', message: `A conversation holds at most ${MAX_GROUP_PARTICIPANTS} participants` };
   }
-  const foreign = participants.filter(p => parseGaiiLoose(p).node !== config.nodeId);
+  const foreign = [...participants, ...invited].filter(p => parseGaiiLoose(p).node !== config.nodeId);
   if (foreign.length) {
     return {
       ok: false, code: 'CROSS_NODE_UNSUPPORTED',
@@ -161,11 +172,23 @@ export async function createGroupConversation(ctx: DeliveryCtx, input: CreateGro
     createdBy: input.createdBy,
     alias: input.alias,
     remote: input.remote,
+    ...(invited.length ? { invited } : {}),
     createdAt: now,
     updatedAt: now,
   });
-  emitChange('messages');
+  emitGroupChange(conversation);
   return { ok: true, conversation };
+}
+
+/**
+ * Tell the open Messages pages of everyone this thread concerns that it changed: each participant's
+ * and each invitee's mailbox, once. The event carries no content, but an event with no owner went to
+ * every stream on the node, so every open Messages page re-read its list whenever anybody wrote into
+ * any group.
+ */
+export function emitGroupChange(convo: Pick<ConversationRecord, 'participants' | 'invited'>, extra: string[] = []): void {
+  const mailboxes = new Set([...convo.participants, ...(convo.invited ?? []), ...extra].map(deliveryTargetFor));
+  for (const mailbox of mailboxes) emitChange('messages', mailbox);
 }
 
 export interface GroupSendInput {
@@ -238,7 +261,7 @@ export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput):
   }
 
   await storage.updateConversation(convo.id, {});
-  emitChange('messages');
+  emitGroupChange(convo);
   return { ok: true, messageId: id, delivered };
 }
 

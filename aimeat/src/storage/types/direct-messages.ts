@@ -232,6 +232,13 @@ export interface ConversationRecord {
    * cannot clear it by writing a Partial that omits it.
    */
   remote?: { ghii: string; nodeId: string; conversationId: string };
+  /**
+   * People invited to the thread who have not answered yet (migration 0111). NOT participants: an
+   * invitee reads nothing and receives nothing until they accept, and then they move into
+   * `participants`. A person whose contact book already accepts the one who added them joins
+   * directly and never appears here (services/conversation-group-manage.ts).
+   */
+  invited?: string[];
   createdAt: string;
   updatedAt: string;
 }

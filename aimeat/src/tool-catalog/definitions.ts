@@ -18,6 +18,7 @@
  *   v1.x -- 2026-10-21 -- definitions/secret-addresses.ts: aimeat_secret_host_set, aimeat_secret_approval_withdraw.
  *   v1.x -- 2026-10-18 -- definitions/publish-requests.ts: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.x -- 2026-10-18 -- definitions/account-rights.ts: adult status, subscriptions, provenance embed (Comicland v3).
+ *   v1.x -- 2026-10-21 -- definitions/dm-groups.ts: the six aimeat_dm_group_* tools (group chat).
  *   v1.x -- 2026-10-17 -- definitions/exposure.ts: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   v1.x -- 2026-10-09 -- definitions/docsign.ts: aimeat_docsign_validate, _lookup, _request_create,
  *     _requests, _request_get, _sign and _cancel (document signing and signature validation).
@@ -91,6 +92,7 @@ import { mcpProxyTools } from './definitions/mcp-proxy.js';
 import { visibilityTools } from './definitions/visibility.js';
 import { docsignTools } from './definitions/docsign.js';
 import { exposureTools } from './definitions/exposure.js';
+import { dmGroupTools } from './definitions/dm-groups.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
@@ -132,6 +134,7 @@ const CATALOG = [
     ...visibilityTools,
     ...docsignTools,
     ...exposureTools,
+    ...dmGroupTools,
     ...publishRequestTools,
     ...accountRightsTools,
     ...secretAddressTools,

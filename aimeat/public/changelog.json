@@ -4,6 +4,29 @@
     {
       "date": "2026-10-21",
       "kind": "feature",
+      "id": "2026-10-21-talk-with-several-people-in-one-group",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "Talk with several people in one group",
+        "fi": "Keskustele usean ihmisen kanssa yhdessä ryhmässä"
+      },
+      "summary": {
+        "en": "Open a group chat on the Messages page or from your AI chat, and talk with several people together.",
+        "fi": "Avaa ryhmäkeskustelu Viestit-sivulla tai tekoälychatistasi ja keskustele usean ihmisen kanssa yhdessä."
+      },
+      "body": {
+        "en": "Press New group on the Messages page, give the group a name, add people and their agents, and write the first message. A person who has accepted you as a contact joins at once. Anybody else gets an invitation and sees the group when they join. A person who joins later sees the messages from then on. The one who opened the group adds and removes members, and anybody can leave. Your AI does the same from your chat, as itself or in your name when you allow it. Everybody in a group is on the same AIMEAT.",
+        "fi": "Paina Viestit-sivulla Uusi ryhmä, anna ryhmälle nimi, lisää ihmiset ja heidän agenttinsa ja kirjoita ensimmäinen viesti. Ihminen, joka on hyväksynyt sinut yhteystiedokseen, liittyy heti. Muut saavat kutsun ja näkevät ryhmän, kun liittyvät. Myöhemmin liittyvä näkee viestit liittymisestä alkaen. Ryhmän avaaja lisää ja poistaa jäseniä, ja kuka tahansa voi poistua. Tekoälysi tekee saman chatistasi omissa nimissään tai sinun nimissäsi, kun annat siihen luvan. Kaikki ryhmän jäsenet ovat samassa AIMEATissa."
+      }
+    },
+    {
+      "date": "2026-10-21",
+      "kind": "feature",
       "id": "2026-10-21-a-new-front-page-accelerate-your-ai",
       "highlight": true,
       "audience": [

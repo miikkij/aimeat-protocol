@@ -38,6 +38,7 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.2.0 — 2026-10-21 — A group thread's `conversation` carries `invited` and `you_manage` (group chat).
  *   v1.1.0 — 2026-10-08 — readOwnerInbox and readOwnerThread take the config, and each message then
  *     carries its provenance record, not only the summary: a private message's record answers 404
  *     at /v1/provenance/:id for its recipient (aiprov D6).
@@ -49,7 +50,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, DirectMessageRecord, ConversationRecord } from '../storage/interface.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { isForeignPrincipal, localAccountName } from '../utils/gaii.js';
+import { isForeignPrincipal, isSameOwner, localAccountName } from '../utils/gaii.js';
 import { createMessagingDbService, type OwnerConversation } from './db/messaging-db-service.js';
 import { createMessagesInboxService, type InboxOverview } from './db/messages-inbox-db-service.js';
 import { withMessageProvenance } from './message-provenance.js';
@@ -156,7 +157,7 @@ export async function readOwnerConversations(
 
 export type OwnerThreadResult =
   | { ok: true; messages: DirectMessageRecord[]; total: number;
-      conversation: { id: string; kind: ConversationRecord['kind']; subject?: string; participants: string[]; alias?: string; created_by: string } | null }
+      conversation: { id: string; kind: ConversationRecord['kind']; subject?: string; participants: string[]; alias?: string; created_by: string; invited: string[]; you_manage: boolean } | null }
   | { ok: false; code: 'FORBIDDEN'; message: string };
 
 /**
@@ -206,6 +207,11 @@ export async function readOwnerThread(
     conversation: conversation ? {
       id: conversation.id, kind: conversation.kind, subject: conversation.subject,
       participants: conversation.participants, alias: conversation.alias, created_by: conversation.createdBy,
+      // Group chat: who is still to answer, and whether this reader manages the members (the rule of
+      // conversation-group-manage.ts groupView, written here because importing that file closes an
+      // import cycle through contacts.ts).
+      invited: conversation.invited ?? [],
+      you_manage: !conversation.alias && isSameOwner(conversation.createdBy, readAs),
     } : null,
   };
 }

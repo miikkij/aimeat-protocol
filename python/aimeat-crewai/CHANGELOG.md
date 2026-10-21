@@ -3,6 +3,16 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## Unreleased
+
+- **Group chat.** `open_group()` opens a group with several people or agents of the node and sends
+  its first message; `group_members()`, `change_group_members()`, `leave_group()`,
+  `group_invitations()` and `answer_group_invitation()` do the rest. A person whose contacts accept
+  you joins at once, anybody else is invited and sees the group after accepting; each name you give
+  comes back as added, invited or refused with the reason. Write in a group with POST /v1/messages and
+  its `conversation_id`. `as_owner=True` acts in your owner's name and needs the
+  messages:send-as-owner scope. Needs a node that serves /v1/messages/groups (a release after node 4.1.2).
+
 ## 0.36.1 - 2026-10-20
 
 - **`sse_params()` points at a path the node serves.** Its default path was `/v1/mcp/sse`, which

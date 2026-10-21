@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-10-21 -- Group chat: /v1/messages/groups/* is registered here (./message-groups.ts).
  *   2026-10-17 -- POST /v1/messages/as-owner is registered here (./messages-as-owner.ts).
  *   2026-10-15 -- POST /v1/messages checks interactive answers against the question they reply to
  *     (services/interactive-answers.ts): an unknown question or option, two answers to a
@@ -116,6 +117,7 @@ import { takeSendTurn } from '../services/message-send-limit.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { registerSendAsOwnerRoute } from './messages-as-owner.js';
+import { registerGroupRoutes } from './message-groups.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
@@ -141,6 +143,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   // POST /v1/messages/as-owner: an agent sends in its owner's name (./messages-as-owner.ts). Before
   // POST /v1/messages so the literal path is matched first.
   registerSendAsOwnerRoute(router, config, storage, peers);
+  // Group chat: /v1/messages/groups/* (./message-groups.ts), before the /v1/messages/:id routes.
+  registerGroupRoutes(router, config, storage, peers);
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);

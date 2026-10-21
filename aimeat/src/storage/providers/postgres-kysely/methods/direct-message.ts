@@ -9,6 +9,9 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.8.0 — 2026-10-21 — Group chat: a conversation's open invitations (`invited`, migration 0111),
+ *     updateConversation writes them and the manager (`createdBy`), listConversationsInvitingMailbox
+ *     reads them. Parity with the SQLite repo.
  *   v1.7.0 — 2026-10-17 — sentByAgent / sentByAgentName on the message, and lastSentByAgent on both
  *     conversation-list reads (migration 0105).
  *   v1.6.0 — 2026-09-13 — Both conversation-list reads carry lastForeignAt (the newest message not
@@ -29,7 +32,7 @@
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
-import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
+import type { ConversationSummary, ConversationUpdate } from '../../../repositories/direct-message.repository.js';
 import type { DirectMessage, ContactConsent, Conversation as ConversationRow, JsonValue, MessageDeliveryLog as MessageDeliveryLogRow } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
@@ -98,6 +101,8 @@ function toConversationRecord(r: Selectable<ConversationRow>): ConversationRecor
   if (r.subject) record.subject = r.subject;
   if (r.alias) record.alias = r.alias;
   if (r.remote) record.remote = r.remote as unknown as ConversationRecord['remote'];
+  const invited = (r.invited ?? []) as unknown as string[];
+  if (invited.length) record.invited = invited;
   return record;
 }
 
@@ -461,6 +466,7 @@ export const directMessageMethods = {
       createdBy: record.createdBy,
       alias: record.alias ?? null,
       remote: record.remote ? jsonb(record.remote) as unknown as JsonValue : null,
+      invited: record.invited?.length ? jsonb(record.invited) as unknown as JsonValue : null,
       createdAt: new Date(record.createdAt),
       updatedAt: new Date(record.updatedAt),
     }).execute();
@@ -475,10 +481,12 @@ export const directMessageMethods = {
   async updateConversation(
     this: PostgresKyselyStorage,
     id: string,
-    updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>,
+    updates: ConversationUpdate,
   ): Promise<ConversationRecord | null> {
     const rows = await this.db.updateTable('Conversation').set({
       ...(updates.participants ? { participants: jsonb(updates.participants) as unknown as JsonValue } : {}),
+      ...(updates.invited ? { invited: jsonb(updates.invited) as unknown as JsonValue } : {}),
+      ...(updates.createdBy ? { createdBy: updates.createdBy } : {}),
       ...(updates.subject !== undefined ? { subject: updates.subject } : {}),
       ...(updates.alias !== undefined ? { alias: updates.alias } : {}),
       updatedAt: new Date(),
@@ -492,6 +500,19 @@ export const directMessageMethods = {
     const rows = await this.db.selectFrom('Conversation').selectAll()
       .where(sql<boolean>`"participants" @> ${jsonb([identity])}`)
       .orderBy('updatedAt', 'desc').execute();
+    return rows.map(toConversationRecord);
+  },
+
+  async listConversationsInvitingMailbox(this: PostgresKyselyStorage, mailboxGhii: string, opts: { limit?: number } = {}): Promise<ConversationRecord[]> {
+    const limit = Math.min(Math.max(1, opts.limit ?? 100), 500);
+    // The mailbox itself, or one of its agents (`bot#alice@node`). The suffix is compared with
+    // right(), not LIKE, so an underscore or a percent sign in an identity is not a wildcard.
+    const suffix = `#${mailboxGhii}`;
+    const rows = await this.db.selectFrom('Conversation').selectAll()
+      .where('invited', 'is not', null)
+      .where(sql<boolean>`EXISTS (SELECT 1 FROM jsonb_array_elements_text("invited") AS e(v)
+        WHERE e.v = ${mailboxGhii} OR right(e.v, ${suffix.length}) = ${suffix})`)
+      .orderBy('updatedAt', 'desc').limit(limit).execute();
     return rows.map(toConversationRecord);
   },
 

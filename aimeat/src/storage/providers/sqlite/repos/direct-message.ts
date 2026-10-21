@@ -8,6 +8,8 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.8.0 -- 2026-10-21 -- Group chat: a conversation's open invitations (`invited`), updateConversation
+ *     writes them and the manager (`createdBy`), listConversationsInvitingMailbox reads them.
  *   v1.7.0 -- 2026-10-17 -- sentByAgent / sentByAgentName on the message, and lastSentByAgent on both
  *     conversation summaries (migration 0105 in Postgres).
  *   v1.6.0 -- 2026-09-13 -- Both conversation summaries carry lastForeignAt (the newest message not
@@ -28,7 +30,7 @@
 
 import type Database from 'better-sqlite3';
 import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
-import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
+import type { ConversationSummary, ConversationUpdate } from '../../../repositories/direct-message.repository.js';
 
 // ── Helpers ──
 
@@ -540,13 +542,17 @@ function deserializeConversation(row: Record<string, unknown>): ConversationReco
   if (row.subject) record.subject = row.subject as string;
   if (row.alias) record.alias = row.alias as string;
   if (row.remote) record.remote = JSON.parse(row.remote as string) as ConversationRecord['remote'];
+  if (row.invited) {
+    const invited = JSON.parse(row.invited as string) as string[];
+    if (invited.length) record.invited = invited;
+  }
   return record;
 }
 
 export function createConversation(db: Database.Database, record: ConversationRecord): ConversationRecord {
   db.prepare(
-    `INSERT INTO conversations (id, kind, subject, participants, createdBy, alias, remote, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO conversations (id, kind, subject, participants, createdBy, alias, remote, invited, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.id,
     record.kind,
@@ -555,6 +561,7 @@ export function createConversation(db: Database.Database, record: ConversationRe
     record.createdBy,
     record.alias ?? null,
     record.remote ? JSON.stringify(record.remote) : null,
+    record.invited?.length ? JSON.stringify(record.invited) : null,
     record.createdAt,
     record.updatedAt,
   );
@@ -569,17 +576,21 @@ export function getConversation(db: Database.Database, id: string): Conversation
 export function updateConversation(
   db: Database.Database,
   id: string,
-  updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>,
+  updates: ConversationUpdate,
 ): ConversationRecord | null {
   const existing = getConversation(db, id);
   if (!existing) return null;
   db.prepare(
     `UPDATE conversations
-     SET participants = COALESCE(?, participants), subject = COALESCE(?, subject),
+     SET participants = COALESCE(?, participants), invited = COALESCE(?, invited),
+         createdBy = COALESCE(?, createdBy), subject = COALESCE(?, subject),
          alias = COALESCE(?, alias), updatedAt = ?
      WHERE id = ?`,
   ).run(
     updates.participants ? JSON.stringify(updates.participants) : null,
+    // An empty list is written as '[]', not NULL, because NULL means "leave it" in this statement.
+    updates.invited ? JSON.stringify(updates.invited) : null,
+    updates.createdBy ?? null,
     updates.subject ?? null,
     updates.alias ?? null,
     new Date().toISOString(),
@@ -600,6 +611,23 @@ export function listConversationsForParticipant(db: Database.Database, identity:
     'SELECT * FROM conversations WHERE participants LIKE ? ORDER BY updatedAt DESC',
   ).all(needle) as Record<string, unknown>[];
   return rows.map(deserializeConversation);
+}
+
+/**
+ * Every group thread with an open invitation for `mailboxGhii` itself or for one of its agents
+ * (`bot#alice@node`), newest first. The LIKE narrows the rows; the exact test on the parsed list is
+ * what decides, so `alice@node` never matches `malice@node` or `alice@node-2`.
+ */
+export function listConversationsInvitingMailbox(db: Database.Database, mailboxGhii: string, opts: { limit?: number } = {}): ConversationRecord[] {
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 500);
+  // The LIKE can admit a near namesake, which the exact test below drops, so the SQL reads a margin
+  // over the limit rather than exactly it.
+  const rows = db.prepare(
+    'SELECT * FROM conversations WHERE invited LIKE ? ORDER BY updatedAt DESC LIMIT ?',
+  ).all(`%${mailboxGhii}"%`, limit * 2) as Record<string, unknown>[];
+  return rows.map(deserializeConversation)
+    .filter(c => (c.invited ?? []).some(i => i === mailboxGhii || i.endsWith(`#${mailboxGhii}`)))
+    .slice(0, limit);
 }
 
 // ── Contact consent ──

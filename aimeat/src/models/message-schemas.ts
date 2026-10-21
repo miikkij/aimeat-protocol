@@ -9,6 +9,8 @@
  * @structure MessageAttachmentInputSchema, InteractivePayloadSchema, MessageSendSchema
  * @usage import { MessageSendSchema } from '../models/message-schemas.js';
  * @version-history
+ *   v1.7.0 -- 2026-10-21 -- Group chat: GroupCreateSchema, GroupMembersSchema, GroupLeaveSchema and
+ *     GroupInvitationAnswerSchema for routes/message-groups.ts.
  *   v1.6.0 -- 2026-10-17 -- MessageSendAsOwnerSchema for POST /v1/messages/as-owner: no `interactive`, strict.
  *   v1.5.0 -- 2026-10-08 -- MessageSendSchema and BroadcastSendSchema take ai_provenance and
  *     ai_provenance_id (aiprov D5). The objects stripped them, so a REST or connector sender's
@@ -152,6 +154,34 @@ export const MessageSendAsOwnerSchema = z.object({
   d => (d.body?.trim().length ?? 0) > 0 || (d.attachments?.length ?? 0) > 0,
   { message: 'A message must have a body or an attachment' },
 );
+
+// ── Group chat (routes/message-groups.ts) ──
+
+/** `as_owner`: an agent acts in its owner's name, on the messages:send-as-owner scope. */
+const GroupAsOwnerField = { as_owner: z.boolean().optional() };
+const GroupMemberList = z.array(z.string().min(1).max(256)).max(63);
+
+/** POST /v1/messages/groups: open a group with its first message. */
+export const GroupCreateSchema = z.object({
+  members: GroupMemberList.min(1),
+  subject: z.string().trim().min(1).max(200),
+  body: z.string().max(200_000).refine(b => b.trim().length > 0, { message: 'A group opens with a first message' }),
+  ...GroupAsOwnerField,
+  ...AiProvenanceBodyFields,
+}).strict();
+
+/** POST /v1/messages/groups/:conversationId/members: the manager adds and removes. */
+export const GroupMembersSchema = z.object({
+  add: GroupMemberList.optional(),
+  remove: GroupMemberList.optional(),
+  ...GroupAsOwnerField,
+}).strict().refine(d => (d.add?.length ?? 0) + (d.remove?.length ?? 0) > 0, { message: 'Name somebody to add or remove' });
+
+/** POST /v1/messages/groups/:conversationId/leave */
+export const GroupLeaveSchema = z.object({ ...GroupAsOwnerField }).strict();
+
+/** POST /v1/messages/groups/:conversationId/invitation: accept or decline. */
+export const GroupInvitationAnswerSchema = z.object({ accept: z.boolean(), ...GroupAsOwnerField }).strict();
 
 // ── Broadcast / send-to-many ──
 

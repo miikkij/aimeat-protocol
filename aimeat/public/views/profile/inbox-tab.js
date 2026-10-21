@@ -15,6 +15,8 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.13.0 -- 2026-10-21 -- Group chat: "New group" opens a group with its first message, the list carries the
+ *     group invitations, an open group has its members strip (./inbox-tab/group-chat.js). The peer names moved to ./inbox-tab/use-peer-names.js.
  *   v2.12.0 -- 2026-10-19 -- peerAvatar(id): an agent peer's own avatar, from the owner's agents and the profile reads the name lookup already makes (no extra request), passed to the list and the thread.
  *   v2.11.0 -- 2026-10-17 -- A conversation my agent takes part in is marked read like any other: it is mine to answer.
  *   v2.10.0 -- 2026-10-08 -- A suggested reply sent as it stands carries the draft's provenance record (aiprov D17).
@@ -180,8 +182,9 @@ import * as agentsSvc from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
-import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, mergeThreadPage } from './inbox-tab/helpers.js';
+import { usePeerNames } from './inbox-tab/use-peer-names.js';
+import { useGroupChat, GroupComposePane, GroupInvitations } from './inbox-tab/group-chat.js';
+import { isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { Composer } from '/components/Composer.js';
 import { Action, Actions, Loud } from '/components/Action.js';
@@ -222,9 +225,6 @@ export default function InboxTab({ showToast }) {
   const { showLinkPreviews, toggleLinkPreviews } = useLinkPreviewToggle(); const [mdViewer, setMdViewer] = useState(null); // link-preview toggle (persisted) + markdown viewer state
   const [aiReply, setAiReply] = useState(null);           // { title, build } — Reply with AI popover (TARGET-031)
   const [nbConv, setNbConv] = useState(null);             // { title, promptText, runServerSummary, parkConversation } — Conversation → Notebook popover
-  const [peerNames, setPeerNames] = useState({});         // id (GHII/GAII or owner@node) → resolved display name
-  const peerNamesRef = useRef({});                        // dedup bookkeeping: an id present here was already looked up
-  const [peerAvatars, setPeerAvatars] = useState({});     // agent GAII → its `avatar` from a profile read (agents only)
   const [composeSubject, setComposeSubject] = useState(''); // optional subject → opens a new topic thread
   const [mode, setMode] = useState('idle');               // 'idle' | 'compose' | 'thread'
   const [to, setTo] = useState('');
@@ -262,6 +262,10 @@ export default function InboxTab({ showToast }) {
   // Ids the user just cancelled — kept so a stale re-fetch (replica lag on a multi-node node) can't
   // re-add a row the user already dismissed until the cancel has propagated.
   const dismissedRef = useRef(new Set());
+  // Group chat (./inbox-tab/group-chat.js): invitations, the open group's members, opening one. The
+  // callbacks are wrapped because they are declared further down.
+  const group = useGroupChat({ showToast, confirm, activeConv, loadLists: () => loadLists(), openConversation: (c) => openConversation(c), goIdle: () => goIdle(), peerDisplay: (id) => peerDisplay(id) });
+  const { peerNames, setPeerNames, peerNamesRef, setPeerAvatars, peerDisplay, peerAvatar } = usePeerNames({ conversations, requests, activeConv, myAgents, extraIds: group.ids });
 
   const loadLists = useCallback(async () => {
     const [reqs, convs, impIds, trs] = await Promise.all([
@@ -305,7 +309,7 @@ export default function InboxTab({ showToast }) {
     setTrackedList((d.tracked || []).filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
     setMyAgents(d.agents || []);
     setMyGroups(d.groups || []);
-  }, [loadLists]);
+  }, [loadLists, peerNamesRef, setPeerNames, setPeerAvatars]);
 
   // Cheap, single-request refresh of ONLY the Tracked Responses list. Used for 'agent-messages'
   // live events: on a busy node 40+ agents emit agent-message changes every second, and those only
@@ -510,43 +514,7 @@ export default function InboxTab({ showToast }) {
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
   };
-  // Peer display names (TARGET-031, part A): the conversation payload carries only ids, so resolve a
-  // human-friendly name once per peer and cache it. Agents → GET /v1/agents/:gaii, humans (owner@node) →
-  // GET /v1/ghii/:ghii (both public, both return display_name). Federated peers on another node aren't
-  // in the local store → 404 → we keep the handle. Reserve each id synchronously so we fetch it once.
-  const resolvePeerNames = useCallback((ids) => {
-    const todo = [...new Set((ids || []).filter(Boolean))].filter(id => !(id in peerNamesRef.current));
-    if (!todo.length) return;
-    todo.forEach(id => { peerNamesRef.current[id] = ''; });   // reserve (fallback = handle) so we look it up once
-    Promise.all(todo.map(async (id) => {
-      const path = String(id).includes('#') ? `/v1/agents/${encodeURIComponent(id)}` : `/v1/ghii/${encodeURIComponent(id)}`;
-      const r = await apiGet(path).catch(err => { swallowed('inbox-tab: openConversation', err); return null; });
-      const dn = String(r?.data?.display_name || '').trim();
-      if (dn) peerNamesRef.current[id] = dn;
-      return r?.data?.avatar ? [id, r.data.avatar] : null;
-    })).then((found) => {
-      setPeerNames({ ...peerNamesRef.current });
-      const avatars = Object.fromEntries(found.filter(Boolean));
-      if (Object.keys(avatars).length) setPeerAvatars(p => ({ ...p, ...avatars }));
-    });
-  }, []);
-  // Resolve names for every peer currently on screen (conversation peers + their owners + requests + open thread).
-  useEffect(() => {
-    const ids = [];
-    // A folded row is filed under who opened it, and each copy under it is named by who it went to.
-    for (const c of conversations) for (const r of [c, ...(c.folded || [])]) {
-      if (r.peerGhii) { ids.push(r.peerGhii); ids.push(ownerKeyOf(r.peerGhii)); }
-      if (c.fold) { ids.push(r.openedBy); ids.push(r.openedTo); }
-    }
-    for (const r of requests) if (r.contactId) ids.push(r.contactId);
-    if (activeConv?.peerGhii) { ids.push(activeConv.peerGhii); ids.push(ownerKeyOf(activeConv.peerGhii)); }
-    resolvePeerNames(ids);
-  }, [conversations, requests, activeConv, resolvePeerNames]);
-  // "Display name (handle)" for an id, falling back to the bare handle when we have no display name.
-  const peerDisplay = (id) => peerLabel(id, peerNames[id]);
-  // An agent peer's own avatar, or null (a person, or an agent without one): the owner's own agents
-  // carry it in their list, another owner's agent in the profile read above.
-  const peerAvatar = (id) => (String(id || '').includes('#') ? (peerAvatars[id] || myAgents.find(a => a.gaii === id)?.avatar || null) : null);
+  // Peer display names and agent avatars: usePeerNames (./inbox-tab/use-peer-names.js), called above.
 
   // Thread-head AI actions — Reply with AI (TARGET-031) and Conversation → Notebook (summarize the whole
   // thread + images, park it for filing/enrichment). Config assembly lives in ./inbox-tab/ai-actions.js.
@@ -559,6 +527,7 @@ export default function InboxTab({ showToast }) {
   const startQuoteReply = useCallback((msg) => { setReplyQuote(msg); setComposerFocus(n => n + 1); }, []);
 
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
+  const startGroup = () => { setMode('group'); setActiveConv(null); };
   const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); setBcAudience(''); };
   const addBcRecipient = (id) => {
     const v = (id ?? bcInput).trim();
@@ -738,6 +707,7 @@ export default function InboxTab({ showToast }) {
       desc=${mode === 'organize' ? t('inbox.org.pageLead') : null}
       actions=${isPage ? null : html`<${Actions}>
           <${Loud} onClick=${startCompose}>${t('inbox.new')}<//>
+          <${Action} small onClick=${startGroup}>${t('inbox.group.new')}<//>
           <${Action} small onClick=${startBroadcast}>${t('inbox.broadcast')}<//>
           <${Action} small soft=${!awaitingCount} onClick=${showTracked} title=${awaitingCount ? t('inbox.trackReady') : ''}>${t('inbox.trackedTitle')}${activeTracked.length ? ` ${activeTracked.length}` : ''}<//>
           ${recentBroadcasts.length ? html`<${Action} small soft onClick=${openResultsList}>${t('inbox.results')}<//>` : null}
@@ -766,7 +736,9 @@ export default function InboxTab({ showToast }) {
       <${Panes} open=${mode !== 'idle'} backLabel=${t('inbox.back')} onBack=${goIdle}
         side=${html`<${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
           peerDisplay=${peerDisplay} peerAvatar=${peerAvatar} accept=${accept} block=${block} openConversation=${openConversation}
-          openFolds=${openFolds} toggleFold=${toggleFold} org=${org} />`}>
+          openFolds=${openFolds} toggleFold=${toggleFold} org=${org}
+          groupInvitations=${html`<${GroupInvitations} invitations=${group.invitations} answer=${group.answer} peerDisplay=${peerDisplay} />`} />`}>
+        ${mode === 'group' ? html`<${GroupComposePane} showToast=${showToast} sending=${sending} onOpened=${group.opened} peerDisplay=${peerDisplay} />` : null}
         ${mode === 'compose' ? html`
           <${Pane}>
             <${PaneHead} name=${t('inbox.new')} />
@@ -789,7 +761,8 @@ export default function InboxTab({ showToast }) {
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
           threadAll=${threadAll} toggleThreadAll=${toggleThreadAll} archiveItem=${org.menuItemFor(activeConv, conversations)}
-          onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds} />` : null}
+          onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds}
+          groupDoor=${group.door} groupStrip=${group.strip} />` : null}
 
         ${mode === 'idle' ? html`<${Pane} empty>${t('inbox.selectConversation')}<//>` : null}
       <//>`}
