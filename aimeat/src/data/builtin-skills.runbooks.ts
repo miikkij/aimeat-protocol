@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-21 — manage-my-agents: an `owner_scope` read or list leaves out an organism's records when
+ *     that organism does not let the agent in, as a read of the key does (secaudit 2026-10, v57).
  *   2026-10-19 — manage-my-agents: an agent's picture (`avatar` on aimeat_agents_list and
  *     aimeat_agent_profile, agent.avatar, the owner's PUT/DELETE .../avatar).
  *   2026-10-18 — manage-my-agents: the node narrows an agent holding all permissions by itself after two
@@ -257,7 +259,12 @@ flowchart LR
   wake runs the task that waited. Reading with \`owner_scope\` reaches the records the owner and the
   other agents keep private only with memory:read-as-owner, which "Full access" does not carry, since
   2026-10-15; without it an agent reads what they mark owner, members or public. An agent that
-  needs the owner's private records for its job asks the owner for that permission by name.
+  needs the owner's private records for its job asks the owner for that permission by name. The
+  organism rule holds there too: a record under \`organism.<id>.\` comes back with \`owner_scope\` only
+  when that organism lets the agent in. An organism that admits only the agents on its list leaves
+  its records out for every other agent, in a read and in a list, as a read of the key itself does;
+  the fix is that the owner adds the agent in the Agents section of the organism's page, not another
+  permission.
   Making something public to anyone takes publish:public when this node asks the owner first: that
   permission is outside "Full access" and no agent has it unless the owner ticked it. Without it a
   change that makes something public (a record, a file, an app, a page, an organism, a board, a

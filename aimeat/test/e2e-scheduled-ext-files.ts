@@ -27,6 +27,21 @@
  *   (16), and the owner can widen it back (17).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scheduled-ext-files
  * @version-history
+ *   v1.5.1 -- 2026-10-21 -- 23d: the app that made a kept schedule runs it now with its own token, as
+ *     the fire runs it; its edit still asks ext:invoke, and run now on a schedule the list does not
+ *     keep is still refused.
+ *   v1.5.0 -- 2026-10-21 -- Tests 23b to 23d (capability-loss review of the ext:invoke fix): an agent
+ *     refused at the fire gets the owner's one-press Allow and then runs; an app's schedule from before
+ *     2026-10-05 runs as the account while a revoked grant's stops; an app schedule kept by the
+ *     once-only step runs while a grant narrowed after the step stops. The suite exits explicitly.
+ *   v1.4.0 -- 2026-10-20 -- Tests 24 to 26: the presigned ZIP route records who wrote the code, so an
+ *     agent's ZIP redeploy falls under the owner's 'installer' narrowing (secaudit 2026-10,
+ *     handleExtensionUpload:installedByPrincipal-not-stamped) and the owner's own ZIP records the
+ *     owner; a ZIP URL kept by a deleted agent is refused with the code unchanged (secaudit 2026-10,
+ *     PUT-v1-upload:no-live-principal-recheck).
+ *   v1.3.0 -- 2026-10-20 -- Tests 19 to 23 (secaudit 2026-10, SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke):
+ *     a task:write-only agent is refused creating, editing and running an extension schedule on REST
+ *     and MCP; with ext:invoke it may; a maker the owner narrows or deletes no longer runs the action.
  *   v1.2.0 -- 2026-10-20 -- Tests 11 to 18 follow the owner's per-extension choice: the default keeps
  *     today's behaviour, and the narrowing is the owner's to set (Jouni, 2026-10-20).
  *   v1.1.0 -- 2026-10-20 -- Tests 10 to 13: the read authority of an unattended run (secaudit
@@ -52,9 +67,15 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { deflateRawSync, crc32 } from 'node:zlib';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool, type McpAgent } from './helpers/mcp-session.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import type { Storage } from '../src/storage/interface.js';
+import { EXTENSION_SCHEDULE_KEEP_KEY, keepAppExtensionSchedulesOnce } from '../src/services/schedule-extension-keep.js';
 async function setupOwner(label: string) {
   const name = `sef${label}${Date.now()}`;
   let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Sched', password: 'SchedFiles1234' }) });
@@ -462,7 +483,364 @@ await test('18. An extension the owner wrote in person reads the file whichever 
   assert(probe.size === SECRET_TEXT.length, `and get the real bytes, got size ${probe.size}`);
 });
 
+// ── WHO MAY PUT AN EXTENSION ACTION ON A CLOCK, AND WHO THE FIRE RUNS AS ─────────────────────────
+//
+// secaudit 2026-10, SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke. POST /v1/ext/:ext/:action
+// asks ext:invoke. The schedule route asked only task:write, so an agent the owner had kept from
+// running extension actions ran any of them, with input it chose, by creating a schedule and
+// triggering it. Create, edit and run-now now ask ext:invoke of anyone but the owner in person, and
+// the fire asks the maker again (services/schedule-actor.ts), so a maker the owner narrows or deletes
+// afterwards no longer runs the action. Test 4 above is the owner's own schedule, which is unchanged.
+
+const makerInput = (key: string) => ({ key, b64: Buffer.from(`made for ${key}`).toString('base64'), visibility: 'private' });
+const ownerFile = (key: string) => json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/${key}`)}`, { headers: auth(owner.token) });
+const extSchedule = (key: string, name: string) => JSON.stringify({
+  kind: 'extension', cron: '0 0 1 1 *', display_name: name, extension_name: EXT, action_id: 'produce', input: makerInput(key),
+});
+let taskOnly: McpAgent;
+let invoker: McpAgent;
+let invokerScheduleId = '';
+const makerScheduleIds: string[] = [];
+
+await test('19. A task:write-only agent is refused putting an extension action on a clock (REST and MCP)', async () => {
+  taskOnly = await makeAgent(BASE, owner, ['task:write', 'workflow:read', 'workflow:write']);
+  // The control the finding rests on: the direct endpoint refuses this agent.
+  const direct = await json(`/v1/ext/${EXT}/produce`, { method: 'POST', headers: auth(taskOnly.token), body: JSON.stringify(makerInput('v52-direct.csv')) });
+  assert(direct.status === 403, `the direct invoke must refuse a task:write-only agent, got ${direct.status}`);
+
+  const rest = await json('/v1/schedules', { method: 'POST', headers: auth(taskOnly.token), body: extSchedule('v52-rest.csv', 'v52-rest') });
+  assert(rest.status === 403 && rest.body.error?.code === 'SCOPE_DENIED', `REST create: ${rest.status} ${JSON.stringify(rest.body?.error)}`);
+  assert(/ext:invoke/.test(rest.body.error?.message ?? ''), `the refusal names the permission: ${rest.body.error?.message}`);
+
+  const s = await openSession(BASE, taskOnly.token);
+  const mcp = await callTool(s, 'aimeat_schedule_create', {
+    kind: 'extension', cron: '0 0 1 1 *', display_name: 'v52-mcp', extension_name: EXT, action_id: 'produce', input: makerInput('v52-mcp.csv'),
+  });
+  // The tool itself refuses (its own word is task:write, which the agent holds), so the answer is the
+  // schedule gate's sentence and not the registration filter's.
+  assert(mcp.isError && /Creating a "extension" schedule requires the "ext:invoke" scope/.test(mcp.text),
+    `MCP create must be refused naming ext:invoke: ${mcp.text.slice(0, 200)}`);
+
+  const list = await json('/v1/schedules', { headers: auth(owner.token) });
+  const names = (list.body.data.managed as any[]).map(m => m.displayName);
+  assert(!names.includes('v52-rest') && !names.includes('v52-mcp'), `a refused create was stored: ${JSON.stringify(names)}`);
+});
+
+await test('20. Control: the same agent with ext:invoke creates and runs it, and the bytes land in the owner\'s storage', async () => {
+  invoker = await makeAgent(BASE, owner, ['task:write', 'workflow:read', 'workflow:write', 'ext:invoke']);
+  const mk = await json('/v1/schedules', { method: 'POST', headers: auth(invoker.token), body: extSchedule('v52-ok.csv', 'v52-ok') });
+  assert(mk.status === 201, `create with ext:invoke: ${mk.status} ${JSON.stringify(mk.body?.error)}`);
+  invokerScheduleId = mk.body.data.schedule.id;
+  makerScheduleIds.push(invokerScheduleId);
+  const t = await json(`/v1/schedules/${invokerScheduleId}/trigger`, { method: 'POST', headers: auth(invoker.token), body: '{}' });
+  assert(t.status === 200, `trigger with ext:invoke: ${t.status} ${JSON.stringify(t.body?.error)}`);
+  assert(t.body.data.schedule.lastRunResult === 'success', `run: ${t.body.data.schedule.lastRunResult} ${t.body.data.schedule.lastRunError ?? ''}`);
+  const back = await ownerFile('v52-ok.csv');
+  assert(back.status === 200, `the produced file is the owner's: ${back.status}`);
+});
+
+await test('21. The task:write-only agent is refused editing and running that schedule (REST and MCP)', async () => {
+  const edit = await json(`/v1/schedules/${invokerScheduleId}`, {
+    method: 'PATCH', headers: auth(taskOnly.token), body: JSON.stringify({ input: makerInput('v52-edited.csv') }),
+  });
+  assert(edit.status === 403 && edit.body.error?.code === 'SCOPE_DENIED', `edit: ${edit.status} ${JSON.stringify(edit.body?.error)}`);
+  const run = await json(`/v1/schedules/${invokerScheduleId}/trigger`, { method: 'POST', headers: auth(taskOnly.token), body: '{}' });
+  assert(run.status === 403 && run.body.error?.code === 'SCOPE_DENIED', `REST trigger: ${run.status} ${JSON.stringify(run.body?.error)}`);
+  const s = await openSession(BASE, taskOnly.token);
+  const mcp = await callTool(s, 'aimeat_schedule_trigger', { schedule_id: invokerScheduleId });
+  assert(mcp.isError && /Running a "extension" schedule requires the "ext:invoke" scope/.test(mcp.text),
+    `MCP trigger must be refused naming ext:invoke: ${mcp.text.slice(0, 200)}`);
+
+  const got = await json(`/v1/schedules/${invokerScheduleId}`, { headers: auth(owner.token) });
+  assert(!JSON.stringify(got.body.data.schedule.input ?? {}).includes('v52-edited'), 'the refused edit was stored');
+  assert((got.body.data.schedule.runCount ?? 0) === 1, `a refused run ran: runCount ${got.body.data.schedule.runCount}`);
+});
+
+await test('22. After the owner narrows the maker to drop ext:invoke, a fire does not run the action', async () => {
+  await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-ok.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
+  assert((await ownerFile('v52-ok.csv')).status === 404, 'the file from test 20 is gone before the fire');
+  const narrow = await json(`/v1/agents/${invoker.name}/scopes`, {
+    method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ scopes: ['task:write', 'workflow:read', 'workflow:write'] }),
+  });
+  assert(narrow.status === 200, `owner narrows: ${narrow.status} ${JSON.stringify(narrow.body?.error)}`);
+
+  // The owner in person runs it: the owner may, and the fire still asks the maker.
+  const t = await json(`/v1/schedules/${invokerScheduleId}/trigger`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+  assert(t.status === 200, `owner trigger: ${t.status} ${JSON.stringify(t.body?.error)}`);
+  assert(t.body.data.schedule.lastRunResult === 'error', `a narrowed maker's schedule ran: ${t.body.data.schedule.lastRunResult}`);
+  assert(/ext:invoke/.test(t.body.data.schedule.lastRunError ?? ''), `the run log names the permission: ${t.body.data.schedule.lastRunError}`);
+  assert((await ownerFile('v52-ok.csv')).status === 404, 'the refused fire wrote the file');
+});
+
+await test('23. After the owner deletes the maker, a fire does not run the action', async () => {
+  const gone = await makeAgent(BASE, owner, ['task:write', 'workflow:read', 'ext:invoke']);
+  const mk = await json('/v1/schedules', { method: 'POST', headers: auth(gone.token), body: extSchedule('v52-gone.csv', 'v52-gone') });
+  assert(mk.status === 201, `create: ${mk.status} ${JSON.stringify(mk.body?.error)}`);
+  const id = mk.body.data.schedule.id as string;
+  makerScheduleIds.push(id);
+  const del = await json(`/v1/agents/${gone.name}`, { method: 'DELETE', headers: auth(owner.token) });
+  assert(del.status === 200, `owner deletes the maker: ${del.status} ${JSON.stringify(del.body?.error)}`);
+
+  const t = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+  assert(t.status === 200, `owner trigger: ${t.status} ${JSON.stringify(t.body?.error)}`);
+  assert(t.body.data.schedule.lastRunResult === 'error', `a deleted maker's schedule ran: ${t.body.data.schedule.lastRunResult}`);
+  assert(/no longer connected/.test(t.body.data.schedule.lastRunError ?? ''), `the run log names the maker as gone: ${t.body.data.schedule.lastRunError}`);
+  assert((await ownerFile('v52-gone.csv')).status === 404, 'the refused fire wrote the file');
+  // A deleted maker is not something to allow: the plain sentence, with no Allow address.
+  assert(!/\/v1\/allow\?/.test(t.body.data.schedule.lastRunError ?? ''), `a deleted maker was offered Allow: ${t.body.data.schedule.lastRunError}`);
+});
+
+// ── WHAT WORKED KEEPS WORKING (capability-loss review, 2026-10-21) ─────────────────────────────
+//
+// The fix closes the way in; it may not take away a use that already ran. Three uses are kept, each
+// beside the refusal that keeps the hole closed:
+//   23b  an agent refused for a missing word: the owner is asked with one press, and after Allow it runs;
+//   23c  an app's schedule from before 2026-10-05 (no grant recorded) runs as the account, as it did;
+//        one that names its grant stops when the grant is revoked;
+//   23d  an app's schedule made before the kind asked ext:invoke, from a grant without the word, runs
+//        after the once-only keep step; a grant the owner narrowed after that step stops.
+// Nothing reachable over HTTP writes a schedule in its pre-2026-10-05 shape or a grant record, so
+// these tests write them into the node's own database from here, on whichever backend the runner pinned.
+
+const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;
+let backend: Storage | null = null;
+async function openBackend(): Promise<Storage> {
+  if (backend) return backend;
+  const dbUrl = serverDbUrl();
+  const sqlitePath = pinnedSqlitePath();
+  assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl),
+    `backend "${provider}" is not reachable from this process`);
+  backend = await createStorage({ provider, sqlitePath, dbUrl });
+  return backend;
+}
+/** A live app grant of `owner`, written as the grant route would leave it. */
+async function grantOf(storage: Storage, scopes: string[]): Promise<string> {
+  const grantId = `appgrant-e2e${Date.now().toString(36)}${Math.floor(Math.random() * 1e6)}`;
+  // One grant per (owner, app), so each grant names an app of its own.
+  await storage.createAppGrant({
+    grantId, app: `${owner.name}/${grantId}.html`, appName: 'Keep', appOrigin: BASE, owner: owner.name, gaii: owner.gaii,
+    scopes, refreshTokenHash: null, createdAt: new Date().toISOString(), lastUsedAt: null, revoked: false,
+  });
+  return grantId;
+}
+/** An extension schedule the owner makes, for the database edit that gives it another maker. */
+async function ownerExtSchedule(key: string, name: string): Promise<string> {
+  const mk = await json('/v1/schedules', { method: 'POST', headers: auth(owner.token), body: extSchedule(key, name) });
+  assert(mk.status === 201, `owner create: ${mk.status} ${JSON.stringify(mk.body?.error)}`);
+  makerScheduleIds.push(mk.body.data.schedule.id);
+  return mk.body.data.schedule.id as string;
+}
+const fire = async (id: string) => {
+  const t = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+  assert(t.status === 200, `owner trigger: ${t.status} ${JSON.stringify(t.body?.error)}`);
+  return t.body.data.schedule as { lastRunResult: string; lastRunError?: string };
+};
+
+await test('23b. KEPT: the owner of a refused agent is asked with one press, and after Allow the schedule runs again', async () => {
+  // Test 22 left the narrowed maker's schedule refused. The run log says where to allow it…
+  const got = await json(`/v1/schedules/${invokerScheduleId}`, { headers: auth(owner.token) });
+  const said: string = got.body.data.schedule.lastRunError ?? '';
+  assert(said.includes(`/v1/allow?agent=${invoker.name}&need=ext%3Ainvoke`), `the run log carries the one-press address: ${said}`);
+  // …and the bell holds the question with its Allow button (services/permission-ask-notice.ts).
+  let ask: any;
+  for (let i = 0; i < 50 && !ask; i++) {
+    const n = await json('/v1/notifications', { headers: auth(owner.token) });
+    ask = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'agent_permission_ask'
+      && x.actions?.some((a: any) => a.endpoint === `/v1/agents/${encodeURIComponent(invoker.name)}/allow`));
+    if (!ask) await new Promise(r => setTimeout(r, 100));
+  }
+  assert(!!ask, 'no Allow notice for the refused agent in the bell');
+  const allow = ask.actions.find((a: any) => a.endpoint?.endsWith('/allow'));
+  assert(JSON.stringify(allow.body?.scopes) === '["ext:invoke"]', `the Allow button gives exactly ext:invoke: ${JSON.stringify(allow.body)}`);
+  const pressed = await json(allow.endpoint, { method: 'POST', headers: auth(owner.token), body: JSON.stringify(allow.body) });
+  assert(pressed.status === 200, `Allow: ${pressed.status} ${JSON.stringify(pressed.body?.error)}`);
+
+  const ran = await fire(invokerScheduleId);
+  assert(ran.lastRunResult === 'success', `after Allow it runs again: ${ran.lastRunResult} ${ran.lastRunError ?? ''}`);
+  assert((await ownerFile('v52-ok.csv')).status === 200, 'and writes its file');
+});
+
+await test('23c. KEPT: an app\'s schedule from before 2026-10-05 runs as the account; a revoked grant\'s schedule stops', async () => {
+  const storage = await openBackend();
+  const oldId = await ownerExtSchedule('v52-oldapp.csv', 'v52-oldapp');
+  // The pre-2026-10-05 shape: the owner's identity as the maker, marked as not the owner in person, no grant.
+  await storage.updateScheduledJob(oldId, { createdByAgent: true });
+  const old = await fire(oldId);
+  assert(old.lastRunResult === 'success', `an old app schedule must keep firing: ${old.lastRunResult} ${old.lastRunError ?? ''}`);
+  assert((await ownerFile('v52-oldapp.csv')).status === 200, 'and write its file');
+
+  // The hole stays closed: a schedule that names its grant stops when the owner revokes the grant.
+  const grantId = await grantOf(storage, ['task:write', 'workflow:write', 'ext:invoke']);
+  const appId = await ownerExtSchedule('v52-revoked.csv', 'v52-revoked');
+  await storage.updateScheduledJob(appId, { createdByAgent: true, createdByApp: grantId });
+  assert((await fire(appId)).lastRunResult === 'success', 'control: a live grant holding ext:invoke runs');
+  await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-revoked.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
+  await storage.updateAppGrant(grantId, { revoked: true });
+  const revoked = await fire(appId);
+  assert(revoked.lastRunResult === 'error', `a revoked grant's schedule ran: ${revoked.lastRunResult}`);
+  assert(/no longer holds your permission/.test(revoked.lastRunError ?? ''), `the reason: ${revoked.lastRunError}`);
+  assert((await ownerFile('v52-revoked.csv')).status === 404, 'the refused fire wrote the file');
+});
+
+await test('23d. KEPT: an app schedule made before the rule from a grant without ext:invoke runs after the keep step; a later narrowing stops', async () => {
+  const storage = await openBackend();
+  // Made under the old rule: the grant holds task:write and not ext:invoke.
+  const narrowGrant = await grantOf(storage, ['task:write', 'workflow:write']);
+  const keptId = await ownerExtSchedule('v52-kept.csv', 'v52-kept');
+  await storage.updateScheduledJob(keptId, { createdByAgent: true, createdByApp: narrowGrant });
+  // A grant that held the word when the step ran, narrowed by the owner afterwards.
+  const wideGrant = await grantOf(storage, ['task:write', 'workflow:write', 'ext:invoke']);
+  const laterId = await ownerExtSchedule('v52-later.csv', 'v52-later');
+  await storage.updateScheduledJob(laterId, { createdByAgent: true, createdByApp: wideGrant });
+
+  const before = await fire(keptId);
+  assert(before.lastRunResult === 'error' && /ext:invoke/.test(before.lastRunError ?? ''), `without the step it is refused: ${before.lastRunResult} ${before.lastRunError ?? ''}`);
+
+  // The node's first start with the rule, run here: the step's record is taken away and the step runs.
+  await storage.deleteMemory(`system@${NODE_ID}`, EXTENSION_SCHEDULE_KEEP_KEY, `system@${NODE_ID}`);
+  const step = await keepAppExtensionSchedulesOnce(storage, { nodeId: NODE_ID });
+  assert(step.ran && step.ids.includes(keptId), `the step keeps the old schedule: ${JSON.stringify(step)}`);
+  assert(!step.ids.includes(laterId), 'a grant holding ext:invoke needs no keeping');
+
+  const after = await fire(keptId);
+  assert(after.lastRunResult === 'success', `the kept schedule runs: ${after.lastRunResult} ${after.lastRunError ?? ''}`);
+  assert((await ownerFile('v52-kept.csv')).status === 200, 'and writes its file');
+
+  // "Run now" by the app that made the kept schedule works as its fire does; an edit by it still asks
+  // ext:invoke, and so does "run now" on a schedule the list does not keep.
+  const appToken = async (grantId: string): Promise<string> => {
+    const raw = `e2e-refresh-${grantId}-${Date.now()}`;
+    await storage.updateAppGrant(grantId, { refreshTokenHash: createHash('sha256').update(raw).digest('hex') });
+    const tk = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: raw }) });
+    assert(tk.status === 200 && typeof tk.body?.data?.access_token === 'string', `app token for ${grantId}: ${tk.status} ${JSON.stringify(tk.body?.error)}`);
+    return tk.body.data.access_token as string;
+  };
+  await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-kept.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
+  const keptApp = await appToken(narrowGrant);
+  const runNow = await json(`/v1/schedules/${keptId}/trigger`, { method: 'POST', headers: auth(keptApp), body: '{}' });
+  assert(runNow.status === 200 && runNow.body.data.schedule?.lastRunResult === 'success',
+    `the app runs its kept schedule now: ${runNow.status} ${JSON.stringify(runNow.body?.error ?? runNow.body?.data?.schedule?.lastRunError)}`);
+  assert((await ownerFile('v52-kept.csv')).status === 200, 'and the run now writes its file');
+  const edit = await json(`/v1/schedules/${keptId}`, { method: 'PATCH', headers: auth(keptApp), body: JSON.stringify({ cron: '0 0 2 1 *' }) });
+  assert(edit.status === 403, `an edit by the kept app still asks ext:invoke: ${edit.status} ${JSON.stringify(edit.body?.error)}`);
+
+  // The hole stays closed: the owner narrows the other grant after the step, and its schedule stops.
+  await storage.updateAppGrant(wideGrant, { scopes: ['task:write', 'workflow:write'] });
+  const later = await fire(laterId);
+  assert(later.lastRunResult === 'error' && /ext:invoke/.test(later.lastRunError ?? ''), `a narrowing after the step must stop it: ${later.lastRunResult} ${later.lastRunError ?? ''}`);
+  assert((await ownerFile('v52-later.csv')).status === 404, 'the refused fire wrote the file');
+  const laterRunNow = await json(`/v1/schedules/${laterId}/trigger`, { method: 'POST', headers: auth(await appToken(wideGrant)), body: '{}' });
+  assert(laterRunNow.status === 403 && laterRunNow.body?.error?.code === 'SCOPE_DENIED',
+    `run now on a schedule the list does not keep still asks ext:invoke: ${laterRunNow.status} ${JSON.stringify(laterRunNow.body?.error)}`);
+  // And the kept grant stops when it is revoked, kept or not.
+  await storage.updateAppGrant(narrowGrant, { revoked: true });
+  assert((await fire(keptId)).lastRunResult === 'error', 'a revoked grant\'s kept schedule ran');
+});
+
+// ── THE PRESIGNED ZIP ROUTE RECORDS WHO WROTE THE CODE ────────────────────────────────────────
+//
+// secaudit 2026-10, handleExtensionUpload:installedByPrincipal-not-stamped. The inline install and
+// redeploy routes stamp the principal that wrote the code (installedByPrincipal), and the owner's
+// 'installer' narrowing reads files with that principal's reach. The presigned ZIP route did not stamp
+// it: an agent's ZIP redeploy of an extension the owner wrote kept the owner as the writer, so the
+// agent's new code read the owner's private files under a narrowing that should have stopped it.
+
+/** Minimal deflated ZIP writer (as test/e2e-presigned-meta.ts), so the suite needs no dependency. */
+function makeZip(files: Record<string, string>): Buffer {
+  const locals: Buffer[] = [], centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(files)) {
+    const nameBuf = Buffer.from(name, 'utf8');
+    const raw = Buffer.from(content, 'utf8');
+    const comp = deflateRawSync(raw);
+    const crc = crc32(raw) >>> 0;
+    const lf = Buffer.alloc(30);
+    lf.writeUInt32LE(0x04034b50, 0); lf.writeUInt16LE(20, 4); lf.writeUInt16LE(0, 6);
+    lf.writeUInt16LE(8, 8); lf.writeUInt16LE(0, 10); lf.writeUInt16LE(0, 12);
+    lf.writeUInt32LE(crc, 14); lf.writeUInt32LE(comp.length, 18); lf.writeUInt32LE(raw.length, 22);
+    lf.writeUInt16LE(nameBuf.length, 26); lf.writeUInt16LE(0, 28);
+    const local = Buffer.concat([lf, nameBuf, comp]);
+    locals.push(local);
+    const cd = Buffer.alloc(46);
+    cd.writeUInt32LE(0x02014b50, 0); cd.writeUInt16LE(20, 4); cd.writeUInt16LE(20, 6);
+    cd.writeUInt16LE(0, 8); cd.writeUInt16LE(8, 10); cd.writeUInt16LE(0, 12); cd.writeUInt16LE(0, 14);
+    cd.writeUInt32LE(crc, 16); cd.writeUInt32LE(comp.length, 20); cd.writeUInt32LE(raw.length, 24);
+    cd.writeUInt16LE(nameBuf.length, 28); cd.writeUInt16LE(0, 30); cd.writeUInt16LE(0, 32);
+    cd.writeUInt16LE(0, 34); cd.writeUInt16LE(0, 36); cd.writeUInt32LE(0, 38);
+    cd.writeUInt32LE(offset, 42);
+    centrals.push(Buffer.concat([cd, nameBuf]));
+    offset += local.length;
+  }
+  const cdBuf = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(0, 4); end.writeUInt16LE(0, 6);
+  end.writeUInt16LE(centrals.length, 8); end.writeUInt16LE(centrals.length, 10);
+  end.writeUInt32LE(cdBuf.length, 12); end.writeUInt32LE(offset, 16); end.writeUInt16LE(0, 20);
+  return Buffer.concat([...locals, cdBuf, end]);
+}
+
+/** The probe extension as a ZIP at `version`: manifest.yaml at the root, the scripts under scripts/. */
+const probeZip = (extName: string, version: string) => makeZip({
+  'manifest.yaml': probeManifest(extName).replace('"version": "1.0.0"', `"version": "${version}"`),
+  ...Object.fromEntries(Object.entries(PROBE_SCRIPTS).map(([id, src]) => [`scripts/${id}`, src])),
+});
+
+/** Mint a presigned ZIP upsert as `token`; PUT `zip` to it unless the caller keeps the URL for later. */
+async function zipUpsert(token: string, zip: Buffer | null): Promise<{ url: string; status: number; body: any }> {
+  const m = await json('/v1/extensions', { method: 'POST', headers: auth(token), body: JSON.stringify({ mode: 'presigned', update: true }) });
+  assert(m.status === 200 && typeof m.body.data?.upload_url === 'string', `mint ${m.status}: ${JSON.stringify(m.body?.error)}`);
+  const url = m.body.data.upload_url as string;
+  if (!zip) return { url, status: 0, body: null };
+  const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/zip' }, body: new Uint8Array(zip) });
+  return { url, status: res.status, body: await res.json() };
+}
+
+await test('24. An agent\'s ZIP redeploy records the agent as the code writer, and the owner\'s narrowing applies to it', async () => {
+  // OWNER_EXT was written by the owner in person and set to 'installer' in test 18.
+  const before = await readerSetting(OWNER_EXT, reader.token);
+  assert(before.installed_by_kind === 'self' && before.authority === 'installer', `start: ${JSON.stringify(before)}`);
+
+  const up = await zipUpsert(agent.token, probeZip(OWNER_EXT, '1.0.1'));
+  assert(up.status === 200 && up.body.updated === true, `ZIP redeploy ${up.status}: ${JSON.stringify(up.body)}`);
+
+  const view = await readerSetting(OWNER_EXT, reader.token);
+  assert(view.installed_by_kind === 'agent', `the agent wrote this code, got ${view.installed_by_kind}`);
+  assert(view.installed_by_principal === agent.gaii, `named exactly, got ${view.installed_by_principal}`);
+  assert(view.authority === 'installer', `and the owner's choice survives the ZIP write, got ${view.authority}`);
+
+  await runProbeUnattended(OWNER_EXT);
+  const probe = await probeOutcome(OWNER_EXT, reader.token);
+  assert(probe.ok === false, `the agent's code must be refused the private file, got ${JSON.stringify(probe)}`);
+  assert(probe.size === undefined && probe.head === undefined, 'nothing of the file reaches it');
+  assert(/installer/i.test(probe.message ?? ''), `the refusal names the setting, got: ${probe.message}`);
+});
+
+await test('25. Control: the owner\'s own ZIP redeploy records the owner, and the run reads the file again', async () => {
+  const up = await zipUpsert(reader.token, probeZip(OWNER_EXT, '1.0.2'));
+  assert(up.status === 200 && up.body.updated === true, `ZIP redeploy ${up.status}: ${JSON.stringify(up.body)}`);
+  const view = await readerSetting(OWNER_EXT, reader.token);
+  assert(view.installed_by_kind === 'self', `the owner wrote this code, got ${view.installed_by_kind}`);
+  await runProbeUnattended(OWNER_EXT);
+  const probe = await probeOutcome(OWNER_EXT, reader.token);
+  assert(probe.ok === true && probe.size === SECRET_TEXT.length, `the owner's code reads the file, got ${JSON.stringify(probe)}`);
+});
+
+await test('26. A ZIP upload URL kept by an agent the owner deleted is refused 401, and the code stays as it was', async () => {
+  const doomed = await makeAgent(BASE, reader, ['ext:write', 'ext:invoke']);
+  const { url } = await zipUpsert(doomed.token, null);
+  const del = await json(`/v1/agents/${doomed.name}`, { method: 'DELETE', headers: auth(reader.token) });
+  assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
+
+  const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/zip' }, body: new Uint8Array(probeZip(OWNER_EXT, '9.9.9')) });
+  assert(res.status === 401, `the PUT must be refused, got ${res.status}: ${await res.text()}`);
+  const ext = await json(`/v1/extensions/${OWNER_EXT}`, { headers: auth(reader.token) });
+  assert(ext.status === 200, `read ${ext.status}`);
+  const version = ext.body.data?.version ?? ext.body.data?.extension?.version;
+  assert(version === '1.0.2', `the code must be unchanged, got version ${version}`);
+});
+
 await test('Cleanup', async () => {
+  for (const id of makerScheduleIds) await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth(owner.token) });
   await json(`/v1/schedules/${okScheduleId}`, { method: 'DELETE', headers: auth(owner.token) });
   await json(`/v1/schedules/${failScheduleId}`, { method: 'DELETE', headers: auth(owner.token) });
   await json(`/v1/extensions/${EXT}`, { method: 'DELETE', headers: auth(owner.token) });
@@ -472,4 +850,5 @@ await test('Cleanup', async () => {
 });
 
 console.log(`\n  Results: ${passed} passed, ${failed} failed out of ${passed + failed}`);
-if (failed > 0) process.exit(1);
+// An exit, not an end of script: the database handle tests 23c and 23d opened would hold the process open.
+process.exit(failed > 0 ? 1 : 0);

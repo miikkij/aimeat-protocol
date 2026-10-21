@@ -15,6 +15,8 @@
  *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   2026-10-21 — callerOwner asks isAnonymousPrincipal, so the minted anonymous token names no owner
+ *     (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.4.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.4.1 — 2026-10-05 — tokenHasScope is scopeIsCovered (secaudit 2026-10, C3).
  *   v1.4.0 — 2026-10-01 — Passes the caller's principal, so a deploy with no runner becomes a proposal
@@ -40,6 +42,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import {
@@ -138,7 +141,7 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
             appOwner: req.params.owner as string,
             filename: req.params.filename as string,
             agentName: req.params.agentName as string,
-            callerOwner: req.auth && !req.auth.anonymous ? bareOwner(req) : null,
+            callerOwner: req.auth && !isAnonymousPrincipal(req.auth) ? bareOwner(req) : null,
         });
         if (!result.ok) { sendRefusal(res, config, result); return; }
         res.json(success(config.nodeId, result.view));

@@ -13,6 +13,7 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-21 — aimeat_extension_get answers `uses_secrets`: which vault secrets the scripts send where.
  *   v2.10.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read with nobody
  *     present. READ ONLY, because the write is the person's own decision and takes
  *     requireOwnerPrincipal; the answer carries where they make it (Jouni, 2026-10-20).
@@ -83,6 +84,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
 import { buildExtensionRecordFromManifest } from '../services/extension-manifest.js';
 import { getExtSecretKeys, maskSecretFields } from '../services/extension-secrets.js';
+import { usesSecretsOf } from '../services/extension-secret-uses.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
@@ -693,6 +695,8 @@ export function registerExtensionsTools(
                         federation: ext.federation,
                         instances: ext.instances,
                         installed_by: ext.installedBy,
+                        // Which vault secrets the scripts send where, and why (services/extension-secret-uses.ts).
+                        uses_secrets: usesSecretsOf(ext.config),
                         installed_at: ext.installedAt,
                         activated_at: ext.activatedAt,
                         used_by: await usedByFor(name),

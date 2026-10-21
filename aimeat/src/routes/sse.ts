@@ -14,6 +14,8 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-10-21 -- The ticket's audience asks isAnonymousPrincipal, so the minted anonymous token gets no
+ *     member-audience events (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.8.0 -- 2026-10-18 -- A workspace's own domain, `workspace:<organismId>/<ws>`
  *     (services/event-bus.ts emitWorkspaceChange), goes only to the streams of that organism's
  *     members, so an open workspace page re-reads when its workspace changed and not on every memory
@@ -62,6 +64,7 @@ import { verifyJWT } from '../auth/jwt.js';
 import { isSocketKind, mintSocketTicket, SOCKET_KINDS, SOCKET_TICKET_TTL_SECONDS } from '../auth/ws-upgrade.js';
 import { createSingleUseTicketStore } from '../services/single-use-tickets.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { onChangeEvent, offChangeEvent, onAppChangeEvent, offAppChangeEvent } from '../services/event-bus.js';
 import type { ChangeEvent, AppChangeEvent } from '../services/event-bus.js';
 import { appStreamTopic, type AppStreamTopic } from '../services/app-news.js';
@@ -144,7 +147,7 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       presenceGhii: resolveIdentity(req.auth!, config.nodeId),
       allow: owner ? null : allowedDomains(req.auth!.scopes),
       presenceEligible: owner && !app,
-      audience: { sub: req.auth!.sub, owner: req.auth!.owner, anonymous: req.auth!.anonymous, federated: req.auth!.federated },
+      audience: { sub: req.auth!.sub, owner: req.auth!.owner, anonymous: isAnonymousPrincipal(req.auth), federated: req.auth!.federated },
       ...(app ? { app } : {}),
     }, 30_000);
     res.json(success(config.nodeId, { ticket, expires: 30 }));

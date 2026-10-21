@@ -13,6 +13,9 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   2026-10-21 — The board list and the three read routes ask isAnonymousPrincipal: the minted anonymous
+ *     token carries no anonymous claim, so it was handed the member roster (owner_gaii, allowed_gaiis)
+ *     and a 403 in place of the 401 (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.13.0 — 2026-10-18 — The posts, a post and its replies pass the caller's classification reader
  *     with the board's classification (classifiedBoardPosts; plan doc-mvdipuyqraas, L1.3): a board
  *     hidden from AI reads as empty to an AI, a post of it as absent.
@@ -91,6 +94,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { BoardCreateSchema, BoardPostSchema, BoardPostUpdateSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply, updateBoardPost } from '../services/board-post.js';
@@ -162,7 +166,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // The shared anonymous identity (global optionalAuth in anonymous mode) is NOT a real
     // principal — treat it as anonymous so the owner_gaii/allowed_gaiis (board member roster)
     // fields below are never handed to the anon internet.
-    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
 
     // An organism board is listed to whoever may read it (services/board-read-access.ts), which is a
     // membership lookup; every other level is decided from the record alone.
@@ -401,7 +405,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     // The anonymous-mode shared identity is not a principal here, the same rule GET /v1/boards
     // applies: with it, a private board answered 403 instead of 401 and consent was consulted on
     // behalf of a pseudo-identity.
-    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
     const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
     if (readRefusal) {
       res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
@@ -461,7 +465,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     // The same read rule as the posts listing (services/board-read-access.ts). This door wrote its
     // own copy of it, which an organism board would have passed to anyone signed in.
-    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
     const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
     if (readRefusal) {
       res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
@@ -518,7 +522,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
       return;
     }
-    const gaii = (req.auth && !req.auth.anonymous) ? resolveIdentity(req.auth, config.nodeId) : undefined;
+    const gaii = (req.auth && !isAnonymousPrincipal(req.auth)) ? resolveIdentity(req.auth, config.nodeId) : undefined;
     const readRefusal = await boardReadRefusal({ storage, config }, gaii, board, req.auth);
     if (readRefusal) {
       res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));

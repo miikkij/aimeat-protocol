@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-21 — autoApprovePrincipal asks isAnonymousPrincipal, so the minted anonymous token is no
+ *     approver of the anonymous account's agents (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.15.0 — 2026-10-20 — approveDeviceAuth and scopesExceedNodeMax move to
  *     device-auth-approve.ts (max-file-lines). A move only: no behaviour changed with it.
  *   v1.14.0 — 2026-10-20 — Same-owner auto-approval of an EXISTING agent is fenced two ways
@@ -99,6 +101,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { validateAgentName, buildGAII, generateUserCode, localAccountName, isOwnerInPerson, mayActOnAgent } from '../../utils/gaii.js';
 import { verifyJWT } from '../../auth/jwt.js';
 import { credentialRevoked, optionalAuth } from '../../auth/middleware.js';
@@ -132,7 +135,7 @@ const APPROVER_SCOPE = 'agent:write';
 
 function autoApprovePrincipal(req: Request, owner: string): { kind: 'owner' | 'agent'; scopes: string[]; mayApprove: boolean } | null {
   const auth = req.auth;
-  if (!auth || auth.anonymous) return null;
+  if (!auth || isAnonymousPrincipal(auth)) return null;
   const roles = auth.roles as string[];
   if (roles.includes('app') || roles.includes('ecosystem')) return null;
   const bare = localAccountName(auth.owner);

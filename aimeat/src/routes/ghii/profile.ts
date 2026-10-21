@@ -6,6 +6,10 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-21 — GET /v1/ghii/list refuses the shared anonymous principal by identity
+ *     (refuseAnonymousPrincipal), and GET /v1/ghii/:ghii gives the agent roster only to an owner that
+ *     isAnonymousPrincipal says is not the anonymous account: the minted anonymous token carries no
+ *     anonymous claim (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.7.0 — 2026-10-19 — The agent roster on GET /v1/ghii/:ghii carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
  *   v1.6.0 — 2026-10-18 — GET /v1/ghii/me/adult: verified adult yes or no, the method and the time (Comicland v3 A-3).
  *   v1.5.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -43,6 +47,7 @@ import type { Storage } from '../../storage/interface.js';
 import { isOwnerPrincipal, isThirdPartyPrincipal, requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { isValidRegion, isValidTimeZone } from '../../services/display-prefs.js';
 import { emitChange } from '../../services/event-bus.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
@@ -65,7 +70,10 @@ export function registerProfileRoutes(
     //     the shared anonymous identity, is rejected 401). Was previously world-readable.
     //  2. Opt-in — only members who explicitly listed themselves (PUT /v1/ghii { directory_listed:
     //     true } → the profile.{username}.directory_listed memory key) appear. Default = unlisted.
-    router.get('/v1/ghii/list', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
+    // refuseAnonymousPrincipal: requireAuth() refuses the injected anonymous identity and not the
+    // token POST /v1/auth/anonymous mints, which listed the members here until 2026-10-20 (secaudit
+    // 2026-10, anonymous-claim-not-signed).
+    router.get('/v1/ghii/list', requireAuth(), refuseAnonymousPrincipal(), requireScope('catalogue:read'), async (req, res) => {
         const q = typeof req.query.q === 'string' ? req.query.q : undefined;
         const level = typeof req.query.level === 'string' ? parseInt(req.query.level, 10) : undefined;
 
@@ -279,7 +287,7 @@ export function registerProfileRoutes(
         // The AGENT ROSTER (each agent's GAII) is not public data — same principle as the organism
         // roster. Only the profile's OWNER (a real signed-in principal) or an operator gets it; the
         // shared anonymous identity and other users get the profile without the agent list.
-        const isOwner = !!req.auth && !req.auth.anonymous && req.auth.owner === record.ownerName;
+        const isOwner = !!req.auth && !isAnonymousPrincipal(req.auth) && req.auth.owner === record.ownerName;
         // The operator half asks isOperatorCaller, as the MCP tools do: the operator's agent holding
         // operator:admin passes too. A profile read writes no operator trail; asked only when not owner.
         const includeAgents = isOwner || await isOperatorCaller(storage, req.auth);

@@ -12,6 +12,8 @@
  * @structure renderDetail · confirmPanel · checkPanel · stepItem · runsTable · settingsFold
  * @usage import { renderDetail } from './detail.js';
  * @version-history
+ *   v1.18.2 -- 2026-10-20 -- The last-run chip and the run list pass the run to runWord, so a run
+ *     refused in flight reads "Stopped" (secaudit 2026-10, v64).
  *   v1.18.1 -- 2026-09-26 -- The verdict's "open the run" stands at the right of its words again, as
  *     main's .wp-verdict drew it (Box beside; fix pass).
  *   v1.18.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head's tags are Marks as data (main's grey notify, skip-done and parallel tags come back as the dim Mark, main's og-chip--dim), the verdict, the confirmation and the check note the Box (the verdict's frame in its tone), the steps the WorkflowSteps, the runs the List (the run's word a Tinted word in its tone), the settings the Facts with their doors under the Split, the rail's agents and keys plain lines. stepBlock becomes stepItem (a step as the component's data).
@@ -81,7 +83,7 @@ export function renderDetail(ctx, item) {
     { label: c('stepsN', { n: def.steps.length }) },
     agents.size ? { label: c('agentsN', { n: agents.size }) } : null,
     gates.length ? { label: c('gatesN', { n: gates.length }) } : null,
-    last ? { kind: 'status', tone: toneStatus(runTone(last.status)), label: c('lastRunChip', { word: runWord(last.status).toLowerCase(), when: rel(last.startedAt) }) } : null,
+    last ? { kind: 'status', tone: toneStatus(runTone(last.status)), label: c('lastRunChip', { word: runWord(last.status, last).toLowerCase(), when: rel(last.startedAt) }) } : null,
     def.notify_on_finish ? { label: c('chipNotify'), tone: 'dim' } : null,
     def.skip_done ? { label: c('chipSkipDone'), tone: 'dim' } : null,
     def.parallel ? { label: c('chipParallel'), tone: 'dim' } : null,
@@ -184,7 +186,7 @@ function runsTable(ctx, item, list) {
       ${list.slice(0, 20).map(r => { const v = verdictOf(r); return html`
         <${Row} key=${r.runId}>
           <${When}>${rel(r.startedAt)}<//>
-          <${Cell} meta>${runTint(v.tone, runWord(r.status))}<//>
+          <${Cell} meta>${runTint(v.tone, runWord(r.status, r))}<//>
           <${Desc}>${v.head}${r.mode === 'full-sandbox' ? ` · ${c('sandboxRun')}` : ''}<//>
           <${Doors}><${Action} small row onClick=${() => ctx.pickView({ kind: 'run', id: item.def.id, runId: r.runId })}>${c('open')}<//><//>
         <//>`; })}

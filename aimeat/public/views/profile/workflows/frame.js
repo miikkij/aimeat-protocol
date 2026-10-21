@@ -10,6 +10,8 @@
  * @structure c · loc · words (runWord, stepWord, triggerWords, signalWords, observedWords) · toneStatus · verdictOf · workflowRows · crumb · renderPage
  * @usage import { renderPage, verdictOf, signalWords } from './frame.js';
  * @version-history
+ *   v1.10.3 -- 2026-10-20 -- runWord takes the run: a run refused in flight reads "Stopped", because it did start (secaudit 2026-10, v64).
+ *   v1.10.2 -- 2026-10-20 -- A run refused in flight (refusal.stoppedBefore) says which step did not start and who the run acts for, instead of "Did not start" (secaudit 2026-10, v64).
  *   v1.10.1 -- 2026-10-13 -- triggerWords says a workspace.rows trigger in words ("when rows are added to inbox").
  *   v1.3.1 -- 2026-09-26 -- A run stopped because its next AI step's estimate did not fit in what was
  *            left of the spending limit says so: the step, the estimate, the spend and the limit.
@@ -72,7 +74,8 @@ export const minutesWords = (min) => durationWords(min * 60000);
 /* ── the words ─────────────────────────────────────────────────────────────────────────────── */
 export const RUN_WORDS = { done: 'run.done', partial: 'run.partial', 'waiting-step': 'run.waiting', running: 'run.running', cancelled: 'run.cancelled', red: 'run.red', stopped: 'run.stopped', refused: 'run.refused' };
 export const STEP_WORDS = { green: 'step.green', 'output-red': 'step.outputRed', 'input-red': 'step.inputRed', 'timed-out': 'step.timedOut', 'agent-offline': 'step.offline', skipped: 'step.skipped', 'waiting-human': 'step.waitingHuman', dispatched: 'step.dispatched', pending: 'step.pending' };
-export const runWord = (s) => (s ? c(RUN_WORDS[s] || 'run.unknown') : '·');
+/** A run refused before a later step (its agent lost a permission mid-run) did start: it reads "Stopped". */
+export const runWord = (s, run) => (s ? c(s === 'refused' && run?.refusal?.stoppedBefore ? RUN_WORDS.stopped : (RUN_WORDS[s] || 'run.unknown')) : '·');
 export const stepWord = (s) => (s ? c(STEP_WORDS[s] || 'step.pending') : '·');
 export const runTone = (s) => (s === 'done' ? 'ok' : s === 'partial' || s === 'red' || s === 'stopped' || s === 'refused' ? 'bad' : s === 'waiting-step' || s === 'running' ? 'wait' : '');
 export const stepTone = (s) => (s === 'green' ? 'ok' : s === 'output-red' || s === 'input-red' || s === 'timed-out' || s === 'agent-offline' ? 'bad' : s === 'waiting-human' || s === 'dispatched' ? 'wait' : '');
@@ -168,6 +171,11 @@ export function verdictOf(run) {
   }
   if (run.status === 'refused') {
     const r = run.refusal || {};
+    // Refused in flight: the run had started, and the step it names was not dispatched.
+    if (r.stoppedBefore) {
+      const words = { step: name(r.stoppedBefore), saver: r.saverName || '', words: (r.missing || []).join(', ') };
+      return { tone: 'bad', head: c(r.gone ? 'verdict.refusedStoppedGone' : 'verdict.refusedStopped', words), sub: c('verdict.doneSub', { n: green, total: steps.length, when, took }) };
+    }
     const head = r.gone ? c('verdict.refusedGone', { saver: r.saverName || '' }) : c('verdict.refused', { saver: r.saverName || '', words: (r.missing || []).join(', ') });
     return { tone: 'bad', head, sub: c('verdict.refusedSub', { last: rel(r.lastAttemptAt || run.startedAt), when }) };
   }
@@ -188,7 +196,7 @@ export function lastRunWords(item) {
   const run = item.lastRun;
   if (!run) return { tone: '', word: c('noRunsYet'), sub: '' };
   const v = verdictOf(run);
-  return { tone: v.tone, word: runWord(run.status), sub: `${rel(run.startedAt)}: ${v.head}` };
+  return { tone: v.tone, word: runWord(run.status, run), sub: `${rel(run.startedAt)}: ${v.head}` };
 }
 
 /** Rows of the workflows table: name and its line, when it runs, the last run's word, what happened, the doors. */

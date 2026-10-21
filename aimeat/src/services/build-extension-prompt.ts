@@ -18,7 +18,12 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
- *   v1.7.1 — 2026-10-18 — ADDITIVE: the on_done input carries the answer as `result`, and
+ *   v1.7.3 — 2026-10-21 — ADDITIVE: a declared host without a port covers every port; `network:` hosts
+ *     count as declared for every secret.
+ *   v1.7.2 — 2026-10-21 —ADDITIVE: the secrets section tells an author to declare `uses_secrets`, says
+ *     which first uses bind by themselves and which ask the owner, and words the instruction to a
+ *     person as "store NAME for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   v1.7.1 — 2026-10-18 —ADDITIVE: the on_done input carries the answer as `result`, and
  *     `ctx.ai.result(job_id)` reads it back. The row said the action could read the answer, and the
  *     sandbox could not reach the owner's namespace it lands in.
  *   v1.7.0 — 2026-10-18 — An action with `public: true` answers a visitor, read-only (the sentence that
@@ -411,11 +416,34 @@ function secretsSection(): string {
     '```',
     '',
     'So a `config:` secret is for one credential the operator holds for everyone, and `{{secret:NAME}}`',
-    'is for each person\'s own. Write the name in your manifest description and in every error you',
-    'return, exactly as it must be stored: a person fills it in on their Access page (section 04,',
-    'Secrets) or asks their own AI, which stores it with `aimeat_secret_set { name, value }` when the',
-    'owner has ticked `secrets:manage` for that agent. Nothing on the node reads a stored value back,',
-    'so an app or a document can only carry the placeholder, never the key.',
+    'is for each person\'s own: an extension other people run serves each of them with their OWN key',
+    'and holds nobody else\'s. Never collect other people\'s keys into your `type: secret` config.',
+    '',
+    'DECLARE each vault secret your scripts name, the hosts they send it to, and why, beside `network`.',
+    'The declaration is public with your extension, the way its source is:',
+    '',
+    '```yaml',
+    'uses_secrets:',
+    '  - name: OPENWEATHER_KEY',
+    '    hosts: [api.openweathermap.org]',
+    '    why: "read the weather for your saved places"',
+    '```',
+    '',
+    'A declared host without a port covers every port of that host; with a port, only that port. The',
+    'hosts in your `network:` block count as declared for every secret your scripts name.',
+    '',
+    'A secret stored with an address goes only there. A secret stored without one is bound to the host',
+    'of its first allowed use: through the owner\'s own extension, a first use to a DECLARED host binds by',
+    'itself, whoever calls (the owner\'s app, their chat agent, a schedule), when the code was written by',
+    'the owner or by an agent holding `secrets:manage`. Any other first use (an undeclared host, code an',
+    'agent without `secrets:manage` wrote, or an extension another account installed) is refused with',
+    '`SECRET_HOST`; the refusal names a page where the owner allows it with one press. An extension',
+    'another account installed never sets a secret\'s address, so tell its users to store the key WITH',
+    'its host. Write the name and the host in your manifest description and in every error you return,',
+    'exactly as they must be stored: "store OPENWEATHER_KEY for host api.openweathermap.org" on the',
+    'Access page (Secrets), or through the person\'s own AI with `aimeat_secret_set { name, value, host }`',
+    'when the owner has ticked `secrets:manage` for that agent. Nothing on the node reads a stored value',
+    'back, so an app or a document can only carry the placeholder, never the key.',
     '',
   ].join('\n');
 }

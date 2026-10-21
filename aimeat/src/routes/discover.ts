@@ -15,6 +15,10 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   2026-10-21 — The organism caller asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
+ *   v0.6.0 — 2026-10-20 — buildContext carries the caller for the organism read rule
+ *     (organismCaller), so the own scope gives an agent no record of an organism that does not admit
+ *     it (secaudit 2026-10, the v57 shape).
  *   v0.5.0 — 2026-10-20 — buildContext carries the principal kind (isApp, isEcosystem) into the
  *     discovery context, so the memory source can refuse the owner's records to an app grant without
  *     memory:read and to an ecosystem app (secaudit 2026-10).
@@ -30,8 +34,10 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { resolveIdentity, isOwnerInPerson } from '../utils/gaii.js';
 import { readerFor } from '../services/classification/reader.js';
+import { callerFromAuth } from '../services/caller-context.js';
 import {
   buildDiscoveryRegistry,
   runDiscovery,
@@ -102,6 +108,10 @@ function buildContext(
           scopes: req.auth.scopes ?? [],
         }
       : { ownerName: '', sub: '', gaii: '', isOwnerSession: false, isApp: false, isEcosystem: false, scopes: [] },
+    // The organism read rule on the own scope asks this caller (secaudit 2026-10, the v57 shape).
+    ...(req.auth && !isAnonymousPrincipal(req.auth)
+      ? { organismCaller: callerFromAuth({ ...req.auth, scopes: req.auth.scopes ?? [] }, config.nodeId, storage) }
+      : {}),
     scope,
     filters,
     nodeId: config.nodeId,

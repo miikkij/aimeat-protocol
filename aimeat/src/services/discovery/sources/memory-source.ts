@@ -16,6 +16,10 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.10.0 — 2026-10-20 — The own scope asks the organism read rule (organismReadableRecords with
+ *     ctx.organismCaller) after ownerScopeView: an agent that a 'listed' organism does not admit got
+ *     that organism's records as entries, while GET /v1/memory/:key answered it 403 (secaudit
+ *     2026-10, the v57 shape).
  *   v0.9.0 — 2026-10-20 — Three refusals on the own scope (secaudit 2026-10). An app grant without
  *     memory:read gets an EMPTY owner set, because its own identity is the owner's GHII and
  *     narrowing it to "its own records" narrowed nothing; an ecosystem app searches only its own
@@ -62,6 +66,7 @@ import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
 import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 import { ownerScopeView, readsAsOwner } from '../../owner-scope-read.js';
+import { organismReadableRecords } from '../../organism-namespace-access.js';
 import { readWorkspaceManifest } from '../../workspace-meta.js';
 import { shownMemoryValue } from '../../secret-records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
@@ -349,6 +354,16 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
       // (services/owner-scope-read.ts). Until 2026-10-20 nothing filtered these hits, so a
       // memory:read agent read the owner's and its siblings' private records as descriptions.
       if (ownerGaiis) candidates = ownerScopeView(candidates, ctx.caller.gaii, readsAllOf(ctx));
+      // The organism rule GET /v1/memory/:key asks, on the own scope: an organism record reaches this
+      // caller only when checkOrganismNamespaceAccess admits it in read mode, so an agent that a
+      // 'listed' organism does not admit gets no description of its records (secaudit 2026-10, the
+      // v57 shape). A context with no caller for the rule keeps organism records only for the owner
+      // in person and an app grant, the two the rule exempts.
+      if (ownerGaiis) {
+        candidates = ctx.organismCaller
+          ? await organismReadableRecords({ storage, config }, ctx.organismCaller, candidates)
+          : (ctx.caller.isOwnerSession || ctx.caller.isApp ? candidates : candidates.filter(h => !h.key.startsWith('organism.')));
+      }
       // The public scope is other accounts' public records: an organism's record among them reaches a
       // caller outside that organism only when its label lets it leave (TARGET-082 review, item 1).
       if (!ownerGaiis) candidates = (await organismKeysCarried({ storage, config }, candidates, ctx.caller.gaii)).kept;

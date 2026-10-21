@@ -13,6 +13,14 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-21 — When the visibility rule left records out, the list, get, links and resource say so
+ *     with READ_AS_OWNER_NOTE (and `omitted` in a JSON answer), as the librarian search does: an agent
+ *     got a shorter list or "Package not found" with no reason, and could not ask the owner for
+ *     memory:read-as-owner (capability-loss review).
+ *   2026-10-20 — SECURITY: the knowledge list, get, links and resource read the owner's and sibling
+ *     agents' records through ownerScopeView (memory:read-as-owner, services/owner-scope-read.ts), and
+ *     the three read tools declare memory:read in the catalog. Any agent, with any scope, read their
+ *     private package manifests and entry values (secaudit 2026-10, v56).
  *   2026-10-17 — SECURITY: aimeat_knowledge_links asks the package read first (readPackage), as the
  *     REST route does; it answered any package's links to any agent.
  *   2026-10-13 — aimeat_knowledge_get and the knowledge-package resource answer a manifest's pacing
@@ -65,6 +73,7 @@ import {
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
 import { presentKnowledgeManifest } from '../services/toll-morsels-names.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -89,8 +98,23 @@ export function registerKnowledgeTools(
     // Owner-scope memory aggregation is services/appdev-kb.ts — packages may sit under the owner's
     // GHII (web UI import) or any of their agents, and which duplicate key wins is a priority order
     // that has to be the same answer on both surfaces.
-    const listOwnerScopePackages = () =>
-        listOwnerScopeShown(storage, config, reader(), { prefix: 'packages/', tags: ['knowledge-package'] });
+    // An agent reads the owner's and its siblings' records only as the visibility rule admits, unless
+    // it reads as the owner (memory:read-as-owner; services/owner-scope-read.ts). Applied before the
+    // GHII-first dedupe (appdev-kb.ts), as GET /v1/memory/:key?owner_scope=true applies it.
+    // `omitted` counts what the visibility rule left out, so an answer that is shorter, or "not
+    // found", says why and names the permission that shows it (READ_AS_OWNER_NOTE), as the librarian
+    // search does. Without it an agent cannot tell a missing package from one it may not read.
+    const view = (omitted: { count: number }) => {
+        const c = caller();
+        return { principal: c.principal, readsAll: readsAsOwner(c), onOmitted: (n: number) => { omitted.count += n; } };
+    };
+    const listOwnerScopePackages = async () => {
+        const omitted = { count: 0 };
+        const records = await listOwnerScopeShown(storage, config, reader(), { prefix: 'packages/', tags: ['knowledge-package'] }, view(omitted));
+        return { records, omitted: omitted.count };
+    };
+    /** What an answer adds when the visibility rule left records out. */
+    const omittedNote = (omitted: number) => (omitted > 0 ? { omitted, note: READ_AS_OWNER_NOTE } : {});
     const warningOf = (record: object) => {
         const w = classificationWarningOf(record);
         return w ? { classificationWarning: w } : {};
@@ -103,17 +127,21 @@ export function registerKnowledgeTools(
     // not exist.
     const readPackage = async (packageId: string) => {
         const manifestKey = `packages/${packageId}/manifest`;
-        const records = await listOwnerScopeShown(storage, config, reader(), { prefix: `packages/${packageId}/` });
+        const omitted = { count: 0 };
+        const records = await listOwnerScopeShown(storage, config, reader(), { prefix: `packages/${packageId}/` }, view(omitted));
         const manifest = records.find(e => e.key === manifestKey);
-        return manifest ? { manifest, entries: records.filter(e => e.key !== manifestKey) } : null;
+        return { found: manifest ? { manifest, entries: records.filter(e => e.key !== manifestKey) } : null, omitted: omitted.count };
     };
+    /** The "not found" answer, with the reason when the visibility rule left the package out. */
+    const notFoundText = (packageId: string, omitted: number) =>
+        `Package not found: ${packageId}${omitted > 0 ? `. ${READ_AS_OWNER_NOTE}` : ''}`;
 
     // ── Resource: knowledge package ──
     mcp.registerResource(
         'knowledge-package',
         new ResourceTemplate('aimeat://knowledge/{packageId}', {
             list: async () => {
-                const entries = await listOwnerScopePackages();
+                const { records: entries } = await listOwnerScopePackages();
                 const manifests = entries.filter(e => e.key.endsWith('/manifest'));
                 return {
                     resources: manifests.map(m => {
@@ -132,9 +160,9 @@ export function registerKnowledgeTools(
         { mimeType: 'application/json', description: 'Knowledge package manifest and entries' },
         async (uri, variables) => {
             const packageId = decodeURIComponent(variables.packageId as string);
-            const found = await readPackage(packageId);
+            const { found, omitted } = await readPackage(packageId);
             if (!found) {
-                return { contents: [{ uri: uri.toString(), text: 'Package not found' }] };
+                return { contents: [{ uri: uri.toString(), text: omitted > 0 ? `Package not found. ${READ_AS_OWNER_NOTE}` : 'Package not found' }] };
             }
             const { manifest, entries } = found;
             const entryList = entries.map(e => ({
@@ -152,6 +180,7 @@ export function registerKnowledgeTools(
                         ...warningOf(manifest),
                         entry_count: entryList.length,
                         entries: entryList,
+                        ...omittedNote(omitted),
                     }, null, 2),
                     mimeType: 'application/json',
                 }],
@@ -168,7 +197,7 @@ export function registerKnowledgeTools(
             annotations: annotationsFor('aimeat_knowledge_list'),
         },
         async () => {
-            const entries = await listOwnerScopePackages();
+            const { records: entries, omitted } = await listOwnerScopePackages();
             const manifests = entries.filter(e => e.key.endsWith('/manifest'));
             const packages = manifests.map(m => {
                 const pkg = m.value as KnowledgeManifestValue;
@@ -186,10 +215,15 @@ export function registerKnowledgeTools(
                 };
             });
             return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify(packages, null, 2),
-                }],
+                content: [
+                    {
+                        type: 'text' as const,
+                        text: JSON.stringify(packages, null, 2),
+                    },
+                    // A second text part, so the list keeps its shape (a JSON array) for every
+                    // client that parses it, and an agent reads why the list is shorter.
+                    ...(omitted > 0 ? [{ type: 'text' as const, text: `${omitted} package(s) left out. ${READ_AS_OWNER_NOTE}` }] : []),
+                ],
             };
         },
     );
@@ -204,10 +238,10 @@ export function registerKnowledgeTools(
         },
         async ({ package_id }) => {
             // A manifest the agent may not see answers the same as one that does not exist.
-            const found = await readPackage(package_id);
+            const { found, omitted } = await readPackage(package_id);
             if (!found) {
                 return {
-                    content: [{ type: 'text' as const, text: `Package not found: ${package_id}` }],
+                    content: [{ type: 'text' as const, text: notFoundText(package_id, omitted) }],
                     isError: true,
                 };
             }
@@ -237,6 +271,7 @@ export function registerKnowledgeTools(
                         manifest: presentKnowledgeManifest(manifest.value),
                         ...warningOf(manifest),
                         entries: entryDetails,
+                        ...omittedNote(omitted),
                     }, null, 2),
                 }],
             };
@@ -299,8 +334,9 @@ export function registerKnowledgeTools(
         async ({ package_id, direction }) => {
             // The package read first, as GET /v1/knowledge/:id/links asks it: links of a package the
             // agent may not read answer the same as a package that does not exist.
-            if (!(await readPackage(package_id))) {
-                return { content: [{ type: 'text' as const, text: `Package not found: ${package_id}` }], isError: true };
+            const read = await readPackage(package_id);
+            if (!read.found) {
+                return { content: [{ type: 'text' as const, text: notFoundText(package_id, read.omitted) }], isError: true };
             }
             const manifestKey = `packages/${package_id}/manifest`;
             const links = await storage.listLinks(manifestKey, {

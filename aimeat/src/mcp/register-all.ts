@@ -226,7 +226,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes, caller);
-    registerAppdevResearchTools(mcp, storage, config, agentGaii);
+    registerAppdevResearchTools(mcp, storage, config, agentGaii, caller);
     registerAppTemplateProposalTools(mcp, storage, config, agentGaii);
     registerAppdevProofTools(mcp, storage, config, agentGaii, scopes, caller);
     registerSkillsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);

@@ -21,6 +21,9 @@
  *       approval points it; an agent with publish:public points it at once;
  *     - gate off again: each of those is direct.
  * @version-history
+ *   v1.1.0 — 2026-10-20 — A presigned app publish by an agent that lost publish:public after the mint
+ *     lands unlisted with a request (202); an agent that still holds it is listed at once (secaudit
+ *     2026-10, PUT-v1-upload:no-live-principal-recheck).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: apps, portfolio, company).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-gate-apps
@@ -186,6 +189,40 @@ await test('A fork and a presigned publish by the agent land unlisted with a req
     const body = await put.json() as Body;
     assert(put.status === 202 && body.publish_request?.kind === 'app', `upload: ${put.status} ${JSON.stringify(body.publish_request ?? body.error)}`);
     assert(!(await anonFinds(pre)), 'the presigned app is not found');
+});
+
+// secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck: the mint's 'allowed' rode in the token,
+// so an agent that lost publish:public after asking for the URL still published the new app listed.
+const presignedPublish = async (token: string, filename: string): Promise<{ mint: string; put: () => Promise<{ status: number; body: Body }> }> => {
+    const mint = await call('/v1/apps', { token, body: { mode: 'presigned', filename, description: 'Publish gate fixture' } });
+    assert(mint.status === 200 && typeof mint.body.data.upload_url === 'string', `mint: ${mint.status} ${JSON.stringify(mint.body.error)}`);
+    const url = mint.body.data.upload_url as string;
+    return {
+        mint: url,
+        put: async () => {
+            const r = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: html(filename) });
+            return { status: r.status, body: await r.json() as Body };
+        },
+    };
+};
+
+await test('Control: an agent holding publish:public publishes a new app by presigned URL, listed at once', async () => {
+    const f = appName('prelive');
+    const up = await presignedPublish(publisher.token, f);
+    const put = await up.put();
+    assert(put.status === 200 && !put.body.publish_request, `upload: ${put.status} ${JSON.stringify(put.body.publish_request ?? put.body.error)}`);
+    assert(await anonFinds(f), 'anonymous finds the app');
+});
+
+await test('An agent that lost publish:public after the mint: the presigned app lands unlisted with a request (202)', async () => {
+    const narrowed = await makeAgent(BASE, A, [...SCOPES, 'publish:public']);
+    const f = appName('prenarrow');
+    const up = await presignedPublish(narrowed.token, f);
+    const p = await call(`/v1/agents/${narrowed.name}/scopes`, { token: A.token, method: 'PATCH', body: { scopes: SCOPES } });
+    assert(p.status === 200, `narrow: ${p.status} ${JSON.stringify(p.body.error)}`);
+    const put = await up.put();
+    assert(put.status === 202 && put.body.publish_request?.kind === 'app', `upload: ${put.status} ${JSON.stringify(put.body.publish_request ?? put.body.error)}`);
+    assert(!(await anonFinds(f)), 'anonymous does not find the waiting app');
 });
 
 await test('MCP: aimeat_app_manage settings and aimeat_app_publish answer with publish_request', async () => {

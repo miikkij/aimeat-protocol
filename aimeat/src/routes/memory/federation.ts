@@ -8,6 +8,14 @@
  *   POST /v1/memory writes: memory:write before the far node is asked, the same key checks at the
  *   door, and then services/memory-write.ts writeMemoryRecord with the caller's own roles and scopes.
  * @version-history
+ *   v1.12.1 — 2026-10-21 — livePeerUrl takes the peer record's URL in every status the heartbeat sets and
+ *     clears on its own (active, degraded, offline, unreachable: LIVENESS_RECOVERABLE), the same set the
+ *     credential check keeps a visitor's session for. Refusing a degraded home peer was more than the
+ *     record asked; the token's homeUrl claim is still never used.
+ *   v1.12.0 — 2026-10-20 —pull, push-home and list-home dial only the URL of the visitor's ACTIVE home
+ *     peer (livePeerUrl) and answer 400 FEDERATION_UNREACHABLE when there is none; they fell back to the
+ *     token's homeUrl claim, so push-home still sent a signed record to an emergency-removed peer
+ *     (secaudit 2026-10, federated-visitor-not-bound-to-live-peer).
  *   v1.11.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on POST /v1/memory/list-remote. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.10.0 — 2026-10-06 — A push-home replicate carries a delivery proof: the home node and the send time (deliveryProof; secaudit 2026-10 last items, D3).
  *   v1.9.0 — 2026-10-06 — A memory-list request names the node it is for (audienceProof; secaudit 2026-10 follow-up, A7).
@@ -49,6 +57,7 @@ import type { MemoryRouteCtx } from './shared.js';
 import { systemReader } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { LIVENESS_RECOVERABLE } from '../../services/federation.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, peers, resolve, stats, onDirectoryChange } = ctx;
@@ -68,6 +77,25 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     if (!appMayWriteKey(req.auth!.roles, key)) {
       return { code: 'RESERVED_KEY', message: `The key "${key}" is managed by the account owner and cannot be written by an app.` };
     }
+    return null;
+  }
+
+  /**
+   * The address of a visitor's home node: the URL of the peer record the operator approved, and
+   * nothing else. The three visitor routes fell back to the token's `homeUrl` claim when the peer
+   * was gone from the registry, so after an emergency de-peer push-home still sent the visitor's
+   * record, signed with this node's key, to the removed peer's address (secaudit 2026-10,
+   * federated-visitor-not-bound-to-live-peer). The credential check refuses such a visitor first
+   * (auth/visitor-peer.ts); this is the same rule where the address is chosen. A peer the heartbeat
+   * marked degraded, offline or unreachable (LIVENESS_RECOVERABLE) is still the operator's approved
+   * peer and is dialled, as before; a removed peer, or one in a status only an operator sets, is
+   * not. Answers the caller and returns null when there is no such peer.
+   */
+  function livePeerUrl(res: Response, homeNode: string): string | null {
+    const peer = peers?.get(homeNode);
+    if (peer?.url && LIVENESS_RECOVERABLE.has(peer.status)) return peer.url;
+    res.status(400).json(error(config.nodeId, 'FEDERATION_UNREACHABLE',
+      `Your home node ${homeNode} is no longer an active peer of this node. Sign in on your home node instead.`));
     return null;
   }
 
@@ -175,12 +203,9 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
     // Construct the owner's GHII on the home node
     const ownerGhii = homeIdentityOf(req.auth!);
 
-    // Resolve home URL: prefer peer map (verified), fall back to JWT claim
-    let resolvedUrl = homeUrl;
-    if (peers) {
-      const peer = peers.get(homeNode);
-      if (peer?.url) resolvedUrl = peer.url;
-    }
+    // The home URL is the active peer record's, never the token's claim (livePeerUrl).
+    const resolvedUrl = livePeerUrl(res, homeNode);
+    if (!resolvedUrl) return;
 
     // SSRF protection
     const urlCheck = await validateOutboundUrl(resolvedUrl);
@@ -270,12 +295,9 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       return;
     }
 
-    // Resolve home URL: prefer peer map (verified), fall back to JWT claim
-    let resolvedUrl = homeUrl;
-    if (peers) {
-      const peer = peers.get(homeNode);
-      if (peer?.url) resolvedUrl = peer.url;
-    }
+    // The home URL is the active peer record's, never the token's claim (livePeerUrl).
+    const resolvedUrl = livePeerUrl(res, homeNode);
+    if (!resolvedUrl) return;
 
     // SSRF protection
     const urlCheck = await validateOutboundUrl(resolvedUrl);
@@ -357,11 +379,9 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
 
     const ownerGhii = homeIdentityOf(req.auth!);
 
-    let resolvedUrl = homeUrl;
-    if (peers) {
-      const peer = peers.get(homeNode);
-      if (peer?.url) resolvedUrl = peer.url;
-    }
+    // The home URL is the active peer record's, never the token's claim (livePeerUrl).
+    const resolvedUrl = livePeerUrl(res, homeNode);
+    if (!resolvedUrl) return;
 
     const urlCheck = await validateOutboundUrl(resolvedUrl);
     if (!urlCheck.valid) {

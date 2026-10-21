@@ -13,10 +13,13 @@
  * @structure applyKnowledgePublish(ctx, ownerGhii, request)
  * @usage PUBLISH_APPLIERS.knowledge (appliers.ts)
  * @version-history
+ *   2026-10-20 — Each named entry is compared with the content digest the request was filed with
+ *     (`target.entry_digests`) as well as its version (secaudit 2026-10,
+ *     apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover, the knowledge variant).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: knowledge packages).
  */
 import type { KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
-import type { PublishApplyResult, PublishRequest, PublishStoreCtx } from './store.js';
+import { memoryValueDigest, type PublishApplyResult, type PublishRequest, type PublishStoreCtx } from './store.js';
 import { namespaceOfOwner } from './apply-memory.js';
 import { packageAudienceOf } from '../knowledge-audience.js';
 import { setKnowledgeSharing, setKnowledgeEntryVisibility, findKnowledgeEntry } from '../knowledge-sharing.js';
@@ -57,11 +60,19 @@ export async function applyKnowledgePublish(ctx: PublishStoreCtx, ownerGhii: str
   // Every check before the first write.
   const entries = namedEntries(request.target.entries);
   if (!entries) return { ok: false, reason: 'the request does not say which entries it names' };
+  // The digests the request was filed with, when it carries them (ask.ts contentBinding): a binned
+  // entry written again restarts at version 1, so the version alone does not say it is the same content.
+  const digests = request.target.entry_digests === undefined
+    ? null : namedEntries(request.target.entry_digests) as Record<string, unknown> | null;
   const toPublish: string[] = [];
   for (const [key, version] of Object.entries(entries)) {
     const entry = findKnowledgeEntry(manifest, key);
     if (!entry) return { ok: false, reason: 'an entry was removed after the request was made' };
-    if (((await ctx.storage.getMemory(ns, key))?.version ?? 0) !== Number(version)) {
+    const current = await ctx.storage.getMemory(ns, key);
+    if ((current?.version ?? 0) !== Number(version)) {
+      return { ok: false, reason: 'an entry changed after the request was made' };
+    }
+    if (digests && typeof digests[key] === 'string' && (!current || memoryValueDigest(current.value) !== String(digests[key]))) {
       return { ok: false, reason: 'an entry changed after the request was made' };
     }
     if (entry.visibility === 'public') continue;

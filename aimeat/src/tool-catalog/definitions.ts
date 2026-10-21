@@ -15,6 +15,7 @@
  * @version-history
  *   v1.x -- 2026-10-20 -- definitions/content.ts: aimeat_content_facts, _inspect, _scan, _classes and _settings
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
+ *   v1.x -- 2026-10-21 -- definitions/secret-addresses.ts: aimeat_secret_host_set, aimeat_secret_approval_withdraw.
  *   v1.x -- 2026-10-18 -- definitions/publish-requests.ts: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.x -- 2026-10-18 -- definitions/account-rights.ts: adult status, subscriptions, provenance embed (Comicland v3).
  *   v1.x -- 2026-10-17 -- definitions/exposure.ts: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
@@ -92,6 +93,7 @@ import { docsignTools } from './definitions/docsign.js';
 import { exposureTools } from './definitions/exposure.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
+import { secretAddressTools } from './definitions/secret-addresses.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -132,6 +134,7 @@ const CATALOG = [
     ...exposureTools,
     ...publishRequestTools,
     ...accountRightsTools,
+    ...secretAddressTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

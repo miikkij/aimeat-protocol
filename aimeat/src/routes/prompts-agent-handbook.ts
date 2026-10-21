@@ -13,6 +13,7 @@
  * @structure registerAgentHandbook(router, config, storage)
  * @usage registerAgentHandbook(router, config, storage);   // AFTER /v1/agents/me/handbook/:module
  * @version-history
+ *   2026-10-21 — The caller's identity asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.0 — 2026-10-11 — Moved out of prompts.ts (max-file-lines), with two changes: the task queue
  *     names no `wait` endpoint, because the long poll is removed, and a stopped agent's queue
  *     lists no queued task and says `agent_stopped`.
@@ -23,6 +24,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose, resolveIdentity } from '../utils/gaii.js';
 import { isStopped } from '../services/agent-stop-rules.js';
@@ -31,7 +33,7 @@ export function registerAgentHandbook(router: Router, config: AimeatConfig, stor
   // GET /v1/agents/me/handbook -- Agent operating handbook
   router.get('/v1/agents/me/handbook', async (req, res) => {
     // The caller's resolved identity: an agent session's own GAII as it is, an owner session's GHII.
-    const gaii = req.auth && !req.auth.anonymous ? resolveIdentity(req.auth, config.nodeId) : 'unknown';
+    const gaii = req.auth && !isAnonymousPrincipal(req.auth) ? resolveIdentity(req.auth, config.nodeId) : 'unknown';
     const agent = gaii !== 'unknown' ? await storage.getAgent(gaii) : null;
     const record = await storage.getSystemPrompt('tier-1');
     if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Handbook not available')); return; }

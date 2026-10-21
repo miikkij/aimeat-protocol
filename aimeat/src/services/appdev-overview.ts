@@ -14,6 +14,13 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, readerFor({ storage, config }, req.auth), { model, sections });
  * @version-history
+ *   2026-10-21 — secrets_note: a key is stored for the host the extension calls, which the extension declares in uses_secrets.
+ *   2026-10-20 — SECURITY: opts.view (the caller's principal and readsAsOwner). The learned-pitfall
+ *     and template-proposal sections read the owner's GHII and every agent of the owner with no
+ *     visibility rule, so an agent without memory:read-as-owner read its owner's and its siblings'
+ *     private records here (secaudit 2026-10, the v56 shape). Both now go through ownerScopeView; the
+ *     template section keeps the owner GHII's proposal store, which the template tools read for any
+ *     memory:read caller. No view reads as not reading as the owner.
  *   2026-10-05 — OVERVIEW_SECTIONS moved unchanged to models/tool-input-vocabulary.ts and is
  *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
  *   v1.4.1 — 2026-10-05 — The skills section lists through the caller's reader too, so a skill hidden
@@ -49,7 +56,8 @@ import { isGEAI, localAccountOf } from '../utils/gaii.js';
 import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
-import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown } from './appdev-kb.js';
+import { filterPitfalls, listLearnedPitfalls, listOwnerScopeShown, type OwnerScopeViewer } from './appdev-kb.js';
+import { ownerScopeView } from './owner-scope-read.js';
 import type { ContentReader } from './classification/reader.js';
 import { listSkills, type SkillAccessor } from './skills.js';
 import { dependencyIndex, appRef as depAppRef } from './dependency-map.js';
@@ -70,6 +78,12 @@ export interface AppdevOverviewOpts {
     model?: string;
     /** Subset of sections to build (token economy); default all. */
     sections?: string[];
+    /**
+     * Who reads the owner-scope sections, for ownerScopeView: the caller's principal and whether it
+     * reads as the owner (services/owner-scope-read.ts readsAsOwner). Without it the caller is read
+     * as not reading as the owner, so a surface that forgets it shows less, never more.
+     */
+    view?: OwnerScopeViewer;
 }
 
 function capped<T>(items: T[]): { items: T[]; total: number; truncated: boolean } {
@@ -101,9 +115,14 @@ export async function buildAppdevOverview(
             : OVERVIEW_SECTIONS,
     );
     const { owner, ownerGhii } = ownerOf(callerGaii, config);
+    // THE OWNER-SCOPE SECTIONS READ AS THE CALLER MAY. Both read the owner's GHII and every agent of
+    // the owner, and until 2026-10-20 they applied no visibility rule, so an agent without
+    // memory:read-as-owner read the private records of its owner and its siblings here, as the MCP
+    // knowledge tools did (secaudit 2026-10, v56 shape). A surface that passes no view shows less.
+    const view: OwnerScopeViewer = opts.view ?? { principal: callerGaii, readsAll: false };
     const out: Record<string, unknown> = {
         scope_note: 'App development ON AIMEAT only. Flow: research (this) → frame (tier, packs, iam?) → propose to the user → build → publish + report learnings.',
-        secrets_note: 'A key for an outside service is never held by an app or typed into one. The call lives in an extension whose header names it as {{secret:NAME}}; the node fills it from the signed-in person\'s vault on the way out, and a missing name fails as SECRET_UNKNOWN naming it. The person stores it on their Access page (section 04 Secrets) or via an agent holding secrets:manage (aimeat_secret_set); aimeat_secret_list shows names and who used them, never a value.',
+        secrets_note: 'A key for an outside service is never held by an app or typed into one. The call lives in an extension whose header names it as {{secret:NAME}}; the node fills it from the signed-in person\'s vault on the way out, and a missing name fails as SECRET_UNKNOWN naming it. The person stores it FOR THE HOST the extension calls ("store NAME for host api.example.com") on their Access page (Secrets section) or via an agent holding secrets:manage (aimeat_secret_set { name, value, host }); aimeat_secret_list shows names, addresses and who used them, never a value. The extension declares the name and host in its manifest\'s uses_secrets, so a first use to that host binds by itself; any other first use is refused with SECRET_HOST and names a page where the owner allows it with one press.',
         ...(model ? { model } : {}),
     };
 
@@ -236,7 +255,7 @@ export async function buildAppdevOverview(
     // no other owner saw any of the 118 shared ones. An entry is about the platform far more often
     // than about the model that happened to meet it.
     if (wanted.has('pitfalls_learned')) {
-        const entries = await listLearnedPitfalls(storage, config, reader, { includeShared: true });
+        const entries = await listLearnedPitfalls(storage, config, reader, { includeShared: true, view });
         const page = filterPitfalls(entries, { status: 'active', sort: 'severity', preferModel: model, limit: CAP });
         out.pitfalls_learned = {
             items: page.pitfalls.map(e => ({
@@ -260,9 +279,15 @@ export async function buildAppdevOverview(
 
     // ── Agent-proposed template proposals (owner scope) ──
     if (wanted.has('template_proposals')) {
+        // The proposal store is the owner's GHII: proposeTemplate writes every proposal there, kept
+        // private from other accounts, and aimeat_app_template_list and GET /v1/appdev/templates read
+        // it for any caller with memory:read. So its rows stay, as those read them. What another
+        // identity of the owner keeps under the same prefix (a sibling agent's own namespace) is read
+        // through ownerScopeView, as every owner-scope listing is (secaudit 2026-10, v56 shape).
         const records = (await listOwnerScopeShown(storage, config, reader, {
             prefix: 'template.catalog.', tags: ['template'],
-        })).filter(r => /\.manifest$/.test(r.key));
+        })).filter(r => /\.manifest$/.test(r.key))
+            .filter(r => r.ownerGaii === ownerGhii || ownerScopeView([r], view.principal, view.readsAll).length > 0);
         const entries = records.map(r => {
             const v = r.value as { id?: string; title?: string; tier?: string; tags?: string[]; model?: string; derivedFrom?: unknown; startMode?: string } | null;
             return {

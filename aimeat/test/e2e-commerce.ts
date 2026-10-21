@@ -8,6 +8,8 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   2026-10-20 — 27b: a PRIVATE app-tool manifest is not sold, at session creation or at completion
+ *     (secaudit 2026-10, sellable-resolvers.ts:appToolSellableResolver:private-manifest-sold).
  *   2026-10-16 — 37c: PUT /v1/commerce/payout/invoice without a credential is refused (QA audit W29).
  *   2026-10-16 — 6b: three completions of one session at the same moment complete once and charge the
  *     pacing once (QA audit S8-04). 37c: the invoice rail is refused for a callable app-tool, a line
@@ -633,6 +635,56 @@ await test('27. Unbound tool with NO manifest agent → TASK assigned to the app
     assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
     const s = done.body.data.session;
     assert(s.status === 'completed' && (s.fulfillment?.taskIds || []).length === 1, `owner-task fulfillment: ${JSON.stringify(s.fulfillment)}`);
+});
+
+// secaudit 2026-10 (sellable-resolvers.ts:appToolSellableResolver:private-manifest-sold): an owner
+// withdraws an app's tools by making apps.{appId}.tools private, and the WebMCP route then answers 404.
+// The checkout read the same record without its visibility, so a stranger still bought and ran the
+// tool. It reads the manifest through publicManifestTools now, at session creation and at completion.
+await test('27b. A PRIVATE tool manifest is not sold: a new session is 404, a session opened while public is refused at completion, nothing is charged or run', async () => {
+    const wdApp = 'withdrawn.html';
+    const wdRef = `${seller.name}/${wdApp}`;
+    const putManifest = (visibility: 'public' | 'private') => json('/v1/memory', {
+        method: 'POST', headers: auth(seller.token),
+        body: JSON.stringify({ key: `apps.${wdApp}.tools`, visibility, value: { tools: [
+            { name: 'echo', description: 'Echo, paced', action_id: echoCapId, tollMorsels: 2 },
+        ] } }),
+    });
+    const open = () => json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: wdRef, tool: 'echo', input: { message: 'withdrawn call' } }] }),
+    });
+    const pub = await putManifest('public');
+    // 201 on the first write of the key, 200 on each rewrite below (routes/memory/crud.ts).
+    assert(pub.status === 201, `public manifest write ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const early = await open();
+    assert(early.status === 201, `a session on the public manifest opens: ${early.status} ${JSON.stringify(early.body.error)}`);
+    const earlyId = early.body.data.session.id as string;
+
+    const priv = await putManifest('private');
+    assert(priv.status === 200 && priv.body.data?.visibility === 'private', `private manifest write ${priv.status}: ${JSON.stringify(priv.body.error ?? priv.body.data?.visibility)}`);
+    const webmcp = await json(`/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(wdApp)}/webmcp`);
+    assert(webmcp.status === 404, `control: the WebMCP listing treats the private manifest as absent: ${webmcp.status}`);
+
+    const late = await open();
+    assert(late.status === 404 && late.body.error?.code === 'APP_TOOLS_NOT_FOUND',
+        `a new session on a private manifest: ${late.status} ${JSON.stringify(late.body.error)}`);
+
+    const buyerBefore = await balance(buyer.token);
+    const done = await json(`/v1/commerce/checkout-sessions/${earlyId}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(done.status === 404 && done.body.error?.code === 'APP_TOOLS_NOT_FOUND',
+        `completing a session after the manifest turned private: ${done.status} ${JSON.stringify(done.body.error)}`);
+    assert(await balance(buyer.token) === buyerBefore, 'nothing is charged on the refusal');
+    const back = await json(`/v1/commerce/checkout-sessions/${earlyId}`, { headers: auth(buyer.token) });
+    assert(back.body.data.session.status === 'open' && !back.body.data.session.fulfillment?.results?.length,
+        `the session stays open with nothing run: ${JSON.stringify({ status: back.body.data.session.status, f: back.body.data.session.fulfillment })}`);
+
+    // Positive control: published again, the same session completes and the tool runs.
+    const again = await putManifest('public');
+    assert(again.status === 200 && again.body.data?.visibility === 'public', `public again ${again.status}: ${JSON.stringify(again.body.error ?? again.body.data?.visibility)}`);
+    const ok = await json(`/v1/commerce/checkout-sessions/${earlyId}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
+    assert(ok.status === 200 && ok.body.data.session.fulfillment?.results?.[0]?.result?.echoed === 'Echo: withdrawn call',
+        `the public manifest sells again: ${ok.status} ${JSON.stringify(ok.body.error ?? ok.body.data?.session?.fulfillment)}`);
 });
 
 // ─── WebMCP bridge (TARGET-034 phase C): app tools as a WebMCP surface + 402 payment flow ───

@@ -38,7 +38,9 @@
  *   - The account's own tools: secrets, access, usage report, agent statistics
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-admin-tools
  * @version-history
- *   v1.1.0 — 2026-10-17 — aimeat_usage_report misses only wallet:read for a memory:read agent, a
+ *   v1.2.0 — 2026-10-21 — aimeat_secret_host_set and aimeat_secret_approval_withdraw: the address
+ *     without the value, another owner refused, and neither offered to '*'.
+ *   v1.1.0 — 2026-10-17 —aimeat_usage_report misses only wallet:read for a memory:read agent, a
  *     one-press word, so it is listed (permission ask, mcp/permission-ask-gate.ts) and the call is
  *     refused SCOPE_DENIED with the allow address. The operator tools keep "not offered".
  *   v1.0.0 — 2026-10-16 — Initial (QA audit W27).
@@ -365,6 +367,29 @@ await test("aimeat_secret_list / _delete: another owner's agent neither sees nor
     assert(del.isError, `another owner deleted it: ${del.text.slice(0, 200)}`);
     const still = await callTool(opSecrets, 'aimeat_secret_list', {});
     assert(still.data.secrets.some((s: any) => s.name === SECRET), 'the secret is gone after another owner\'s delete');
+});
+
+await test('aimeat_secret_host_set / _approval_withdraw: an agent gives only a first address; a withdraw of nothing is refused', async () => {
+    // The secret has an address from aimeat_secret_set: changing or removing it is the owner's in person (R62).
+    const change = await callTool(opSecrets, 'aimeat_secret_host_set', { name: SECRET, host: 'api2.example.test' });
+    assert(change.isError && /IN_PERSON_ONLY/.test(change.text), `an agent changed the address: ${change.text.slice(0, 300)}`);
+    const clear = await callTool(opSecrets, 'aimeat_secret_host_set', { name: SECRET, host: '' });
+    assert(clear.isError && /IN_PERSON_ONLY/.test(clear.text), `an agent removed the address: ${clear.text.slice(0, 300)}`);
+    // Stored again without a host, the secret has none, and the agent may give it its first one.
+    const again = await callTool(opSecrets, 'aimeat_secret_set', { name: SECRET, value: 'sk-mcp-e2e-value-456' });
+    assert(!again.isError && again.data.hosts.length === 0, `restore: ${again.text.slice(0, 300)}`);
+    const set = await callTool(opSecrets, 'aimeat_secret_host_set', { name: SECRET, host: 'api2.example.test' });
+    assert(!set.isError && set.data.hosts[0] === 'api2.example.test' && set.data.hostBinding?.how === 'set', `host_set: ${set.text.slice(0, 300)}`);
+    const bad = await callTool(opSecrets, 'aimeat_secret_host_set', { name: SECRET, host: 'https://x.test/p' });
+    assert(bad.isError && /INVALID_SECRET_HOST/.test(bad.text), `a bad host: ${bad.text.slice(0, 200)}`);
+    const theirs = await callTool(memSecrets, 'aimeat_secret_host_set', { name: SECRET, host: 'evil.test' });
+    assert(theirs.isError && /SECRET_NOT_FOUND/.test(theirs.text), `another owner set the host: ${theirs.text.slice(0, 200)}`);
+    const none = await callTool(opSecrets, 'aimeat_secret_approval_withdraw', { name: SECRET, extension: 'nope', installer: 'nobody', host: 'x.test' });
+    assert(none.isError && /APPROVAL_NOT_FOUND/.test(none.text), `withdraw of nothing: ${none.text.slice(0, 200)}`);
+    for (const tool of ['aimeat_secret_host_set', 'aimeat_secret_approval_withdraw']) {
+        const r = await callTool(opStar, tool, { name: SECRET, host: 'x.test', extension: 'e', installer: 'i' });
+        assert(r.isError && !r.offered, `${tool} offered to '*': ${r.text.slice(0, 200)}`);
+    }
 });
 
 await test('Cleanup: aimeat_secret_delete removes the secret, and a second delete is refused', async () => {

@@ -14,6 +14,8 @@
  * @structure aiJobTools -- AimeatToolDefinition[]
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   2026-10-20 — aimeat_ai_job_start: on_done needs ext:invoke, and a public result_visibility is
+ *     asked of the publish gate like any memory write (secaudit 2026-10, ai-jobs/service.ts).
  *   2026-10-20 — list, get and cancel say whose jobs a caller reaches: the ones it started, and the
  *     owner's and its siblings' only with memory:read-as-owner (secaudit 2026-10,
  *     mcp/ai-jobs.ts:registerAiJobTools:jobs-keyed-by-owner-ghii).
@@ -50,12 +52,12 @@ export const aiJobTools = [
             prompt_key: { type: 'string', description: 'An owner memory key holding the prompt text (a string, or an object with a `prompt` field), so changing the prompt is a memory write rather than a code change.' },
             input_keys: { type: 'array', description: 'Memory keys read and appended to the prompt, labelled by key. This is the ONLY way the model sees stored data — it has no tools. A key naming a record this node keeps for itself (an AI key, a payout setting, a spend limit) is refused with RESERVED_KEY, because everything read goes to the model provider.', zod: z.array(z.string()) },
             result_key: { type: 'string', required: true, description: 'Where the answer is written, in the owner\'s own namespace. A key naming another namespace is refused, and so is a record this node keeps for itself (RESERVED_KEY).' },
-            result_visibility: { type: 'string', description: 'Visibility of the record written at result_key. Default private.', enum: ['private', 'owner', 'public'] },
+            result_visibility: { type: 'string', description: 'Visibility of the record written at result_key. Default private. "public" is held to the same rule as a memory write: when your owner must approve making something public, the answer is stored private and a request waits for them; the job record then says private.', enum: ['private', 'owner', 'public'] },
             model: { type: 'string', description: 'Explicit model id. Omit to use the owner\'s configured model.' },
             system_prompt: { type: 'string', description: 'Optional system prompt.' },
             json: { type: 'boolean', description: 'Parse the answer as JSON before storing it, so a malformed answer fails the job instead of becoming a string every reader has to re-parse.' },
             app_id: { type: 'string', description: 'App attribution — enables the owner\'s per-app allowlist and per-app daily quota.' },
-            on_done: { type: 'object', description: '{ extension, action } — an extension action of the job\'s OWN owner, invoked with { job_id, state, result_key } when the job finishes.', zod: z.object({ extension: z.string(), action: z.string() }) },
+            on_done: { type: 'object', description: '{ extension, action } — an extension action of the job\'s OWN owner, invoked with { job_id, state, result_key } when the job finishes. It needs the ext:invoke permission, as running the action directly does; without it the start is refused.', zod: z.object({ extension: z.string(), action: z.string() }) },
             op: { type: 'string', description: 'The kind of model call. "text" (default): a completion. "image": one picture from the prompt; json does not apply. "transcribe": speech-to-text over audio_key; no prompt.', enum: ['text', 'image', 'transcribe'] },
             provider: { type: 'string', description: 'A provider to use, by id or by type. Naming one turns fallback to another provider off. Omit to let the owner\'s rules choose.' },
             audio_key: { type: 'string', description: 'For op "transcribe" (required there): the storage key of an audio file in your own storage. A key that is not there is refused with NOT_FOUND before the job is written.' },

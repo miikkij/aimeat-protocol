@@ -28,7 +28,18 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
- *   v1.17.0 — 2026-10-18 — `visitor`: a run for nobody signed in refuses memory set and delete with
+ *   v1.18.3 — 2026-10-21 — The owner's approvals and the extension's declared uses reach the resolver;
+ *     a refusal's text, with the allow page's address, comes from secretRefusalText.
+ *   v1.18.2 — 2026-10-21 —v58 amended: the caller's vault serves any extension they run, to a bound
+ *     host only; another account's extension never binds a secret with no host (SECRET_HOST).
+ *   v1.18.1 — 2026-10-21 —ExtensionCtxDeps.unattended: the unattended run names itself, and the
+ *     vault's first-use decision reads that flag instead of role strings.
+ *   v1.18.0 — 2026-10-20 — ctx.fetch fills `{{secret:NAME}}` from the caller's vault only for an
+ *     extension the caller's account installed, or living-hooks as the node ships it (secaudit
+ *     2026-10, v58), and a vault secret with no host is bound on first use only when the deciding
+ *     principal is the owner in person or holds secrets:manage; in an unattended run that is the
+ *     extension's code writer (ruling 6; v59). Both in services/extension-secret-authority.ts.
+ *   v1.17.0 — 2026-10-18 —`visitor`: a run for nobody signed in refuses memory set and delete with
  *     VISITOR_READ_ONLY (Comicland v3 A-7).
  *   v1.16.0 — 2026-10-13 — ctx.calendar on every code path (services/extension-calendar.ts).
  *   v1.15.0 — 2026-10-13 — ctx.fetch takes `timeoutMs`, the script's own deadline for one call
@@ -124,8 +135,9 @@ import { extensionCrossNotify, safeNotificationLink } from './extension-notify.j
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeBody } from './extension-fetch-decode.js';
-import { parseGAII, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
-import { resolveSecretForHeaders, secretPlaceholderNames, secretUnknownMessage, secretHostMessage } from './owner-secrets.js';
+import { parseGAII, localAccountName } from '../utils/gaii.js';
+import { resolveSecretForHeaders, secretPlaceholderNames } from './owner-secrets.js';
+import { vaultOwnerForCall, decideFirstUse, secretRefusalText } from './extension-secret-authority.js';
 import { scrubFormsOf, scrubResponse } from './extension-fetch-scrub.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -182,6 +194,10 @@ export interface ExtensionCtxDeps {
 
     /** A visitor's run (a public action, nobody signed in): the memory reads, its writes are refused. */
     visitor?: boolean;
+
+    /** An unattended run (services/extension-system-run.ts): nobody is present, so the code writer
+     *  decides a vault secret's first host (ruling 6). Set by the code path, never read from roles. */
+    unattended?: boolean;
 }
 
 /** The refusal a visitor's write meets. A public action serves reading; a write needs an account. */
@@ -420,24 +436,34 @@ async function resolveOutboundSecrets(
     const extName = deps.extension?.name
         ?? deps.extMemoryOwner.replace(/^ext:/, '').split('.')[0];
 
+    // The vault belongs to the HUMAN, whichever of their principals is calling: the owner at a
+    // screen, their agent, their granted app; vaultOwnerForCall collapses all three to one GHII. It
+    // serves every extension the caller runs, another account's included (bring your own key). A
+    // bound secret goes only to its bound host; a secret with no host is never bound through
+    // another account's extension, because that script chose the address (secaudit 2026-10, v58 as
+    // amended 2026-10-21). decideFirstUse answers the second.
+    const vaultOwner = vaultOwnerForCall(deps.caller);
+
     const resolved = await resolveSecretForHeaders({
         storage: deps.storage,
         config: deps.config,
-        // The vault belongs to the HUMAN, whichever of their principals is calling: the owner at a
-        // screen, their agent, their granted app. ownerGhiiOf collapses all three to one coordinate.
-        ownerGhii: ownerGhiiOf(deps.caller.gaii),
+        ownerGhii: vaultOwner,
         principal: deps.caller.gaii,
+        // Who may choose the first host of a vault secret that has none (ruling 6, the extension's
+        // declared uses; secaudit 2026-10, v59). Asked only when this call would bind one.
+        firstUse: (secretName, host) => decideFirstUse({
+            storage: deps.storage, config: deps.config, caller: deps.caller, extension: deps.extension,
+            vaultOwnerGhii: vaultOwner, unattended: deps.unattended === true, secretName, host, extConfig: deps.extConfig,
+        }),
+        // The approvals the owner gave on a secret name this extension and the account that installed it.
+        ...(deps.extension ? { approvedFor: { extension: deps.extension.name, installer: deps.extension.owner } } : {}),
         extConfig: deps.extConfig,
         extName,
         headers,
         url,
     });
-    if (!resolved.ok) {
-        if (resolved.reason === 'host') {
-            throw new Error(`SECRET_HOST: ${secretHostMessage(resolved.headerName, resolved.secretName, resolved.boundTo, resolved.host)}`);
-        }
-        throw new Error(`SECRET_UNKNOWN: ${secretUnknownMessage(resolved.headerName, resolved.secretName)}`);
-    }
+    // A refused first use files the owner's question and names its address (services/secret-approvals.ts).
+    if (!resolved.ok) throw new Error(await secretRefusalText({ ...deps, vaultOwnerGhii: vaultOwner, extName }, resolved));
     // Which headers actually carried a secret — the ones a cross-origin redirect must not inherit.
     const sensitive = Object.entries(headers ?? {})
         .filter(([, v]) => typeof v === 'string' && named.some(n => v.includes(`{{secret:${n}}}`)))

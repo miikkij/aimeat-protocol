@@ -17,12 +17,15 @@
  *   const canSee = await canSeeMembers(storage, organism, await rosterCallerFromAuth(storage, req.auth));
  *   res.json({ organism: redactOrganism(organism, canSee), members_hidden: !canSee });
  * @version-history
+ *   v1.1.1 — 2026-10-21 — rosterCallerFromAuth asks isAnonymousPrincipal, so the minted anonymous token
+ *     reads rosters as the anonymous internet (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2). rosterCallerFromAuth is async and takes the storage.
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { isOrganismOwner } from './organism-ownership.js';
 import { isOperatorCaller, type OperatorAuth } from './operator-override.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 export type MemberVisibility = NonNullable<OrganismRecord['memberVisibility']>;
 
@@ -48,7 +51,7 @@ export interface RosterCaller {
  *  `isOperator` is isOperatorCaller's answer, the question the MCP tools ask: the operator in person,
  *  or the operator's agent holding operator:admin. A roster read writes no operator trail. */
 export async function rosterCallerFromAuth(storage: Storage, auth?: OperatorAuth | null): Promise<RosterCaller> {
-  const isAnon = !!auth?.anonymous;
+  const isAnon = isAnonymousPrincipal(auth);
   return {
     ownerName: isAnon ? undefined : auth?.owner,
     isOperator: !isAnon && await isOperatorCaller(storage, auth),

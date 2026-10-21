@@ -11,6 +11,16 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-21 — The once-only keep steps (keepAppExtensionSchedulesOnce and the scope chain through
+ *     keepOnDoneForAppsOnce) moved unchanged to once-only-keep-steps.ts (max-file-lines), and the
+ *     whole of it is awaited before the node serves requests.
+ *   2026-10-21 — keepDatapackageReadForAppsOnce(): an app that reads data packages keeps storage:read (secaudit 2026-10 v41).
+ *   2026-10-21 — keepOnDoneForAppsOnce(): a published app whose AI jobs bind on_done keeps ext:invoke
+ *     (services/app-on-done-keep-migration.ts, secaudit 2026-10).
+ *   2026-10-21 — keepAppExtensionSchedulesOnce(), awaited before the scheduler starts: an app's extension
+ *     schedule made before the kind asked ext:invoke keeps firing (services/schedule-extension-keep.ts).
+ *   2026-10-20 — registerVisitorPeers(peers): the live peer registry is filed for the credential check,
+ *     which ends a visitor's session when its home peer is removed or restricted (auth/visitor-peer.ts).
  *   2026-10-20 — keepStorageReadForAppsOnce(), chained after the third scope step: the published apps
  *     that read /v1/pub keep storage:read (services/app-storage-read-keep-migration.ts).
  *   2026-10-20 — registerDirectoryNotifier(): the member-directory refresh is reachable from the
@@ -96,6 +106,7 @@ import type { PeerInfo } from '../services/federation.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { enableAnonymousAuth } from '../auth/middleware.js';
+import { registerVisitorPeers } from '../auth/visitor-peer.js';
 import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
 import { startScreenshotAutoCapture } from '../services/screenshot-capture.js';
 import { presence } from '../services/presence.js';
@@ -121,10 +132,7 @@ import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.j
 import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
-import { migrateToolScopeWordsOnce } from '../services/tool-scope-words-migration.js';
-import { migrateRestScopeGatesOnce, migrateAgentReadGrantOnce } from '../services/rest-scope-gates-migration.js';
-import { migrateRestScopeKeepWorkingOnce } from '../services/rest-scope-keep-working-migration.js';
-import { keepStorageReadForAppsOnce } from '../services/app-storage-read-keep-migration.js';
+import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -369,27 +377,10 @@ export async function initializeServices(
   // router a key-only save wrote as the owner's model is cleared, so the node's default applies.
   migrateImplicitFreeModelOnce(storage, config.nodeId)
     .catch(err => logger.error('Failed to clear the implicit free model from AI settings; the next boot tries again', { error: String(err) }));
-  // The MCP tool scope words of 2026-10-06 (services/tool-scope-words-migration.ts), once per node:
-  // an agent approved before them keeps its workspace read tools and its send-as-owner tool.
-  // Taken before the chain starts, so the third step below hands its words only to principals that
-  // existed before this start, never to one made while the steps still run.
-  const scopeStepsBegan = new Date().toISOString();
-  migrateToolScopeWordsOnce(storage, config.nodeId)
-    .catch(err => logger.error('Failed to carry existing agents onto the 2026-10-06 tool scope words; the next boot tries again', { error: String(err) }))
-    // The REST scope gates of 4.0.0 (services/rest-scope-gates-migration.ts), once per node: the one new
-    // word goes to every agent and approved ecosystem app that could reach its routes. Chained after
-    // the line above because both rewrite an agent's whole scope list.
-    .then(() => migrateRestScopeGatesOnce(storage, config.nodeId))
-    // agent:read, the word of the owner's agent list from 4.0.0: the second step, once, under its own record.
-    .then(() => migrateAgentReadGrantOnce(storage, config.nodeId))
-    // The third step, on the first start as 4.0.x only: every word the 4.0.0 gates check goes to the
-    // agents and ecosystem apps that existed before, so what worked on 3.x keeps working (ruling
-    // decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
-    .then(() => migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: scopeStepsBegan }))
-    // storage:read for the published apps that read /v1/pub, on a node that ran the third step before
-    // S3-03 gated that route (services/app-storage-read-keep-migration.ts).
-    .then(() => keepStorageReadForAppsOnce(storage, config, { existedBefore: scopeStepsBegan }))
-    .catch(err => logger.error('Failed to give the REST scope gate words to existing principals; the next boot tries again', { error: String(err) }));
+  // The once-only keep steps: older app extension schedules keep firing, and the agents, ecosystem
+  // apps and published apps keep the scope words they used before each word was asked
+  // (server-bootstrap/once-only-keep-steps.ts).
+  await runOnceOnlyKeepSteps(storage, config);
 
   // Encrypt the payment secrets of every seller record written before they were stored sealed.
   // Until this runs, a plain Stripe key is readable through the generic memory doors
@@ -480,6 +471,9 @@ export async function initializeServices(
   } catch (err) {
     logger.error('Failed to load persisted peers', { error: String(err) });
   }
+  // The credential check reads this live registry on every visitor request, so a peer the operator
+  // removes or restricts ends its visitors' sessions at once (auth/visitor-peer.ts).
+  registerVisitorPeers(peers, config.nodeId);
 
   // The daily package update check needs the peers, so its handler is registered here rather than
   // with the other core handlers above (services/packages/peer/package-upstream-refresh.ts).

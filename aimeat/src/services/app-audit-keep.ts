@@ -14,12 +14,14 @@
  * @structure archiveAuditFor · readAuditKeep · setAuditKeep
  * @usage const out = await setAuditKeep(storage, config, caller, req.body?.keep);
  * @version-history
+ *   v1.0.1 — 2026-10-21 — The owner test asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.0 — 2026-10-05 — Moved out of the handlers of routes/apps/legal.ts by extraction;
  *     aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { isSameAccount } from '../utils/same-account.js';
 import { isOwnerPrincipal } from '../auth/account-security.js';
 import { resolveAppTarget } from './app-dev-grant.js';
@@ -47,7 +49,7 @@ export async function archiveAuditFor(
   const bare = localAccountName(ref.owner);
   if (!app && bare !== ref.owner) app = await storage.getAppByOwnerName(bare, ref.filename);
   // An anonymous identity is nobody's owner (optionalAuth hands one out on an anonymous node).
-  const isOwner = !!app && caller.anonymous !== true && isSameAccount((await ownAccount(storage, config, caller)).owner, app.ownerName);
+  const isOwner = !!app && !isAnonymousPrincipal(caller) && isSameAccount((await ownAccount(storage, config, caller)).owner, app.ownerName);
   if (!app || !isOwner) return refuse(404, 'NOT_FOUND', `App "${ref.filename}" not found in your uploads`);
   if (typeof before !== 'string' || !Number.isFinite(Date.parse(before))) {
     return refuse(400, 'INVALID_INPUT', 'before must be a date, e.g. "2026-01-01" or an ISO time.');

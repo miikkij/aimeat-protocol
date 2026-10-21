@@ -39,7 +39,9 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
- *   v1.9.0 — 2026-10-20 — writeExtensionRecord stamps `installedByPrincipal` with the actor of the
+ *   v1.10.0 — 2026-10-21 — An update of byte-identical code keeps the old-code first-use mark; a changed
+ *     script drops it (services/extension-first-use-keep.ts carryFirstUseKeep).
+ *   v1.9.0 — 2026-10-20 —writeExtensionRecord stamps `installedByPrincipal` with the actor of the
  *     write, so an unattended run reads files as the principal that wrote the code and not as the
  *     account name (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii).
  *   v1.8.0 — 2026-10-13 — activateExtension makes the extension's capability rows before it answers
@@ -81,6 +83,7 @@ import { logger } from '../utils/logger.js';
 import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extensionCodeOf } from './component-versions.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { carryHostFieldValues } from './extension-network-hosts.js';
+import { carryFirstUseKeep } from './extension-first-use-keep.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -198,6 +201,9 @@ export async function writeExtensionRecord(
     // A host field (manifest network.host_fields) is the owner's answer for this install: the new
     // build takes the host the install holds, before the no-op comparison below sees it.
     record.config = carryHostFieldValues(record.config, existing.config);
+    // Byte-identical code keeps the old-code first-use mark; a changed script drops it
+    // (services/extension-first-use-keep.ts).
+    record.config = carryFirstUseKeep(record.config, record.actions, existing);
 
     // Identical derived bytes are a safe no-op, and a no-op must not re-run the extension's
     // @activate work or re-register its schedules.

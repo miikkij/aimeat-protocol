@@ -12,7 +12,14 @@
  * @structure keyRow · keyOpen · secretRow · sessionsBlock · federationBlock
  * @usage import { keyRow, secretRow, sessionsBlock, federationBlock } from './rows.js';
  * @version-history
- *   v1.18.0 -- 2026-10-02 -- The question mark that explains morsels: commerce.morsels on the spending ceiling's Label (components/HelpTip.js).
+ *   v1.20.1 -- 2026-10-21 -- The Set column says each fact once: the date set, "Last replaced" only
+ *     when the value was replaced, and when it was last used or that it was not used yet.
+ *   v1.20.0 -- 2026-10-21 --Browser check: a secret's row names the extensions that declare it before
+ *     its first use and says when it was last used; its host stays on one line; the panel's buttons
+ *     are at the control size.
+ *   v1.19.0 -- 2026-10-21 --A secret's row says how many questions wait for an answer, and its opened
+ *     panel (Manage) holds the address and the extensions allowed to send it (secret-panel.js).
+ *   v1.18.0 -- 2026-10-02 --The question mark that explains morsels: commerce.morsels on the spending ceiling's Label (components/HelpTip.js).
  *   v1.17.0 --2026-09-26 -- Every part is a component that takes data, and the file writes no class
  *     (component plan, page group G3): a key and a secret are List rows (Name, Desc, Who, When, Doors)
  *     with the opened Panel, an opened key's rights a dense List (a base package's line dim), the
@@ -56,6 +63,7 @@ import { Note } from '/components/Note.js';
 import { Figure, Tinted } from '/components/Figure.js';
 import { TextField } from '/components/TextField.js';
 import { HelpLabel } from '/components/HelpTip.js';
+import { secretWaitingLine, secretAddress, secretApprovals } from './secret-panel.js';
 
 const doorWord = (open) => (open ? x('close') : x('open'));
 
@@ -123,7 +131,7 @@ function keyOpen(ctx, row) {
  * this file or in the answer the page read.
  * The address line under "used by" says where the value may go: a vault secret is bound to the host
  * of the first call that uses it, and every other host is refused.
- * @param {any} ctx @param {{ name: string, setAt?: string, updatedAt?: string, usedBy?: string[], hosts?: string[] }} row
+ * @param {any} ctx @param {{ name: string, setAt?: string, updatedAt?: string, usedBy?: string[], hosts?: string[], declaredBy?: string[], lastUsedAt?: string }} row
  */
 export function secretRow(ctx, row) {
   const open = ctx.replaceName === row.name;
@@ -131,13 +139,19 @@ export function secretRow(ctx, row) {
   const used = Array.isArray(row.usedBy) ? row.usedBy : [];
   const hosts = Array.isArray(row.hosts) ? row.hosts : [];
   const replaced = row.updatedAt && row.updatedAt !== row.setAt ? row.updatedAt : null;
+  const waiting = secretWaitingLine(row);
+  // Named but not used yet: the account's extensions that declare it, and those that asked for it.
+  const named = Array.isArray(row.declaredBy) ? row.declaredBy : [];
+  const users = used.length
+    ? used.join(', ')
+    : (named.length ? html`<${Tinted} tone="dim">${x('secrets.namedBy', { names: named.join(', ') })}<//>` : html`<${Tinted} tone="dim">${x('secrets.usedByNone')}<//>`);
   return html`
     <${Row} key=${row.name} open=${open}>
       <${Name} meta=${'{{secret:' + row.name + '}}'}>${row.name}<//>
-      <${Who} sub=${hosts.length ? secretHostLine(hosts) : x('secrets.notBound')}>${used.length ? used.join(', ') : html`<${Tinted} tone="dim">${x('secrets.usedByNone')}<//>`}<//>
-      <${When}>${dateWord(row.setAt)}<br />${replaced ? x('secrets.colReplaced') + ' ' + dateWord(replaced) : x('secrets.neverReplaced')}<//>
+      <${Who} sub=${html`${hosts.length ? secretHostLine(hosts) : x('secrets.notBound')}${waiting ? html`<br /><b>${waiting}</b>` : null}`}>${users}<//>
+      <${When}>${dateWord(row.setAt)}${replaced ? html`<br />${x('secrets.colReplaced')} ${dateWord(replaced)}` : null}<br />${row.lastUsedAt ? x('secrets.lastUsed', { date: dateWord(row.lastUsedAt) }) : x('secrets.neverUsed')}<//>
       <${Doors}>
-        <${Action} small row expanded=${open} onClick=${() => ctx.openReplace(row.name)}>${open ? x('close') : x('secrets.replace')}<//>
+        <${Action} small row expanded=${open} onClick=${() => ctx.openReplace(row.name, hosts[0])}>${open ? x('close') : x('secrets.manage')}<//>
         <${Action} small row tone="danger" disabled=${busy} onClick=${() => ctx.deleteSecret(row)}>${x('secrets.delete')}<//>
       <//>
       ${open ? secretReplace(ctx, row, busy) : null}
@@ -150,17 +164,11 @@ export function secretRow(ctx, row) {
  * The sentence is split around a marker so the translation decides where the host goes.
  */
 function secretHostLine(hosts) {
-  const marker = ' ';
+  const marker = '\u0000';
   const [before, after = ''] = x('secrets.goesTo', { host: marker }).split(marker);
-  // The last two labels stay together, so a line never ends up holding only "com".
-  const host = (h) => {
-    const parts = h.split('.');
-    const labels = parts.length > 1 ? [...parts.slice(0, -2), parts.slice(-2).join('.')] : parts;
-    // Each label is kept whole (Tinted whole: never broken inside, not at its hyphen), so the line
-    // breaks only at the <wbr /> between labels.
-    return labels.map((part, i) =>
-      html`<${Tinted} whole>${part}${i < labels.length - 1 ? '.' : ''}<//>${i < labels.length - 1 ? html`<wbr />` : null}`);
-  };
+  // A host is kept on one line (Tinted whole), never broken at a dot or a hyphen: broken, it reads
+  // as two addresses (browser check 2026-10-21).
+  const host = (h) => html`<${Tinted} whole>${h}<//>`;
   return html`${before}${hosts.map((h, i) => html`${i ? ', ' : ''}${host(h)}`)}${after}`;
 }
 
@@ -173,10 +181,12 @@ function secretReplace(ctx, row, busy) {
       <${TextField} type="password" autoComplete="new-password" spellCheck=${false} ariaLabel=${x('secrets.value')}
         placeholder=${x('secrets.valuePlaceholder')} value=${ctx.replaceValue} onInput=${(v) => ctx.setReplaceValue(v)}
         actions=${html`
-          <${Action} small disabled=${busy || !ctx.replaceValue} onClick=${() => ctx.writeSecret(row.name, ctx.replaceValue, true)}>${busy ? x('secrets.saving') : x('secrets.replaceSave')}<//>
-          <${Action} small soft onClick=${() => ctx.openReplace(row.name)}>${x('cancel')}<//>`} />
+          <${Action} small control disabled=${busy || !ctx.replaceValue} onClick=${() => ctx.writeSecret(row.name, ctx.replaceValue, true, ctx.hostDraft)}>${busy ? x('secrets.saving') : x('secrets.replaceSave')}<//>
+          <${Action} small soft control onClick=${() => ctx.openReplace(row.name)}>${x('cancel')}<//>`} />
       ${ctx.secretMsg ? html`<${Note} kind="message" error=${ctx.secretMsg.error}>${ctx.secretMsg.text}<//>` : null}
       <${Note}>${x('secrets.valueHint')}<//>
+      ${secretAddress(ctx, row, busy)}
+      ${secretApprovals(ctx, row, busy)}
     <//>`;
 }
 

@@ -16,12 +16,15 @@
  *   person (secaudit 2026-10, AI-2 and AI-3). An app's schedule now carries its grant
  *   (`createdByApp`) and fires as that app, with the grant's scopes. One an app made before that
  *   carries no grant and cannot be told from the owner's own except by `createdByAgent`; it does not
- *   fire, and says why.
- * @structure ScheduleActor · scheduleActor(storage, job)
+ *   fire, and says why. The `extension` and `agent_task` kinds fire such a schedule as the account
+ *   itself, as before (services/schedule-fire-refusal.ts).
+ * @structure ScheduleActor · makerOf(job) · scheduleActor(storage, job)
  * @usage
  *   const actor = await scheduleActor(storage, job);
  *   if (!actor.ok) throw new Error(actor.reason);
  * @version-history
+ *   v1.1.0 — 2026-10-21 — makerOf() is exported, for services/schedule-fire-refusal.ts and
+ *     services/schedule-extension-keep.ts (secaudit 2026-10, capability-loss review).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-2 and AI-3).
  */
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
@@ -46,7 +49,7 @@ export type ScheduleActor =
   | { ok: false; reason: string };
 
 /** The maker of a schedule, in the terms the workflow trigger uses for a saver. */
-function makerOf(job: Pick<ScheduledJobRecord, 'createdBy' | 'createdByAgent' | 'createdByApp'>): WorkflowSaver | 'unknown-app' {
+export function makerOf(job: Pick<ScheduledJobRecord, 'createdBy' | 'createdByAgent' | 'createdByApp'>): WorkflowSaver | 'unknown-app' {
   if (job.createdByApp) return { kind: 'app', id: job.createdByApp };
   const id = job.createdBy ?? '';
   if (job.createdByAgent && id.includes('#')) return isGEAI(id) ? { kind: 'ecosystem', id } : { kind: 'agent', id };

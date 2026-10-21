@@ -13,6 +13,10 @@
  *   identity. What the fan-out then SHOWS is decided by services/owner-scope-read.ts.
  * @usage app.use(librarianRouter(config, storage))
  * @version-history
+ *   2026-10-20 — The `own` search passes the caller to the organism read rule (organismReadableRecords
+ *     in services/librarian.ts): an agent that a 'listed' organism does not admit got that
+ *     organism's records as snippets, while GET /v1/memory/:key answered it 403 (secaudit 2026-10,
+ *     the v57 shape).
  *   2026-10-20 — Two refusals on the `own` fan-out (secaudit 2026-10). An ecosystem app never gets
  *     it: its data-area allowlist (ecoMayReadKey, routes/memory/key.ts) is its fence, and the
  *     fan-out walked around it. And the hits now pass ownerScopeView, so a caller that does not read
@@ -136,6 +140,8 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
       keyPrefix,
       scope,
       reader: readerFor({ storage, config }, req.auth),
+      // The organism read rule GET /v1/memory/:key applies, on the own scope (secaudit 2026-10, v57 shape).
+      organismCaller: caller,
     });
 
     res.json(success(config.nodeId, {

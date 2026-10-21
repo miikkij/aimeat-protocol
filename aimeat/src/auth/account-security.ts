@@ -7,6 +7,8 @@
  *   and their docblocks moved unchanged, and middleware.ts re-exports all three, so every existing
  *   import keeps working.
  * @version-history
+ *   v1.3.3 — 2026-10-20 — isSignedInCaller and requireOwnerPrincipal ask isAnonymousPrincipal, so the
+ *     minted anonymous token counts as nobody too (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.3.2 — 2026-10-05 — isOwnerPrincipal takes the caller as data ({ roles, scopes, federated }), a
  *     verified token included, so services/app-audit-keep.ts asks the same test for a route's token
  *     and for an MCP session; aimeat_app_manage calls the service in place of the route over loopback
@@ -29,6 +31,7 @@ import { ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { deny401, deny403 } from './deny.js';
+import { isAnonymousPrincipal } from './anonymous-principal.js';
 
 /**
  * Require a principal that IS the account holder, rather than something acting on the account
@@ -126,7 +129,9 @@ export function isOwnerPrincipal(
  * Found by the AI triage of 2026-09-13.
  */
 export function isSignedInCaller(auth: Request['auth'] | undefined): boolean {
-  return !!auth && !auth.anonymous;
+  // isAnonymousPrincipal, not the flag: the token POST /v1/auth/anonymous mints carries no anonymous
+  // claim (secaudit 2026-10, anonymous-claim-not-signed).
+  return !!auth && !isAnonymousPrincipal(auth);
 }
 
 export function isThirdPartyPrincipal(auth: Request['auth'] | undefined): boolean {
@@ -146,7 +151,7 @@ export function requireOwnerPrincipal(reason?: string) {
     // `!req.auth` alone is not the test: optionalAuth runs globally and, in anonymous mode, injects
     // a shared identity, so an unauthenticated caller arrives here truthy. Nobody signed in as
     // nobody changes how an account is signed into (invariant 6).
-    if (!req.auth || req.auth.anonymous) {
+    if (!req.auth || isAnonymousPrincipal(req.auth)) {
       deny401(req, res, 'Authentication required');
       return;
     }

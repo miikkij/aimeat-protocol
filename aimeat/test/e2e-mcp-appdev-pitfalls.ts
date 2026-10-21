@@ -9,6 +9,11 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-appdev-pitfalls).
  * @version-history
+ *   v1.2.0 — 2026-10-20 — The owner-scope learned entries read as the caller may: on
+ *     aimeat_appdev_pitfall_list, GET /v1/appdev/pitfalls/index and /learned an agent without
+ *     memory:read-as-owner lists no private entry of its owner or a sibling and keeps the sibling's
+ *     owner-visibility one; an agent with the word and the owner in person list every entry
+ *     (secaudit 2026-10, the v56 shape).
  *   v1.1.0 — 2026-09-13 — The list's hint names a door that opens a shared entry, the row carries the
  *     owner that door needs, and B reads A's shared body through it. A report and its list row carry
  *     verified_at / verified_version.
@@ -49,7 +54,8 @@ async function json(path: string, opts: RequestInit = {}) {
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
-import { ownerSignIn } from './helpers/owner-login.js';
+import { ownerSignIn, registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession as openAgentSession, callTool as callAgentTool, type McpAgent } from './helpers/mcp-session.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -331,6 +337,81 @@ await test('aimeat_appdev_overview merges learned pitfalls + curated + packs in 
 await test('delete of a missing entry errors cleanly', async () => {
     const del = await A.call('aimeat_appdev_pitfall_delete', { category: 'nope', slug: 'missing' });
     assert(del.result?.isError === true, 'expected isError for missing entry');
+});
+
+// ── The owner-scope learned entries read as the caller may (secaudit 2026-10, the v56 shape) ──
+// The index (MCP aimeat_appdev_pitfall_list, GET /v1/appdev/pitfalls/index) and the learned page
+// (GET /v1/appdev/pitfalls/learned) read the owner's GHII and every agent of the owner with no
+// visibility rule, so an agent without memory:read-as-owner listed its owner's and its siblings'
+// private entries. Since 2026-10-15 those cost memory:read-as-owner.
+const VS = `pfview${stamp}`;
+const viewKeys = {
+    ownerPriv: `packages/appdev-pitfalls/data/${VS}-owner-priv`,
+    sibPriv: `packages/appdev-pitfalls/data/${VS}-sib-priv`,
+    sibOwner: `packages/appdev-pitfalls/data/${VS}-sib-owner`,
+};
+let viewOwner: { name: string; token: string };
+let viewPlain: McpAgent;
+let viewAsOwner: McpAgent;
+
+await test('Setup (view): the owner and a sibling keep private and owner-visibility learned entries', async () => {
+    viewOwner = await registerOwner(BASE, `pfview${stamp}`);
+    const sibling = await makeAgent(BASE, viewOwner, ['memory:read', 'memory:write'], `pfsib${stamp}`);
+    viewPlain = await makeAgent(BASE, viewOwner, ['memory:read'], `pfplain${stamp}`);
+    viewAsOwner = await makeAgent(BASE, viewOwner, ['memory:read', 'memory:read-as-owner'], `pfasown${stamp}`);
+    const entry = (slug: string) => ({
+        title: `View ${slug}`, symptom: `symptom of ${slug}`, resolution: `resolution of ${slug}`,
+        model: 'goose', category: 'data', slug, applies_to: ['app'], severity: 'critical', status: 'active',
+        reported_by: 'pitfall-view-e2e', created: new Date().toISOString(), updated: new Date().toISOString(),
+    });
+    const write = async (token: string, key: string, visibility: string) => {
+        const { status, body } = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ key, value: entry(key.split('/').pop()!), visibility, tags: ['knowledge-entry', 'pitfall', 'model:goose'] }),
+        });
+        // Every key here is new, so the write creates it.
+        assert(status === 201, `seed ${key}: ${status} ${JSON.stringify(body?.error)}`);
+    };
+    await write(viewOwner.token, viewKeys.ownerPriv, 'private');
+    await write(sibling.token, viewKeys.sibPriv, 'private');
+    await write(sibling.token, viewKeys.sibOwner, 'owner');
+});
+
+const indexKeys = (d: any): string[] => (d?.pitfalls ?? []).map((p: any) => p.key).filter(Boolean);
+const restIndex = async (token: string) => {
+    const r = await json('/v1/appdev/pitfalls/index?scope=own&limit=100', { headers: { Authorization: `Bearer ${token}` } });
+    assert(r.status === 200, `index ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return indexKeys(r.body.data);
+};
+const restLearned = async (token: string) => {
+    const r = await json('/v1/appdev/pitfalls/learned?limit=100', { headers: { Authorization: `Bearer ${token}` } });
+    assert(r.status === 200, `learned ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return indexKeys(r.body.data);
+};
+const mcpIndex = async (agent: McpAgent) => {
+    const s = await openAgentSession(BASE, agent.token, 'pf-view');
+    const r = await callAgentTool(s, 'aimeat_appdev_pitfall_list', { scope: 'own', limit: 100 });
+    assert(!r.isError, `aimeat_appdev_pitfall_list: ${r.text.slice(0, 300)}`);
+    return indexKeys(r.data);
+};
+
+await test('An agent without memory:read-as-owner lists no private entry of its owner or a sibling (MCP, /index, /learned)', async () => {
+    for (const [door, keys] of [['MCP list', await mcpIndex(viewPlain)], ['GET /index', await restIndex(viewPlain.token)], ['GET /learned', await restLearned(viewPlain.token)]] as const) {
+        assert(!keys.includes(viewKeys.ownerPriv) && !keys.includes(viewKeys.sibPriv), `${door} handed a plain agent a private entry: ${JSON.stringify(keys)}`);
+        // A filter, not a ban: the sibling's owner-visibility entry stays.
+        assert(keys.includes(viewKeys.sibOwner), `${door} lost the sibling's owner-visibility entry: ${JSON.stringify(keys)}`);
+    }
+});
+
+await test('An agent holding memory:read-as-owner, and the owner in person, list every entry', async () => {
+    const all = Object.values(viewKeys);
+    for (const [who, keys] of [
+        ['read-as-owner MCP', await mcpIndex(viewAsOwner)], ['read-as-owner /index', await restIndex(viewAsOwner.token)],
+        ['read-as-owner /learned', await restLearned(viewAsOwner.token)],
+        ['owner /index', await restIndex(viewOwner.token)], ['owner /learned', await restLearned(viewOwner.token)],
+    ] as const) {
+        for (const k of all) assert(keys.includes(k), `${who} lost ${k}: ${JSON.stringify(keys)}`);
+    }
 });
 
 console.log('\n' + '─'.repeat(40));

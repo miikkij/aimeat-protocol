@@ -21,6 +21,8 @@
  *   - The owner gets one line on the activity feed, the operator one incident on the Security page.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-keep-working.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-20 — INLINE_CONSTANTS names DATAPACKAGE_READ_SCOPE (storage:read), which the data
+ *     package read routes now ask a same-owner principal (secaudit 2026-10, v41).
  *   v1.1.0 — 2026-10-20 — The list test also reads the words a route refuses inline with denyScope403
  *     (S3-03's storage:read on GET /v1/pub was missed because only requireRestScope was read).
  *   v1.0.0 — 2026-10-13 — Initial.
@@ -96,7 +98,11 @@ const INLINE_NOT_KEPT: Record<string, string> = {
     // routes/connections-read-through.ts, READ_THROUGH_SCOPE: a route made on 2026-10-05 with the check in place.
     'connections:read-through': 'the read-through route asked it from its first day',
 };
-const INLINE_CONSTANTS: Record<string, string> = { READ_THROUGH_SCOPE: 'connections:read-through' };
+const INLINE_CONSTANTS: Record<string, string> = {
+    READ_THROUGH_SCOPE: 'connections:read-through',
+    // services/datapackage/audience.ts: the word a same-owner principal needs for a non-public package (ruling 2026-10-20).
+    DATAPACKAGE_READ_SCOPE: 'storage:read',
+};
 
 /**
  * Every word a route under src/routes/ refuses inline with denyScope403(req, res, [...]): a check

@@ -11,6 +11,16 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-21 -- A handle for a public file asked for with no credential lives the owner's TTL again
+ *     (3600 s), as before 2026-10-20; the version binding closes the hole, and the shorter life was
+ *     not part of it. A download URL minted before the binding is served until it expires.
+ *   2026-10-21 -- The public-file reader asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
+ *   2026-10-20 -- A download handle names the file version it was minted for (download-token.ts `ver`),
+ *     and GET /v1/download/:token answers 404 once the key holds another version, so a handle for a
+ *     public file no longer serves a private re-upload. A handle asked for with no credential takes the
+ *     foreign TTL on a node with anonymous mode off too (secaudit 2026-10, GET-v1-download:
+ *     token-not-bound-to-file-version). The request readers moved to storage-files-request.ts
+ *     (max-file-lines).
  *   2026-10-19 -- A raw-body upload whose `?key=` is not one string (repeated, so an array) gets 400
  *     "key is required" from the shared write instead of reaching it as an array (CodeQL 1755, 1756).
  *   2026-10-18 — The presigned answer carries the shared mint's `warnings` (PUBLIC_IS_SIGNED_IN_HERE, plan V1.6).
@@ -129,14 +139,16 @@
  *     public in place.
  */
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { setStoredFileHeaders, safeDownloadName } from '../utils/file-download-headers.js';
+import { setStoredFileHeaders } from '../utils/file-download-headers.js';
+import { INLINE_MAX_BYTES, isInlineableMime, extractKey, requestedFilename } from './storage-files-request.js';
 import { storageChunkedUploadRouter } from './storage-files-chunked.js';
 import { setAcceptRanges, serveStoredFile, needsBytesForType, storedFileEtag, versionedAddress, type StoredFileReader } from '../utils/http-range.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
@@ -151,7 +163,7 @@ import {
 } from '../services/storage-file-write.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai-provenance-marks.js';
-import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
+import { generateDownloadToken, verifyDownloadToken, DownloadTokenError, servesFileVersion } from '../services/download-token.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
 // Named apart from this file's own byte `readerFor` below: this one is the classification reader.
@@ -160,36 +172,6 @@ import { fileTarget } from '../services/classification/labels.js';
 import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
-
-/** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
-const INLINE_MAX_BYTES = 32 * 1024;
-/** F11: mime types small enough / textual enough to be safe to inline. */
-function isInlineableMime(mime: string): boolean {
-    return mime.startsWith('text/') || /(json|xml|csv|javascript|yaml|markdown|x-www-form-urlencoded)/i.test(mime);
-}
-
-/**
- * Extract storage key from Express 5 wildcard {*key} param.
- * path-to-regexp v8 returns an array of path segments and auto-decodes %xx.
- * Handles both encoded slashes (%2F → single element) and raw slashes (multiple elements).
- */
-function extractKey(params: Record<string, string | string[]>): string {
-    const k = params.key;
-    return Array.isArray(k) ? k.join('/') : k;
-}
-
-/**
- * `?filename=` on a handle request: the name the file should be SAVED as, from whoever knows it.
- *
- * A key is an address, and for a direct-message attachment its last segment is an id — so a person
- * pressing download got a file called `23ea6d2c`. The inbox knows the name the sender gave it, and
- * this is how it says so. Reduced to something that can only be a filename before it goes anywhere
- * near a header, and the caller only ever names their own download.
- */
-function requestedFilename(req: Request): string | undefined {
-    const raw = Array.isArray(req.query.filename) ? req.query.filename[0] : req.query.filename;
-    return safeDownloadName(typeof raw === 'string' ? raw : undefined) || undefined;
-}
 
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -236,8 +218,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         const file = await storage.getStorageFileMeta(verified.sub, verified.key);
-        if (!file) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'File not found'));
+        // The token authorizes ONE version of the file: the one stored when it was minted. A file
+        // written again under the key since then (another visibility, other bytes) is not what the
+        // holder was allowed to read, so it answers as absent, the same answer as a deleted file.
+        if (!file || !servesFileVersion(verified, file)) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                'File not found, or it was replaced after this download URL was made. Ask for a new download URL.'));
             return;
         }
 
@@ -502,7 +488,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const sendHandle = async (accessorGaii: string, prov: ServedProvenance | undefined): Promise<void> => {
             const ttl = accessorGaii === gaii ? OWN_HANDLE_TTL_SECONDS : FOREIGN_HANDLE_TTL_SECONDS;
             const token = await generateDownloadToken(
-                { sub: gaii, key, mimeType: file.mimeType, size: file.size, filename: requestedFilename(req) }, ttl,
+                { sub: gaii, key, mimeType: file.mimeType, size: file.size, version: file.createdAt, filename: requestedFilename(req) }, ttl,
             );
             res.json(success(config.nodeId, {
                 ref: `${gaii}/${key}`, owner_gaii: gaii, key, mode: 'handle',
@@ -531,6 +517,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             }
             const viewer = req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : 'anonymous';
             const prov = await markProvenance(res, file, viewer === gaii);
+            // A caller with no credential gets the handle the owner's GAII would: it lives the owner's
+            // hour, as it always has. The handle names the file version it was minted for, so a later
+            // private re-upload under the key is not served through it whatever its TTL.
             if (handleMode) { await sendHandle(req.auth?.sub ? viewer : gaii, prov); return; }
             // A public file is world-readable by definition, and for a long time only by <img>: a
             // script that fetched the same bytes got no Access-Control-Allow-Origin and was blocked.
@@ -595,7 +584,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // An anonymous caller holding a matching grant can still be allowed (parity with the prior
         // behavior). The <img>-loadable path for a NON-public file is: the reader's app blob-fetches
         // /v1/pub with the reader's Bearer, and this decision gates it.
-        const isAnonymous = !req.auth?.sub || req.auth.anonymous === true;
+        const isAnonymous = !req.auth?.sub || isAnonymousPrincipal(req.auth);
         // Resolve to the GHII/GAII — an OWNER session carries a BARE `sub`, but consent grants and the
         // workspace manifest gate are keyed under the resolved identity (owner@node). Passing the bare
         // name would miss the grant. This mirrors what the workspace route (canReadWorkspace) resolves.
@@ -754,7 +743,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 return;
             }
             const token = await generateDownloadToken({
-                sub: file.ownerGaii, key, mimeType: file.mimeType, size: file.size,
+                sub: file.ownerGaii, key, mimeType: file.mimeType, size: file.size, version: file.createdAt,
                 filename: requestedFilename(req),
             });
             res.json(success(config.nodeId, {

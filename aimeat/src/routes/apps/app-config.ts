@@ -12,6 +12,8 @@
  * @structure registerAppConfigRoutes(router, config, storage)
  *   GET /v1/apps/:owner/:filename/config · PUT /v1/apps/:owner/:filename/config
  * @version-history
+ *   2026-10-21 — The owner test asks isAnonymousPrincipal, so the minted anonymous token is nobody's
+ *     owner here (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.2.1 — 2026-10-05 — The owner test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.2.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
  *   v1.1.0 — 2026-10-05 — The read applies the app's own gates: an operator-hidden app is not found,
@@ -24,6 +26,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { resolveIdentity, ownerGhiiOf, localAccountName } from '../../utils/gaii.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { getAppConfig, setAppConfig } from '../../services/app-config.js';
@@ -34,7 +37,7 @@ export function registerAppConfigRoutes(router: Router, config: AimeatConfig, st
         const ownerName = localAccountName(req.params.owner as string);
         // The app's own gates (secaudit 2026-10, APP-6): the owner, an agent of theirs and an operator
         // pass them; anyone else brings the access code or the unlock token, as for the app itself.
-        const auth = req.auth && req.auth.anonymous !== true ? req.auth : null;
+        const auth = req.auth && !isAnonymousPrincipal(req.auth) ? req.auth : null;
         const ownerOrOperator = !!auth && (isSameAccount(ownerGhiiOf(resolveIdentity(auth, config.nodeId)), ownerName)
             || await isOperatorCaller(storage, auth));
         const header = (name: string) => (typeof req.headers[name] === 'string' ? req.headers[name] as string : undefined);

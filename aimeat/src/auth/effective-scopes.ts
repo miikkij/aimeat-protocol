@@ -12,6 +12,10 @@
  *   callAuthority(auth) → both, for the remote MCP chokepoint
  * @usage req.auth = await withCurrentScopes(storage, verified);
  * @version-history
+ *   v1.5.0 -- 2026-10-20 -- withCurrentScopes narrows a visitor from another node too: its token's
+ *     scopes intersected with what its home peer may grant now (./visitor-peer.ts visitorPeerScopes),
+ *     so narrowing a peer's federation_auth_scopes reaches live visitor sessions at once and never
+ *     widens one (secaudit 2026-10, federated-visitor-not-bound-to-live-peer).
  *   v1.4.1 -- 2026-10-05 -- isOwnerInPerson moves to utils/gaii.ts and is re-exported here (secaudit 2026-10, C4).
  *   v1.4.0 -- 2026-09-24 -- isOwnerInPerson and callAuthority: a door tells the remote MCP chokepoint
  *     whether the caller is the owner in person, so an app grant, which resolves to its owner's
@@ -34,6 +38,7 @@ import type { VerifiedToken } from './jwt.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 import { isForeignPrincipal, isOwnerInPerson } from '../utils/gaii.js';
+import { visitorPeerScopes } from './visitor-peer.js';
 
 /**
  * The permissions a principal holding `token` has, given that its record currently allows `record`.
@@ -87,6 +92,18 @@ export function intersectScopes(token: readonly string[], record: readonly strin
  */
 export async function withCurrentScopes(storage: Storage | null, v: VerifiedToken): Promise<VerifiedToken> {
   v = await withCurrentOperatorRole(storage, v);
+  // A visitor from another node: its token's list INTERSECTED with what its home peer may grant a
+  // visitor now (./visitor-peer.ts, in memory), so an operator who narrows the peer's
+  // federation_auth_scopes narrows every live visitor session at once, and a wider list widens none.
+  const peerScopes = visitorPeerScopes(v);
+  if (peerScopes) {
+    const narrowed = intersectScopes(v.scopes, peerScopes);
+    if (narrowed.length === v.scopes.length && narrowed.every((s, i) => s === v.scopes[i])) return v;
+    logger.info('effective-scopes: a visitor narrowed to its home peer\'s current scopes', {
+      sub: v.sub, homeNode: v.homeNode, token: v.scopes.join(','), peer: peerScopes.join(','), effective: narrowed.join(','),
+    });
+    return { ...v, scopes: narrowed };
+  }
   // Agents only. An owner session bypasses scopes entirely; a GEAI and an app grant have their
   // permission lists somewhere other than an agent record, so this must not touch them.
   if (!storage || v.anonymous || !v.roles.includes('agent')) return v;

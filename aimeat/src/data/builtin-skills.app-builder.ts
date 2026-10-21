@@ -24,7 +24,9 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
- *   v1.10.0 — 2026-10-11 — Do / Don't: the node tells the screen when its data changed, and a timer
+ *   v1.10.1 — 2026-10-21 — A key is stored "for host X": the app tells the person the name and the
+ *     host, and the extension declares both in `uses_secrets` (secaudit 2026-10, v58 and v59 follow-up).
+ *   v1.10.0 — 2026-10-11 —Do / Don't: the node tells the screen when its data changed, and a timer
  *     is kept for data that has no event (build-events-first.ts says what happened without it).
  *   v1.9.0 — 2026-10-10 — The finish has a fifth step, the data map, and names when an app is
  *     finished: the four things next_steps shows present (face, bound skill, data map, design spec).
@@ -323,10 +325,13 @@ extension — just auth + data + UI libs.
 **A key for that API is named, never held.** The app never asks for, stores or sends one; the
 extension writes it into the outbound header as \`{{secret:NAME}}\`, and the node fills it from
 the signed-in person's own vault on the way out (a missing name fails as \`SECRET_UNKNOWN\`,
-naming it, with nothing sent). What the app owes the person is the NAME and where it goes: their
-Access page, section 04 Secrets, or their own AI (\`aimeat_secret_set { name, value }\`, behind
-the \`secrets:manage\` scope the owner ticks per agent; \`aimeat_secret_list\` shows names and
-who used them, never a value). Show a missing key by its name in the UI; never draw a field for it.
+naming it, with nothing sent). What the app owes the person is the NAME and the HOST it goes to:
+"store NAME for host api.example.com" on their Access page, Secrets section, or through their own
+AI (\`aimeat_secret_set { name, value, host }\`, behind the \`secrets:manage\` scope the owner ticks
+per agent; \`aimeat_secret_list\` shows names, addresses and who used them, never a value). The
+extension declares the same name and host in its manifest's \`uses_secrets\`, so its first use binds
+by itself; a first use the node refuses names a page where the owner allows it with one press.
+Show a missing key by its name in the UI; never draw a field for it.
 
 ## Dates, times and numbers: never from the language
 

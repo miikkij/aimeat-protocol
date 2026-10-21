@@ -15,6 +15,12 @@
  *   itself. The last part checks return_url on aimeat_organism_invite_email.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-agent-access
  * @version-history
+ *   2026-10-21 — A record of an organism that no longer exists stays in an agent's owner-scope reads
+ *     (REST list, aimeat_memory_list, aimeat_memory_read), as before v57; the barred agent still gets
+ *     nothing of the live organism.
+ *   2026-10-20 — An unlisted agent reads no organism record through GET /v1/memory?owner_scope=true
+ *     (values and meta), aimeat_memory_read and aimeat_memory_list with owner_scope; a listed agent and
+ *     the owner in person still do (secaudit 2026-10, v57).
  *   2026-10-15 — A plain member, signed in, is refused listing their own agent: only the organism's
  *     owner or an admin adds to the list (feature-list audit #58).
  *   v1.1.0 — 2026-09-30 — aimeat_workspace_comment_delete: a listed agent deletes its own comment and,
@@ -44,6 +50,8 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 async function sign(privB64: string, message: string): Promise<string> {
     return Buffer.from(await ed.signAsync(new TextEncoder().encode(message), Buffer.from(privB64, 'base64'))).toString('base64');
@@ -245,6 +253,31 @@ async function run() {
         assert(!list.isError && !list.text.includes(orgId), 'the organism is still in an unlisted agent\'s organism list');
     });
 
+    // Secaudit 2026-10, v57: the key route refused an unlisted agent, and the owner-scope list and
+    // read paths returned the same organism record, its value included.
+    const probeKey = `organism.${orgId}.shared.v57probe`;
+    await test('an unlisted agent reads no organism record through the owner-scope list and read paths', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: bearer(A.ownerToken),
+            body: JSON.stringify({ key: probeKey, value: { text: 'v57 organism record' }, visibility: 'members' }),
+        });
+        assert(w.status === 201, `the owner's organism record ${w.status}: ${JSON.stringify(w.body?.error)}`);
+        const keyRoute = await json(`/v1/memory/${encodeURIComponent(probeKey)}?owner_scope=true`, { headers: bearer(a2.token) });
+        assert(keyRoute.status === 403, `control: the key route answered an unlisted agent ${keyRoute.status}`);
+        const prefix = encodeURIComponent(`organism.${orgId}.`);
+        const list = await json(`/v1/memory?owner_scope=true&prefix=${prefix}`, { headers: bearer(a2.token) });
+        assert(list.status === 200 && !JSON.stringify(list.body.data.items).includes('v57probe'), `GET /v1/memory?owner_scope=true listed it: ${JSON.stringify(list.body.data?.items).slice(0, 300)}`);
+        const meta = await json(`/v1/memory?owner_scope=true&include=meta&prefix=${prefix}`, { headers: bearer(a2.token) });
+        assert(meta.status === 200 && !JSON.stringify(meta.body.data.items).includes('v57probe'), `the meta listing named it: ${JSON.stringify(meta.body.data?.items).slice(0, 300)}`);
+        const read = await callTool(A, 'aimeat_memory_read', { key: probeKey, owner_scope: true });
+        assert(read.isError && !read.text.includes('v57 organism record'), `aimeat_memory_read answered: ${read.text.slice(0, 300)}`);
+        const mlist = await callTool(A, 'aimeat_memory_list', { prefix: `organism.${orgId}.`, owner_scope: true });
+        assert(!mlist.isError && !mlist.text.includes('v57probe'), `aimeat_memory_list named it: ${mlist.text.slice(0, 300)}`);
+        // The owner in person still lists it (positive control).
+        const mine = await json(`/v1/memory?prefix=${prefix}`, { headers: bearer(A.ownerToken) });
+        assert(mine.status === 200 && JSON.stringify(mine.body.data.items).includes('v57probe'), `the owner lost their own record: ${mine.status}`);
+    });
+
     await test('a consent to the organism does not reach an unlisted agent', async () => {
         const s = await readShared(a2.token);
         assert(s.status !== 200, `an unlisted agent read a record shared with the organism: ${s.status}`);
@@ -266,6 +299,47 @@ async function run() {
         assert(!ov.isError, `the listed agent was refused: ${ov.text.slice(0, 300)}`);
         const w = await callTool(A, 'aimeat_memory_write', { key: `organism.${orgId}.w.${wsId}.doc.listed`, value: { title: 'by a listed agent' } });
         assert(!w.isError, `a listed agent of the workspace creator could not write its workspace: ${w.text.slice(0, 300)}`);
+    });
+
+    await test('a listed agent reads the organism record through the owner-scope paths (v57 positive control)', async () => {
+        const read = await callTool(A, 'aimeat_memory_read', { key: probeKey, owner_scope: true });
+        assert(!read.isError && read.text.includes('v57 organism record'), `the listed agent could not read it: ${read.text.slice(0, 300)}`);
+        const mlist = await callTool(A, 'aimeat_memory_list', { prefix: `organism.${orgId}.`, owner_scope: true });
+        assert(!mlist.isError && mlist.text.includes('v57probe'), `aimeat_memory_list left it out: ${mlist.text.slice(0, 300)}`);
+        const list = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(`organism.${orgId}.`)}`, { headers: bearer(A.agent.token) });
+        assert(list.status === 200 && JSON.stringify(list.body.data.items).includes('v57 organism record'), `GET /v1/memory?owner_scope=true left it out: ${list.status}`);
+    });
+
+    await test('a record of an organism that no longer exists stays in an agent\'s owner-scope reads, as before v57', async () => {
+        // No route writes under an organism that does not exist, and deleting one removes its keys, so
+        // the row is written behind the server's back: a record left from an organism gone earlier.
+        const provider = (process.env.AIMEAT_DB ?? '') as StorageProvider;
+        const dbUrl = serverDbUrl();
+        const sqlitePath = pinnedSqlitePath();
+        assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+        const storage = await createStorage({ provider, sqlitePath, dbUrl });
+        const goneKey = `organism.gone${Date.now().toString(36)}.shared.leftover`;
+        const now = new Date().toISOString();
+        await storage.setMemory({
+            key: goneKey, ownerGaii: `${A.owner}@${NODE_ID}`, value: { text: 'left from a deleted organism' },
+            visibility: 'members', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        });
+        try {
+            const prefix = goneKey.slice(0, goneKey.indexOf('.shared.') + 1);
+            // a2 is barred from the live organism; the gone one has no rule to bar it with.
+            const list = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(prefix)}`, { headers: bearer(a2.token) });
+            assert(list.status === 200 && JSON.stringify(list.body.data.items).includes('left from a deleted organism'),
+                `GET /v1/memory?owner_scope=true left it out: ${list.status} ${JSON.stringify(list.body.data?.items ?? list.body.error).slice(0, 300)}`);
+            const mlist = await callTool(A, 'aimeat_memory_list', { prefix, owner_scope: true });
+            assert(!mlist.isError && mlist.text.includes('leftover'), `aimeat_memory_list left it out: ${mlist.text.slice(0, 300)}`);
+            const read = await callTool(A, 'aimeat_memory_read', { key: goneKey, owner_scope: true });
+            assert(!read.isError && read.text.includes('left from a deleted organism'), `aimeat_memory_read refused it: ${read.text.slice(0, 300)}`);
+            // The hole stays closed: the same agent still gets nothing of the live organism that bars it.
+            const live = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(`organism.${orgId}.`)}`, { headers: bearer(a2.token) });
+            assert(live.status === 200 && !JSON.stringify(live.body.data.items).includes('v57probe'), `the barred agent listed the live organism's record: ${JSON.stringify(live.body.data?.items).slice(0, 300)}`);
+        } finally {
+            await storage.deleteMemory(`${A.owner}@${NODE_ID}`, goneKey, `${A.owner}@${NODE_ID}`);
+        }
     });
 
     await test('aimeat_workspace_comment_delete: an agent takes back its own comment, and an admin\'s agent removes the admin\'s', async () => {

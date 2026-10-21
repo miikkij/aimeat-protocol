@@ -11,6 +11,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-21 -- diagnose-a-workflow, steps 3 and 6, and set-up-content-pipeline: an `extension` fire
+ *     needs `ext:invoke` and an `agent_task` fire `task:write` of the maker, and a run in flight ends
+ *     `refused` with `refusal.stoppedBefore` when the principal it answers to is gone or narrowed
+ *     (secaudit 2026-10, services/schedule-actor.ts, services/workflow/dispatch-authority.ts).
  *   2026-10-20 -- diagnose-a-workflow, step 3: a fire can fail for the maker rather than the work.
  *     The maker is gone, it lost the permission its kind needs (`ai:use`, `work:request`), or the
  *     file a publishing schedule names is one the maker may no longer read (secaudit 2026-10,
@@ -460,7 +464,9 @@ A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIG
   capability with \`aimeat_ai_capabilities\` before saving, because one that is off stops the step.
 - The schedule runs on the saver's permissions. The agent that saves the workflow must keep every
   permission its steps need; if the owner later takes one away, the scheduled run is refused and
-  the owner is asked, once. Chaining agents is giving them work, so a step that dispatches to an
+  the owner is asked, once. A run already going is asked too: the node checks the agent or app the
+  run answers to before every step, and a run whose agent was removed or lost a step's permission
+  ends \`refused\` before that step (\`refusal.stoppedBefore\` names it). Chaining agents is giving them work, so a step that dispatches to an
   agent costs \`work:request\`: ask the owner for it before saving, or the save answers SCOPE_DENIED.
 - An extension step reads the run's vars, and nothing else, unless it names what it takes:
   \`input_from: { proposal: "x.{ref}.proposal", decision: "x.{ref}.decision" }\` hands it an
@@ -606,8 +612,9 @@ metadata:
    **A schedule acts as whoever made it**, asked again at every fire, so a run can fail for the
    maker rather than for the work. The message says which: the agent or app that made it is gone
    ("no longer connected", "no longer holds your permission"), it no longer holds the permission the
-   kind needs (\`ai:use\` for an \`ai\` schedule, \`work:request\` for one that calls a connected
-   outside app), or the file a publishing schedule names is one its maker may no longer read. Each
+   kind needs (\`ai:use\` for an \`ai\` schedule, \`ext:invoke\` for an \`extension\` one, \`task:write\`
+   for an \`agent_task\` one, which then puts no task in the queue, \`work:request\` for one that calls
+   a connected outside app), or the file a publishing schedule names is one its maker may no longer read. Each
    of these is logged as an error with that sentence, and nothing ran. The fix is the maker's
    permission or a schedule made again by someone who has it, never the cron. A schedule an app made
    before 2026-10-05 carries no grant, so the node cannot tell which app made it and says so.
@@ -637,6 +644,11 @@ metadata:
    (\`savedBy\`) is disconnected or lost a permission its steps need, and \`refusal.missing\` names
    it. The owner either runs it once as themselves from the notification, approves the
    permission again, or saves the workflow in person so the trigger runs on their authority.
+   A run that had already started can end \`refused\` too. A run answers to the agent or app that
+   started it (for a trigger's run, the saver), and the node asks that principal again before it
+   starts each step. When it is gone, or no longer holds a permission that step needs, the step is
+   not started, the steps not yet finished are skipped, and \`refusal.stoppedBefore\` names the step
+   that did not start. The owner is told once and has the same three ways on.
 7. **An ai step that failed on its provider:** the error names the refusal. 400
    \`AI_CAPABILITY_UNAVAILABLE\` lists each provider with the reason it was left out (\`untested\`,
    \`failing\`, \`no-key\`, \`no-model\`, \`capability-off\`, \`leaves-machine\`, and \`too-costly\` when the

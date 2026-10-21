@@ -9,6 +9,9 @@
  * @structure appdevOverviewRouter(config, storage) → Router
  * @usage app.use(appdevOverviewRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-10-20 — SECURITY: GET /v1/appdev/overview hands the overview the caller's view (principal and
+ *     readsAsOwner), so an agent without memory:read-as-owner no longer reads its owner's or its
+ *     siblings' private learned pitfalls and template records there (secaudit 2026-10, v56 shape).
  *   v1.4.1 — 2026-10-06 — POST /v1/appdev/templates is rate-limited (30 a minute) and answers a memory
  *     ceiling with 413 QUOTA_EXCEEDED (secaudit 2026-10 last items, F3).
  *   v1.4.0 — 2026-10-06 — POST /v1/appdev/templates proposes (upserts) a template through
@@ -34,6 +37,8 @@ import { rateLimit } from '../middleware/rate-limit.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev-overview.js';
 import { readerFor } from '../services/classification/reader.js';
+import { callerOf } from '../middleware/caller.js';
+import { readsAsOwner } from '../services/owner-scope-read.js';
 import { logger } from '../utils/logger.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal, proposeTemplate,
@@ -54,7 +59,11 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     const sections = typeof req.query.sections === 'string'
       ? req.query.sections.split(',').map(s => s.trim()).filter(Boolean)
       : undefined;
-    const overview = await buildAppdevOverview(storage, config, reader, { model, sections });
+    // The owner-scope sections read as this caller may: everything for the owner in person, an app
+    // grant or an agent holding memory:read-as-owner, the visible part for any other (secaudit 2026-10).
+    const caller = callerOf(req, config.nodeId, storage);
+    const view = { principal: caller.principal, readsAll: readsAsOwner(caller) };
+    const overview = await buildAppdevOverview(storage, config, reader, { model, sections, view });
     res.json(success(config.nodeId, overview, [
       { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
       { description: 'Library pack detail', method: 'GET', url: '/v1/library-packs/{id}' },

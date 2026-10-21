@@ -23,6 +23,7 @@
  * @structure registerOpenItemsPrompt(router, config, storage)
  * @usage registerOpenItemsPrompt(router, config, storage);
  * @version-history
+ *   2026-10-21 — The display name asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.0 — 2026-08-09 — Extracted from routes/prompts.ts on the 800-line limit.
  *   v1.1.0 — 2026-08-09 — ai-instructions: a route to buildInstructionBlocks(), which had been
  *     reachable from an organism's workspace read alone.
@@ -30,6 +31,7 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { success } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { optionalAuth } from '../auth/middleware.js';
 import { buildOpenItemsPrompt, OPEN_ITEMS_SKILL } from '../services/open-items-prompt.js';
@@ -81,7 +83,7 @@ export function registerOpenItemsPrompt(
     // Fold in the person's own name when we know it, so the page is about someone. Anonymous
     // callers get the same prompt with the model told to ask for the name instead.
     let displayName = '';
-    if (req.auth && !req.auth.anonymous && req.auth.owner) {
+    if (req.auth && !isAnonymousPrincipal(req.auth) && req.auth.owner) {
       const ghii = await storage.getGHIIByOwner(req.auth.owner);
       displayName = ghii?.displayName ?? req.auth.owner;
     }

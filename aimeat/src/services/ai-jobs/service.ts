@@ -22,6 +22,23 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.14.0 — 2026-10-21 — Every use that worked before keeps working (the developer's rule for the
+ *     round): the answer's write starts no trigger or recipe (`noTriggers`), as before; what the
+ *     write would refuse and the start can know (organism key, archived record, a schema lock that
+ *     cannot take the op's answer, key ceiling, byte quota) is refused at the start, before any cost
+ *     (result-precheck.ts); the on_done refusal tells an app's author what to declare
+ *     (starter.ts onDoneScopeRefusal), and published apps that bind on_done keep ext:invoke
+ *     (services/app-on-done-keep-migration.ts).
+ *   v1.13.0 — 2026-10-20 — The answer is written through the shared memory write
+ *     (services/memory-write.ts writeMemoryRecord) as the job's starter (starter.ts jobWriter), with
+ *     gatePublic: a raise to public by a caller the node asks the owner about stays private and files
+ *     a publish request, the closed-node level and the label audience cap apply, and an `organism.*`
+ *     result key is held to the organism namespace rule, which the start also asks before anything
+ *     is written. The job records the version and the visibility actually stored. It was a raw
+ *     storage write at the caller's chosen visibility (secaudit 2026-10,
+ *     writeResult:raw-write-caller-chosen-visibility; the organism case is record v66). `on_done`
+ *     from a starter that is not the owner in person needs ext:invoke, refused 403 SCOPE_DENIED at
+ *     the start; ctx.ai.start keeps working (secaudit 2026-10, assertCallbackAllowed:on-done-asks-no-ext-invoke).
  *   v1.12.0 — 2026-10-20 — `getJob`, `listJobs` and `cancelJob` take a `viewer` (types.ts AiJobViewer):
  *     a caller that does not read as the owner sees and stops only the jobs it started. The MCP tools
  *     look the OWNER's namespace up, so without it an agent holding ai:use read its owner's and its
@@ -69,7 +86,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, MemoryRecord } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../email.js';
 import { CAS_ATTEMPTS } from '../record-cas.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
@@ -78,7 +95,9 @@ import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
-import { jobReader } from './starter.js';
+import { jobReader, jobWriter, starterMayInvokeExtensions, onDoneScopeRefusal } from './starter.js';
+import { writeMemoryRecord } from '../memory-write.js';
+import { resultWriteRefusal } from './result-precheck.js';
 import { warningsNote } from '../classification/reader.js';
 import { presentMemory } from '../classification/present-memory.js';
 import { fireOnDone } from './on-done.js';
@@ -154,10 +173,30 @@ export class AiJobService implements AiJobStarter {
                 `This chain has called itself ${chainDepth} times and was stopped; the limit on this node is ${this.config.aiJobMaxChain}.`);
         }
 
-        // The FIRST of the two owner checks on a callback. The second is at fire time, in
-        // on-done.ts, because `installedBy` is decided at install and a delete-and-reinstall by
-        // another owner outlives this one.
-        if (input.on_done) await this.assertCallbackAllowed(ownerGhii, input.on_done.extension, input.on_done.action);
+        // Where the answer lands, asked as the shared memory write will ask it when the answer is
+        // written (services/memory-write.ts): an `organism.*` key the starter may not write, an
+        // archived record, a schema lock that cannot take this op's answer, the key ceiling and the
+        // byte quota are refused here, before any money is spent, rather than failing the job after
+        // the model call (result-precheck.ts).
+        const resultRefusal = await resultWriteRefusal({ storage: this.storage, config: this.config }, {
+            ownerGhii, key: input.result_key, op, ...(input.json ? { json: true } : {}),
+            ...(ctx.startedBy ? { startedBy: ctx.startedBy } : {}),
+        });
+        if (resultRefusal) throw new AiJobError(resultRefusal.code, resultRefusal.status, resultRefusal.message);
+
+        if (input.on_done) {
+            // Who may bind a callback at all. The action runs unattended in the owner's name, which
+            // costs ext:invoke on every other code path (POST /v1/ext/:ext/:action, a workflow
+            // extension step), so ai:use alone does not buy it. The owner in person and ctx.ai.start
+            // in an extension (no starter recorded) pass.
+            if (!starterMayInvokeExtensions(ctx.startedBy)) {
+                throw new AiJobError('SCOPE_DENIED', 403, onDoneScopeRefusal(ctx.startedBy));
+            }
+            // The FIRST of the two owner checks on a callback. The second is at fire time, in
+            // on-done.ts, because `installedBy` is decided at install and a delete-and-reinstall by
+            // another owner outlives this one.
+            await this.assertCallbackAllowed(ownerGhii, input.on_done.extension, input.on_done.action);
+        }
 
         const queuedForOwner = this.countQueued(ownerGhii);
         if (queuedForOwner >= this.config.aiJobMaxQueuedPerOwner) {
@@ -412,8 +451,9 @@ export class AiJobService implements AiJobStarter {
             const written = await this.writeResult(entry.job, outcome.value, outcome.parseJson, spend.provenance_id);
             // Before the callback, so readResult already hands the answer to the on_done action.
             // Stored too, not only kept in this process: a restart during on_done folds the stored
-            // record into the log, and ctx.ai.result reads the answer from there.
-            entry.job = { ...entry.job, result_version: written.version };
+            // record into the log, and ctx.ai.result reads the answer from there. The visibility is
+            // the one STORED, so a raise to public that waits for the owner reads as what it is.
+            entry.job = { ...entry.job, result_version: written.version, result_visibility: written.visibility };
             await writeJob(this.storage, entry.job);
 
             // The callback, and the reason a green job can still be a failure. See on-done.ts.
@@ -458,10 +498,10 @@ export class AiJobService implements AiJobStarter {
 
     /** Land the answer where the caller said it should go. `parseJson` is set for a text answer
      *  the job asked JSON of; an image record and a transcription arrive in their final shape.
-     *  Answers with the value stored and the version it was stored at. */
+     *  Answers with the value stored, the version it was stored at and the visibility it got. */
     private async writeResult(
         job: AiJobRecord, answer: unknown, parseJson: boolean, provenanceId?: string,
-    ): Promise<{ value: unknown; version: number }> {
+    ): Promise<{ value: unknown; version: number; visibility: AiJobRecord['result_visibility'] }> {
         let value: unknown = answer;
         if (parseJson) {
             // Parsed HERE when the job asked for JSON, so a malformed answer fails at the job rather
@@ -472,36 +512,42 @@ export class AiJobService implements AiJobStarter {
             value = JSON.parse(m[0]);
         }
 
+        // THROUGH THE SHARED MEMORY WRITE, as the job's starter (starter.ts jobWriter). A raw storage
+        // write here stored the answer at whatever visibility the caller asked: an agent without
+        // publish:public made its answer public with no request to the owner, past the closed-node
+        // level and the label audience cap, and wrote an `organism.*` key the organism namespace
+        // rule refuses it on POST /v1/memory (secaudit 2026-10). `gatePublic` asks the publish gate,
+        // which keeps the record at the level it had and files the request; the job records what
+        // was stored. `ai:use` is the word this write answers to, the one the start already asked.
+        //
         // Written on the version read, so the version the job records (result_version) is the one
         // its answer holds: a concurrent writer makes this read again instead of being overwritten
         // under a version number that then names two different values.
+        const writer = jobWriter(job);
         for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
             const existing = await this.storage.getMemory(job.owner, job.result_key);
-            const now = new Date().toISOString();
-            const version = existing ? existing.version + 1 : 1;
-            const record: MemoryRecord = {
+            const written = await writeMemoryRecord({ storage: this.storage, config: this.config }, writer, {
                 key: job.result_key,
-                ownerGaii: job.owner,
                 value,
-                // TARGET-058: the completion already minted an observed record — the node watched the
-                // model produce these exact bytes — so it is CARRIED here rather than re-derived. Nobody
-                // read the substance on this path, so `humanInvolvement: 'none'` stands untouched.
-                ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
                 visibility: job.result_visibility,
                 tags: ['ai', 'ai-job-result'],
                 ttlHours: null,
-                version,
-                createdAt: existing?.createdAt ?? now,
-                updatedAt: now,
-            };
-            const written = existing
-                ? (this.storage.setMemoryIfVersion
-                    ? await this.storage.setMemoryIfVersion(record, existing.version)
-                    : await this.storage.setMemory(record))
-                : (this.storage.createMemoryIfAbsent
-                    ? await this.storage.createMemoryIfAbsent(record)
-                    : await this.storage.setMemory(record));
-            if (written) return { value, version };
+                expectedVersion: existing?.version ?? 0,
+                authorisingScope: 'ai:use',
+                gatePublic: true,
+                // As before the answer came through here: it starts no workflow trigger, Tracked
+                // Response, connector push, ecosystem push or automation recipe. A chain of work
+                // after a job is what on_done is for.
+                noTriggers: true,
+                pipeline: `ai-job:${job.id}`,
+                // TARGET-058: the completion already minted an observed record — the node watched the
+                // model produce these exact bytes — so it is CARRIED here rather than re-derived. Nobody
+                // read the substance on this path, so `humanInvolvement: 'none'` stands untouched.
+                ...(provenanceId ? { declaredProvenanceId: provenanceId } : {}),
+            });
+            if (written.ok) return { value, version: written.record.version, visibility: written.record.visibility };
+            if (written.code === 'VERSION_CONFLICT') continue;
+            throw new AiJobError(written.code, written.status, written.message);
         }
         throw new Error(`The record at "${job.result_key}" changed under every one of ${CAS_ATTEMPTS} attempts to write the answer.`);
     }

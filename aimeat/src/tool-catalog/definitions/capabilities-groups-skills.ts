@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-20 — aimeat_knowledge_list, aimeat_knowledge_get and aimeat_knowledge_links declare memory:read, as aimeat_memory_read does (secaudit 2026-10, v56).
  *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, lowering only (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take visibility `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9).
@@ -456,6 +457,9 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Knowledge Packages', readOnlyHint: true },
+        // Package manifests and entries are memory records: read with the word aimeat_memory_read asks
+        // (secaudit 2026-10, v56). The resource aimeat://knowledge/{id} takes aimeat_knowledge_get's.
+        scope: 'memory:read',
         surfaces: ['agent', 'service'],
         input: {},
     },
@@ -465,6 +469,7 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Read Knowledge Package', readOnlyHint: true },
+        scope: 'memory:read',
         surfaces: ['agent', 'service'],
         input: { package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' } },
     },
@@ -492,6 +497,7 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Knowledge Links', readOnlyHint: true },
+        scope: 'memory:read',
         surfaces: ['agent', 'service'],
         input: {
             package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },

@@ -31,6 +31,11 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-21 — Section 5 says which older app-made schedules keep running as before (the unknown-app
+ *     maker counts as the owner; kept app extension schedules fire and run now).
+ *   2026-10-21 — Section 5: the `extension` kind needs `ext:invoke` on create, edit and run, and the
+ *     `extension` and `agent_task` fires ask the maker again, as the `ai` fire does (secaudit 2026-10,
+ *     services/schedule-gate.ts, services/schedule-actor.ts scheduleFireRefusal).
  *   2026-10-20 — Section 5: an `ai` schedule's `output_visibility` over REST is checked when it is
  *     saved, and a fire refuses when the maker is gone or lost the word its kind needs (secaudit
  *     2026-10, services/schedule-write.ts, services/scheduler-ai-job.ts, services/schedule-actor.ts).
@@ -216,7 +221,7 @@ sees every schedule and can pause or delete any of them.
 |---|---|---|
 | \`ai\` | \`prompt\`, \`input_keys\` (the owner's memory keys given to the model), \`output_key\` (where the result is written, private) | \`ai:use\` |
 | \`agent_task\` | \`target_agent\` (an agent of the same owner; yourself when left out), \`task_title\`, \`task_description\` | \`task:write\` |
-| \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | |
+| \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | \`ext:invoke\` |
 | \`refinery\` | \`input: { prefix }\` | \`connections:read-through\`, \`ai:use\`, \`organism:rows\`, \`memory:write\` |
 
 It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you made (\`detail: true\` adds
@@ -262,11 +267,16 @@ nobody should have to approve every morning.
 - The owner can cap a schedule: \`max_runs\` turns it off after that many runs, and \`daily_limit\`
   caps the day's AI spend in US dollars.
 - The maker is gone, or lost the permission the kind needs. A schedule acts as whoever made it, and
-  the node asks again at each fire. An \`ai\` schedule whose maker no longer holds \`ai:use\`, and one
-  that calls a connected outside app whose maker no longer holds \`work:request\`, do not run: the
-  fire is logged as an error saying to approve the maker again or delete the schedule. The same
+  the node asks again at each fire. An \`ai\` schedule whose maker no longer holds \`ai:use\`, an
+  \`extension\` one whose maker no longer holds \`ext:invoke\`, an \`agent_task\` one whose maker no
+  longer holds \`task:write\`, and one that calls a connected outside app whose maker no longer holds
+  \`work:request\`, do not run: the fire is logged as an error saying to approve the maker again or
+  delete the schedule. An \`agent_task\` fire refused this way puts no task in the queue. The same
   happens when the agent or app that made it was deleted. Five failed runs in a row pause the
-  schedule and the owner is told, so the fix is the maker's permission, not the cron.
+  schedule and the owner is told, so the fix is the maker's permission, not the cron. Two kinds of
+  older schedule keep running as before: one an app made before 2026-10-05, which counts as the
+  owner's, and an \`extension\` one an app made without \`ext:invoke\` before the node's 2026-10 security update, which still
+  fires and can be run now; changing it needs the word.
 
 ## The rule underneath all of this
 

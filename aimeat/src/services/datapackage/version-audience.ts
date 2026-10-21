@@ -15,6 +15,8 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.1.0 — 2026-10-21 — setVersionAudience records the audience on the version's descriptor file as a
+ *     tag (./audience.ts withAudienceTag) and keeps a file's tags when it re-tiers it (secaudit 2026-10 v42).
  *   v1.0.0 — 2026-10-18 — Extracted from ./store.ts (writeLatest, upsertCatalogueEntry) with
  *     readPointer and setVersionAudience (plan doc-mvcn6c7e4e5q, V4).
  */
@@ -26,7 +28,7 @@ import {
     bare, bytesHash, descriptorKey, latestKey, packageId, packageKeyRoot, publicUrl,
 } from './contract.js';
 import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
-import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf } from './audience.js';
+import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, withAudienceTag } from './audience.js';
 
 /**
  * The storage, the config and, from ./store.ts, the MCP resource notifications a file write sends. A
@@ -163,10 +165,14 @@ export async function setVersionAudience(
         if (!file) continue;
         const written = await writeStorageFile(deps, ownerGhii, {
             key: file.key, data: file.data, mimeType: file.mimeType, visibility: tier,
+            ...(file.tags?.length ? { tags: file.tags } : {}),
             ...(file.aiProvenanceId ? { aiProvenanceId: file.aiProvenanceId } : {}),
         });
         if (!written.ok) return { ok: false, message: `storing ${file.key} failed: ${written.message}` };
     }
+    // The version's own audience, recorded on its descriptor file (./audience.ts versionOpenTo): an
+    // organism audience and a private one share a tier, so the tier alone cannot say which it is.
+    await deps.storage.updateFileTagsByKey(ownerGhii, dKey, withAudienceTag(descriptorFile.tags, visibility));
     const descriptorUrl = publicUrl(deps.config.baseUrl, ownerGhii, dKey);
     await writeLatest(deps, ownerGhii, name, contentHash, descriptorUrl, new Date().toISOString(), visibility);
     if (opts.catalogue) {

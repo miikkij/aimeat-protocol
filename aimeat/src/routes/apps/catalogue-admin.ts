@@ -6,6 +6,9 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-21 — GET /v1/apps asks isAnonymousPrincipal for own=true, building=true, the member listing
+ *     and the access codes: the minted anonymous token carries no anonymous claim and counted as a
+ *     signed-in member (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.17.0 — 2026-10-18 — GET /v1/apps carries `open_to`, who may open the app: the owner's own value
  *     (anyone, signed-in, organism:<id>), and for everyone else the level only (organism without its
  *     id), so the catalogue can say who opens an app (plan doc-mvcn6c7e4e5q, V2.5).
@@ -60,6 +63,7 @@ import { appListingOf } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { requireAuth, optionalAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { emitChange } from '../../services/event-bus.js';
 import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
@@ -109,7 +113,7 @@ export function registerCatalogueAdminRoutes(
         // would have filtered to the anonymous identity and answered an empty list, which looks like
         // an answer and is not one.
         const ownOnly = req.query.own === 'true';
-        if (ownOnly && (!viewerGhii || req.auth?.anonymous)) {
+        if (ownOnly && (!viewerGhii || isAnonymousPrincipal(req.auth))) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'own=true needs a signed-in caller'));
             return;
         }
@@ -118,13 +122,13 @@ export function registerCatalogueAdminRoutes(
         // default answer — an agent that iterates "my apps" and starts editing another person's
         // would be a listing change with consequences nobody asked for.
         const buildingOnly = req.query.building === 'true';
-        if (buildingOnly && (!viewerGhii || req.auth?.anonymous)) {
+        if (buildingOnly && (!viewerGhii || isAnonymousPrincipal(req.auth))) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'building=true needs a signed-in caller'));
             return;
         }
         // A member of this node (signed in, not the anonymous credential, not a visitor from another
         // node) also sees the apps their owners listed to the community.
-        const isMember = !!viewerGhii && !req.auth?.anonymous && !isForeignPrincipal(req.auth);
+        const isMember = !!viewerGhii && !isAnonymousPrincipal(req.auth) && !isForeignPrincipal(req.auth);
         const opts = {
             category: req.query.category as string | undefined,
             q: req.query.q as string | undefined,
@@ -165,7 +169,7 @@ export function registerCatalogueAdminRoutes(
         const filesByOwner = await storage.listStorageFilesForOwners([...new Set(apps.map(a => a.ownerGaii))]);
         // Whether this caller may read the access codes of the viewer's own protected apps: whoever
         // could set one (publishing with access_code asks app:write).
-        const mayReadCodes = !!req.auth && !req.auth.anonymous && callerOf(req, config.nodeId, storage).has('app:write');
+        const mayReadCodes = !!req.auth && !isAnonymousPrincipal(req.auth) && callerOf(req, config.nodeId, storage).has('app:write');
         // Which of the VIEWER's own apps have a pending staging draft — one query, owner-only.
         // Others' apps never expose draft state (a draft is owner-private).
         const viewerDraftFilenames = viewerGhii

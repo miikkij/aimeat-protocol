@@ -6980,6 +6980,18 @@ components:
             `stopped`: the node ended the run at its cost cap (maxCostUsd); `costCap` and `reason` say
             why. `refused`: the workflow's own trigger found the principal that saved it gone, or
             short of a permission the steps need, so nothing ran; `refusal` and `reason` say which.
+            A run already going is `refused` too when, before a step is dispatched, the principal it
+            answers to (`principal`) is gone or no longer holds a permission that step costs; then
+            `refusal.stoppedBefore` names the step, and the steps not yet finished are `skipped`.
+        principal:
+          type: object
+          description: >-
+            The principal the run answers to, asked again before every step is dispatched: the
+            principal that started it, or for a run the trigger started, the workflow's saver.
+            Absent on a run started before 2026-10-20, whose saver stands in.
+          properties:
+            kind: { type: string, enum: [owner, agent, ecosystem, app] }
+            id: { type: string }
         reason: { type: string, description: 'Why the node ended the run itself, or did not start it, in words.' }
         refusal:
           type: object
@@ -7004,6 +7016,7 @@ components:
               properties:
                 runId: { type: string }
                 at: { type: string, format: date-time }
+            stoppedBefore: { type: string, description: 'Set when the run had started and was refused in flight: the step that was not dispatched.' }
         costCap:
           type: object
           description: >-
@@ -19909,7 +19922,12 @@ paths:
                   type: string
                   enum: [private, owner, public]
                   default: private
-                  description: Visibility of the record written at `result_key`.
+                  description: >
+                    Visibility of the record written at `result_key`. The answer is written through
+                    the same memory write as POST /v1/memory, as the caller that started the job: when
+                    the node's publish gate asks the owner before this caller makes something public,
+                    the record keeps the level it had (a new one: private) and a publish request is
+                    filed. The job's `result_visibility` then reads the level actually stored.
                 model:
                   type: string
                   description: Optional explicit model id (overrides the owner's configured model).
@@ -19951,7 +19969,10 @@ paths:
                 on_done:
                   type: object
                   required: [extension, action]
-                  description: An extension action of the job's OWN owner, invoked when the job finishes.
+                  description: >
+                    An extension action of the job's OWN owner, invoked when the job finishes. A
+                    caller that is not the owner in person needs `ext:invoke` for it, as for
+                    POST /v1/ext/{extName}/{actionId}; without it the start answers 403 `SCOPE_DENIED`.
                   properties:
                     extension: { type: string }
                     action: { type: string }
@@ -19972,18 +19993,41 @@ paths:
             call. Same wording whichever way it fails: which extensions exist is not a stranger's
             business. `RESERVED_KEY` — `prompt_key`, an `input_keys` entry or `result_key` names a
             record this node keeps for itself, such as an AI key, a payout setting or a spend limit.
+            `SCOPE_DENIED` — `on_done` is set and the caller is not the owner in person and does not
+            hold `ext:invoke`. `ACCESS_DENIED` or `CONSENT_REQUIRED` — `result_key` is an
+            `organism.*` key the caller may not write, as POST /v1/memory would answer. Refused at
+            the start, before the model is called.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '409':
+          description: >
+            `ARCHIVED` — the record at `result_key`, or the workspace or organism it belongs to, is
+            archived (read-only). Refused at the start, before the model is called; unarchive it or
+            name another key.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '413':
-          description: '`AI_JOB_PROMPT_TOO_LARGE` — the prompt and its inputs came to more than the cap.'
+          description: >
+            `AI_JOB_PROMPT_TOO_LARGE` — the prompt and its inputs came to more than the cap.
+            `QUOTA_EXCEEDED` — `result_key` is a new key and the account is at its memory key limit,
+            or the account is already over its memory quota with no balance for the overage. Refused
+            at the start, before the model is called. An answer over the per-value size limit can
+            only be known once the model has answered, so it fails the job instead.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '422':
-          description: '`AI_JOB_CHAIN_TOO_DEEP` — a chain called itself too many times and was stopped.'
+          description: >
+            `AI_JOB_CHAIN_TOO_DEEP` — a chain called itself too many times and was stopped.
+            `SCHEMA_VALIDATION_FAILED` — a schema lock on `result_key` takes a JSON type this job's
+            answer cannot have (a text answer is a string; an image record and a `json` transcription
+            are objects). Refused at the start, before the model is called. A lock that could take the
+            answer is checked against the answer itself when it is written.
           content:
             application/json:
               schema:
@@ -24681,7 +24725,10 @@ paths:
         replication. Only available for federated sessions. The remote node sends
         the entry to the home node's /v1/federation/replicate endpoint. An entry whose
         classification does not let it leave its organism is not sent: 403 CLASSIFIED names
-        its label (TARGET-082).
+        its label (TARGET-082). Only the address of the visitor's active home peer is used.
+        A visitor session ends (401) once its home node is no longer an active peer that may
+        sign people in here, and the scopes it holds are at most the peer's current
+        federation_auth_scopes.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -25180,7 +25227,12 @@ paths:
             validator for extension/cortex ZIPs (`INVALID_MANIFEST`, `MISSING_SCRIPT`,
             `CODE_TOO_LARGE`, …) and `message` names the offending field.
         '401':
-          description: Invalid token
+          description: |
+            Invalid token (`TOKEN_INVALID`). Also when the principal the URL was made for no longer
+            stands: the agent or ecosystem app was deleted, or registered again under its released
+            name, after the URL was made, or its account is closed. Nothing is stored; ask for a new
+            URL as a principal that exists. An agent that still exists but lost `publish:public`
+            after the URL was made gets the 202 answer below rather than a public file.
         '403':
           description: |
             The target already exists and belongs to another owner (extension and cortex uploads,
@@ -25224,7 +25276,10 @@ paths:
       summary: Download file via presigned token
       description: |
         Streams the bytes of one stored file. The token (from aimeat_storage_download or
-        GET /v1/storage/{key}?mode=handle) encodes the owner and key and has a TTL.
+        GET /v1/storage/{key}?mode=handle) encodes the owner, the key and the file version it was
+        made for (the file's write time and size), and has a TTL. A file written again under the
+        key after the token was made is a different version and answers 404, whatever its
+        visibility; ask for a new download URL to read it.
         No Authorization header needed; supports Range headers. Not single-use — the handle
         may be fetched multiple times within its TTL (e.g. Range requests, resumes).
         Each fetch is written to the file owner's consent audit log when the consent
@@ -25249,9 +25304,9 @@ paths:
         '206':
           description: Partial content (Range request)
         '401':
-          description: Invalid token
+          description: Invalid token, including a token made before 2026-10-20 that names no file version
         '404':
-          description: File not found
+          description: File not found, or replaced by a later write after the token was made
         '410':
           description: Token expired
 
@@ -25459,6 +25514,13 @@ paths:
         an AIMEAT session. A package published members, organism:<id> or private answers 404 to a
         caller its visibility does not admit; its owner always reads it. For the raw bytes use the
         descriptor_url this returns, which is a permanent, range-readable /v1/pub address.
+
+        The owner in person reads every version of their own package. The owner's agent, app grant
+        or ecosystem app reads a private package only with `storage:read`, and gets 403
+        SCOPE_DENIED without it; a members, organism or public package it reads as any caller its
+        audience admits. A pinned earlier version answers on its own audience, the one it was
+        published or last set at: an earlier private version of a package made public later answers
+        404 to anyone who does not read as the owner.
       tags: [Data Packages]
       security: [{}, { BearerAuth: [] }]
       parameters:
@@ -25468,6 +25530,8 @@ paths:
       responses:
         '200':
           description: The descriptor, its permanent URL, and the latest pointer when unpinned
+        '403':
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package or version
 
@@ -25486,7 +25550,8 @@ paths:
 
         No authentication for a public package, for the same reason as the descriptor: a history
         nobody can see is not a history a consumer can rely on. A non-public package answers as the
-        descriptor does.
+        descriptor does. The list is the caller's: an earlier version whose own audience does not
+        admit the caller (an earlier private version of a package made public later) is not listed.
       tags: [Data Packages]
       security: [{}, { BearerAuth: [] }]
       parameters:
@@ -25495,6 +25560,8 @@ paths:
       responses:
         '200':
           description: The version list, newest first
+        '403':
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package
 
@@ -25519,6 +25586,8 @@ paths:
       responses:
         '200':
           description: rows, total, and the Table Schema of what was returned
+        '403':
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package, version or resource
 
@@ -25533,7 +25602,9 @@ paths:
   #    an OData-shaped body; the envelope would surface in Excel as "something went wrong".
   #  - no authentication for a public package. Its CSV is world-readable at a permanent address, so a
   #    feed over the same rows is world-readable too. A package published members, organism:<id> or
-  #    private answers 404 to a caller its visibility does not admit (a bearer token is read).
+  #    private answers 404 to a caller its visibility does not admit (a bearer token is read). The
+  #    owner's agent, app grant or ecosystem app without storage:read gets 403 Forbidden on a private
+  #    package, as on GET /v1/datapackages/{owner}/{name}.
   #  - there is no meter. Metering needs an authenticated caller and an entitlement coordinate, which
   #    is a different door. A half-built meter counting anonymous reads as free would misreport.
   /v1/odata/{owner}/{name}:
@@ -25560,6 +25631,8 @@ paths:
       responses:
         '200':
           description: '{ "@odata.context": …, "value": [ { name, kind, url } ] }'
+        '403':
+          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
         '404':
           description: No such package (OData error shape, not the node envelope)
 
@@ -25591,6 +25664,8 @@ paths:
           content:
             application/xml:
               schema: { type: string }
+        '403':
+          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
         '404':
           description: No such package
 
@@ -25637,6 +25712,8 @@ paths:
           description: '{ "@odata.context": …, "@odata.count": …, "value": [ … ], "@odata.nextLink": … }. `@odata.count` only with `$count=true`; `@odata.nextLink` only when more rows follow.'
         '400':
           description: A named property does not exist, or an option is malformed
+        '403':
+          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
         '404':
           description: No such package, version or entity set
         '501':
@@ -30293,7 +30370,8 @@ paths:
         on that remote node. The requesting node must be an active peer whose link
         may carry a sign-in, and it signs the request with its node key. The user's
         auth consent for that node is checked before the password; a missing consent,
-        a missing account and a wrong password all answer 401 FEDERATION_AUTH_FAILED.
+        a consent whose `expires` time has passed, a missing account and a wrong password
+        all answer 401 FEDERATION_AUTH_FAILED.
         The password has the same per-account lock as the sign-in route (429
         PASSWORD_LOCKED), and an account with two-step sign-in needs its code
         (401 TOTP_REQUIRED without one). Returns a signed attestation on success.
@@ -36352,8 +36430,11 @@ paths:
         runner agent (default `crew-forge`). The fleet reads the crew-def back via app_get
         (manifest.cortex.agents) and instantiates the agent itself - the node never executes
         a crew-def. HARD GUARD: the target owner is ALWAYS the requester; a supplied
-        owner/target_owner naming anyone else is 403 CROSS_OWNER_FORBIDDEN. If the runner is
-        in task-runner mode the task auto-activates (one-click deploy).
+        owner/target_owner naming anyone else is 403 CROSS_OWNER_FORBIDDEN. The task starts by the
+        same rule as any task given to the runner: it starts at once (one-click deploy) when the
+        runner is in task-runner mode or set to start on its own, and it is `queued` for the owner
+        when the runner is stopped, holds a permission that spends, sends or deletes as the owner, or
+        is set to ask first; `note` says why, and the owner is notified unless they asked in person.
 
         With no `runner_agent` given and no `crew-forge` agent of the owner's, the agent becomes an
         agent proposal instead (POST /v1/agents/v2/agent-proposals): the answer has `kind: proposed`,
@@ -38558,6 +38639,10 @@ paths:
         `{ how: "first-use", by, extension, at }` naming the principal and the extension whose call
         bound it. Null while unbound.
 
+        `approvals` lists the extensions the owner allowed to send the secret to a host
+        (`{ extension, installer, host, why, approvedAt }`) and the questions still waiting for an
+        answer (the same entry without `approvedAt`).
+
         Needs `secrets:manage`, which no wildcard carries. An owner session bypasses scopes as
         always; an agent or an app grant must hold the exact word.
       tags: [Secrets]
@@ -38579,8 +38664,28 @@ paths:
         `host` given in this call, or to none, so the next use binds the secret to its host again.
 
         `host` (optional) binds the secret now: it is sent only there, from its first call on, and
-        the list records who set it. Without it, the first call that uses the secret binds it, and
-        that first call may come from any of the owner's agents or apps that run an extension.
+        the list records who set it. Set it when you use the secret through an extension another
+        account installed: any extension you run may use your secret, but only toward the host
+        it is bound to, and an extension another account installed never binds a secret that has
+        no host yet. That call is refused with SECRET_HOST, naming the extension, its installer
+        and the host, and nothing is sent or bound, whoever made the call.
+
+        Without `host`, the first call through an extension your own account installed binds it.
+        An extension whose code was installed before this rule came in (node 4.1.x) keeps the old
+        first use: it binds to the host its script names, whoever calls, until its code is written
+        again. Through living-hooks, a host on the operator's node-wide allowlist binds by itself; a
+        host only on your own allowlist asks you once per secret and host. A first use to a host
+        the extension declares for this secret in its public `uses_secrets` or `network:` hosts binds whoever calls
+        (your app, your chat agent, a schedule), when the extension's code was written by you,
+        through an app of yours, or by an agent holding `secrets:manage`. Otherwise only the owner
+        signed in, or a principal holding `secrets:manage`, may make that first call; in an
+        unattended run (a workflow step, an AI job's follow-up action) the principal that wrote
+        the extension's code is the one asked. Anyone else gets SECRET_HOST, and nothing is sent
+        or bound.
+
+        Every refused first use files a question on the secret, tells the owner in the bell, and
+        names the page where the owner allows it with one press (`/v1/secret-allow`). See
+        `POST /v1/secrets/{name}/approvals`. `PATCH` sets or changes the address without the value.
 
         The value goes in and comes out of nothing. What it is FOR is being named in an outbound
         header as `{{secret:NAME}}`: an extension writes the placeholder, the node fills in the
@@ -38646,6 +38751,145 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: SECRET_NOT_FOUND — you hold no secret of that name }
+    patch:
+      operationId: secretHostSet
+      summary: Set, change or remove a secret's address without the value
+      description: |
+        `{ "host": "api.example.com" }` binds the secret to that host now (`hostBinding.how` is
+        `set`); `{ "host": null }` or an empty string removes the address, so its next allowed first
+        use binds it again. The value and the approvals are untouched. Needs `secrets:manage`.
+
+        A `secrets:manage` holder may only give a secret that has no address its first one. Changing
+        or removing an address the secret already has is the account holder's own, signed in: anyone
+        else gets 403 IN_PERSON_ONLY and nothing changes. (`PUT` with a value and a host still
+        rebinds; it requires the caller to bring the value itself.)
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host]
+              properties:
+                host: { type: string, nullable: true, description: '`host` or `host:port`, no scheme, no path. Null removes the address.' }
+      responses:
+        '200': { description: The secret's summary, never the value }
+        '400': { description: INVALID_INPUT (no host field), INVALID_SECRET_NAME or INVALID_SECRET_HOST }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: SECRET_NOT_FOUND }
+
+  /v1/secrets/{name}/approval:
+    get:
+      operationId: secretApprovalRead
+      summary: The question an extension's refused call filed on a secret (account holder in person)
+      description: |
+        `?extension=&host=` names it. Answers the extension, the account that installed it when it
+        asked (`installer`), the host, the extension's declared reason (`why`), when and by whom the
+        call was made, whether it is already allowed (`approved_at`), who installs the extension now
+        (`installer_now`) and the hosts it declares for this secret (`declared_hosts`). Only the
+        account holder signed in reads it; an agent, an app or a visitor gets 403 IN_PERSON_ONLY.
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: extension, in: query, required: true, schema: { type: string } }
+        - { name: host, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The question and its facts }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY }
+        '404': { description: APPROVAL_NOT_FOUND }
+
+  /v1/secrets/{name}/approvals:
+    post:
+      operationId: secretApprovalAllow
+      summary: Allow an extension to send this secret to one host (account holder in person)
+      description: |
+        Answers a waiting question, filed when a first use of an unbound secret was refused: through
+        an extension another account installed, to a host the extension does not declare in
+        `uses_secrets`, or by code an agent without `secrets:manage` wrote. From then on that
+        extension, installed by that account, may send this secret to that host, whatever the
+        secret's own address says; nothing is bound and the secret's other uses are unchanged. The
+        extension must still be installed by the account that asked. Only the account holder signed
+        in answers; the refusal's text and the bell notice carry the page that asks
+        (`/v1/secret-allow?secret=&extension=&host=`).
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [extension, host]
+              properties:
+                extension: { type: string }
+                host: { type: string }
+      responses:
+        '200': { description: 'The approval: { extension, installer, host, why, requestedAt, requestedBy, approvedAt, approvedBy }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY }
+        '404': { description: 'APPROVAL_NOT_FOUND: the question no longer waits (the secret was removed or stored again, the question was answered, or the extension changed hands); nothing is allowed' }
+    delete:
+      operationId: secretApprovalWithdraw
+      summary: Withdraw an approval, or drop a waiting question
+      description: |
+        `?extension=&installer=&host=` names it. That extension's next call to that host is refused
+        and asks again. Needs `secrets:manage`: withdrawing only narrows.
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: extension, in: query, required: true, schema: { type: string } }
+        - { name: installer, in: query, required: true, schema: { type: string } }
+        - { name: host, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Withdrawn }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: APPROVAL_NOT_FOUND }
+
+  /v1/secrets/{name}/approvals/decline:
+    post:
+      operationId: secretApprovalDecline
+      summary: Say no to a waiting question (account holder in person)
+      description: |
+        Removes the waiting question for `{ extension, host }`. Nothing was sent and nothing is
+        allowed; the next refused call asks again.
+      tags: [Secrets]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [extension, host]
+              properties:
+                extension: { type: string }
+                host: { type: string }
+      responses:
+        '200': { description: '{ declined: true } when a question was removed, false when none waited' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY }
 
   /v1/ghii/login/passkey/options:
     post:
@@ -40036,7 +40280,9 @@ paths:
 
         Privacy (2026-07-03): **requires authentication** — you must be a signed-in user to
         browse the directory (the anonymous internet is rejected). Entries are opt-in: only
-        profiles that chose to be listed appear.
+        profiles that chose to be listed appear. On a node in anonymous mode, the shared
+        anonymous access is refused with 401 AUTH_REQUIRED, including the token
+        POST /v1/auth/anonymous gives.
       tags: [Directories]
       security:
         - BearerAuth: []
@@ -55607,7 +55853,8 @@ paths:
       summary: Edit a schedule (cron, enabled/pause, timezone, constraints, input)
       description: >
         A caller that is not the owner in person holds the scope for what the schedule
-        drives, as on create (`ai:use` for an ai schedule, `task:write` for agent_task,
+        drives, as on create (`ext:invoke` for an extension schedule, `ai:use` for an ai
+        schedule, `task:write` for agent_task, `work:request` for eco-capability,
         `connections:use` for connections-publish, the four refinery words), for any edit
         but a pause or a change of display_name, description or purpose; without it the
         answer is 403 SCOPE_DENIED.
@@ -55681,9 +55928,13 @@ paths:
         message). A manual run only defers to a genuinely running (active/stalled)
         occurrence — a paused/queued/archived one no longer blocks it.
         A caller that is not the owner in person also holds the scope for what the
-        schedule drives, as on create (`ai:use` for an ai schedule, `task:write` for
-        agent_task, `connections:use` for connections-publish, the four refinery words);
-        without it the answer is 403 SCOPE_DENIED.
+        schedule drives, as on create (`ext:invoke` for an extension schedule, `ai:use`
+        for an ai schedule, `task:write` for agent_task, `work:request` for
+        eco-capability, `connections:use` for connections-publish, the four refinery
+        words); without it the answer is 403 SCOPE_DENIED. At every fire, cron or manual,
+        the node asks the schedule's maker again: a maker that is gone, or that is not
+        the owner in person and no longer holds that scope, does not run, and the run
+        ends as `error` with the reason in `lastRunError`.
       tags: [Schedules]
       security:
         - BearerAuth: []
@@ -61749,6 +62000,12 @@ paths:
           description: >
             A token without all four of connections:read-through, ai:use, organism:rows and
             memory:write, or a visitor from another node (LOCAL_ACCOUNT_REQUIRED).
+        '409':
+          description: >
+            BATCH_BUSY. A batch of this definition is already running that another principal of the
+            owner started, and this caller may not see it: a caller sees a run it started, or any run
+            of the owner when it is the owner, an app grant of the owner, or an agent holding
+            connections:read-as-owner. The answer carries no part of that run.
   /v1/refinery/runs/{id}:
     get:
       operationId: getRefineryRun
@@ -61778,7 +62035,10 @@ paths:
         '403':
           description: A token without connections:read-through; the rows name the subjects of the mail read.
         '404':
-          description: No such run of yours, or it finished more than an hour ago.
+          description: >
+            No such run of yours, or it finished more than an hour ago. An agent sees only the runs
+            it started, unless it holds connections:read-as-owner; the owner and the owner's app
+            grants see every run of the owner.
 
   /v1/content:
     get:

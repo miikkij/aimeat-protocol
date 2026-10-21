@@ -15,6 +15,9 @@
  *   owner: no owner role, and a name (its home GHII) that no local account can have.
  * @usage cd aimeat && pnpm exec vitest run test/unit/federated-principal.test.ts
  * @version-history
+ *   v1.4.1 — 2026-10-20 — The account-check describe registers the visitor's home as a live peer: a
+ *     visitor with no live peer is now refused by credentialRevoked's seventh question (secaudit
+ *     2026-10, federated-visitor-not-bound-to-live-peer; that question has test/unit/visitor-peer.test.ts).
  *   v1.4.0 — 2026-09-26 — The account check (credentialRevoked) asks no local account of a visitor,
  *     also when a local account of the same local part is made after the visitor's token; a local
  *     owner token of the same age is refused.
@@ -42,6 +45,7 @@ import { credentialRevoked, initSessionAuth, isOwnerPrincipal, requireRole, requ
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { homeIdentityOf, isForeignPrincipal, localAccountName, localAccountOf, resolveIdentity, runAsNode, setThisNodeId } from '../../src/utils/gaii.js';
+import { registerVisitorPeers } from '../../src/auth/visitor-peer.js';
 
 const NODE = 'aimeat-local-001-dev';
 const HOME = 'aimeat-peer-home-001';
@@ -249,7 +253,13 @@ describe('the account check and a visitor', () => {
     const namesakeMadeNow = () => {
         owners.set('alice', { name: 'alice', roles: ['owner'], createdAt: new Date(Date.now() + 1000).toISOString(), disabledAt: null });
     };
-    beforeAll(() => initSessionAuth(accounts, { nodeId: NODE } as AimeatConfig));
+    // The visitor's home is a live peer that may sign people in here: since 2026-10-20 a visitor whose
+    // peer is gone or restricted is refused by the seventh question (auth/visitor-peer.ts), which this
+    // describe is not about.
+    beforeAll(() => {
+        initSessionAuth(accounts, { nodeId: NODE, federationAuthPolicy: 'all_peers', federationDefaultScopes: ['memory:read', 'catalogue:read'] } as AimeatConfig);
+        registerVisitorPeers(new Map([[HOME, { nodeId: HOME, status: 'active', tier: 'member', allowFederatedAuth: true, federationAuthScopes: [] }]]), NODE);
+    });
     afterAll(() => { initSessionAuth(null as unknown as Storage); setThisNodeId(null); });
 
     it('keeps a visitor, with no local account and after a local namesake is made', async () => {

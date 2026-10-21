@@ -28,6 +28,9 @@
  *   const datapackage = makeExtensionDataPackage({ storage, config, ownerGhii, producedBy });
  *   const ctx = buildExtensionCtx({ …, datapackage });
  * @version-history
+ *   v1.1.1 -- 2026-10-20 -- open and rows read as the owner in person (ownerAuthOf names the role), so
+ *     the store's storage:read rule for the owner's other principals does not apply to an extension
+ *     run, attended or unattended (secaudit 2026-10 v41, standing rulings 1 and 5).
  *   v1.1.0 -- 2026-10-17 -- open and rows read as the owner, so a package published members,
  *     organism:<id> or private is read on its audience (plan doc-mvcn6c7e4e5q, V3.8).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, A4).

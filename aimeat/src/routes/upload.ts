@@ -24,6 +24,17 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.28.1 — 2026-10-21 — A ZIP update of byte-identical code keeps the old-code first-use mark; a
+ *     changed script drops it (services/extension-first-use-keep.ts).
+ *   v1.28.0 — 2026-10-20 —The PUT asks whether the principal the token was minted for still stands
+ *     (services/upload-principal.ts) before it reads a byte: an agent deleted, or replaced under its
+ *     released name, or an account closed, is refused 401 and nothing is stored. A storage or app
+ *     upload by an agent the mint allowed to publish asks the publish gate again from the agent's
+ *     current record, so publish:public withdrawn after the mint holds the content back with a
+ *     request (secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck). An extension ZIP stamps
+ *     `installedByPrincipal` with the token's actor on install and on update, as the inline routes
+ *     do, so the owner's 'installer' narrowing applies to the agent that wrote the code (secaudit
+ *     2026-10, handleExtensionUpload:installedByPrincipal-not-stamped).
  *   v1.26.0 — 2026-10-18 — A cortex ZIP whose manifest asks for `public` asks the publish gate with
  *     the uploader's grant (services/publish-requests/upload-gate.ts): on an ask it installs private
  *     and the answer is 202 with `publish_request` (plan doc-mvcn6c7e4e5q, V4).
@@ -174,7 +185,10 @@ import { odpsWriteRefusal, extensionOdpsKey } from '../services/exchange-odps-wr
 import { managedChangeRefusal } from '../services/packages/install/package-managed.js';
 import { receiveFontUpload } from '../services/themes/fonts.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
+import { publishAskOf, type PublishAsk } from '../services/publish-requests/ask.js';
+import { uploadPrincipalRefusal } from '../services/upload-principal.js';
 import { cortexAskedFields } from '../services/cortex-visibility.js';
+import { carryFirstUseKeep } from '../services/extension-first-use-keep.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
@@ -197,6 +211,16 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                 return;
             }
             res.status(401).json({ success: false, error: 'TOKEN_INVALID', message: 'Invalid upload token' });
+            return;
+        }
+
+        // The token is a credential this route verifies itself, so it asks here what every bearer is
+        // asked per request: is the agent (or ecosystem app) it was minted for still there and not
+        // replaced, and does its account still stand? Asked before a byte is read, so a URL kept by a
+        // deleted agent stores nothing (services/upload-principal.ts).
+        const principalRefused = await uploadPrincipalRefusal(storage, verified);
+        if (principalRefused) {
+            res.status(401).json({ success: false, error: 'TOKEN_INVALID', message: principalRefused });
             return;
         }
 
@@ -232,13 +256,13 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
         try {
             switch (verified.utype) {
                 case 'app':
-                    await handleAppUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
+                    await handleAppUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data, verified.actorIsAgent);
                     return;
                 case 'storage':
-                    await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
+                    await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data, verified.actorIsAgent);
                     return;
                 case 'extension':
-                    await handleExtensionUpload(res, config, storage, verified.sub, verified.meta, data);
+                    await handleExtensionUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
                     return;
                 case 'cortex':
                     await handleCortexUpload(res, config, storage, verified.sub, data);
@@ -276,7 +300,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
 
 async function handleAppUpload(
     res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer,
+    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer, actorIsAgent: boolean,
 ): Promise<void> {
     // `sub` is the presigned token subject: a full GAII (agent#owner@node) for
     // agent uploads, or the owner's GHII (owner@node) for owner uploads. Either
@@ -349,8 +373,10 @@ async function handleAppUpload(
         accessCode: { mode: 'carry' },
         source: 'presigned',
         // The gate was asked when the URL was minted, for the session that asked for it; the signed
-        // token carries the answer (services/app-publish-gate.ts).
-        publishGate: publishAskFromMeta(meta.publish_ask),
+        // token carries the answer (services/app-publish-gate.ts). An agent the mint ALLOWED is asked
+        // again with the grant its record holds now, so publish:public taken away after the mint
+        // applies to this upload too.
+        publishGate: await livePublishAsk(storage, config, actor, actorIsAgent, publishAskFromMeta(meta.publish_ask)),
         roadmap: typeof meta.roadmap === 'string' ? meta.roadmap : undefined,
         // The declaration the caller made when they asked for this URL, carried in the signed token.
         // Re-validated rather than trusted: the token is ours and cannot be forged, but a block that
@@ -400,13 +426,26 @@ async function handleAppUpload(
     });
 }
 
+/**
+ * The app publish gate's answer at the PUT. The mint's answer stands, except that an agent the mint
+ * allowed is asked again from its current record (services/publish-requests/upload-gate.ts), so a
+ * permission withdrawn inside the token's hour holds the new app unlisted with a request instead.
+ */
+async function livePublishAsk(
+    storage: Storage, config: AimeatConfig, actor: string, actorIsAgent: boolean, carried: PublishAsk | null,
+): Promise<PublishAsk | null> {
+    if (!actorIsAgent || carried?.kind !== 'allowed') return carried;
+    const gate = await uploadPublishGate(storage, config.nodeId, actor);
+    return gate ? publishAskOf({ storage, config }, gate.caller) : carried;
+}
+
 // ── Handler: Storage ── routes/upload-storage.ts (handleStorageUpload, declaredFromMeta)
 
 // ── Handler: Extension ──
 
 async function handleExtensionUpload(
     res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, meta: Record<string, unknown>, data: Buffer,
+    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
     // Derived BEFORE the manifest is parsed, because the manifest check for config.app compares
     // the named app's owner against the installer. The token subject is a full GAII
@@ -425,6 +464,13 @@ async function handleExtensionUpload(
     // below and the record therefore read one value, not two.
     const record = result.record!;
     record.installedAt = new Date().toISOString();
+    // The principal that wrote THIS code, as writeExtensionRecord stamps it on the inline install and
+    // redeploy routes (services/extension-lifecycle.ts): an unattended run the owner narrowed to
+    // 'installer' reads files with this principal's reach (services/extension-system-run.ts). The
+    // token's actor, set at the mint from the session's identity, never from the client. Without it a
+    // ZIP written by an agent kept the previous writer, often the owner, and the narrowing read as
+    // the owner (secaudit 2026-10, handleExtensionUpload:installedByPrincipal-not-stamped).
+    record.installedByPrincipal = actor;
 
     // `update`/`activate` ride in the token meta (PRESIGNED_META_KEYS). This handler used to ignore
     // them entirely and answer a flat 409 on an existing name, so a caller that had explicitly asked
@@ -486,7 +532,9 @@ async function handleExtensionUpload(
         });
         return;
     }
-    record.config = encConfig;
+    // Byte-identical code keeps the old-code first-use mark; a changed script drops it
+    // (services/extension-first-use-keep.ts).
+    record.config = carryFirstUseKeep(encConfig, record.actions, existing);
 
     let saved: ExtensionRecord;
     if (existing) {
@@ -504,6 +552,9 @@ async function handleExtensionUpload(
             limits: record.limits,
             federation: record.federation,
             instances: record.instances,
+            // Travels with the code, as in services/extension-upsert.ts. `unattendedReadAuthority` is
+            // deliberately absent: it is the owner's choice about the extension, not the code's.
+            installedByPrincipal: record.installedByPrincipal,
             ...(wantActivate && existing.status !== 'active'
                 ? { status: 'active' as const, activatedAt: new Date().toISOString() }
                 : {}),

@@ -26,6 +26,7 @@
  *   2026-10-04 — aimeat_task_decline; aimeat_task_fail points to it for a refusal.
  *   2026-10-02 — aimeat_task_create takes `start`, propose_todos takes `effects` and says what to do
  *     next; aimeat_task_start and aimeat_agent_task_start_set.
+ *   2026-10-20 — aimeat_schedule_create's kind says an extension schedule needs ext:invoke and every fire re-checks its maker (secaudit 2026-10, v52, v65).
  *   2026-09-29 — aimeat_schedule_create takes kind "refinery" (one mail refinery batch each fire, input { prefix }).
  *   2026-09-27 — aimeat_schedule_list takes detail (each schedule's prompt); aimeat_schedule_update takes prompt.
  *   2026-09-27 — Agent-facing texts use industry terms: door, surface and the house became endpoint, tool, interface, page or this server (docs/coding-guidelines/shell-and-git.md).
@@ -83,7 +84,7 @@ export const schedulesTasksMemoryTools = [
         scope: 'task:write',
         surfaces: ['agent'],
         input: {
-            kind: { type: 'string', required: true, description: 'ai | agent_task | extension | refinery', enum: ['ai', 'agent_task', 'extension', 'refinery'] },
+            kind: { type: 'string', required: true, description: 'ai | agent_task | extension | refinery. An extension schedule also needs ext:invoke, and every fire checks again that its maker still exists and holds the permissions.', enum: ['ai', 'agent_task', 'extension', 'refinery'] },
             cron: { type: 'string', required: true, description: 'Cron expression, e.g. "0 7 * * *".' },
             display_name: { type: 'string', required: true, description: 'Human-readable label.' },
             timezone: { type: 'string', description: 'IANA timezone, e.g. "Europe/Helsinki".' },

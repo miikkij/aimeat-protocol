@@ -9,6 +9,9 @@
  * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
+ *   2026-10-20 — SECURITY: GET /v1/catalogue/directory refuses the shared anonymous principal by
+ *     identity (refuseAnonymousPrincipal), so the token POST /v1/auth/anonymous mints no longer lists
+ *     the signed-in-only people directory (secaudit 2026-10, jwt.ts:issueJWT:anonymous-claim-not-signed).
  *   2026-10-20 — SECURITY: GET /v1/catalogue/knowledge runs the manifests through the caller's
  *     classification reader (readerFor, presentMemories), the one GET /v1/knowledge/:id uses, so the
  *     listing and the single read agree; the cached scan stays raw and shared and the reader runs per
@@ -34,6 +37,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -223,7 +227,11 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   // Privacy: (1) requireAuth() — you must be a SIGNED-IN user to browse it (the anonymous internet
   // is rejected); (2) opt-in — DirectoryService only indexes profiles with an active "federation"
   // consent grant, so every entry has already opted in to being listed.
-  router.get('/v1/catalogue/directory', requireAuth(), requireScope('catalogue:read'), async (req, res) => {
+  // requireAuth() refuses the identity anonymous mode injects for a request with no credential, and
+  // not the token POST /v1/auth/anonymous mints, which carries no anonymous claim. That token reached
+  // this listing with catalogue:read until 2026-10-20, so the shared anonymous principal is refused
+  // here by identity (auth/anonymous-principal.ts; secaudit 2026-10, anonymous-claim-not-signed).
+  router.get('/v1/catalogue/directory', requireAuth(), refuseAnonymousPrincipal(), requireScope('catalogue:read'), async (req, res) => {
     if (!directoryService) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Directory service is not available'));
       return;

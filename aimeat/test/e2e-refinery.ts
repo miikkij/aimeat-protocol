@@ -21,7 +21,9 @@
  *     failure among good ones is filed as Unclear with its error;
  *   - the refusals: a token lacking one of the four words, an agent running its owner's mailbox,
  *     another owner reading a run, a status without the word that reads mail;
- *   - a `refinery` schedule checks its input on create and runs a batch when triggered.
+ *   - a `refinery` schedule checks its input on create and runs a batch when triggered;
+ *   - a run is shown to the principal that started it, or to a caller that reads the owner's mail:
+ *     an agent with '*' and without connections:read-as-owner gets no part of the owner's run.
  *
  *   WHY IT OWNS ITS SERVER. The mailbox, the model addresses and loopback egress are boot-time
  *   settings. It follows the runner's backend: Postgres when the env file names it, a temporary
@@ -29,6 +31,11 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-refinery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-refinery.ts
  * @version-history
+ *   v1.1.0 — 2026-10-20 — Section 7: the run map is fenced on the starter. While the owner's batch is
+ *     held at a model call (a pass-through in front of the two model stand-ins), an agent with
+ *     '*' and without connections:read-as-owner gets 409 BATCH_BUSY with no run from a start and
+ *     NOT_FOUND by id, on REST and MCP; an agent holding the word, the owner, and the agent for its
+ *     own run still see it (secaudit 2026-10, v60).
  *   v1.0.2 — 2026-10-12 — 6a: the two agents that create a refinery schedule hold task:write, the
  *     word node 4.0.0 asks on POST /v1/schedules (REST scope gates), so the mailbox 404 and the
  *     organism:rows refusal are still what the test proves there.
@@ -38,6 +45,8 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -75,7 +84,7 @@ const dbDir = mkdtempSync(join(tmpdir(), 'aimeat-refinery-'));
 const DB_PATH = join(dbDir, 'refinery.db');
 const PG_URL = process.env.AIMEAT_DB === 'postgres-kysely' ? (process.env.DATABASE_URL ?? '') : '';
 
-async function startServer(mailPort: number): Promise<ChildProcess> {
+async function startServer(mailPort: number, modelPort: number): Promise<ChildProcess> {
   const target = PG_URL
     ? { port: PORT, baseUrl: BASE, dbType: 'postgres-kysely', dbPath: '', dbUrl: PG_URL, external: false }
     : { port: PORT, baseUrl: BASE, dbType: 'sqlite', dbPath: DB_PATH, dbUrl: '', external: false };
@@ -93,9 +102,10 @@ async function startServer(mailPort: number): Promise<ChildProcess> {
     AIMEAT_CONNECTIONS_ENABLED: 'true',
     AIMEAT_CONNECT_FAKE_BASE_URL: mail,
     AIMEAT_DECIDE_ENABLED: 'true',
-    AIMEAT_DECIDE_BASE_URL: `${mail}/v1/systemone`,
+    // Both model stand-ins are reached through the gate (startModelGate), which section 7 holds.
+    AIMEAT_DECIDE_BASE_URL: `http://127.0.0.1:${modelPort}/v1/systemone`,
     AIMEAT_TYPESAFE_INSTANCE_KEY: 'refinery-e2e-decide-key',
-    AIMEAT_AI_FIXED_BASEURL_OVERRIDES: JSON.stringify({ openrouter: `${mail}/ai/v1` }),
+    AIMEAT_AI_FIXED_BASEURL_OVERRIDES: JSON.stringify({ openrouter: `http://127.0.0.1:${modelPort}/ai/v1` }),
     AIMEAT_OPENROUTER_INSTANCE_KEY: 'refinery-e2e-ai-key',
     AIMEAT_MODEL_DEFAULT_CHAT: 'e2e/refinery-model', AIMEAT_MODEL_DEFAULT_EXECUTION: 'e2e/refinery-model',
     AIMEAT_MODEL_DEFAULT_VISION: 'e2e/refinery-model', AIMEAT_MODEL_FREE_FALLBACK: 'e2e/refinery-model',
@@ -114,6 +124,36 @@ async function stopServer(child: ChildProcess): Promise<void> {
     await once(child, 'exit');
     clearTimeout(timer);
   }
+}
+
+/**
+ * A pass-through in front of the two model stand-ins (decision and completion) that can hold their
+ * answers, so a batch stays running for as long as a test needs to ask about it (section 7). Both are
+ * held because a decision the node answered before comes from its cache and never reaches the
+ * stand-in, while the field extraction after it does. Open, it forwards every request.
+ */
+let modelHold: Promise<void> | null = null;
+let releaseModels: () => void = () => {};
+function holdModels(): void { modelHold = new Promise<void>((r) => { releaseModels = () => { modelHold = null; r(); }; }); }
+
+async function startModelGate(targetPort: number): Promise<{ port: number; close(): Promise<void> }> {
+  const srv = createServer(async (req, res) => {
+    const chunks: Buffer[] = [];
+    for await (const c of req) chunks.push(c as Buffer);
+    if (modelHold) await modelHold;
+    const headers: Record<string, string> = { 'content-type': String(req.headers['content-type'] ?? 'application/json') };
+    if (req.headers.authorization) headers.authorization = String(req.headers.authorization);
+    const up = await fetch(`http://127.0.0.1:${targetPort}${req.url}`, {
+      method: req.method, headers, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}),
+    });
+    const out: Record<string, string> = {};
+    up.headers.forEach((v, k) => { if (!['content-length', 'transfer-encoding', 'connection', 'content-encoding'].includes(k)) out[k] = v; });
+    res.writeHead(up.status, out);
+    res.end(Buffer.from(await up.arrayBuffer()));
+  });
+  srv.listen(0, '127.0.0.1');
+  await once(srv, 'listening');
+  return { port: (srv.address() as AddressInfo).port, close: () => new Promise<void>((r) => srv.close(() => r())) };
 }
 
 // ── principals ────────────────────────────────────────────────────────────────
@@ -237,7 +277,8 @@ async function row(owner: Owner, org: string, ws: string, id: string): Promise<a
 
 (async () => {
   const mail: FakeMailServer = await startFakeMailServer(0);
-  const server = await startServer(mail.port);
+  const modelGate = await startModelGate(mail.port);
+  const server = await startServer(mail.port, modelGate.port);
   console.log('\nThe mail refinery (wish aimeat-refinery)\n');
 
   const A = await setupOwner('a');
@@ -466,7 +507,88 @@ async function row(owner: Owner, org: string, ws: string, id: string): Promise<a
     assert(m14?.klass === 'booking' && m14.fields?.booking_number === 'HK-77120', `m14 ${JSON.stringify(m14)?.slice(0, 200)}`);
   });
 
+  // ── 7. A run is shown to its starter, or to a caller that reads the owner's mail (secaudit 2026-10, v60) ──
+  // An agent of the owner holding '*' covers the four run words but not connections:read-as-owner,
+  // the word an agent needs to read its owner's mailbox. The owner's batch copies the subjects of the
+  // owner's mail into its state, so that agent must not get the run, by start or by id.
+  const { org: org7, ws: ws7 } = await makeWorkspace(A);
+  await saveDefinition(A, 'mv', { ...DEF, organismId: org7, workspaceId: ws7 });
+  const star = await connectAgent(A, `refstar${Date.now()}`, ['*']);
+  const star2 = await connectAgent(A, `refstartwo${Date.now()}`, ['*']);
+  const reader = await connectAgent(A, `refreader${Date.now()}`, ['*', 'connections:read-as-owner']);
+  let ownerRun = '';
+  let heldSubject = '';
+  holdModels();
+  try {
+    await test('7a. the owner\'s batch is running and shows the subject it is on to the owner', async () => {
+      const s = await startBatch(A.token, { prefix: 'mv' });
+      assert(s.status === 202, `start ${s.status} ${JSON.stringify(s.body?.error)}`);
+      ownerRun = s.body.data.run.id;
+      for (let i = 0; i < 80 && !heldSubject; i++) {
+        const r = await json(`/v1/refinery/runs/${ownerRun}`, { headers: auth(A.token) });
+        assert(r.status === 200, `owner read ${r.status}`);
+        if (r.body.data.run.status === 'running' && r.body.data.run.subject) heldSubject = r.body.data.run.subject;
+        else await sleep(100);
+      }
+      assert(heldSubject.length > 0, 'the batch reached a message and is held at a model call');
+    });
+
+    await test('7b. an agent with \'*\' and without connections:read-as-owner starts the same definition: 409 BATCH_BUSY, no run in it', async () => {
+      const r = await startBatch(star, { prefix: 'mv' });
+      assert(r.status === 409 && r.body.error?.code === 'BATCH_BUSY', `got ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+      const text = JSON.stringify(r.body);
+      assert(!r.body.data?.run && !text.includes(ownerRun) && !text.includes(heldSubject), `the refusal carries the run: ${text.slice(0, 300)}`);
+      const m = await mcpCall(star, 'aimeat_refinery_run', { prefix: 'mv' });
+      const mt = toolText(m);
+      assert(m.result?.isError === true && mt.startsWith('BATCH_BUSY'), `MCP start ${mt.slice(0, 200)}`);
+      assert(!mt.includes(ownerRun) && !mt.includes(heldSubject), `the MCP refusal carries the run: ${mt.slice(0, 300)}`);
+    });
+
+    await test('7c. the same agent reading the owner\'s run by id gets NOT_FOUND on REST and MCP', async () => {
+      const g = await json(`/v1/refinery/runs/${ownerRun}`, { headers: auth(star) });
+      assert(g.status === 404 && g.body.error?.code === 'NOT_FOUND', `GET ${g.status} ${JSON.stringify(g.body).slice(0, 200)}`);
+      const st = await mcpCall(star, 'aimeat_refinery_status', { run_id: ownerRun });
+      const t = toolText(st);
+      assert(st.result?.isError === true && t.startsWith('NOT_FOUND') && !t.includes(heldSubject), `MCP status ${t.slice(0, 200)}`);
+    });
+
+    await test('7d. an agent holding connections:read-as-owner still sees the owner\'s run, by start and by id, on REST and MCP', async () => {
+      const s = await startBatch(reader, { prefix: 'mv' });
+      assert(s.status === 200 && s.body.data.already_running === true && s.body.data.run.id === ownerRun, `start ${s.status} ${JSON.stringify(s.body).slice(0, 200)}`);
+      const g = await json(`/v1/refinery/runs/${ownerRun}`, { headers: auth(reader) });
+      assert(g.status === 200 && g.body.data.run.id === ownerRun, `GET ${g.status}`);
+      const m = await mcpCall(reader, 'aimeat_refinery_run', { prefix: 'mv' });
+      const started = JSON.parse(toolText(m));
+      assert(started.already_running === true && started.run?.id === ownerRun, `MCP start ${toolText(m).slice(0, 200)}`);
+      const st = await mcpCall(reader, 'aimeat_refinery_status', { run_id: ownerRun });
+      assert(JSON.parse(toolText(st)).run?.id === ownerRun, `MCP status ${toolText(st).slice(0, 200)}`);
+    });
+  } finally {
+    releaseModels();
+  }
+
+  await test('7e. the owner\'s finished run stays hidden from the agent, and the owner still reads it', async () => {
+    const done = await waitRun(A.token, ownerRun);
+    assert(done.status === 'done' && done.rows.length > 0, `run ${done.status} ${done.error ?? ''}`);
+    const g = await json(`/v1/refinery/runs/${ownerRun}`, { headers: auth(star) });
+    assert(g.status === 404, `the agent read the finished run: ${g.status}`);
+  });
+
+  await test('7f. an agent\'s own run is visible to itself and to its owner, and not to a sibling agent without connections:read-as-owner', async () => {
+    const s = await startBatch(star, { prefix: 'mv' });
+    assert(s.status === 202, `start ${s.status} ${JSON.stringify(s.body?.error)}`);
+    const own = await waitRun(star, s.body.data.run.id);
+    assert(own.status === 'failed' && String(own.error).startsWith('NOT_FOUND'), `its run ${own.status} ${own.error}`);
+    const st = await mcpCall(star, 'aimeat_refinery_status', { run_id: own.id });
+    assert(JSON.parse(toolText(st)).run?.id === own.id, `MCP status of its own run ${toolText(st).slice(0, 200)}`);
+    const byOwner = await json(`/v1/refinery/runs/${own.id}`, { headers: auth(A.token) });
+    assert(byOwner.status === 200, `the owner read the agent's run: ${byOwner.status}`);
+    const bySibling = await json(`/v1/refinery/runs/${own.id}`, { headers: auth(star2) });
+    assert(bySibling.status === 404, `a sibling agent read it: ${bySibling.status}`);
+  });
+
   await stopServer(server);
+  await modelGate.close();
   await mail.close();
   try { rmSync(dbDir, { recursive: true, force: true }); } catch { /* the OS will collect it */ }
   console.log(`\n  ${passed} passed, ${failed} failed`);

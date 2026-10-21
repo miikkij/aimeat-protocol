@@ -9,6 +9,7 @@
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   2026-10-21 — isAuthenticated asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.14.0 — 2026-10-18 — Who may open the page (plan doc-mvcn6c7e4e5q, V3.10): PUT /v1/portfolio/config
  *     and the JSON PUT /v1/portfolio/upload take `access` (anyone, signed-in, organism:<id>; an organism
  *     the setter is not an active member of is refused before any write); opening a page that is on to
@@ -75,6 +76,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, AgentRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { listPublishedMembers } from '../services/portfolio-members.js';
 import { readerFor } from '../services/classification/reader.js';
@@ -521,7 +523,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // Anonymous-mode note: optionalAuth injects a truthy shared identity
     // (anonymous: true) — a bare !!req.auth would report every visitor as
     // authenticated. The viewer uses this flag for the portfolio auth bridge.
-    const isAuthenticated = !!req.auth && req.auth.anonymous !== true;
+    const isAuthenticated = !!req.auth && !isAnonymousPrincipal(req.auth);
     const isOwner = isAuthenticated && req.auth?.owner === username;
 
     // Who may open the page (services/page-access.ts, V3.10): the same decision the portfolio origin

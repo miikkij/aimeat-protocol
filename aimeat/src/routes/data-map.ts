@@ -17,6 +17,7 @@
  * @structure dataMapRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-21 — The caller asks isAnonymousPrincipal, so the minted anonymous token is nobody here too (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-16 — GET answers the map of an app that is not public only to whoever may see that app (services/data-map/data-map-access.ts), and the caller comes from callerOf (middleware/caller.ts) with whether it is a member of this node and its session for the operator question (QA audit list review).
  *   v2.1.0 — 2026-10-11 — PUT and DELETE …/agents/:agent: tie an app to one of the owner's agents,
  *     or take the tie away, by one row of the map.
@@ -31,6 +32,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { callerOf as requestCaller } from '../middleware/caller.js';
 import { readProgramMap, stateProgramMap, type DataMapCaller } from '../services/data-map/data-map-access.js';
 import { tieAgent, untieAgent } from '../services/data-map/data-map-agent-tie.js';
@@ -58,7 +60,7 @@ export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/datamap/apps/:owner/:filename', optionalAuth(), async (req, res) => {
     const ref = `${req.params.owner}/${req.params.filename}`;
     // The anonymous credential of AIMEAT_ANONYMOUS_MODE is nobody, as no token is.
-    const out = await readProgramMap(storage, config, req.auth && !req.auth.anonymous ? callerOf(req) : null, ref,
+    const out = await readProgramMap(storage, config, req.auth && !isAnonymousPrincipal(req.auth) ? callerOf(req) : null, ref,
       new Date().toISOString());
     if ('refusal' in out) {
       res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));

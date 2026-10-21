@@ -12,6 +12,10 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.12.0 — 2026-10-20 — The token carries its issue time to the millisecond (`iat_ms`) and, when the
+ *     principal asking for it named an agent record at the mint, `actor_agent`. verifyUploadToken
+ *     returns both, so the PUT asks whether that agent and its account still stand
+ *     (services/upload-principal.ts; secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck).
  *   v1.11.0 — 2026-10-18 — PRESIGNED_META_KEYS.storage carries `publish_ask`, the requester the publish
  *     gate asked about at the mint (plan doc-mvcn6c7e4e5q, V4).
  *   v1.10.0 — 2026-10-09 — Single use is durable: verifyUploadToken takes the storage and files the
@@ -49,6 +53,8 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { createHash, randomUUID, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { sessionStorage } from '../auth/node-auth.js';
+import { isGEAI } from '../utils/gaii.js';
 
 // ── Key management (initialized from jwt.ts node keys) ──
 
@@ -135,6 +141,15 @@ export interface VerifiedUploadToken {
     meta: Record<string, unknown>;
     maxBytes: number;
     contentType: string;
+    /** When the token was minted: `iat` in seconds, and `iatMs` exact to the millisecond when it carries one. */
+    iat?: number;
+    iatMs?: number;
+    /**
+     * True when `actor` named an agent record at the mint. The PUT then refuses the upload once that
+     * agent is gone (services/upload-principal.ts). A scoped personal access token's GAII, an app's
+     * `app#owner@node` and an ecosystem app name no agent record, so they never carry it.
+     */
+    actorIsAgent: boolean;
 }
 
 export type UploadTokenErrorCode = 'TOKEN_EXPIRED' | 'TOKEN_USED' | 'TOKEN_INVALID';
@@ -221,9 +236,24 @@ export async function generateUploadToken(payload: UploadTokenPayload, ttlSecond
     return handle;
 }
 
+/**
+ * Does the principal that asks for the URL name an agent record now? Asked once at the mint, of the
+ * node's own storage, so the PUT can tell a deleted agent (refused) from a principal that never had
+ * an agent record (a scoped personal access token, an app; services/upload-principal.ts). Only a
+ * `name#owner@node` that is not an ecosystem app is looked up. No storage registered (a unit test)
+ * answers no, which leaves the PUT with the checks it had before.
+ */
+async function actorIsAgentRecord(actor: string): Promise<boolean> {
+    if (!actor.includes('#') || isGEAI(actor)) return false;
+    const storage = sessionStorage();
+    if (!storage) return false;
+    return !!(await storage.getAgent(actor));
+}
+
 /** The signed credential itself. Split out so the handle can wrap it without duplicating the mint. */
 async function signUploadToken(payload: UploadTokenPayload, ttlSeconds: number): Promise<string> {
     if (!_privateKey) throw new Error('Upload token keys not initialized');
+    const actor = payload.actor ?? payload.sub;
 
     return new SignJWT({
         typ: 'upload',
@@ -232,6 +262,10 @@ async function signUploadToken(payload: UploadTokenPayload, ttlSeconds: number):
         meta: payload.meta,
         maxBytes: payload.maxBytes,
         contentType: payload.contentType,
+        // The issue time to the millisecond, so an agent registered again in the same second under a
+        // released name is still newer than the token (auth/credential-age.ts).
+        iat_ms: Date.now(),
+        ...(await actorIsAgentRecord(actor) ? { actor_agent: true } : {}),
     })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
         // EdDSA signing is deterministic: without a nonce, two tokens minted in the same
@@ -309,5 +343,8 @@ export async function verifyUploadToken(tokenOrHandle: string, store: UploadSpen
         meta: payload.meta as Record<string, unknown>,
         maxBytes: payload.maxBytes as number,
         contentType: payload.contentType as string,
+        ...(typeof payload.iat === 'number' ? { iat: payload.iat } : {}),
+        ...(typeof payload.iat_ms === 'number' ? { iatMs: payload.iat_ms } : {}),
+        actorIsAgent: payload.actor_agent === true,
     };
 }

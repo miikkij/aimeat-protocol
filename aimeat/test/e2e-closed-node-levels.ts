@@ -19,6 +19,8 @@
  *   listed, open to anyone and with no access code. An unlisted or signed-in-only new app, and an
  *   unlisted fork, are not announced; making the app public announces it once.
  * @version-history
+ *   v1.1.0 — 2026-10-21 — The owner's agent without storage:read reads the owner's members data package on
+ *     the closed node, and gets 403 on a private one (secaudit 2026-10 v41, capability-loss review).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V1.6 and the new-app feed ruling).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-closed-node-levels
@@ -286,6 +288,21 @@ await test('POST /v1/datapackages with the public default: the warning; owner B 
     const d = await publishData(A.token, dataName);
     assert((d.status === 201 || d.status === 200) && warned(d.body.data) && !d.body.data.publish_request, `publish: ${show(d)}`);
     assert((await readData(B.token, dataName)).status === 200, 'owner B reads the data package');
+});
+
+// secaudit 2026-10 v41 and its capability-loss review: on a closed node every package is stored at
+// members, and the owner's own agent without storage:read keeps reading them; only a private one asks the word.
+await test('A\'s agent without storage:read reads A\'s members data package (descriptor, rows, feed); A\'s private one answers 403 naming storage:read', async () => {
+    assert((await readData(agent.token, dataName)).status === 200, 'the agent reads the descriptor');
+    const rows = await call(`/v1/datapackages/${A.name}/${dataName}/rows/items`, { token: agent.token });
+    assert(rows.status === 200 && rows.body.data.total === 1, `rows: ${show(rows)}`);
+    const feed = await call(`/v1/odata/${A.name}/${dataName}/items`, { token: agent.token });
+    assert(feed.status === 200, `feed: ${show(feed)}`);
+    const priv = `cnpriv${tag}`;
+    const p = await publishData(A.token, priv, 'private');
+    assert(p.status === 201, `private publish: ${show(p)}`);
+    const refused = await call(`/v1/datapackages/${A.name}/${priv}/rows/items`, { token: agent.token });
+    assert(refused.status === 403 && refused.body.error?.code === 'SCOPE_DENIED', `private: ${show(refused)}`);
 });
 
 console.log('\nWorkspace shares');

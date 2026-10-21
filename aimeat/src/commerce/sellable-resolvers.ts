@@ -16,6 +16,10 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-10-20 — The app-tool resolver reads the manifest through publicManifestTools, so a PRIVATE
+ *     apps.{appId}.tools record answers 404 APP_TOOLS_NOT_FOUND at session creation and at the
+ *     completion re-resolve, as the WebMCP route does (secaudit 2026-10,
+ *     sellable-resolvers.ts:appToolSellableResolver:private-manifest-sold).
  *   2026-10-20 — The app-tool fulfilment refuses an `action_id` whose capability the seller does not
  *     own (CAPABILITY_NOT_OWNED_BY_APP, the collect refunded), and carries the BUYER session's own
  *     authority, read from the completing token, in place of the asserted `{ scopes: ['mcp:use'] }`
@@ -57,6 +61,7 @@ import { AppToolsDocSchema, appToolsKey, applyLockedInput, toolMoneyPrices, type
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { listPaymentHandlers } from './payment-handlers.js';
+import { publicManifestTools } from './app-tool-catalog.js';
 import { integerMicros, percentFee } from './money.js';
 import { readSplit } from './beneficiary-split.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
@@ -207,10 +212,19 @@ export function appToolSellableResolver(): SellableResolver {
 
       const sellerGhii = `${sellerOwner}@${config.nodeId}`;
       const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
-      if (!rec) throw new CommerceError('APP_TOOLS_NOT_FOUND', 404, `App "${appRef}" declares no tool manifest (${appToolsKey(appId)})`);
-      const parsed = AppToolsDocSchema.safeParse(rec.value);
-      if (!parsed.success) throw new CommerceError('INVALID_TOOL_MANIFEST', 422, `App "${appRef}" has a malformed tool manifest: ${parsed.error.message}`);
-      const tool: AppTool | undefined = parsed.data.tools.find((t) => t.name === toolName);
+      // The manifest is read through the same gate as the WebMCP route and the catalog, so a PRIVATE
+      // manifest (an offer the seller withdrew) reads exactly like an absent one here too. This runs
+      // at session creation and again at the completion re-resolve, so a manifest that turned private
+      // after the session opened is refused before anything is collected or run.
+      const tools = publicManifestTools(rec);
+      if (!tools) {
+        if (rec && rec.visibility === 'public') {
+          const parsed = AppToolsDocSchema.safeParse(rec.value);
+          throw new CommerceError('INVALID_TOOL_MANIFEST', 422, `App "${appRef}" has a malformed tool manifest: ${parsed.success ? 'unreadable' : parsed.error.message}`);
+        }
+        throw new CommerceError('APP_TOOLS_NOT_FOUND', 404, `App "${appRef}" declares no tool manifest (${appToolsKey(appId)})`);
+      }
+      const tool: AppTool | undefined = tools.find((t) => t.name === toolName);
       if (!tool) throw new CommerceError('TOOL_NOT_FOUND', 404, `Tool not found on app "${appRef}": ${toolName}`);
 
       // Who the app serves is decided before a session opens, so nothing is collected from somebody

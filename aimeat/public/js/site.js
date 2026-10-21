@@ -16,7 +16,8 @@
  *     session reaches on such a node, and whether this one shows the sign-in page instead
  * @usage import { siteLink, hasSite } from '/js/site.js';
  * @version-history
- *   v1.5.0 — 2026-10-18 — signedInOnly(), SIGN_IN_STEPS and signInFirst(): on a node set to show its
+ *   v1.5.1 — 2026-10-21 — /v1/secret-allow is a sign-in step: the owner allows a secret's use there.
+ *   v1.5.0 — 2026-10-18 —signedInOnly(), SIGN_IN_STEPS and signInFirst(): on a node set to show its
  *     content to signed-in accounts only, a visitor without a session sees the sign-in page in place
  *     of every view except the steps of signing in (plan doc-mvcn6c7e4e5q, V1.5).
  *   v1.0.0 — 2026-07-28 — Initial. Makes every public-page app reference operator-configurable
@@ -144,7 +145,7 @@ export function signedInOnly() {
  * what an agent asked for (allow). Each one asks for the sign-in itself. The agent device consent
  * (/v1/agents/verify) and the OAuth consent are the server's own pages and never reach the SPA.
  */
-export const SIGN_IN_STEPS = new Set(['/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow']);
+export const SIGN_IN_STEPS = new Set(['/v1/app-grant', '/v1/app-open', '/v1/invite', '/v1/oauth-round', '/v1/allow', '/v1/secret-allow']);
 
 /**
  * Whether the view at `pathname` gives way to the sign-in page: on a signed-in-only node, for a

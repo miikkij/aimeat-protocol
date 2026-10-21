@@ -9,6 +9,10 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.11.1 — 2026-10-20 — issueJWT says why it does not sign the `anonymous` claim: a signed claim
+ *     would make requireAuth() refuse the minted anonymous token on the memory and storage routes that
+ *     anonymous mode advertises. Routes for signed-in members ask isAnonymousPrincipal()
+ *     (auth/anonymous-principal.ts) instead (secaudit 2026-10, jwt.ts:issueJWT:anonymous-claim-not-signed).
  *   v1.11.0 — 2026-10-12 — The optional `aud` claim: issueJWT writes it when asked, verifyJWT carries it.
  *     An MCP OAuth access token names this node's MCP endpoint, and the MCP endpoint refuses a token
  *     whose audience is another resource (mcp/oauth-binding.ts, Core 2026-11 MCP-07).
@@ -172,6 +176,12 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.app ? { app: payload.app } : {}),
     ...(payload.via === 'pat' ? { via: 'pat' } : {}),
     ...(typeof payload.auth_time === 'number' ? { auth_time: payload.auth_time } : {}),
+    // `anonymous` is NOT written, on purpose (secaudit 2026-10, anonymous-claim-not-signed). The one
+    // mint that sets it is POST /v1/auth/anonymous, and requireAuth() refuses every credential that
+    // carries the flag, so a signed claim would refuse that token on POST /v1/memory and the
+    // anonymous/* storage upload, which anonymous mode advertises (test/e2e-anonymous.ts). A route
+    // for signed-in members asks auth/anonymous-principal.ts isAnonymousPrincipal() instead, which
+    // knows the shared anonymous principal by its identity whether or not the flag is there.
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)

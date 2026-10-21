@@ -14,6 +14,10 @@
  *   AiJobError · AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.11.0 — 2026-10-20 — `result_visibility` on the record is the level the answer was STORED at,
+ *     which the shared memory write decides (a raise to public waiting for the owner keeps the level
+ *     the record had; a closed node stores 'members'), and `started_by.federated` marks a visitor from another node
+ *     (secaudit 2026-10, ai-jobs/service.ts:writeResult:raw-write-caller-chosen-visibility).
  *   v1.10.0 — 2026-10-20 — AiJobViewer: who is asking after a job, so a read or a cancel can be held to
  *     the jobs that principal started (secaudit 2026-10, ai-jobs.ts:jobs-keyed-by-owner-ghii).
  *   v1.9.0 — 2026-10-19 — `finish_reason` and `truncated` on the record of a text job, so job get and
@@ -40,6 +44,7 @@
 import type { AiOp } from './op.js';
 import type { warningsNote } from '../classification/reader.js';
 import type { AiCallLimitMark } from '../account-limits.js';
+import type { MemoryRecord } from '../../storage/interface.js';
 
 export type { AiOp as AiJobOp } from './op.js';
 
@@ -88,7 +93,11 @@ export interface AiJobRecord {
     size?: string;
 
     result_key: string;
-    result_visibility: 'private' | 'owner' | 'public';
+    /** The level asked for until the answer is written, then the level it was STORED at: the shared
+     *  memory write (services/memory-write.ts) keeps a raise to public at the level the record had
+     *  (a new one: private) while the owner is asked, and stores 'members' on a node that shows its
+     *  content to signed-in accounts only. */
+    result_visibility: MemoryRecord['visibility'];
     /** The version of the record at `result_key` that this job wrote. Set once the answer is
      *  written, which is before `on_done` runs. `readResult` hands the answer out only while the
      *  record is still this version: a later write to the same key is somebody else's data. */
@@ -148,6 +157,9 @@ export interface AiJobStartedBy {
     /** The app an app grant names (`owner/file.html`), when an app started the job. The job's
      *  model call then runs as that app, under the owner's rules for it (secaudit 2026-10, AI-3). */
     app?: string;
+    /** A session from another node (isForeignPrincipal): a visitor is never the owner in person,
+     *  whatever its role list says. */
+    federated?: boolean;
 }
 
 /**

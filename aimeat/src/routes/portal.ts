@@ -22,6 +22,8 @@
  *     and sends the operator to the Config page (it said to set environment variables and restart).
  *   2026-10-11 — The privacy page's {{ownerAnalyticsNotice}}: the paragraph about account holders'
  *     own analytics, written only while one of them uses Clarity or Google Analytics.
+ *   2026-10-21 — /v1/secret-allow joins the SPA routes: the owner allows an extension to send one of
+ *     their secrets to one address (views/secret-allow.js, services/secret-approvals.ts).
  *   2026-10-17 — /v1/allow joins the SPA routes: the owner allows what their agent asked for with one
  *     press (views/agent-allow.js, services/permission-ask.ts).
  *   2026-10-09 — /v1/oauth-round joins the SPA routes: the owner confirms a sign-in round an agent
@@ -594,6 +596,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
     '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
     '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)
+    '/v1/secret-allow', // The owner allows an extension to send a secret to one address (SPA, ?secret=&extension=&host=)
   ];
 
   // The short address of the whole feature list, the one the front page and the footer hand out.

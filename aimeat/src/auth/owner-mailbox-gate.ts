@@ -16,12 +16,15 @@
  * @structure requireOwnerMailboxRead(nodeId)
  * @usage router.get('/v1/messages/inbox', requireAuth(), requireOwnerMailboxRead(config.nodeId), handler)
  * @version-history
+ *   v1.0.3 — 2026-10-20 — The 401 asks isAnonymousPrincipal, so it refuses the minted anonymous token
+ *     too (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.2 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question.
  *   v1.0.1 — 2026-09-13 — The 401 also refuses the anonymous identity optionalAuth injects.
  *   v1.0.0 — 2026-09-12 — Initial, replacing requireRole('owner') on the four mailbox reads.
  */
 import type { Request, Response, NextFunction } from 'express';
 import { deny401, deny403, denyScope403 } from './deny.js';
+import { isAnonymousPrincipal } from './anonymous-principal.js';
 import { mailboxReaderOf, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
 import { isForeignPrincipal } from '../utils/gaii.js';
 
@@ -31,7 +34,7 @@ export function requireOwnerMailboxRead(nodeId: string) {
     // a shared identity carrying role 'agent', so an unauthenticated caller arrives here truthy.
     // requireAuth() ahead of this one already refuses that principal, and this line does not depend
     // on it having run (invariant 6).
-    if (!req.auth || req.auth.anonymous) { deny401(req, res, 'Authentication required'); return; }
+    if (!req.auth || isAnonymousPrincipal(req.auth)) { deny401(req, res, 'Authentication required'); return; }
     if (mailboxReaderOf(req.auth, nodeId)) { next(); return; }
     const roles = req.auth.roles ?? [];
     if (isForeignPrincipal(req.auth)) {

@@ -25,12 +25,16 @@
  *   owner, the owner is told: a person must see when their AI acted for them.
  * @structure PUBLISH_REQUEST_PREFIX · PublishKind · PublishRequest · PublishRequester ·
  *   inPublishQueue · readPublishRequest · listPublishRequests · effectiveState · summarizePublishRequest ·
- *   filePublishRequest · settlePublishRequest · requesterName · approveUrl · PublishApplyResult ·
- *   PublishApplier
+ *   filePublishRequest · settlePublishRequest · settleRequestsForBinnedRecord · memoryValueDigest ·
+ *   requesterName · approveUrl · PublishApplyResult · PublishApplier
  * @usage
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-20 — memoryValueDigest() and settleRequestsForBinnedRecord(): a request binds the record's
+ *     content digest beside its version (left out of the fingerprint), and a binned record settles
+ *     every request still waiting on it `outdated` (secaudit 2026-10,
+ *     apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover).
  *   2026-10-20 — The kind `consent`: a consent whose recipient is `*` reaches the same readers a
  *     public record does, so it asks the same gate (secaudit 2026-10,
  *     grantConsent:wildcard-recipient-skips-publish-gate).
@@ -112,6 +116,21 @@ export interface PublishStoreCtx { storage: Storage; config: AimeatConfig }
 
 const publishRequestKey = (id: string): string => `${PUBLISH_REQUEST_PREFIX}${id}`;
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
+
+/**
+ * The digest of a record's value that a request binds beside its version (`target.digest`, and
+ * `target.entry_digests` for a knowledge package). A version is not unique over a key's lifetime: a
+ * binned key re-created by a create-if-absent write starts again at version 1, so the version alone
+ * let an approval publish content written after the request (secaudit 2026-10,
+ * apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover). Canonical JSON, so the two
+ * backends give the same digest for the same value.
+ */
+export function memoryValueDigest(value: unknown): string {
+  return sha256(stableStringify(value ?? null));
+}
+
+/** The target fields that bind the request to one content, not to one target: left out of the fingerprint. */
+const CONTENT_BINDING_FIELDS = new Set(['version', 'digest', 'entry_digests']);
 
 /** One filing or decision at a time per owner, in this process: two taps cannot both approve. */
 export function inPublishQueue<T>(ownerGhii: string, work: () => Promise<T>): Promise<T> {
@@ -214,8 +233,8 @@ export async function filePublishRequest(
   ctx: PublishStoreCtx, ownerGhii: string, draft: PublishRequestDraft,
 ): Promise<{ ok: true; request: PublishRequest; alreadyWaiting: boolean } | PublishRequestFail> {
   const { storage } = ctx;
-  // The version is left out: a second ask about the same target is the same request.
-  const where = Object.fromEntries(Object.entries(draft.target).filter(([k]) => k !== 'version'));
+  // The version and the content digests are left out: a second ask about the same target is the same request.
+  const where = Object.fromEntries(Object.entries(draft.target).filter(([k]) => !CONTENT_BINDING_FIELDS.has(k)));
   const fingerprint = sha256(stableStringify({
     kind: draft.kind, by: draft.requested_by.principal, target: where, to: draft.change.to,
   }));
@@ -348,4 +367,49 @@ export async function settlePublishRequest(
     event: 'publish.request_settled', owner: ownerGhii, id: request.id, state, by: how.by,
   });
   return settled;
+}
+
+/** Does this waiting request name the record (namespace, key): a memory record, or a knowledge package's manifest or entry? */
+function namesRecord(request: PublishRequest, namespace: string, key: string): boolean {
+  if (String(request.target.namespace ?? '') !== namespace) return false;
+  if (request.kind === 'memory') return String(request.target.key ?? '') === key;
+  if (request.kind !== 'knowledge') return false;
+  if (`packages/${String(request.target.package_id ?? '')}/manifest` === key) return true;
+  try {
+    const entries = JSON.parse(String(request.target.entries ?? '{}')) as Record<string, unknown>;
+    return !!entries && typeof entries === 'object' && Object.prototype.hasOwnProperty.call(entries, key);
+  } catch (err) {
+    // A damaged entry list names nothing here; the applier refuses it on approval.
+    logger.warn('Publish request: the entry list of a knowledge request does not parse', { id: request.id, error: String(err) });
+    return false;
+  }
+}
+
+/**
+ * A record went into the bin: every request still waiting on it is settled `outdated`, and the one
+ * who asked is told. What the owner would approve is gone, and a later write at the same key starts a
+ * new life (a create-if-absent write takes the binned row over at version 1), so approving the old
+ * request would publish content written after it (secaudit 2026-10,
+ * apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover). Best-effort: a failure here
+ * leaves the delete done, and the applier's version and digest check still refuses the approval.
+ */
+export async function settleRequestsForBinnedRecord(
+  ctx: PublishStoreCtx, ownerGhii: string, namespace: string, key: string,
+): Promise<number> {
+  try {
+    return await inPublishQueue(ownerGhii, async () => {
+      const now = Date.now();
+      const waiting = (await listPublishRequests(ctx.storage, ownerGhii))
+        .filter(r => r.state === 'awaiting_owner' && !publishRequestExpired(r, now) && namesRecord(r, namespace, key));
+      for (const r of waiting) {
+        await settlePublishRequest(ctx, ownerGhii, r, 'outdated', {
+          by: null, outcome: { reason: `the record ${key} was deleted after the request was made` },
+        });
+      }
+      return waiting.length;
+    });
+  } catch (err) {
+    logger.warn('Publish request: could not settle the requests on a deleted record', { owner: ownerGhii, namespace, key, error: String(err) });
+    return 0;
+  }
 }

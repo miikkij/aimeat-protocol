@@ -36,6 +36,9 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   2026-10-21 — callerOwner asks isAnonymousPrincipal: the token POST /v1/auth/anonymous mints carries
+ *     no anonymous claim and was given the anonymous account's owner scope (secaudit 2026-10,
+ *     anonymous-claim-not-signed).
  *   v1.6.1 — 2026-10-19 — POST /v1/provenance attaches the record id on the attached record's version
  *     (setMemoryIfVersion) and reads again on a conflict (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.6.0 — 2026-10-18 — POST /v1/provenance/embed: the provenance written into an exported PNG, JPEG,
@@ -69,6 +72,7 @@ import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
   AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AI_UPSTREAM_MARKS,
@@ -165,7 +169,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
   function callerOwner(req: Request): string | undefined {
     // optionalAuth() injects a shared anonymous identity, so `req.auth` is truthy even for an
     // anonymous caller — checking `!req.auth` here would hand every visitor the same owner scope.
-    if (!req.auth || req.auth.anonymous === true) return undefined;
+    if (!req.auth || isAnonymousPrincipal(req.auth)) return undefined;
     return ownerGhiiOf(resolve(req));
   }
 

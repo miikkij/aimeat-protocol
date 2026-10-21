@@ -17,7 +17,11 @@
  *       aimeat_datapackage_publish;
  *     - the refusals: the asker cannot approve its own request (403 OWN_REQUEST); an agent of another
  *       owner cannot widen A's package (403 FORBIDDEN).
+ *     - an approval opens only the version it names: an earlier private version stays closed to the
+ *       anonymous caller, another owner and the owner's agent without storage:read, pinned or listed
+ *       (secaudit 2026-10 v42).
  * @version-history
+ *   v1.1.0 — 2026-10-20 — D5: approving version 2 public opens no earlier private version (secaudit 2026-10 v42).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: packages, knowledge, data packages).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-gate-packages
@@ -305,6 +309,55 @@ await test('D4. The publisher and the owner in person publish a public data pack
     const o = await publishData(A.token, `pgpdataown${short}`, ROWS);
     assert(o.status === 201, `owner: ${show(o)}`);
     assert((await anonData(`pgpdataown${short}`)).status === 200, 'owner data public');
+});
+
+// secaudit 2026-10 v42: the approval names one version, and only that version opens. Before the fix
+// the public pointer opened every stored version: an anonymous caller listed the earlier private
+// version and read its rows with ?version=, while its files stayed private at /v1/pub.
+await test('D5. Approving version 2 public opens no earlier private version: anonymous gets 404 pinned to version 1, and the list leaves it out', async () => {
+    const name = `pgpdataver${short}`;
+    const v1 = await publishData(asker.token, name, [{ id: 1, label: 'PRIVATE-A1' }, { id: 2, label: 'PRIVATE-A2' }], 'private');
+    assert(v1.status === 201 && !v1.body.data.publish_request, `version 1 (private): ${show(v1)}`);
+    const h1 = v1.body.data.content_hash as string;
+    const v2 = await publishData(asker.token, name, [{ id: 1, label: 'BENIGN-B1' }]);
+    assert(v2.status === 202 && v2.body.data.publish_request?.kind === 'datapackage', `version 2: ${show(v2)}`);
+    const h2 = v2.body.data.content_hash as string;
+    const d = await decide(v2.body.data.publish_request.request_id, A.token, 'approve');
+    assert(d.status === 200 && d.body.data.request.state === 'approved', `approve: ${show(d)}`);
+
+    const base = `/v1/datapackages/${A.name}/${name}`;
+    const pin = `?version=${encodeURIComponent(h1)}`;
+    // Version 2, the approved one, is public.
+    const cur = await call(`${base}/rows/items`);
+    assert(cur.status === 200 && JSON.stringify(cur.body.data.rows).includes('BENIGN-B1'), `anonymous reads version 2: ${show(cur)}`);
+    // Version 1 is not: rows, descriptor and the OData feed pinned to it answer 404, with no row.
+    for (const path of [`${base}/rows/items${pin}`, `${base}${pin}`, `/v1/odata/${A.name}/${name}/items${pin}`]) {
+        const r = await call(path);
+        assert(r.status === 404, `anonymous ${path}: ${show(r)}`);
+        assert(!JSON.stringify(r.body).includes('PRIVATE-A'), `anonymous ${path}: a private row leaked`);
+    }
+    const anonList = await call(`${base}/versions`);
+    const anonHashes = (anonList.body.data?.versions ?? []).map((v: Body) => v.contentHash);
+    assert(anonList.status === 200 && anonHashes.includes(h2) && !anonHashes.includes(h1), `anonymous versions: ${show(anonList)}`);
+    assert(!JSON.stringify(anonList.body).includes('PRIVATE'), 'anonymous versions list shows version 1');
+    // Another owner's account is refused version 1 too.
+    const other = await call(`${base}/rows/items${pin}`, { token: B.token });
+    assert(other.status === 404, `owner B pinned to version 1: ${show(other)}`);
+    // The owner's agent without storage:read reads the public version, and is told what it lacks for version 1.
+    const askerPinned = await call(`${base}/rows/items${pin}`, { token: asker.token });
+    assert(askerPinned.status === 403 && askerPinned.body.error?.code === 'SCOPE_DENIED', `asker pinned to version 1: ${show(askerPinned)}`);
+    const askerList = await call(`${base}/versions`, { token: asker.token });
+    assert(!(askerList.body.data?.versions ?? []).some((v: Body) => v.contentHash === h1), `asker versions: ${show(askerList)}`);
+
+    // The owner in person, and the owner's agent holding storage:read, read every version.
+    const reader = await makeAgent(BASE, A, ['storage:read']);
+    for (const [who, token] of [['owner', A.token], ['storage:read agent', reader.token]] as const) {
+        const own = await call(`${base}/rows/items${pin}`, { token });
+        assert(own.status === 200 && JSON.stringify(own.body.data.rows).includes('PRIVATE-A1'), `${who} reads version 1: ${show(own)}`);
+        const list = await call(`${base}/versions`, { token });
+        const hashes = (list.body.data?.versions ?? []).map((v: Body) => v.contentHash);
+        assert(hashes.includes(h1) && hashes.includes(h2), `${who} versions: ${show(list)}`);
+    }
 });
 
 await test('Cleanup: the gate back to off', async () => {

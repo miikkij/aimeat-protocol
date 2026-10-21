@@ -14,6 +14,20 @@
  *   PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   2026-10-20 -- listOwnerScopeMemory and listOwnerScopeShown take an optional `view` (the reader's
+ *     principal and whether it reads as the owner), applied with ownerScopeView before the GHII-first
+ *     dedupe, so a copy the reader may not see does not hide the reader's own record. The MCP
+ *     knowledge tools pass it: they listed the owner's and sibling agents' private packages to any
+ *     agent (secaudit 2026-10, v56).
+ *   2026-10-20 -- ownPitfallRecords and listLearnedPitfalls pass an optional `view` through to
+ *     listOwnerScopeShown, so the app-development overview's learned section reads as the caller may
+ *     (secaudit 2026-10, the v56 shape on services/appdev-overview.ts). pitfallIndex and
+ *     queryLearnedPitfalls take the view too, and without one read as not reading as the owner: an
+ *     agent without memory:read-as-owner listed its owner's and siblings' private learned entries
+ *     through GET /v1/appdev/pitfalls/index, /learned and aimeat_appdev_pitfall_list.
+ *   2026-10-21 -- OwnerScopeViewer.onOmitted: listOwnerScopeMemory says how many keys the visibility
+ *     rule left out, so a surface can name the permission that shows them instead of answering a
+ *     shorter list or "not found" with no reason (capability-loss review).
  *   v1.5.1 -- 2026-10-11 -- Deleting an entry kept to its owner tells that owner's streams only.
  *   v1.5.0 -- 2026-10-06 -- pitfallIndex(): the merged index (own, curated, shared by scope) that
  *     aimeat_appdev_pitfall_list built inline, moved here so GET /v1/appdev/pitfalls/index answers
@@ -54,6 +68,18 @@ import { writeMemoryRecord } from './memory-write.js';
 import type { ContentReader } from './classification/reader.js';
 import { presentMemories, classificationWarningOf } from './classification/present-memory.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
+import { ownerScopeView } from './owner-scope-read.js';
+
+/** Who reads an owner-scope listing, for ownerScopeView: the principal and whether it reads as the owner. */
+export interface OwnerScopeViewer {
+    principal: string;
+    readsAll: boolean;
+    /**
+     * Told how many keys the visibility rule left out: keys some identity holds and this reader sees
+     * no copy of. A surface passes it to say so, and which permission would show them (READ_AS_OWNER_NOTE).
+     */
+    onOmitted?: (keys: number) => void;
+}
 
 export const PITFALL_PACKAGE_ID = 'appdev-pitfalls';
 export const PITFALL_PREFIX = `packages/${PITFALL_PACKAGE_ID}/`;
@@ -114,6 +140,7 @@ function ownerOf(callerGaii: string, _config: AimeatConfig): string | null {
 export async function listOwnerScopeMemory(
     storage: Storage, config: AimeatConfig, callerGaii: string,
     opts: { prefix?: string; tags?: string[]; visibility?: string },
+    view?: OwnerScopeViewer,
 ): Promise<MemoryRecord[]> {
     const owner = ownerOf(callerGaii, config);
     if (!owner) return storage.listMemory(callerGaii, opts);
@@ -121,7 +148,15 @@ export async function listOwnerScopeMemory(
     const agents = await storage.getAgentsByOwner(owner);
     const owners = [ownerGhii, ...agents.map(a => a.gaii)];
     const priority = new Map(owners.map((g, i) => [g, i]));
-    const rows = await storage.listMemoryForOwners(owners, opts);
+    // The visibility rule first, the dedupe after: a hidden owner copy must not shadow the reader's own.
+    const listed = await storage.listMemoryForOwners(owners, opts);
+    const rows = view ? ownerScopeView(listed, view.principal, view.readsAll) : listed;
+    if (view?.onOmitted) {
+        // A key counts as left out only when no copy of it is shown: a hidden owner copy beside the
+        // reader's own is not something the reader is missing.
+        const shownKeys = new Set(rows.map(r => r.key));
+        view.onOmitted(new Set(listed.filter(r => !shownKeys.has(r.key)).map(r => r.key)).size);
+    }
     rows.sort((x, y) => (priority.get(x.ownerGaii) ?? 0) - (priority.get(y.ownerGaii) ?? 0));
     const seen = new Set<string>();
     const out: MemoryRecord[] = [];
@@ -140,8 +175,9 @@ export async function listOwnerScopeMemory(
 export async function listOwnerScopeShown(
     storage: Storage, config: AimeatConfig, reader: ContentReader,
     opts: { prefix?: string; tags?: string[]; visibility?: string },
+    view?: OwnerScopeViewer,
 ): Promise<MemoryRecord[]> {
-    return presentMemories(reader, await listOwnerScopeMemory(storage, config, reader.identity, opts));
+    return presentMemories(reader, await listOwnerScopeMemory(storage, config, reader.identity, opts, view));
 }
 
 /** The identity set (GHII + agent GAIIs) of the caller's owner — for own/other filtering. */
@@ -238,9 +274,9 @@ function toEntry(rec: MemoryRecord, source: 'own' | 'shared'): LearnedPitfallEnt
 
 /** The reader's own learned entries (any visibility, manifest left out), as this reader may see them. */
 export async function ownPitfallRecords(
-    storage: Storage, config: AimeatConfig, reader: ContentReader,
+    storage: Storage, config: AimeatConfig, reader: ContentReader, view?: OwnerScopeViewer,
 ): Promise<MemoryRecord[]> {
-    return (await listOwnerScopeShown(storage, config, reader, { prefix: PITFALL_PREFIX, tags: ['pitfall'] }))
+    return (await listOwnerScopeShown(storage, config, reader, { prefix: PITFALL_PREFIX, tags: ['pitfall'] }, view))
         .filter(r => r.key !== PITFALL_MANIFEST_KEY);
 }
 
@@ -273,9 +309,9 @@ async function listSharedByOthers(
  */
 export async function listLearnedPitfalls(
     storage: Storage, config: AimeatConfig, reader: ContentReader,
-    opts: { includeShared?: boolean } = {},
+    opts: { includeShared?: boolean; view?: OwnerScopeViewer } = {},
 ): Promise<LearnedPitfallEntry[]> {
-    const own = (await ownPitfallRecords(storage, config, reader)).map(r => toEntry(r, 'own'));
+    const own = (await ownPitfallRecords(storage, config, reader, opts.view)).map(r => toEntry(r, 'own'));
     if (!opts.includeShared) return own;
     return [...own, ...await listSharedByOthers(storage, config, reader)];
 }
@@ -414,8 +450,10 @@ export function filterPitfalls<T extends PitfallLike>(entries: T[], query: Pitfa
 export async function queryLearnedPitfalls(
     storage: Storage, config: AimeatConfig, reader: ContentReader,
     query: PitfallListQuery & { includeShared?: boolean },
+    /** Who reads, for ownerScopeView. No view reads as not reading as the owner: shows less, never more. */
+    view: OwnerScopeViewer = { principal: reader.identity, readsAll: false },
 ) {
-    const own = await listLearnedPitfalls(storage, config, reader);
+    const own = await listLearnedPitfalls(storage, config, reader, { view });
     const shared = await listSharedByOthers(storage, config, reader);
     const scope = query.includeShared ? [...own, ...shared] : own;
     return { ...filterPitfalls(scope, query), community: shared.length };
@@ -464,12 +502,14 @@ export interface PitfallIndexQuery {
  */
 export async function pitfallIndex(
     storage: Storage, config: AimeatConfig, reader: ContentReader, query: PitfallIndexQuery,
+    /** Who reads, for ownerScopeView. No view reads as not reading as the owner: shows less, never more. */
+    view: OwnerScopeViewer = { principal: reader.identity, readsAll: false },
 ): Promise<Record<string, unknown>> {
     const scope = query.scope ?? 'all';
     const wantStatus = query.status ?? 'active';
     const entries: PitfallLike[] = [];
     if (scope === 'own' || scope === 'all') {
-        for (const rec of await ownPitfallRecords(storage, config, reader)) entries.push(asIndexEntry('learned', rec));
+        for (const rec of await ownPitfallRecords(storage, config, reader, view)) entries.push(asIndexEntry('learned', rec));
     }
     if (scope === 'platform' || scope === 'all') {
         for (const p of getAppdevPitfalls({ includeOutdated: wantStatus !== 'active' })) {

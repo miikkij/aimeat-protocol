@@ -3,6 +3,9 @@
 // Run: cd aimeat && AIMEAT_ANONYMOUS=true PORT=40251 npx tsx src/index.ts
 // Then: cd aimeat && npx tsx test/e2e-anonymous.ts
 
+import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
+
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 
@@ -172,6 +175,155 @@ await test('Anonymous PRESIGNED mint INSIDE anonymous/* still works end to end',
     const result = await put.json() as { success?: boolean; key?: string; size?: number };
     assert(result.success === true && result.key === key, `Expected the file stored under ${key}, got ${JSON.stringify(result)}`);
     assert(result.size === 7, `Expected 7 raw bytes (no base64 inflation), got ${result.size}`);
+});
+
+// ─── Phase 3: The people directory is for signed-in members ───
+// secaudit 2026-10, jwt.ts:issueJWT:anonymous-claim-not-signed. The token POST /v1/auth/anonymous
+// mints carries no anonymous claim, so requireAuth() took it for an ordinary agent, and with
+// catalogue:read it listed the people directory, which the route keeps for signed-in members, on
+// REST and over MCP. Both are refused now by the principal's identity; the memory flows above keep
+// working with the same token, and a signed-in owner and their agent still read the directory.
+console.log('\nPhase 3 — People directory (signed-in members only)');
+
+const dirOwner = await (async () => {
+    try { return await registerOwner(BASE, `anondir${Date.now().toString(36)}`); }
+    catch (err) { console.error(`  fixture: ${(err as Error).message}`); return null; }
+})();
+
+await test('Anonymous token → GET /v1/catalogue/directory is 401 AUTH_REQUIRED', async () => {
+    const { status, body } = await json('/v1/catalogue/directory?type=people', anonAuth());
+    assert(status === 401, `Expected 401, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.error?.code === 'AUTH_REQUIRED', `Expected AUTH_REQUIRED, got ${body.error?.code}`);
+});
+
+await test('A signed-in owner still reads the people directory (positive control)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const { status, body } = await json('/v1/catalogue/directory?type=people', {
+        headers: { Authorization: `Bearer ${dirOwner!.token}` },
+    });
+    assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(Array.isArray(body.data?.entries), 'Expected an entries list');
+});
+
+await test('Anonymous token → MCP aimeat_catalogue_directory is refused AUTH_REQUIRED', async () => {
+    const session = await openSession(BASE, anonToken, 'e2e-anonymous-directory');
+    const r = await callTool(session, 'aimeat_catalogue_directory', {});
+    assert(r.isError, `Expected a refusal, got ${r.text.slice(0, 200)}`);
+    assert(/^AUTH_REQUIRED: /.test(r.text), `Expected AUTH_REQUIRED, got ${r.text.slice(0, 200)}`);
+});
+
+await test('An agent of a signed-in owner still lists the directory over MCP (positive control)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const agent = await makeAgent(BASE, dirOwner!, ['catalogue:read']);
+    const session = await openSession(BASE, agent.token, 'e2e-anonymous-directory-member');
+    const r = await callTool(session, 'aimeat_catalogue_directory', {});
+    assert(!r.isError, `Expected the listing, got ${r.text.slice(0, 200)}`);
+    assert(Array.isArray(r.data), `Expected a list, got ${r.text.slice(0, 200)}`);
+});
+
+await test('The anonymous token still writes its own memory after the refusals', async () => {
+    const key = `anonymous.after-directory-${Date.now()}`;
+    const { status, body } = await json('/v1/memory', anonAuth({
+        method: 'POST',
+        body: JSON.stringify({ key, value: { ok: true } }),
+    }));
+    assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    await json(`/v1/memory/${encodeURIComponent(key)}`, anonAuth({ method: 'DELETE' }));
+});
+
+// ─── Phase 3b: Every guard that asked only the anonymous flag ───
+// Same root cause as Phase 3 (secaudit 2026-10, anonymous-claim-not-signed). Each guard below read
+// `req.auth.anonymous`, which the minted token never carries, so each one took the shared anonymous
+// principal for a signed-in caller. They ask isAnonymousPrincipal now. One assertion per guard: the
+// minted token gets what the anonymous internet gets, and a signed-in owner keeps what it had.
+console.log('\nPhase 3b — Signed-in-only guards refuse the minted token too');
+
+const ownerAuth = (opts: RequestInit = {}): RequestInit =>
+    ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${dirOwner?.token ?? ''}` } });
+
+let publicBoardId = '';
+let privateBoardId = '';
+await test('fixture: the owner opens a public and a private board', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    for (const visibility of ['public', 'private'] as const) {
+        const r = await json('/v1/boards', ownerAuth({ method: 'POST', body: JSON.stringify({ name: `anon-guard-${visibility}-${Date.now()}`, visibility }) }));
+        // 201: the owner in person opens it at once (202 would be a publish request, which this test does not want).
+        assert(r.status === 201, `create ${visibility} board: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+        const id = r.body.data?.id ?? r.body.data?.board?.id;
+        assert(typeof id === 'string', `board id: ${JSON.stringify(r.body.data).slice(0, 200)}`);
+        if (visibility === 'public') publicBoardId = id; else privateBoardId = id;
+    }
+});
+
+await test('GET /v1/boards: the minted token gets no member roster, the owner does', async () => {
+    const anon = await json('/v1/boards', anonAuth());
+    const a = (anon.body.data?.boards ?? []).find((b: any) => b.id === publicBoardId);
+    assert(a?.id === publicBoardId, `the public board is listed to the minted token: ${JSON.stringify(anon.body).slice(0, 200)}`);
+    assert(a.owner_gaii === undefined && a.allowed_gaiis === undefined, `no roster for the minted token, got ${JSON.stringify(a)}`);
+    const own = await json('/v1/boards', ownerAuth());
+    const o = (own.body.data?.boards ?? []).find((b: any) => b.id === publicBoardId);
+    assert(o && typeof o.owner_gaii === 'string', `the owner sees the roster: ${JSON.stringify(o)}`);
+});
+
+await test('GET /v1/boards/:private/posts: the minted token is 401, the owner reads', async () => {
+    const anon = await json(`/v1/boards/${privateBoardId}/posts`, anonAuth());
+    assert(anon.status === 401, `minted token on a private board: ${anon.status} ${JSON.stringify(anon.body.error)}`);
+    const own = await json(`/v1/boards/${privateBoardId}/posts`, ownerAuth());
+    assert(own.status === 200, `owner: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('GET /v1/ghii/list: the minted token is 401, the owner lists', async () => {
+    const anon = await json('/v1/ghii/list', anonAuth());
+    assert(anon.status === 401 && anon.body.error?.code === 'AUTH_REQUIRED', `minted token: ${anon.status} ${JSON.stringify(anon.body.error)}`);
+    const own = await json('/v1/ghii/list', ownerAuth());
+    assert(own.status === 200, `owner: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('GET /v1/ghii/anonymous@node: no agent roster for the minted token; the owner sees their own', async () => {
+    const anon = await json(`/v1/ghii/${encodeURIComponent(`anonymous@${NODE_ID}`)}`, anonAuth());
+    assert(anon.status === 200, `profile: ${anon.status}`);
+    assert(anon.body.data?.agents === undefined, `the minted token is not the anonymous account's owner: ${JSON.stringify(anon.body.data?.agents)}`);
+    const own = await json(`/v1/ghii/${encodeURIComponent(dirOwner!.ghii)}`, ownerAuth());
+    assert(Array.isArray(own.body.data?.agents), `the owner sees their roster: ${JSON.stringify(own.body.data).slice(0, 200)}`);
+});
+
+await test('GET /v1/owners/anonymous: no roles or roster for the minted token; the owner sees their own', async () => {
+    const anon = await json('/v1/owners/anonymous', anonAuth());
+    assert(anon.status === 200, `owner card: ${anon.status}`);
+    assert(anon.body.data?.roles === undefined && anon.body.data?.agents === undefined,
+        `the minted token is not the anonymous account: ${JSON.stringify(anon.body.data)}`);
+    const own = await json(`/v1/owners/${dirOwner!.name}`, ownerAuth());
+    assert(Array.isArray(own.body.data?.roles), `the owner sees their roles: ${JSON.stringify(own.body.data)}`);
+});
+
+await test('GET /v1/apps?own=true: the minted token is 401, the owner lists', async () => {
+    const anon = await json('/v1/apps?own=true', anonAuth());
+    assert(anon.status === 401, `minted token: ${anon.status} ${JSON.stringify(anon.body.error)}`);
+    const own = await json('/v1/apps?own=true', ownerAuth());
+    assert(own.status === 200, `owner: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('POST /v1/auth/refresh: the minted token is not renewed (401); an agent token is', async () => {
+    const anon = await json('/v1/auth/refresh', anonAuth({ method: 'POST', body: '{}' }));
+    assert(anon.status === 401, `minted token refresh: ${anon.status} ${JSON.stringify(anon.body).slice(0, 200)}`);
+    const agent = await makeAgent(BASE, dirOwner!, ['memory:read']);
+    const r = await json('/v1/auth/refresh', { method: 'POST', body: '{}', headers: { Authorization: `Bearer ${agent.token}` } });
+    assert(r.status === 200, `agent refresh: ${r.status} ${JSON.stringify(r.body.error)}`);
+});
+
+await test('GET /v1/ghii/cors (requireOwnerPrincipal): the minted token is 401, the owner reads', async () => {
+    const anon = await json('/v1/ghii/cors', anonAuth());
+    assert(anon.status === 401, `minted token: ${anon.status} ${JSON.stringify(anon.body.error)}`);
+    const own = await json('/v1/ghii/cors', ownerAuth());
+    assert(own.status === 200, `owner: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('POST /v1/docsign/validate with a stored file: the minted token is 401, the owner is read as themself', async () => {
+    const body = JSON.stringify({ storage_key: 'anonymous/no-such-file.pdf' });
+    const anon = await json('/v1/docsign/validate', anonAuth({ method: 'POST', body }));
+    assert(anon.status === 401, `minted token: ${anon.status} ${JSON.stringify(anon.body.error)}`);
+    const own = await json('/v1/docsign/validate', ownerAuth({ method: 'POST', body: JSON.stringify({ storage_key: 'no-such-file.pdf' }) }));
+    assert(own.status !== 401, `owner is not refused as signed out: ${own.status} ${JSON.stringify(own.body.error)}`);
 });
 
 // ─── Phase 4: Anonymous Prompts ───

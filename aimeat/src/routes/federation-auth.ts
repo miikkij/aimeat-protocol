@@ -14,6 +14,11 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   v1.4.2 -- 2026-10-21 -- Only an end time that is in the past ends an auth consent. An end time that
+ *     does not parse is honoured, as before v1.4.1: no record asked for that refusal (authConsentEnded).
+ *   v1.4.1 -- 2026-10-20 --An auth consent whose end time has passed is no consent: verify answers
+ *     401 FEDERATION_AUTH_FAILED for it, whether or not the consent-expiry job has marked the row yet
+ *     (secaudit 2026-10, federation-auth.ts:verify:auth-consent-expiry-unchecked).
  *   v1.4.0 -- 2026-10-10 -- A peer that has once sent a verified audience or delivery proof is refused a
  *     verify request without one, whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal;
  *     secaudit 2026-10-10 I21).
@@ -46,6 +51,19 @@ import { sign, verify } from '../auth/keypair.js';
 import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../services/signed-node-request.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Has this auth consent's end time passed? Only a time that parses and lies at or before `now` ends
+ * the consent. No end time, or one that does not parse, keeps the consent as it was before the
+ * end time was checked here (v1.4.1): the record that asked for the check (secaudit 2026-10,
+ * auth-consent-expiry-unchecked) is about a consent that ended, and an end time nobody can read
+ * names no moment at which it ended.
+ */
+export function authConsentEnded(expires: string | Date | null | undefined, now: Date): boolean {
+    if (!expires) return false;
+    const end = new Date(expires).getTime();
+    return Number.isFinite(end) && end <= now.getTime();
+}
 
 export function federationAuthRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -131,8 +149,16 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             // and filter for auth-related consents targeting this node.
             const ghii = `${username.toLowerCase().trim()}@${config.nodeId}`;
             const consents = await storage.listConsents(ghii, { status: 'active' });
+            // A consent with an end time stops granting at that time. listConsents filters by status
+            // only, and a row stays 'active' until the consent-expiry job runs (every ten minutes, and
+            // not at all when the consent layer is off), so the end time is compared here, as
+            // services/consent.ts does for its readers (secaudit 2026-10,
+            // federation-auth.ts:verify:auth-consent-expiry-unchecked). An end time that does not
+            // parse is honoured, as before (authConsentEnded).
+            const consentCheckedAt = new Date();
             const hasAuthConsent = consents.some(c => {
                 if (c.scope !== 'auth') return false;
+                if (authConsentEnded(c.expires, consentCheckedAt)) return false;
                 if (c.recipient === `node:${requesting_node}`) return true;
                 if (c.recipient === '*') return true;
                 if (c.recipient === 'domain:*') return true;

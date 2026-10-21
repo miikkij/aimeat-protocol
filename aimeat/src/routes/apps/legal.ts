@@ -22,6 +22,8 @@
  *   the MCP tool, both through services/app-legal.ts.
  * @structure registerLegalRoutes(router, config, storage, canonicalOwner)
  * @version-history
+ *   2026-10-21 — authenticated() asks isAnonymousPrincipal, so the minted anonymous token is no owner of
+ *     an app here (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.6.1 — 2026-10-08 — A legal page's label is decided for a public surface when served (it is served without the access code).
  *   v1.6.0 — 2026-10-05 — The audit archive and the keep setting's logic (the owner test, the
  *     refusals, the account-holder test for a limit that deletes) moved to services/app-audit-keep.ts;
@@ -56,6 +58,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
 import { optionalAuth, requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { detectLocale } from '../../i18n.js';
 import { sandboxedCsp } from './inline-frame.js';
 import {
@@ -88,7 +91,7 @@ export function registerLegalRoutes(
    * therefore answered "yes, this is the owner" to somebody who had presented nothing, and handed
    * them the owner's own unpublished legal drafts (security invariant 6).
    */
-  const authenticated = (req: Request): boolean => !!req.auth && req.auth.anonymous !== true;
+  const authenticated = (req: Request): boolean => !!req.auth && !isAnonymousPrincipal(req.auth);
 
   /** The app, or null; false when the viewer may not know it exists. */
   async function visibleApp(req: Request, owner: string, filename: string): Promise<AppRecord | null | 'hidden'> {

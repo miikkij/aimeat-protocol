@@ -6,6 +6,11 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-10-21 — 45 and 46 (capability-loss review): a narrowed maker's refusal tells the owner where to
+ *     allow the word and runs again after; an app's agent_task schedule from before 2026-10-05 still runs.
+ *   2026-10-20 — Phase 13 (secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker): an
+ *     agent_task schedule whose maker the owner deleted, or narrowed to drop task:write, puts no task
+ *     in the target's queue and the run log says why; a live maker's schedule still does.
  *   2026-10-20 — Phase 12 (secaudit 2026-10): who manages whose schedule, by the caller's KIND —
  *     an ecosystem app manages only what it made, an agent manages no app-made schedule, and a
  *     sibling agent still manages an agent-made one; and an `ai` schedule's output_visibility is
@@ -51,6 +56,8 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -946,6 +953,114 @@ await test('42. An ai schedule may not be pointed at an organism the owner is no
     });
     assert(okEdit.status === 200, `an ordinary edit was refused: ${okEdit.status} ${JSON.stringify(okEdit.body?.error)}`);
     await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
+});
+
+console.log('\nPhase 13 -- An agent_task schedule fires as its maker, asked at every fire');
+
+// secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker. services/schedule-actor.ts states the
+// rule: a schedule acts as its maker, the maker is looked up again at every fire, and a maker that is
+// gone does not fire. The ai kind asked; agent_task did not, so an agent the owner had deleted kept
+// putting its work orders into a sibling's queue, presented as the owner's. The fire now asks, and a
+// maker that is gone or no longer holds task:write puts no task in the queue; the run log says why.
+
+const V65_TARGET = 'v65target';
+async function v65Tasks(title: string): Promise<any[]> {
+    const { body } = await json(`/v1/agents/${V65_TARGET}/tasks?per_page=100`, { headers: auth1 });
+    return (body.data.tasks || []).filter((t: any) => t.title === title);
+}
+async function v65Schedule(makerToken: string, title: string): Promise<string> {
+    const made = await json('/v1/schedules', {
+        method: 'POST', headers: { Authorization: `Bearer ${makerToken}` },
+        body: JSON.stringify({
+            kind: 'agent_task', agent_name: V65_TARGET, cron: '0 0 1 1 *', display_name: title,
+            task_template: { title, description: 'written by the maker agent' },
+        }),
+    });
+    assert(made.status === 201, `maker create: ${made.status} ${JSON.stringify(made.body?.error)}`);
+    return made.body.data.schedule.id;
+}
+/** Run the schedule now as the owner in person, and read back what the run log kept. */
+async function v65Fire(id: string) {
+    const run = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth1 });
+    assert(run.status === 200, `trigger ${run.status}: ${JSON.stringify(run.body?.error)}`);
+    const got = await json(`/v1/schedules/${id}`, { headers: auth1 });
+    return { outcome: run.body.data.outcome as string, schedule: got.body.data.schedule, runs: got.body.data.runs as any[] };
+}
+
+await test('43. Control: a live maker\'s agent_task schedule puts its task in the sibling\'s queue', async () => {
+    const t = await json('/v1/agents', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({ name: V65_TARGET, owner: o1.ownerName, capabilities: ['memory'] }),
+    });
+    assert(t.status === 201, `target agent: ${t.status} ${JSON.stringify(t.body?.error)}`);
+    const maker = await scopedAgent(o1.ownerName, o1.ownerToken, 'v65live', ['task:write', 'workflow:read']);
+    const id = await v65Schedule(maker, 'V65_LIVE_MAKER');
+    const fired = await v65Fire(id);
+    assert(fired.outcome === 'created', `a live maker's schedule runs: ${fired.outcome} ${fired.schedule?.lastRunError ?? ''}`);
+    assert((await v65Tasks('V65_LIVE_MAKER')).length === 1, 'the task is in the target\'s queue');
+});
+
+await test('44. A deleted maker\'s schedule puts no task in the queue, and the run log names the maker as gone', async () => {
+    const maker = await scopedAgent(o1.ownerName, o1.ownerToken, 'v65gone', ['task:write', 'workflow:read']);
+    const id = await v65Schedule(maker, 'V65_DELETED_MAKER');
+    const del = await json('/v1/agents/v65gone', { method: 'DELETE', headers: auth1 });
+    assert(del.status === 200, `owner deletes the maker: ${del.status} ${JSON.stringify(del.body?.error)}`);
+
+    const fired = await v65Fire(id);
+    assert(fired.outcome === 'error', `the fire must be refused, got outcome ${fired.outcome}`);
+    assert((await v65Tasks('V65_DELETED_MAKER')).length === 0, 'a deleted maker\'s work order reached the queue');
+    assert(fired.schedule.lastRunResult === 'error', `lastRunResult ${fired.schedule.lastRunResult}`);
+    assert(/no longer connected/.test(fired.schedule.lastRunError ?? ''), `the reason names the maker as gone: ${fired.schedule.lastRunError}`);
+    assert(JSON.stringify(fired.runs ?? []).includes('no longer connected'), 'the run log the owner reads carries the reason');
+});
+
+await test('45. A maker the owner narrowed to drop task:write puts no task in the queue', async () => {
+    const maker = await scopedAgent(o1.ownerName, o1.ownerToken, 'v65narrow', ['task:write', 'workflow:read']);
+    const id = await v65Schedule(maker, 'V65_NARROWED_MAKER');
+    const narrow = await json('/v1/agents/v65narrow/scopes', { method: 'PATCH', headers: auth1, body: JSON.stringify({ scopes: ['workflow:read'] }) });
+    assert(narrow.status === 200, `owner narrows the maker: ${narrow.status} ${JSON.stringify(narrow.body?.error)}`);
+
+    const fired = await v65Fire(id);
+    assert(fired.outcome === 'error', `the fire must be refused, got outcome ${fired.outcome}`);
+    assert((await v65Tasks('V65_NARROWED_MAKER')).length === 0, 'a narrowed maker\'s work order reached the queue');
+    assert(/task:write/.test(fired.schedule.lastRunError ?? ''), `the reason names the missing permission: ${fired.schedule.lastRunError}`);
+
+    // KEPT (capability-loss review, 2026-10-21): the owner is told where to allow it. task:write is a
+    // powerful word, so the answer is the agent's page with its own tick, not one press
+    // (services/permission-ask.ts); the bell carries the same question.
+    assert((fired.schedule.lastRunError ?? '').includes('/v1/profile?tab=agents&agent=v65narrow'), `the run log carries the agent's page: ${fired.schedule.lastRunError}`);
+    let ask: any;
+    for (let i = 0; i < 50 && !ask; i++) {
+        const n = await json('/v1/notifications', { headers: auth1 });
+        ask = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'agent_permission_ask'
+            && String(x.link ?? '').includes('agent=v65narrow'));
+        if (!ask) await sleep(100);
+    }
+    assert(!!ask, 'no permission question for the refused agent in the bell');
+    const allowed = await json('/v1/agents/v65narrow/scopes', { method: 'PATCH', headers: auth1, body: JSON.stringify({ scopes: ['task:write', 'workflow:read'] }) });
+    assert(allowed.status === 200, `owner allows it again: ${allowed.status}`);
+    const again = await v65Fire(id);
+    assert(again.outcome === 'created', `after the owner allows it, the schedule runs: ${again.outcome} ${again.schedule?.lastRunError ?? ''}`);
+    assert((await v65Tasks('V65_NARROWED_MAKER')).length === 1, 'and its task is in the queue');
+});
+
+await test('46. KEPT: an app\'s agent_task schedule from before 2026-10-05 (no grant recorded) still runs as the account', async () => {
+    const provider = (process.env.AIMEAT_DB ?? 'memory') as StorageProvider;
+    const dbUrl = serverDbUrl();
+    const sqlitePath = pinnedSqlitePath();
+    assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+    const storage = await createStorage({ provider, sqlitePath, dbUrl });
+    const made = await json('/v1/schedules', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({ kind: 'agent_task', agent_name: V65_TARGET, cron: '0 0 1 1 *', display_name: 'V65_OLD_APP', task_template: { title: 'V65_OLD_APP' } }),
+    });
+    assert(made.status === 201, `owner create: ${made.status}`);
+    const id = made.body.data.schedule.id as string;
+    // Nothing over HTTP writes the pre-2026-10-05 shape: the owner's identity as the maker, not in person, no grant.
+    await storage.updateScheduledJob(id, { createdByAgent: true });
+    const fired = await v65Fire(id);
+    assert(fired.outcome === 'created', `an old app schedule must keep firing: ${fired.outcome} ${fired.schedule?.lastRunError ?? ''}`);
+    assert((await v65Tasks('V65_OLD_APP')).length === 1, 'its task is in the queue');
 });
 
 console.log('\nCleanup');

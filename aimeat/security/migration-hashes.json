@@ -110,6 +110,7 @@
     "0106_company_front_page_access.sql": "fa440410d6411d87de67f77b11de07cf9e1cb82d5ca8cf55ca4931e6195d14e5",
     "0107_agent_clearance.sql": "cd2a6c4ee2e2bc6ace604062dc12a9905004ce3d3255e049f8519c5aa3477f96",
     "0108_extension_installed_by_principal.sql": "4056e267e951d63db0f2e00acc1296c26ab91b2ca2a5c62c6e611fa43dc4e553",
-    "0109_extension_unattended_read_authority.sql": "13156417883e623e524f8a796223009b5e99628879825d74bb92e42513560c68"
+    "0109_extension_unattended_read_authority.sql": "13156417883e623e524f8a796223009b5e99628879825d74bb92e42513560c68",
+    "0110_secret_approvals.sql": "6765824a157d9cea951645d7a61fa7c84297ebaf05275fb7387f473d4e12099b"
   }
 }

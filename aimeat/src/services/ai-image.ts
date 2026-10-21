@@ -21,6 +21,8 @@
  *   import { generateForOwner } from '../services/ai-image.js';
  *   const out = await generateForOwner(storage, config, gaii, { prompt: 'a red bicycle' });
  * @version-history
+ *   v2.10.1 -- 2026-10-20 -- The result carries the stored file's createdAt, the version a download
+ *     token for the picture is bound to (services/download-token.ts).
  *   v2.10.0 -- 2026-10-18 -- Takes reference pictures and a mask (read by the caller with
  *     readImageInputs), so a character keeps its look from panel to panel and part of a picture can be
  *     redrawn; the result says how many references went and how the mask reached the model
@@ -128,6 +130,8 @@ export interface GenerateForOwnerResult {
   fetchUrl: string;
   mime: string;
   sizeBytes: number;
+  /** The stored file's createdAt: the version a download token for it is bound to (download-token.ts). */
+  createdAt: string;
   /** Pixel size from the file's header; null when the format's header could not be read. */
   width: number | null;
   height: number | null;
@@ -232,6 +236,7 @@ export async function generateForOwner(
   const key = opts.storageKey
     || `ai-images/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extensionFor(result.mime)}`;
   const visibility = opts.publicVisibility ? 'public' as const : 'private' as const;
+  const createdAt = new Date().toISOString();
   await storage.createStorageFile({
     key,
     ownerGaii: gaii,
@@ -239,7 +244,7 @@ export async function generateForOwner(
     mimeType: result.mime,
     size: result.data.length,
     data: result.data,
-    createdAt: new Date().toISOString(),
+    createdAt,
   });
 
   const settled = await settleAiCall(storage, config, gaii, answered, {
@@ -272,6 +277,7 @@ export async function generateForOwner(
     fetchUrl: imageFetchUrl(visibility, gaii, key),
     mime: result.mime,
     sizeBytes: result.data.length,
+    createdAt,
     width: result.width ?? null,
     height: result.height ?? null,
     model: result.model,

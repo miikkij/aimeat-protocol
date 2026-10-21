@@ -18,6 +18,10 @@
  *     tests 14b to 14d are the positive controls: memory:read-as-owner, and the owner in person.
  *     Test 16: an ecosystem app approved with the node's default scopes gets no owner record at all,
  *     because its data-area allowlist is its fence and the fan-out walked around it (secaudit 2026-10).
+ *   v1.3.0 — 2026-10-20 — Tests 17 to 19: an organism that admits only listed agents. An unlisted
+ *     agent of the organism's creator, with memory:read and with memory:read-as-owner, gets no snippet
+ *     of its record, as GET /v1/memory/:key refuses it; a listed agent and the owner in person still
+ *     find it (secaudit 2026-10, the v57 shape on the librarian).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=librarian
 
@@ -357,6 +361,63 @@ await test('16. An ecosystem app with the default scopes and no data areas finds
     const mine = await json(`/v1/librarian/search?q=${ECO_TERM}`, { headers: auth(A.token) });
     assert((mine.body.data.hits || []).some((h: any) => h.key === 'notebook.inbox.ecoprobe'),
         `the owner finds their own record: ${JSON.stringify((mine.body.data.hits || []).map((h: any) => h.key))}`);
+});
+
+// -- The organism read rule (secaudit 2026-10, the v57 shape). An organism set to admit only the
+// agents its owners listed refuses every other agent on GET /v1/memory/:key. The librarian's own-scope
+// fan-out applied no organism rule, so an unlisted agent read that organism's records as snippets. --
+const ORG_TERM = 'quxorglistedterm';
+const gaiiOf = (token: string) => JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')).sub as string;
+let org3 = '';
+let orgProbeKey = '';
+await test('Setup: A\'s organism record (members visibility) is found by A\'s memory:read agent while the organism admits every agent', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Gamma Org', description: 'x', type: 'project', join_policy: 'approval_required', visibility: 'private' }) });
+    assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body.error)}`);
+    org3 = o.body.data.organism.id as string;
+    orgProbeKey = `organism.${org3}.shared.libprobe`;
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: orgProbeKey, value: { text: `the ${ORG_TERM} only admitted agents may read` }, visibility: 'members' }) });
+    assert(w.status === 201, `organism record ${w.status}: ${JSON.stringify(w.body.error)}`);
+    // Before the organism narrows its agents, the same kind of agent finds the record: the refusal
+    // below is the organism rule and not a miss of the index or of the visibility rule.
+    const before = await connectAgent(A.token, A.name, 'lib-org-before', ['memory:read']);
+    const r = await json(`/v1/librarian/search?q=${ORG_TERM}`, { headers: auth(before.token) });
+    assert(r.status === 200 && (r.body.data.hits || []).some((h: any) => h.key === orgProbeKey),
+        `control: the agent did not find the organism record before the setting: ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+    const set = await json(`/v1/organisms/${org3}`, { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ agent_access: 'listed' }) });
+    assert(set.status === 200, `agent_access listed ${set.status}: ${JSON.stringify(set.body.error)}`);
+});
+
+await test('17. An agent the organism does not list gets no snippet of its record, with or without memory:read-as-owner', async () => {
+    for (const scopes of [['memory:read'], ['memory:read', 'memory:read-as-owner']]) {
+        const U = await connectAgent(A.token, A.name, `lib-org-unlisted-${scopes.length}`, scopes);
+        // Control: the key route refuses this agent, which is the answer the search has to agree with.
+        const key = await json(`/v1/memory/${encodeURIComponent(orgProbeKey)}?owner_scope=true`, { headers: auth(U.token) });
+        assert(key.status === 403, `control: the key route answered an unlisted agent ${key.status}`);
+        const r = await json(`/v1/librarian/search?q=${ORG_TERM}`, { headers: auth(U.token) });
+        assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+        const hits = r.body.data.hits || [];
+        assert(!hits.some((h: any) => h.key === orgProbeKey) && !JSON.stringify(hits).includes(ORG_TERM),
+            `an unlisted agent (${scopes.join(' ')}) got the organism record: ${JSON.stringify(hits.map((h: any) => h.key))}`);
+        // The organism rule is not a permission the agent can ask for, so it is not counted as such.
+        assert(r.body.data.note === undefined, `the read-as-owner note was given for an organism refusal: ${JSON.stringify(r.body.data.note)}`);
+    }
+});
+
+await test('18. An agent the organism lists still finds the record', async () => {
+    const L = await connectAgent(A.token, A.name, 'lib-org-listed', ['memory:read']);
+    const add = await json(`/v1/organisms/${org3}/agents`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ agent_gaii: gaiiOf(L.token) }) });
+    assert(add.status === 201, `list the agent ${add.status}: ${JSON.stringify(add.body.error)}`);
+    const r = await json(`/v1/librarian/search?q=${ORG_TERM}`, { headers: auth(L.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert((r.body.data.hits || []).some((h: any) => h.key === orgProbeKey),
+        `a listed agent lost the organism record: ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+});
+
+await test('19. The owner in person still finds the organism record', async () => {
+    const r = await json(`/v1/librarian/search?q=${ORG_TERM}`, { headers: auth(A.token) });
+    assert(r.status === 200, `search ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert((r.body.data.hits || []).some((h: any) => h.key === orgProbeKey),
+        `the owner lost their own organism record: ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

@@ -9,6 +9,9 @@
  * @structure renderRun
  * @usage import { renderRun } from './run.js';
  * @version-history
+ *   v1.14.2 — 2026-10-20 — The status chip passes the run to runWord, so a run refused in flight reads
+ *     "Stopped" (secaudit 2026-10, v64). A step skipped because the run stopped in flight says so,
+ *     not that a step before it failed.
  *   v1.14.1 — 2026-09-26 — The run record scrolls after 32rem again, as main's .wp-code did (Code
  *     scroll="page"; fix pass).
  *   v1.14.0 — 2026-09-26 — Every part is a component that takes data (page group G5): the head's tags are Marks as data (main's grey took, check, sandbox and variable tags come back as the dim Mark, main's og-chip--dim), the verdict the Box in its tone, the steps the WorkflowSteps, the rail's states plain lines, the record the Code block; the crumb's way back is data.
@@ -68,7 +71,7 @@ export function renderRun(ctx, item, runId) {
   const title = `${wfTitle} · ${isCheck ? c('checkWord') : c('runWord')} ${day(run.startedAt)}`;
 
   const marks = [
-    { kind: 'status', tone: toneStatus(runTone(run.status)), label: runWord(run.status) },
+    { kind: 'status', tone: toneStatus(runTone(run.status)), label: runWord(run.status, run) },
     { label: c('startedChip', { when: rel(run.startedAt) }) },
     { label: c('producedChip', { n: green, total: def.steps.length }) },
     took ? { label: c('tookChip', { took }), tone: 'dim' } : null,
@@ -102,7 +105,7 @@ export function renderRun(ctx, item, runId) {
           const imgs = collectImages([rs.outputObserved, rs.inputObserved, rs.writes], s.id);
           const why = rs.state === 'input-red' ? c('whyInput', { what: r?.required_to_function && r.required_to_function !== 'none' ? signalWords(r.required_to_function) : '' })
             : rs.state === 'output-red' ? c('whyOutput', { what: r?.success_signal ? signalWords(r.success_signal) : '' })
-            : rs.state === 'skipped' ? c('whySkipped') : rs.state === 'timed-out' ? c('whyTimedOut') : rs.state === 'agent-offline' ? c('whyOffline')
+            : rs.state === 'skipped' ? c(run.refusal?.stoppedBefore ? 'whySkippedStopped' : 'whySkipped') : rs.state === 'timed-out' ? c('whyTimedOut') : rs.state === 'agent-offline' ? c('whyOffline')
             : rs.state === 'green' ? c('whyGreen', { what: r?.success_signal ? signalWords(r.success_signal) : '' }) : rs.state === 'dispatched' ? c('whyDispatched', { since: rel(rs.startedAt || run.startedAt) }) : '';
           return {
             key: s.id, num: String(i + 1).padStart(2, '0'), title: stepTitle(s), sub: `${s.id} · ${who}${s.offer ? ` · ${s.offer}` : ''}`,

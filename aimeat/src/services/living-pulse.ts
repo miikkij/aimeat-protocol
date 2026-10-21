@@ -18,7 +18,21 @@
  *   CLASSIFICATION OF SOURCE COPIES (TARGET-082 V4): a `living-src` copy written here inherits the
  *   strictest label of the items it was copied from (living-source-labels.ts). A source whose label
  *   rises later does not raise its copies yet: a background pass raises copies when a source rises (V4, later).
+ *
+ *   WHOSE READ AUTHORITY. The pulse gathers with the authority of the principal that holds the config
+ *   (holderReadsAsOwner): the owner's GHII, or an agent whose stored scopes cover memory:read-as-owner,
+ *   reads the owner's whole identity set; any other holder reads its own records plus the owner-,
+ *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
+ *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-10-20 — SECURITY: the gather passes the config's holder to the organism read rule
+ *     (holderCaller, librarianSearch's organismCaller). An agent-held config gathered records of an
+ *     organism that admits only listed agents and does not list that agent (secaudit 2026-10, the
+ *     v57 shape).
+ *   2026-10-20 — SECURITY: the gather and the agent-section fold read with the authority of the config's
+ *     holder. They read the owner's whole identity set for every holder, so an agent without
+ *     memory:read-as-owner wrote a living config and the next unattended pulse copied the owner's and
+ *     its siblings' private records into that agent's namespace (secaudit 2026-10, v51).
  *   2026-10-18 — A section's history is prepended with updateRecord, and an agent section's task state
  *     changes only on the version the pulse read (swapTaskState): the dispatch is claimed before the
  *     task is made, and a finished task is taken off the state before it is folded.
@@ -44,7 +58,10 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, MemoryRecord, AgentTaskRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { localAccountName } from '../utils/gaii.js';
+import { localAccountName, isGEAI, parseGAII } from '../utils/gaii.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { readsAsOwner, ownerScopeView } from './owner-scope-read.js';
+import { callerFromAuth, agentSessionCaller, type CallerContext } from './caller-context.js';
 import { completeForOwner, AiCompletionError } from './ai/completion.js';
 import { librarianSearch } from './librarian.js';
 import { systemReader } from './classification/reader.js';
@@ -202,6 +219,37 @@ function evaluateDue(cfg: Record<string, unknown>, wsItems: WsItem[], now = Date
   return false;
 }
 
+/**
+ * Does the principal holding this config read the owner's identity set as the owner does? The
+ * owner's own GHII does; an agent does when its stored scopes cover memory:read-as-owner (the rule
+ * readsAsOwner states, asked here of the agent's grant because an unattended pulse has no session);
+ * an ecosystem app and any other holder do not. The config is found under whichever namespace holds
+ * it, and an agent of the owner may write one there.
+ */
+async function holderReadsAsOwner(storage: Storage, holder: string): Promise<boolean> {
+  if (isGEAI(holder)) return false;
+  // A GHII names no agent; anything naming one is an agent, or not a principal at all.
+  if (!holder.includes('#')) return true;
+  if (parseGAII(holder) === null) return false;
+  const scopes = (await storage.getAgent(holder))?.defaultScopes ?? [];
+  return readsAsOwner({ kind: 'agent', has: (word: string) => scopeIsCovered(scopes, word) });
+}
+
+/**
+ * The config's holder as the caller the organism read rule asks (organismReadableRecords, through
+ * librarianSearch): the owner's GHII as the owner in person, an agent with its stored scopes, an
+ * ecosystem app with none. An unattended pulse has no session, so the holder's grant stands in for
+ * one, as holderReadsAsOwner reads it. Without this the gather copied records of an organism that
+ * does not admit the holding agent into its namespace (secaudit 2026-10, the v57 shape).
+ */
+async function holderCaller(storage: Storage, config: AimeatConfig, holder: string): Promise<CallerContext> {
+  const owner = localAccountName(holder);
+  if (isGEAI(holder)) return callerFromAuth({ sub: holder, owner, roles: ['ecosystem'], scopes: [] }, config.nodeId, storage);
+  if (!holder.includes('#')) return callerFromAuth({ sub: owner, owner, roles: ['owner'], scopes: [] }, config.nodeId, storage);
+  const scopes = parseGAII(holder) === null ? [] : (await storage.getAgent(holder))?.defaultScopes ?? [];
+  return agentSessionCaller(holder, owner, scopes, config.nodeId, storage);
+}
+
 /** Write one source copy and answer its key, so the caller can label it after its sources. */
 async function addSrc(storage: Storage, ownerGaii: string, loc: Loc, slot: string, src: { text: string; origin?: string; producer?: string | null }): Promise<string> {
   const id = 's-' + Math.random().toString(36).slice(2, 10);
@@ -232,13 +280,16 @@ async function dispatchAgentTask(storage: Storage, config: AimeatConfig, ownerGa
 
 /** Read a completed task's deliverable from the agent's memory (deliverableKey, then task tag, then
  *  longest *output value) — mirrors the client getDeliverableContent. Answers the text and the agent
- *  memory key it came from (the copy's source for classification). */
-async function readDeliverable(storage: Storage, task: AgentTaskRecord): Promise<{ text: string; key: string } | null> {
+ *  memory key it came from (the copy's source for classification). `shown` says which of the agent's
+ *  records the config's holder may read (holderReadsAsOwner); a record it may not read is skipped. */
+async function readDeliverable(
+  storage: Storage, task: AgentTaskRecord, shown: (m: MemoryRecord) => boolean,
+): Promise<{ text: string; key: string } | null> {
   if (task.deliverableKey) {
     const m = await storage.getMemory(task.agentGaii, task.deliverableKey);
-    if (m?.value != null) return { text: typeof m.value === 'string' ? m.value : JSON.stringify(m.value, null, 2), key: m.key };
+    if (m?.value != null && shown(m)) return { text: typeof m.value === 'string' ? m.value : JSON.stringify(m.value, null, 2), key: m.key };
   }
-  const items = await storage.listMemory(task.agentGaii);
+  const items = (await storage.listMemory(task.agentGaii)).filter(shown);
   const tag = `task:${task.id}`;
   const cand = items.filter(i => (i.tags || []).includes(tag) || /latest_output$/.test(i.key));
   const pick = cand.sort((a, b) => (typeof b.value === 'string' ? b.value.length : 0) - (typeof a.value === 'string' ? a.value.length : 0))[0];
@@ -251,7 +302,7 @@ async function readDeliverable(storage: Storage, task: AgentTaskRecord): Promise
  *  waiting/failed (caller skips derive this pulse). */
 async function handleAgentSection(
   storage: Storage, config: AimeatConfig, ownerGaii: string, loc: Loc,
-  sec: Record<string, unknown>, slot: string, charter: { scope?: string },
+  sec: Record<string, unknown>, slot: string, charter: { scope?: string }, readsAll: boolean,
 ): Promise<'dispatched' | 'waiting' | 'failed' | 'folded'> {
   const [agentName, offerId] = String(sec.agent).split('/');
   const stateKey = taskStateKey(loc, slot);
@@ -269,7 +320,7 @@ async function handleAgentSection(
     if (task.status === 'done') {
       if (!await clear()) return 'waiting';
       try {
-        const content = await readDeliverable(storage, task);
+        const content = await readDeliverable(storage, task, m => ownerScopeView([m], ownerGaii, readsAll).length > 0);
         if (content) {
           const key = await addSrc(storage, ownerGaii, loc, slot, { text: content.text, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
           await inheritSourceLabels({ storage, config }, ownerGaii, [{ key, sources: [memoryTarget(task.agentGaii, content.key)] }]);
@@ -321,24 +372,30 @@ export async function pulseInstanceServer(
   const sections = Array.isArray(cfg.template) ? cfg.template as Array<Record<string, unknown>> : [];
   let costUsd = 0, derived = 0;
   const rendered: string[] = [];
+  // Read with the authority of whoever holds the config, never more (secaudit 2026-10, v51).
+  const readsAll = await holderReadsAsOwner(storage, ownerGaii);
+  // ...and with the organism rule the holder meets on GET /v1/memory/:key (secaudit 2026-10, v57 shape).
+  const organismCaller = await holderCaller(storage, config, ownerGaii);
 
   for (const sec of sections) {
     const slot = String(sec.slot);
     if (sec.agent) {
       // Agent-backed section: dispatch a task, then fold its deliverable on a later pulse.
-      const r = await handleAgentSection(storage, config, ownerGaii, loc, sec, slot, charter);
+      const r = await handleAgentSection(storage, config, ownerGaii, loc, sec, slot, charter, readsAll);
       if (r !== 'folded') continue;   // dispatched / waiting / failed → nothing new to derive this pulse
     } else {
       // 1. Gather from the owner's own material.
       const copies: SourceCopy[] = [];
       try {
         const { hits } = await librarianSearch(storage, config, {
-          // The pulse is the node's own work in the owner's name, so it reads the owner's identity
-          // set as the owner does (readsAll; services/owner-scope-read.ts).
-          ownerName, fanOutOwner: true, readsAll: true, viewerGaii: ownerGaii,
+          // The pulse is the node's own work for the config's holder, so it reads the owner's
+          // identity set as that holder may (holderReadsAsOwner; services/owner-scope-read.ts): all of
+          // it for the owner, the visible part for an agent without memory:read-as-owner.
+          ownerName, fanOutOwner: true, readsAll, viewerGaii: ownerGaii,
           query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
           // The pulse runs with no caller; what it hands the model passes useForAi at the model.
           reader: systemReader({ storage, config }, ownerGaii),
+          organismCaller,
         });
         const { items } = await storage.listAllMemory({ prefix: `${wsRoot(loc)}.living-src.${loc.docId}__`, limit: 500 });
         const seen = new Set(items.map(i => (i.value as { origin?: string })?.origin).filter(Boolean));

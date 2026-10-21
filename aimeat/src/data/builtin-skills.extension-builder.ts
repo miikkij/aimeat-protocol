@@ -27,6 +27,20 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-21 — Section 9: code installed before the rules keeps the old first use until it is written
+ *     again; through living-hooks only the operator's list binds by itself (Jouni, 2026-10-21).
+ *   2026-10-21 — Section 9: a declared host without a port covers every port; `network:` hosts count as
+ *     declared; only the owner signed in changes an address a secret already has.
+ *   2026-10-21 — Section 9: declare `uses_secrets`; a first use to a declared host binds by itself for
+ *     a trusted code writer; every refused first use names the owner's one-press allow page; tell users
+ *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   2026-10-21 — Section 9, v58 as Jouni amended it: `{{secret:NAME}}` reads the caller's own vault
+ *     for every extension the caller runs (bring your own key), a secret with a host goes only there,
+ *     and a secret with no host is never bound through another account's extension.
+ *   2026-10-21 — Section 7:an `extension` schedule asks ext:invoke and its maker at each fire.
+ *     Section 9: `{{secret:NAME}}` reads the caller's vault only for an extension the caller's account
+ *     installed, and who may make a vault secret's first use (secaudit 2026-10, v58 and v59,
+ *     services/extension-secret-authority.ts, services/schedule-gate.ts).
  *   2026-10-20 — An unattended ctx.files.read can be narrower than the attended one, because the owner
  *     chooses whose reach it uses per extension (Jouni, 2026-10-20).
  *   2026-10-18 — How an extension reads the answer of its ctx.ai.start job: input.result, ctx.ai.result.
@@ -189,7 +203,9 @@ schedules:
 
 A schedule names an \`action\`; an action id has no special meaning. A manifest schedule runs for the
 extension, not per instance: an instance's schedule is created with \`aimeat_schedule_create\` (kind
-\`extension\`, with \`instance_id\`) or \`POST /v1/schedules\`.
+\`extension\`, with \`instance_id\`) or \`POST /v1/schedules\`. Creating, editing and running such a
+schedule asks \`ext:invoke\` of an agent or an app, as calling the action does, and each fire asks
+the schedule's maker again: a maker that was removed or lost the word does not run the action.
 
 ## 8. Money price and pacing
 
@@ -223,6 +239,41 @@ Every action can carry two values, and they do different jobs:
 - A credential lives in a \`config:\` field with \`type: secret\`: encrypted at rest, decrypted only
   inside the sandbox, \`undefined\` until somebody sets it. Or write a header as \`{{secret:NAME}}\` and
   the node fills it from the caller's own vault on the way out; the script never holds the value.
+  This is how an extension other people call serves each of them with their OWN key (bring your
+  own key): every caller keeps the credential in their own vault, and the extension holds nobody
+  else's. Do not put other people's keys in the extension's \`type: secret\` config.
+  Where the secret may go is the caller's decision, not the script's. A vault secret that has a host
+  goes through any extension the caller runs, to that host only; any other address is refused with
+  \`SECRET_HOST\`. A secret with no host yet is never sent through an extension another account
+  installed, whoever calls: the call is refused with \`SECRET_HOST\`, naming the extension, its
+  installer and the host, and nothing is sent. Tell your users to store the secret FOR the host
+  your extension calls: "store NAME for host api.example.com" (Access page, Secrets, or
+  \`aimeat_secret_set { name, value, host }\`; \`aimeat_secret_host_set\` gives a secret with no address
+  its first one, and only the owner signed in changes or removes an address it already has).
+- **Declare every vault secret your scripts name**, beside \`network\`, with the hosts it goes to and
+  why: \`uses_secrets: [{ name: OPENWEATHER_KEY, hosts: [api.openweathermap.org], why: "read the
+  weather for your saved places" }]\`. It is public with the extension (GET /v1/extensions/{name},
+  \`aimeat_extension_get\`), so whoever runs it sees where their key goes before it goes. A host
+  without a port covers every port of that host; with a port, only that port. The hosts in your
+  \`network:\` block count as declared for every secret your scripts name.
+- Through the caller's own account's extension, a secret saved with no host is bound to the host of
+  its first use. A first use to a host \`uses_secrets\` declares for that secret binds by itself,
+  whoever calls (the owner's app, their chat agent, a schedule), when the extension's code was
+  written by the owner, through an app of theirs, or by an agent holding \`secrets:manage\` now.
+  Otherwise only the owner in person or a principal holding \`secrets:manage\` makes that first
+  use; on a schedule, a workflow step or an \`on_done\` callback nobody is present, so the
+  principal that wrote the extension's code is asked instead.
+- An extension whose code was installed before these rules (node 4.1.x) keeps the old first use: it
+  binds to the host its script names, whoever calls, until its code is written again (an install,
+  a redeploy, a ZIP upload, a package install or a changed action script). So publishing new code
+  for an old extension brings it under the rules above: declare \`uses_secrets\` when you do.
+- Through living-hooks, a host on the operator's node-wide allowlist binds by itself; a host only on
+  the person's own allowlist asks the owner once per secret and host.
+- **Every refused first use asks the owner.** The \`SECRET_HOST\` text names a page
+  (/v1/secret-allow?...) where the owner, signed in, allows that extension to send that secret to
+  that host with one press, and the owner gets the same question in the bell. Hand that address to
+  the person. An approval does not bind the secret; it lets that extension, installed by that
+  account, reach that host, and the owner withdraws it on the Access page.
   Never put a key in a script or a return value.
 - Files: a client uploads through the storage API and passes the keys; \`ctx.files\` reads and writes
   stored files by reference. Return references, not large payloads.

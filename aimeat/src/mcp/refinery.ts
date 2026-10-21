@@ -21,6 +21,10 @@
  *   v1.0.1 — 2026-10-05 — The run scopes and the prefix rule are the one copy in
  *     services/refinery/schedule-input.ts (secaudit 2026-10, drift 1).
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
+ *   2026-10-20 — aimeat_refinery_run and aimeat_refinery_status pass the session principal as the
+ *     run's viewer (services/refinery/runs.ts runViewerOf): an agent sees the runs it started, and its
+ *     owner's only with connections:read-as-owner. A start that meets a batch it may not see answers
+ *     BATCH_BUSY with no run in it (secaudit 2026-10, v60).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
@@ -30,8 +34,8 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { CLASS_PACKS } from '../data/refinery-classes.js';
-import { startRun, getRun } from '../services/refinery/runs.js';
-import type { RefineryCaller } from '../services/refinery/pipeline.js';
+import { startRun, getRun, runViewerOf } from '../services/refinery/runs.js';
+import { RefineryError, type RefineryCaller } from '../services/refinery/pipeline.js';
 
 // The scopes a batch spends and the prefix rule: the one copy the REST route and the scheduler read.
 import { REFINERY_RUN_SCOPES as RUN_SCOPES, REFINERY_PREFIX_RE as PREFIX_RE } from '../services/refinery/schedule-input.js';
@@ -76,7 +80,16 @@ export function registerRefineryTools(
       const ids = Array.isArray(message_ids)
         ? message_ids.filter((x) => typeof x === 'string' && /^[A-Za-z0-9_=-]{1,200}$/.test(x)).slice(0, 50)
         : undefined;
-      const { run, already } = startRun({ storage, config }, who, p, { messageIds: ids });
+      // A batch of this definition that another principal started, and this agent may not see,
+      // answers BATCH_BUSY with no part of that run in it (services/refinery/runs.ts).
+      let started: ReturnType<typeof startRun>;
+      try {
+        started = startRun({ storage, config }, who, p, { messageIds: ids });
+      } catch (e) {
+        if (e instanceof RefineryError) return toolError(e.code, e.message);
+        throw e;
+      }
+      const { run, already } = started;
       return ok({ run, already_running: already, next: `Follow it with aimeat_refinery_status { run_id: "${run.id}" }.` });
     });
 
@@ -85,7 +98,8 @@ export function registerRefineryTools(
     annotations: annotationsFor('aimeat_refinery_status') },
     async ({ run_id }) => {
       const who = refineryCaller();
-      const run = who ? getRun(String(run_id ?? ''), who.ownerGhii) : null;
+      // Only a run this agent started, unless it reads its owner's mail (connections:read-as-owner).
+      const run = who ? getRun(String(run_id ?? ''), who.ownerGhii, runViewerOf(who)) : null;
       if (!run) return toolError('NOT_FOUND', 'No such run. A finished run is kept for an hour; the workspace rows and <prefix>.runs keep the rest.');
       return ok({ run });
     });

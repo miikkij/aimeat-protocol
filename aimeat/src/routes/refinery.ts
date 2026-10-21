@@ -15,6 +15,10 @@
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  *   v1.0.1 — 2026-10-05 — The run scopes and the prefix rule are the one copy in
  *     services/refinery/schedule-input.ts (secaudit 2026-10, drift 1).
+ *   2026-10-20 — POST and GET /v1/refinery/runs pass the resolved principal as the run's viewer
+ *     (services/refinery/runs.ts runViewerOf): an agent sees the runs it started, and its owner's only
+ *     with connections:read-as-owner; a start that meets a batch it may not see answers 409
+ *     BATCH_BUSY with no run in it (secaudit 2026-10, v60).
  */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -24,8 +28,8 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
 import { isOwnerPrincipal } from '../auth/account-security.js';
 import { CLASS_PACKS } from '../data/refinery-classes.js';
-import { startRun, getRun } from '../services/refinery/runs.js';
-import type { RefineryCaller } from '../services/refinery/pipeline.js';
+import { startRun, getRun, runViewerOf } from '../services/refinery/runs.js';
+import { RefineryError, type RefineryCaller } from '../services/refinery/pipeline.js';
 
 import { REFINERY_RUN_SCOPES, REFINERY_PREFIX_RE as PREFIX_RE } from '../services/refinery/schedule-input.js';
 
@@ -68,16 +72,28 @@ export function refineryRouter(config: AimeatConfig, storage: Storage): Router {
     const ids = Array.isArray(req.body?.message_ids)
       ? (req.body.message_ids as unknown[]).filter((x): x is string => typeof x === 'string' && /^[A-Za-z0-9_=-]{1,200}$/.test(x)).slice(0, 50)
       : undefined;
-    const { run, already } = startRun({ storage, config }, refineryCallerOf(req, config.nodeId), prefix, { messageIds: ids });
+    // A batch of this definition that another principal started, and this caller may not see,
+    // answers 409 BATCH_BUSY with no part of that run in it (services/refinery/runs.ts).
+    let started: ReturnType<typeof startRun>;
+    try {
+      started = startRun({ storage, config }, refineryCallerOf(req, config.nodeId), prefix, { messageIds: ids });
+    } catch (e) {
+      if (e instanceof RefineryError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
+    }
+    const { run, already } = started;
     res.status(already ? 200 : 202).json(success(config.nodeId, { run, already_running: already }, [
       { description: 'Follow the batch', method: 'GET', url: `/v1/refinery/runs/${run.id}` },
     ]));
   });
 
   // ── GET /v1/refinery/runs/:id ── how far a batch is; only the owner it runs for sees it, and only
-  //    with the word that reads a mailbox, because the rows name the subjects it read.
+  //    with the word that reads a mailbox, because the rows name the subjects it read. Within that
+  //    owner, a caller sees a run it started, or any run when it reads the owner's mail as the owner
+  //    does (runViewerOf: the owner, an app grant, an agent holding connections:read-as-owner).
   router.get('/v1/refinery/runs/:id', requireAuth(), requireScope('connections:read-through'), (req: Request, res: Response) => {
-    const run = getRun(req.params.id as string, `${req.auth!.owner}@${config.nodeId}`);
+    const caller = refineryCallerOf(req, config.nodeId);
+    const run = getRun(req.params.id as string, caller.ownerGhii, runViewerOf(caller));
     if (!run) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such run. A finished run is kept for an hour; the batch\'s rows and <prefix>.runs keep the rest.'));
       return;

@@ -20,6 +20,8 @@
  * @structure registerSecretTools(mcp, storage, config, getAgentGaii)
  * @usage registerSecretTools(mcp, storage, config, agentGaii) — from mcp/register-all.ts
  * @version-history
+ *   2026-10-21 — aimeat_secret_host_set (PATCH /v1/secrets/:name) and aimeat_secret_approval_withdraw
+ *     (DELETE /v1/secrets/:name/approvals): the address without the value, and withdrawing an approval.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-09 — aimeat_secret_set takes an optional `host`, the same as PUT /v1/secrets/:name (secrets
@@ -34,7 +36,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { listOwnerSecrets, putOwnerSecret, deleteOwnerSecret } from '../services/owner-secrets.js';
+import { putOwnerSecret, deleteOwnerSecret, setOwnerSecretHost } from '../services/owner-secrets.js';
+import { withdrawSecretApproval, listOwnerSecretsWithUses } from '../services/secret-approvals.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 export function registerSecretTools(
@@ -48,7 +51,7 @@ export function registerSecretTools(
     const vaultOf = (): string => ownerGhiiOf(getAgentGaii());
 
     mcp.registerTool('aimeat_secret_list', { description: descriptionFor('aimeat_secret_list'), inputSchema: zodShapeFor('aimeat_secret_list'), annotations: annotationsFor('aimeat_secret_list') }, async () => {
-        const secrets = await listOwnerSecrets(storage, vaultOf());
+        const secrets = await listOwnerSecretsWithUses(storage, vaultOf());
         return { content: [{ type: 'text' as const, text: JSON.stringify({ secrets, count: secrets.length }, null, 2) }] };
     });
 
@@ -61,6 +64,27 @@ export function registerSecretTools(
         }
         emitChange('secrets', ownerGhii);
         return { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] };
+    });
+
+    mcp.registerTool('aimeat_secret_host_set', { description: descriptionFor('aimeat_secret_host_set'), inputSchema: zodShapeFor('aimeat_secret_host_set'), annotations: annotationsFor('aimeat_secret_host_set') }, async ({ name, host }) => {
+        const ownerGhii = vaultOf();
+        // An empty string removes the address, as null does on PATCH /v1/secrets/:name.
+        // An MCP session is an agent's, never the account holder in person: it may give a secret its
+        // first address and nothing more (secaudit 2026-10, R62).
+        const r = await setOwnerSecretHost(storage, ownerGhii, name, host === '' ? null : host, getAgentGaii(), { inPerson: false });
+        if (!r.ok) {
+            return { content: [{ type: 'text' as const, text: `${r.code}: ${r.message}` }], isError: true };
+        }
+        emitChange('secrets', ownerGhii);
+        return { content: [{ type: 'text' as const, text: JSON.stringify(r.data, null, 2) }] };
+    });
+
+    mcp.registerTool('aimeat_secret_approval_withdraw', { description: descriptionFor('aimeat_secret_approval_withdraw'), inputSchema: zodShapeFor('aimeat_secret_approval_withdraw'), annotations: annotationsFor('aimeat_secret_approval_withdraw') }, async ({ name, extension, installer, host }) => {
+        const withdrawn = await withdrawSecretApproval(storage, vaultOf(), name, { extension, installer, host: host.toLowerCase() });
+        if (!withdrawn) {
+            return { content: [{ type: 'text' as const, text: 'APPROVAL_NOT_FOUND: No approval for that extension, installer and host on this secret.' }], isError: true };
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ name, extension, installer, host, withdrawn: true }, null, 2) }] };
     });
 
     mcp.registerTool('aimeat_secret_delete', { description: descriptionFor('aimeat_secret_delete'), inputSchema: zodShapeFor('aimeat_secret_delete'), annotations: annotationsFor('aimeat_secret_delete') }, async ({ name }) => {

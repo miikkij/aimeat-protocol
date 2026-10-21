@@ -35,6 +35,12 @@
  *     does not read as the owner (`readsAll`) gets its own records plus the owner-, members- and
  *     public-visibility ones, never a private record of the owner or of a sibling agent. The count
  *     left out is returned so the route can say which permission would show them (secaudit 2026-10).
+ *   v1.8.0 — 2026-10-20 — An own-scope search with an `organismCaller` passes its hits through the
+ *     organism read rule (organismReadableRecords), before ownerScopeView: an agent that a 'listed'
+ *     organism does not admit, or that holds no consent where GET /v1/memory/:key asks for one, got
+ *     that organism's records as snippets here while the key route answered 403 (secaudit 2026-10,
+ *     the v57 shape). The records it drops are not counted in `omitted`, because memory:read-as-owner
+ *     would not show them.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -43,6 +49,7 @@ import type { ContentReader } from './classification/reader.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { organismKeysCarried } from './group-shares-classification.js';
 import { ownerScopeView } from './owner-scope-read.js';
+import { organismReadableRecords, type OrganismListCaller } from './organism-namespace-access.js';
 
 export interface LibrarianHit {
   key: string;
@@ -164,7 +171,11 @@ function snippetOf(text: string, tokens: string[]): string {
 export async function librarianSearch(
   storage: Storage,
   config: AimeatConfig,
-  opts: { ownerName: string; fanOutOwner: boolean; readsAll: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public'; reader: ContentReader },
+  opts: {
+    ownerName: string; fanOutOwner: boolean; readsAll: boolean; viewerGaii: string; query: string; limit?: number; keyPrefix?: string; scope?: 'own' | 'public'; reader: ContentReader;
+    /** The session asking, for the organism read rule on the own scope. A route passes callerOf(req). */
+    organismCaller?: OrganismListCaller;
+  },
 ): Promise<{ hits: LibrarianHit[]; ownersSearched: number; omitted: number }> {
   const tokens = queryTokens(opts.query);
   if (tokens.length === 0) return { hits: [], ownersSearched: 0, omitted: 0 };
@@ -206,6 +217,15 @@ export async function librarianSearch(
   // (services/owner-scope-read.ts, 2026-10-15). Until 2026-10-20 the fan-out was chosen on
   // memory:read alone and nothing filtered the hits, so a default-approved agent read the owner's
   // and every sibling agent's private records as snippets (secaudit 2026-10).
+  // THE ORGANISM RULE, AS GET /v1/memory/:key ASKS IT. An organism record in the own scope is read
+  // only when checkOrganismNamespaceAccess admits this caller in read mode: an agent a 'listed'
+  // organism does not admit, or one without the consent the key route asks for, gets no snippet
+  // (secaudit 2026-10, the v57 shape). Asked before ownerScopeView so `omitted` counts only what
+  // memory:read-as-owner would show. The owner in person and an app grant are exempt in the helper.
+  if (opts.scope !== 'public' && opts.organismCaller) {
+    const admitted = new Set(await organismReadableRecords({ storage, config }, opts.organismCaller, candidates.map(h => h.record)));
+    candidates = candidates.filter(h => admitted.has(h.record));
+  }
   let omitted = 0;
   if (opts.scope !== 'public' && opts.fanOutOwner) {
     const shown = new Set(ownerScopeView(candidates.map(h => h.record), opts.viewerGaii, opts.readsAll));

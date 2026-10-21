@@ -12,6 +12,9 @@
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-20 — SECURITY: aimeat_catalogue_directory refuses the shared anonymous principal by
+ *     identity (AUTH_REQUIRED), as GET /v1/catalogue/directory does (secaudit 2026-10,
+ *     jwt.ts:issueJWT:anonymous-claim-not-signed).
  *   2026-10-20 — SECURITY: aimeat_catalogue_directory answers from the node's DirectoryService, so it
  *     lists only people holding an active federation consent, as GET /v1/catalogue/directory does;
  *     aimeat_catalogue_agents drops `unlisted` agents, as GET /v1/catalogue/agents does
@@ -34,13 +37,14 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 import { nodeDirectory } from '../services/directory.js';
 import { toolError } from './tool-error.js';
+import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { logger } from '../utils/logger.js';
 
 export function registerCatalogueTools(
     mcp: McpServer,
     storage: Storage,
     _config: AimeatConfig,
-    _getAgentGaii: () => string,
+    getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
@@ -139,6 +143,10 @@ export function registerCatalogueTools(
             // MCP one listed people the REST one kept out (secaudit 2026-10). It now reads the same
             // service, which also drops a person whose consent was revoked before the index was
             // rebuilt (directory.ts stillConsented).
+            // Signed-in members only, as on GET /v1/catalogue/directory. A session opened with the token
+            // POST /v1/auth/anonymous mints is the shared anonymous principal, and that token carries
+            // no anonymous claim, so it is recognised by identity (auth/anonymous-principal.ts).
+            if (isAnonymousPrincipal({ sub: getAgentGaii() })) return { ...toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL) };
             const directory = nodeDirectory();
             if (!directory) return { ...toolError('FEATURE_DISABLED', 'This node runs no people directory.') };
 

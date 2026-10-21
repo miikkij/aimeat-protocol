@@ -25,6 +25,12 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.4.0 -- 2026-10-20 -- The three GETs pass the caller's whole auth (roles and scopes) to the store:
+ *     an agent, app grant or ecosystem app of the owner reads a private package only with
+ *     storage:read, and gets 403 SCOPE_DENIED naming the word without it; members, organism and
+ *     public packages it reads on their audience, as before (secaudit 2026-10 v41, standing ruling 5,
+ *     capability-loss review 2026-10-21). The versions list leaves out an earlier version whose own
+ *     audience does not admit the caller (secaudit 2026-10 v42).
  *   v1.3.0 -- 2026-10-18 -- On a node that shows its content to signed-in accounts only, a publish that
  *     would make the package public lands at 'members' and the answer carries `warnings`
  *     PUBLIC_IS_SIGNED_IN_HERE (services/datapackage/publish-ask.ts, plan V1.6).
@@ -39,6 +45,7 @@
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1, B2).
  */
 import { Router } from 'express';
+import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
@@ -52,6 +59,8 @@ import { publishPackage, openPackage, readRows, listPackages, listVersions, pars
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
+import { denyScope403 } from '../auth/deny.js';
+import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
  *  OPTIONAL on the wire — an app that hands over rows and nothing else is asking for a proposal — so
@@ -63,6 +72,22 @@ interface PublishBody extends Omit<Partial<PublishInput>, 'resources'> {
 export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
     const store = { storage, config };
+
+    /**
+     * After a refused read: a principal of the package's owner (agent, app grant, ecosystem app)
+     * without storage:read gets 403 SCOPE_DENIED naming the word, as /v1/pub answers for the same
+     * bytes, instead of a 404 that reads as a missing package (secaudit 2026-10 v41). Only when the
+     * package or version is there for its owner, so a missing one or a missing resource stays 404.
+     */
+    const refusedForScope = async (req: Request, res: Response, ref: string): Promise<boolean> => {
+        const parsed = parseRef(ref, config.nodeId);
+        if (!parsed || !lacksPackageReadScope(parsed.ownerGhii, req.auth)) return false;
+        if (await openPackage(store, ref, config.nodeId, req.auth)) return false;
+        if (!(await openPackage(store, ref, config.nodeId, ownerAuthOf(parsed.ownerGhii)))) return false;
+        denyScope403(req, res, [DATAPACKAGE_READ_SCOPE],
+            'Reading a private data package of your owner, or a private earlier version of one, needs the "storage:read" scope. Ask the owner to grant it.');
+        return true;
+    };
 
     /**
      * Publish one version.
@@ -201,6 +226,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         const ref = buildRef(req.params.owner as string, req.params.name as string, req.query.version);
         const opened = await openPackage(store, ref, config.nodeId, req.auth);
         if (!opened) {
+            if (await refusedForScope(req, res, ref)) return;
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${ref}`));
             return;
         }
@@ -227,11 +253,13 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         const name = req.params.name as string;
         const opened = await openPackage(store, buildRef(owner, name, undefined), config.nodeId, req.auth);
         if (!opened) {
+            if (await refusedForScope(req, res, buildRef(owner, name, undefined))) return;
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${buildRef(owner, name, undefined)}`));
             return;
         }
         const ownerGhii = owner.includes('@') ? owner : `${owner}@${config.nodeId}`;
-        const versions = await listVersions(store, ownerGhii, name);
+        // The caller's history: an earlier version it may not open is not listed (secaudit 2026-10 v42).
+        const versions = await listVersions(store, ownerGhii, name, req.auth);
         res.json(success(config.nodeId, { package_id: opened.descriptor.aimeat.packageId, versions, total: versions.length }, [
             { description: 'The newest version', method: 'GET', url: `/v1/datapackages/${owner}/${name}` },
         ]));
@@ -248,6 +276,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             ...(select?.length ? { select } : {}),
         }, req.auth);
         if (!out) {
+            if (await refusedForScope(req, res, ref)) return;
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such resource in ${ref}`));
             return;
         }

@@ -634,6 +634,7 @@ export function applySchemaTables4(db: Database.Database): void {
       usedBy     TEXT NOT NULL DEFAULT '{}',
       hosts      TEXT NOT NULL DEFAULT '[]',
       hostBinding TEXT,
+      approvals  TEXT NOT NULL DEFAULT '[]',
       PRIMARY KEY (ownerGaii, name)
     );
     CREATE INDEX IF NOT EXISTS idx_secrets_owner ON secrets(ownerGaii);

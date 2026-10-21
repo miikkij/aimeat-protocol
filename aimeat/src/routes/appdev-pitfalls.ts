@@ -10,6 +10,9 @@
  * @structure appdevPitfallsRouter(config, storage) → Router
  * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   2026-10-20 — SECURITY: GET /index and GET /learned read the owner-scope learned entries through
+ *     the caller's view (readsAsOwner): an agent without memory:read-as-owner listed its owner's and
+ *     its siblings' private entries here (secaudit 2026-10, the v56 shape).
  *   v1.5.0 — 2026-10-06 — GET /index: the merged index (own, curated and shared, by scope) that the
  *     node's MCP list tool answers with, through services/appdev-kb.ts pitfallIndex(), so the
  *     connector's tool reaches the curated registry too (secaudit 2026-10 follow-up, Part B).
@@ -30,6 +33,7 @@
  *   v1.0.0 — 2026-07-19 — initial: paginated index (+applies_to/severity filters, facets) + by-id.
  */
 import { Router } from 'express';
+import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -44,12 +48,20 @@ import {
 } from '../services/appdev-kb.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { readerFor } from '../services/classification/reader.js';
+import { readsAsOwner } from '../services/owner-scope-read.js';
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 25;
 
 export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /** Who reads the owner-scope learned entries: everything for the owner in person, an app grant or
+   *  an agent holding memory:read-as-owner, the visible part for any other (secaudit 2026-10). */
+  const ownerScopeViewOf = (req: Request) => {
+    const caller = callerOf(req, config.nodeId, storage);
+    return { principal: caller.principal, readsAll: readsAsOwner(caller) };
+  };
 
   // ── LEARNED entries (the profile UI's management surface) — MUST be registered before
   // the parameterized /v1/appdev/pitfalls/:id route or "learned" would match as an id. ──
@@ -75,7 +87,7 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
       applies_to: str(req.query.applies_to, 20),
       limit: num(req.query.limit),
       offset: num(req.query.offset),
-    });
+    }, ownerScopeViewOf(req));
     res.json(success(config.nodeId, index));
   });
 
@@ -104,7 +116,7 @@ export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Ro
       sort: sort === 'severity' ? 'severity' : 'updated',
       limit: num(req.query.limit),
       offset: num(req.query.offset),
-    });
+    }, ownerScopeViewOf(req));
     res.json(success(config.nodeId, page));
   });
 

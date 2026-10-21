@@ -11,6 +11,8 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-21 — GET /v1/owners/:name asks isAnonymousPrincipal: the minted anonymous token read the
+ *     anonymous account as itself, with roles and agent roster (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-19 — The agent roster on GET /v1/owners/:name carries each agent's `avatar` (services/agent-avatar.ts), one batched read.
  *   2026-10-16 — POST /v1/owners takes `setupCode`: the first account on a node whose base URL is not
  *     loopback needs the one-time setup code (claimOperatorSetupCode) and is refused 403
@@ -52,6 +54,7 @@ import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { validateOwnerName, isForeignPrincipal } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
@@ -238,7 +241,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // the name alone made a visitor the local namesake here and showed them its roles and agent
     // roster (security-development-dna invariant 11c). A federated session is
     // never this account and never this node's operator.
-    const local = !!req.auth && !req.auth.anonymous && !isForeignPrincipal(req.auth);
+    const local = !!req.auth && !isAnonymousPrincipal(req.auth) && !isForeignPrincipal(req.auth);
     const isSelf = local && req.auth!.owner === owner.name;
     // isOperatorCaller, the question the MCP tools ask: the operator's agent holding operator:admin
     // passes too. A read of the profile card writes no operator trail; asked only when not self.

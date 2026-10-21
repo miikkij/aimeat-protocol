@@ -22,6 +22,8 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   2026-10-20 — A private picture's download token names the stored file's version (createdAt), as
+ *     every download token now must (services/download-token.ts).
  *   2026-10-18 — POST /v1/ai/settings merges into `openrouter.settings` on the record's version
  *     (updatePrivateRecord), so an agent cap or an MCP AI config change written at the same moment
  *     persists (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -423,7 +425,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
         // for and an app holding only ai:use does not have. A signed address that loads without a
         // sign-in for an hour lets the caller show what it just paid for (System 2, V5).
         const download = r.visibility === 'private'
-          ? await generateDownloadToken({ sub: gaii, key: r.storageKey, mimeType: r.mime, size: r.sizeBytes }, IMAGE_DOWNLOAD_TTL_SECONDS)
+          ? await generateDownloadToken({ sub: gaii, key: r.storageKey, mimeType: r.mime, size: r.sizeBytes, version: r.createdAt }, IMAGE_DOWNLOAD_TTL_SECONDS)
           : null;
         res.json(success(config.nodeId, {
           storage_key: r.storageKey,
