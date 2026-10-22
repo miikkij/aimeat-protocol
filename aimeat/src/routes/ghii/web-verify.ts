@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — GET /v1/ghii/magic-link/verify asks an account with TOTP armed for its code (totp_code or
+ *     backup_code query parameter) before the link is spent, as the emailed link's endpoint does; the
+ *     mailbox alone had yielded a lasting agent key (secaudit2026oct22, magic-link-verify:no-second-factor).
  *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — The account's app agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   2026-10-16 — POST /v1/ghii/register-web takes `setupCode`: the first account on a node whose base URL
@@ -83,6 +86,7 @@ import { sixDigitCode } from '../../utils/one-time-code.js';
 import { registrationRefusal, createAccountRows, createdAccountIsOperator, ownerRegistrationRefusal, announceOwnerRegistered, SetupCodeRefusedError } from '../../services/owner-provisioning.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
+import { checkSecondFactor } from '../../services/password-check.js';
 
 /**
  * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
@@ -573,9 +577,20 @@ export function registerWebVerifyRoutes(
         // (secaudit 2026-10, AUTH-3). Every refusal comes before anything is written: the BR-04
         // refusal once sat below the re-key, so a link for a DEACTIVATED account replaced the
         // owner's pinned public key on a request that was then refused (invariant 14).
-        const redeemed = await redeemLoginLink(storage, config, token);
+        // TWO-STEP SIGN-IN, as on the emailed link's endpoint (login-link-open.ts) and the password
+        // sign-in: an account with TOTP armed sends its code as `totp_code` or `backup_code`, checked
+        // before the link is spent, so a missing code leaves the link usable. The mailbox alone had
+        // been enough for a lasting agent key on such an account (secaudit2026oct22).
+        const codes = { totp_code: req.query.totp_code, backup_code: req.query.backup_code };
+        const redeemed = await redeemLoginLink(storage, config, token, async (ghiiRec) => {
+            const second = await checkSecondFactor(storage, config, ghiiRec, codes);
+            return second.ok ? null : { status: second.status, code: second.code, message: second.message };
+        });
         if (!redeemed.ok) {
-            if (redeemed.code === 'ACCOUNT_DISABLED') {
+            if (redeemed.code === 'REFUSED_BEFORE_SPEND') {
+                res.status(redeemed.refusal.status).json(error(config.nodeId, redeemed.refusal.code,
+                    `${redeemed.refusal.message} Send it as the totp_code or backup_code query parameter with the same link.`));
+            } else if (redeemed.code === 'ACCOUNT_DISABLED') {
                 res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
             } else {
                 res.status(401).json(error(config.nodeId, redeemed.code, redeemed.code === 'EXPIRED' ? 'Magic link has expired' : 'Invalid or expired magic link'));

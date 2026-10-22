@@ -408,6 +408,23 @@ async function run() {
         assert(again.status === 401 && again.body.error?.code === 'SECOND_FACTOR_EXPIRED', `the same ticket twice: ${again.status} ${again.body.error?.code}`);
     });
 
+    // secaudit2026oct22 (web-verify.ts magic-link-verify:no-second-factor): the program endpoint redeems
+    // the same link, and on a TOTP account it handed out a lasting agent key without the code. It now
+    // asks for the code before the link is spent; an account without TOTP answers as before.
+    await test('the program endpoint asks a TOTP account for its code and keeps the link until it gets it', async () => {
+        const token = new URL(await askLink(totpEmail)).searchParams.get('token')!;
+        const bare = await json(`/v1/ghii/magic-link/verify?token=${token}`, { headers: asClient() });
+        assert(bare.status === 401 && bare.body.error?.code === 'TOTP_REQUIRED', `expected 401 TOTP_REQUIRED, got ${bare.status} ${bare.body.error?.code}`);
+        assert(!JSON.stringify(bare.body).includes('agent_private_key'), 'no key without the code');
+        const withCode = await json(`/v1/ghii/magic-link/verify?token=${token}&totp_code=${totpCode(totpSecret, 1)}`, { headers: asClient() });
+        assert(withCode.status === 200 && typeof withCode.body.data?.agent_private_key === 'string',
+            `the same link with the code must work: ${withCode.status} ${JSON.stringify(withCode.body?.error)}`);
+
+        const plain = new URL(await askLink(email)).searchParams.get('token')!;
+        const noTotp = await json(`/v1/ghii/magic-link/verify?token=${plain}`, { headers: asClient() });
+        assert(noTotp.status === 200 && typeof noTotp.body.data?.token === 'string', `an account without TOTP works as before: ${noTotp.status}`);
+    });
+
     await test('attach-email on an account with TOTP armed asks for the code', async () => {
         // An account below verification level 1 with a password, armed after a password sign-in:
         // the account the attach-email check is for.
