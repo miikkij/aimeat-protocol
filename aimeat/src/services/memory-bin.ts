@@ -21,6 +21,9 @@
  *   lowerRestored() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-22 — The account holder in person deletes a hold or beneficiary share of their own
+ *     (OWNER_REMOVABLE_SERVICE_PREFIXES); restoring one and every other service-owned key stay refused
+ *     (secaudit2026oct22).
  *   2026-10-20 — deleteMemoryRecord settles every publish request still waiting on the binned record
  *     `outdated` (settleRequestsForBinnedRecord): an agent binned its record, wrote it again at
  *     version 1 with other content, and the owner's approval of the old request published that
@@ -65,8 +68,8 @@ import type { Storage } from '../storage/interface.js';
 import { emitRecordChange } from './event-bus.js';
 import { checkDeleteGuard } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
-import { isServiceOwnedKey, isReservedServerKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
-import { isGEAI, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
+import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import { settleRequestsForBinnedRecord } from './publish-requests/store.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
 import { isSecretRecordKey, secretRecordBinRefusal } from './secret-records.js';
@@ -198,7 +201,11 @@ async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'dele
   // policy switched classification off for its owner without the proposal a person must accept
   // (TARGET-082 review finding 2), and putting an old copy back would restore a policy the person
   // has since changed. Asked first, so it says nothing about whether the record exists.
-  if (isServiceOwnedKey(req.key)) {
+  // The one exception: the account holder in person deletes a finished hold or share of their own
+  // (OWNER_REMOVABLE_SERVICE_PREFIXES); never restores one, and never in another namespace.
+  const ownerRemoves = act === 'delete' && isOwnerRemovableServiceKey(req.key)
+    && isOwnerInPerson({ roles: req.roles ?? [] }) && !req.ownerOverride;
+  if (isServiceOwnedKey(req.key) && !ownerRemoves) {
     const refusal = serverWrittenKeyRefusal(req.key);
     return { ok: false, code: refusal.code, message: refusal.message, status: 403 };
   }

@@ -16,15 +16,16 @@
  *   - A second register with the same password → 410 SETUP_CLOSED, and no owner by that name exists
  *   - A wrong password still gets 401, so the closed state is told only to the password holder
  *   - The route the refusal names works: an ordinary account, then POST /v1/admin/roles/grant
+ *   - setup/token: a session-bound token; a TOTP account → 401; a deactivated account → 403 (last)
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-setup-closed
  * @version-history
- *   v1.1.0 — 2026-10-22 — setup/token mints a session-bound token and refuses an account with two-step
- *     sign-in armed (secaudit2026oct22).
+ *   v1.1.0 — 2026-10-22 — setup/token mints a session-bound token, and refuses a deactivated account
+ *     (403) and an account with two-step sign-in armed (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, 1.4).
  */
-import { ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { ownerToken, registerOwner, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { TOTP, Secret } from 'otpauth';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -59,7 +60,21 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 // /v1/admin/setup/auth, /register and /token share one limiter: five requests per sixty seconds per
-// IP (middleware/rate-limit.ts). This suite makes four of them.
+// IP (middleware/rate-limit.ts). This suite makes six of them, so the setup/token refusals go through
+// setupTokenCall, which waits out the window once when the limiter answers 429.
+async function setupTokenCall(owner: string, privateKey: string) {
+    const call = () => json('/v1/admin/setup/token', {
+        method: 'POST',
+        headers: { 'X-Admin-Password': ADMIN_PW },
+        body: JSON.stringify({ owner, private_key: privateKey }),
+    });
+    const first = await call();
+    if (first.status !== 429) return first;
+    const waitSec = Number(first.headers.get('retry-after') ?? '60');
+    await new Promise((r) => setTimeout(r, (waitSec + 1) * 1000));
+    return call();
+}
+
 function register(name: string, password = ADMIN_PW) {
     return json('/v1/admin/setup/register', {
         method: 'POST',
@@ -74,6 +89,7 @@ const firstName = `setupop${stamp}`;
 const secondName = `setupop2${stamp}`;
 const wrongPwName = `setupop3${stamp}`;
 const plainName = `setupplain${stamp}`;
+const offName = `setupoff${stamp}`;
 
 let firstKey = '';
 let operatorToken = '';
@@ -165,14 +181,27 @@ await test('setup/token refuses an account with two-step sign-in armed and names
     const armed = await json('/v1/ghii/totp/verify', op({ method: 'POST', body: JSON.stringify({ code }) }));
     assert(armed.status === 200, `totp verify ${armed.status}: ${JSON.stringify(armed.body)}`);
 
-    const { status, body } = await json('/v1/admin/setup/token', {
-        method: 'POST',
-        headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ owner: firstName, private_key: firstKey }),
-    });
+    const { status, body } = await setupTokenCall(firstName, firstKey);
     assert(status === 401, `the account key alone opened a TOTP account: ${status} ${JSON.stringify(body).slice(0, 200)}`);
     assert(!body.token, 'a refused setup/token handed out a token');
     assert(JSON.stringify(body).includes('/v1/ghii/login'), `the refusal does not name the password sign-in: ${JSON.stringify(body)}`);
+});
+
+// Last, because it deactivates the first operator: only that account's key is known to the suite
+// (an account made on POST /v1/ghii or /v1/owners never hands out its private key).
+await test('setup/token refuses a deactivated account: its key no longer opens a session (403)', async () => {
+    const second = await registerOwner(BASE, offName);
+    const grant = await json('/v1/admin/roles/grant', op({ method: 'POST', body: JSON.stringify({ owner: offName, role: 'operator' }) }));
+    assert(grant.status === 200, `grant ${grant.status}: ${JSON.stringify(grant.body)}`);
+    const secondOp = await ownerToken(BASE, second.name);
+    const off = await json(`/v1/admin/owners/${firstName}/disable`, {
+        method: 'POST', headers: { Authorization: `Bearer ${secondOp}` }, body: '{}',
+    });
+    assert(off.status === 200, `disable ${off.status}: ${JSON.stringify(off.body)}`);
+
+    const { status, body } = await setupTokenCall(firstName, firstKey);
+    assert(status === 403, `a deactivated account's key opened a session: ${status} ${JSON.stringify(body).slice(0, 200)}`);
+    assert(!body.token, 'a refused setup/token handed out a token');
 });
 
 // ─── Summary ───

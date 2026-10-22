@@ -17,12 +17,13 @@ import { skillInstallTarget } from '../../src/cli/skill-install.js';
 
 describe('isAllowedSkillPath', () => {
     it('keeps the files a real skill carries', () => {
-        for (const p of ['SKILL.md', 'scripts/run.sh', 'references/api/v1.md', 'assets/logo.png', 'scripts/a.b.c.py']) {
+        // An empty or '.' segment stays inside the folder, and skills stored with one before the fix keep working.
+        for (const p of ['SKILL.md', 'scripts/run.sh', 'references/api/v1.md', 'assets/logo.png', 'scripts/a.b.c.py', 'scripts/..hidden', 'scripts/./x', 'references//x.md']) {
             expect(isAllowedSkillPath(p), p).toBe(true);
         }
     });
     it('refuses a path that leaves its folder or names nothing', () => {
-        for (const p of ['scripts/../../.bashrc', 'scripts/..', 'references/a/../../../x', 'scripts/./x', 'scripts//x',
+        for (const p of ['scripts/../../.bashrc', 'scripts/..', 'references/a/../../../x',
             'assets/a\\..\\..\\x', 'scripts/a\\b', '/scripts/x', 'scripts/', 'other/x']) {
             expect(isAllowedSkillPath(p), p).toBe(false);
         }
@@ -42,5 +43,8 @@ describe('skillInstallTarget', () => {
     });
     it('refuses a file path that would land outside the skill directory', () => {
         expect(skillInstallTarget(base, 'shop-guide', 'shop-guide', 'scripts/../../../x')).toBeNull();
+    });
+    it('places a stored path with an empty or "." segment inside the directory', () => {
+        expect(skillInstallTarget(base, 'shop-guide', 'shop-guide', 'references//x.md')?.target).toBe(join(base, 'shop-guide', 'references', 'x.md'));
     });
 });

@@ -210,6 +210,19 @@ await test('12. Unknown seller is rejected', async () => {
   assert(status === 404, `expected 404, got ${status}`);
 });
 
+// secaudit2026oct22: the hold ledger is service-owned, so no memory route writes or restores a hold;
+// the account holder in person still deletes a finished hold of their own, as before, so the records
+// the hold book never removes do not fill the key limit.
+await test('13. The buyer deletes a finished hold of their own, cannot put it back, and nobody writes one', async () => {
+  const key = `commerce.hold.${holdId}`;
+  const write = await json('/v1/memory', { method: 'POST', headers: authed(buyer.token), body: JSON.stringify({ key, value: { id: holdId, status: 'held' }, visibility: 'private' }) });
+  assert(write.status === 403 && write.body.error?.code === 'RESERVED_KEY', `a write over the hold: ${write.status} ${JSON.stringify(write.body.error)}`);
+  const del = await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: authed(buyer.token) });
+  assert(del.status === 200, `the owner deletes a finished hold: ${del.status} ${JSON.stringify(del.body.error)}`);
+  const back = await json(`/v1/memory/${encodeURIComponent(key)}/restore`, { method: 'POST', headers: authed(buyer.token), body: '{}' });
+  assert(back.status === 403, `a deleted hold is not put back: ${back.status} ${JSON.stringify(back.body.error)}`);
+});
+
 // ─── Summary ───
 console.log(`\n${'─'.repeat(40)}`);
 console.log(`${passed} passed, ${failed} failed out of ${passed + failed}`);

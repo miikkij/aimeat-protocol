@@ -225,7 +225,11 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             try {
                 const targetUrl = `${targetPeer.url}${path}`;
                 const peerOrigin = URL.parse(targetPeer.url)?.origin;
-                if (!peerOrigin || URL.parse(targetUrl)?.origin !== peerOrigin) {
+                if (!peerOrigin) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_URL', `The stored address of peer ${target_node} is not a valid URL`));
+                    return;
+                }
+                if (URL.parse(targetUrl)?.origin !== peerOrigin) {
                     res.status(400).json(error(config.nodeId, 'INVALID_PATH', 'path must stay on the peer\'s own address'));
                     return;
                 }

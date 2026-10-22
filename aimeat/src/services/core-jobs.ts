@@ -14,7 +14,9 @@
  *   2026-10-22 — The 30-day dispute timeout takes back the toll delivery paid the provider
  *     (takeBackFromProvider, disputedAmount), as every interactive resolution does, and leaves the
  *     dispute escalated when the provider cannot cover it; it had refunded the whole escrow from
- *     nowhere (secaudit2026oct22). runDisputeTimeoutJob is exported for its unit test.
+ *     nowhere (secaudit2026oct22). runDisputeTimeoutJob is exported for its unit test. A dispute left
+ *     escalated that way gets one audit entry and one notification to every operator
+ *     (tellOperatorsTimeoutWaits), so it does not wait unseen.
  *   2026-10-20 — installContentIntake: the content class pipeline listens for stored files and memory
  *     writes (services/content/intake.ts; wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   2026-10-16 — memory-ttl-cleanup is one provider DELETE over every owner (storage.deleteExpiredMemory);
@@ -325,7 +327,42 @@ async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {
   if (removed > 0) logger.info(`Board-post TTL cleanup: removed ${removed} expired posts`);
 }
 
-export async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {
+/**
+ * A timed-out dispute whose provider cannot cover the take-back stays escalated for the operator's
+ * ruling. The first round that finds it so writes one audit entry and tells every operator once, so
+ * the dispute does not wait unseen; later rounds see the entry and stay silent.
+ */
+async function tellOperatorsTimeoutWaits(config: AimeatConfig, storage: Storage, disputeId: string, amount: number): Promise<void> {
+  const log = await storage.getDisputeAuditLog(disputeId);
+  if (log.some((e) => e.event === 'timeout_waiting_operator')) return;
+  const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
+  const { createHash } = await import('node:crypto');
+  const timestamp = new Date().toISOString();
+  const entryData = JSON.stringify({ event: 'timeout_waiting_operator', actor: 'system', timestamp });
+  await storage.addDisputeAuditEntry(disputeId, {
+    sequence: log.length + 1,
+    event: 'timeout_waiting_operator',
+    actor: 'system',
+    timestamp,
+    data: { reason: 'Timed out after 30 days; the provider balance does not cover the refund', amount },
+    hash: createHash('sha256').update(prevHash + entryData).digest('hex'),
+    previousHash: prevHash,
+  });
+  logger.warn(`Dispute ${disputeId} timed out but the provider cannot cover ${amount} morsels; it waits for an operator ruling`);
+
+  const { listOperatorGhiis } = await import('./operators.js');
+  const { notify } = await import('./notify.js');
+  for (const ghii of await listOperatorGhiis(storage, config)) {
+    await notify(storage, ghii, {
+      type: 'dispute_timeout_waiting',
+      title: `Dispute ${disputeId} needs your ruling`,
+      body: `The dispute timed out after 30 days, but the provider's balance does not cover the refund of ${amount} morsels. Rule it with POST /v1/admin/disputes/${disputeId}/rule.`,
+      link: '/v1/admin',
+    });
+  }
+}
+
+export async function runDisputeTimeoutJob(config: AimeatConfig, storage: Storage): Promise<void> {
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 3_600_000;
   const THIRTY_DAYS = 30 * 24 * 3_600_000;
@@ -375,10 +412,10 @@ export async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Stora
       // the whole escrow from nowhere while the provider kept the toll (secaudit2026oct22). A provider
       // whose balance cannot cover it leaves the dispute escalated for the operator's ruling.
       const toRequester = disputedAmount(work);
-      const resolved = await storage.transaction(async () => {
+      const outcome = await storage.transaction(async (): Promise<'resolved' | 'skip' | 'short'> => {
         const current = await storage.getDispute(dispute.id);
-        if (!current || current.status !== 'escalated') return false;
-        if (!(await takeBackFromProvider(storage, work, { toRequester }))) return false;
+        if (!current || current.status !== 'escalated') return 'skip';
+        if (!(await takeBackFromProvider(storage, work, { toRequester }))) return 'short';
 
         await storage.updateDispute(dispute.id, {
           status: 'resolved',
@@ -394,9 +431,10 @@ export async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Stora
           status: 'settled',
           updatedAt: new Date().toISOString(),
         });
-        return true;
+        return 'resolved';
       });
-      if (!resolved) continue;
+      if (outcome === 'short') await tellOperatorsTimeoutWaits(config, storage, dispute.id, toRequester);
+      if (outcome !== 'resolved') continue;
       // A timed-out dispute is a lost one (services/trust.ts LOST_DISPUTE_VERDICTS).
       await refreshTrustScore(storage, work.providerGaii);
 
