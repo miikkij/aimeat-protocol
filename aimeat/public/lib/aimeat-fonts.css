@@ -13,6 +13,9 @@
  *   palettes gets the faces) and linked directly by the served pages that do not read the palettes
  *   (connect, the developer page, the front-page variants). Nothing on the node links a font CDN.
  * @version-history
+ *   v1.6.0 — 2026-10-22 — Michroma (Google Fonts v21, the one cut, 400) and the IBM Plex Mono 600
+ *     (Google's v20 static cut, beside the 400 and 500 already here), latin + latin-ext subsets,
+ *     for the TDR look (the machine-room family of apps). SIL OFL 1.1, rows in /lib/fonts/LICENSE.md.
  *   v1.5.0 — 2026-10-17 — Newsreader (Google's variable files, roman and italic) and the Fraunces
  *     italic (Google's v38 variable file, the cut that matches the roman already here), latin +
  *     latin-ext subsets, for the kirjapaino look (the printed-letter design Jouni chose for the
@@ -377,4 +380,28 @@
   font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 500; font-display: swap;
   src: url('/lib/fonts/ibm-plex-mono-500-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* IBM Plex Mono 600 (2026-10-22): the TDR look's bold, the cut the TDR family kit sets its lit
+   step and its table heads in. Without it a browser asked for 600 takes the 500 and smears it. */
+@font-face {
+  font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/lib/fonts/ibm-plex-mono-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 600; font-display: swap;
+  src: url('/lib/fonts/ibm-plex-mono-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* Michroma: the display face of the TDR look (the machine-room family of apps: M-ROOM, DROP, LOOM,
+   LINGUA), a wide, squared sans set letter-spaced in titles. One cut, 400. Latin and latin-ext. */
+@font-face {
+  font-family: 'Michroma'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/michroma-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Michroma'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/lib/fonts/michroma-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }

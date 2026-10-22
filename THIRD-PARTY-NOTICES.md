@@ -92,7 +92,7 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [Preact](https://preactjs.com) | 10.29.8 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
 | [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
 | [minidenticons](https://github.com/laurentpayot/minidenticons) | 4.2.1 | MIT | Copyright (c) 2021 Laurent Payot | served by the node | notice only |
-| [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
+| [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader, Michroma](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
 | [KaTeX](https://katex.org) | 0.18.5 | MIT | Copyright (c) 2013-2020 Khan Academy and other contributors | served by the node | notice only |
 | [AIMEAT (this project's own served libraries)](https://github.com/miikkij/aimeat-protocol) | see each file's @version-history header | MIT | Copyright (c) 2026 Jouni Miikki | served by the node | notice only |
 | [models.dev (model data)](https://models.dev) | 2026-09-28 | MIT | Copyright (c) 2025 models.dev | served by the node | notice only |
@@ -6660,7 +6660,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader see fonts/LICENSE.md
+### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader, Michroma see fonts/LICENSE.md
 
 ```text
 Copyright (c) <dates>, <Copyright Holder> (<URL|email>),
@@ -13019,7 +13019,7 @@ its NOTICE file:
   (c) Copyright [2014-2015] Hewlett-Packard Development Company, L.P
 ```
 
-### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader see fonts/LICENSE.md
+### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader, Michroma see fonts/LICENSE.md
 
 ```text
 # Vendored font licenses
@@ -13055,8 +13055,9 @@ full text: https://openfontlicense.org/open-font-license-official-text/
 | Hubot Sans | v1.0.1 (variable slnt, wdth 75–125, wght 200–900; one file, latin and latin-ext whole) | `hubot-sans-var.woff2` | © 2022 GitHub (https://github.com/github/hubot-sans), Reserved Font Name "Hubot Sans" | https://github.com/github/hubot-sans/releases/tag/v1.0.1 |
 | Press Start 2P | v16 (400, the only cut) | `press-start-2p-400-latin.woff2`, `press-start-2p-400-latin-ext.woff2` | © 2012 The Press Start 2P Project Authors (cody@zone38.net), Reserved Font Name "Press Start 2P" | https://fonts.google.com/specimen/Press+Start+2P |
 | IBM Plex Sans | v23 on Google Fonts (variable wdth 85–100, wght 100–700) | `ibm-plex-sans-var-latin.woff2`, `ibm-plex-sans-var-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Sans |
-| IBM Plex Mono | v20 on Google Fonts (static 400 and 500) | `ibm-plex-mono-400-latin.woff2`, `ibm-plex-mono-400-latin-ext.woff2`, `ibm-plex-mono-500-latin.woff2`, `ibm-plex-mono-500-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Mono |
+| IBM Plex Mono | v20 on Google Fonts (static 400, 500 and 600) | `ibm-plex-mono-400-latin.woff2`, `ibm-plex-mono-400-latin-ext.woff2`, `ibm-plex-mono-500-latin.woff2`, `ibm-plex-mono-500-latin-ext.woff2`, `ibm-plex-mono-600-latin.woff2`, `ibm-plex-mono-600-latin-ext.woff2` | © 2017 IBM Corp. (https://github.com/IBM/plex), Reserved Font Name "Plex" | https://fonts.google.com/specimen/IBM+Plex+Mono |
 | Selawik | 1.01 (static 300, 350, 400, 600, 700; one file per cut, each whole) | `selawik-300.woff2`, `selawik-350.woff2`, `selawik-400.woff2`, `selawik-600.woff2`, `selawik-700.woff2` | © 2015 Microsoft Corporation (www.microsoft.com), Reserved Font Name Selawik; Selawik is a trademark of Microsoft Corporation | https://github.com/microsoft/Selawik/releases/tag/1.01 |
+| Michroma | v21 on Google Fonts (static 400, the only cut) | `michroma-400-latin.woff2`, `michroma-400-latin-ext.woff2` | © 2011 The Michroma Project Authors (https://github.com/googlefonts/Michroma-font) | https://fonts.google.com/specimen/Michroma |
 
 Baloo 2 + Bangers vendored 2026-07-19 for the self-hosted `fonts` capability pack
 (game/display faces, loaded via `/lib/fonts.css`). Inter, Space Grotesk, Fraunces and
@@ -13094,6 +13095,16 @@ the v38 file that matches the roman already here (the roman files are byte-ident
 v38). Newsreader's licence was read from its upstream repository
 (https://github.com/productiontype/Newsreader/blob/master/OFL.txt): SIL OFL 1.1, copyright 2020 The
 Newsreader Project Authors, no Reserved Font Name.
+
+Michroma and the IBM Plex Mono 600 vendored 2026-10-22 for the TDR look, the machine-room style of
+the operator's family of apps (M-ROOM, DROP, LOOM, LINGUA), which set everything in IBM Plex Mono
+and their titles in Michroma. Both are Google Fonts' latin and latin-ext subsets, unchanged:
+Michroma v21 (its latin file is byte-identical to the copy the TDR family kit has served from the
+operator's public storage), the Plex Mono 600 the v20 cut that matches the 400 and 500 already
+here (those are byte-identical to Google's v20). Michroma's licence was read from the Google Fonts
+repository (https://github.com/google/fonts/blob/main/ofl/michroma/OFL.txt, upstream
+https://github.com/googlefonts/Michroma-font): SIL OFL 1.1, copyright 2011 The Michroma Project
+Authors, designed by Vernon Adams, no Reserved Font Name.
 ```
 
 ### bare-path 3.1.2
