@@ -20,9 +20,12 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-setup-closed
  * @version-history
+ *   v1.1.0 — 2026-10-22 — setup/token mints a session-bound token and refuses an account with two-step
+ *     sign-in armed (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, 1.4).
  */
 import { ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { TOTP, Secret } from 'otpauth';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
@@ -74,6 +77,7 @@ const plainName = `setupplain${stamp}`;
 
 let firstKey = '';
 let operatorToken = '';
+let setupToken = '';
 
 function op(opts: RequestInit = {}): RequestInit {
     return { ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${operatorToken}` } };
@@ -103,6 +107,7 @@ await test('The setup wizard\'s next step still works: setup/token for the first
     });
     assert(status === 200, `setup/token ${status}: ${JSON.stringify(body)}`);
     assert(typeof body.token === 'string' && body.token.length > 0, 'no token');
+    setupToken = body.token as string;
 });
 
 await test('A second register with the same admin password → 410 SETUP_CLOSED, naming the role grant', async () => {
@@ -141,6 +146,33 @@ await test('The route the refusal names works: an ordinary account, then the ope
     const owners = await json('/v1/admin/owners', op());
     const row = (owners.body.data.owners as any[]).find(o => o.name === plainName);
     assert(row?.roles?.includes('operator'), `the role did not land: ${JSON.stringify(row?.roles)}`);
+});
+
+// secaudit2026oct22 (admin-setup-token/owner-key-sign-in-after-removal-without-second-factor): the
+// wizard's token route signs in with the account key, as POST /v1/auth/token's owner branch does, and
+// it now keeps that branch's two rules: a session row (so signing out everywhere ends it) and no
+// key-only sign-in on an account with two-step sign-in armed.
+await test('setup/token mints a session-bound token, so signing out everywhere ends it', async () => {
+    const payload = JSON.parse(Buffer.from(setupToken.split('.')[1], 'base64url').toString('utf8'));
+    assert(typeof payload.jti === 'string' && payload.jti.length > 0, `the setup token has no session id: ${JSON.stringify(payload)}`);
+});
+
+await test('setup/token refuses an account with two-step sign-in armed and names the password sign-in', async () => {
+    const setup = await json('/v1/ghii/totp/setup', op({ method: 'POST', body: '{}' }));
+    assert(setup.status === 200, `totp setup ${setup.status}: ${JSON.stringify(setup.body)}`);
+    const secret = setup.body.data.totp_secret as string;
+    const code = new TOTP({ secret: Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 }).generate();
+    const armed = await json('/v1/ghii/totp/verify', op({ method: 'POST', body: JSON.stringify({ code }) }));
+    assert(armed.status === 200, `totp verify ${armed.status}: ${JSON.stringify(armed.body)}`);
+
+    const { status, body } = await json('/v1/admin/setup/token', {
+        method: 'POST',
+        headers: { 'X-Admin-Password': ADMIN_PW },
+        body: JSON.stringify({ owner: firstName, private_key: firstKey }),
+    });
+    assert(status === 401, `the account key alone opened a TOTP account: ${status} ${JSON.stringify(body).slice(0, 200)}`);
+    assert(!body.token, 'a refused setup/token handed out a token');
+    assert(JSON.stringify(body).includes('/v1/ghii/login'), `the refusal does not name the password sign-in: ${JSON.stringify(body)}`);
 });
 
 // ─── Summary ───
