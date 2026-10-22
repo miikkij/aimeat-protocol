@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-22 — Section 4: payment holds and beneficiary shares are written only by the payment
+ *     routes; the person in person deletes a finished one, and none is restored (secaudit2026oct22,
+ *     utils/reserved-keys.ts, services/memory-bin.ts, routes/memory/bulk.ts).
  *   2026-10-21 — Section 4: a delete settles the record's waiting publish requests `outdated`, and an
  *     approval is refused when the record's content changed after the request (secaudit 2026-10,
  *     services/memory-bin.ts, services/publish-requests/apply-memory.ts).
@@ -172,6 +175,10 @@ What an export leaves out, and why:
   \`MORSEL_PRICE_REMOVED\` means the record is an app tool manifest or an offers document that still
   holds the old morsel price: it stays in the bin, and the person writes it again with the pacing
   amount (\`tollMorsels\`) instead.
+- Payment holds and beneficiary shares (\`commerce.hold.\`, \`commerce.hold-in.\`, \`commerce.benefit.\`)
+  are written only by the payment routes. The person, signed in themselves, may delete one of theirs to
+  clear a finished hold away; an agent may not, and a deleted one does not come back from the bin
+  (\`RESERVED_KEY\`).
 - A record that went into the bin PUBLIC comes back out through the same visibility rules a write
   passes, so putting it back can be refused where deleting it was not. \`PUBLISH_NOT_ALLOWED\` means
   this node asks the person before anything of theirs goes public and you are not one of the

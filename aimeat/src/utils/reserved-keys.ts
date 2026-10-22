@@ -379,6 +379,19 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['scope-use.', 'a record of permission use, and only the node writes it.'],
 ];
 
+/**
+ * Service-owned ledgers the account holder in person may still DELETE from their own namespace, as
+ * they could before these prefixes were service-owned (secaudit2026oct22): the books never remove a
+ * finished hold or share, and every one counts toward the key limit. Removing one's own record harms
+ * nobody else; writing and restoring one stays refused to everyone, which is what closed the hole.
+ */
+export const OWNER_REMOVABLE_SERVICE_PREFIXES: readonly string[] = ['commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.'];
+
+/** True iff the account holder in person may delete `key` although no memory route writes or restores it. */
+export function isOwnerRemovableServiceKey(key: unknown): boolean {
+  return typeof key === 'string' && OWNER_REMOVABLE_SERVICE_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {
   return typeof key === 'string' && SERVICE_OWNED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));

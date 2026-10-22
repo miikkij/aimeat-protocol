@@ -100,8 +100,8 @@
       "why": "POST /v1/federation/retract, a peer taking back a record it replicated here: gatePeer with the capability word ('replicateMemory', so an active peer with a key and the replication door), then the retraction's own signature against the pinned key, verified unconditionally before anything is read. The same pinned key is read again for the audience proof that names this node and for the pin, and the signed send time carries a five-minute single-use window, checked after the signature so a forged message cannot use up a real one. The replica key is built from the node id the signature proved, never from a body field, and a row is removed only when it carries a tag naming that node, so a peer reaches its own copies and nothing else (secaudit 2026-10, replica retention)."
     },
     "src/routes/federation-sync/routing.ts": {
-      "count": 7,
-      "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off."
+      "count": 8,
+      "why": "Routed calls go to an active peer with allowRouting; resolve answers an active peer's url; cross-node work checks validateOutboundUrl and allowRouting. A packages-only peer has allowRouting off. The routed call parses the active peer's stored url once more to keep the request on that peer's own origin, refusing a path that would leave it (secaudit2026oct22)."
     },
     "src/routes/federation-sync/templates.ts": {
       "count": 5,

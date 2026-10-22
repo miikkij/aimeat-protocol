@@ -42,17 +42,18 @@ export const SKILL_DESCRIPTION_MAX_CHARS = 1024;
 
 /**
  * Allowed relative paths inside a skill directory (the ZIP allowlist reuses this). A path is a file
- * under scripts/, references/ or assets/ whose every segment names something: no empty, '.' or '..'
- * segment and no backslash, so the path stays inside the skill directory on every platform. Publish,
- * the ZIP download and `aimeat skill install` all ask this (secaudit2026oct22: a first-folder check let
- * `scripts/../../x` write outside ~/.claude/skills/<name>).
+ * under scripts/, references/ or assets/ with no '..' segment and no backslash, so it stays inside the
+ * skill directory on every platform. Publish, the ZIP download and `aimeat skill install` all ask this
+ * (secaudit2026oct22: a first-folder check let `scripts/../../x` write outside
+ * ~/.claude/skills/<name>). An empty or '.' segment does not leave the folder and skills stored with
+ * one keep working, so it is not refused.
  */
 export function isAllowedSkillPath(path: string): boolean {
   if (path === 'SKILL.md') return true;
-  if (typeof path !== 'string' || path.includes('\0') || path.includes('\\')) return false;
+  if (typeof path !== 'string' || path.includes('\0') || path.includes('\\') || path.endsWith('/')) return false;
   const segments = path.split('/');
   if (!['scripts', 'references', 'assets'].includes(segments[0]) || segments.length < 2) return false;
-  return segments.every((s) => s !== '' && s !== '.' && s !== '..');
+  return segments.every((s) => s !== '..');
 }
 
 export interface SkillFrontmatter {

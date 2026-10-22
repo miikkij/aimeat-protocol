@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — The bulk delete removes a finished hold or beneficiary share of the account holder in
+ *     person (OWNER_REMOVABLE_SERVICE_PREFIXES), as it did before those ledgers became service-owned
+ *     (secaudit2026oct22).
  *   2026-10-18 — An entry that would raise its record past its label's audience cap fails with
  *     LABEL_CAPS_AUDIENCE before the batch stores anything (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, an entry of POST
@@ -91,7 +94,7 @@ import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
-import { isServiceOwnedKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
+import { isServiceOwnedKey, isOwnerRemovableServiceKey, serverWrittenKeyRefusal } from '../../utils/reserved-keys.js';
 import { presentMemories, presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
@@ -484,7 +487,10 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // A service-owned key (the classification policy) is removed by no memory route, for any
     // principal (TARGET-082 review finding 2). Named outright it is refused; matched by a prefix it is
     // left in place, so clearing `classification.` still clears the rest.
-    const namedServiceKey = keys ? ([...keys] as string[]).find(k => isServiceOwnedKey(k)) : undefined;
+    // The account holder in person may remove a finished hold or share of their own
+    // (OWNER_REMOVABLE_SERVICE_PREFIXES, secaudit2026oct22).
+    const ownerMayRemove = (k: string) => isOwnerInPerson(req.auth) && isOwnerRemovableServiceKey(k);
+    const namedServiceKey = keys ? ([...keys] as string[]).find(k => isServiceOwnedKey(k) && !ownerMayRemove(k)) : undefined;
     if (namedServiceKey) {
       const refusal = serverWrittenKeyRefusal(namedServiceKey);
       res.status(403).json(error(config.nodeId, refusal.code, refusal.message));
@@ -530,7 +536,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const deletedVisibility: string[] = [];
     for (const r of records) {
       if (keys && !keys.has(r.key)) continue;
-      if (isServiceOwnedKey(r.key)) continue;
+      if (isServiceOwnedKey(r.key) && !ownerMayRemove(r.key)) continue;
       if (await storage.deleteMemory(r.ownerGaii, r.key)) {
         deleted++;
         deletedVisibility.push(r.visibility);

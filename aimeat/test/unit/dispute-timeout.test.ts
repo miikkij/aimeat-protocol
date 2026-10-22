@@ -83,4 +83,14 @@ describe('runDisputeTimeoutJob', () => {
         expect(await balOf(storage, PROVIDER)).toBe(3);
         expect((await storage.getDisputeByTrackingCode(work.trackingCode))?.status).toBe('escalated');
     });
+
+    it('tells the operator once that the dispute waits for a ruling', async () => {
+        const work = await escalatedDeliveredWork(3);
+        const disputeId = `d-${work.trackingCode}`;
+        await runDisputeTimeoutJob({ nodeId: 'test-node' } as AimeatConfig, storage);
+        await runDisputeTimeoutJob({ nodeId: 'test-node' } as AimeatConfig, storage);
+        const waiting = (await storage.getDisputeAuditLog(disputeId)).filter((e) => e.event === 'timeout_waiting_operator');
+        expect(waiting).toHaveLength(1);
+        expect(waiting[0].data).toMatchObject({ amount: 10 });
+    });
 });

@@ -348,7 +348,7 @@ export function adminRouter(
         const ownerGhiiRecord = await storage.getGHII(`${ownerName}@${config.nodeId}`);
         if (ownerGhiiRecord?.totpEnabled && ownerGhiiRecord.totpSecret) {
             res.status(401).json({ ok: false, code: 'SECOND_FACTOR_REQUIRED', sign_in: 'POST /v1/ghii/login',
-                error: 'This account uses two-step sign-in, so the account key alone does not sign you in. Sign in with your password and the code from your app at /v1/ghii/login.' });
+                error: 'This account uses two-step sign-in, so the account key alone does not sign you in. Sign in on the front page with your password and the code from your app, then open /v1/admin.' });
             return;
         }
         const setupSessionId = generateSessionId();

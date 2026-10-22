@@ -373,7 +373,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:e313c216c690c478a5ed15bd",
+      "digest": "sha256:8b78bcfd18eabc92e1600c73",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -420,18 +420,18 @@
       "digest": "sha256:b8b91484608af79b78c64d6b"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-22",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:60b641e92130a5b530d4ce82"
+      "digest": "sha256:2c4e5625b1491a3141d0611d"
     },
     "node:install-skills-locally": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-10-22",
       "watches": [
         "aimeat/src/cli/skill-install.ts"
       ],
-      "digest": "sha256:cec4c74bb67ae7d2b7990016"
+      "digest": "sha256:86b918b2382facc544199a46"
     },
     "node:diagnose-a-workflow": {
       "reviewedOn": "2026-10-21",
@@ -652,10 +652,10 @@
       "aimeat/src/services/ai/routing.ts": "d74535089a1987a1"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "5b5be5c4260fc1f5"
+      "aimeat/src/routes/skills.ts": "7a6e7bcde1adbf5b"
     },
     "node:install-skills-locally": {
-      "aimeat/src/cli/skill-install.ts": "e6ba3efb63c188a5"
+      "aimeat/src/cli/skill-install.ts": "7be705d404708006"
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
@@ -755,9 +755,9 @@
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
     "node:aimeat-data-ownership": {
-      "aimeat/src/routes/memory/bulk.ts": "1d52ec1a99a97f7f",
+      "aimeat/src/routes/memory/bulk.ts": "53b5f0bc9a912ed5",
       "aimeat/src/routes/memory/key.ts": "ee6eb5fd530c09d5",
-      "aimeat/src/services/memory-bin.ts": "d18c1836a21f8bd7",
+      "aimeat/src/services/memory-bin.ts": "4674e2af0981fd35",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "86ef0669d00f4040",
       "aimeat/src/services/owner-erasure.ts": "ddd5686027483180",
