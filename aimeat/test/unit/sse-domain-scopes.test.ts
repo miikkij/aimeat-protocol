@@ -61,6 +61,7 @@ describe('allowedDomains', () => {
         expect(allowedDomains(['notifications:send'])!.has('notifications')).toBe(true);
         expect(allowedDomains(['catalogue:read'])!.has('catalogue')).toBe(true);
         expect(allowedDomains(['social:read'])!.has('boards')).toBe(true);
+        expect(allowedDomains(['social:read'])!.has('realtime-rooms')).toBe(true);
         expect(allowedDomains(['knowledge:read'])!.has('packages')).toBe(true);
     });
 

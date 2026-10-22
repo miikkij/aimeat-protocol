@@ -22,6 +22,10 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.7.0 — 2026-10-22 — `realtime-rooms` passes for a principal holding social:read: a realtime
+ *     room appeared, closed, or a player came or went, so a lobby on screen re-reads the public room
+ *     list instead of waiting for a Refresh (Band Jam). `realtime` itself stays infra: the
+ *     operator's relay changes ride it (wish-realtime-huoneiden-muutokset-sovelluksille-aimeat-liven-kaut).
  *   v1.6.0 — 2026-10-20 — `contentclass` passes for a principal holding storage:read: the content
  *     class pipeline's facts changed (wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   v1.5.0 — 2026-10-18 — A workspace's own domain (`workspace:<organismId>/<ws>`) passes for a
@@ -73,6 +77,10 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   boards: 'social:read',
   groups: 'social:read',
   matches: 'social:read',
+  // Realtime rooms came, went, or changed their player count. The room list it points at is
+  // public (GET /v1/realtime/rooms needs no account), so the name tells an app nothing it could not
+  // read; the read word still gates it, like every other social surface.
+  'realtime-rooms': 'social:read',
 
   // Conversations
   messages: 'messages:read',

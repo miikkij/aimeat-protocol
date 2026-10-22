@@ -52,7 +52,7 @@ describe('events first, a timer last', () => {
     for (const m of EVENTS_FIRST_DOMAINS.matchAll(/((?:`[a-z-]+`(?: and )?)+) \(([a-z]+:[a-z]+)\)/g)) {
       for (const d of m[1].matchAll(/`([a-z-]+)`/g)) pairs.push([d[1], m[2]]);
     }
-    expect(pairs.length).toBe(11);
+    expect(pairs.length).toBe(12);
     for (const [domain, scope] of pairs) expect(DOMAIN_SCOPE[domain], domain).toBe(scope);
   });
 
