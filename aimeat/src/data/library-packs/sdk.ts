@@ -10,6 +10,9 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.35.0 — 2026-10-22 — aimeat-audio 1.2.0: the aiDoc says how to place a note at an exact time and
+ *     into a bus (play(..., { when, destination }), now(), timeAt(), bus()) and that the master has a
+ *     limiter; how a jam app pairs it with SharedClock.schedule().
  *   v1.34.2 — 2026-10-19 — aimeat-auth's aiDoc names what the isolated frame also lacks (push, install,
  *     Web Locks) and isAppOrigin() there; aimeat-organism's names the applied and pending_approval
  *     answers to adding a space. Both facts were only in curated pitfalls that are removed now.
@@ -553,8 +556,9 @@ export const SDK_PACKS: LibraryPack[] = [
     requires: [],
     license: 'MIT',
     apiSurface: 'AIMEAT.audio',
-    aiDoc: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge for jam apps. AIMEAT.audio.play(instrument, note, { velocity?, duration? }). SAMPLE-ONLY instruments: strings, organ, epiano, trumpet, guitar-steel and guitar-el have recorded samples and no synth voice of their own. Call AIMEAT.audio.loadSamples(name) at boot for every one you use (it returns a promise; hasSamples(name) says when the bank is in). Until it resolves, play() sounds a stand-in voice (epiano → piano, the guitars → guitar, strings/organ/trumpet → synth) and logs one note naming loadSamples, so it is audible but not yet the real instrument. loadSamples on piano/guitar/bass/flute/drums upgrades those from synth to recorded sound.',
+    aiDoc: 'Audio engine: 6 built-in instruments (piano, guitar, bass, drums, flute, synth), custom synth builder, sample loader, soundboard, realtime bridge for jam apps. AIMEAT.audio.play(instrument, note, { velocity?, duration? }). SAMPLE-ONLY instruments: strings, organ, epiano, trumpet, guitar-steel and guitar-el have recorded samples and no synth voice of their own. Call AIMEAT.audio.loadSamples(name) at boot for every one you use (it returns a promise; hasSamples(name) says when the bank is in). Until it resolves, play() sounds a stand-in voice (epiano → piano, the guitars → guitar, strings/organ/trumpet → synth) and logs one note naming loadSamples, so it is audible but not yet the real instrument. loadSamples on piano/guitar/bass/flute/drums upgrades those from synth to recorded sound. TIMING: play() takes { when, destination }: when is a time on the AudioContext clock (AIMEAT.audio.now() is that clock now; AIMEAT.audio.timeAt(unixMs) turns a wall-clock instant such as a shared t0 + n * stepMs into it), so notes placed ~100 ms ahead play exactly in time instead of whenever the main thread got to them; a past when plays now. destination is a node of your own or a bus name: AIMEAT.audio.bus(\'drums\') is a GainNode into the master (bus(\'drums\').gain.value = 0.6 is a mixer fader). The master runs through a limiter (AIMEAT.audio.master.limiter = false takes it out). A note scheduled ahead replaces the same note only when it starts, and stop() cancels notes that have not started. For a band in time on several machines use SharedClock from /lib/realtime.js: clock.schedule((n, atMs, atAudio) => AIMEAT.audio.play(\'drums\', \'kick\', { when: atAudio }), { audio: AIMEAT.audio.context }).',
     changelog: [
+      { version: '1.2.0', date: '2026-10-22', summary: 'play(instrument, note, { when, destination }) places a note at an exact AudioContext time and into any node or a named bus (bus(name)); now() and timeAt(unixMs) give that clock; the master has a limiter (master.limiter). Samples, custom synths and the soundboard take the same options. Existing calls are unchanged.' },
       { version: '1.1.0', date: '2026-09-13', summary: 'A sample-only instrument played before loadSamples() resolved made no sound and logged "Unknown instrument"; it now plays a stand-in voice and says the samples are not loaded.' },
     ],
     tierHint: 'T1',
