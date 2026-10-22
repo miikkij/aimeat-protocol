@@ -304,6 +304,22 @@ await test('6. File outside the contract layout rejected (422)', async () => {
     assert(status === 422, `status ${status}`);
 });
 
+// secaudit2026oct22: the layout check read only the first folder, so a path that climbs out of it was
+// stored and later written outside the reader's skill directory by `aimeat skill install` and the ZIP.
+await test('6b. A file path that climbs out of its folder is rejected (422), and nothing is stored', async () => {
+    const md = SKILL_MD.replace('research-briefs', 'climb-out');
+    for (const path of ['scripts/../../.bashrc', 'references/a/../../../x.md', 'assets/a\\..\\..\\x']) {
+        const { status } = await json('/v1/skills', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ skill_md: md, files: { [path]: 'payload' } }),
+        });
+        assert(status === 422, `${path}: status ${status}`);
+    }
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!JSON.stringify(lib.body).includes('climb-out'), 'a refused skill was stored');
+});
+
 await test('7. Multi-file skill publishes with a file index', async () => {
     const md = SKILL_MD.replace('research-briefs', 'brief-tooling');
     const { status, body } = await json('/v1/skills', {

@@ -40,10 +40,19 @@ export const SKILL_NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 export const SKILL_BODY_MAX_CHARS = 100_000;
 export const SKILL_DESCRIPTION_MAX_CHARS = 1024;
 
-/** Allowed relative paths inside a skill directory (the ZIP allowlist reuses this). */
+/**
+ * Allowed relative paths inside a skill directory (the ZIP allowlist reuses this). A path is a file
+ * under scripts/, references/ or assets/ whose every segment names something: no empty, '.' or '..'
+ * segment and no backslash, so the path stays inside the skill directory on every platform. Publish,
+ * the ZIP download and `aimeat skill install` all ask this (secaudit2026oct22: a first-folder check let
+ * `scripts/../../x` write outside ~/.claude/skills/<name>).
+ */
 export function isAllowedSkillPath(path: string): boolean {
   if (path === 'SKILL.md') return true;
-  return /^(scripts|references|assets)\/[^\0]+$/.test(path) && !path.endsWith('/');
+  if (typeof path !== 'string' || path.includes('\0') || path.includes('\\')) return false;
+  const segments = path.split('/');
+  if (!['scripts', 'references', 'assets'].includes(segments[0]) || segments.length < 2) return false;
+  return segments.every((s) => s !== '' && s !== '.' && s !== '..');
 }
 
 export interface SkillFrontmatter {
