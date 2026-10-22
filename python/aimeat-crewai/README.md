@@ -37,7 +37,7 @@ This package is the **bridge** that gives a CrewAI crew access to all of that wi
 pip install aimeat-crewai
 ```
 
-Requires Python 3.10+ and CrewAI 0.80+. Depends on `crewai-tools[mcp]` and `mcp`.
+Requires Python 3.11+ and CrewAI 0.80+. Depends on `crewai-tools[mcp]` and `mcp`.
 
 ## Setup
 

@@ -7,7 +7,7 @@ name = "aimeat-crewai"
 version = "0.36.1"
 description = "AIMEAT Liaison Agent for CrewAI -- drop-in crew member that handles all communication with an AIMEAT node (Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle, offers + workflow-compatibility) so the rest of the crew can focus on domain work."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [
     { name = "Jouni Miikki" },
@@ -18,7 +18,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
@@ -77,11 +76,16 @@ Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-
 # without a bound). This package and crewai use mcp as a client only, so the newer minor release is
 # safe for what they run. Kept below 2, which is a new major line. An override replaces the whole
 # requirement, so the [ws] extra that mcpadapt asks for is repeated here.
-override-dependencies = ["mcp[ws]>=1.30.0,<2"]
+#
+# crewai-cli (1.15.17, and 1.15.28, the newest on 2026-10-22) pins uv~=0.11.6, and every uv before
+# 0.13.4 trusts the emSign ECC Root CA - G3 in its bundled CA store (GHSA-hq85-5cpj-mr62, critical:
+# compromised intermediate keys allow a certificate for any host name). crewai-cli runs uv only as a
+# subprocess for its `crewai install` and `crewai run` commands, which no crew of this package calls.
+override-dependencies = ["mcp[ws]>=1.30.0,<2", "uv>=0.13.4"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aimeat_crewai"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"

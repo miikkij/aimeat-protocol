@@ -22,7 +22,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .paths import aimeat_home
@@ -71,7 +71,7 @@ def jwt_expiry(token: str) -> datetime | None:
     if not isinstance(exp, (int, float)) or isinstance(exp, bool):
         return None
     try:
-        return datetime.fromtimestamp(exp, tz=timezone.utc)
+        return datetime.fromtimestamp(exp, tz=UTC)
     except (OverflowError, OSError, ValueError):
         return None
 

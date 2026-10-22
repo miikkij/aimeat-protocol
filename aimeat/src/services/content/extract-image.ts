@@ -15,9 +15,11 @@
  *
  *   A failure in exifr is recorded in `errors.exif` and the picture still gets its format and its
  *   size from the IHDR chunk or from sniffImage (services/openrouter.ts).
- * @structure readImageFacts · readSvgFacts · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
+ * @structure readImageFacts · opensAsSvg · readSvgFacts · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
  * @usage const { facts, digitalSourceType, software, errors } = await readImageFacts(bytes, 'image/png');
  * @version-history
+ *   v1.2.1 — 2026-10-22 — The SVG sniff skips leading comments with indexOf (opensAsSvg) instead of a
+ *     regex that backtracked exponentially on repeated "--><!--" (CodeQL js/redos, alert 1760).
  *   v1.2.0 — 2026-10-21 — SVG: its size, title and the XMP in <metadata> are read (readSvgFacts), with no
  *     exifr and no error. The other 112 pictures with "Unknown file format" on aimeat.io were SVG.
  *   v1.1.0 — 2026-10-21 — WebP: its EXIF and XMP chunks are read (webpMetadataAsJpeg), and a WebP with
@@ -168,6 +170,25 @@ export function webpMetadataAsJpeg(webp: Buffer): Buffer | null {
 }
 
 /**
+ * True when the text opens as an SVG document: an optional XML declaration, any number of comments,
+ * then `<svg`. The comments are skipped with indexOf, because a regex with a repeated lazy comment
+ * group backtracks exponentially on "<!--" followed by many "--><!--" (CodeQL js/redos).
+ * @param {string} head - The first bytes of the file as text.
+ * @returns {boolean}
+ */
+function opensAsSvg(head: string): boolean {
+  let rest = head.replace(/^\s*<\?xml[^>]*>/i, '');
+  for (;;) {
+    rest = rest.trimStart();
+    if (!rest.startsWith('<!--')) break;
+    const end = rest.indexOf('-->', 4);
+    if (end < 0) return false;
+    rest = rest.slice(end + 3);
+  }
+  return /^<svg[\s>]/i.test(rest);
+}
+
+/**
  * The facts a picture carries about itself.
  * @param {Buffer} bytes - The file.
  * @param {string} mimeType - Its MIME type; the format is the subtype ("png", "jpeg").
@@ -179,7 +200,7 @@ export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
   const errors: Record<string, string> = {};
   const mime = (mimeType || '').toLowerCase().split(';')[0].trim();
   // An SVG is XML, which exifr does not read: its size, title and any XMP in <metadata> are read here.
-  if (mime === 'image/svg+xml' || /^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(bytes.toString('utf8', 0, 2048))) {
+  if (mime === 'image/svg+xml' || opensAsSvg(bytes.toString('utf8', 0, 2048))) {
     return readSvgFacts(bytes.toString('utf8'));
   }
   const sniff = sniffImage(bytes);

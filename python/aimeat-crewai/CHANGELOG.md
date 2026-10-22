@@ -5,6 +5,9 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
 
 ## Unreleased
 
+- **Python 3.11 or newer is required.** Python 3.10 reaches its end of life in October 2026, and
+  Pillow 13, which fixes the critical and high Pillow advisories, does not install on it. A crew on
+  Python 3.10 keeps 0.36.1.
 - **Group chat.** `open_group()` opens a group with several people or agents of the node and sends
   its first message; `group_members()`, `change_group_members()`, `leave_group()`,
   `group_invitations()` and `answer_group_invitation()` do the rest. A person whose contacts accept
