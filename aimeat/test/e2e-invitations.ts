@@ -242,6 +242,34 @@ await test('10a-i. An AGENT of the matched account cannot accept for them (invit
         `the person it was addressed to could no longer accept: ${asPerson.status} ${JSON.stringify(asPerson.body?.error)}`);
 });
 
+// A signed-in accept joins the account it already has a credential for; it mints no new session
+// (secaudit2026oct22, invite-accept/signed-in-branch-mints-owner-session-with-record-roles). The
+// signed-in branch admits an owner-level PAT and an agent holding account:security by design, and it
+// used to answer them with a fresh owner session carrying the account record's roles (operator
+// included) and a refresh cookie, wider than the credential that asked. The join itself is the
+// designed use and stays; registering from the link (test 4) still returns its session.
+await test('10a-ii. A signed-in accept joins without minting a new session (PAT and person)', async () => {
+    const inviteEmail = `patjoin.${Date.now()}@example.com`;
+    const P = await registerVerified(inviteEmail);
+    const mint = await json('/v1/access/tokens', { method: 'POST', headers: auth(P.token), body: JSON.stringify({ label: 'invite test', grant_owner: true }) });
+    assert(mint.status === 201 && typeof mint.body.data?.token === 'string', `owner PAT ${mint.status}: ${JSON.stringify(mint.body?.error)}`);
+    const pat = mint.body.data.token as string;
+
+    const c1 = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: inviteEmail, orgRole: 'member' }) });
+    const r1 = await fetch(`${BASE}/v1/invitations/${tokenFrom(c1.body.data.accept_url)}/accept`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(pat) }, body: '{}' });
+    const b1 = await r1.json() as any;
+    assert(r1.status === 200 && b1.data?.status === 'joined', `the owner PAT could not join its account: ${r1.status} ${JSON.stringify(b1?.error)}`);
+    assert(b1.data.token === undefined, 'a signed-in accept by an owner PAT minted a new session token');
+    assert(!(r1.headers.get('set-cookie') ?? '').includes('aimeat_rt'), 'a signed-in accept by an owner PAT set a refresh cookie');
+
+    const c2 = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: inviteEmail, orgRole: 'member' }) });
+    const r2 = await fetch(`${BASE}/v1/invitations/${tokenFrom(c2.body.data.accept_url)}/accept`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...auth(P.token) }, body: '{}' });
+    const b2 = await r2.json() as any;
+    assert(r2.status === 200 && b2.data?.status === 'joined' && typeof b2.data.redirect === 'string', `the person could not join: ${r2.status} ${JSON.stringify(b2?.error)}`);
+    assert(b2.data.token === undefined, 'a signed-in accept by the person minted a second session token');
+    assert(!(r2.headers.get('set-cookie') ?? '').includes('aimeat_rt'), 'a signed-in accept by the person set a second refresh cookie');
+});
+
 await test('10b. Logged-in account with a DIFFERENT verified email → 403 EMAIL_MISMATCH (invite stays pending)', async () => {
     const otherEmail = `other.${Date.now()}@example.com`;
     const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: otherEmail, orgRole: 'member' }) });

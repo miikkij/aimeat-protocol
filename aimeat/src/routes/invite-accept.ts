@@ -24,6 +24,12 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-10-22 — A signed-in accept joins and mints no session: only an account made here gets a token
+ *     and a refresh cookie. The signed-in branch admits an owner-level PAT and an agent holding
+ *     account:security, and it answered them with a fresh owner session carrying the account
+ *     record's roles (operator included), wider than the credential that asked (secaudit2026oct22,
+ *     invite-accept/signed-in-branch-mints-owner-session-with-record-roles). The SPA accept page
+ *     already holds its session and follows only `redirect`.
  *   2026-10-21 — The viewer verdict and the accepting account ask isAnonymousPrincipal, so the minted
  *     anonymous token never accepts as the anonymous account (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-15 — A refusal from an extension bound to pre_owner_registration answers 403 and leaves the invitation
@@ -280,6 +286,18 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
 
     const nowIso = new Date().toISOString();
 
+    // A SESSION ONLY FOR AN ACCOUNT MADE HERE. The signed-in branch already holds a credential, and
+    // isOwnerPrincipal admits an owner-level PAT and an agent holding account:security, so minting
+    // here would hand them an owner session with the account record's roles: wider than what asked,
+    // operator included on an operator's account, and outliving the PAT or the agent. The SPA accept
+    // page keeps its own session and follows `redirect` (secaudit2026oct22).
+    async function newAccountSession(owner: string): Promise<{ token?: string; expires_in?: number }> {
+      if (!createdAccount) return {};
+      const record = await storage.getOwner(owner);
+      const s = await establishOwnerSession(storage, config, req, res, { owner, roles: record?.roles ?? ['owner'] });
+      return { token: s.token, expires_in: s.expiresIn };
+    }
+
     // ── APP invitation: the membership comes from the app invitation itself. When the approval
     //    could not run (every seat taken), the link stays usable and the person is told. ──
     if (appInvite) {
@@ -292,8 +310,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       const still = await openAppInvitation(inv);
       const joined = !still;
       if (joined) await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });
-      const appOwner = await storage.getOwner(ownerName);
-      const appSession = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles: appOwner?.roles ?? ['owner'] });
+      const appSession = await newAccountSession(ownerName);
       const back = inv.returnUrl ? resolveInvitationReturnTarget(inv.returnUrl, config) : null;
       res.set('Cache-Control', 'no-store');
       res.json(success(config.nodeId, {
@@ -302,8 +319,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
         app_id: appInvite.meta.appId,
         created_account: createdAccount,
         workspaces: [],
-        token: appSession.token,
-        expires_in: appSession.expiresIn,
+        ...appSession,
         ...(joined ? {} : { reason: 'The app has no free place for a member right now. The invitation stays open; open the link again later.' }),
         redirect: back ?? '/v1/home',
       }));
@@ -333,18 +349,14 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       }).catch(err => logger.warn('registration invite: funnel markers failed', { error: String(err) }));
       emitChange('ghii');
 
-      const nodeOwner = await storage.getOwner(ownerName);
-      const nodeSession = await establishOwnerSession(storage, config, req, res, {
-        owner: ownerName, roles: nodeOwner?.roles ?? ['owner'],
-      });
+      const nodeSession = await newAccountSession(ownerName);
       res.set('Cache-Control', 'no-store');
       res.json(success(config.nodeId, {
         status: 'registered',
         organism_id: null,
         created_account: createdAccount,
         workspaces: [],
-        token: nodeSession.token,
-        expires_in: nodeSession.expiresIn,
+        ...nodeSession,
         // Straight to the home's first step. The chain does not end at the account: the welcome mat
         // and the first agent still come, exactly as they do for anyone who registered themselves.
         redirect: '/v1/home',
@@ -381,10 +393,8 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     emitChange('notifications');
     emitChange('organisms');
 
-    // Log the accepting user straight in (fresh roles), so the SPA lands authenticated.
-    const ownerRecord = await storage.getOwner(ownerName);
-    const roles = ownerRecord?.roles ?? ['owner'];
-    const session = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
+    // An account made here is signed straight in, so the SPA lands authenticated.
+    const session = await newAccountSession(ownerName);
 
     // Land the accepter on the inviter's chosen return target (e.g. back in the Experience Center
     // app, already signed in), else inside the invited-to organism. Re-validate the stored value
@@ -396,8 +406,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       organism_id: organismId,
       created_account: createdAccount,
       workspaces: grantedWs,
-      token: session.token,
-      expires_in: session.expiresIn,
+      ...session,
       // ?joined=1 = fresh join; the generic profile is what an invited member measurably bounced off (UX-remake v3, P8).
       redirect: returnTarget ?? `/v1/profile?tab=organisms&org=${encodeURIComponent(organismId)}&joined=1`,
     }));
