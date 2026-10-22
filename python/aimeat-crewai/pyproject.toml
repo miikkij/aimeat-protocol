@@ -81,7 +81,18 @@ Changelog = "https://github.com/miikkij/aimeat-protocol/blob/main/python/aimeat-
 # 0.13.4 trusts the emSign ECC Root CA - G3 in its bundled CA store (GHSA-hq85-5cpj-mr62, critical:
 # compromised intermediate keys allow a certificate for any host name). crewai-cli runs uv only as a
 # subprocess for its `crewai install` and `crewai run` commands, which no crew of this package calls.
-override-dependencies = ["mcp[ws]>=1.30.0,<2", "uv>=0.13.4"]
+#
+# crewai (1.15.17) pins opentelemetry-api, -sdk and -exporter-otlp-proto-http at ~=1.42.0, and every
+# opentelemetry-api up to 1.45.0 parses a W3C tracestate header without a bound
+# (GHSA-xcq7-p3pf-p88h, moderate). The sdk and the exporter require their own api version exactly,
+# so the three move together. Kept below 2.
+override-dependencies = [
+    "mcp[ws]>=1.30.0,<2",
+    "uv>=0.13.4",
+    "opentelemetry-api>=1.45.1,<2",
+    "opentelemetry-sdk>=1.45.1,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.45.1,<2",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aimeat_crewai"]
