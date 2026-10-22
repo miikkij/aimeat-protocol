@@ -110,8 +110,8 @@ function askNotice(baseUrl: string, app: string, entry: EcoCapabilityApproval): 
   const name = entry.name ?? entry.capability;
   return {
     type: ECO_CAPABILITY_ASK_TYPE,
-    title: `${registrant} wants your outside app ${app} to run ${entry.action}`,
-    body: `The capability "${name}" of ${registrant} asks your outside app ${app} to run its action ${entry.action} for you. Open this to see what it sends, or answer here.`,
+    title: `${registrant} asks to use your outside app ${app}`,
+    body: `"${name}" from ${registrant} would like your outside app ${app} to run its action ${entry.action}. Open this to see what it sends, or answer here.`,
     link: url.slice(url.indexOf('/v1/')),
     i18n: { key: ECO_CAPABILITY_ASK_TYPE, vars: { registrant, app, action: entry.action, name } },
     // Both answers on the notice, as on the page: a question with only Allow cannot be answered no.
