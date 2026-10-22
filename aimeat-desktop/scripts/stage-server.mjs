@@ -13,8 +13,8 @@
  *     1. `pnpm build` in ../aimeat (produces dist/ with public, locales, static).
  *     2. Reset resources/server/ and copy dist/.
  *     3. Copy aimeat package.json (+ lockfile) so the prod install resolves the
- *        right versions and pnpm's onlyBuiltDependencies allows better-sqlite3
- *        to produce its native .node binary.
+ *        right versions. better-sqlite3 13 ships its native binary for each
+ *        platform in prebuilds/, so nothing is compiled.
  *     4. `pnpm install --prod --no-optional` in resources/server/ — runtime deps
  *        only; --no-optional drops Prisma engines (Mongo/Postgres are excluded
  *        from the SQLite desktop bundle).
@@ -25,6 +25,10 @@
  *   and no scripts/ (step 4).
  * @usage  node scripts/stage-server.mjs   (run via `pnpm stage`)
  * @version-history
+ *   v0.6.0 — 2026-10-23 — better-sqlite3 13 loads a prebuilt N-API binary from
+ *     prebuilds/<target>.node and is no longer compiled at install (aimeat package.json lists it under
+ *     ignoredBuiltDependencies). Step 5d removes flat prebuild FILES for other targets as well as
+ *     folders, and step 6 asserts the binary better-sqlite3 will load on this platform.
  *   v0.5.0 — 2026-09-29 — Step 5d: prebuilds/<platform>-<arch>/ folders for other platforms are
  *     removed, and on Linux musl builds too; linuxdeploy had stopped the first Linux AppImage build
  *     on an Android binary of bare-fs.
@@ -78,7 +82,7 @@ if (existsSync(csmExamples)) {
   cpSync(csmExamples, join(serverDir, 'docs', 'csm-examples'), { recursive: true });
 }
 
-// 4. Write the staging package.json (carries "type":"module" + pnpm.onlyBuiltDependencies),
+// 4. Write the staging package.json (carries "type":"module" + the pnpm build settings),
 //    but with optionalDependencies stripped. The ONLY optional dep is @prisma/client,
 //    which the SQLite bundle never imports and whose engines are large. We must NOT use
 //    pnpm's --no-optional, though: quickjs-emscripten pulls quickjs-emscripten-core and
@@ -107,8 +111,8 @@ if (existsSync(lockfile)) {
   copyFileSync(lockfile, join(serverDir, 'pnpm-lock.yaml'));
 }
 
-// 5. Install production dependencies (with build scripts so better-sqlite3 yields its
-//    native binary). Key flags:
+// 5. Install production dependencies. better-sqlite3 brings its native binary prebuilt.
+//    Key flags:
 //    --node-linker=hoisted : produce a FLAT, symlink-free node_modules. pnpm's default
 //      isolated linker uses symlinks with absolute build-machine targets, which the
 //      NSIS/MSI bundler breaks on copy — severing module resolution in the installed app
@@ -185,6 +189,9 @@ console.log(`[stage-server] removed ${pruned.files} files no running server read
 //     Android binary, and the 2026-09-28 build stopped there ("Failed to run ldd", on
 //     bare-fs/prebuilds/android-x64). A folder is kept when its platform is this one and one of its
 //     '+'-joined architectures is this one (darwin-x64+arm64 is a universal build).
+//     better-sqlite3 13 keeps its binaries as FILES, prebuilds/<target>.node, where target is
+//     linux-x64, linuxmusl-x64, win32-arm64 and so on; a file is kept only for this target, read
+//     the way better-sqlite3 reads it (lib/binding.js), so the one it will load stays.
 //     On Linux, musl builds go as well, files tagged .musl. and folders named for musl: the
 //     AppImage and the .deb run on glibc, where a musl library can never load, and linuxdeploy
 //     refuses one whose libc.musl dependency it cannot find.
@@ -206,7 +213,14 @@ function pruneForeignPrebuilds(dir) {
     }
     if (entry.name === 'prebuilds') {
       for (const target of readdirSync(full, { withFileTypes: true })) {
-        if (!target.isDirectory()) continue;
+        if (!target.isDirectory()) {
+          if (target.name.endsWith('.node') && target.name !== `${prebuildTarget()}.node`) {
+            const targetFile = join(full, target.name);
+            removed += statSync(targetFile).size;
+            rmSync(targetFile, { force: true });
+          }
+          continue;
+        }
         const [platform, archs = ''] = target.name.split(/-(.*)/s);
         if (platform === process.platform && archs.split('+').includes(process.arch)) continue;
         const targetDir = join(full, target.name);
@@ -217,6 +231,11 @@ function pruneForeignPrebuilds(dir) {
     removed += pruneForeignPrebuilds(full);
   }
   return removed;
+}
+/** better-sqlite3's name for this platform's prebuilt binary (its lib/binding.js, getPrebuildPath). */
+function prebuildTarget() {
+  const musl = process.platform === 'linux' && !process.report.getReport().header.glibcVersionRuntime;
+  return `${musl ? 'linuxmusl' : process.platform}-${process.arch}`;
 }
 function sizeOf(dir) {
   let size = 0;
@@ -230,18 +249,15 @@ const foreign = pruneForeignPrebuilds(join(serverDir, 'node_modules'));
 console.log(`[stage-server] removed native prebuilds for other platforms (${(foreign / 1048576).toFixed(1)} MB); kept ${process.platform}-${process.arch}`);
 
 // 6. Sanity check: the native SQLite binary must be present, or the packaged app
-//    will fail to start the node.
-const nativeBinary = join(
-  serverDir,
-  'node_modules',
-  'better-sqlite3',
-  'build',
-  'Release',
-  'better_sqlite3.node',
-);
-if (!existsSync(nativeBinary)) {
-  console.error(`[stage-server] MISSING native binary: ${nativeBinary}`);
-  console.error('[stage-server] better-sqlite3 did not build. Ensure build tools are available.');
+//    will fail to start the node. better-sqlite3 loads prebuilds/<target>.node first and
+//    falls back to a compiled build/Release/better_sqlite3.node.
+const sqliteDir = join(serverDir, 'node_modules', 'better-sqlite3');
+const nativeBinary = [
+  join(sqliteDir, 'prebuilds', `${prebuildTarget()}.node`),
+  join(sqliteDir, 'build', 'Release', 'better_sqlite3.node'),
+].find(existsSync);
+if (!nativeBinary) {
+  console.error(`[stage-server] MISSING native binary: neither prebuilds/${prebuildTarget()}.node nor build/Release/better_sqlite3.node under ${sqliteDir}`);
   process.exit(1);
 }
 

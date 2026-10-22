@@ -331,7 +331,7 @@
     "ajv-formats": "^3.0.1",
     "archiver": "^8.0.0",
     "asn1js": "^3.1.0",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "busboy": "^1.6.0",
     "compression": "^1.8.2",
     "croner": "^10.0.1",
@@ -373,7 +373,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "@types/archiver": "^8.0.0",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/busboy": "^1.5.5",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
@@ -404,9 +404,11 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "better-sqlite3",
       "esbuild",
       "js-tokens"
+    ],
+    "ignoredBuiltDependencies": [
+      "better-sqlite3"
     ],
     "overrides": {
       "hono": ">=4.13.7",
