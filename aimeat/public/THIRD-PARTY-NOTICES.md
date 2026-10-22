@@ -102,22 +102,22 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 490 npm packages that travel inside the `aimeat` package. Build and test
+The 489 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
 |---|---|---|
 | [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.3.0 | Apache-2.0 |
-| [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 1.0.1 | MIT |
-| [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 1.7.0 | Apache-2.0 |
-| [@ai-sdk/anthropic](https://ai-sdk.dev/docs) | 4.0.71 | Apache-2.0 |
-| [@ai-sdk/gateway](https://ai-sdk.dev/docs) | 4.0.103 | Apache-2.0 |
-| [@ai-sdk/mistral](https://ai-sdk.dev/docs) | 4.0.56 | Apache-2.0 |
-| [@ai-sdk/openai-compatible](https://ai-sdk.dev/docs) | 3.0.62 | Apache-2.0 |
-| [@ai-sdk/openai](https://ai-sdk.dev/docs) | 4.0.83 | Apache-2.0 |
-| [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.53 | Apache-2.0 |
-| [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.21 | Apache-2.0 |
-| [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.14 | Apache-2.0 |
+| [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 1.0.3 | MIT |
+| [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 1.9.0 | Apache-2.0 |
+| [@ai-sdk/anthropic](https://ai-sdk.dev/docs) | 4.0.86 | Apache-2.0 |
+| [@ai-sdk/gateway](https://ai-sdk.dev/docs) | 4.0.122 | Apache-2.0 |
+| [@ai-sdk/mistral](https://ai-sdk.dev/docs) | 4.0.70 | Apache-2.0 |
+| [@ai-sdk/openai-compatible](https://ai-sdk.dev/docs) | 3.0.76 | Apache-2.0 |
+| [@ai-sdk/openai](https://ai-sdk.dev/docs) | 4.0.100 | Apache-2.0 |
+| [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.66 | Apache-2.0 |
+| [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.32 | Apache-2.0 |
+| [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.28 | Apache-2.0 |
 | [@cfworker/json-schema](https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md) | 4.1.1 | MIT |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
@@ -125,7 +125,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@colors/colors](https://github.com/DABH/colors.js) | 1.6.1 | MIT |
 | [@dabh/diagnostics](https://github.com/DABH/diagnostics) | 2.0.9 | MIT |
 | [@hexagon/base64](https://base64.56k.guru) | 1.1.28 | MIT |
-| [@hono/node-server](https://github.com/honojs/node-server) | 2.1.3 | MIT |
+| [@hono/node-server](https://github.com/honojs/node-server) | 2.1.5 | MIT |
 | [@inversifyjs/common](https://inversify.io) | 1.5.2 | MIT |
 | [@inversifyjs/container](https://inversify.io) | 1.15.0 | MIT |
 | [@inversifyjs/core](https://inversify.io) | 9.2.0 | MIT |
@@ -152,25 +152,25 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@noble/hashes](https://paulmillr.com/noble/) | 2.4.0 | MIT |
 | [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.1.0 | MIT |
 | [@openrouter/ai-sdk-provider](https://github.com/OpenRouterTeam/ai-sdk-provider) | 3.1.0 | Apache-2.0 |
-| [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.9.1 | Apache-2.0 |
+| [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.10.0 | Apache-2.0 |
 | [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.3.2 | Apache-2.0 |
-| [@peculiar/asn1-android](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/android#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-asym-key](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/asym-key#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-csr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/csr#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-ecc](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ecc#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-ocsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ocsp#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-pfx](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pfx#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-pkcs8](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs8#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-pkcs9](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs9#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-rsa](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/rsa#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-schema](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/schema#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-tsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/tsp#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-x509-attr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-attr#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-x509-post-quantum](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-post-quantum#readme) | 2.10.0 | MIT |
-| [@peculiar/asn1-x509](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509#readme) | 2.10.0 | MIT |
+| [@peculiar/asn1-android](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/android#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-asym-key](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/asym-key#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-cms](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/cms#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-csr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/csr#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-ecc](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ecc#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-ocsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/ocsp#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-pfx](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pfx#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-pkcs8](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs8#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-pkcs9](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/pkcs9#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-rsa](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/rsa#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-schema](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/schema#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-tsp](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/tsp#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-x509-attr](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-attr#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-x509-post-quantum](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509-post-quantum#readme) | 2.11.0 | MIT |
+| [@peculiar/asn1-x509](https://github.com/PeculiarVentures/asn1-schema/tree/master/packages/x509#readme) | 2.11.0 | MIT |
 | [@peculiar/utils](https://github.com/PeculiarVentures/pvtsutils#readme) | 2.0.3 | MIT |
-| [@peculiar/x509](https://github.com/PeculiarVentures/x509#readme) | 2.1.0 | MIT |
+| [@peculiar/x509](https://github.com/PeculiarVentures/x509#readme) | 2.2.0 | MIT |
 | [@prometheus-io/client](https://github.com/prometheus/client_js) | 0.16.1 | Apache-2.0 |
 | [@sd-jwt/core](https://github.com/openwallet-foundation/sd-jwt-js/wiki) | 0.20.1 | Apache-2.0 |
 | [@simplewebauthn/server](https://github.com/MasterKale/SimpleWebAuthn/tree/master/packages/server#readme) | 14.0.3 | MIT |
@@ -187,7 +187,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@types/validator](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/validator) | 13.15.10 | MIT |
 | [@types/xml-encryption](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/xml-encryption) | 1.2.4 | MIT |
 | [@types/xml2js](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/xml2js) | 0.4.14 | MIT |
-| [@vercel/blob](https://vercel.com/storage/blob) | 2.8.0 | Apache-2.0 |
+| [@vercel/blob](https://vercel.com/storage/blob) | 2.8.2 | Apache-2.0 |
 | [@vercel/cli-config](https://vercel.com/docs/projects/project-configuration/global-configuration) | 0.3.1 | Apache-2.0 |
 | [@vercel/cli-exec](https://vercel.com) | 1.0.1 | Apache-2.0 |
 | [@vercel/oidc](https://vercel.com) | 3.2.0 | Apache-2.0 |
@@ -201,7 +201,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [acorn-import-attributes](https://github.com/xtuc/acorn-import-attributes#readme) | 1.9.5 | MIT |
 | [acorn](https://github.com/acornjs/acorn) | 8.15.0 | MIT |
 | [agent-base](https://github.com/TooTallNate/proxy-agents#readme) | 7.1.4 | MIT |
-| [ai](https://ai-sdk.dev/docs) | 7.0.127 | Apache-2.0 |
+| [ai](https://ai-sdk.dev/docs) | 7.0.149 | Apache-2.0 |
 | [ajv-formats](https://github.com/ajv-validator/ajv-formats#readme) | 3.0.1 | MIT |
 | [ajv](https://ajv.js.org) | 8.20.0 | MIT |
 | [ansi-regex](https://github.com/chalk/ansi-regex#readme) | 5.0.1 | MIT |
@@ -211,7 +211,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [array-union](https://github.com/sindresorhus/array-union#readme) | 2.1.0 | MIT |
 | [arrify](https://github.com/sindresorhus/arrify#readme) | 2.0.1 | MIT |
 | [asn1.js](https://github.com/indutny/asn1.js) | 5.4.1 | MIT |
-| [asn1js](https://github.com/PeculiarVentures/ASN1.js#readme) | 3.0.10 | BSD-3-Clause |
+| [asn1js](https://github.com/PeculiarVentures/ASN1.js#readme) | 3.1.0 | BSD-3-Clause |
 | [assert](https://github.com/browserify/commonjs-assert) | 2.1.0 | MIT |
 | [async-retry](https://github.com/vercel/async-retry#readme) | 1.3.3 | MIT |
 | [async](https://caolan.github.io/async/) | 3.2.6 | MIT |
@@ -220,10 +220,10 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [balanced-match](https://github.com/juliangruber/balanced-match#readme) | 1.0.2 | MIT |
 | [balanced-match](https://github.com/juliangruber/balanced-match#readme) | 4.0.4 | MIT |
 | [bare-events](https://github.com/holepunchto/bare-events#readme) | 2.9.2 | Apache-2.0 |
-| [bare-fs](https://github.com/holepunchto/bare-fs#readme) | 4.8.2 | Apache-2.0 |
+| [bare-fs](https://github.com/holepunchto/bare-fs#readme) | 4.8.4 | Apache-2.0 |
 | [bare-path](https://github.com/holepunchto/bare-path#readme) | 3.1.2 | Apache-2.0 |
 | [bare-stream](https://github.com/holepunchto/bare-stream#readme) | 2.13.4 | Apache-2.0 |
-| [bare-url](https://github.com/holepunchto/bare-url) | 2.5.4 | Apache-2.0 |
+| [bare-url](https://github.com/holepunchto/bare-url) | 2.5.5 | Apache-2.0 |
 | [base64-js](https://github.com/beatgammit/base64-js) | 0.0.8 | MIT |
 | [base64-js](https://github.com/beatgammit/base64-js) | 1.5.1 | MIT |
 | [better-sqlite3](http://github.com/WiseLibs/better-sqlite3) | 12.11.1 | MIT |
@@ -231,7 +231,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [bintrees](https://github.com/vadimg/js_bintrees#readme) | 1.0.2 | MIT |
 | [bl](https://github.com/rvagg/bl) | 4.1.0 | MIT |
 | [bn.js](https://github.com/indutny/bn.js) | 4.12.5 | MIT |
-| [body-parser](https://github.com/expressjs/body-parser#readme) | 2.3.0 | MIT |
+| [body-parser](https://github.com/expressjs/body-parser#readme) | 2.4.0 | MIT |
 | [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 1.1.21 | MIT |
 | [brace-expansion](https://github.com/juliangruber/brace-expansion#readme) | 5.0.12 | MIT |
 | [brotli](https://github.com/devongovett/brotli.js) | 1.3.3 | MIT |
@@ -267,8 +267,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [compressible](https://github.com/jshttp/compressible#readme) | 2.0.18 | MIT |
 | [compression](https://github.com/expressjs/compression#readme) | 1.8.2 | MIT |
 | [concat-map](https://github.com/substack/node-concat-map#readme) | 0.0.1 | MIT |
-| [content-disposition](https://github.com/jshttp/content-disposition#readme) | 1.1.0 | MIT |
-| [content-type](https://github.com/jshttp/content-type#readme) | 1.0.5 | MIT |
+| [content-disposition](https://github.com/jshttp/content-disposition#readme) | 2.0.1 | MIT |
 | [content-type](https://github.com/jshttp/content-type#readme) | 2.1.0 | MIT |
 | [cookie-signature](https://github.com/visionmedia/node-cookie-signature#readme) | 1.2.2 | MIT |
 | [cookie](https://github.com/jshttp/cookie#readme) | 0.7.2 | MIT |
@@ -320,13 +319,13 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [execa](https://github.com/sindresorhus/execa#readme) | 5.1.1 | MIT |
 | [exifr](https://mutiny.cz/exifr/) | 7.1.3 | MIT |
 | [expand-template](https://github.com/ralphtheninja/expand-template) | 2.0.3 | (MIT OR WTFPL) |
-| [express](https://expressjs.com/) | 5.2.1 | MIT |
+| [express](https://expressjs.com/) | 5.3.0 | MIT |
 | [fast-deep-equal](https://github.com/epoberezkin/fast-deep-equal#readme) | 3.1.3 | MIT |
 | [fast-fifo](https://github.com/mafintosh/fast-fifo) | 1.3.2 | MIT |
 | [fast-levenshtein](https://github.com/hiddentao/fast-levenshtein#readme) | 2.0.6 | MIT |
 | [fast-string-truncated-width](https://github.com/fabiospampinato/fast-string-truncated-width#readme) | 3.0.3 | MIT |
 | [fast-string-width](https://github.com/fabiospampinato/fast-string-width#readme) | 3.0.2 | MIT |
-| [fast-uri](https://github.com/fastify/fast-uri) | 3.1.8 | BSD-3-Clause |
+| [fast-uri](https://github.com/fastify/fast-uri) | 3.1.9 | BSD-3-Clause |
 | [fast-wrap-ansi](https://github.com/43081j/fast-wrap-ansi#readme) | 0.2.2 | MIT |
 | [fecha](https://github.com/taylorhakes/fecha) | 4.2.3 | MIT |
 | [file-uri-to-path](https://github.com/TooTallNate/file-uri-to-path) | 1.0.0 | MIT |
@@ -351,7 +350,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [has-symbols](https://github.com/ljharb/has-symbols#readme) | 1.1.0 | MIT |
 | [has-tostringtag](https://github.com/inspect-js/has-tostringtag#readme) | 1.0.2 | MIT |
 | [hasown](https://github.com/inspect-js/hasOwn#readme) | 2.0.4 | MIT |
-| [hono](https://hono.dev) | 4.13.12 | MIT |
+| [hono](https://hono.dev) | 4.13.13 | MIT |
 | [http-errors](https://github.com/jshttp/http-errors#readme) | 2.0.1 | MIT |
 | [http_ece](https://github.com/martinthomson/encrypted-content-encoding) | 1.2.0 | MIT |
 | [https-proxy-agent](https://github.com/TooTallNate/proxy-agents#readme) | 7.0.6 | MIT |
@@ -379,9 +378,9 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [is-typed-array](https://github.com/inspect-js/is-typed-array#readme) | 1.1.15 | MIT |
 | [isarray](https://github.com/juliangruber/isarray) | 1.0.0 | MIT |
 | [isexe](https://github.com/isaacs/isexe#readme) | 2.0.0 | ISC |
-| [javascript-obfuscator](https://obfuscator.io/) | 5.8.1 | BSD-2-Clause |
+| [javascript-obfuscator](https://obfuscator.io/) | 5.9.0 | BSD-2-Clause |
 | [jose](https://github.com/panva/jose) | 5.10.0 | MIT |
-| [jose](https://github.com/panva/jose) | 6.2.12 | MIT |
+| [jose](https://github.com/panva/jose) | 6.2.13 | MIT |
 | [js-md5](https://github.com/emn178/js-md5) | 0.8.3 | MIT |
 | [js-string-escape](https://github.com/joliss/js-string-escape#readme) | 1.0.1 | MIT |
 | [jsbi](https://github.com/GoogleChromeLabs/jsbi#readme) | 4.3.2 | Apache-2.0 |
@@ -390,10 +389,10 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [jwa](https://github.com/brianloveswords/node-jwa#readme) | 2.0.1 | MIT |
 | [jws](https://github.com/brianloveswords/node-jws#readme) | 4.0.1 | MIT |
 | [kuler](https://github.com/3rd-Eden/kuler) | 2.0.0 | MIT |
-| [kysely](https://kysely.dev) | 0.29.6 | MIT |
+| [kysely](https://kysely.dev) | 0.29.7 | MIT |
 | [lazystream](https://github.com/jpommerening/node-lazystream) | 1.0.1 | MIT |
 | [levn](https://github.com/gkz/levn) | 0.3.0 | MIT |
-| [libphonenumber-js](https://gitlab.com/catamphetamine/libphonenumber-js#readme) | 1.13.14 | MIT |
+| [libphonenumber-js](https://gitlab.com/catamphetamine/libphonenumber-js#readme) | 1.13.15 | MIT |
 | [linebreak](https://github.com/devongovett/linebreaker) | 1.1.0 | MIT |
 | [locate-path](https://github.com/sindresorhus/locate-path#readme) | 5.0.0 | MIT |
 | [logform](https://github.com/winstonjs/logform#readme) | 2.7.0 | MIT |
@@ -419,8 +418,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [napi-build-utils](https://github.com/inspiredware/napi-build-utils#readme) | 2.0.0 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
-| [node-abi](https://github.com/electron/node-abi#readme) | 3.96.0 | MIT |
-| [nodemailer](https://nodemailer.com/) | 10.0.13 | MIT-0 |
+| [node-abi](https://github.com/electron/node-abi#readme) | 3.100.0 | MIT |
+| [nodemailer](https://nodemailer.com/) | 10.2.1 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
 | [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.8 | MIT |
@@ -428,7 +427,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [object-is](https://github.com/es-shims/object-is) | 1.1.6 | MIT |
 | [object-keys](https://github.com/ljharb/object-keys#readme) | 1.1.1 | MIT |
 | [object.assign](https://github.com/ljharb/object.assign#readme) | 4.1.7 | MIT |
-| [on-finished](https://github.com/jshttp/on-finished#readme) | 2.4.1 | MIT |
+| [on-finished](https://github.com/jshttp/on-finished#readme) | 2.4.2 | MIT |
 | [on-headers](https://github.com/jshttp/on-headers#readme) | 1.1.0 | MIT |
 | [once](https://github.com/isaacs/once#readme) | 1.4.0 | ISC |
 | [one-time](https://github.com/3rd-Eden/one-time#readme) | 1.0.0 | MIT |
@@ -458,8 +457,8 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [pg](https://github.com/brianc/node-postgres) | 8.23.1 | MIT |
 | [pgpass](https://github.com/hoegaarden/pgpass#readme) | 1.0.5 | MIT |
 | [pkce-challenge](https://github.com/crouchcd/pkce-challenge#readme) | 5.0.1 | MIT |
-| [pkijs](https://github.com/PeculiarVentures/PKI.js#readme) | 3.4.2 | BSD-3-Clause |
-| [playwright-core](https://playwright.dev) | 1.63.0 | Apache-2.0 |
+| [pkijs](https://github.com/PeculiarVentures/PKI.js#readme) | 3.4.3 | BSD-3-Clause |
+| [playwright-core](https://playwright.dev) | 1.64.1 | Apache-2.0 |
 | [png-js](https://github.com/devongovett/png.js#readme) | 1.1.0 | MIT |
 | [pngjs](https://github.com/lukeapage/pngjs) | 5.0.0 | MIT |
 | [possible-typed-array-names](https://github.com/ljharb/possible-typed-array-names#readme) | 1.1.0 | MIT |
@@ -476,7 +475,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [pvtsutils](https://github.com/PeculiarVentures/pvtsutils#readme) | 1.3.6 | MIT |
 | [pvutils](https://github.com/PeculiarVentures/pvutils#readme) | 1.2.0 | MIT |
 | [qrcode](http://github.com/soldair/node-qrcode) | 1.5.4 | MIT |
-| [qs](https://github.com/ljharb/qs) | 6.16.0 | BSD-3-Clause |
+| [qs](https://github.com/ljharb/qs) | 6.16.1 | BSD-3-Clause |
 | [quickjs-emscripten-core](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [quickjs-emscripten](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [range-parser](https://github.com/jshttp/range-parser#readme) | 1.3.0 | MIT |
@@ -484,7 +483,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [rc](https://github.com/dominictarr/rc#readme) | 1.2.8 | (BSD-2-Clause OR MIT OR Apache-2.0) |
 | [readable-stream](https://github.com/nodejs/readable-stream) | 2.3.8 | MIT |
 | [readable-stream](https://github.com/nodejs/readable-stream) | 3.6.2 | MIT |
-| [readable-stream](https://github.com/nodejs/readable-stream) | 4.7.0 | MIT |
+| [readable-stream](https://github.com/nodejs/readable-stream) | 4.8.0 | MIT |
 | [readdir-glob](https://github.com/Yqnn/node-readdir-glob) | 3.0.0 | Apache-2.0 |
 | [reflect-metadata](http://rbuckton.github.io/reflect-metadata) | 0.2.2 | Apache-2.0 |
 | [require-directory](https://github.com/troygoode/node-require-directory/) | 2.1.1 | MIT |
@@ -560,11 +559,11 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [undici](https://undici.nodejs.org) | 7.30.1 | MIT |
 | [unicode-properties](https://github.com/devongovett/unicode-properties) | 1.4.1 | MIT |
 | [unicode-trie](https://github.com/devongovett/unicode-trie) | 2.0.0 | MIT |
-| [unpdf](https://github.com/unjs/unpdf#readme) | 1.8.1 | MIT |
+| [unpdf](https://github.com/unjs/unpdf#readme) | 1.9.1 | MIT |
 | [unpipe](https://github.com/stream-utils/unpipe#readme) | 1.0.0 | MIT |
 | [util-deprecate](https://github.com/TooTallNate/util-deprecate) | 1.0.2 | MIT |
 | [util](https://github.com/browserify/node-util) | 0.12.5 | MIT |
-| [uuid](https://github.com/uuidjs/uuid#readme) | 14.0.2 | MIT |
+| [uuid](https://github.com/uuidjs/uuid#readme) | 14.0.3 | MIT |
 | [validator](https://github.com/validatorjs/validator.js) | 13.15.35 | MIT |
 | [vanilla-cookieconsent](https://cookieconsent.orestbida.com) | 3.1.0 | MIT |
 | [vary](https://github.com/jshttp/vary#readme) | 1.1.2 | MIT |
@@ -580,7 +579,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [ws](https://github.com/websockets/ws) | 8.22.0 | MIT |
 | [xdg-app-paths](https://github.com/rivy/js.xdg-app-paths#readme) | 5.5.1 | MIT |
 | [xdg-portable](https://github.com/rivy/js.xdg-portable#readme) | 7.3.0 | MIT |
-| [xml-crypto](https://github.com/node-saml/xml-crypto#readme) | 6.3.2 | MIT |
+| [xml-crypto](https://github.com/node-saml/xml-crypto#readme) | 6.4.0 | MIT |
 | [xml-encryption](https://github.com/auth0/node-xml-encryption#readme) | 3.1.0 | MIT |
 | [xml2js](https://github.com/Leonidas-from-XIV/node-xml2js) | 0.6.2 | MIT |
 | [xmlbuilder](http://github.com/oozcitak/xmlbuilder-js) | 11.0.1 | MIT |
@@ -596,14 +595,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [yauzl](https://github.com/thejoshwolfe/yauzl) | 3.4.0 | MIT |
 | [zip-stream](https://github.com/archiverjs/node-zip-stream) | 7.0.5 | MIT |
 | [zod](https://zod.dev) | 4.1.11 | MIT |
-| [zod](https://zod.dev) | 4.6.5 | MIT |
+| [zod](https://zod.dev) | 4.6.7 | MIT |
 
 ## Licence texts
 
 Each text below is reproduced as the component ships it. Where several components ship
 the identical text, they share one section.
 
-### @ag-ui/core 1.0.1
+### @ag-ui/core 1.0.3
 
 ```text
 MIT License
@@ -629,7 +628,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @agentclientprotocol/sdk 1.7.0
+### @agentclientprotocol/sdk 1.9.0
 
 ```text
 Apache License
@@ -824,7 +823,7 @@ Apache License
    limitations under the License.
 ```
 
-### @ai-sdk/anthropic 4.0.71, @ai-sdk/gateway 4.0.103, @ai-sdk/mistral 4.0.56, @ai-sdk/openai-compatible 3.0.62, @ai-sdk/openai 4.0.83, @ai-sdk/provider 4.0.21, @ai-sdk/xai 5.0.14, ai 7.0.127
+### @ai-sdk/anthropic 4.0.86, @ai-sdk/gateway 4.0.122, @ai-sdk/mistral 4.0.70, @ai-sdk/openai-compatible 3.0.76, @ai-sdk/openai 4.0.100, @ai-sdk/provider 4.0.32, @ai-sdk/xai 5.0.28, ai 7.0.149
 
 ```text
 Copyright 2023 Vercel, Inc.
@@ -938,7 +937,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @hono/node-server 2.1.3
+### @hono/node-server 2.1.5
 
 ```text
 MIT License
@@ -1016,7 +1015,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### @javascript-obfuscator/estraverse 5.4.0, estraverse 5.3.0, esutils 2.0.3, javascript-obfuscator 5.8.1
+### @javascript-obfuscator/estraverse 5.4.0, estraverse 5.3.0, esutils 2.0.3, javascript-obfuscator 5.9.0
 
 ```text
 Redistribution and use in source and binary forms, with or without
@@ -1696,7 +1695,7 @@ APPENDIX: How to apply the Apache License to your work.
   limitations under the License.
 ```
 
-### @peculiar/asn1-android 2.10.0, @peculiar/asn1-pkcs9 2.10.0
+### @peculiar/asn1-android 2.11.0, @peculiar/asn1-pkcs9 2.11.0
 
 ```text
 MIT License
@@ -1722,7 +1721,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/asn1-asym-key 2.10.0, @peculiar/asn1-x509-post-quantum 2.10.0
+### @peculiar/asn1-asym-key 2.11.0, @peculiar/asn1-x509-post-quantum 2.11.0
 
 ```text
 MIT License
@@ -1748,7 +1747,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/asn1-cms 2.10.0, @peculiar/asn1-csr 2.10.0, @peculiar/asn1-ecc 2.10.0, @peculiar/asn1-ocsp 2.10.0, @peculiar/asn1-pfx 2.10.0, @peculiar/asn1-pkcs8 2.10.0, @peculiar/asn1-rsa 2.10.0, @peculiar/asn1-schema 2.10.0, @peculiar/asn1-x509-attr 2.10.0, @peculiar/asn1-x509 2.10.0
+### @peculiar/asn1-cms 2.11.0, @peculiar/asn1-csr 2.11.0, @peculiar/asn1-ecc 2.11.0, @peculiar/asn1-ocsp 2.11.0, @peculiar/asn1-pfx 2.11.0, @peculiar/asn1-pkcs8 2.11.0, @peculiar/asn1-rsa 2.11.0, @peculiar/asn1-schema 2.11.0, @peculiar/asn1-x509-attr 2.11.0, @peculiar/asn1-x509 2.11.0
 
 ```text
 MIT License
@@ -1774,7 +1773,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/asn1-tsp 2.10.0
+### @peculiar/asn1-tsp 2.11.0
 
 ```text
 MIT License
@@ -1826,7 +1825,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @peculiar/x509 2.1.0
+### @peculiar/x509 2.2.0
 
 ```text
 MIT License
@@ -2133,7 +2132,7 @@ MIT License
     SOFTWARE
 ```
 
-### @vercel/blob 2.8.0
+### @vercel/blob 2.8.2
 
 ```text
 Apache License
@@ -2831,7 +2830,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.9.1, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-events 2.9.2, bare-fs 4.8.2, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.4, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
+### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.10.0, @owf/identity-common 0.3.2, @prometheus-io/client 0.16.1, @sd-jwt/core 0.20.1, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-events 2.9.2, bare-fs 4.8.4, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.5, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
 
 ```text
 Apache License
@@ -3090,7 +3089,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### asn1js 3.0.10
+### asn1js 3.1.0
 
 ```text
 Copyright (c) 2014, GMO GlobalSign
@@ -3449,7 +3448,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### body-parser 2.3.0, compression 1.8.2, type-is 2.1.0
+### body-parser 2.4.0, compression 1.8.2, type-is 2.1.0
 
 ```text
 (The MIT License)
@@ -4243,7 +4242,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### content-disposition 1.1.0, forwarded 0.2.0, media-typer 1.1.1, vary 1.1.2
+### content-disposition 2.0.1, forwarded 0.2.0, media-typer 1.1.1, vary 1.1.2
 
 ```text
 (The MIT License)
@@ -4270,7 +4269,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### content-type 1.0.5, content-type 2.1.0
+### content-type 2.1.0
 
 ```text
 (The MIT License)
@@ -6015,7 +6014,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### express 5.2.1
+### express 5.3.0
 
 ```text
 (The MIT License)
@@ -6151,7 +6150,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 ```
 
-### fast-uri 3.1.8
+### fast-uri 3.1.9
 
 ```text
 Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
@@ -7079,7 +7078,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### hono 4.13.12
+### hono 4.13.13
 
 ```text
 MIT License
@@ -7756,7 +7755,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### jose 5.10.0, jose 6.2.12
+### jose 5.10.0, jose 6.2.13
 
 ```text
 The MIT License (MIT)
@@ -8274,7 +8273,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### kysely 0.29.6
+### kysely 0.29.7
 
 ```text
 The MIT License (MIT)
@@ -8399,7 +8398,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### libphonenumber-js 1.13.14
+### libphonenumber-js 1.13.15
 
 ```text
 (The MIT License)
@@ -9047,7 +9046,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### node-abi 3.96.0
+### node-abi 3.100.0
 
 ```text
 MIT License
@@ -9073,7 +9072,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### nodemailer 10.0.13
+### nodemailer 10.2.1
 
 ```text
 Copyright (c) 2011-2023 Andris Reinman
@@ -9224,7 +9223,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### on-finished 2.4.1
+### on-finished 2.4.2
 
 ```text
 (The MIT License)
@@ -10360,7 +10359,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### pkijs 3.4.2
+### pkijs 3.4.3
 
 ```text
 Copyright (c) 2014, GlobalSign
@@ -10395,7 +10394,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### playwright-core 1.63.0
+### playwright-core 1.64.1
 
 ```text
 Apache License
@@ -10851,7 +10850,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### qs 6.16.0
+### qs 6.16.1
 
 ```text
 BSD 3-Clause License
@@ -10960,7 +10959,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### readable-stream 2.3.8, readable-stream 3.6.2, readable-stream 4.7.0, string_decoder 1.1.1, string_decoder 1.3.0
+### readable-stream 2.3.8, readable-stream 3.6.2, readable-stream 4.8.0, string_decoder 1.1.1, string_decoder 1.3.0
 
 ```text
 Node.js is licensed for use as follows:
@@ -12367,7 +12366,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### unpdf 1.8.1
+### unpdf 1.9.1
 
 ```text
 MIT License
@@ -12449,7 +12448,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### uuid 14.0.2
+### uuid 14.0.3
 
 ```text
 The MIT License (MIT)
@@ -12661,7 +12660,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### xml-crypto 6.3.2
+### xml-crypto 6.4.0
 
 ```text
 (The MIT License)
@@ -12904,7 +12903,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### zod 4.1.11, zod 4.6.5
+### zod 4.1.11, zod 4.6.7
 
 ```text
 MIT License
@@ -13130,7 +13129,7 @@ The above copyright notice and this permission notice shall be included
 in all copies or substantial portions of the Software.
 ```
 
-### playwright-core 1.63.0
+### playwright-core 1.64.1
 
 ```text
 Playwright

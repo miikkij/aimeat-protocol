@@ -144,6 +144,16 @@ what a vulnerability feed matches on, so the licence work is what made the scan 
 - **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then `pnpm gate --postgres`,
   which adds the production backend to the guard tier. A dependency bump is a change to what users run.
 
+### Advisories we accept
+
+`pnpm.auditConfig.ignoreGhsas` in `aimeat/package.json` lists the advisories `pnpm audit` skips. An
+entry goes there only when no fixed version exists and the vulnerable code cannot receive input from
+outside. Each entry has its reason here, and it leaves the list when a fix ships.
+
+| Advisory | Package and path | Why it is accepted | Accepted |
+|---|---|---|---|
+| GHSA-vfj7-8cjw-p6xm (CVE-2026-93687) | `braces` ≤ 3.0.3 via `kysely-codegen > micromatch` (dev only) | No fixed `braces` exists. `kysely-codegen` is a CLI a developer runs by hand to regenerate `db-types.ts` from our own database; the brace patterns it expands come from its own options, never from a request. The node does not ship it. | 2026-10-22 |
+
 ### The one outbound call that must not use safeFetch
 
 `src/services/consul-config.ts` talks to the Consul agent with plain `fetch`, and that is deliberate:
