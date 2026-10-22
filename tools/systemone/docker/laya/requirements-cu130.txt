@@ -17,9 +17,9 @@ anyio==4.15.1 \
     # via
     #   httpx
     #   starlette
-certifi==2026.7.22 \
-    --hash=sha256:62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775 \
-    --hash=sha256:741e2c3b351ddf169a738da9f2c048608ff7f2c5cc02f1ebc6b118bb090d5d55
+certifi==2026.10.19 \
+    --hash=sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae \
+    --hash=sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b
     # via
     #   httpcore
     #   httpx
@@ -738,7 +738,7 @@ torch==2.14.0+cu130 \
     --hash=sha256:e729d57eb3e0c859fa7a9c27f9f274121c2c09ae70a376ac227a650807b0457c \
     --hash=sha256:fca94b3181939ca5bdfc1f7d108a79888dec750f3683f922bda40dc4e78d6eaa
     # via
-    #   -c /tmp/systemone-cu130.txt
+    #   -c C:/Users/joumii/AppData/Local/Temp/tmp.5dVKstmyLE/cu130.txt
     #   -r laya/requirements.in
     #   laya
 tqdm==4.70.1 \
