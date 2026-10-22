@@ -19,6 +19,8 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-22 — The skill ZIP answers 404 for a stored name that is not a skill name and leaves out a file
+ *     path that would leave the {name}/ wrapper (secaudit2026oct22, skill-zip/entry-name-not-contained).
  *   2026-10-21 — The reader and isAnonymous ask isAnonymousPrincipal: the minted anonymous token read the
  *     skills kept for this node's members (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, POST /v1/skills and PATCH
@@ -66,7 +68,7 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { SkillValidationError } from '../services/skill-md.js';
+import { SkillValidationError, isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
 import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill-audience.js';
 import { ProvenanceScopeError } from '../services/ai-provenance.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
@@ -345,6 +347,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       if (!skill) { sendSkillError(res, lastErr); return; }
 
       const bareName = skill.name;   // pin stripped — the wrapper dir must equal the skill name
+      // The wrapper is a directory a reader extracts into, so it must be a skill name (secaudit2026oct22).
+      if (!SKILL_NAME_RE.test(bareName)) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Skill not found: ${nameParam}`)); return; }
       const archive = new ZipArchive({ zlib: { level: 6 } });
       const chunks: Buffer[] = [];
       archive.on('data', (c: Buffer) => chunks.push(c));
@@ -362,7 +366,10 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       archive.on('error', (err: Error) => {
         res.status(500).json(error(config.nodeId, 'ZIP_ERROR', `Failed to build skill ZIP: ${err.message}`));
       });
+      // A path stored before isAllowedSkillPath checked every segment is left out, so every entry
+      // stays inside the {name}/ wrapper (secaudit2026oct22).
       for (const [path, content] of Object.entries(skill.fileContents)) {
+        if (!isAllowedSkillPath(path)) continue;
         archive.append(content, { name: `${bareName}/${path}` });
       }
       await archive.finalize();

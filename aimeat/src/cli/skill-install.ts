@@ -17,12 +17,15 @@
  *   aimeat skill install user:alice/style@1.0.2 --project
  *   aimeat skill install ws:ORG/WS/team-style --dir C:\\skills
  * @version-history
+ *   v1.1.0 -- 2026-10-22 -- skillInstallTarget: the node's skill name must be a skill name and the one asked
+ *     for before the directory is cleared, and every file must resolve inside it; the installer had joined
+ *     both unchecked and could write or remove outside ~/.claude/skills (secaudit2026oct22).
  *   v1.0.0 -- 2026-07-06 -- Initial (Skills feature — local install for Claude Code/Desktop)
  */
 import { homedir } from 'node:os';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
-import { isAllowedSkillPath } from '../services/skill-md.js';
+import { isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
 
 interface ResolvedSkillPayload {
   ref: string;
@@ -64,6 +67,28 @@ export function stampProvenance(skillMd: string, pinnedRef: string, nodeUrl: str
   upsert('aimeat_ref', pinnedRef);
   upsert('aimeat_node', nodeUrl);
   return `${m[1]}${fm}${m[3]}${m[4]}`;
+}
+
+/** The skill name a ref asks for: its last segment without an @version pin. */
+export function requestedSkillName(ref: string): string {
+  const bare = ref.replace(/@\d+\.\d+\.\d+$/, '');
+  return bare.slice(Math.max(bare.lastIndexOf(':'), bare.lastIndexOf('/')) + 1);
+}
+
+/**
+ * Where one file of a skill is written, or null when it would not stay inside the skill's own
+ * directory: the name the node returned must be a skill name and the one asked for, and the file path
+ * must be an allowed skill path that resolves under that directory. The installer had joined the
+ * node's name and paths unchecked and removed that directory first (secaudit2026oct22).
+ */
+export function skillInstallTarget(baseDir: string, nameFromNode: string, requestedName: string, relPath: string): { skillDir: string; target: string } | null {
+  if (!SKILL_NAME_RE.test(nameFromNode) || nameFromNode !== requestedName) return null;
+  if (!isAllowedSkillPath(relPath)) return null;
+  const skillDir = join(baseDir, nameFromNode);
+  const target = resolve(skillDir, relPath);
+  const rel = relative(skillDir, target);
+  if (rel === '' || rel.startsWith('..') || isAbsolute(rel)) return null;
+  return { skillDir, target };
 }
 
 export async function runSkillInstall(ref: string | undefined, flags: Record<string, string>): Promise<void> {
@@ -111,7 +136,11 @@ export async function runSkillInstall(ref: string | undefined, flags: Record<str
       : flags.project
         ? join(process.cwd(), '.claude', 'skills')
         : join(homedir(), '.claude', 'skills');
-    const skillDir = join(baseDir, skill.name);
+    // The name decides which directory is cleared and written, so it must be a skill name and the one
+    // asked for before anything on disk is touched.
+    const placed = skillInstallTarget(baseDir, skill.name, requestedSkillName(ref), 'SKILL.md');
+    if (!placed) throw new Error(`The node answered with a skill named "${skill.name}", which is not the skill asked for (${requestedSkillName(ref)}). Nothing was installed.`);
+    const skillDir = placed.skillDir;
 
     // Fresh install semantics: clear a pre-existing directory so removed files don't linger.
     if (existsSync(skillDir) && readdirSync(skillDir).length) rmSync(skillDir, { recursive: true, force: true });
@@ -119,11 +148,12 @@ export async function runSkillInstall(ref: string | undefined, flags: Record<str
     const pinnedRef = /@\d+\.\d+\.\d+$/.test(skill.ref) ? skill.ref : `${skill.ref}@${skill.version}`;
     let written = 0;
     for (const [relPath, content] of Object.entries(skill.fileContents)) {
-      if (!isAllowedSkillPath(relPath)) {
+      const file = skillInstallTarget(baseDir, skill.name, requestedSkillName(ref), relPath);
+      if (!file) {
         console.error(`Skipping unexpected path from node: ${relPath}`);
         continue;
       }
-      const target = join(skillDir, relPath);
+      const target = file.target;
       mkdirSync(dirname(target), { recursive: true });
       const body = relPath === 'SKILL.md' ? stampProvenance(content, pinnedRef, nodeUrl) : content;
       writeFileSync(target, body, 'utf-8');
