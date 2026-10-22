@@ -23,6 +23,8 @@
  *   leaves it, and copied again by the duplication step the retry sweep runs.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-group-attachment-version
  * @version-history
+ *   v1.0.1 -- 2026-10-22 -- REFUSED: the person's agent without messages:send cannot send a file into
+ *     the group (403), and the operator holds nothing of it (check:denial-coverage).
  *   v1.0.0 -- 2026-10-22 -- Initial (secaudit 2026-10 wave 3, v82).
  */
 import type { Server } from 'node:http';
@@ -162,6 +164,18 @@ try {
         });
         assert(!await holdsBytes(op, agentOld), `the agent's older file reached the operator: ${JSON.stringify(att)}`);
         assert(att?.mode !== 'duplicate' && att?.expired === true, `the attachment ends: ${JSON.stringify(att)}`);
+    });
+
+    await test('REFUSED: the person\'s agent without messages:send cannot send a file into the group (403), and the operator holds nothing of it', async () => {
+        const key = `grp/agent-send-${stamp}.txt`;
+        const text = `G4-AGENT-SEND-${stamp}`;
+        await upload(bot.token, key, text);
+        const r = await N.json('/v1/messages', {
+            method: 'POST', headers: auth(bot.token),
+            body: JSON.stringify({ to: 'support@operators', subject: `file ${key}`, body: `file ${key}`, attachments: [{ storage_key: key, mime: 'text/plain', size: Buffer.byteLength(text), kind: 'file', name: key }] }),
+        });
+        assert(r.status === 403, `the agent's group send: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        assert(!await holdsBytes(op, text), 'the agent\'s file reached the operator\'s storage');
     });
 } finally {
     for (const srv of servers) { try { srv.close(); } catch { /* closing */ } }

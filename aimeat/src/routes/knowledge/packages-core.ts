@@ -6,6 +6,8 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-22 — broken-links asks whether a public record is at the target with one read by that key,
+ *     where it read every owner and agent of the node on each request (check:unbounded-lists).
  *   2026-10-22 — A link row belongs to the namespace that holds its source manifest: POST /link and the
  *     import write the row under the manifest's ownerGaii, DELETE /link deletes that namespace's row
  *     only, and GET /links lists the outgoing rows of the record it found (the caller's own first).
@@ -556,12 +558,21 @@ export function registerPackagesCoreRoutes(
     const account = localAccountName(sourceOwner);
     const sameAccount = [`${account}@${config.nodeId}`, ...(await storage.getAgentsByOwner(account)).map(a => a.gaii)];
     if ((await storage.listMemoryForOwners(sameAccount, { prefix: target })).some(r => r.key === target)) return true;
-    const everyone = [
-      ...(await storage.listOwners()).map(o => `${o.name}@${config.nodeId}`),
-      ...(await storage.listAgents()).map(a => a.gaii),
-    ];
-    if ((await storage.listMemoryForOwners(everyone, { prefix: target, visibility: 'public' })).some(r => r.key === target)) return true;
+    if (await publicRecordAt(target)) return true;
     // A package shared with the node's accounts or an organism the caller is in.
     return /^packages\/[^/]+\/manifest$/.test(target) && !!(await findReadableManifest(req, target));
+  }
+
+  /**
+   * Whether a person or an agent of this node holds a public, not archived record at exactly `target`.
+   * One read by the key (any owner), filtered to this node's people and agents; it read every owner
+   * and every agent of the node on each call before (check:unbounded-lists).
+   */
+  async function publicRecordAt(target: string): Promise<boolean> {
+    const rows = storage.getMemoryByKeysAnyOwner
+      ? await storage.getMemoryByKeysAnyOwner([target])
+      : (await storage.listAllMemory({ prefix: target, visibility: 'public', limit: 100 })).items;
+    const ofThisNode = (gaii: string) => !gaii.startsWith('eco:') && !gaii.startsWith('ext:') && gaii.endsWith(`@${config.nodeId}`);
+    return rows.some(r => r.key === target && r.visibility === 'public' && !r.archived && ofThisNode(r.ownerGaii));
   }
 }

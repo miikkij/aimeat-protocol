@@ -1,5 +1,5 @@
 {
-  "note": "Storage list methods with nothing to bound what they return, and the calls outside src/storage that read a whole table through one (scripts/check-unbounded-lists.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P7-10). An entry under methods is DEBT, a known unbounded read nobody has judged yet, or the reason the list cannot grow. Answering one means giving the method a limit and a cursor, or replacing DEBT with that reason. wholeTableCalls counts calls with no arguments per file; a count may only fall, and the gate fails until a fallen count is lowered here. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance.",
+  "note": "Storage list methods with nothing to bound what they return, and the calls outside src/storage that read a whole table through one (scripts/check-unbounded-lists.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P7-10). An entry under methods is DEBT, a known unbounded read nobody has judged yet, or the reason the list cannot grow. Answering one means giving the method a limit and a cursor, or replacing DEBT with that reason. wholeTableCalls counts calls with no arguments per file; a count may only fall, and the gate fails until a fallen count is lowered here. The counts of services/account-event-task-keep.ts, services/app-tool-invoke-keep.ts and services/knowledge-link-owner-keep.ts are once-only start steps (server-bootstrap/once-only-keep-steps.ts): each reads those tables whole once per node, before the node serves, and never in a request. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance.",
   "methods": {
     "getAllConfigValues": "DEBT: ConfigRepository.getAllConfigValues() reads the whole table, with no limit or cursor",
     "listActionsByProvider": "DEBT: ActionRepository.listActionsByProvider(gaii) returns every match for its scope, with no limit or cursor",
@@ -60,11 +60,13 @@
     "listSubdomainSites": "DEBT: SubdomainSiteRepository.listSubdomainSites() reads the whole table, with no limit or cursor",
     "listSubscriptionsByAgent": "DEBT: BoardRepository.listSubscriptionsByAgent(gaii) returns every match for its scope, with no limit or cursor",
     "listThreads": "DEBT: AgentMessageRepository.listThreads(agentGaii) returns every match for its scope, with no limit or cursor",
+    "listUnplacedLinks": "Read only by the once-only start step services/knowledge-link-owner-keep.ts. Every link writer passes the owner of the source record since 2026-10-22, so the set of unplaced rows only shrinks.",
     "listVatCodes": "DEBT: FinanceRepository.listVatCodes() reads the whole table, with no limit or cursor",
     "listWorkByProvider": "DEBT: WorkRepository.listWorkByProvider(gaii) returns every match for its scope, with no limit or cursor",
     "listWorkByProviders": "DEBT: WorkRepository.listWorkByProviders(providerGaiis) returns every match for its scope, with no limit or cursor",
     "listWorkByRequester": "DEBT: WorkRepository.listWorkByRequester(gaii) returns every match for its scope, with no limit or cursor",
-    "listWorkByRequesters": "DEBT: WorkRepository.listWorkByRequesters(requesterGaiis) returns every match for its scope, with no limit or cursor"
+    "listWorkByRequesters": "DEBT: WorkRepository.listWorkByRequesters(requesterGaiis) returns every match for its scope, with no limit or cursor",
+    "listWorkspaceRowRevisions": "One row's kept revisions: both providers cap the read at 100, and services/workspace-rows/row-service.ts prunes a row to REVISIONS_PER_ROW (20) kept revisions."
   },
   "wholeTableCalls": {
     "src/config-overrides.ts": {
@@ -178,6 +180,9 @@
     "src/services/ai/catalog/refresh.ts": {
       "listOwners": 1
     },
+    "src/services/account-event-task-keep.ts": {
+      "listAppGrants": 1
+    },
     "src/services/app-agent-deploy.ts": {
       "listAgents": 1
     },
@@ -192,6 +197,10 @@
     },
     "src/services/app-seo.ts": {
       "listSubdomainSites": 1
+    },
+    "src/services/app-tool-invoke-keep.ts": {
+      "listAgents": 1,
+      "listOwners": 1
     },
     "src/services/app-tools-key.ts": {
       "listOwners": 1
@@ -266,6 +275,11 @@
     },
     "src/services/install-set-grants.ts": {
       "listSubdomainSites": 1
+    },
+    "src/services/knowledge-link-owner-keep.ts": {
+      "listUnplacedLinks": 1,
+      "listOwners": 1,
+      "listAgents": 1
     },
     "src/services/knowledge-overview.ts": {
       "listAgents": 1

@@ -21,6 +21,8 @@
  *   sibling agent made before the step is not kept (the ruling covers apps only).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-events-task-keep
  * @version-history
+ *   v1.0.1 — 2026-10-22 — The sibling agent and the app grant are refused the worker's task decline,
+ *     with a 403 each (check:denial-coverage).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v89; the developer's ruling of 2026-10-22).
  */
 import * as ed from '@noble/ed25519';
@@ -252,6 +254,18 @@ await test('a narrowing ends the keep: once the owner takes a word away, the nex
     early = await refresh(early);
     // The row is in the archive by now (the test above), so the archive is where it is read.
     assertWithheld(declined(await rows(ARCHIVE, early.access)), 'narrowed, archive');
+});
+
+await test('refused: the sibling agent and the app grant cannot decline the worker\'s task (403 each), and the task stays open', async () => {
+    const t = await json(`/v1/agents/${worker.name}/tasks`, { method: 'POST', headers: bearer(ownerTok), body: JSON.stringify({ title: `second-${TAG}`, description: 'probe' }) });
+    assert(t.status === 201, `task ${t.status}: ${short(t.body)}`);
+    const id = t.body.data.task.id as string;
+    for (const [who, tok] of [['sibling agent', sibling.token], ['app grant', early.access]] as const) {
+        const d = await json(`/v1/agents/${worker.name}/tasks/${id}/decline`, { method: 'POST', headers: bearer(tok), body: JSON.stringify({ reason: `by-${who}` }) });
+        assert(d.status === 403, `the ${who}'s decline: ${d.status} ${short(d.body)}`);
+    }
+    const after = await json(`/v1/agents/${worker.name}/tasks/${id}`, { headers: bearer(ownerTok) });
+    assert(after.status === 200 && after.body.data?.task?.status !== 'declined', `the task after the refusals: ${after.status} ${short(after.body?.data?.task ?? after.body)}`);
 });
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);

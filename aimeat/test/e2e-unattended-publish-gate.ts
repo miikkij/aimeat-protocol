@@ -33,6 +33,8 @@
  *   - Phase 6 what exists at the update keeps working
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-unattended-publish-gate
  * @version-history
+ *   2026-10-22 — The agent is refused the approval of the request its own extension filed, with a 403
+ *     (check:denial-coverage).
  *   2026-10-22 — Initial (secaudit 2026-10, v68 and v69).
  */
 import * as ed from '@noble/ed25519';
@@ -255,6 +257,12 @@ await test('the agent\'s own extension publishes at the kept level and files a r
     const q = await waitingFor('datapackage', `${EXT}-b`);
     assert(q && q.requested_by?.principal === agentGaii, `no request naming the agent: ${short(await requests())}`);
     attendedRequest = q.id;
+});
+
+await test('the agent cannot approve the request its own extension filed (403), and the package stays closed', async () => {
+    const d = await json(`/v1/publish-requests/${attendedRequest}/decision`, { method: 'POST', headers: bearer(agentTok), body: JSON.stringify({ decision: 'approve' }) });
+    assert(d.status === 403, `the agent's own approval: ${d.status} ${short(d.body)}`);
+    assert(await anon(pkgUrl(`${EXT}-b`)) !== 200, 'the package opened on the agent\'s approval');
 });
 
 await test('the owner\'s approval opens the same address', async () => {

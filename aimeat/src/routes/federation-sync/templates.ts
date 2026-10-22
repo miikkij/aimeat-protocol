@@ -5,6 +5,8 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.1 — 2026-10-22 — The inventory consent check names the local person with localAccountOf()
+ *     (check:identity-shortening).
  *   v1.6.0 — 2026-10-22 — POST /v1/federation/memory/list lists a principal of the requesting node as
  *     before, a person of this node only while that person's sign-in consent for the requesting node
  *     holds (403 CONSENT_REQUIRED otherwise; an agent follows its owner's consent), and refuses a
@@ -46,7 +48,7 @@ import {
 } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
 import { peerMayActFor, signInConsentRefusal } from '../../services/federation-auth-consent.js';
-import { parseGaiiLoose } from '../../utils/gaii.js';
+import { parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
 const FRESHNESS_MS = 5 * 60 * 1000;
@@ -72,7 +74,11 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
         if (parsed.node !== config.nodeId) {
             return { code: 'NAMESPACE_NOT_ALLOWED', message: `A node lists its own people's records here, and ${gaii} is on ${parsed.node}, not on ${requestingNode}, the node that signed this request.` };
         }
-        const person = `${parsed.owner.toLowerCase()}@${config.nodeId}`;
+        const account = localAccountOf(gaii);
+        if (!account) {
+            return { code: 'NAMESPACE_NOT_ALLOWED', message: `A memory list names a person or agent of the node that asks or of this node, and "${gaii}" is neither. Send the full identity, such as name@node.` };
+        }
+        const person = `${account.toLowerCase()}@${config.nodeId}`;
         if (await peerMayActFor(storage, { tier: peer.tier, nodeId: requestingNode }, person)) return null;
         return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, requestingNode, config.nodeId) };
     };

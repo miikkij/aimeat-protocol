@@ -21,6 +21,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-format-md
  * @version-history
+ *   v1.1.1 — 2026-10-22 — Case 8b: the developer of another account is refused with a 403
+ *     (check:denial-coverage).
  *   v1.1.0 — 2026-10-22 — Cases 7 to 16: a delegated developer and the ?format=md declaration (secaudit 2026-10, r54).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
@@ -191,6 +193,12 @@ await test('8. FAILURE: the same refusal through the draft route (save the draft
     assert(isDelegateRefusal(r), `${r.status} ${JSON.stringify(r.body.error)}`);
     assert((await formatMdOf(DAPP)).formatMd === null, 'manifest unchanged');
     await json(`/v1/apps/${a.name}/${DAPP}/draft`, auth(a.token, { method: 'DELETE' }));
+});
+
+await test('8b. FAILURE: the refusal of the developer of another account is a 403, and the app keeps no declaration', async () => {
+    const r = await publishFor(b.token, a.name, DAPP, page(meta(`/v1/ext/${EXT}/render`)));
+    assert(r.status === 403, `the developer of another account: ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert((await formatMdOf(DAPP)).formatMd === null, 'manifest unchanged');
 });
 
 await test('9. the owner in person adds the declaration to the shared app, and ?format=md serves the action', async () => {

@@ -22,6 +22,8 @@
  *   - an ecosystem app still gets the hands on its own record.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=memory-hands-readers
  * @version-history
+ *   v1.0.1 — 2026-10-22 — 4b: an agent without memory:read is refused the hands with a 403
+ *     (check:denial-coverage).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v88).
  */
 import * as ed from '@noble/ed25519';
@@ -190,6 +192,13 @@ await test('4. An ecosystem app with the default scopes gets no row for the owne
         const d = await restHands(eco.token, key);
         assert(d.hands.length === 0, `hands on ${key} told the ecosystem app: ${JSON.stringify(d.hands)}`);
     }
+});
+
+await test('4b. An agent without memory:read is refused the hands on the owner\'s key with a 403', async () => {
+    const noRead = await makeAgent(BASE, O, ['ext:invoke']);
+    const r = await json(`/v1/memory/${encodeURIComponent(K_PRIV)}/hands`, { headers: bearer(noRead.token) });
+    assert(r.status === 403, `hands without memory:read: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+    assert(!Array.isArray(r.body?.data?.hands), `the refusal carried hands: ${JSON.stringify(r.body?.data)}`);
 });
 
 // ── Kept ─────────────────────────────────────────────────────────────────────────────────────

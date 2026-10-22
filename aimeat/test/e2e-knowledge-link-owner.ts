@@ -18,6 +18,8 @@
  *   account reads a members package's links; the anonymous viewer reads a public package's links; a
  *   clone's derived-from row is listed as incoming and counted in clone_count.
  * @version-history
+ *   v1.0.1 — 2026-10-22 — R8: an agent without memory:write is refused the import that writes link
+ *     rows, with a 403 (check:denial-coverage).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v78 and v79).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=knowledge-link-owner
@@ -167,6 +169,12 @@ await test('R7. A public record of B\'s at the key does not stand in for A\'s ow
     assert(!descriptions(own).includes('B-text') && !descriptions(own).includes('B-inject'), `A's listing shows B's rows: ${show(own)}`);
     const anon = await links(pa);
     assert(!descriptions(anon).includes('A-private') && !descriptions(anon).includes('A-second'), `the anonymous caller read A's rows: ${show(anon)}`);
+});
+
+await test('R8. An agent of A without memory:write cannot write a package with link rows (403 on the import)', async () => {
+    const reader = await makeAgent(BASE, A, ['memory:read']);
+    const r = await importPackage(reader.token, 'Reader package', { links: [{ target: T_A, relation: 'references', description: 'reader-link' }] });
+    assert(r.status === 403, `the import without memory:write: ${show(r)}`);
 });
 
 // ── What keeps working ───────────────────────────────────────────────────────────────────────
