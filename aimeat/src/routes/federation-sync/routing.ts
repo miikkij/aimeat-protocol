@@ -5,6 +5,9 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — POST /v1/federation/route refuses a path that does not start with a single "/" or that
+ *     would leave the peer's origin (400 INVALID_PATH, before the fee and the fetch); joined as strings,
+ *     a path starting with '.' or ':' sent the signed relay to another host or port (secaudit2026oct22).
  *   2026-10-16 — A refusal from the far node answers HTTP 502 PEER_REFUSED (PEER_REFUSED_STATUS) on both forwarding routes; the far node's status is only in details.peer_status, so its 401 cannot read as the caller's own session ending (decision 2026-10-16).
  *   2026-10-16 — GET /v1/federation/resolve/:gaii names and asks only the peers the public directory
  *     lists; a private peer's address is not given out (QA audit S6-09).
@@ -133,6 +136,14 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'target_node and path are required'));
             return;
         }
+        // The path is a path on the peer, never a part of its address: the request goes to the peer's
+        // stored origin and nowhere else. Joined as strings, a path starting with '.' or ':' moved it
+        // to another host or port, this node's signed relay claim included (secaudit2026oct22).
+        // Refused before any fee or fetch.
+        if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') || path.includes('\\')) {
+            res.status(400).json(error(config.nodeId, 'INVALID_PATH', 'path must be an absolute path on the peer, starting with a single "/" (for example /v1/health)'));
+            return;
+        }
 
         // Honour inbound X-Relay-Hops header from upstream relay, otherwise use body or config default
         const inboundHops = req.headers['x-relay-hops'] ? parseInt(req.headers['x-relay-hops'] as string, 10) : null;
@@ -213,6 +224,11 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
         if (targetPeer) {
             try {
                 const targetUrl = `${targetPeer.url}${path}`;
+                const peerOrigin = URL.parse(targetPeer.url)?.origin;
+                if (!peerOrigin || URL.parse(targetUrl)?.origin !== peerOrigin) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_PATH', 'path must stay on the peer\'s own address'));
+                    return;
+                }
                 // SSRF validation: block requests to private/reserved IPs
                 const targetUrlCheck = await validateOutboundUrl(targetUrl);
                 if (!targetUrlCheck.valid) {

@@ -550,6 +550,20 @@ await test("the sender's own allow_routing still governs what this node relays O
     assert(r.body.error.code === 'POLICY_DENIED', `code: ${r.body.error.code}`);
 });
 
+// secaudit2026oct22 (fed-route-path-not-anchored-to-peer-origin): the relay joined the peer's address
+// and the caller's path as strings, so a path starting with '.' or ':' moved the request to another
+// host or port, signed relay claim included. A path must start with '/' and stay on the peer's origin;
+// the refusal comes before any fetch and before the routing fee.
+await test('a relay path that would leave the peer\'s origin is refused before anything is sent', async () => {
+    for (const path of ['.attacker.test/v1/health', ':8443/v1/health', '//attacker.test/v1/health', 'v1/health']) {
+        const r = await json('/v1/federation/route', {
+            method: 'POST', headers: auth(),
+            body: JSON.stringify({ target_node: OK_NODE, method: 'GET', path }),
+        });
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_PATH', `path ${JSON.stringify(path)}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+});
+
 await test('Cleanup', async () => {
     await new Promise<void>(resolve => server.close(() => resolve()));
     for (const suffix of ['', '-wal', '-shm']) {
