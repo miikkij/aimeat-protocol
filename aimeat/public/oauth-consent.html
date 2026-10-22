@@ -8,6 +8,8 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.8.0 — 2026-10-22 — With no stored theme the page follows the OS preference, as the SPA does,
+        instead of opening light. The ☀|☾ switch stays and its choice wins.
     v1.7.0 — 2026-10-19 — The agent picker lists the agents in alphabetical order of their shown name.
     v1.6.0 — 2026-10-12 — The approval relays code_challenge_method and every `resource` from the
         authorize redirect to /v1/mcp/authorize-consent, which requires PKCE and the resource from
@@ -71,13 +73,16 @@
   <title>Authorize — AIMEAT</title>
   <!-- No-flash theme boot: same storage key as spa.html, so the choice made on either surface
        carries to the other. Plain inline JS (NOT a module — modules defer and reintroduce the
-       flash). Unset key = LIGHT, deliberately not the OS preference: this is the doorstep a
-       first-time visitor lands on, and it opens bright. An explicit dark choice is kept. -->
+       flash). Unset key = follow the OS preference, as spa.html does: a person signing in from a
+       dark room got a white page (Jouni, 2026-10-22, reversing the light-by-default call of
+       2026-08-24). An explicit choice from the ☀|☾ switch is kept and wins. -->
   <script>
     (function () {
       try {
         var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
-        document.documentElement.dataset.theme = stored === 'dark' ? 'dark' : 'light';
+        document.documentElement.dataset.theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
       }

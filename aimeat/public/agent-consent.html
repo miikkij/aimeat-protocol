@@ -7,6 +7,8 @@
     scope model and the shared consent vocabulary, so its presets and sentences can never diverge
     from the SPA's AgentConsent panel again.
   @version-history
+    v1.4.0 — 2026-10-22 — With no stored theme the page follows the OS preference, as the SPA does,
+        instead of opening light. The ☀|☾ switch stays and its choice wins.
     v1.3.0 — 2026-08-29 — The page shows what the agent ASKED FOR and offers it as a choice,
         preselected on a first approval. The list comes from the owner's own pending listing
         (authenticated) and never from /verify/info, which is unauthenticated and must keep
@@ -36,13 +38,16 @@
   <title>Agent Authorization — AIMEAT</title>
   <!-- No-flash theme boot: same storage key as spa.html and oauth-consent.html, so the choice
        carries between them. Plain inline JS (NOT a module — modules defer and reintroduce the
-       flash). Unset key = LIGHT, deliberately not the OS preference: this is a doorstep page,
-       and it opens bright. An explicit dark choice is kept. -->
+       flash). Unset key = follow the OS preference, as spa.html does (Jouni, 2026-10-22,
+       reversing the light-by-default call of 2026-08-24). An explicit choice from the ☀|☾
+       switch is kept and wins. -->
   <script>
     (function () {
       try {
         var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
-        document.documentElement.dataset.theme = stored === 'dark' ? 'dark' : 'light';
+        document.documentElement.dataset.theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
       }
