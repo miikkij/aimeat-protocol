@@ -12,6 +12,11 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-22 -- A copy is made only of the file version the message sent (isSentVersion:
+ *     the stamped version, or for an older attachment a file not written after the send), on the
+ *     same-node read, the own-agents fallback and the cross-node pull; a changed or removed file ends
+ *     the attachment as expired and the recipient is told to ask for it again (origin answers 409
+ *     FILE_CHANGED). sameAccount is exported for the storage grant route (secaudit 2026-10 wave 3, v81, v82).
  *   v1.5.1 -- 2026-10-10 -- A file found under the sender's agent passes leave() with that file's
  *     workspace binding; it was checked with none, so an organism's label never applied (secaudit 2026-10-10 I9).
  *   v1.5.0 -- 2026-10-06 -- The storage grant request names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
@@ -76,10 +81,30 @@ function peerForNode(peers: Map<string, PeerInfo>, nodeId: string): PeerInfo | u
  * as well as the owner (isSameOwner alone reads only the name, and a name is not unique across
  * nodes).
  */
-function sameAccount(a: string, b: string): boolean {
+export function sameAccount(a: string, b: string): boolean {
   const x = parseGaiiLoose(a), y = parseGaiiLoose(b);
   return x.owner === y.owner && x.node === y.node;
 }
+
+/** What the recipient is told when the file under the key is no longer the one that was sent. */
+export const FILE_CHANGED_REASON = 'The sender changed or removed this file after sending it. Ask them to send it again.';
+
+/**
+ * Is this stored file the version the message sent? An attachment stamped at the send names that
+ * version exactly (its createdAt then). One stored before the stamp existed is bound to the message's
+ * own time instead: every write under a key gives the file a new createdAt, so a file not written
+ * after the send is the file that was sent, and an unchanged older attachment keeps working.
+ * `messageCreatedAt` is always this node's own copy of the message, never a peer's word.
+ */
+export function isSentVersion(file: { createdAt: string }, att: Pick<DirectMessageAttachment, 'version'>, messageCreatedAt: string): boolean {
+  if (att.version) return file.createdAt === att.version;
+  const fileAt = new Date(file.createdAt).getTime();
+  const sentAt = new Date(messageCreatedAt).getTime();
+  return Number.isFinite(fileAt) && Number.isFinite(sentAt) && fileAt <= sentAt;
+}
+
+/** Bytes of a file that is not the one that was sent: ended, not retried, with the reason. */
+type Changed = { changed: string };
 
 /** Recipient-side storage key for a duplicated attachment. */
 function localKeyFor(message: DirectMessageRecord, att: DirectMessageAttachment): string {
@@ -92,7 +117,7 @@ function localKeyFor(message: DirectMessageRecord, att: DirectMessageAttachment)
  */
 async function fetchAttachmentBytes(
   ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment,
-): Promise<Buffer | { classified: string } | null> {
+): Promise<Buffer | { classified: string } | Changed | null> {
   // The only storage an attachment may be read from is the SENDER's ACCOUNT. The descriptor names an
   // owner and a key, and on an inbound federated message that name came off the wire, so reading it
   // unchecked turns "here is my photo" into "open this local owner's private file for me". The
@@ -117,8 +142,19 @@ async function fetchAttachmentBytes(
     // mailbox with the owner's name on a file its agent uploaded, and the sweep would retry it every
     // minute until it expired. The same account's own agents are searched once, so those messages
     // heal on the next sweep instead of needing the sender to send them again.
-    const held = file ? { holder: att.ownerGhii, data: file.data, workspaceRef: file.workspaceRef } : await readFromOwnAgents(ctx, att);
-    if (!held) return null;
+    //
+    // Whichever principal holds it, the file must be the version the message sent (secaudit 2026-10
+    // wave 3, v82): a file written under the key after the send is not copied, so bytes the sender
+    // never attached never reach the recipient.
+    if (file && !isSentVersion(file, att, message.createdAt)) {
+      logger.warn('attachment duplication: the file changed after the send, not copied', { messageId: message.id, attachmentId: att.id, key: att.storageKey });
+      return { changed: FILE_CHANGED_REASON };
+    }
+    const held = file ? { holder: att.ownerGhii, data: file.data, workspaceRef: file.workspaceRef } : await readFromOwnAgents(ctx, att, message.createdAt);
+    if (!held) {
+      // A stamped version that is gone can never come back: any later write is a new version.
+      return att.version ? { changed: FILE_CHANGED_REASON } : null;
+    }
     // The copy goes to another account, so the sender's file passes leave() first (TARGET-082). A
     // cross-node copy is checked by the origin node when it mints the grant (federation-sync/messaging.ts).
     // The workspace binding is the HOLDER's file's, whichever principal held it: a file found under an
@@ -134,12 +170,12 @@ async function fetchAttachmentBytes(
     }
     return held.data;
   }
-  return requestStorageGrant(ctx, message, att);
+  return pullFromOrigin(ctx, message, att);
 }
 
 /** The sender account's own agents, searched for a file the named principal does not have. The
  *  found file's workspace binding comes back with it, for the classification check. */
-async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment): Promise<{ holder: string; data: Buffer; workspaceRef?: string } | null> {
+async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachment, messageCreatedAt: string): Promise<{ holder: string; data: Buffer; workspaceRef?: string } | null> {
   const owner = localAccountName(att.ownerGhii);
   const agents = await ctx.storage.getAgentsByOwner(owner).catch(err => {
     logger.warn('attachment duplication: agent lookup failed', { error: String(err), owner });
@@ -148,7 +184,9 @@ async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachmen
   for (const agent of agents) {
     if (!agent.gaii || agent.gaii === att.ownerGhii) continue;
     const file = await ctx.storage.getStorageFile(agent.gaii, att.storageKey);
-    if (file) {
+    // Only the version the message sent: an agent's file written under the same key after the send
+    // is another file, not this attachment.
+    if (file && isSentVersion(file, att, messageCreatedAt)) {
       logger.info('attachment duplication: found under the account\'s own agent', { key: att.storageKey, holder: agent.gaii });
       return { holder: agent.gaii, data: file.data, workspaceRef: file.workspaceRef };
     }
@@ -158,6 +196,16 @@ async function readFromOwnAgents(ctx: AttachmentCtx, att: DirectMessageAttachmen
 
 /** Recipient→origin: signed storage grant, then download the bytes from the returned URL. */
 export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment): Promise<Buffer | null> {
+  const got = await pullFromOrigin(ctx, message, att);
+  return Buffer.isBuffer(got) ? got : null;
+}
+
+/**
+ * requestStorageGrant, plus the one answer that ends the attachment: the origin's 409 FILE_CHANGED,
+ * which says the file under the key is no longer the version that was sent, so no retry can ever
+ * succeed. Every other refusal stays retryable, as before.
+ */
+async function pullFromOrigin(ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment): Promise<Buffer | Changed | null> {
   const peer = peerForNode(ctx.peers, att.originNodeId);
   if (!peer || !peer.url || !peerTakesMessages(peer)) return null;
   const nodeKey = await ctx.storage.getNodeKey();
@@ -187,6 +235,20 @@ export async function requestStorageGrant(ctx: AttachmentCtx, message: DirectMes
       body: JSON.stringify({ ...payload, signature, ...audience }),
       signal: AbortSignal.timeout(ctx.config.federationTimeoutMs),
     });
+    if (resp.status === 409) {
+      const refusal = await readBodyCapped(resp, MAX_GRANT_ANSWER_BYTES);
+      let code: unknown;
+      try {
+        code = (JSON.parse(refusal?.toString('utf8') ?? '{}') as { error?: { code?: unknown } })?.error?.code;
+      } catch (err) {
+        logger.warn('attachment duplication: the origin\'s 409 answer is not JSON, kept for a retry', { node: att.originNodeId, error: String(err) });
+      }
+      if (code === 'FILE_CHANGED') {
+        logger.info('attachment duplication: the origin says the file changed after the send', { node: att.originNodeId, attachmentId: att.id });
+        return { changed: FILE_CHANGED_REASON };
+      }
+      return null;
+    }
     if (!resp.ok) return null;
     // Both answers are the PEER's, so both are read with a ceiling that holds while they arrive
     // (utils/read-capped.ts): a peer's Content-Length is its own word, and may be missing or false.
@@ -230,6 +292,7 @@ export async function duplicateMessageAttachments(
 
   let changed = false;
   let quotaNotified = false;
+  let changedNotified = false;
   const result: DirectMessageAttachment[] = [];
 
   for (const att of atts) {
@@ -254,6 +317,21 @@ export async function duplicateMessageAttachments(
 
     const bytes = await fetchAttachmentBytes(ctx, message, att);
     if (!bytes) { result.push({ ...att, mode: 'reference' }); continue; }
+    // Changed after the send: ended now, and the recipient is told what to do, once per message.
+    if (!Buffer.isBuffer(bytes) && 'changed' in bytes) {
+      result.push({ ...att, mode: 'reference', expired: true });
+      changed = true;
+      if (!changedNotified) {
+        changedNotified = true;
+        await notify(ctx.storage, recipientGhii, {
+          type: 'direct_message_attachment_expired',
+          title: 'An attachment was not received',
+          body: `${att.name ?? att.storageKey}: ${bytes.changed}`,
+          link: `/v1/profile#inbox/${message.conversationId}`,
+        });
+      }
+      continue;
+    }
     // Classified: never copied, so it is ended now rather than retried until it expires. The
     // recipient sees the attachment as expired, and the log above names the key and the reason.
     if (!Buffer.isBuffer(bytes)) { result.push({ ...att, mode: 'reference', expired: true }); changed = true; continue; }

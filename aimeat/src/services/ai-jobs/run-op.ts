@@ -18,9 +18,13 @@
  *   in silence, and a long generation is the reason a background job exists. The text branch passes
  *   `uncapped: true`, so the owner's saved max_tokens setting stays off it too, and hands back the
  *   provider's finish_reason and truncated for the job record.
- * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key)
+ * @structure runJobOp(deps, job, prompt, signal) → JobOpOutcome · assertAudioInReach(deps, owner, key, viewer?)
  * @usage const outcome = await runJobOp({ storage, config }, entry.job, entry.prompt, signal);
  * @version-history
+ *   v1.9.0 -- 2026-10-22 -- A transcription's audio is held to the job's viewer (starter.ts
+ *     jobReadViewer), at the start and on the bytes: an agent that does not read as the owner, or
+ *     an extension's code narrowed to its writer, is refused the owner's private audio with
+ *     READ_AS_OWNER_NOTE; its own files and the owner in person are unchanged (secaudit 2026-10, r49, v75).
  *   v1.8.0 — 2026-10-21 — An image job whose answer is asked public asks the publish gate for the
  *     picture as the answer's record does, with the same writer (starter.ts jobWriter): an agent
  *     without publish:public gets the picture stored private and a file request for the owner, whose
@@ -49,7 +53,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { completeForOwner } from '../ai/completion.js';
 import { readAiFile } from '../ai-inputs.js';
-import { jobReader, jobCaller, jobWriter } from './starter.js';
+import { aiFileRefusal, AiInputHiddenError, type AiReadViewer } from '../ai-read-viewer.js';
+import { jobReader, jobCaller, jobWriter, jobReadViewer } from './starter.js';
 import { memoryWriterAsk } from '../memory-publish-gate.js';
 import { warningsNote } from '../classification/reader.js';
 import { generateForOwner, type GenerateForOwnerResult } from '../ai-image.js';
@@ -94,10 +99,14 @@ const MB = 1024 * 1024;
  * Reads the file's metadata only, not its bytes.
  */
 export async function assertAudioInReach(
-    deps: { storage: Storage; config: AimeatConfig }, ownerGhii: string, audioKey: string,
+    deps: { storage: Storage; config: AimeatConfig }, ownerGhii: string, audioKey: string, viewer?: AiReadViewer,
 ): Promise<void> {
     const meta = await deps.storage.getStorageFileMeta(ownerGhii, audioKey);
     if (!meta) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${audioKey}".`);
+    // A file the job's viewer may not read (the owner's private audio, for an agent that does not
+    // read as the owner) is refused at the start, before anything queues (services/ai-read-viewer.ts).
+    const refusal = await aiFileRefusal(deps.storage, deps.config, viewer, meta);
+    if (refusal) throw new AiJobError('SCOPE_DENIED', 403, refusal);
     const maxMb = deps.config.sttMaxMb;
     if (maxMb > 0 && meta.size > maxMb * MB) {
         throw new AiJobError('AUDIO_TOO_LARGE', 400,
@@ -164,8 +173,15 @@ export async function runJobOp(
         // been deleted while the job queued.
         // The one loader of what a model reads (services/ai-inputs.ts), as whoever started the job;
         // a job with no starter recorded reads as an AI (starter.ts).
+        // The same viewer the start asked (starter.ts jobReadViewer), asked again on the bytes.
         const reader = jobReader({ storage, config }, job);
-        const file = await readAiFile(storage, reader, job.owner, key, { capability: 'transcription' });
+        let file: Awaited<ReturnType<typeof readAiFile>>;
+        try {
+            file = await readAiFile(storage, reader, job.owner, key, { capability: 'transcription' }, { config, viewer: jobReadViewer(job) });
+        } catch (err) {
+            if (err instanceof AiInputHiddenError) throw new AiJobError(err.code, err.status, err.message);
+            throw err;
+        }
         if (!file) throw new AiJobError('NOT_FOUND', 404, `No such file in your storage: audio_key "${key}".`);
         const r = await transcribeForOwner(storage, config, payer, {
             ...common,

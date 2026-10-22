@@ -39,8 +39,12 @@
  *   - WorkspaceRowPage     -- rows plus the cursor to continue with
  *   - WorkspaceRowStats    -- count, bytes and the time span, without reading a row
  *   - WorkspaceRowUsage    -- what a quota check needs
+ *   - WorkspaceRowRevision -- an earlier content of a row, kept when another writer family replaced it
  * @usage import type { WorkspaceRowRecord } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-10-22 — `updatedBy` on a row, and WorkspaceRowRevision: a replacement by another
+ *     writer family keeps the old content as a revision the delete authority can restore (secaudit
+ *     2026-10, v80; developer ruling 2026-10-22).
  *   v1.0.0 — 2026-08-26 — Initial: workspace row spaces (`backing: 'rows'`).
  */
 
@@ -71,12 +75,52 @@ export interface WorkspaceRowRecord {
   createdAt: string;
   /** When it was last changed here. Equals `createdAt` for a row never touched again. */
   updatedAt: string;
-  /** The exact principal that wrote it (GHII / GAII / GEAI). */
+  /**
+   * The exact principal that first wrote it (GHII / GAII / GEAI, or `ext:<name>`). A replacement by
+   * the same writer family sets it to the new writer, as it always did; a replacement by another
+   * writer family keeps it (row-service.ts appendRows).
+   */
   createdBy: string;
+  /**
+   * The principal that last wrote it. Absent or '' on a row written before 2026-10-22, which reads
+   * as `createdBy`. Optional so a caller that builds a record (an import, a test) need not name it.
+   */
+  updatedBy?: string;
   /** The row itself. */
   body: Record<string, unknown>;
   /** Serialised size of `body`, so a quota check never has to re-measure. */
   bytes: number;
+}
+
+/**
+ * An earlier content of a row, kept when a writer of another family replaced it.
+ *
+ * A row space keeps no version history of its own, and a delete needs memory:purge for that reason.
+ * A replacement by a principal of another writer family removed the old content just as finally, so
+ * the node keeps it here, and the delete authority can list and restore it (developer ruling,
+ * 2026-10-22; secaudit 2026-10, v80). A revision ages out after the space's retention window, or
+ * 30 days, and at most 20 are kept per row.
+ */
+export interface WorkspaceRowRevision {
+  /** The revision's own id. */
+  revisionId: string;
+  organismId: string;
+  wsId: string;
+  namespace: string;
+  rowId: string;
+  /** The row's surrogate id, which the classification label of the row is addressed by. */
+  id: string;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  /** The principal that wrote this content. */
+  updatedBy: string;
+  body: Record<string, unknown>;
+  bytes: number;
+  /** When the content was replaced, and by whom. */
+  replacedAt: string;
+  replacedBy: string;
 }
 
 /** What a caller appends. Everything else the service settles. */

@@ -17,6 +17,13 @@
  *   a detection rule. Level organism: its creator or an admin, as for the organism's audit log
  *   (policy-admin.ts readAuditLog), and an agent the organism does not admit is no one there.
  *
+ *   WHAT AN AGENT WITHOUT memory:read-as-owner SEES (secaudit 2026-10, v77). At level owner, the
+ *   owner in person, an app grant and a holder of memory:read-as-owner list every row. Anyone else
+ *   lists the rows on its own content, rows on the owner's or a sibling's memory record or file whose
+ *   visibility admits a same-owner reader, the containers, and rows whose record no longer exists;
+ *   a row on a record it may not read with owner_scope is left out and the page carries
+ *   READ_AS_OWNER_NOTE (owner-scope-labels.ts).
+ *
  *   WHAT AN AI DOES NOT SEE. Where classification is on for the item's scope, an AI caller is not
  *   told an item exists when its label hides it from AI, and no caller sees an item whose label's
  *   audience leaves them out: the same answer a memory list gives. The check is made here and not
@@ -31,6 +38,8 @@
  *   const q = explorerQueryOf({ level: 'owner', pending: true });
  *   const page = await listLabels({ storage, config }, actor, q);
  * @version-history
+ *   v1.3.0 — 2026-10-22 — memory:read-as-owner at level owner: a row on a record of the owner or a
+ *     sibling that the caller may not read with owner_scope is left out, with `note` (secaudit 2026-10, v77).
  *   v1.2.0 — 2026-10-18 — The containers are listed first: the organism and its workspaces at level
  *     organism, the owner's boards and apps at level owner; `kind` takes them (plan doc-mvdipuyqraas,
  *     L1.5). A cursor from before names a (scope, kind) pair that still exists.
@@ -45,6 +54,7 @@ import { audienceCheck } from './audience.js';
 import { labelById, type ClassificationLabel, type ClassificationPolicy } from './defaults.js';
 import { ClassificationError, type ClassificationDeps, type LabelActor } from './labels.js';
 import { classificationActiveFor, policyFor, scopeOrganism } from './policy.js';
+import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 
 /** Items per page when the caller names none, and the most a caller may ask for. */
 const DEFAULT_LIMIT = 50;
@@ -110,6 +120,8 @@ export interface ExplorerPage {
   next: string | null;
   /** How many stored rows this call read to fill the page. */
   scanned: number;
+  /** READ_AS_OWNER_NOTE, when this page left out a record the caller may not read (owner-scope-labels.ts). */
+  note?: string;
 }
 
 const bad = (message: string): never => { throw new ClassificationError('INVALID_INPUT', 400, message); };
@@ -240,6 +252,12 @@ export async function listLabels(deps: ClassificationDeps, actor: LabelActor, q:
     return inside(label.audience, row.scope);
   };
 
+  // memory:read-as-owner (owner-scope-labels.ts): a caller that does not read every record of its
+  // owner is not told about a record of the owner or a sibling it may not read with owner_scope.
+  const ownerView = q.level === 'owner' ? ownerScopeLabelView(deps.storage, actor) : null;
+  let leftOut = false;
+  const page = (rest: Omit<ExplorerPage, 'note'>): ExplorerPage => (leftOut ? { ...rest, note: READ_AS_OWNER_NOTE } : rest);
+
   const items: ExplorerItem[] = [];
   let scanned = 0;
   let calls = 0;
@@ -249,7 +267,7 @@ export async function listLabels(deps: ClassificationDeps, actor: LabelActor, q:
     const { policy, active } = await policyOf(scope);
     for (;;) {
       if (calls >= SCAN_CALLS) {
-        return { level: q.level, subject, items, next: encodeCursor({ s: scope, k: kind, a: cursorKey ?? '' }), scanned };
+        return page({ level: q.level, subject, items, next: encodeCursor({ s: scope, k: kind, a: cursorKey ?? '' }), scanned });
       }
       const rows = await deps.storage.listContentLabels({ scope, kind, ...(cursorKey !== undefined ? { after: cursorKey } : {}), limit: SCAN_PAGE });
       calls++;
@@ -259,6 +277,7 @@ export async function listLabels(deps: ClassificationDeps, actor: LabelActor, q:
         if (q.label && row.label !== q.label) continue;
         if (q.pending && !row.suggestion) continue;
         if (!(await visible(row, policy, active))) continue;
+        if (ownerView && await ownerView.hidden(row)) { leftOut = true; continue; }
         // A suggestion on personal content that was deleted since waits for nobody: leave it out.
         // An organism document is stored under its copies' keys by any member, so it is not looked up.
         if (row.suggestion && row.kind === 'memory' && !scopeOrganism(row.scope)
@@ -270,11 +289,11 @@ export async function listLabels(deps: ClassificationDeps, actor: LabelActor, q:
           justification: row.justification, humanSaid: row.humanSaid, setBy: row.setBy, updatedAt: row.updatedAt,
         });
         if (items.length >= q.limit) {
-          return { level: q.level, subject, items, next: encodeCursor({ s: scope, k: kind, a: row.key }), scanned };
+          return page({ level: q.level, subject, items, next: encodeCursor({ s: scope, k: kind, a: row.key }), scanned });
         }
       }
       if (rows.length < SCAN_PAGE) break;
     }
   }
-  return { level: q.level, subject, items, next: null, scanned };
+  return page({ level: q.level, subject, items, next: null, scanned });
 }

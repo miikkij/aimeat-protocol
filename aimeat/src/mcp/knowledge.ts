@@ -11,6 +11,9 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-22 — SECURITY: aimeat_knowledge_links lists the outgoing rows of the namespace that holds
+ *     the package it read, so another account's record at the same key no longer brings that
+ *     account's rows into the answer (secaudit 2026-10, v78).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-21 — When the visibility rule left records out, the list, get, links and resource say so
@@ -339,8 +342,12 @@ export function registerKnowledgeTools(
                 return { content: [{ type: 'text' as const, text: notFoundText(package_id, read.omitted) }], isError: true };
             }
             const manifestKey = `packages/${package_id}/manifest`;
+            // The outgoing rows of the namespace that holds the manifest read above, as GET
+            // /v1/knowledge/:id/links lists them: never another account's rows at the same key
+            // (secaudit 2026-10, v78).
             const links = await storage.listLinks(manifestKey, {
                 direction: direction ?? 'both',
+                sourceOwner: read.found.manifest.ownerGaii,
             });
             return {
                 content: [{

@@ -3,7 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The REST surface for workspace ROW spaces: append, the paged read, one row, the two
- *   retention deletes, and the stats a workspace index shows instead of rows.
+ *   retention deletes, the stats a workspace index shows instead of rows, and a row's kept
+ *   revisions with their restore.
  *
  *   THESE HANDLERS DECIDE NOTHING. Every access check, quota gate and retention sweep lives in
  *   services/workspace-rows/row-service.ts, which the MCP tools and the CLI dispatch call too. That
@@ -18,6 +19,9 @@
  * @structure registerOrganismWorkspaceRowRoutes(router, config, storage)
  * @usage registerOrganismWorkspaceRowRoutes(router, config, storage) in routes/organisms.ts
  * @version-history
+ *   v1.5.0 — 2026-10-22 — GET .../rows/:space/:rowId/revisions and POST .../revisions/:revisionId/restore,
+ *     on the row delete's two words, and `revisions_kept` in the append answer: a replacement by
+ *     another writer family keeps the old content (secaudit 2026-10, v80; developer ruling 2026-10-22).
  *   v1.4.0 — 2026-10-13 — The row caller carries the session's scopes, which the fenced-space rule
  *     reads through the access rule (services/fenced-space.ts, ruled 2026-10-13).
  *   v1.3.0 — 2026-10-02 — The two DELETE routes need memory:purge beside organism:write: a removed
@@ -38,6 +42,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { readerFor } from '../../services/classification/reader.js';
 import {
   appendRows, readRows, readRow, deleteRow, deleteRowsBefore, spaceStats,
+  listRowRevisions, restoreRowRevision,
   WorkspaceRowError,
   type RowCaller,
 } from '../../services/workspace-rows/row-service.js';
@@ -112,6 +117,8 @@ export function registerOrganismWorkspaceRowRoutes(
         });
         res.json(success(config.nodeId, {
           written: result.written, row_ids: result.rowIds, pruned: result.pruned,
+          // The rows whose earlier content, written by another writer family, the node kept.
+          revisions_kept: result.revisionsKept,
         }, [{
           description: 'Read them back', method: 'GET',
           url: `/v1/organisms/${req.params.id}/workspace/rows/${req.params.space}?ws=${ws}`,
@@ -224,6 +231,46 @@ export function registerOrganismWorkspaceRowRoutes(
           req.params.space as string, req.params.rowId as string,
         );
         res.json(success(config.nodeId, { deleted: true }));
+      } catch (err) { fail(res, err); }
+    });
+
+  // ── A row's kept revisions: the earlier contents a writer of another family replaced
+  //    (services/workspace-rows/row-revisions.ts). The same two words as the row delete: whoever may
+  //    remove a row may see and put back what it held. An app never does either. ──
+
+  /** One row's kept revisions, newest replacement first. */
+  router.get('/v1/organisms/:id/workspace/rows/:space/:rowId/revisions',
+    requireAuth(), requireScope('organism:write', 'memory:purge'),
+    async (req: Request, res: Response) => {
+      const ws = wsOf(req);
+      if (!needWs(res, ws)) return;
+      try {
+        const out = await listRowRevisions(
+          deps, callerOf(req), req.params.id as string, ws,
+          req.params.space as string, req.params.rowId as string, readerFor(deps, req.auth),
+        );
+        res.json(success(config.nodeId, { space: out.space, row_id: out.rowId, revisions: out.revisions }));
+      } catch (err) { fail(res, err); }
+    });
+
+  /** Put one kept revision back as the row's content; the content it replaces is kept in turn. */
+  router.post('/v1/organisms/:id/workspace/rows/:space/:rowId/revisions/:revisionId/restore',
+    requireAuth(), requireScope('organism:write', 'memory:purge'),
+    rateLimit({ windowMs: 60_000, max: 60 }),
+    async (req: Request, res: Response) => {
+      const ws = wsOf(req);
+      if (!needWs(res, ws)) return;
+      try {
+        const out = await restoreRowRevision(
+          deps, callerOf(req), req.params.id as string, ws, req.params.space as string,
+          req.params.rowId as string, req.params.revisionId as string, readerFor(deps, req.auth),
+        );
+        res.json(success(config.nodeId, {
+          row_id: out.rowId, restored: out.restored, revision_kept: out.revisionKept,
+        }, [{
+          description: 'Read the row', method: 'GET',
+          url: `/v1/organisms/${req.params.id}/workspace/rows/${req.params.space}/${encodeURIComponent(out.rowId)}?ws=${ws}`,
+        }]));
       } catch (err) { fail(res, err); }
     });
 }

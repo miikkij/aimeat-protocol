@@ -5,6 +5,19 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — Replicate stores under a person of this node only while that person holds the
+ *     sign-in consent for the signing node (services/federation-auth-consent.ts), the consent
+ *     push-home's visitor session already needed; without it the answer is 403 CONSENT_REQUIRED and
+ *     nothing is written (secaudit 2026-10 wave 3, v71). An agent of this node follows its owner's
+ *     consent (the developer's ruling of 2026-10-22). The signing node's own principals are admitted
+ *     as before.
+ *   2026-10-22 — The storage grant is bound to the sender's own outbound copy of the message on this
+ *     node (direction outbound, origin local, sender in owner_ghii's account), to a recipient on the
+ *     requesting node, and to an attachment this node's sender account holds; an inbound copy, which
+ *     a peer could plant naming a local person's own key, is 403 (secaudit 2026-10 wave 3, v81). The
+ *     file is read from the holder the send recorded, so an attachment held by the sending agent is
+ *     served instead of 404. Only the version that was sent is granted: a changed or removed file is
+ *     409 FILE_CHANGED (v82).
  *   2026-10-20 — The attachment download token names the stored file's version (createdAt), as every
  *     download token now must (services/download-token.ts).
  *   2026-10-18 — Replicate compares the timestamps against the stored record and writes the replica on
@@ -84,10 +97,11 @@ import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../util
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
 import { listOperatorGhiis } from '../../services/operators.js';
 import { generateDownloadToken } from '../../services/download-token.js';
-import { duplicateMessageAttachments } from '../../services/attachment-duplication.js';
+import { duplicateMessageAttachments, sameAccount, isSentVersion, FILE_CHANGED_REASON } from '../../services/attachment-duplication.js';
 import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
+import { peerMayActFor, signInConsentRefusal } from '../../services/federation-auth-consent.js';
 
 /**
  * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
@@ -149,21 +163,32 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
      * principals (`agent#owner@<source>`), and push-home (routes/memory/federation.ts) sends a
      * visitor's record to their home account on this node. So the namespace is a principal of the
      * signing node, or a person or agent that exists on this node. Anything else, a system namespace
-     * such as package-entitlements or a third node's principal, is refused.
+     * such as package-entitlements or a third node's principal, is refused. A person of this node
+     * passes only while they hold the sign-in consent for the signing node that push-home's visitor
+     * session needed in the first place (services/federation-auth-consent.ts), and an agent of this
+     * node only while its owner holds it: existence alone let a linked peer publish records under
+     * any local person or agent (secaudit 2026-10 wave 3, v71).
      */
-    const replicaNamespaceRefusal = async (gaii: string, sourceNode: string): Promise<string | null> => {
+    const replicaNamespaceRefusal = async (gaii: string, peer: PeerInfo): Promise<{ code: string; message: string } | null> => {
+        const sourceNode = peer.nodeId;
         const parsed = parseGaiiLoose(gaii);
-        const notAnIdentity = `A replicate is stored under a person or agent of the node that signed it or of this node, and "${gaii}" is neither. Send the record under its owner's identity.`;
+        const refuse = (message: string) => ({ code: 'NAMESPACE_NOT_ALLOWED', message });
+        const notAnIdentity = refuse(`A replicate is stored under a person or agent of the node that signed it or of this node, and "${gaii}" is neither. Send the record under its owner's identity.`);
         if (!parsed.owner || !parsed.node) return notAnIdentity;
         if (parsed.node === sourceNode) return null;
         if (parsed.node !== config.nodeId) {
-            return `A node replicates its own people's records only, and ${gaii} is on ${parsed.node}, not on ${sourceNode}, the node that signed this replicate.`;
+            return refuse(`A node replicates its own people's records only, and ${gaii} is on ${parsed.node}, not on ${sourceNode}, the node that signed this replicate.`);
         }
         if (gaii.startsWith('eco:')) return notAnIdentity;
         const exists = parsed.agent
             ? !!(await storage.getAgent(gaii))
             : !!(await storage.getOwner(localAccountName(gaii)));
-        return exists ? null : `${gaii} is not a person or agent on this node, so no replica is stored for it.`;
+        if (!exists) return refuse(`${gaii} is not a person or agent on this node, so no replica is stored for it.`);
+        // An agent of this node follows its owner's consent (the developer's ruling of 2026-10-22):
+        // the person who let the peer sign them in may save their agent's records home too.
+        const person = `${parsed.owner.toLowerCase()}@${config.nodeId}`;
+        if (await peerMayActFor(storage, peer, person)) return null;
+        return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, sourceNode, config.nodeId) };
     };
 
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
@@ -200,9 +225,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // The namespace the replica lands in. Refused before anything is read or written: a body
         // field that only had to be non-empty let a member peer write into a system namespace
         // (package-entitlements, app-member) or any other string (QA audit S6-02).
-        const namespaceRefusal = await replicaNamespaceRefusal(String(gaii), String(source_node));
+        const namespaceRefusal = await replicaNamespaceRefusal(String(gaii), { ...peer, nodeId: String(source_node) });
         if (namespaceRefusal) {
-            res.status(403).json(error(config.nodeId, 'NAMESPACE_NOT_ALLOWED', namespaceRefusal, 403, { gaii: String(gaii), source_node }));
+            res.status(403).json(error(config.nodeId, namespaceRefusal.code, namespaceRefusal.message, 403, { gaii: String(gaii), source_node }));
             return;
         }
 
@@ -686,27 +711,51 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // Each grant hands out a fresh download link, so a grant passes once, inside the window.
         if (await refuseOldOrReplayed(res, source_node, timestamp, signature, { signed: grantPayload, body: req.body ?? {}, peer })) return;
 
-        // Authority check: this node must hold the sender's copy of that message, addressed to the
-        // requesting recipient, and it must actually reference this storage key.
-        const msg = await storage.getDirectMessage(message_id, owner_ghii);
-        if (!msg || msg.recipientGhii !== recipient_ghii) {
+        // Authority check: this node must hold the SENDER's own outbound copy of that message,
+        // addressed to a recipient on the requesting node, and that copy must attach this storage key
+        // as a file of this node held by the sender's account. Any copy found under owner_ghii was
+        // taken as proof until 2026-10-22, so a peer that had delivered an inbound message naming a
+        // local person's own key was granted that person's private file (secaudit 2026-10 wave 3,
+        // v81). The inbound copy is the recipient's mailbox row and proves nothing about what was sent.
+        const sender = String(owner_ghii);
+        let msg: Awaited<ReturnType<typeof storage.getDirectMessage>> = null;
+        // A 1:1 send keeps the sender's copy under the sender itself (an agent's under the agent); a
+        // group thread keeps it in the sender's mailbox (deliveryTargetFor).
+        for (const mailbox of new Set([sender, deliveryTargetFor(sender)])) {
+            const copy = await storage.getDirectMessage(String(message_id), mailbox);
+            if (copy && copy.direction === 'outbound' && copy.origin === 'local'
+                && copy.originNodeId === config.nodeId && sameAccount(copy.senderGhii, sender)) { msg = copy; break; }
+        }
+        if (!msg || msg.recipientGhii !== recipient_ghii || parseGaiiLoose(String(recipient_ghii)).node !== source_node) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'No matching message for this grant'));
             return;
         }
-        const att = msg.attachments?.find(a => a.storageKey === storage_key);
+        const sentBy = msg.senderGhii;
+        const att = msg.attachments?.find(a => a.storageKey === storage_key
+            && a.originNodeId === config.nodeId && sameAccount(a.ownerGhii, sentBy));
         if (!att) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Attachment not part of this message'));
             return;
         }
-        const file = await storage.getStorageFile(owner_ghii, storage_key);
+        // The file is read from the identity that HOLDS it, as the send recorded it: the sending agent
+        // for aimeat_dm_send_as_owner, which answered 404 here while the owner's name was read.
+        const holder = att.ownerGhii;
+        const file = await storage.getStorageFile(holder, storage_key);
+        // Only the version that was sent (secaudit 2026-10 wave 3, v82): a file written under the key
+        // after the send, or a stamped version that is gone, is refused for good, so a repeated grant
+        // can only return the bytes the recipient was sent.
+        if (file ? !isSentVersion(file, att, msg.createdAt) : !!att.version) {
+            res.status(409).json(error(config.nodeId, 'FILE_CHANGED', FILE_CHANGED_REASON));
+            return;
+        }
         if (!file) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Attachment file not found'));
             return;
         }
         // The download token lets the peer pull the bytes, so the file passes leave() before one is
         // minted. Federation has no caller of this node behind it: the node's own reader (TARGET-082).
-        const { left } = await systemReader({ storage, config }, owner_ghii)
-            .leave([storage_key], k => fileTarget(owner_ghii, k, file.workspaceRef), { kind: 'federation', peer: source_node });
+        const { left } = await systemReader({ storage, config }, holder)
+            .leave([storage_key], k => fileTarget(holder, k, file.workspaceRef), { kind: 'federation', peer: source_node });
         if (left.length) {
             logger.info('storage grant refused: the attachment is classified', { peer: source_node, key: storage_key, label: left[0]!.label });
             res.status(403).json(error(config.nodeId, 'CLASSIFIED', `The attachment is ${left[0]!.reason}, so no download is granted.`));
@@ -714,7 +763,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         }
 
         const token = await generateDownloadToken(
-            { sub: owner_ghii, key: storage_key, mimeType: file.mimeType, size: file.size, version: file.createdAt },
+            { sub: holder, key: storage_key, mimeType: file.mimeType, size: file.size, version: file.createdAt },
             300,
         );
         res.json(success(config.nodeId, {

@@ -22,11 +22,21 @@
  *
  *   IT RETURNS A DECISION, NEVER A THROW. Also `ctx.buy`'s shape and its stated reason: the
  *   extension can degrade instead of dying when the queue is full or a chain has gone too deep.
- * @structure buildExtensionAi(deps) → ExtensionCtx['ai']
+ *
+ *   WHOSE READ: THE OWNER'S, UNLESS THE OWNER NARROWED IT. A job reads its prompt_key, input_keys
+ *   and audio_key across the owner scope. `readAs` hands the job the run's own read authority when
+ *   that is narrower: the principal that wrote the code, on an unattended run the owner set to read
+ *   as its installer (extension-system-run.ts) or on that principal's own invoke (attendedReadAs).
+ *   A private record or file of the owner is then refused at the start, as ctx.files refuses it on
+ *   the same run, and the answer can no longer carry it back through on_done or ctx.ai.result.
+ * @structure buildExtensionAi(deps) → ExtensionCtx['ai'] · maybeExtensionAi(args) · attendedReadAs(author, caller)
  * @usage
  *   const ctx = buildExtensionCtx({ …, ai: buildExtensionAi({ service, extName: ext.name,
  *       ownerGhii, nodeId }) });
  * @version-history
+ *   v1.6.0 -- 2026-10-22 -- `readAs`: the jobs an extension starts read the owner scope as the run
+ *     reads, when the owner narrowed it to the code's writer or the writer invokes its own extension;
+ *     everyone else's jobs read with the owner's reach as before (secaudit 2026-10, v75).
  *   v1.5.0 — 2026-10-18 — `result(job_id)`: the answer of a job this extension started or is the
  *     `on_done` of, for its installer. Never throws, like `start`.
  *   v1.4.1 — 2026-10-06 — Only the first start in an on_done callback is exempt; the rest are counted
@@ -47,7 +57,7 @@
 import type { ExtensionCtx } from '../extension-ctx-contract.js';
 import { logger } from '../../utils/logger.js';
 import { AiJobError } from './types.js';
-import type { AiJobStarter, AiJobChainStop, StartAiJobInput } from './types.js';
+import type { AiJobStarter, AiJobChainStop, StartAiJobInput, AiJobStartedBy } from './types.js';
 
 export interface ExtensionAiDeps {
     service: AiJobStarter;
@@ -57,6 +67,14 @@ export interface ExtensionAiDeps {
     ownerGhii: string;
     /** The principal recorded as having asked. Audit, not authority. */
     createdBy: string;
+    /**
+     * Who the jobs this run starts read the owner scope AS, when that is narrower than the owner:
+     * the principal that wrote the extension's code (an agent or an ecosystem app), on an unattended
+     * run the owner narrowed to it, or on that principal's own invoke. Absent, a job reads with the
+     * owner's reach, as every extension's job always has. It decides only which records and files
+     * the model is handed; who pays, where the answer lands and the chain are unchanged.
+     */
+    readAs?: AiJobStartedBy;
     /** Present only when this run IS the continuation of a job: its id and depth, and where a
      *  refusal of the next job must be reported. */
     chain?: {
@@ -82,14 +100,39 @@ export function maybeExtensionAi(args: {
     nodeId: string;
     /** The principal that invoked the action, recorded for audit only. */
     createdBy: string;
+    /** `ExtensionRecord.installedByPrincipal`: who wrote the extension's code. */
+    installedByPrincipal?: string;
+    /** The invoking caller's credential facts, for attendedReadAs. */
+    caller?: { gaii: string; owner: string; roles: readonly string[]; scopes: readonly string[] };
 }): ExtensionCtx['ai'] | undefined {
     if (!args.service) return undefined;
+    const readAs = attendedReadAs(args.installedByPrincipal, args.caller);
     return buildExtensionAi({
         service: args.service,
         extName: args.extName,
         ownerGhii: `${args.extOwner}@${args.nodeId}`,
         createdBy: args.createdBy,
+        ...(readAs ? { readAs } : {}),
     });
+}
+
+/**
+ * Who an invoked action's ctx.ai.start reads as. The principal that wrote the extension's code
+ * (an agent or an ecosystem app, a name with `#`) invoking its own extension reads as itself, as its
+ * ctx.files on the same run does: otherwise its code would read through a job what its own
+ * GET /v1/memory/:key?owner_scope=true and POST /v1/ai/jobs are refused (secaudit 2026-10, v75).
+ * Every other caller gets no narrowing, and the job reads with the installer's reach as before: the
+ * owner in person, an app grant, another of the owner's agents calling an extension it did not
+ * write (ruling 3: it must never read less than another account's caller), and another account
+ * calling the owner's extension (ruling 2).
+ */
+export function attendedReadAs(
+    installedByPrincipal: string | undefined,
+    caller: { gaii: string; owner: string; roles: readonly string[]; scopes: readonly string[] } | undefined,
+): AiJobStartedBy | undefined {
+    const author = (installedByPrincipal ?? '').trim();
+    if (!caller || !author.includes('#') || caller.gaii !== author) return undefined;
+    return { principal: caller.gaii, owner: caller.owner, roles: [...caller.roles], scopes: [...caller.scopes] };
 }
 
 /** The three refusals that mean "the chain could not continue", as opposed to "that request was
@@ -101,7 +144,7 @@ const CHAIN_STOPS: Record<string, AiJobChainStop> = {
 };
 
 export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCtx['ai']> {
-    const { service, extName, ownerGhii, createdBy, chain } = deps;
+    const { service, extName, ownerGhii, createdBy, chain, readAs } = deps;
     // One callback continues its chain once. The first start in it is exempt; every further start
     // is counted, so one counted start cannot fan out to F + F^2 + ... jobs over the chain's depth
     // (secaudit 2026-10 last items, F1). Taken before the await, so starts made together share it.
@@ -139,6 +182,9 @@ export function buildExtensionAi(deps: ExtensionAiDeps): NonNullable<ExtensionCt
                     ownerGhii,
                     createdBy,
                     extension: extName,
+                    // Narrower than the owner only where the owner chose it or the code's writer
+                    // runs it (readAs above); a refused input comes back as a decision, below.
+                    ...(readAs ? { readAs } : {}),
                     // The installer's AI call limit (services/account-limits.ts), the allowance
                     // POST /v1/ai/jobs draws on: an action is a request anyone the extension admits
                     // can make, so its start is counted. A refusal comes back as a decision the

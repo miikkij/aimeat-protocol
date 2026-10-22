@@ -16,9 +16,11 @@
  *     (one per owner+app) with upsert/get/delete/list-by-owner.
  *   v1.3.0 — 2026-06-16 — Persist the app's OWN bilingual Markdown `setup` guide ({ fi, en }) as a
  *     JSON column on both eco_auth and ecosystem_apps (mirrors capabilities/automation).
+ *   v1.4.0 — 2026-10-22 — Read `capabilityApprovals` and write it only by compare-and-swap
+ *     (swapEcosystemAppCapabilityApprovals); secaudit 2026-10, capability-invoke ecosystem source.
  */
 import type Database from 'better-sqlite3';
-import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
+import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, EcoCapabilityApproval } from '../../../interface.js';
 
 // ── EcosystemApp (GEAI principal) ────────────────────────────────────────
 
@@ -41,7 +43,28 @@ function deserializeEcosystemApp(row: Record<string, unknown>): EcosystemAppReco
   if (row.capabilities) record.capabilities = JSON.parse(row.capabilities as string);
   if (row.automation) record.automation = JSON.parse(row.automation as string);
   if (row.setup) record.setup = JSON.parse(row.setup as string);
+  // Set only when the owner was asked something, so a record without approvals reads as before.
+  const approvals = row.capabilityApprovals ? JSON.parse(row.capabilityApprovals as string) as EcoCapabilityApproval[] : [];
+  if (approvals.length) record.capabilityApprovals = approvals;
   return record;
+}
+
+/** The stored text of an approval list, so a compare-and-swap compares the bytes it wrote. */
+export function capabilityApprovalsText(list: readonly EcoCapabilityApproval[] | undefined): string {
+  return JSON.stringify(list ?? []);
+}
+
+/**
+ * Write the approval list only if the stored one is still `expected`. The column is left out of
+ * createEcosystemApp and updateEcosystemApp on purpose: a reconnect rewrites the row's other columns
+ * and keeps what the owner allowed.
+ */
+export function swapEcosystemAppCapabilityApprovals(
+  db: Database.Database, geai: string, expected: EcoCapabilityApproval[], next: EcoCapabilityApproval[],
+): boolean {
+  const r = db.prepare('UPDATE ecosystem_apps SET capabilityApprovals = ? WHERE geai = ? AND capabilityApprovals = ?')
+    .run(capabilityApprovalsText(next), geai, capabilityApprovalsText(expected));
+  return Number(r.changes ?? 0) > 0;
 }
 
 export function createEcosystemApp(db: Database.Database, app: EcosystemAppRecord): EcosystemAppRecord {

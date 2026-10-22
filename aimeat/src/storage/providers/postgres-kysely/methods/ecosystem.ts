@@ -8,11 +8,13 @@
  *   Prisma implementation. jsonb columns (dataAreas/capabilities/automation/setup/validationResult/
  *   appCredentials/trigger/agents) go through the `jsonb()` helper on write and cast back on read.
  * @version-history
+ *   v1.2.0 — 2026-10-22 — capabilityApprovals (migration 0112): read on the record, written only by
+ *     swapEcosystemAppCapabilityApprovals (secaudit 2026-10, capability-invoke ecosystem source).
  *   v1.1.0 — 2026-10-18 — setEcosystemAppScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-07-15 — Phase 5: ecosystem-apps on Postgres+Kysely.
  */
 import { sql, type Selectable } from 'kysely';
-import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
+import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, EcoCapabilityApproval } from '../../../interface.js';
 import type { EcosystemApp, EcoAuth, EcoAutomationRecipe as EcoAutomationRecipeTable } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError, scopeListIs } from '../helpers.js';
@@ -30,8 +32,18 @@ function toEcosystemApp(r: Selectable<EcosystemApp>): EcosystemAppRecord {
     capabilities: (r.capabilities ?? undefined) as unknown as EcosystemAppRecord['capabilities'],
     automation: (r.automation ?? undefined) as unknown as EcosystemAppRecord['automation'],
     setup: (r.setup ?? undefined) as unknown as EcosystemAppRecord['setup'],
+    ...capabilityApprovalsOf(r.capabilityApprovals),
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
+}
+
+/** The stored text of an approval list, so a compare-and-swap compares the bytes it wrote. */
+const capabilityApprovalsText = (list: readonly EcoCapabilityApproval[] | undefined): string => JSON.stringify(list ?? []);
+
+/** Set only when the owner was asked something, so a record without approvals reads as before. */
+function capabilityApprovalsOf(text: string | null | undefined): { capabilityApprovals?: EcoCapabilityApproval[] } {
+  const list = text ? JSON.parse(text) as EcoCapabilityApproval[] : [];
+  return list.length ? { capabilityApprovals: list } : {};
 }
 
 function toEcoAuth(r: Selectable<EcoAuth>): EcoAuthorizationRecord {
@@ -112,6 +124,18 @@ export const ecosystemMethods = {
         .where('geai', '=', geai).where(scopeListIs('scopes', expected)).executeTakeFirst();
       return Number(r.numUpdatedRows ?? 0) > 0;
     } catch (err) { throw dbError('setEcosystemAppScopesIf', err); }
+  },
+  // The column is left out of create and update on purpose: a reconnect rewrites the row's other
+  // columns and keeps what the owner allowed. Text compare: the stored text is what
+  // capabilityApprovalsText wrote, so the expected list matches byte for byte.
+  async swapEcosystemAppCapabilityApprovals(
+    this: PostgresKyselyStorage, geai: string, expected: EcoCapabilityApproval[], next: EcoCapabilityApproval[],
+  ): Promise<boolean> {
+    try {
+      const r = await this.db.updateTable('EcosystemApp').set({ capabilityApprovals: capabilityApprovalsText(next) } as never)
+        .where('geai', '=', geai).where('capabilityApprovals', '=', capabilityApprovalsText(expected)).executeTakeFirst();
+      return Number(r.numUpdatedRows ?? 0) > 0;
+    } catch (err) { throw dbError('swapEcosystemAppCapabilityApprovals', err); }
   },
   async deleteEcosystemApp(this: PostgresKyselyStorage, geai: string): Promise<boolean> {
     const r = await this.db.deleteFrom('EcosystemApp').where('geai', '=', geai).executeTakeFirst();

@@ -11,13 +11,20 @@
  *   audience admits reads them, and the request names the version. The approval gives that version
  *   the audience 'public' through setVersionAudience (./version-audience.ts), the function a publish
  *   of the same bytes as public calls.
- * @structure DatapackageGate · datapackagePublishGate · fileDatapackageAsk
+ *
+ *   ctx.datapackage.publish (./ext-capability.ts) and the workflow datapackage step ask the same
+ *   decision through datapackageGateOf, about the principals behind the run
+ *   (services/publish-actors.ts), because they reach publishPackage with no request to ask.
+ * @structure DatapackageGate · datapackagePublishGate · datapackageGateOf · fileDatapackageAsk
  * @usage
  *   const gate = await datapackagePublishGate(deps, caller, app, ownerGhii, name, body.visibility);
  *   if (gate.kind === 'refused') → 403
  *   const out = await publishPackage(deps, ownerGhii, { ...input, visibility: gate.visibility }, producedBy);
  *   const asked = gate.requester && out.ok ? await fileDatapackageAsk(deps, owner, gate.requester, ownerGhii, name, out.contentHash, gate.from) : {};
  * @version-history
+ *   v1.3.0 — 2026-10-22 — datapackageGateOf: the decision with the gate's answer supplied by the
+ *     caller, for the extension capability and the workflow step (secaudit 2026-10, v68).
+ *     datapackagePublishGate calls it with the request's caller object, unchanged.
  *   v1.2.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a publish that
  *     raises the package to public (named, or visibility.datapackage_default) is stored at 'members'
  *     and the gate answers `warning` PUBLIC_IS_SIGNED_IN_HERE (services/closed-node-level.ts, plan V1.6).
@@ -27,7 +34,7 @@
  */
 import type { CallerContext } from '../caller-context.js';
 import { isRaiseToPublic } from '../publish-gate.js';
-import { publishAskOf, fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
+import { publishAskOf, fileAsk, publishRequestedBody, type PublishAsk } from '../publish-requests/ask.js';
 import type { PublishRequester, PublishStoreCtx } from '../publish-requests/store.js';
 import { readPointer } from './version-audience.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
@@ -42,6 +49,18 @@ export type DatapackageGate =
 export async function datapackagePublishGate(
   ctx: PublishStoreCtx, caller: CallerContext, app: string | undefined, ownerGhii: string, name: string, requested: string | undefined,
 ): Promise<DatapackageGate> {
+  return datapackageGateOf(ctx, () => publishAskOf(ctx, caller, app), ownerGhii, name, requested);
+}
+
+/**
+ * The same decision, with the publish gate's answer supplied by the caller. The extension capability
+ * and the workflow step ask it about the principals behind an unattended or sandboxed publish
+ * (services/publish-actors.ts askActors), where there is no request whose caller object could be asked.
+ * `askOf` runs only for a raise to public, as the request doors ask.
+ */
+export async function datapackageGateOf(
+  ctx: PublishStoreCtx, askOf: () => PublishAsk, ownerGhii: string, name: string, requested: string | undefined,
+): Promise<DatapackageGate> {
   const pointer = typeof name === 'string' && name ? await readPointer(ctx, ownerGhii, name) : null;
   // A pointer with a version and no visibility is a public package's (./audience.ts).
   const from = pointer?.contentHash ? (pointer.visibility ?? 'public') : undefined;
@@ -52,7 +71,7 @@ export async function datapackagePublishGate(
   const closed = closedNodeLevel(ctx.config, level, 'members' as const, { from });
   if (closed.warning) return { kind: 'go', visibility: closed.level, requester: null, from: kept, warning: closed.warning };
   if (!isRaiseToPublic(from, level)) return { kind: 'go', visibility: level, requester: null, from: kept };
-  const ask = publishAskOf(ctx, caller, app);
+  const ask = askOf();
   if (ask.kind === 'refused') return ask;
   if (ask.kind === 'allowed') return { kind: 'go', visibility: level, requester: null, from: kept };
   return { kind: 'go', visibility: kept, requester: ask.requester, from: kept };

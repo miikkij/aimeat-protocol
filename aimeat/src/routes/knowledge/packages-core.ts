@@ -6,6 +6,13 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-22 — A link row belongs to the namespace that holds its source manifest: POST /link and the
+ *     import write the row under the manifest's ownerGaii, DELETE /link deletes that namespace's row
+ *     only, and GET /links lists the outgoing rows of the record it found (the caller's own first).
+ *     Another account that wrote a record at packages/<id>/manifest read, replaced and deleted the
+ *     owner's rows (secaudit 2026-10, v78). linked_by is the contributor's full identity
+ *     (callerOf().ownerGhii), not the bare account name, so owner erasure finds it; broken-links reads
+ *     the package's rows in the caller's own account, where it read no row at all (v79).
  *   2026-10-19 — POST /v1/knowledge/:id/link appends to the manifest's links on the manifest's version
  *     (record-cas.ts updateMemoryRecord), where it wrote back the manifest it had read (check:atomic-writes).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, POST /v1/knowledge/import
@@ -65,6 +72,7 @@ import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { memoryContentBytes } from '../../utils/memory-content.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { classificationWarningOf } from '../../services/classification/present-memory.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { normalizeKnowledgeSharing, presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
@@ -82,7 +90,7 @@ export function registerPackagesCoreRoutes(
   storage: Storage,
   helpers: KnowledgeHelpers,
 ): void {
-  const { resolve, findReadableManifest } = helpers;
+  const { resolve, findReadableManifest, findOwnerScopeMemory } = helpers;
 
   /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
   router.post('/v1/knowledge/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
@@ -314,7 +322,9 @@ export function registerPackagesCoreRoutes(
       createdEntries.push(entry.key);
     }
 
-    // Create memory links if specified
+    // Create memory links if specified: rows of the namespace that holds the manifest just written,
+    // contributed by the caller's account in its full identity (secaudit 2026-10, v78 and v79).
+    const linkedBy = callerOf(req, config.nodeId, storage).ownerGhii;
     for (const link of manifest.links ?? []) {
       await storage.createLink({
         source: manifestKey,
@@ -322,8 +332,8 @@ export function registerPackagesCoreRoutes(
         relation: link.relation,
         description: link.description,
         linked_at: link.linked_at || now,
-        linked_by: ghii,
-      });
+        linked_by: linkedBy,
+      }, ownerGaii);
     }
 
     // Create organism consent grant if requested
@@ -409,7 +419,8 @@ export function registerPackagesCoreRoutes(
   /* ── POST /v1/knowledge/:id/link — Create a link from this package to another memory ── */
   router.post('/v1/knowledge/:id/link', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const ownerGaii = resolve(req);
-    const ghii = req.auth!.owner as string;
+    // The contributor in its full identity (MemoryLinkRecord.linked_by), which owner erasure deletes by.
+    const ghii = callerOf(req, config.nodeId, storage).ownerGhii;
     const packageId = req.params.id as string;
     const { target, relation, description } = req.body;
 
@@ -441,7 +452,9 @@ export function registerPackagesCoreRoutes(
       linked_by: ghii,
     };
 
-    await storage.createLink(link);
+    // A row of the namespace that holds the manifest found above: another account's row with the same
+    // source and target is a different row and stays (secaudit 2026-10, v78).
+    await storage.createLink(link, ownerGaii);
 
     // Also update the manifest's links array: on the stored manifest's version (record-cas.ts), so a
     // link added at the same moment stays.
@@ -468,15 +481,20 @@ export function registerPackagesCoreRoutes(
     const relation = req.query.relation as string | undefined;
 
     // The links of a package are read on the terms of the package itself (helpers.ts
-    // findReadableManifest): a package this caller may not read answers like a missing one.
-    if (!(await findReadableManifest(req, manifestKey))) {
+    // findReadableManifest): a package this caller may not read answers like a missing one. The
+    // caller's own package first, so another account's record at the same key never stands in for it.
+    const found = await findReadableManifest(req, manifestKey, { preferOwn: true });
+    if (!found) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
       return;
     }
 
+    // The outgoing rows are those of the namespace that holds the manifest found above, never of
+    // another account that wrote a record at the same key (secaudit 2026-10, v78).
     const links = await storage.listLinks(manifestKey, {
       direction: direction as 'outgoing' | 'incoming' | 'both',
       relation,
+      sourceOwner: found.record.ownerGaii,
     });
 
     res.json(success(config.nodeId, { links, count: links.length }));
@@ -500,7 +518,9 @@ export function registerPackagesCoreRoutes(
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
       return;
     }
-    const deleted = await storage.deleteLink(manifestKey, target);
+    // Only this namespace's row: another account's record at the same key reaches no row of the
+    // package owner (secaudit 2026-10, v78).
+    const deleted = await storage.deleteLink(manifestKey, target, ownerGaii);
     if (!deleted) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Link not found'));
       return;
@@ -511,10 +531,37 @@ export function registerPackagesCoreRoutes(
   });
 
   /* ── GET /v1/knowledge/:id/broken-links — Find broken links ── */
+  // The links of this package whose source or target is gone. It asked the storage for the caller's
+  // rows by contributor, which no row matched (the contributor was stored as the bare account name), so
+  // it always answered an empty list (secaudit 2026-10, v79). Now: the package in the caller's own
+  // account (the owner in person also finds one their agent holds), that namespace's rows, and a
+  // target counts as present when it is a record in the same account, a public record, or a package
+  // the caller may read. A package not in the caller's account answers an empty list, as before.
   router.get('/v1/knowledge/:id/broken-links', requireAuth(), requireRestScope('memory:read'), requireRole('agent'), async (req, res) => {
-    const ownerGaii = resolve(req);
-    const broken = await storage.findBrokenLinks(ownerGaii);
+    const manifestKey = `packages/${req.params.id as string}/manifest`;
+    const found = await findOwnerScopeMemory(req, manifestKey);
+    const broken: MemoryLinkRecord[] = [];
+    if (found) {
+      for (const link of await storage.findBrokenLinks(found.ownerGaii, manifestKey)) {
+        const sourceGone = !(await storage.getMemory(found.ownerGaii, link.source));
+        if (sourceGone || !(await targetPresent(req, found.ownerGaii, link.target))) broken.push(link);
+      }
+    }
 
     res.json(success(config.nodeId, { broken_links: broken, count: broken.length }));
   });
+
+  /** Whether a link target outside the source's namespace still exists for this caller. */
+  async function targetPresent(req: Express.Request, sourceOwner: string, target: string): Promise<boolean> {
+    const account = localAccountName(sourceOwner);
+    const sameAccount = [`${account}@${config.nodeId}`, ...(await storage.getAgentsByOwner(account)).map(a => a.gaii)];
+    if ((await storage.listMemoryForOwners(sameAccount, { prefix: target })).some(r => r.key === target)) return true;
+    const everyone = [
+      ...(await storage.listOwners()).map(o => `${o.name}@${config.nodeId}`),
+      ...(await storage.listAgents()).map(a => a.gaii),
+    ];
+    if ((await storage.listMemoryForOwners(everyone, { prefix: target, visibility: 'public' })).some(r => r.key === target)) return true;
+    // A package shared with the node's accounts or an organism the caller is in.
+    return /^packages\/[^/]+\/manifest$/.test(target) && !!(await findReadableManifest(req, target));
+  }
 }

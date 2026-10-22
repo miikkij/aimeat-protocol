@@ -52,6 +52,15 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.9.0 -- 2026-10-22 -- ctx.files and ctx.datapackage ask the node's publish gate about the
+ *     principal that installed the extension (and `alsoPublishFor`, a workflow run's principal) before
+ *     they make anything public; an extension an agent installed before this keeps its old behaviour
+ *     until its code changes (services/publish-actors.ts, services/extension-publish-keep.ts;
+ *     secaudit 2026-10, v68 and v69).
+ *   v1.8.0 -- 2026-10-22 -- The owner's 'installer' narrowing reaches ctx.datapackage.open and rows
+ *     (v74) and the AI jobs the run starts (`ai` may be built from the narrowed reader, v75), as it
+ *     reached ctx.files; on the default setting every read is the owner's reach as before
+ *     (secaudit 2026-10).
  *   v1.7.1 — 2026-10-21 — The ctx it builds says `unattended: true`, so the code writer decides a
  *     vault secret's first host (secaudit 2026-10, v59).
  *   v1.7.0 — 2026-10-20 — The read authority is the owner's choice per extension, and its default is
@@ -90,6 +99,7 @@ import type { ExtensionCtxDeps } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
 import { buildUnattendedExtensionWorkspace } from './extension-workspace-rows.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
+import { installerActor, type PublishActor } from './publish-actors.js';
 import { getEncryptionKey } from './encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
@@ -132,14 +142,19 @@ export interface SystemRunArgs {
     /** The cron the producer runs on, when it has one. This is what `updateFrequency` in the ODPS
      *  SLA block is projected from, so it is recorded rather than described. */
     producerSchedule?: string;
+    /** More principals the publish gate is asked about, beside the installer: a workflow run's (services/publish-actors.ts runActor). */
+    alsoPublishFor?: PublishActor[];
     /** Wrap the context in memory-access tracking and return the reads/writes (the scheduler logs them). */
     trackMemory?: boolean;
     /**
      * Background AI jobs, when this road can offer them. Passed in rather than built here because
      * the CHAIN matters: an action fired as a job's `on_done` starts its next job as a continuation
-     * of that job, and only the caller knows which job it is continuing.
+     * of that job, and only the caller knows which job it is continuing. As a function it is built
+     * once this run knows who it reads as: `narrowed` is the reader when the owner narrowed the run
+     * to the principal that wrote the code, and undefined on the owner's reach, so the jobs it starts
+     * read what ctx.files on the same run reads.
      */
-    ai?: ExtensionCtx['ai'];
+    ai?: ExtensionCtx['ai'] | ((narrowed: UnattendedReader | undefined) => ExtensionCtx['ai']);
     /**
      * Set when the extension runs as an AI provider (System 2 plan V6): ctx.fetch reaches only the
      * declared hosts, and the owner's provider key header is added outside the sandbox. Passed
@@ -230,6 +245,15 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
     // Asked before the sandbox starts, and asked again on every run: the owner can narrow or remove
     // an agent after it installed the extension, and the next run must see that.
     const reader = await unattendedExtensionReader(storage, ext, ownerName, storageOwnerGhii);
+    // Who a public file or package is published for: the principal that installed the code, and a
+    // workflow run's principal when the step passes one. The node's publish gate is asked about each
+    // before ctx.files or ctx.datapackage makes anything public (services/publish-actors.ts; secaudit
+    // 2026-10, v68 and v69). Asked again on every run, like the reader.
+    const publishers = [await installerActor(storage, config, ext, ownerName), ...(args.alsoPublishFor ?? [])];
+    // The owner's reach is `reader.gaii === storageOwnerGhii`; anything else is the narrowing the
+    // owner chose, and every read this run makes through a node service follows it.
+    const narrowed = reader.gaii === storageOwnerGhii ? undefined : reader;
+    const ai = typeof args.ai === 'function' ? args.ai(narrowed) : args.ai;
 
     // An instance-scoped run gets the same bring-your-own-key config a live instance action would;
     // `type: 'secret'` fields are decrypted just before the VM (services/extension-secrets.ts).
@@ -281,14 +305,18 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
             readerOwner: reader.owner,
             readerRoles: reader.roles,
             readerScopes: reader.scopes,
-            ...(reader.gaii === storageOwnerGhii ? {} : {
+            ...(narrowed ? {
                 narrowedNote: `This extension runs unattended with the reach of ${reader.gaii}, because you set it to read as its installer. Change it on the extension's page at /profile?tab=extensions.`,
-            }),
+            } : {}),
+            publishers,
         }),
         // The deterministic producers live here, so this is the road ctx.datapackage exists for.
         // Owner namespace on both roads, and the producer block records WHICH unattended road it
         // was: a package a clock refreshes weekly and one a workflow rebuilds after a human approval
         // are different products, and a buyer choosing between them needs to see which is which.
+        // A package is written in the owner's namespace whoever reads; open() and rows() read as the
+        // owner in person unless the owner narrowed this run, and then as the narrowed principal, as
+        // ctx.files above does (secaudit 2026-10, v74).
         datapackage: makeExtensionDataPackage({
             config, storage,
             ownerGhii: storageOwnerGhii,
@@ -298,8 +326,14 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
                 ref: args.producerRef ?? `${ext.name}/${actionId}`,
                 ...(args.producerSchedule ? { schedule: args.producerSchedule } : {}),
             },
+            publishers,
+            ...(narrowed ? {
+                reader: { sub: narrowed.gaii, owner: narrowed.owner, roles: narrowed.roles, scopes: narrowed.scopes },
+                narrowedNote: `This extension runs unattended with the reach of ${narrowed.gaii}, because you set it to read as its installer. `
+                    + 'Change it on the extension\'s page at /profile?tab=extensions, or give that agent the storage:read permission.',
+            } : {}),
         }),
-        ...(args.ai ? { ai: args.ai } : {}),
+        ...(ai ? { ai } : {}),
         notify: buildExtensionNotify({
             storage, config, extName: ext.name,
             recipientGaii: ownerName, recipientOwner: ownerName,

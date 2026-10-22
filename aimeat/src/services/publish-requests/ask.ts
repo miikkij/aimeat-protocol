@@ -20,6 +20,11 @@
  *   ... store at the level it had ...
  *   if (ask.kind === 'ask') { const filed = await fileAsk(ctx, caller.owner, ask.requester, draft); ... 202 }
  * @version-history
+ *   2026-10-22 — fileAsk binds the content digest of a user skill (its files) and of a cortex (its
+ *     manifest and served libraries) as `target.digest` (content-digests.ts): a skill deleted and
+ *     created again restarts at 1.0.0, and a cortex takes a new manifest under the same version
+ *     (secaudit 2026-10, apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate,
+ *     apply-cortex.ts:applyCortexPublish:version-not-bound-to-manifest-or-reinstalled-libs).
  *   2026-10-20 — fileAsk binds the content digest of a memory record (`target.digest`) and of each
  *     named knowledge entry (`target.entry_digests`) beside the versions (secaudit 2026-10,
  *     apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover).
@@ -32,6 +37,7 @@ import {
   filePublishRequest, approveUrl, memoryValueDigest,
   type PublishRequest, type PublishRequestDraft, type PublishRequester, type PublishStoreCtx,
 } from './store.js';
+import { userSkillContent, cortexContentDigest } from './content-digests.js';
 import { logger } from '../../utils/logger.js';
 
 export type PublishAsk =
@@ -60,11 +66,20 @@ export function publishAskOf(ctx: PublishStoreCtx, caller: CallerContext, app?: 
 }
 
 /**
- * The content digests a memory or knowledge request binds beside the versions it names, read from the
- * records as they stand at filing. A record whose version is no longer the one named gets no digest:
- * the version check refuses that request on approval anyway.
+ * The content digests a memory, knowledge, skill or cortex request binds beside the versions it
+ * names, read from the content as it stands at filing. Content whose version is no longer the one
+ * named gets no digest: the version check refuses that request on approval anyway.
  */
 async function contentBinding(ctx: PublishStoreCtx, target: PublishRequestDraft['target'], kind: PublishRequestDraft['kind']): Promise<Record<string, string>> {
+  // A user skill and a cortex: the digest of the files (and the cortex manifest) at the version named.
+  if (kind === 'skill') {
+    const now = await userSkillContent(ctx, String(target.owner ?? ''), String(target.name ?? ''));
+    return now && now.version === String(target.version) ? { digest: now.digest } : {};
+  }
+  if (kind === 'cortex') {
+    const ext = target.name ? await ctx.storage.getCortexExtension(String(target.name)) : null;
+    return ext && ext.version === String(target.version) ? { digest: await cortexContentDigest(ctx.storage, ext) } : {};
+  }
   const ns = String(target.namespace ?? '');
   if (!ns) return {};
   if (kind === 'memory') {
@@ -90,9 +105,10 @@ async function contentBinding(ctx: PublishStoreCtx, target: PublishRequestDraft[
 }
 
 /**
- * File the request, after the door stored the content at the level it was allowed to set. A memory
- * or knowledge request also binds the digest of the content it names, so an approval publishes only
- * the content that was there when it was asked (apply-memory.ts, apply-knowledge.ts).
+ * File the request, after the door stored the content at the level it was allowed to set. A memory,
+ * knowledge, skill or cortex request also binds the digest of the content it names, so an approval
+ * publishes only the content that was there when it was asked (apply-memory.ts, apply-knowledge.ts,
+ * apply-skill.ts, apply-cortex.ts).
  */
 export async function fileAsk(
   ctx: PublishStoreCtx, owner: string, requester: PublishRequester, draft: Omit<PublishRequestDraft, 'requested_by'>,

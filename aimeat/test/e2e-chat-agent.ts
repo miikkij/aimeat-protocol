@@ -36,6 +36,8 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   2026-10-22 — A session id another owner writes into their own thread record opens a fresh session
+ *     rather than the first owner's (secaudit 2026-10, r55).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 — 2026-10-02 — The cancel is counted as the notification goose obeys, and asserted to stop
  *     the agent; the turn ceiling: asked for an answer past twelve tool calls, and ended by the node
@@ -635,6 +637,52 @@ async function run(): Promise<void> {
             body: JSON.stringify({ text: 'not mine' }),
         });
         assert(turnByStranger.status === 404, `another owner speaking into this thread: ${turnByStranger.status}`);
+    });
+
+    await test('a session id copied into another owner\'s thread record opens a fresh session, never the first owner\'s (r55)', async () => {
+        // On the shared key one process holds every person's sessions. The thread record that names a
+        // conversation's session is the person's own memory, so they can write any id into it; the
+        // node keeps who it opened each session for and resumes it for nobody else (secaudit 2026-10).
+        const firstToken = token;
+        const firstStamp = String((await readThread(threadId)).gooseSessionId ?? '');
+        assert(firstStamp.includes(':'), `the first owner's thread names a stamped session, got ${JSON.stringify(firstStamp)}`);
+        const firstSession = firstStamp.split(':').slice(1).join(':');
+        token = await registerOwner(`chatplant${Date.now() % 100000}`);
+        try {
+            const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'mine' }) }));
+            assert(created.status === 201, `create ${created.status}`);
+            const mine = created.body.data.thread.id as string;
+            const own = await turn(mine, { text: 'hello from the second owner' });
+            assert(own.at(-1)!.kind === 'done', `the second owner's own first turn runs, got ${JSON.stringify(own.at(-1))}`);
+            assert(peerRequests('session/prompt').at(-1)!.params.sessionId !== firstSession, 'on a session of their own');
+
+            const key = `chat.thread.${mine}`;
+            const rec = await json(`/v1/memory/${encodeURIComponent(key)}`, authed());
+            assert(rec.status === 200, `read own thread record ${rec.status}`);
+            const raw = rec.body?.data?.value ?? rec.body?.data?.memory?.value;
+            const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            const put = await json('/v1/memory', authed({
+                method: 'POST', body: JSON.stringify({ key, value: { ...value, gooseSessionId: firstStamp }, tags: ['chat', 'thread'] }),
+            }));
+            assert(put.status === 200 || put.status === 201, `the owner may still write their own record: ${put.status}`);
+
+            const opened = peerRequests('session/new').length;
+            const planted = await turn(mine, { text: 'second turn from the second owner' });
+            assert(planted.at(-1)!.kind === 'done', `the second owner's chat keeps working, got ${JSON.stringify(planted.at(-1))}`);
+            const sent = peerRequests('session/prompt').at(-1)!.params.sessionId;
+            assert(sent !== firstSession, 'the turn must not go into the session opened for the first owner');
+            assert(peerRequests('session/new').length === opened + 1, `a fresh session was opened, got ${peerRequests('session/new').length - opened}`);
+
+            const again = await turn(mine, { text: 'and once more' });
+            assert(again.at(-1)!.kind === 'done', 'the next turn runs');
+            assert(peerRequests('session/prompt').at(-1)!.params.sessionId === sent, 'and resumes that fresh session');
+            assert(peerRequests('session/new').length === opened + 1, 'without opening another');
+        } finally {
+            token = firstToken;
+        }
+        const back = await turn(threadId, { text: 'still on mine?' });
+        assert(back.at(-1)!.kind === 'done', 'the first owner\'s turn runs');
+        assert(peerRequests('session/prompt').at(-1)!.params.sessionId === firstSession, 'on the first owner\'s own session, resumed');
     });
 
     await stopNode(node);

@@ -24,6 +24,7 @@
  * @structure
  *   - createGroupConversation() — open a thread with a membership
  *   - sendGroupMessage() — one message, one copy per participant mailbox
+ *   - stampSentVersions() — each attachment of this node records the version that is sent
  *   - fanOutToParticipants() — the shared write: one copy per mailbox, notify, wake the agents
  *   - setParticipants() — replace the membership (a support thread re-resolves its operators)
  *   - emitGroupChange() — the live `messages` event, to the thread's own mailboxes only
@@ -33,6 +34,9 @@
  *   const convo = await createGroupConversation(ctx, { createdBy, participants, subject });
  *   await sendGroupMessage(ctx, { conversationId: convo.id, senderGhii, body });
  * @version-history
+ *   v1.6.0 -- 2026-10-22 -- sendGroupMessage stamps each of this node's attachments with the version
+ *     that is sent (stampSentVersions), as a direct send does, so a participant's copy is made of that
+ *     version or of nothing (secaudit 2026-10 wave 3, v82).
  *   v1.5.0 — 2026-10-21 — Group chat. createGroupConversation takes `invited` (people who have not
  *     answered yet), and they count towards the floor and the ceiling. The live `messages` event goes
  *     to the mailboxes of the thread's participants and invitees (emitGroupChange), where it had gone
@@ -232,13 +236,14 @@ export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput):
 
   const id = randomUUID();
   const now = new Date().toISOString();
+  const attachments = await stampSentVersions(ctx, input.attachments, input.sentByAgent);
 
   const { delivered } = await fanOutToParticipants(ctx, convo, {
     id,
     senderGhii: input.senderGhii,
     recipientGhii: threadAddressFor(convo),
     body: input.body,
-    attachments: input.attachments,
+    attachments,
     interactive: input.interactive,
     replyToId: input.replyToId,
     aiProvenanceId: input.aiProvenanceId,
@@ -263,6 +268,34 @@ export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput):
   await storage.updateConversation(convo.id, {});
   emitGroupChange(convo);
   return { ok: true, messageId: id, delivered };
+}
+
+/**
+ * Each of this node's own attachments records the version that is sent: the held file's createdAt
+ * now (DirectMessageAttachment.version), as a direct send records it (message-send.ts
+ * resolveAttachmentHolders). A copy or a storage grant later serves this version or nothing
+ * (attachment-duplication.ts isSentVersion), so a file written under the same key after the send, or
+ * another file of the account under that key, never reaches a participant (secaudit 2026-10 wave 3,
+ * v82). The holder is looked for where the copy step looks: the descriptor's owner, then the agent
+ * that sends in the owner's name. Nothing else changes: an attachment no holder has keeps no stamp and
+ * the send-time bound, as before, and an attachment from another node is the peer's to answer for.
+ */
+async function stampSentVersions(
+  ctx: DeliveryCtx, attachments: DirectMessageAttachment[] | undefined, sentByAgent: string | undefined,
+): Promise<DirectMessageAttachment[] | undefined> {
+  if (!attachments?.length) return attachments;
+  const out: DirectMessageAttachment[] = [];
+  for (const att of attachments) {
+    if (att.version || att.mode === 'duplicate' || att.originNodeId !== ctx.config.nodeId) { out.push(att); continue; }
+    let version: string | undefined;
+    for (const who of sentByAgent && sentByAgent !== att.ownerGhii ? [att.ownerGhii, sentByAgent] : [att.ownerGhii]) {
+      // Metadata only, as the direct send reads it: no bytes are needed for the version.
+      const meta = await ctx.storage.getStorageFileMeta(who, att.storageKey);
+      if (meta) { version = meta.createdAt; break; }
+    }
+    out.push(version ? { ...att, version } : att);
+  }
+  return out;
 }
 
 export interface FanOutMessage {

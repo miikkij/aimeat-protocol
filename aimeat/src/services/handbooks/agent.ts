@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.41.1 -- 2026-10-22 -- Classification: private records of the owner and siblings show only with
+ *     memory:read-as-owner, and an answer that left one out says so in `note` (secaudit 2026-10, v76/v77).
  *   v1.41.0 -- 2026-10-21 -- Group chats: the six aimeat_dm_group_* tools and how a group is written in.
  *   v1.40.0 -- 2026-10-20 -- Content classes: read a file's facts before the file, the aimeat_content_*
  *     tools (aimeat_content_correct when the person says a class or a field is wrong), the model steps
@@ -146,7 +148,9 @@ themselves in their Data Wallet with a written reason, so tell them what you wan
 their reasons. \`aimeat_classification\` reads and changes classifications,
 with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\`,
 \`explorer\` (a page of your owner's classified items, or with \`pending: true\` the suggestions that
-wait for them) and \`exception_list\`. Your
+wait for them) and \`exception_list\`. Records your owner or their other agents keep private show in
+\`explorer\`, \`audit\`, \`exception_list\`, \`get\` and \`scan\` only when your owner has granted you
+\`memory:read-as-owner\`; an answer that left one out says so in \`note\`. Your
 own judgement never lowers a classification and never changes one a person set: it becomes a
 suggestion your owner accepts or rejects. When your owner tells you what to set, pass their own
 words, verbatim, in \`human_said\`. A classification at least as strict then applies at once as

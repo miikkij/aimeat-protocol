@@ -52,6 +52,9 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.11.0 — 2026-10-22 — readContentLabel follows memory:read-as-owner (owner-scope-labels.ts): a
+ *     record of the owner or a sibling that the caller may not read with owner_scope answers as one
+ *     with no stored label, and the view carries READ_AS_OWNER_NOTE (secaudit 2026-10, v77).
  *   v1.10.0 — 2026-10-18 — The audience cap (plan doc-mvdipuyqraas, L3): setLabel tells the label-raise
  *     listener (label-core.ts labelRaised) of every applied raise, so content over the new label's cap
  *     is lowered; labelForException({ audience }) takes a container and records the effective label.
@@ -117,6 +120,7 @@ import {
   assertMayLabelContainer, containerTargetOf, isContainerKind, resolveContainer, CONTAINER_KINDS,
 } from './containers.js';
 import { effectiveLabels, type EffectiveLabel } from './effective.js';
+import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 
 export { ClassificationError, isAppActor, isOwnerPerson, appNameOf, type ClassificationDeps, type LabelActor } from './label-core.js';
 export { documentKeyOf, memoryTarget, labelAddressOf, documentContentKeys, labelsFor, targetId } from './label-rows.js';
@@ -568,6 +572,12 @@ export interface LabelView {
   locked: boolean;
   suggestion: ContentLabelRow['suggestion'];
   history: ContentLabelRow['history'];
+  /**
+   * READ_AS_OWNER_NOTE: the caller does not read every record of its owner, the content is held by
+   * another identity of that owner, and no stored label is shown (none exists, or the record is
+   * private to that identity). Absent otherwise.
+   */
+  note?: string;
 }
 
 /** The label a piece of content carries, with its effective label, its waiting suggestion and its last changes. */
@@ -575,10 +585,19 @@ export async function readContentLabel(deps: ClassificationDeps, actor: LabelAct
   const target = await addressOf(deps.storage, named);
   await assertMayLabel(deps, actor, target, 'read');
   const policy = await policyFor(deps.storage, deps.config, target.scope);
-  const { row } = await currentRow(deps.storage, policy, target);
+  const current = await currentRow(deps.storage, policy, target);
+  // The memory:read-as-owner rule (owner-scope-labels.ts, secaudit 2026-10 v77): a record of the
+  // owner or a sibling that this caller may not read with owner_scope answers as one with no stored
+  // label, so the answer tells a hidden record from an absent one no more than the memory read does.
+  const view = ownerScopeLabelView(deps.storage, actor);
+  const hidden = await view.hidden(target);
+  const row = hidden ? undefined : current.row;
+  const note = !view.readsAll && !row && (target.kind === 'memory' || target.kind === 'file')
+    && !scopeOrganism(target.scope) && target.scope !== actor.principal ? READ_AS_OWNER_NOTE : undefined;
   const label = row?.label ?? policy.defaultLabel;
   await assertInsideCurrent(deps, actor, target, labelById(policy, label));
-  const eff = (await effectiveLabels(deps.storage, policy, [target])).get(targetId(target));
+  // The effective label reads the content's own row as well, so a hidden record does not ask it.
+  const eff = hidden ? undefined : (await effectiveLabels(deps.storage, policy, [target])).get(targetId(target));
   // currentRow folds a document's older copy rows in; the effective label takes the stricter of the two.
   const effective: EffectiveLabel = !eff || (labelById(policy, label)?.rank ?? -1) >= (labelById(policy, eff.label)?.rank ?? -1)
     ? { label, from: 'own' } : { label: eff.label, from: eff.from };
@@ -587,6 +606,7 @@ export async function readContentLabel(deps: ClassificationDeps, actor: LabelAct
     effective: { ...effective, labelDetail: labelById(policy, effective.label) ?? null },
     source: row?.source ?? 'default',
     locked: !!row?.locked, suggestion: row?.suggestion ?? null, history: (row?.history ?? []).slice(-10),
+    ...(note ? { note } : {}),
   };
 }
 

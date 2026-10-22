@@ -14,6 +14,9 @@
  *   through services/password-check.ts, with the same per-account lock as the sign-in route, and an
  *   account with two-step sign-in needs its code here too.
  * @version-history
+ *   v1.5.0 -- 2026-10-22 -- The consent predicate and the link's sign-in ceiling moved, unchanged, to
+ *     services/federation-auth-consent.ts, which POST /v1/federation/memory/list and POST
+ *     /v1/federation/replicate now read too (secaudit 2026-10 wave 3, v70 and v71).
  *   v1.4.2 -- 2026-10-21 -- Only an end time that is in the past ends an auth consent. An end time that
  *     does not parse is honoured, as before v1.4.1: no record asked for that refusal (authConsentEnded).
  *   v1.4.1 -- 2026-10-20 --An auth consent whose end time has passed is no consent: verify answers
@@ -43,8 +46,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import type { PeerInfo } from '../services/federation.js';
-import { coerceTier, tierCeiling } from '../services/federation-tiers.js';
 import { gatePeer } from '../services/federation-peer-gate.js';
+import { hasNodeAuthConsent, linkCarriesSignIn } from '../services/federation-auth-consent.js';
 import { federationAuthPayload } from '../services/federation-auth-payload.js';
 import { checkPassword, checkSecondFactor } from '../services/password-check.js';
 import { sign, verify } from '../auth/keypair.js';
@@ -52,18 +55,8 @@ import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerPro
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 
-/**
- * Has this auth consent's end time passed? Only a time that parses and lies at or before `now` ends
- * the consent. No end time, or one that does not parse, keeps the consent as it was before the
- * end time was checked here (v1.4.1): the record that asked for the check (secaudit 2026-10,
- * auth-consent-expiry-unchecked) is about a consent that ended, and an end time nobody can read
- * names no moment at which it ended.
- */
-export function authConsentEnded(expires: string | Date | null | undefined, now: Date): boolean {
-    if (!expires) return false;
-    const end = new Date(expires).getTime();
-    return Number.isFinite(end) && end <= now.getTime();
-}
+/** Moved to services/federation-auth-consent.ts (v1.5.0); exported here too for its existing importers. */
+export { authConsentEnded } from '../services/federation-auth-consent.js';
 
 export function federationAuthRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -116,7 +109,7 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
                 res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
                 return;
             }
-            if (!tierCeiling(coerceTier(gate.peer.tier)).allowFederatedAuth) {
+            if (!linkCarriesSignIn(gate.peer)) {
                 res.status(403).json(error(config.nodeId, 'FEDERATION_AUTH_NOT_ALLOWED', 'This link does not carry sign-ins'));
                 return;
             }
@@ -148,22 +141,14 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage, pee
             // and we need to check by node ID (not a real GAII), we query consents directly
             // and filter for auth-related consents targeting this node.
             const ghii = `${username.toLowerCase().trim()}@${config.nodeId}`;
-            const consents = await storage.listConsents(ghii, { status: 'active' });
             // A consent with an end time stops granting at that time. listConsents filters by status
             // only, and a row stays 'active' until the consent-expiry job runs (every ten minutes, and
-            // not at all when the consent layer is off), so the end time is compared here, as
+            // not at all when the consent layer is off), so the end time is compared too, as
             // services/consent.ts does for its readers (secaudit 2026-10,
             // federation-auth.ts:verify:auth-consent-expiry-unchecked). An end time that does not
-            // parse is honoured, as before (authConsentEnded).
-            const consentCheckedAt = new Date();
-            const hasAuthConsent = consents.some(c => {
-                if (c.scope !== 'auth') return false;
-                if (authConsentEnded(c.expires, consentCheckedAt)) return false;
-                if (c.recipient === `node:${requesting_node}`) return true;
-                if (c.recipient === '*') return true;
-                if (c.recipient === 'domain:*') return true;
-                return false;
-            });
+            // parse is honoured, as before (authConsentEnded). The predicate lives in
+            // services/federation-auth-consent.ts, which the memory list and the replicate read too.
+            const hasAuthConsent = await hasNodeAuthConsent(storage, ghii, requesting_node, new Date());
             if (!hasAuthConsent) {
                 logger.info(`Federation auth denied: ${ghii} has no auth consent for node ${requesting_node}`);
                 failed();

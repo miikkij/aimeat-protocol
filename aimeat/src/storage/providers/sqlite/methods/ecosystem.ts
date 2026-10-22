@@ -8,12 +8,13 @@
  * @structure ecosystemMethods
  * @usage Object.assign(SqliteStorage.prototype, ecosystemMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-10-22 — swapEcosystemAppCapabilityApprovals (mirrors Postgres migration 0112).
  *   v1.1.0 — 2026-10-18 — setEcosystemAppScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
  *   v1.0.0 — 2026-10-05 — 17 methods (createEcosystemApp, getEcosystemApp, getEcosystemAppByOwnerAndApp, …)
  *     moved here from federation-oauth.ts so the file mirrors postgres-kysely/methods/ecosystem.ts (secaudit
  *     2026-10, M8).
  */
-import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
+import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe, EcoCapabilityApproval } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import * as ecosystemAppRepo from '../repos/ecosystem-app.js';
 import { sameScopeList } from '../../../scope-list.js';
@@ -44,6 +45,11 @@ export const ecosystemMethods = {
       this.db.prepare('UPDATE ecosystem_apps SET scopes = ? WHERE geai = ?').run(JSON.stringify(next), geai);
       return true;
     }).immediate();
+  },
+  async swapEcosystemAppCapabilityApprovals(
+    this: SqliteStorage, geai: string, expected: EcoCapabilityApproval[], next: EcoCapabilityApproval[],
+  ): Promise<boolean> {
+    return ecosystemAppRepo.swapEcosystemAppCapabilityApprovals(this.db, geai, expected, next);
   },
   async deleteEcosystemApp(this: SqliteStorage, geai: string): Promise<boolean> {
     return ecosystemAppRepo.deleteEcosystemApp(this.db, geai);

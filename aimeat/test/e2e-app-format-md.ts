@@ -12,16 +12,24 @@
  *     - another owner cannot name the first owner's extension (422 APP_FORMAT_MD_INVALID);
  *     - an action the extension does not have is refused (422);
  *     - an action that throws falls back to the converted page (200, the page text);
- *     - the extension's own route still refuses an anonymous caller (401): only the node runs it.
+ *     - the extension's own route still refuses an anonymous caller (401): only the node runs it;
+ *     - a publisher-right developer of another account cannot add the declaration or change the
+ *       extension or action it names (403), on the inline and the draft route (secaudit r54).
+ *   Kept working beside that refusal: the owner in person, the owner's own agent, the developer
+ *   republishing the live declaration or removing it, a full-right developer, an existing app.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-format-md
  * @version-history
+ *   v1.1.0 — 2026-10-22 — Cases 7 to 16: a delegated developer and the ?format=md declaration (secaudit 2026-10, r54).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
+ed.hashes.sha512 = m => new Uint8Array(createHash('sha512').update(m).digest());
 const stamp = Date.now() % 100000;
 
 let passed = 0, failed = 0;
@@ -131,6 +139,135 @@ await test('5. FAILURE: an action that throws falls back to the converted page',
 await test('6. FAILURE: the extension\'s own route still refuses an anonymous caller; only the node runs it for ?format=md', async () => {
     const r = await json(`/v1/ext/${EXT}/render`, { method: 'POST', body: '{}' });
     assert(r.status === 401, `anonymous extension call: ${r.status}`);
+});
+
+// ── A developer of another account (secaudit 2026-10, r54) ──────────────────────────────────────
+// The node runs the declared action in the OWNER's name for every reader, so which action that is
+// stays the owner's choice: a publisher-right developer may keep or remove the live declaration, and
+// only the full right may add one or change what it names.
+const DAPP = 'deleg-md.html';
+const EXT2 = `fmd2-${stamp}`;
+const manifest2 = manifest.replaceAll(EXT, EXT2).replace(/  - id: broken[\s\S]*?script: "actions\/broken.js"\n/, '');
+async function publishFor(token: string, ownerName: string, filename: string, html: string) {
+    return json('/v1/apps', auth(token, { method: 'POST', body: JSON.stringify({ owner: ownerName, filename, content: Buffer.from(html).toString('base64'), mimeType: 'text/html', name: filename, description: 'Format md test app', roadmap: 'Format md delegate test version.' }) }));
+}
+async function formatMdOf(filename: string) {
+    const list = await json('/v1/apps?own=true&limit=200', auth(a.token));
+    const row = (list.body.data?.apps ?? []).find((x: any) => x.filename === filename);
+    return { formatMd: row?.manifest?.formatMd ?? null, version: row?.versionNumber ?? row?.version_number ?? row?.version ?? null };
+}
+async function mdText(filename: string) {
+    const res = await fetch(`${BASE}/v1/apps/${a.name}/${filename}?format=md`);
+    return { status: res.status, text: await res.text() };
+}
+const grant = (level: string) => json(`/v1/apps/${a.name}/${DAPP}/dev-grants/${b.name}`, auth(a.token, { method: 'PUT', body: JSON.stringify({ level }) }));
+const isDelegateRefusal = (r: { status: number; body: any }) => r.status === 403 && r.body.error?.code === 'FORBIDDEN'
+    && /full development right/.test(r.body.error?.message ?? '') && r.body.error.message.includes(a.name);
+
+const inst2 = await json('/v1/extensions', auth(a.token, { method: 'POST', body: JSON.stringify({ manifest: manifest2, scripts: { 'actions/render.js': scripts['actions/render.js'] } }) }));
+assert(inst2.status === 201, `install 2 ${inst2.status}: ${JSON.stringify(inst2.body.error)}`);
+const act2 = await json(`/v1/extensions/${EXT2}/activate`, auth(a.token, { method: 'POST', body: '{}' }));
+assert(act2.status === 200, `activate 2 ${act2.status}: ${JSON.stringify(act2.body.error)}`);
+const first = await publish(a.token, DAPP, page(''));
+assert(first.status === 201 || first.status === 200, `publish ${DAPP} ${first.status}: ${JSON.stringify(first.body.error)}`);
+const granted = await grant('publisher');
+assert(granted.status === 200, `grant publisher ${granted.status}: ${JSON.stringify(granted.body.error)}`);
+
+await test('7. FAILURE: a publisher-right developer of another account cannot add the declaration; the app and its ?format=md stay as they were', async () => {
+    const before = await formatMdOf(DAPP);
+    const r = await publishFor(b.token, a.name, DAPP, page(meta(`/v1/ext/${EXT}/render`)));
+    assert(isDelegateRefusal(r), `${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(/leave the aimeat-format-md line out/.test(r.body.error.message), `names what to do: ${r.body.error.message}`);
+    const after = await formatMdOf(DAPP);
+    assert(after.formatMd === null && after.version === before.version, `manifest unchanged: ${JSON.stringify(after)}`);
+    const md = await mdText(DAPP);
+    assert(md.status === 200 && md.text.includes('The page body text.') && !md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('8. FAILURE: the same refusal through the draft route (save the draft, then publish it)', async () => {
+    const saved = await json(`/v1/apps/${a.name}/${DAPP}/draft`, auth(b.token, { method: 'PUT', body: JSON.stringify({ content: Buffer.from(page(meta(`/v1/ext/${EXT}/render`))).toString('base64'), mime_type: 'text/html' }) }));
+    assert(saved.status === 200 || saved.status === 201, `draft save ${saved.status}: ${JSON.stringify(saved.body.error)}`);
+    const r = await json(`/v1/apps/${a.name}/${DAPP}/publish-draft`, auth(b.token, { method: 'POST', body: JSON.stringify({ roadmap: 'Format md delegate draft.' }) }));
+    assert(isDelegateRefusal(r), `${r.status} ${JSON.stringify(r.body.error)}`);
+    assert((await formatMdOf(DAPP)).formatMd === null, 'manifest unchanged');
+    await json(`/v1/apps/${a.name}/${DAPP}/draft`, auth(a.token, { method: 'DELETE' }));
+});
+
+await test('9. the owner in person adds the declaration to the shared app, and ?format=md serves the action', async () => {
+    const r = await publishFor(a.token, a.name, DAPP, page(meta(`/v1/ext/${EXT}/render`)));
+    assert(r.status === 201 || r.status === 200, `publish ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const fm = (await formatMdOf(DAPP)).formatMd;
+    assert(fm?.extension === EXT && fm.action === 'render', `manifest: ${JSON.stringify(fm)}`);
+    const md = await mdText(DAPP);
+    assert(md.text.includes('# Live from the app') && md.text.includes(`of ${a.name}/${DAPP}`), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('10. the publisher-right developer republishes with the same declaration, and ?format=md still serves the owner\'s action', async () => {
+    const before = await formatMdOf(DAPP);
+    const r = await publishFor(b.token, a.name, DAPP, page(meta(`/v1/ext/${EXT}/render`)).replace('The page body text.', 'The page body text, v2.'));
+    assert(r.status === 201 || r.status === 200, `publish ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const after = await formatMdOf(DAPP);
+    assert(after.formatMd?.extension === EXT && after.formatMd.action === 'render' && after.version !== before.version, `manifest: ${JSON.stringify(after)}`);
+    const md = await mdText(DAPP);
+    assert(md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('11. FAILURE: the publisher-right developer cannot change the declared action', async () => {
+    const r = await publishFor(b.token, a.name, DAPP, page(meta(`/v1/ext/${EXT}/broken`)));
+    assert(isDelegateRefusal(r), `${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(r.body.error.message.includes(`/v1/ext/${EXT}/render`), `names the live declaration to keep: ${r.body.error.message}`);
+    const fm = (await formatMdOf(DAPP)).formatMd;
+    assert(fm?.extension === EXT && fm.action === 'render', `manifest unchanged: ${JSON.stringify(fm)}`);
+});
+
+await test('12. FAILURE: the publisher-right developer cannot change the declared extension', async () => {
+    const r = await publishFor(b.token, a.name, DAPP, page(meta(`/v1/ext/${EXT2}/render`)));
+    assert(isDelegateRefusal(r), `${r.status} ${JSON.stringify(r.body.error)}`);
+    const fm = (await formatMdOf(DAPP)).formatMd;
+    assert(fm?.extension === EXT && fm.action === 'render', `manifest unchanged: ${JSON.stringify(fm)}`);
+});
+
+await test('13. the publisher-right developer may remove the declaration, and ?format=md falls back to the page', async () => {
+    const r = await publishFor(b.token, a.name, DAPP, page(''));
+    assert(r.status === 201 || r.status === 200, `publish ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert((await formatMdOf(DAPP)).formatMd === null, 'the declaration is gone');
+    const md = await mdText(DAPP);
+    assert(md.text.includes('The page body text.') && !md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('14. a full-right developer may add the declaration, and ?format=md serves the owner\'s action', async () => {
+    const g = await grant('full');
+    assert(g.status === 200, `grant full ${g.status}: ${JSON.stringify(g.body.error)}`);
+    const r = await publishFor(b.token, a.name, DAPP, page(meta(`/v1/ext/${EXT2}/render`)));
+    assert(r.status === 201 || r.status === 200, `publish ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const fm = (await formatMdOf(DAPP)).formatMd;
+    assert(fm?.extension === EXT2 && fm.action === 'render', `manifest: ${JSON.stringify(fm)}`);
+    const md = await mdText(DAPP);
+    assert(md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('15. the owner\'s own agent adds the declaration for the owner, unchanged by the delegate rule', async () => {
+    const pub = await publish(a.token, 'agent-md.html', page(''));
+    assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const name = `fmdag${stamp}`;
+    const reg = await json('/v1/agents', auth(a.token, { method: 'POST', body: JSON.stringify({ name, owner: a.name, scopes: ['app:write'] }) }));
+    assert(reg.status === 201, `agent ${reg.status}: ${JSON.stringify(reg.body.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const timestamp = new Date().toISOString();
+    const sig = await ed.signAsync(new TextEncoder().encode(gaii + timestamp), Buffer.from(reg.body.data.private_key, 'base64'));
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature: Buffer.from(sig).toString('base64') }) });
+    assert(tok.status === 200, `agent token ${tok.status}: ${JSON.stringify(tok.body.error)}`);
+    const r = await publish(tok.body.data.token, 'agent-md.html', page(meta(`/v1/ext/${EXT}/render`)));
+    assert(r.status === 201 || r.status === 200, `agent publish ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const fm = (await formatMdOf('agent-md.html')).formatMd;
+    assert(fm?.extension === EXT && fm.action === 'render', `manifest: ${JSON.stringify(fm)}`);
+    const md = await mdText('agent-md.html');
+    assert(md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('16. an app published before any of this still answers ?format=md', async () => {
+    const md = await mdText('live-md.html');
+    assert(md.status === 200 && md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

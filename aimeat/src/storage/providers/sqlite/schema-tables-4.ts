@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.14.0 — 2026-10-22 — Ends with applyWorkspaceRowRevisionSchema: workspace_rows.updatedBy and
+ *     workspace_row_revisions (secaudit 2026-10, v80). Mirrors Postgres 0113.
  *   v1.13.0 — 2026-10-09 — secrets.hostBinding: who bound a vault secret to its host. Mirrors Postgres 0099.
  *   v1.12.0 — 2026-09-29 — classification_audit table: the classification audit log (TARGET-082 V4).
  *     Mirrors Postgres 0091.
@@ -30,6 +32,7 @@
  *     (contacts/send log), moved from schema-tables-3.ts.
  */
 import type Database from 'better-sqlite3';
+import { applyWorkspaceRowRevisionSchema } from './schema-workspace-row-revisions.js';
 
 export function applySchemaTables4(db: Database.Database): void {
   db.exec(`
@@ -760,4 +763,6 @@ export function applySchemaTables4(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_classification_audit_last ON classification_audit(lastAt);
 
   `);
+  // workspace_rows.updatedBy and the row revisions table, after workspace_rows exists (Postgres 0113).
+  applyWorkspaceRowRevisionSchema(db);
 }

@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.13.0 — 2026-10-22 — The knowledge_links step deletes the person's link rows under the bare
+ *     account name too: every link writer stored that form until 2026-10-22, so the step, which asked
+ *     for the GHII only, found none (secaudit 2026-10, v79).
  *   v1.12.0 — 2026-10-20 — Organism membership is read under the bare account name as well as the
  *     GHII, and the name goes from every owners/admins/members array; the grants other parties made
  *     TO the account and to each of its agents are cleared (secaudit 2026-10,
@@ -380,8 +383,12 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     }, deletionLog, storage);
 
     await step('knowledge_links', async () => {
+      // The links this person contributed. Written with the GHII since 2026-10-22; a row written
+      // before carries the bare account name, the form every link writer stored until then (secaudit
+      // 2026-10, v79). The links of their packages go with the per-identity cascade (ownerGaii).
       const count = await storage.deleteLinksByContributor(ghii);
-      return count ? `knowledge_links:${count}` : null;
+      const count2 = await storage.deleteLinksByContributor(name);
+      return count + count2 ? `knowledge_links:${count + count2}` : null;
     }, deletionLog, storage);
 
     await step('knowledge_reviews', async () => {

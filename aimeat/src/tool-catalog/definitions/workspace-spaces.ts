@@ -13,6 +13,9 @@
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-09-02 — Initial: the extraction, plus the two document tools that caused it.
  *   v1.1.0 — 2026-10-02 — aimeat_workspace_rows_delete names memory:purge and organism:write.
+ *   v1.2.0 — 2026-10-22 — aimeat_workspace_rows_revisions and aimeat_workspace_rows_restore, on the
+ *     delete's two words; the append's description says what it keeps when it replaces another
+ *     writer's row (secaudit 2026-10, v80; developer ruling 2026-10-22).
  */
 
 import { z } from 'zod';
@@ -62,7 +65,7 @@ export const workspaceSpaceTools = [
     },
     {
         name: 'aimeat_workspace_rows_append',
-        description: "Add rows to a workspace ROW space — the shape for what a GROUP accumulates (received messages, events, readings, a log) rather than for records a person authors one by one. A row space is declared in the manifest with backing:'rows'; it is charged to the workspace and the organism instead of to whoever wrote the row, keeps no version history, and never appears row-by-row in a workspace index (the index shows a count). Send one row, or up to 500 in `rows`. Supplying `row_id` makes the append IDEMPOTENT: repeating it REPLACES that row and keeps its original createdAt, so re-running an ingest updates instead of duplicating. `occurred_at` is when the thing happened in the world (a message's own date, not now) and is what reads are ordered and bounded by. Refused before anything is written if the space is not a row space, the caller may not write it, a row is over the size ceiling, or the workspace/organism quota is reached.",
+        description: "Add rows to a workspace ROW space — the shape for what a GROUP accumulates (received messages, events, readings, a log) rather than for records a person authors one by one. A row space is declared in the manifest with backing:'rows'; it is charged to the workspace and the organism instead of to whoever wrote the row, keeps no version history, and never appears row-by-row in a workspace index (the index shows a count). Send one row, or up to 500 in `rows`. Supplying `row_id` makes the append IDEMPOTENT: repeating it REPLACES that row and keeps its original createdAt, so re-running an ingest updates instead of duplicating. When the row you replace was last written by somebody else, the node keeps its earlier content as a revision (aimeat_workspace_rows_revisions), the row keeps its first author in createdBy, and the answer names the row in `revisions_kept`. `occurred_at` is when the thing happened in the world (a message's own date, not now) and is what reads are ordered and bounded by. Refused before anything is written if the space is not a row space, the caller may not write it, a row is over the size ceiling, or the workspace/organism quota is reached.",
         caller: 'agent',
         visibility: agentEverywhere,
         // Row spaces. The append is idempotent BY THE CALLER'S CHOICE: supplying row_id makes a repeat
@@ -136,6 +139,39 @@ export const workspaceSpaceTools = [
             space: { type: 'string', required: true, description: 'The row space, by objectType name or namespace.' },
             row_id: { type: 'string', description: 'Remove this one row.' },
             before: { type: 'string', description: 'ISO 8601: remove every row created before this.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_revisions',
+        description: "List the earlier contents the node kept for one row of a workspace ROW space, newest first. When an append replaces a row whose last writer was somebody else (another person, or another person's agent, app or extension), the node keeps the content it replaced, for the space's retention window or 30 days and at most 20 per row; the row keeps its first author in createdBy and names the new writer in updatedBy. Each revision carries its revision_id, the body, who wrote it and who replaced it. Put one back with aimeat_workspace_rows_restore. For whoever may remove rows: needs memory:purge and organism:write.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'List Workspace Row Revisions', readOnlyHint: true },
+        // The row delete's two words: whoever may remove a row may see and put back what it held
+        // (secaudit 2026-10, v80; developer ruling 2026-10-22). The handler asks organism:write.
+        scope: ['memory:purge', 'organism:write'],
+        surfaces: ['appdev', 'agent', 'service'],
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            space: { type: 'string', required: true, description: 'The row space, by objectType name or namespace.' },
+            row_id: { type: 'string', required: true, description: 'The row whose kept revisions to list.' },
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_restore',
+        description: "Put a kept revision back as a row's content in a workspace ROW space (list them with aimeat_workspace_rows_revisions). The content the restore replaces is kept as a revision in turn, so a restore can be undone the same way. The row keeps its first author in createdBy, and updatedBy names you. For whoever may remove rows: needs memory:purge and organism:write.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Restore Workspace Row Revision', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+        scope: ['memory:purge', 'organism:write'],
+        surfaces: ['appdev', 'agent', 'service'],
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ws: { type: 'string', required: true, description: 'Workspace id.' },
+            space: { type: 'string', required: true, description: 'The row space, by objectType name or namespace.' },
+            row_id: { type: 'string', required: true, description: 'The row to restore.' },
+            revision_id: { type: 'string', required: true, description: 'The kept revision to put back, from aimeat_workspace_rows_revisions.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

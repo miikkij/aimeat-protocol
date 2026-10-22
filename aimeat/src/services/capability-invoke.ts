@@ -6,6 +6,12 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.8.0 - 2026-10-22 - The `ecosystem` case refuses another account's capability unless the
+ *     caller's outside app declared the action and the account holder allowed it once with one press
+ *     (ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL with the address, ECOSYSTEM_CAPABILITY_NOT_YOURS,
+ *     ECO_APP_NOT_FOUND; services/eco-capability-approvals.ts). The registrant chose the action and,
+ *     through lockedInput, the arguments the caller's own app ran as the caller (secaudit 2026-10,
+ *     capability-invoke.ts:ecosystem-source:app-slug-resolved-in-caller-reach). Own use unchanged.
  *   v1.7.0 - 2026-10-20 - The `mcp` case refuses a capability of ANOTHER owner unless the publisher
  *     reaches the same server row the caller's slug resolves to (MCP_CAPABILITY_NOT_YOURS). The slug
  *     was resolved in the caller's namespace alone, so another owner's capability selected the tool,
@@ -48,6 +54,7 @@ import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
 import { verifyJWT } from '../auth/jwt.js';
 import { callAuthority, withCurrentScopes } from '../auth/effective-scopes.js';
 import { resolvePat, PAT_PREFIX } from './access-token.js';
+import { ecosystemCallRefusal } from './eco-capability-approvals.js';
 import { logger } from '../utils/logger.js';
 
 export interface InvokeResult {
@@ -337,6 +344,13 @@ export async function invokeCapability(
       if (!app) {
         throw Object.assign(new Error('Malformed ecosystem capability ref'), { statusCode: 500, code: 'BAD_ECOSYSTEM_REF' });
       }
+      // The tunnel below is the CALLER's own app, so the action and the input are the caller's to
+      // allow. Another account's capability chose both and the caller's app ran them as the caller
+      // (secaudit 2026-10, capability-invoke.ts:ecosystem-source:app-slug-resolved-in-caller-reach).
+      // It now runs only for an action the app declared and after the account holder allowed it once
+      // with one press; the account's own capability is unchanged (services/eco-capability-approvals.ts).
+      const refusal = await ecosystemCallRefusal({ storage, config }, { capability, app, action: capId, callerGhii, input });
+      if (refusal) throw Object.assign(new Error(refusal.message), refusal);
       const owner = localAccountName(callerGhii);
       const geai = buildGEAI(app, owner, config.nodeId);
       const mgr = getActiveConnectTunnelManager();

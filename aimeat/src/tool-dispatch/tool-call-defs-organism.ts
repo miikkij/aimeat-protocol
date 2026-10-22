@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — aimeat_workspace_rows_revisions → GET .../rows/:space/:rowId/revisions and
+ *     aimeat_workspace_rows_restore → POST .../revisions/:revisionId/restore (secaudit 2026-10, v80).
  *   2026-10-16 — aimeat_workspace_share → PUT /v1/organisms/:id/workspace/share, its body built by
  *     services/workspace-share-input.ts as the node tool builds it.
  *   2026-10-08 — aimeat_workspace_comment forwards ai_provenance and ai_provenance_id, which
@@ -271,6 +273,25 @@ export const organismTools: ConnectCliToolDefinition[] = [
             return rowId
                 ? client.delete(`/v1/organisms/${org}/workspace/rows/${space}/${encodeURIComponent(rowId)}${query({ ws })}`)
                 : client.delete(`/v1/organisms/${org}/workspace/rows/${space}${query({ ws, before })}`);
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_revisions',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            const rowId = encodeURIComponent(requiredString(input, 'row_id'));
+            return client.get(`/v1/organisms/${org}/workspace/rows/${space}/${rowId}/revisions${query({ ws: requiredString(input, 'ws') })}`);
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_restore',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            const rowId = encodeURIComponent(requiredString(input, 'row_id'));
+            const revisionId = encodeURIComponent(requiredString(input, 'revision_id'));
+            return client.post(`/v1/organisms/${org}/workspace/rows/${space}/${rowId}/revisions/${revisionId}/restore${query({ ws: requiredString(input, 'ws') })}`, {});
         },
     },
     // ── In-place DOCUMENT edits. Same door, same reason as the row entries above: this is what a

@@ -56,6 +56,9 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   2026-10-22 — DecideCaller.readsAll: whether the caller reads the owner's private records, which a
+ *     decision run's keys and prefix and its run store follow (runs.ts; secaudit 2026-10, v83, v84).
+ *     A single decision does not read it.
  *   2026-10-16 — The data map check reads as the node itself (NODE_READ), so the visibility gate on a private app's map does not refuse the app's own declaration (QA audit list review).
  *   v1.4.8 -- 2026-10-08 -- A provider's 404 is 422 PROVIDER_REJECTED, as a 400 is, not 502 (aiprov plan, A10).
  *   v1.4.7 -- 2026-10-07 -- A refusal of the node's own key is 424 INVALID_API_KEY too, not 502 PROVIDER_ERROR.
@@ -125,6 +128,13 @@ export interface DecideCaller {
   appId?: string;
   /** The human owner acting directly. Only they may skip the scrubber without a policy saying so. */
   isOwner: boolean;
+  /**
+   * True when the caller reads the owner's private records as the owner does (owner-scope-read.ts
+   * readsAsOwner: the owner in person, an app grant, an agent holding memory:read-as-owner). Set by
+   * the REST route and the MCP tool from the caller, never read from a request body. A decision run
+   * reads `keys` and `prefix`, and shows the runs of others, only to such a caller (runs.ts).
+   */
+  readsAll?: boolean;
   /** 'exempt' for node-internal work (an item of a run, the classifier, a refinery batch); absent,
    *  the decision counts against the account's AI call limit (services/account-limits.ts). Set by
    *  the code that builds the caller, never read from a request body. */

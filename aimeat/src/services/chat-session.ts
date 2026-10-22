@@ -29,6 +29,9 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.10.0 — 2026-10-22 — A goose session is resumed only for the person and thread the node opened
+ *     it for (sessionOpeners); a session id that the thread record names but this node did not open
+ *     for that thread opens a fresh session (secaudit 2026-10, r55).
  *   v1.9.0 — 2026-10-04 — A goose session runs in the chat's own empty directory, not the node's.
  *   v1.8.0 — 2026-10-02 — The node speaks in the turn and the turn has a ceiling
  *     (services/chat-turn-guard.ts). A progress line within 1.5 s and one per kind of step, in the
@@ -166,6 +169,23 @@ export function shutdownChat(): void {
     pool.closeAll();
 }
 
+/**
+ * Who each goose session was opened for, per agent process: session id -> `<person GHII>\n<thread id>`.
+ *
+ * The thread record that names a conversation's session lives in the person's own memory, and the
+ * person can rewrite it through the generic memory write. On the shared key one process holds every
+ * person's sessions, each opened with its opener's own MCP token, so a session id copied into
+ * another person's thread record would send that person's turn into the opener's session (secaudit
+ * 2026-10, r55). The node therefore keeps the binding itself and resumes a session only for the
+ * person and thread it opened it for; any other id, foreign or unknown (for instance one issued
+ * before the node restarted), opens a fresh session, which is what a stale id already did.
+ * Keyed by the client object, so a process's bindings go when the process goes.
+ */
+const sessionOpeners = new WeakMap<GooseAcpClient, Map<string, string>>();
+function openerOf(gaii: string, threadId: string): string {
+    return `${gaii}\n${threadId}`;
+}
+
 /** A goose session id is only meaningful for the process that issued it. */
 function stamp(generation: number, sessionId: string): string {
     return `${generation}:${sessionId}`;
@@ -211,7 +231,9 @@ async function sessionFor(
     const { storage, config } = deps;
     const thread = await readThread(storage, gaii, threadId);
     const existing = unstamp(thread?.gooseSessionId, lease.generation);
-    if (existing) return existing;
+    let openers = sessionOpeners.get(lease.client);
+    if (existing && openers?.get(existing) === openerOf(gaii, threadId)) return existing;
+    if (existing) logger.warn(`[chat] thread ${threadId} of ${gaii} named a session this node did not open for it; opening a new one`);
 
     const identity = await ensureChatAgent(storage, config, ownerName);
     const { token } = await mintChatAgentToken(storage, config, identity);
@@ -222,6 +244,8 @@ async function sessionFor(
         // round as project hints (services/goose-chat-config.ts).
         cwd: ensureChatGooseConfig(config).cwd,
     });
+    if (!openers) { openers = new Map(); sessionOpeners.set(lease.client, openers); }
+    openers.set(sessionId, openerOf(gaii, threadId));
     await setGooseSession(storage, gaii, threadId, stamp(lease.generation, sessionId));
     logger.info(`[chat] ${identity.gaii} -> goose session ${sessionId} for thread ${threadId}`);
     return sessionId;

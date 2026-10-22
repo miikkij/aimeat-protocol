@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.4 — 2026-10-22 — ADDITIVE: ctx.files.write and ctx.datapackage.publish say that a public write
+ *     by an agent without publish:public waits for the owner and returns `publishRequest` (secaudit
+ *     2026-10, v68 and v69).
  *   v1.7.3 — 2026-10-21 — ADDITIVE: a declared host without a port covers every port; `network:` hosts
  *     count as declared for every secret.
  *   v1.7.2 — 2026-10-21 —ADDITIVE: the secrets section tells an author to declare `uses_secrets`, says
@@ -143,8 +146,8 @@ function sandboxSection(): string {
     '| `ctx.memory.getPublic(namespace, key)` | Read a PUBLIC key in another namespace (another `ext:` one, or an owner\'s), or null |',
     `| \`ctx.fetch(url, {method, headers, body, gunzip, timeoutMs})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer (more with \`limits.fetch_max_mb\`, below), and throws \`RESPONSE_TOO_LARGE\` past that. \`gunzip: true\` inflates a gzipped answer (a \`.xml.gz\`, a compressed export) before it is decoded. \`timeoutMs\` (100 to 30000) is your own deadline for this one call: past it the call throws \`FETCH_TIMEOUT: …\`, which you catch and go on from. Give one whenever a run calls several addresses, because without it one address that never answers holds the call until the whole run times out |`,
     '| `ctx.files.read(ref)` | A stored file as `{base64, mime, size, key}`, or null. Read with the CALLER\'s rights |',
-    '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes under `ext/{name}/`, private unless `visibility: \'public\'`. Returns `{key, gaii, owner, url, size}`; `owner` is whose storage it landed in |',
-    '| `ctx.datapackage.publish / validate / inferSchema / open / rows / fail` | AIMEAT Data Packages, built on the node. `publish` THROWS when the quality gate refuses; `validate` looks first without throwing |',
+    '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes under `ext/{name}/`, private unless `visibility: \'public\'`. Returns `{key, gaii, owner, url, size}`; `owner` is whose storage it landed in. Public meets the node\'s publish gate: run by an agent without the owner\'s publish:public, the file is stored private and `publishRequest` says the owner approves it, after which `url` opens |',
+    '| `ctx.datapackage.publish / validate / inferSchema / open / rows / fail` | AIMEAT Data Packages, built on the node. `publish` THROWS when the quality gate refuses; `validate` looks first without throwing. A public publish by an agent without the owner\'s publish:public lands at the level the package had and returns `publishRequest` for the owner to approve |',
     '| `ctx.workspace.index(orgId, ws)` | The CALLER\'s organism workspace: manifest, schemas, titles (no bodies) |',
     '| `ctx.workspace.get(orgId, ws, ids, {space})` | Full values of those records; `_draftVersion` is what `ifVersion` swaps against |',
     '| `ctx.workspace.write(orgId, ws, space, id, value, {ifVersion})` | A schema-validated DRAFT record, as the caller. `ifVersion: 0` = only if no draft yet |',

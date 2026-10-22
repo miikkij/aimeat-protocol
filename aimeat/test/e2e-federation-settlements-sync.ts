@@ -44,6 +44,10 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-federation-settlements-sync.ts
  *   E2E_STACKS=1 adds the stack to every failure, for the ones that come from inside the node.
  * @version-history
+ *   2026-10-22 — The positive memory-inventory request comes after B's operator gives A the sign-in
+ *     consent; a new case before it shows the same signed request without the consent is 403
+ *     CONSENT_REQUIRED with no entries (secaudit 2026-10 wave 3, v70; test change approved by the
+ *     developer on 2026-10-22).
  *   2026-10-16 — A refusal from the far node is HTTP 502 PEER_REFUSED on POST /v1/work/request,
  *     /v1/federation/route and /v1/federation/cross-node/work, with the far node's status (401, 500) only
  *     in details.peer_status; these tests asserted the far status as the response status (decision 2026-10-16).
@@ -918,7 +922,26 @@ async function run(): Promise<void> {
         assert(forged.status === 401 && String(forged.body.error?.message).includes('Invalid'), `forged: ${forged.status} ${JSON.stringify(forged.body)}`);
     });
 
+    await test('…and refuses a signing peer the inventory of a person here who gave it no sign-in consent', async () => {
+        const timestamp = new Date().toISOString();
+        const signed = JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp });
+        const signature = await sign(A.nodeKey.privateKey, signed);
+        const proof = await audienceProof(A.nodeKey.privateKey, signed, B_ID);
+        const { status, body } = await B.json('/v1/federation/memory/list', {
+            method: 'POST', body: JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp, signature, ...proof }),
+        });
+        assert(status === 403 && body.error?.code === 'CONSENT_REQUIRED', `expected 403 CONSENT_REQUIRED, got ${status} ${JSON.stringify(body)}`);
+        assert(!body.data?.entries, `no inventory may come back with the refusal: ${JSON.stringify(body.data)}`);
+    });
+
     await test('…and hands the inventory to a peer that signs for it', async () => {
+        // B's operator lets A sign them in first, the consent list-home's visitor session needs
+        // (secaudit 2026-10 wave 3, v70; the developer's ruling of 2026-10-22).
+        const consent = await B.json('/v1/consent', {
+            method: 'POST', headers: auth(B.ownerToken),
+            body: JSON.stringify({ data_pattern: '_identity', recipient: `node:${A_ID}`, scope: 'auth', purpose: 'federation_login' }),
+        });
+        assert(consent.status === 201, `B's operator's sign-in consent for A: ${consent.status} ${JSON.stringify(consent.body?.error)}`);
         const timestamp = new Date().toISOString();
         const signed = JSON.stringify({ requesting_node: A_ID, gaii: B.ownerGhii, timestamp });
         const signature = await sign(A.nodeKey.privateKey, signed);

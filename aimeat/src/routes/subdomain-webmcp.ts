@@ -11,7 +11,12 @@
  * @structure AppOriginDeps · registerAppOriginWebmcp(router, storage, deps) — one `router.all` for `/webmcp*`
  * @usage Called from subdomainServeRouter, which is mounted BEFORE the WebMCP router; that order
  *   is what makes the rewrite land.
+ *   THE SAME RULES. Because this rewrites rather than serving its own handler, a POST here meets every
+ *   check of the apex route, the exchange:write an agent or ecosystem app is asked included
+ *   (routes/webmcp-invoke-gate.ts). Nothing on this origin may answer the invoke on its own.
  * @version-history
+ *   v1.0.1 — 2026-10-22 — Header only: the invoke on this origin is asked exchange:write by the apex
+ *     handler it is rewritten to (secaudit 2026-10, v72); test/e2e-app-tool-invoke-scope.ts proves it here.
  *   v1.0.0 — 2026-07-29 — Extracted from subdomains.ts (max-file-lines) as it was written.
  */
 import type { Router, Request, Response } from 'express';

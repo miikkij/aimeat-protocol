@@ -5,6 +5,11 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-10-22 — POST /v1/federation/memory/list lists a principal of the requesting node as
+ *     before, a person of this node only while that person's sign-in consent for the requesting node
+ *     holds (403 CONSENT_REQUIRED otherwise; an agent follows its owner's consent), and refuses a
+ *     third node's principal (403 NAMESPACE_NOT_ALLOWED). It had listed any local person's private
+ *     key names for any linked member peer (secaudit 2026-10 wave 3, v70).
  *   v1.5.0 — 2026-10-16 — POST /v1/federation/templates/sync stores what it fetched, one memory record
  *     per peer (services/federation-remote-templates.ts), and answers per peer whether it was stored;
  *     it had counted each listing and dropped it (QA audit F1-04).
@@ -40,11 +45,38 @@ import {
     signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
 } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
+import { peerMayActFor, signInConsentRefusal } from '../../services/federation-auth-consent.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
 const FRESHNESS_MS = 5 * 60 * 1000;
 
 export function registerTemplatesRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+    /**
+     * Whose key inventory a peer may list, or the refusal (secaudit 2026-10 wave 3, v70). Two callers
+     * exist (routes/memory/federation.ts): list-remote names a principal of the requesting node itself,
+     * and list-home names a person of this node who is signed in on the requesting node as a visitor,
+     * which this node allowed only after it found the person's sign-in consent for that node
+     * (routes/federation-auth.ts). So the requesting node's own principals are listed as before; a
+     * person of this node is listed only while that same consent holds (an agent or app of this node
+     * follows its owner's consent); a third node's principal is refused, as the replicate route does.
+     * Until 2026-10-22 the gaii in the body was not checked, and a linked peer listed any local
+     * person's private key names.
+     */
+    const inventoryRefusal = async (gaii: string, requestingNode: string, peer: PeerInfo): Promise<{ code: string; message: string } | null> => {
+        const parsed = parseGaiiLoose(gaii);
+        if (!parsed.owner || !parsed.node) {
+            return { code: 'NAMESPACE_NOT_ALLOWED', message: `A memory list names a person or agent of the node that asks or of this node, and "${gaii}" is neither. Send the full identity, such as name@node.` };
+        }
+        if (parsed.node === requestingNode) return null;
+        if (parsed.node !== config.nodeId) {
+            return { code: 'NAMESPACE_NOT_ALLOWED', message: `A node lists its own people's records here, and ${gaii} is on ${parsed.node}, not on ${requestingNode}, the node that signed this request.` };
+        }
+        const person = `${parsed.owner.toLowerCase()}@${config.nodeId}`;
+        if (await peerMayActFor(storage, { tier: peer.tier, nodeId: requestingNode }, person)) return null;
+        return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, requestingNode, config.nodeId) };
+    };
+
     // ── Federation Template Sharing ──
 
     // GET /v1/federation/templates — Serve template listings to peer nodes
@@ -230,6 +262,13 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             publicKey: peer.publicKey, thisNodeId: config.nodeId, required: config.federationAudienceRequired, provenSince,
         })) ?? signedMessageRefusal(String(requesting_node), timestamp, String(signature));
         if (replayed) { res.status(replayed.status).json(error(config.nodeId, replayed.code, replayed.message)); return; }
+
+        // Whose inventory, after the peer has proved who it is and before anything is read.
+        const whose = await inventoryRefusal(String(gaii), String(requesting_node), peer);
+        if (whose) {
+            res.status(403).json(error(config.nodeId, whose.code, whose.message, 403, { gaii: String(gaii), requesting_node: String(requesting_node) }));
+            return;
+        }
 
         try {
             const memories = await storage.listMemory(gaii as string, {});

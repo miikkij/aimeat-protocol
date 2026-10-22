@@ -21,6 +21,10 @@
  *   review a label suggestion or a policy proposal, a non-operator does not move the switch.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification
  * @version-history
+ *   2026-10-22 — Section 11, memory:read-as-owner on classification metadata (secaudit 2026-10, v76
+ *     and v77): an agent without the word scans, lists, reads in the audit log and the exceptions,
+ *     and reads the label of no private record of its owner or a sibling, and is told which
+ *     permission shows them; the owner and an agent with the word keep the whole view.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.5.1 — 2026-10-18 — The setup takes the default audience caps off, which a new node carries from
  *     plan doc-mvdipuyqraas L5.1; the suite writes public records to test the reader, not the caps.
@@ -918,6 +922,164 @@ await test('ORGANISM DELETE: deleting an organism takes its exceptions and its a
   const auditAfter = await json('/v1/classification/audit?level=node&action=exception&limit=1000', { headers: auth(op.token) });
   assert(auditAfter.status === 200 && inScope(auditAfter.body.data.rows).length === 0, `audit after: ${JSON.stringify(inScope(auditAfter.body?.data?.rows ?? []))}`);
   assert((after.body.data.exceptions as any[]).some(e => e.id === orgException), 'POSITIVE CONTROL: the other organism\'s exception stays');
+});
+
+// ─── 11. memory:read-as-owner on classification metadata (secaudit 2026-10, v76 and v77) ───
+console.log('\nmemory:read-as-owner: an agent without it learns nothing of a private record of its owner or a sibling through classification');
+
+/** Three agents of alice: one without memory:read-as-owner, a sibling, and one with the word. */
+let raoPlain: Agent, raoSib: Agent, raoWord: Agent;
+const RAO = { secret: 'rao.secret', sib: 'rao.sib', shared: 'rao.shared', mine: 'rao.mine', none: 'rao.none' };
+const raoKeys = (rows: any[] | undefined) => (rows ?? []).map(r => r.key ?? r.target?.key);
+const raoLabel = (token: string, key: string) => json(`/v1/classification/label?key=${encodeURIComponent(key)}`, { headers: auth(token) });
+/** Every explorer page over REST (a call reads at most ten storage pages, so an owner with several
+ *  agents gets a cursor): the items, and whether any page carried the note. */
+async function raoExplorer(token: string): Promise<{ status: number; keys: string[]; note: string }> {
+  const keys: string[] = [];
+  let note = '';
+  let cursor: string | null = null;
+  for (let i = 0; i < 20; i++) {
+    const r = await json(`/v1/classification/labels?limit=200${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`, { headers: auth(token) });
+    if (r.status !== 200) return { status: r.status, keys, note };
+    keys.push(...raoKeys(r.body.data.items));
+    note ||= r.body.data.note ?? '';
+    cursor = r.body.data.next;
+    if (!cursor) break;
+  }
+  return { status: 200, keys, note };
+}
+/** The same walk over the node MCP explorer. */
+async function raoExplorerMcp(s: Session): Promise<{ ok: boolean; keys: string[]; note: string }> {
+  const keys: string[] = [];
+  let note = '';
+  let cursor: string | null = null;
+  for (let i = 0; i < 20; i++) {
+    const r = await nodeTool(s, 'aimeat_classification', { action: 'explorer', limit: 200, ...(cursor ? { cursor } : {}) });
+    if (r.isError) return { ok: false, keys, note: r.text };
+    keys.push(...raoKeys(r.payload?.items));
+    note ||= r.payload?.note ?? '';
+    cursor = r.payload?.next ?? null;
+    if (!cursor) break;
+  }
+  return { ok: true, keys, note };
+}
+
+await test('READ-AS-OWNER setup: private records of the owner and a sibling, an owner-visible one, and the agent\'s own', async () => {
+  raoPlain = await agent(alice, 'clsraoplain', ['memory:read', 'memory:write']);
+  raoSib = await agent(alice, 'clsraosib', ['memory:read', 'memory:write']);
+  raoWord = await agent(alice, 'clsraoword', ['memory:read', 'memory:write', 'memory:read-as-owner']);
+  const put = async (token: string, key: string, value: string, visibility: string) => {
+    const w = await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key, value, visibility }) });
+    assert(w.status === 201, `write ${key}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+  };
+  await put(alice.token, RAO.secret, 'password: hunter22xyz', 'private');
+  await put(raoSib.token, RAO.sib, 'password: siblingsecret99', 'private');
+  await put(alice.token, RAO.shared, 'password: sharedpass77', 'owner');
+  await put(raoPlain.token, RAO.mine, 'password: minepass55', 'private');
+  // The control the scan must match: the memory read refuses both private records to this agent.
+  for (const key of [RAO.secret, RAO.sib]) {
+    const r = await json(`/v1/memory/${encodeURIComponent(key)}?owner_scope=true`, { headers: auth(raoPlain.token) });
+    assert(r.status === 404, `control, ${key} with owner_scope: ${r.status}`);
+  }
+});
+
+await test('SCAN (v76): the agent without memory:read-as-owner gets private records of the owner and a sibling as missing, with the note', async () => {
+  const r = await json('/v1/classification/scan', { method: 'POST', headers: auth(raoPlain.token), body: JSON.stringify({ keys: [RAO.secret, RAO.sib, RAO.none] }) });
+  assert(r.status === 200, `scan: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  assert((r.body.data.classified as any[]).length === 0, `classified: ${JSON.stringify(r.body.data.classified)}`);
+  assert(JSON.stringify([...r.body.data.missing].sort()) === JSON.stringify([RAO.none, RAO.secret, RAO.sib].sort()), `missing: ${JSON.stringify(r.body.data.missing)}`);
+  assert(/memory:read-as-owner/.test(r.body.data.note ?? ''), `note: ${JSON.stringify(r.body.data.note)}`);
+});
+
+await test('SCAN (v76): a prefix leaves the hidden keys out of the queue, on REST and the node MCP, with the note', async () => {
+  const rest = await json('/v1/classification/scan', { method: 'POST', headers: auth(raoPlain.token), body: JSON.stringify({ prefix: 'rao.' }) });
+  const mcp = await nodeTool(raoPlain.mcp, 'aimeat_classification', { action: 'scan', prefix: 'rao.' });
+  assert(!mcp.isError, `node MCP: ${mcp.text.slice(0, 200)}`);
+  for (const [name, out] of [['REST', rest.body?.data], ['node MCP', mcp.payload]] as const) {
+    const queued = [...(out?.queued ?? [])].sort();
+    assert(JSON.stringify(queued) === JSON.stringify([RAO.mine, RAO.shared].sort()), `${name} queued: ${JSON.stringify(out?.queued)}`);
+    assert(/memory:read-as-owner/.test(out?.note ?? ''), `${name} note: ${JSON.stringify(out?.note)}`);
+  }
+});
+
+await test('SCAN, the uses that stay: the agent judges its own and the owner-visible record; the agent with the word and the owner judge everything', async () => {
+  // Judged is what is asserted, not which rule matched: a regex rule under a busy machine's time
+  // budget counts as no match (detect.ts), which is the rules' business, not this one's.
+  const own = await json('/v1/classification/scan', { method: 'POST', headers: auth(raoPlain.token), body: JSON.stringify({ keys: [RAO.mine, RAO.shared] }) });
+  const ownKeys = ((own.body?.data?.classified ?? []) as any[]).map(c => c.key).sort();
+  assert(own.status === 200 && JSON.stringify(ownKeys) === JSON.stringify([RAO.mine, RAO.shared].sort()), `own and owner-visible: ${JSON.stringify(own.body?.data)}`);
+  const word = await json('/v1/classification/scan', { method: 'POST', headers: auth(raoWord.token), body: JSON.stringify({ keys: [RAO.secret, RAO.sib] }) });
+  const wordKeys = ((word.body?.data?.classified ?? []) as any[]).map(c => c.key).sort();
+  assert(word.status === 200 && JSON.stringify(wordKeys) === JSON.stringify([RAO.secret, RAO.sib].sort()) && !word.body.data.note, `the agent with the word: ${JSON.stringify(word.body?.data)}`);
+  const person = await json('/v1/classification/scan', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ prefix: 'rao.' }) });
+  const all = [...(person.body?.data?.queued ?? [])].sort();
+  assert(person.status === 200 && JSON.stringify(all) === JSON.stringify([RAO.mine, RAO.secret, RAO.shared, RAO.sib].sort()) && !person.body.data.note, `the owner: ${JSON.stringify(person.body?.data)}`);
+});
+
+await test('READ-AS-OWNER labels: the owner lowers the two private records\' labels with her reasons, and makes an exception on hers', async () => {
+  const up = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key: RAO.secret, label: 'erittain-luottamuksellinen' }) });
+  assert(up.status === 200, `raise hers first: ${up.status} ${JSON.stringify(up.body?.error)}`);
+  const low = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key: RAO.secret, label: 'sisainen', justification: 'contract with ACME ended' }) });
+  assert(low.status === 200 && low.body.data.label === 'sisainen', `lower hers: ${low.status} ${JSON.stringify(low.body)}`);
+  const sib = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key: RAO.sib, owner: raoSib.gaii, label: 'luottamuksellinen', justification: 'only a draft now' }) });
+  assert(sib.status === 200 && sib.body.data.label === 'luottamuksellinen', `lower the sibling's: ${sib.status} ${JSON.stringify(sib.body)}`);
+  // The rules labelled the other two highly confidential, which this suite hides from AI; at
+  // confidential an AI is told they exist, so the explorer shows what the owner-scope rule decides.
+  for (const [key, owner] of [[RAO.shared, undefined], [RAO.mine, raoPlain.gaii]] as const) {
+    const r = await json('/v1/classification/label', { method: 'PUT', headers: auth(alice.token), body: JSON.stringify({ key, ...(owner ? { owner } : {}), label: 'luottamuksellinen', justification: 'e2e: an AI may know it exists' }) });
+    assert(r.status === 200 && r.body.data.label === 'luottamuksellinen', `lower ${key}: ${r.status} ${JSON.stringify(r.body)}`);
+  }
+  for (const key of [RAO.secret, RAO.shared]) {
+    const e = await json('/v1/classification/exceptions', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key, action: 'leave', reason: `e2e read-as-owner ${key}` }) });
+    assert(e.status === 201, `exception on ${key}: ${e.status} ${JSON.stringify(e.body?.error)}`);
+  }
+});
+
+await test('EXPLORER (v77): the agent without the word does not list private records of the owner or a sibling, on REST and the node MCP, with the note', async () => {
+  const rest = await raoExplorer(raoPlain.token);
+  const mcp = await raoExplorerMcp(raoPlain.mcp);
+  assert(rest.status === 200 && mcp.ok, `explorer: ${rest.status} ${mcp.note.slice(0, 200)}`);
+  for (const [name, out] of [['REST', rest], ['node MCP', mcp]] as const) {
+    const keys = out.keys.filter(k => k?.startsWith('rao.'));
+    assert(!keys.includes(RAO.secret) && !keys.includes(RAO.sib), `${name} lists a hidden record: ${keys.join(', ')}`);
+    assert(keys.includes(RAO.mine) && keys.includes(RAO.shared), `${name} keeps its own and the owner-visible: ${keys.join(', ')}`);
+    assert(/memory:read-as-owner/.test(out.note), `${name} note: ${JSON.stringify(out.note)}`);
+  }
+});
+
+await test('AUDIT and EXCEPTIONS (v77): the owner-level lists leave out the private records for the agent without the word, with the note', async () => {
+  const audit = await json('/v1/classification/audit?level=owner&limit=1000', { headers: auth(raoPlain.token) });
+  const auditKeys = raoKeys(audit.body?.data?.rows);
+  assert(audit.status === 200 && !auditKeys.includes(RAO.secret) && !auditKeys.includes(RAO.sib), `audit: ${auditKeys.filter(k => k?.startsWith('rao.')).join(', ')}`);
+  assert(auditKeys.includes(RAO.shared) && /memory:read-as-owner/.test(audit.body.data.note ?? ''), `audit keeps the owner-visible, with the note: ${JSON.stringify(audit.body.data.note)}`);
+  const ex = await json('/v1/classification/exceptions', { headers: auth(raoPlain.token) });
+  const exKeys = raoKeys(ex.body?.data?.exceptions);
+  assert(ex.status === 200 && !exKeys.includes(RAO.secret) && exKeys.includes(RAO.shared), `exceptions: ${exKeys.filter(k => k?.startsWith('rao.')).join(', ')}`);
+  assert(/memory:read-as-owner/.test(ex.body.data.note ?? ''), `exceptions note: ${JSON.stringify(ex.body.data.note)}`);
+});
+
+await test('LABEL READ (v77): the owner\'s private record reads as an absent one to the agent without the word, with the note', async () => {
+  const hidden = await raoLabel(raoPlain.token, RAO.secret);
+  const absent = await raoLabel(raoPlain.token, RAO.none);
+  assert(hidden.status === 200 && absent.status === 200, `status: ${hidden.status} ${absent.status}`);
+  const shape = (d: any) => JSON.stringify({ label: d.label, source: d.source, locked: d.locked, suggestion: d.suggestion, history: d.history, effective: d.effective?.label, note: d.note });
+  assert(shape(hidden.body.data) === shape(absent.body.data), `hidden ${shape(hidden.body.data)} vs absent ${shape(absent.body.data)}`);
+  assert(!JSON.stringify(hidden.body.data).includes('ACME') && /memory:read-as-owner/.test(hidden.body.data.note ?? ''), `hidden: ${JSON.stringify(hidden.body.data).slice(0, 300)}`);
+  const shared = await raoLabel(raoPlain.token, RAO.shared);
+  assert(shared.status === 200 && shared.body.data.source !== 'default' && !shared.body.data.note, `the owner-visible record keeps its label: ${JSON.stringify(shared.body.data).slice(0, 300)}`);
+});
+
+await test('READ-AS-OWNER, the uses that stay: the owner and the agent with the word see every row, the reasons included', async () => {
+  for (const [name, token] of [['the owner', alice.token], ['the agent with the word', raoWord.token]] as const) {
+    const ex = await raoExplorer(token);
+    assert(ex.status === 200 && [RAO.secret, RAO.sib, RAO.shared, RAO.mine].every(k => ex.keys.includes(k)) && !ex.note, `${name} explorer: ${ex.keys.filter(k => k?.startsWith('rao.')).join(', ')} ${ex.note}`);
+    const audit = await json('/v1/classification/audit?level=owner&limit=1000', { headers: auth(token) });
+    assert(raoKeys(audit.body?.data?.rows).includes(RAO.secret) && !audit.body.data.note, `${name} audit`);
+    const exc = await json('/v1/classification/exceptions', { headers: auth(token) });
+    assert(raoKeys(exc.body?.data?.exceptions).includes(RAO.secret) && !exc.body.data.note, `${name} exceptions`);
+    const read = await raoLabel(token, RAO.secret);
+    assert(read.status === 200 && read.body.data.label === 'sisainen' && JSON.stringify(read.body.data.history).includes('ACME') && !read.body.data.note, `${name} label read: ${JSON.stringify(read.body?.data).slice(0, 300)}`);
+  }
 });
 
 // ─── Cleanup ───

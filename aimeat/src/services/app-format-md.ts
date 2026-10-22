@@ -24,9 +24,13 @@
  *   string is taken too). Anything else, a refusal, a timeout or a result past the 256 KB face cap,
  *   is logged and answers null, and the node serves what it served before: the stored face or the
  *   converted HTML. The caller's per-version cache bounds how often an anonymous GET starts a sandbox.
- * @structure withoutComments(text) · parseFormatMdMeta(html) · formatMdRefusal(storage, ownerName, decl) · renderAppMarkdown(deps, app)
+ * @structure withoutComments(text) · parseFormatMdMeta(html) · formatMdRefusal(storage, ownerName, decl) ·
+ *   formatMdDelegateRefusal(opts) · renderAppMarkdown(deps, app)
  * @usage const md = await renderAppMarkdown({ storage, config }, app); // string or null
  * @version-history
+ *   v1.1.0 — 2026-10-22 — formatMdDelegateRefusal(): a developer of another account may republish or
+ *     remove the declaration the live version has, and only the full right may add one or change
+ *     which extension or action it names (secaudit 2026-10, r54).
  *   v1.0.1 — 2026-10-03 — parseFormatMdMeta() takes comments out with withoutComments(), as a browser
  *     reads them, including one that never closes; the regex strip could leave a `<!--` behind
  *     (CodeQL alert 1696).
@@ -92,6 +96,32 @@ export async function formatMdRefusal(storage: Storage, ownerName: string, decl:
     return `the extension "${decl.extension}" has no action "${decl.action}" (it has: ${ext.actions.map(a => a.id).join(', ') || 'none'})`;
   }
   return null;
+}
+
+/**
+ * Why a developer of another account, publishing the owner's app under a development right, may not
+ * publish this declaration; null when they may.
+ *
+ * WHY. The node runs the named action unattended in the OWNER's name for every reader
+ * (renderAppMarkdown below): the owner's file reach, the owner's extension settings, no paywall. Which
+ * action that is, is the owner's choice. Without this rule a developer holding the publisher right
+ * named any action of any extension the owner installed, and anonymous readers got its output
+ * (secaudit 2026-10, r54). Every delegate may still republish the declaration the live version has,
+ * since that is the owner's own choice carried forward, and may remove it, since that only stops a
+ * run in the owner's name. The full right (the `operate` act) covers choosing it, as it covers
+ * bundled agents and app tools. The owner in person and the owner's own agents never reach here.
+ */
+export function formatMdDelegateRefusal(opts: {
+  ownerName: string; decl: FormatMdDeclaration | null; live?: FormatMdDeclaration | null; mayOperate: boolean;
+}): string | null {
+  const { ownerName, decl, live, mayOperate } = opts;
+  if (!decl || mayOperate) return null;
+  if (live && live.extension === decl.extension && live.action === decl.action) return null;
+  const keep = live
+    ? `keep the aimeat-format-md line as the live version has it (content="/v1/ext/${live.extension}/${live.action}") or leave it out`
+    : 'leave the aimeat-format-md line out';
+  return `Only ${ownerName} chooses which of their extension actions answers ?format=md for this app, because the node runs that action in their name for every reader. `
+    + `To publish this version, ${keep}. To make the change, ask ${ownerName} to publish a version with the line themselves, or to give you the full development right on this app.`;
 }
 
 /** The markdown the app's own action returns, or null when it has none to give right now. */

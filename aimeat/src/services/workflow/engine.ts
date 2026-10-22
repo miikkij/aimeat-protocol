@@ -117,6 +117,7 @@
  *     before every dispatch: gone, or short of a word the step costs, and the step is not dispatched
  *     and the run ends refused (dispatch-authority.ts; secaudit 2026-10, v64). resumeInflight's body
  *     moved unchanged to engine-resume.ts (max-file-lines).
+ *   v1.23.0 — 2026-10-22 — An answer whose write was refused turns its step red, and the owner is told as for any failed step (secaudit 2026-10, r66).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -764,6 +765,7 @@ export class WorkflowEngine {
         picks: answer.picks, pick: answer.picks[0] ?? '', other: answer.other,
         by: answer.by, byIsHuman: answer.byIsHuman,
       });
+      if (run.steps[stepId]?.state === 'output-red') await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       await this.tick(ownerGhii, run);
       logger.info(`workflow ${workflowId} run ${runId}: step "${stepId}" answered by ${answer.by}`);
       return { ok: true as const };

@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.11.0 — 2026-10-22 — knowledge_links.ownerGaii, keyed on (ownerGaii, source, target), for a fresh
+ *     database; schema-knowledge-links.ts rebuilds an existing table (secaudit 2026-10, v78).
  *   v1.10.0 — 2026-10-20 — extensions.unattendedReadAuthority for a fresh database (Jouni, 2026-10-20).
  *   v1.9.0 — 2026-10-20 — extensions.installedByPrincipal for a fresh database
  *     (schema-columns-extensions.ts adds it to an existing one).
@@ -25,6 +27,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from sqlite/schema.ts (max-file-lines)
  */
 import type Database from 'better-sqlite3';
+import { keyKnowledgeLinksByOwner } from './schema-knowledge-links.js';
 
 export function applySchemaTables2(db: Database.Database): void {
   db.exec(`
@@ -403,14 +406,17 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_app_purchases_app ON app_purchases(sellerGaii, appFilename);
 
     -- ── Knowledge System: Memory Links ──
+    -- ownerGaii: the namespace that holds the source manifest; '' for a row written before it
+    -- (schema-knowledge-links.ts rebuilds an older table, services/knowledge-link-owner-keep.ts places it).
     CREATE TABLE IF NOT EXISTS knowledge_links (
+      ownerGaii   TEXT NOT NULL DEFAULT '',
       source      TEXT NOT NULL,
       target      TEXT NOT NULL,
       relation    TEXT NOT NULL,
       description TEXT NOT NULL,
       linked_at   TEXT NOT NULL,
       linked_by   TEXT NOT NULL,
-      PRIMARY KEY (source, target)
+      PRIMARY KEY (ownerGaii, source, target)
     );
     CREATE INDEX IF NOT EXISTS idx_klinks_source ON knowledge_links(source);
     CREATE INDEX IF NOT EXISTS idx_klinks_target ON knowledge_links(target);
@@ -699,4 +705,6 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_eco_automation_recipes_owner ON eco_automation_recipes(owner);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_eco_automation_recipes_owner_app ON eco_automation_recipes(owner, app);
   `);
+  // A knowledge_links table made before ownerGaii is rebuilt with it, once (mirrors Postgres 0114).
+  keyKnowledgeLinksByOwner(db);
 }

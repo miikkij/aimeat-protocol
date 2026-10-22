@@ -12,6 +12,7 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-10-22 — handsOnKey takes the CallerContext and answers by the owner-scope read rule: the full union for the owner in person, an app grant and an agent holding memory:read-as-owner; for any other same-owner caller its own namespace plus the records a same-owner reader may see; for an ecosystem app or a visitor its own namespace only. The organism rule applies, the rows are newest first, and the REST route calls it too (secaudit 2026-10, v88).
  *   2026-10-18 — The map carries the optional `invites` statement through a write, and every read and write checks the map against the app's declared scopes (declaredScopesOf), so an app asking for organism:invite whose map does not say it invites people has the finding DATAMAP_INVITES_UNSTATED. putProgramMap answers the findings too (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-16 — readProgramMap answers the map of an app an operator hid, an app behind an access code, an unlisted app or a community-listed app only to a caller who may see that app (the owner's account, an operator, and for a community listing any signed-in member of this node); everyone else gets the 404 of an app that does not exist. The caller 'node' is the node's own check (decide service) and passes. (QA audit list review).
  *   v2.1.2 — 2026-09-26 — readProgramMap takes the owner's account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
@@ -34,6 +35,10 @@ import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor, type MapCheck } from './data-map-check.js';
 import { DATA_MAP_SPEC, type DataMap, type DataMapStamp, type InvitesStatement } from './data-map-types.js';
 import { parseAppScopes } from '../protected-resource.js';
+import type { CallerContext } from '../caller-context.js';
+import { readsAsOwner, visibleToSameOwnerReader, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
+import { organismReadableRecords } from '../organism-namespace-access.js';
+import { ecoMayReadKey } from '../ecosystem-access.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -292,6 +297,12 @@ export interface HandsAnswer {
     firstAt: string; lastAt: string; namespace: string;
   }[];
   notCovered: string[];
+  /**
+   * What this caller's answer leaves out, for a caller that does not read every record of the owner.
+   * Given on every such answer, not only when rows were left out, so its presence says nothing about
+   * whether a hidden record exists.
+   */
+  note?: string;
 }
 
 /** Said the same way wherever a tally number is rendered. */
@@ -300,22 +311,66 @@ export const HANDS_NOT_COVERED = [
   'It counts what came in through a door somebody was behind. AIMEAT also writes to your store on its own, and that is not a hand.',
 ];
 
+/** The note of an answer that covers only the caller's own records: an ecosystem app or a visitor. */
+export const HANDS_OWN_ONLY_NOTE = 'This answer covers the records this app or session keeps itself. '
+  + 'The account owner sees the hands on every record of the account.';
+
+/** The caller facts the tally needs: services/caller-context.ts, from callerOf(req) or the MCP session. */
+export type HandsCaller = Pick<CallerContext, 'principal' | 'owner' | 'kind' | 'inPerson' | 'visitor' | 'has' | 'auth' | 'principalView'>;
+
 /**
  * How many hands have been on one key.
  *
  * OWNER SCOPE, because a namespace is not an account. An agent writing its own copy of a key lands
  * under the AGENT, so an owner asking about their own key would otherwise be told nobody had touched
  * it while their agent was writing it every minute.
+ *
+ * THE SAME READ RULE AS GET /v1/memory/:key?owner_scope=true (routes/memory/key.ts) and MCP
+ * aimeat_memory_read. The tally holds no visibility, so until 2026-10-22 an agent without
+ * memory:read-as-owner and an ecosystem app learned that the owner or a sibling agent kept a private
+ * record under a key, who wrote it and when, while every read path answered that record as absent
+ * (secaudit 2026-10, v88). Now:
+ *   - the owner in person, an app grant and an agent holding memory:read-as-owner get every namespace
+ *     of the owner, as before (owner-scope-read.ts readsAsOwner);
+ *   - any other same-owner caller gets its own namespace, and another namespace's rows only while that
+ *     namespace's record of the key is one a same-owner reader may see (owner, members or public
+ *     visibility); a hidden or deleted record of another namespace answers as an absent one;
+ *   - an ecosystem app and a session from another node get their own namespace only, because the
+ *     owner-scope read excludes both (an ecosystem app is fenced to its granted data areas, and a
+ *     visitor's account name is the local part of an account on another node);
+ *   - the organism rule applies to an `organism.` key outside the caller's own namespace, as on
+ *     the read paths (organismReadableRecords, secaudit 2026-10, v57).
  */
 export async function handsOnKey(
-  storage: Storage, config: AimeatConfig, caller: DataMapCaller, key: string,
+  storage: Storage, config: AimeatConfig, caller: HandsCaller, key: string,
 ): Promise<HandsAnswer> {
-  const ownerGhii = `${caller.ownerName}@${config.nodeId}`;
-  const agents = await storage.getAgentsByOwner(caller.ownerName);
-  const namespaces = [...new Set([ownerGhii, caller.principal, ...agents.map(a => a.gaii)])];
+  const ownOnly = caller.kind === 'ecosystem' || caller.visitor;
+  let namespaces: string[];
+  if (ownOnly) {
+    // An ecosystem app's organism key needs a granted read area, as on GET /v1/memory/:key.
+    namespaces = caller.kind === 'ecosystem' && !(await ecoMayReadKey(storage, caller.auth.sub, key))
+      ? [] : [caller.principal];
+  } else {
+    const ownerGhii = `${caller.owner}@${config.nodeId}`;
+    const agents = await storage.getAgentsByOwner(caller.owner);
+    namespaces = [...new Set([ownerGhii, caller.principal, ...agents.map(a => a.gaii)])];
+  }
+  const all = !ownOnly && readsAsOwner(caller);
+  const organismOpen = ownOnly
+    || (await organismReadableRecords({ storage, config }, caller, [{ key }])).length > 0;
+  const shown = await Promise.all(namespaces.map(async (ns) => {
+    if (ns === caller.principal) return true;
+    if (!organismOpen) return false;
+    if (all) return true;
+    const record = await storage.getMemory(ns, key);
+    return !!record && visibleToSameOwnerReader(record, caller.principal);
+  }));
   const rows = (await Promise.all(
-    namespaces.map(ns => storage.listMemoryWriteTally({ ownerGaii: ns, key })),
+    namespaces.filter((_, i) => shown[i]).map(ns => storage.listMemoryWriteTally({ ownerGaii: ns, key })),
   )).flat();
+  // Each namespace query is ordered on its own; the merged list is newest first, as the contract
+  // states (feature-list audit #50).
+  rows.sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''));
 
   return {
     key,
@@ -324,5 +379,6 @@ export async function handsOnKey(
       firstAt: r.firstAt, lastAt: r.lastAt, namespace: r.ownerGaii,
     })),
     notCovered: HANDS_NOT_COVERED,
+    ...(ownOnly ? { note: HANDS_OWN_ONLY_NOTE } : all ? {} : { note: READ_AS_OWNER_NOTE }),
   };
 }

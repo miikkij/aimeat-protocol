@@ -197,6 +197,19 @@
       "verification": "behavior-tested",
       "decision": "existing-contract"
     },
+    "WorkspaceRowRevision.createdBy": {
+      "role": "authorship",
+      "current": "Kept, with createdBy, updatedBy and replacedBy rewritten to the erasure's pseudonym by the owner cascade on both providers (src/storage/erased-account-records.ts, action pseudonymise), as WorkspaceRow.createdBy is. A revision also ages out after the space's retention window or 30 days (services/workspace-rows/row-revisions.ts).",
+      "reason": "A revision is an earlier content of a workspace row, which belongs to the organism and its other members like the row itself (secaudit 2026-10, v80).",
+      "evidence": [
+        "src/storage/erased-account-records.ts",
+        "src/storage/providers/postgres-kysely/methods/account-records-erasure.ts",
+        "src/storage/providers/sqlite/repos/account-records-erasure.ts"
+      ],
+      "test": "test/unit/account-records-erasure.test.ts",
+      "verification": "behavior-tested",
+      "decision": "existing-contract"
+    },
     "ComponentVersion.createdBy": {
       "role": "history",
       "current": "Kept, with the column rewritten to the erasure's pseudonym by the owner cascade on both providers (src/storage/erased-account-records.ts, action pseudonymise), so the next holder of the name reads none of it.",

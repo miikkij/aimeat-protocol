@@ -13,6 +13,9 @@
  *   payload → message → conversation → delivery log → contact consent.
  * @usage import type { DirectMessageRecord } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-10-22 — DirectMessageAttachment.version: the sent file's createdAt, so a copy or a
+ *     storage grant serves only the version that was sent (secaudit 2026-10 wave 3, v82). Stored in
+ *     the attachments JSON column, so neither provider needs a migration.
  *   v1.1.0 — 2026-10-17 — DirectMessageRecord.sentByAgent / sentByAgentName: the agent that sent a
  *     message in its owner's name.
  *   v1.0.0 — 2026-08-23 — Extracted from agents-messaging.ts (max-file-lines), when
@@ -42,6 +45,13 @@ export interface DirectMessageAttachment {
   localKey?: string;
   /** Set when a held (reference) attachment was never duplicated within the retry TTL and was dropped. */
   expired?: boolean;
+  /**
+   * The sent file's `createdAt` at the send, stamped by the sending node from its own storage: the
+   * one version a copy or a storage grant may serve. Every write under a key rewrites createdAt, so a
+   * file replaced after the send no longer matches. Absent on attachments stored before 2026-10-22,
+   * which are bound to the message's own createdAt instead (attachment-duplication.ts isSentVersion).
+   */
+  version?: string;
   mime: string;
   size: number;
   /** Original filename / caption. */

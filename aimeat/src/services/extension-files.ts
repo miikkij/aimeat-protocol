@@ -32,7 +32,15 @@
  *   never gets to say where its bytes land. Handing an extension a free choice of root would undo
  *   the one rule that keeps an installed extension off the owner's own files, so `keyPrefix` is set
  *   by the factory's caller and is never read from anything the guest supplies.
- * @structure MAX_FILE_BYTES · parseRef · makeExtensionFiles (the ctx.files factory)
+ *
+ *   A PUBLIC WRITE MEETS WHAT AN UPLOAD MEETS. With `publishers` (services/publish-actors.ts), a
+ *   write asked as public takes the closed node's level, the label's audience cap and the node's
+ *   publish gate, as writeStorageFile does for an upload: a principal the owner is asked about gets
+ *   the file stored at the level it had (a new one: private), a request filed, and `publishRequest`
+ *   in the answer; the same url opens for everyone once the owner approves. An agent without
+ *   publish:public made a file public at its own or the owner's address through an extension it
+ *   installed (secaudit 2026-10, v69).
+ * @structure MAX_FILE_BYTES · parseRef · publicFileLevel · makeExtensionFiles (the ctx.files factory)
  * @usage const files = makeExtensionFiles({ config, storage, callerGaii, extName });
  *   const ctx: ExtensionCtx = { …, files };
  *   // unattended: the owner's namespace, the installer's reach
@@ -40,6 +48,9 @@
  *     readerGaii: installer.gaii, readerOwner: installer.owner,
  *     readerRoles: installer.roles, readerScopes: installer.scopes });
  * @version-history
+ *   v1.6.0 — 2026-10-22 — `publishers`: a public write takes the closed node's level, the label's
+ *     audience cap and the publish gate, as an upload does, and answers `visibility` and, when making
+ *     it public waits for the owner, `publishRequest` (secaudit 2026-10, v69).
  *   v1.5.0 — 2026-10-20 — `narrowedNote`: a refusal caused by the owner's own setting says so and
  *     says where to change it, so a narrowing never reads as a fault (Jouni, 2026-10-20).
  *   v1.4.0 — 2026-10-20 — `readerGaii`, `readerOwner`, `readerRoles` and `readerScopes`: a read is
@@ -61,7 +72,12 @@
  *     who the caller is; without them the caller reads as an unattended run.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, StorageFileRecord } from '../storage/interface.js';
+import type { PublishRequester } from './publish-requests/store.js';
+import type { ClosedNodeWarning } from './closed-node-level.js';
+import { closedFileLevel, fileCapRefusal, keptFileLevel, fileFilePublishRequest } from './storage-file-publish.js';
+import { isRaiseToPublic } from './publish-gate.js';
+import { askActors, type PublishActor } from './publish-actors.js';
 import { authorizeRead } from './access-guard.js';
 import { parseFileRef } from './file-refs.js';
 import { checkStorageQuota } from './quota.js';
@@ -86,6 +102,44 @@ export interface ExtensionFileRef {
  * Kept as a named export here (the sandbox's vocabulary) over the shared implementation.
  */
 export const parseRef = parseFileRef;
+
+/** Where a sandbox write lands: its level, and who the owner is asked for when publishing it waits. */
+interface WriteLevel {
+    visibility: StorageFileRecord['visibility'];
+    groupId: string | undefined;
+    workspaceRef: string | undefined;
+    requester: PublishRequester | null;
+    warning: ClosedNodeWarning | null;
+}
+
+/**
+ * The level a sandbox write stores a file at: what writeStorageFile decides for an upload
+ * (services/storage-file-write.ts), asked about the run's publishers. A private write is unchanged. A
+ * public one is stored at 'members' on a node that shows its content to signed-in accounts only, is
+ * refused past its label's audience cap, and, when it raises the file to public for a principal the
+ * owner is asked about, is stored at the level the file had (a new one: private) with the requester
+ * the request is filed for. A refusal throws, as every refusal in the sandbox does.
+ */
+async function publicFileLevel(
+    ctx: { storage: Storage; config: AimeatConfig }, ownerGaii: string, key: string, asked: 'public' | 'private',
+    publishers: readonly PublishActor[],
+): Promise<WriteLevel> {
+    const plain: WriteLevel = { visibility: asked, groupId: undefined, workspaceRef: undefined, requester: null, warning: null };
+    if (asked !== 'public') return plain;
+    const closed = await closedFileLevel(ctx, ownerGaii, key, 'public' as const);
+    const first = publishers[0];
+    const capped = first
+        ? await fileCapRefusal(ctx, ownerGaii, key, closed.visibility, undefined, { caller: first.caller, ...(first.app ? { app: first.app } : {}) })
+        : null;
+    if (capped) throw new Error(`${capped.code}: ${capped.message}`);
+    if (closed.visibility !== 'public') return { ...plain, visibility: closed.visibility, warning: closed.warning };
+    const existing = await ctx.storage.getStorageFileMeta(ownerGaii, key);
+    if (!isRaiseToPublic(existing?.visibility, 'public')) return plain;
+    const ask = askActors(ctx, publishers);
+    if (ask.kind === 'refused') throw new Error(`${ask.code}: ${ask.message}`);
+    if (ask.kind === 'allowed') return plain;
+    return { ...keptFileLevel(existing), requester: ask.requester, warning: null };
+}
 
 export function makeExtensionFiles(deps: {
     config: AimeatConfig;
@@ -125,10 +179,19 @@ export function makeExtensionFiles(deps: {
      * road that derives the whole key itself — see the file header.
      */
     keyPrefix?: string;
+    /**
+     * The principals the node's publish gate is asked about when a write makes a file public
+     * (services/publish-actors.ts): the caller of an attended action, the installer of an unattended
+     * one. Absent asks nothing, as before.
+     */
+    publishers?: readonly PublishActor[];
 }): {
     read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string; classificationWarning?: ExtensionFileWarning } | null>;
     write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
-        Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
+        Promise<{
+            key: string; gaii: string; owner: string; url: string; size: number; visibility: string;
+            publishRequest?: unknown; warnings?: Array<{ code: string; message: string }>;
+        }>;
 } {
     const { config, storage, callerGaii, callerOwner, extName } = deps;
     const keyPrefix = deps.keyPrefix ?? `ext/${extName}/`;
@@ -214,17 +277,26 @@ export function makeExtensionFiles(deps: {
             const quota = await checkStorageQuota(config, storage, callerGaii, data.length);
             if (!quota.allowed) throw new Error(quota.reason ?? 'storage quota exceeded');
 
-            const visibility = opts?.visibility === 'public' ? 'public' : 'private';
-            await storage.createStorageFile({
+            const asked = opts?.visibility === 'public' ? 'public' : 'private';
+            // A public write meets what an upload meets (services/storage-file-write.ts): the closed
+            // node's level, the label's audience cap and the publish gate, asked about `publishers`.
+            const level: WriteLevel = deps.publishers
+                ? await publicFileLevel({ storage, config }, callerGaii, full, asked, deps.publishers)
+                : { visibility: asked, groupId: undefined, workspaceRef: undefined, requester: null, warning: null };
+            const file = await storage.createStorageFile({
                 key: full,
                 ownerGaii: callerGaii,
-                visibility,
+                visibility: level.visibility,
+                ...(level.groupId ? { groupId: level.groupId } : {}),
+                ...(level.workspaceRef ? { workspaceRef: level.workspaceRef } : {}),
                 mimeType: opts?.mime || 'application/octet-stream',
                 size: data.length,
                 data,
                 tags: [`ext:${extName}`],
                 createdAt: new Date().toISOString(),
             });
+            // The request the gate asked for, now that the file it names exists.
+            const filed = level.requester ? await fileFilePublishRequest({ storage, config }, level.requester, file) : null;
             return {
                 key: full,
                 gaii: callerGaii,
@@ -233,8 +305,13 @@ export function makeExtensionFiles(deps: {
                 // wants to hand the address on cannot work it out from anything else it holds.
                 owner: callerGaii,
                 // Only meaningful for a public file; a private one is fetched with the owner's token.
+                // A file whose publishing waits for the owner opens at this address once approved.
                 url: `${config.baseUrl}/v1/pub/${encodeURIComponent(callerGaii)}/${full.split('/').map(encodeURIComponent).join('/')}`,
                 size: data.length,
+                visibility: level.visibility,
+                ...(filed?.ok ? { publishRequest: filed.publishRequest } : {}),
+                ...(filed && !filed.ok ? { warnings: [filed.warning] } : {}),
+                ...(level.warning ? { warnings: [level.warning] } : {}),
             };
         },
     };

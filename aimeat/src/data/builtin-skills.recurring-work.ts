@@ -219,7 +219,7 @@ sees every schedule and can pause or delete any of them.
 
 | kind | Fields | The caller needs |
 |---|---|---|
-| \`ai\` | \`prompt\`, \`input_keys\` (the owner's memory keys given to the model), \`output_key\` (where the result is written, private) | \`ai:use\` |
+| \`ai\` | \`prompt\`, \`input_keys\` (the owner's memory keys given to the model), \`output_key\` (where the result is written, private) | \`ai:use\`; an owner's or another agent's private record also needs \`memory:read-as-owner\` |
 | \`agent_task\` | \`target_agent\` (an agent of the same owner; yourself when left out), \`task_title\`, \`task_description\` | \`task:write\` |
 | \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | \`ext:invoke\` |
 | \`refinery\` | \`input: { prefix }\` | \`connections:read-through\`, \`ai:use\`, \`organism:rows\`, \`memory:write\` |

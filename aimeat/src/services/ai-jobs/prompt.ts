@@ -21,9 +21,12 @@
  *   `prompt_key` or an `input_keys` entry naming a credential record or a key the node acts on is
  *   refused before the first read (services/ai-job-keys.ts). The start refuses it too; this is the
  *   read itself, which a restart reaches without passing the start.
- * @structure assembleJobPrompt(deps, reader, ownerGhii, spec) → string (throws RESERVED_KEY, AI_JOB_PROMPT_TOO_LARGE)
- * @usage const prompt = await assembleJobPrompt({ storage, config }, reader, ownerGhii, job);
+ * @structure assembleJobPrompt(deps, reader, ownerGhii, spec, viewer?) → string (throws RESERVED_KEY, SCOPE_DENIED, AI_JOB_PROMPT_TOO_LARGE)
+ * @usage const prompt = await assembleJobPrompt({ storage, config }, reader, ownerGhii, job, jobReadViewer(job));
  * @version-history
+ *   v1.3.0 -- 2026-10-22 -- `viewer`: a prompt_key or input key naming a record the owner or a
+ *     sibling agent keeps private is refused 403 SCOPE_DENIED with READ_AS_OWNER_NOTE for a starter
+ *     that does not read as the owner (secaudit 2026-10, r49).
  *   v1.2.0 — 2026-09-29 — The records are read through readAiRecords (services/ai-inputs.ts) with a
  *     classification reader: the owner scope as before, plus the credential mask and useForAi
  *     (TARGET-082). assembleJobPrompt takes the reader.
@@ -38,6 +41,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { readAiRecords } from '../ai-inputs.js';
+import { AiInputHiddenError, type AiReadViewer } from '../ai-read-viewer.js';
 import type { ContentReader } from '../classification/reader.js';
 import { AiJobError } from './types.js';
 
@@ -62,6 +66,7 @@ export async function assembleJobPrompt(
     reader: ContentReader,
     ownerGhii: string,
     spec: PromptSpec,
+    viewer?: AiReadViewer,
 ): Promise<string> {
     const { config } = deps;
 
@@ -69,9 +74,17 @@ export async function assembleJobPrompt(
     if (kept) throw new AiJobError(kept.code, kept.status, kept.message);
 
     // The one loader of what a model reads (services/ai-inputs.ts): owner scope, the credential mask
-    // and the classification check, before the model is called.
-    const readOwnerRecord = async (key: string): Promise<unknown | undefined> =>
-        (await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' }))[0]?.value;
+    // and the classification check, before the model is called. With a viewer (starter.ts
+    // jobReadViewer), a same-owner record it may not read refuses the job here, with the permission
+    // that would admit it, instead of reaching the model.
+    const readOwnerRecord = async (key: string): Promise<unknown | undefined> => {
+        try {
+            return (await readAiRecords(deps, reader, ownerGhii, [{ key }], { capability: 'text' }, viewer))[0]?.value;
+        } catch (err) {
+            if (err instanceof AiInputHiddenError) throw new AiJobError(err.code, err.status, err.message);
+            throw err;
+        }
+    };
 
     let prompt = typeof spec.prompt === 'string' ? spec.prompt : '';
 

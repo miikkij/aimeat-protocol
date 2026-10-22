@@ -11,6 +11,9 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.10.0 — 2026-10-22 — Each attachment of this node records the version that was sent (the held
+ *     file's createdAt, DirectMessageAttachment.version), read from the same metadata the holder
+ *     check already reads (secaudit 2026-10 wave 3, v82).
  *   v1.9.0 — 2026-10-17 — sentByAgent / sentByAgentName: the agent that sends in the sender's name is
  *     written on every copy, named in the recipient's bell and carried to another node
  *     (services/message-send-as-owner.ts).
@@ -150,13 +153,18 @@ async function resolveAttachmentHolders(
   for (const att of attachments) {
     if (att.mode === 'duplicate' || att.originNodeId !== nodeId) { resolved.push(att); continue; }
     let holder: string | undefined;
+    let version: string | undefined;
     for (const who of holders) {
       // Metadata only: the bytes are not needed to answer "does this exist", and a 30 MB video read
       // into memory once per recipient of a broadcast is a different kind of defect.
-      if (await storage.getStorageFileMeta(who, att.storageKey)) { holder = who; break; }
+      const meta = await storage.getStorageFileMeta(who, att.storageKey);
+      if (meta) { holder = who; version = meta.createdAt; break; }
     }
     if (!holder) { missing.push(att.name || att.storageKey); continue; }
-    resolved.push(holder === att.ownerGhii ? att : { ...att, ownerGhii: holder });
+    // The version that is sent: the file's createdAt now. A copy or a storage grant later serves this
+    // version or nothing, so a file written under the same key after the send never reaches the
+    // recipient (secaudit 2026-10 wave 3, v82).
+    resolved.push({ ...att, ownerGhii: holder, version });
   }
 
   return { attachments: resolved, missing };

@@ -29,6 +29,8 @@
  *   import { accountEventsRouter } from './routes/account-events.js';
  *   app.use(accountEventsRouter(config, storage));
  * @version-history
+ *   v1.3.1 — 2026-10-22 — The two reads project for accountEventReader: an app grant that existed before v1.3.0, held memory:read and not task:read, keeps the title and reason while its token covers what it held then (services/account-event-task-keep.ts; the developer's ruling, 2026-10-22).
+ *   v1.3.0 — 2026-10-22 — The two reads project each row for the caller (services/account-event-view.ts): a task row's title and decline reason reach only the owner in person, an app grant holding task:read and the task's own agent, as on GET /v1/agents/:name/tasks. Every other reader keeps the row with its kind, time, link and agent name, its `withheld` fields named, and a `note` on the answer (secaudit 2026-10, v89).
  *   v1.2.0 — 2026-09-24 — An app's event link is checked by safeRedirectPath, so a link a browser
  *     reads as another site (`/\host`, a tab or a line break inside) is dropped.
  *   v1.1.0 — 2026-08-17 — Moved to /v1/account/events. /v1/events belongs to the SSE stream and
@@ -46,6 +48,9 @@ import {
   recordAccountEvent, readAccountEvents, readAccountEventArchive, windowSize,
 } from '../services/account-events.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
+import { callerOf } from '../middleware/caller.js';
+import { projectAccountEvents, TASK_CONTENT_NOTE } from '../services/account-event-view.js';
+import { accountEventReader } from '../services/account-event-task-keep.js';
 
 /** A kind an app may spell: lower-case, short, no separators that would break the namespace. */
 const APP_KIND = /^[a-z][a-z0-9_]{1,39}$/;
@@ -128,13 +133,17 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
   router.get('/v1/account/events', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const limit = Number(req.query.limit);
-    const events = await readAccountEvents(storage, ownerGhii, {
+    // Each row as this reader may see it: a task's title and reason only for the readers the task
+    // route admits (services/account-event-view.ts, secaudit 2026-10, v89).
+    // An app grant that existed before that rule keeps reading them (services/account-event-task-keep.ts).
+    const { rows: events, withheld } = projectAccountEvents(await readAccountEvents(storage, ownerGhii, {
       limit: Number.isFinite(limit) ? limit : undefined,
-    }, config);
+    }, config), await accountEventReader(callerOf(req, config.nodeId, storage), req.auth!, storage, config.nodeId));
     res.json(success(config.nodeId, {
       events,
       count: events.length,
       window: windowSize(config),
+      ...(withheld ? { note: TASK_CONTENT_NOTE } : {}),
     }, [
       { description: 'Everything older than the window', method: 'GET', url: '/v1/account/events/archive' },
     ]));
@@ -150,7 +159,7 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const limit = Number(req.query.limit);
     const offset = Number(req.query.offset);
-    const [events, total] = await Promise.all([
+    const [archived, total] = await Promise.all([
       readAccountEventArchive(storage, ownerGhii, {
         limit: Number.isFinite(limit) ? limit : 50,
         offset: Number.isFinite(offset) ? offset : 0,
@@ -159,7 +168,12 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
       }),
       storage.countAccountEventArchive(ownerGhii),
     ]);
-    res.json(success(config.nodeId, { events, count: events.length, total }));
+    // The same projection as the window above (secaudit 2026-10, v89).
+    const { rows: events, withheld } = projectAccountEvents(archived,
+      await accountEventReader(callerOf(req, config.nodeId, storage), req.auth!, storage, config.nodeId));
+    res.json(success(config.nodeId, {
+      events, count: events.length, total, ...(withheld ? { note: TASK_CONTENT_NOTE } : {}),
+    }));
   });
 
   return router;

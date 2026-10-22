@@ -499,8 +499,29 @@ export interface WorkspaceRow {
   createdAt: string;
   updatedAt: string;
   createdBy: Generated<string>;
+  /** Migration 0120: the last writer. NULL on a row written before it, read as createdBy. */
+  updatedBy: string | null;
   body: Generated<unknown>;
   bytes: Generated<number>;
+}
+
+/** Migration 0120: a row's earlier content, kept when a writer of another family replaced it. */
+export interface WorkspaceRowRevision {
+  revisionId: string;
+  organismId: string;
+  wsId: string;
+  namespace: string;
+  rowId: string;
+  id: string;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: Generated<string>;
+  updatedBy: Generated<string>;
+  body: Generated<unknown>;
+  bytes: Generated<number>;
+  replacedAt: string;
+  replacedBy: Generated<string>;
 }
 
 /** TARGET-080 (migration 0079). `record` is the aimeat.decision/v1 document. The rule columns are
@@ -1328,6 +1349,7 @@ export interface EcosystemApp {
   automation: Json | null;
   boundRef: string | null;
   capabilities: Json | null;
+  capabilityApprovals: Generated<string>;
   createdAt: Generated<Timestamp>;
   dataAreas: Json | null;
   description: string | null;
@@ -1613,6 +1635,7 @@ export interface KnowledgeLink {
   id: Generated<string>;
   linkedAt: Generated<Timestamp>;
   linkedBy: string;
+  ownerGaii: Generated<string>;
   relation: string;
   source: string;
   target: string;
@@ -2363,6 +2386,7 @@ export interface DB {
   MemoryFamilyTally: MemoryFamilyTally;
   AccountEventArchive: AccountEventArchive;
   WorkspaceRow: WorkspaceRow;
+  WorkspaceRowRevision: WorkspaceRowRevision;
   SsoConnection: SsoConnection;
   McpServer: McpServer;
   AiProvenance: AiProvenance;

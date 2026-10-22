@@ -6,6 +6,9 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-22 — The clone's derived-from link is a row of the cloner's namespace, and its
+ *     linked_by is the cloner's full identity rather than the bare account name (secaudit 2026-10, v78
+ *     and v79).
  *   v1.7.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, the sharing PATCH
  *     asked to list the package stores the audience 'members' (unlisted) and the entry PATCH asked
  *     public stores 'members', each with the warning PUBLIC_IS_SIGNED_IN_HERE, before the publish
@@ -313,15 +316,17 @@ export function registerSharingRoutes(
       updatedAt: now,
     });
 
-    // Create derived-from link
+    // Create derived-from link: a row of the cloner's namespace, which holds the cloned manifest, by the
+    // cloner's account in its full identity (secaudit 2026-10, v78 and v79). The manifest's author
+    // field above keeps requesterGhii as it was.
     await storage.createLink({
       source: `packages/${newPackageId}/manifest`,
       target: sourceManifestKey,
       relation: 'derived-from',
       description: `Cloned from ${manifest.name}`,
       linked_at: now,
-      linked_by: requesterGhii,
-    });
+      linked_by: callerOf(req, config.nodeId, storage).ownerGhii,
+    }, requesterGaii);
 
     res.status(201).json(success(config.nodeId, {
       cloned_package_id: newPackageId,

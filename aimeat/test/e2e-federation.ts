@@ -4,6 +4,10 @@
  *   trust advisories and the node's own federation surface.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
  * @version-history
+ *   2026-10-22 — Tests 12 and 12e give the agent's owner's sign-in consent for the direct peer before
+ *     the replicate into the agent; 12-0 and 12e-0 show the same replicate without it (none yet, then
+ *     taken back) is 403 CONSENT_REQUIRED with nothing stored (secaudit 2026-10 wave 3, v71; test
+ *     change approved by the developer on 2026-10-22).
  *   2026-10-16 — Test 18 asserts the warning advisory is stored, and 18a that a signed notice from a node
  *     that is not a peer is refused and stored nowhere (QA audit S6-06).
  *   2026-10-15 — Phase 7 reads the genesis memory door as an approved genesis peer, signed for this node, and an unsigned read is refused (feature-list audit 166).
@@ -396,7 +400,38 @@ await test('11b. An UNSIGNED heartbeat from a known peer is refused (H-14)', asy
 // ─── Phase 3: Data Replication & Catalogue Sync ───
 console.log('\nPhase 3 — Data Replication & Catalogue Sync');
 
+/** The agent's owner lets the direct peer sign them in, as the Access tab does (secaudit 2026-10 wave 3, v71). */
+let ownerSignInConsentId = '';
+async function ownerLetsDirectPeerSignIn(): Promise<void> {
+    const consent = await json('/v1/consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ data_pattern: '_identity', recipient: `node:${directPeerNodeId}`, scope: 'auth', purpose: 'federation_login' }),
+    });
+    assert(consent.status === 201, `the owner's sign-in consent for the direct peer: ${consent.status} ${JSON.stringify(consent.body?.error)}`);
+    ownerSignInConsentId = consent.body.data?.id ?? consent.body.data?.consent?.id;
+}
+/** A signed, proven replicate from the direct peer into the local agent's namespace. */
+async function replicateIntoAgent(key: string) {
+    const payload = {
+        source_node: directPeerNodeId, gaii: agentGaii, key,
+        value: { theme: 'unconsented' }, visibility: 'public', version: 1, timestamp: new Date().toISOString(),
+    };
+    const signed = JSON.stringify(payload);
+    return json('/v1/federation/replicate', {
+        method: 'POST', body: JSON.stringify({ ...payload, signature: await signMsg(directPeerPrivKeyB64, signed), ...await deliveryProof(directPeerPrivKeyB64, signed, NODE_ID) }),
+    });
+}
+
+await test('12-0. REFUSED — a replicate into a local agent whose owner gave the peer no sign-in consent: 403, nothing stored', async () => {
+    const { status, body } = await replicateIntoAgent('shared-pref-unconsented');
+    assert(status === 403 && body.error?.code === 'CONSENT_REQUIRED', `expected 403 CONSENT_REQUIRED, got ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    assert(!(await replicaExists('shared-pref-unconsented')), 'nothing is stored under the agent');
+});
+
 await test('12. Replicate memory entry', async () => {
+    // The agent's owner lets the peer sign them in first (secaudit 2026-10 wave 3, v71; the
+    // developer's ruling of 2026-10-22).
+    await ownerLetsDirectPeerSignIn();
     const replicatePayload = {
         source_node: directPeerNodeId,
         gaii: agentGaii,
@@ -598,7 +633,18 @@ const replicateBody = (key: string) => ({
     value: { theme: 'pinned' }, visibility: 'public', version: 1, timestamp: new Date().toISOString(),
 });
 
+await test('12e-0. REFUSED — with the owner\'s sign-in consent taken back, a proven replicate into the agent is 403 and nothing is stored', async () => {
+    const revoked = await json(`/v1/consent/${encodeURIComponent(ownerSignInConsentId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(revoked.status === 200, `revoke the owner's sign-in consent: ${revoked.status} ${JSON.stringify(revoked.body?.error)}`);
+    const { status, body } = await replicateIntoAgent('proven-pref-unconsented');
+    assert(status === 403 && body.error?.code === 'CONSENT_REQUIRED', `expected 403 CONSENT_REQUIRED, got ${status} ${JSON.stringify(body.error ?? body.data)}`);
+    assert(!(await replicaExists('proven-pref-unconsented')), 'nothing is stored under the agent');
+});
+
 await test('12e. A replicate with a delivery proof is stored', async () => {
+    // The agent's owner lets the peer sign them in first (secaudit 2026-10 wave 3, v71; the
+    // developer's ruling of 2026-10-22).
+    await ownerLetsDirectPeerSignIn();
     const payload = replicateBody('proven-pref');
     const signed = JSON.stringify(payload);
     const proof = await deliveryProof(directPeerPrivKeyB64, signed, NODE_ID);

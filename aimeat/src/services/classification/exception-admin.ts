@@ -15,13 +15,17 @@
  *   audience of the label it carries (labels.ts labelForException).
  *   READ: the same authorization as the audit log (policy-admin.ts auditSubjectFor): level owner is
  *   the caller's owner's content, organism is its creator's or an admin's, node is the operator's
- *   and lists the whole node.
+ *   and lists the whole node. At level owner, a caller that does not read every record of its owner
+ *   (memory:read-as-owner, owner-scope-labels.ts) does not see an exception on a record of the owner
+ *   or a sibling it may not read with owner_scope; the answer then carries READ_AS_OWNER_NOTE.
  *   WITHDRAW: the principal who made it, or the level's person (the owner for their own content, an
  *   organism's creator or admin, the node's operator). A withdrawn exception stays on the list.
  * @structure PERSON_MAKES_EXCEPTION · ExceptionRequest · makeException() · readExceptions() ·
  *   removeException()
  * @usage const e = await makeException(deps, actor, { key, action: 'leave', reason });
  * @version-history
+ *   v1.2.0 — 2026-10-22 — readExceptions at level owner follows memory:read-as-owner, with `note`
+ *     (secaudit 2026-10, v77).
  *   v1.1.0 — 2026-10-18 — Action 'audience' (plan doc-mvdipuyqraas, L3.3): the owner in person only,
  *     never an app (PERSON_REQUIRED), with a reason (JUSTIFICATION_REQUIRED without one); it may name
  *     a container, and it records the item's effective label.
@@ -32,6 +36,7 @@ import {
   type ClassificationDeps, type LabelActor, type TargetInput,
 } from './labels.js';
 import { auditSubjectFor } from './policy-admin.js';
+import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 import type { PolicyLevel } from './policy.js';
 import {
   addException, EXCEPTION_ACTIONS, ExceptionError, findException, levelOfScope, listExceptions, PERSON_EXCEPTION_ACTIONS,
@@ -95,7 +100,7 @@ export async function makeException(deps: ClassificationDeps, actor: LabelActor,
 export async function readExceptions(
   deps: ClassificationDeps, actor: LabelActor, level: PolicyLevel, organismId: string | null | undefined,
   filter: { action?: string; since?: string; limit?: number } = {},
-): Promise<{ level: PolicyLevel; subject: string; exceptions: ClassificationException[] }> {
+): Promise<{ level: PolicyLevel; subject: string; exceptions: ClassificationException[]; note?: string }> {
   const subject = await auditSubjectFor(deps, actor, level, organismId);
   if (filter.action !== undefined && !EXCEPTION_ACTIONS.includes(filter.action as ClassificationException['action'])) {
     throw new ClassificationError('INVALID_INPUT', 400, `action is one of: ${EXCEPTION_ACTIONS.join(', ')}.`);
@@ -103,10 +108,18 @@ export async function readExceptions(
   if (filter.since !== undefined && Number.isNaN(new Date(filter.since).getTime())) {
     throw new ClassificationError('INVALID_INPUT', 400, 'since is an ISO date and time.');
   }
-  const exceptions = await listExceptions(deps, {
+  const listed = await listExceptions(deps, {
     level: level === 'node' ? 'all' : level, subject, action: filter.action, since: filter.since, limit: filter.limit,
   });
-  return { level, subject, exceptions };
+  // memory:read-as-owner at level owner (owner-scope-labels.ts): an exception on a record of the
+  // owner or a sibling that this caller may not read with owner_scope is left out, with the note.
+  const ownerView = level === 'owner' ? ownerScopeLabelView(deps.storage, actor) : null;
+  if (!ownerView || ownerView.readsAll) return { level, subject, exceptions: listed };
+  const exceptions: ClassificationException[] = [];
+  for (const e of listed) {
+    if (!e.target || !(await ownerView.hidden({ kind: e.target.kind, scope: e.scope, key: e.target.key }))) exceptions.push(e);
+  }
+  return { level, subject, exceptions, ...(exceptions.length < listed.length ? { note: READ_AS_OWNER_NOTE } : {}) };
 }
 
 /** Does the authorization check pass? Its refusal is a no; any other failure goes to the caller. */

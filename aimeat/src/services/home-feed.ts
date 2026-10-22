@@ -26,6 +26,7 @@
  * @usage
  *   import { readHomeFeed } from '../services/home-feed.js';
  * @version-history
+ *   v2.1.0 — 2026-10-22 — readHomeFeed takes the reader and projects each recorded row for them (services/account-event-view.ts): a task row's title and decline reason only for the owner in person, an app grant holding task:read and the task's own agent; every other reader keeps the row and its `withheld` fields are named (secaudit 2026-10, v89).
  *   v2.0.0 — 2026-08-17 — The derived path is gone. Every row but the live one comes from
  *     AccountEvent; onboarding records its own at the marker. backfillHomeFeed() converts an
  *     existing account's markers once, so nobody's history disappears on deploy.
@@ -37,6 +38,7 @@ import type { Storage, AccountEventKind } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
 import { readAccountEvents, recordAccountEvent } from './account-events.js';
+import { projectAccountEvents, type AccountEventReader } from './account-event-view.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
@@ -50,6 +52,8 @@ export interface FeedItem {
     link: string | null;
     /** Values the translated line interpolates (an agent's name, which room). */
     data?: Record<string, string>;
+    /** The `data` fields this reader may not see and that were taken out (services/account-event-view.ts). */
+    withheld?: string[];
 }
 
 /**
@@ -61,18 +65,31 @@ export interface FeedItem {
  */
 export async function readHomeFeed(
     storage: Storage, config: AimeatConfig, owner: string,
-    opts: { pendingAgents?: number; limit?: number } = {},
+    opts: {
+        pendingAgents?: number; limit?: number;
+        /**
+         * Who reads the feed. Each recorded row is projected for them before it loses its actor
+         * (services/account-event-view.ts): a task's title and reason only for the readers the task
+         * route admits. GET /v1/home/feed always passes it; absent means a read made by the node for
+         * the owner (the unit tests), and the rows are the owner's view.
+         */
+        reader?: AccountEventReader;
+    } = {},
 ): Promise<FeedItem[]> {
     const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
     const ghii = `${owner}@${config.nodeId}`;
 
     let recorded: FeedItem[] = [];
     try {
-        recorded = (await readAccountEvents(storage, ghii, { limit }, config)).map(e => ({
+        const rows = await readAccountEvents(storage, ghii, { limit }, config);
+        const shown: Array<(typeof rows)[number] & { withheld?: string[] }> = opts.reader
+            ? projectAccountEvents(rows, opts.reader).rows : rows;
+        recorded = shown.map(e => ({
             kind: e.kind,
             at: e.at,
             link: e.link || null,
             ...(Object.keys(e.data).length ? { data: e.data } : {}),
+            ...(e.withheld ? { withheld: e.withheld } : {}),
         }));
     } catch (err) {
         // An unreadable store leaves the live row, which is the one that needs acting on anyway.

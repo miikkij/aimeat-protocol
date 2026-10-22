@@ -28,8 +28,15 @@
  * @structure
  *   - RowCaller / RowServiceDeps
  *   - appendRows / readRows / readRow / deleteRow / sweepRows / spaceStats / workspaceRowIndex
+ *   - sweepRevisions / listRowRevisions / restoreRowRevision
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-10-22 — A replacement across writer families keeps the old content as a revision and the
+ *     row's first author in createdBy, and names the new writer in updatedBy (row-revisions.ts);
+ *     appendRows answers which rows it kept. listRowRevisions and restoreRowRevision give the delete
+ *     authority the way back; deleteRow takes a row's revisions with it. No new refusal: an agent
+ *     without memory:purge re-appended under another member's rowId and removed that content for
+ *     good (secaudit 2026-10, v80; developer ruling 2026-10-22).
  *   2026-10-20 — A read on the member path and the app path meets decideWorkspaceRead, the decision
  *     the records loader makes (services/workspace-access.ts). A plain member with no workspace
  *     grant read every row of a workspace whose records path gave them nothing, because
@@ -63,7 +70,7 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type {
-  Storage, WorkspaceRowRecord, WorkspaceRowStats,
+  Storage, WorkspaceRowRecord, WorkspaceRowStats, WorkspaceRowRevision,
 } from '../../storage/interface.js';
 import { checkOrganismNamespaceAccess } from '../organism-namespace-access.js';
 import { decideWorkspaceRead } from '../workspace-access.js';
@@ -76,6 +83,9 @@ import {
   WorkspaceRowError, resolveRowSpace, columnsForBody, columnsForWhere, retentionOf,
   type RowSpace, type RowObjectType,
 } from './row-space.js';
+import {
+  settleReplacements, lastWriterOf, revisionOf, revisionKeepDays, REVISIONS_PER_ROW,
+} from './row-revisions.js';
 
 export { WorkspaceRowError } from './row-space.js';
 
@@ -122,6 +132,26 @@ export interface AppendRowsResult {
   rowIds: string[];
   /** What the retention sweep removed on the way out. Zero is the ordinary answer. */
   pruned: number;
+  /**
+   * The rowIds whose earlier content this call replaced across writer families, and which the node
+   * kept as a revision (row-revisions.ts). Empty is the ordinary answer.
+   */
+  revisionsKept: string[];
+}
+
+/** A row's kept earlier content, as a caller sees it. */
+export interface RowRevisionView {
+  revisionId: string;
+  rowId: string;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+  body: Record<string, unknown>;
+  bytes: number;
+  replacedAt: string;
+  replacedBy: string;
 }
 
 export interface ReadRowsResult {
@@ -312,6 +342,7 @@ function publicRow(r: WorkspaceRowRecord): ReadRowsResult['rows'][number] {
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     createdBy: r.createdBy,
+    updatedBy: lastWriterOf(r),
     body: r.body,
     bytes: r.bytes,
   };
@@ -394,9 +425,14 @@ export async function appendRows(
 
   await enforceQuota(deps, organismId, wsId, deduped);
 
+  // Every gate has answered. A row this call replaces keeps its content as a revision when its last
+  // writer is of another family, and keeps its first author (row-revisions.ts, ruled 2026-10-22).
+  const revisionsKept = await settleReplacements(storage, caller.identity, deduped, now);
+
   await storage.appendWorkspaceRows(deduped);
 
   const pruned = await sweepRows(deps, organismId, wsId, space);
+  await sweepRevisions(deps, organismId, wsId, space);
 
   emitChange('organisms', undefined);
   // One event for the whole call, after the insert: a workflow that starts on new rows starts once
@@ -405,7 +441,7 @@ export async function appendRows(
     nodeId: config.nodeId, organismId, wsId, space: space.name, namespace: space.namespace,
     rowIds: deduped.map(r => r.rowId), createdBy: caller.identity,
   });
-  return { written: deduped.length, rowIds: deduped.map(r => r.rowId), pruned };
+  return { written: deduped.length, rowIds: deduped.map(r => r.rowId), pruned, revisionsKept };
 }
 
 /**
@@ -461,6 +497,23 @@ export async function sweepRows(
     });
   }
   return pruned;
+}
+
+/**
+ * Age a space's row revisions: older than the space's retention window or 30 days, belonging to a
+ * row that is gone, or past the newest 20 of a row. Never throws, for the reason sweepRows does not.
+ */
+export async function sweepRevisions(
+  deps: RowServiceDeps, organismId: string, wsId: string, space: RowSpace,
+): Promise<void> {
+  try {
+    const before = new Date(Date.now() - revisionKeepDays(space.retention.maxDays) * 86_400_000).toISOString();
+    await deps.storage.pruneWorkspaceRowRevisions(organismId, wsId, space.namespace, before, REVISIONS_PER_ROW);
+  } catch (err) {
+    logger.warn('workspace-rows: revision sweep failed, revisions kept', {
+      organismId, wsId, namespace: space.namespace, error: String(err),
+    });
+  }
 }
 
 export interface ReadRowsInput {
@@ -534,6 +587,9 @@ export async function deleteRow(
   if (!removed) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No row "${rowId}" in ${space.name}.`);
   }
+  // The row's kept revisions go with it: the delete authority removed the row, and a removed row has
+  // no history to come back from.
+  await deps.storage.deleteWorkspaceRowRevisions(organismId, wsId, space.namespace, rowId);
   emitChange('organisms', undefined);
 }
 
@@ -548,8 +604,77 @@ export async function deleteRowsBefore(
     throw new WorkspaceRowError('INVALID_ROW', 400, 'Name the cutoff as an ISO 8601 timestamp in `before`.');
   }
   const removed = await deps.storage.deleteWorkspaceRowsBefore(organismId, wsId, space.namespace, cutoff);
+  // The revisions of the rows removed here go with them (sweepRevisions drops a gone row's).
+  if (removed) await sweepRevisions(deps, organismId, wsId, space);
   if (removed) emitChange('organisms', undefined);
   return removed;
+}
+
+/** What leaves the service for a revision. The surrogate id and the space address are ours. */
+function publicRevision(v: WorkspaceRowRevision): RowRevisionView {
+  return {
+    revisionId: v.revisionId, rowId: v.rowId, occurredAt: v.occurredAt, createdAt: v.createdAt,
+    updatedAt: v.updatedAt, createdBy: v.createdBy, updatedBy: v.updatedBy, body: v.body, bytes: v.bytes,
+    replacedAt: v.replacedAt, replacedBy: v.replacedBy,
+  };
+}
+
+/**
+ * One row's kept earlier contents, newest replacement first (row-revisions.ts).
+ *
+ * WHO MAY LIST AND RESTORE is the delete authority: this service asks the write gate of the space,
+ * and the REST routes and the MCP tools add memory:purge beside organism:write, the words the row
+ * delete asks. The owner in person passes both. A revision passes the caller's classification reader
+ * at the row's own address, as a row read does.
+ */
+export async function listRowRevisions(
+  deps: RowServiceDeps, caller: RowCaller,
+  organismId: string, wsId: string, spaceName: string, rowId: string, reader: ContentReader,
+): Promise<{ space: string; rowId: string; revisions: RowRevisionView[] }> {
+  const space = await loadSpace(deps, organismId, wsId, spaceName);
+  await gate(deps, caller, organismId, wsId, space, 'write');
+  const kept = await deps.storage.listWorkspaceRowRevisions(organismId, wsId, space.namespace, rowId);
+  const shown = await reader.show(kept, v => rowTarget(organismId, wsId, space.name, v.id));
+  return { space: space.name, rowId, revisions: shown.map(publicRevision) };
+}
+
+/**
+ * Put a kept revision back as the row's content. The content the restore replaces is kept as a
+ * revision in turn, whoever wrote it, so a restore can itself be undone. The row keeps its first
+ * author in createdBy and names the restorer in updatedBy.
+ */
+export async function restoreRowRevision(
+  deps: RowServiceDeps, caller: RowCaller,
+  organismId: string, wsId: string, spaceName: string, rowId: string, revisionId: string, reader: ContentReader,
+): Promise<{ rowId: string; restored: string; revisionKept: boolean }> {
+  const { storage, config } = deps;
+  const space = await loadSpace(deps, organismId, wsId, spaceName);
+  await gate(deps, caller, organismId, wsId, space, 'write');
+  const stored = await storage.getWorkspaceRowRevision(organismId, wsId, space.namespace, revisionId);
+  const [rev] = stored && stored.rowId === rowId
+    ? await reader.show([stored], v => rowTarget(organismId, wsId, space.name, v.id)) : [];
+  if (!rev) {
+    throw new WorkspaceRowError('NOT_FOUND', 404, `No kept revision "${revisionId}" of row "${rowId}" in ${space.name}.`);
+  }
+  const [current] = await storage.getWorkspaceRowsByIds(organismId, wsId, space.namespace, [rowId]);
+  const now = new Date().toISOString();
+  const record: WorkspaceRowRecord = {
+    id: current?.id ?? rev.id, organismId, wsId, namespace: space.namespace, rowId,
+    ...columnsForBody(space, rev.body),
+    occurredAt: rev.occurredAt, createdAt: current?.createdAt ?? now, updatedAt: now,
+    createdBy: current?.createdBy ?? rev.createdBy, updatedBy: caller.identity,
+    body: rev.body, bytes: rev.bytes,
+  };
+  await enforceQuota(deps, organismId, wsId, [record]);
+  if (current) await storage.appendWorkspaceRowRevisions([revisionOf(current, caller.identity, now)]);
+  await storage.appendWorkspaceRows([record]);
+  await sweepRevisions(deps, organismId, wsId, space);
+  emitChange('organisms', undefined);
+  emitRowsAppended({
+    nodeId: config.nodeId, organismId, wsId, space: space.name, namespace: space.namespace,
+    rowIds: [rowId], createdBy: caller.identity,
+  });
+  return { rowId, restored: revisionId, revisionKept: !!current };
 }
 
 export async function spaceStats(

@@ -8,6 +8,11 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.5.0 — 2026-10-22 — An answer_to_key that names an `organism.*` key is written through the shared
+ *     memory write, as the owner when the owner answered in person and otherwise as the run's
+ *     principal, so the organism namespace rule applies (step-write.ts; secaudit 2026-10, r66). A
+ *     refused write keeps the answer pinned in the run and turns the step output-red; the engine tells
+ *     the owner as for any failed step. The owner's own keys are written as before.
  *   v1.4.1 — 2026-10-19 — The review stamp is attached on the reviewed record's version
  *     (setMemoryIfVersion); a record changed after the read keeps its new value and no stamp
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -39,6 +44,7 @@ import { template } from './engine-util.js';
 import { failDownstream } from './engine-readiness.js';
 import type { WorkflowRun, WorkflowStep, WorkflowHumanQuestion } from '../../models/workflow-schemas.js';
 import { logger } from '../../utils/logger.js';
+import { writeStepValue, StepWriteRefused } from './step-write.js';
 
 /** Default wait for a human-input step's answer — humans sleep; 24h, not the agent-step 60 min. */
 export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
@@ -89,13 +95,23 @@ export async function applyHumanAnswer(
   rs.human = { ...rs.human!, answeredAt: now, answer: ans };
   if (action?.answer_to_key) {
     const key = (run.keyPrefix ?? '') + template(action.answer_to_key, run.vars);
-    const existing = await storage.getMemory(ownerGhii, key);
-    await storage.setMemory({
-      key, ownerGaii: ownerGhii, value: { ...ans, answeredAt: now },
-      visibility: 'private', tags: ['workflow-human-answer'], ttlHours: null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now, updatedAt: now,
-    });
+    // An `organism.*` key goes through the shared memory write and the organism namespace rule
+    // (step-write.ts): an owner who may not write that workspace does not change what its members
+    // read (secaudit 2026-10, r66). The owner's own keys are written as before. A refusal keeps the
+    // person's answer pinned in the run above, and the step goes red with the reason in the log.
+    try {
+      await writeStepValue({ storage, config }, ownerGhii, run, {
+        key, value: { ...ans, answeredAt: now }, visibility: 'private', tags: ['workflow-human-answer'],
+        authorisingScope: 'workflow:write', pipeline: `workflow:${run.defSnapshot.id}/${stepId}`,
+        answeredInPerson: ans.byIsHuman === true,
+      });
+    } catch (err) {
+      if (!(err instanceof StepWriteRefused)) throw err;
+      logger.warn(`workflow ${run.workflowId} run ${run.runId}: the answer of step "${stepId}" was not written`, { code: err.code, error: err.message });
+      rs.state = 'output-red'; rs.endedAt = now;
+      failDownstream(run, stepId);
+      return;
+    }
     rs.writes = [...new Set([...rs.writes, key])];
   }
 
