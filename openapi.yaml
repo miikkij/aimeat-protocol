@@ -51106,8 +51106,9 @@ paths:
         binding — otherwise 403 EMAIL_MISMATCH and the invite is NOT consumed); a wrong signed-in
         session can never absorb the grant. Otherwise creates a new account from { username, password,
         display_name } (the invited email is recorded as verified). Applies organism membership + the
-        workspace grants, marks the invitation accepted (single-use), and establishes a login session
-        (refresh cookie). The success response `redirect` is the inviter's allowlisted return target
+        workspace grants and marks the invitation accepted (single-use). Only an account created here
+        gets a login session (`token`, `expires_in` and the refresh cookie); a signed-in accept keeps
+        the caller's own session and gets none. The success response `redirect` is the inviter's allowlisted return target
         (an app the invitee lands in signed-in) when one was pinned, else the profile organisms view.
         An `app` invitation makes the person a member of the app in the invited role instead and
         answers status `joined_app` with `app_id` and the app as `redirect`; when the app has no free
