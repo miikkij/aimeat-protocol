@@ -600,6 +600,25 @@ await test('22b. Only the porting path writes the redirect pointer, and a self-w
     assert(rewrite.status === 403 && rewrite.body.error?.code === 'RESERVED_KEY', `rewriting the pointer key: ${rewrite.status} ${JSON.stringify(rewrite.body.error)}`);
 });
 
+// secaudit2026oct22 (reserved-keys commerce-hold-owner-writable, commerce-benefit-owner-writable): the
+// hold book and the beneficiary book are the one writer of their ledgers and read them as fact (which
+// seller's rail to call, which share is released and payable). A record written through a memory
+// route made the hold book act on another seller's rail and put a self-released share in a
+// provider's payout. The prefixes are service-owned now; the books still write and read them.
+await test('22c. The hold and beneficiary ledgers are written only by their books', async () => {
+    for (const key of [`commerce.hold.ad${Date.now()}`, `commerce.hold-in.ad${Date.now()}`, `commerce.benefit.ad${Date.now()}`]) {
+        const own = await json('/v1/memory', { method: 'POST', headers: auth(P.token), body: JSON.stringify({ key, value: { id: key, status: 'held' }, visibility: 'private' }) });
+        if (own.status === 200 || own.status === 201) await json(`/v1/memory/${encodeURIComponent(key)}`, { method: 'DELETE', headers: auth(P.token) });
+        assert(own.status === 403 && own.body.error?.code === 'RESERVED_KEY', `the owner in person wrote ${key}: ${own.status} ${JSON.stringify(own.body.error)}`);
+    }
+    const writer = await setupAgent(P, 'ledger-writer', ['memory:read', 'memory:write']);
+    const benefitKey = `commerce.benefit.ag${Date.now()}`;
+    const agentOwn = await json('/v1/memory', { method: 'POST', headers: auth(writer.token), body: JSON.stringify({ key: benefitKey, value: { items: [] } }) });
+    assert(agentOwn.status === 403 && agentOwn.body.error?.code === 'RESERVED_KEY', `an agent into its own namespace: ${agentOwn.status} ${JSON.stringify(agentOwn.body.error)}`);
+    const holds = await json('/v1/commerce/holds', { headers: auth(P.token) });
+    assert(holds.status === 200, `the owner still reads their holds: ${holds.status} ${JSON.stringify(holds.body.error)}`);
+});
+
 // ─── Phase 6 — scopes and federate ───
 console.log('Phase 6 — scopes and federate');
 

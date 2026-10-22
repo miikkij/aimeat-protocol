@@ -20,6 +20,11 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.27.0 — 2026-10-22 — `commerce.hold.`, `commerce.hold-in.` and `commerce.benefit.` are service-owned:
+ *     the hold book and the beneficiary book are their writers and read them as fact, and an owner or
+ *     agent writing them through a memory route made the hold book call another seller's rail and put a
+ *     self-released share in a provider's payout (secaudit2026oct22). The refusal names each
+ *     service-owned record and where to read it; it had called every one a classification policy.
  *   v1.26.0 — 2026-10-20 — `contentclass.` joins the list: the content class settings, ontology and
  *     facts, which decide what spends the owner's AI key and what extraction prompts say
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -350,8 +355,29 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * date, which an extension reads as the right to the subscribed content, and the kept card a renewal
  * charges. A principal that could write it could give itself any period for free.
  * commerce/subscriptions.ts is its one writer; the buyer cancels through /v1/commerce/subscriptions.
+ *
+ * `commerce.hold.`, `commerce.hold-in.` and `commerce.benefit.` (2026-10-22, secaudit2026oct22) are the
+ * payment holds and the beneficiary shares. commerce/hold-book.ts reads a hold as fact about which
+ * seller's rail to call and which two namespaces to write, and commerce/beneficiary-book.ts and
+ * beneficiary-payout.ts read a share's status and amount as what a provider owes. A record written
+ * through a memory route made the hold book call another seller's rail and put a self-released share
+ * into a provider's payout. The two books are their writers, straight to storage; people read them
+ * through /v1/commerce/holds and /v1/commerce/beneficiary.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.'];
+
+/** Where each service-owned record is read and changed instead of a memory route. */
+const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
+  ['classification.policy.', 'a classification policy, and only the classification service writes or removes it. Read and change it with GET and PUT /v1/classification/policy or the aimeat_classification MCP tool.'],
+  ['commerce.hold.', 'a payment hold, and only the hold book writes it. Read holds with GET /v1/commerce/holds.'],
+  ['commerce.hold-in.', 'a payment hold, and only the hold book writes it. Read holds with GET /v1/commerce/holds?side=seller.'],
+  ['commerce.benefit.', 'a beneficiary share, and only the beneficiary book writes it. Read shares with GET /v1/commerce/beneficiary/obligations or /v1/commerce/beneficiary/earnings.'],
+  ['commerce.session.', 'an open checkout, and only the checkout service writes it. Use /v1/commerce/checkout-sessions.'],
+  ['commerce.subscription.', 'a subscription, and only the subscription service writes it. Use /v1/commerce/subscriptions.'],
+  ['identity.adult.', 'an adult verification, and only the verification service writes it.'],
+  ['agent-workplace.', 'an agent\'s workplace, set through /v1/agents/{name}/workplace.'],
+  ['scope-use.', 'a record of permission use, and only the node writes it.'],
+];
 
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {
@@ -381,11 +407,9 @@ export function isReservedServerKey(key: string): boolean {
 /** What a memory door answers when asked to write one of them, and which act writes it instead. */
 export function serverWrittenKeyRefusal(key: string): { code: 'RESERVED_KEY'; message: string } {
   if (isServiceOwnedKey(key)) {
-    return {
-      code: 'RESERVED_KEY',
-      message: `"${key}" is a classification policy, and only the classification service writes or removes it. `
-        + 'Read and change it with GET and PUT /v1/classification/policy or the aimeat_classification MCP tool.',
-    };
+    const way = SERVICE_OWNED_WAY.find(([prefix]) => key.startsWith(prefix))?.[1]
+      ?? 'kept by one service of this node, and no memory route writes it.';
+    return { code: 'RESERVED_KEY', message: `"${key}" is ${way}` };
   }
   if (key.startsWith('notif.')) {
     return {
