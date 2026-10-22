@@ -18,6 +18,8 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.5.2 — 2026-10-22 — The extension paragraph: ctx.ai.start also answers SCOPE_DENIED for a private
+ *     input the run may not read (services/ai-jobs/ext-capability.ts readAs; secaudit 2026-10, v75).
  *   v1.5.1 — 2026-10-18 — The extension paragraph: the on_done input carries the answer, and
  *     `ctx.ai.result(job_id)` reads it back; the answer is never reached with ctx.memory.get.
  *   v1.5.0 — 2026-10-11 — Sections 0, 2c, 2d and 2e and the extension paragraph of section 3, from
@@ -232,7 +234,9 @@ result.
   seconds (5 unless the operator set another limit) and a model call can take minutes.
   It never throws: \`{ ok: true, job_id }\` or \`{ ok: false, code }\` with AI_JOB_QUEUE_FULL,
   AI_JOB_LIMIT_REACHED (usually a loop), AI_JOB_CHAIN_TOO_DEEP, AI_JOB_PROMPT_TOO_LARGE or
-  AI_JOB_START_FAILED. The extension's installer pays, counted as the app \`ext:<extension name>\`.
+  AI_JOB_START_FAILED, and SCOPE_DENIED when the job names a private record or file that this run
+  may not read (an agent's extension reads as that agent when the owner chose it, or when that agent
+  invokes it). The extension's installer pays, counted as the app \`ext:<extension name>\`.
   \`on_done: { extension, action }\` calls that action with \`{ job_id, state, result_key, result }\` when
   the job is done: \`result\` is the answer, or \`result_too_large: true\` when it is over 64 kB.
   \`ctx.ai.result(job_id)\` reads the answer of a job the extension started, at any later time:

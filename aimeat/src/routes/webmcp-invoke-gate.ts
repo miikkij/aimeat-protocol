@@ -31,6 +31,8 @@
  * @structure refuseAppToolInvokeWithoutWord(req, res, config, storage)
  * @usage if (await refuseAppToolInvokeWithoutWord(req, res, config, storage, toolName)) return;
  * @version-history
+ *   v1.0.1 — 2026-10-22 — The ecosystem app's refusal sentence in plain words; the words it holds moved
+ *     to `details.held` (check:plain-language).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v72).
  */
 import type { Request, Response } from 'express';
@@ -82,11 +84,12 @@ export async function refuseAppToolInvokeWithoutWord(
   // An ecosystem app's words change when its person approves a new hello, on their Ecosystem apps page.
   const page = `${config.baseUrl.replace(/\/+$/, '')}/v1/profile#ecosystem-apps`;
   res.setHeader('WWW-Authenticate', `Bearer error="insufficient_scope", scope="${APP_TOOL_INVOKE_WORD}"`);
+  // The sentence is for the person this app speaks to; the permission words it holds and the request
+  // that asks for the missing one are in `details` and the next steps (middleware/refusals.ts).
   res.status(403).json(error(config.nodeId, 'SCOPE_DENIED',
-    `Scope "${APP_TOOL_INVOKE_WORD}" required to call an app tool, because the call can spend your person's contract budget or pacing. `
-    + `App scopes: [${held.join(', ')}]. Ask again with POST /v1/ecosystem-apps/hello naming "${APP_TOOL_INVOKE_WORD}" beside the scopes you hold; `
-    + `your person approves it with one press at ${page}, and then you repeat this call.`,
-    403, { needed: [APP_TOOL_INVOKE_WORD], allow_url: page, one_press: true },
+    `To call an app tool, this app needs your person's permission "${APP_TOOL_INVOKE_WORD}", because each call can spend their contract budget or pacing. `
+    + `Ask for it again beside the permissions you already hold; your person allows it with one press at ${page}, and then you repeat this call.`,
+    403, { needed: [APP_TOOL_INVOKE_WORD], held, allow_url: page, one_press: true },
     [
       { description: `Ask your person for "${APP_TOOL_INVOKE_WORD}" beside the scopes you hold`, method: 'POST', url: '/v1/ecosystem-apps/hello' },
       { description: 'Where your person approves it with one press', method: 'GET', url: page },

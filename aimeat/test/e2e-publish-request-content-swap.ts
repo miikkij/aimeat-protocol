@@ -24,6 +24,8 @@
  *   test/unit/publish-request-content-binding.test.ts.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-request-content-swap
  * @version-history
+ *   2026-10-22 — The asking agent and a sibling without publish:public are refused the approval with a
+ *     403, and the request still waits (check:denial-coverage).
  *   2026-10-22 — Initial (secaudit 2026-10, apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate,
  *     apply-cortex.ts:applyCortexPublish:version-not-bound-to-manifest-or-reinstalled-libs).
  */
@@ -168,6 +170,18 @@ await test('KEPT: the asker republishes the skill while its request waits, asks 
     assert(d.status === 200 && d.body.data?.request?.state === 'approved', `approve: ${d.status} ${short(d.body)}`);
     const anon = await anonSkill(name);
     assert(anon.status === 200 && JSON.stringify(anon.body).includes('The second text.'), `anonymous read: ${anon.status} ${short(anon.body)}`);
+});
+
+await test('SECURITY: the asking agent cannot approve its own request and the sibling without publish:public cannot approve it (403 each); the request still waits', async () => {
+    const name = `pcs-self-${STAMP}`;
+    const id = asked(await publishSkill(asker.token, name, 'The asked text.', 'public'), 'publish');
+    const decide = (token: string) => call(`/v1/publish-requests/${id}/decision`, { token, method: 'POST', body: { decision: 'approve' } });
+    const own = await decide(asker.token);
+    assert(own.status === 403 && own.body.error?.code === 'OWN_REQUEST', `the asker's own approval: ${own.status} ${short(own.body)}`);
+    const sib = await decide(sibling.token);
+    assert(sib.status === 403 && sib.body.error?.code === 'SCOPE_DENIED', `the sibling's approval: ${sib.status} ${short(sib.body)}`);
+    assert(await requestState(id) === 'awaiting_owner', `the request after the refusals: ${await requestState(id)}`);
+    assert((await anonSkill(name)).status !== 200, 'the skill went public');
 });
 
 await test('KEPT: the owner in person and the agent holding publish:public publish a skill public at once', async () => {

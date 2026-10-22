@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — The replicate consent check names the local person with localAccountOf()
+ *     (check:identity-shortening).
  *   2026-10-22 — Replicate stores under a person of this node only while that person holds the
  *     sign-in consent for the signing node (services/federation-auth-consent.ts), the consent
  *     push-home's visitor session already needed; without it the answer is 403 CONSENT_REQUIRED and
@@ -91,7 +93,7 @@ import {
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
-import { parseGaiiLoose, isSameOwner, localAccountName } from '../../utils/gaii.js';
+import { parseGaiiLoose, isSameOwner, localAccountName, localAccountOf } from '../../utils/gaii.js';
 import { acceptedSameAccount } from '../../services/contact-same-account.js';
 import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
 import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
@@ -186,7 +188,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         if (!exists) return refuse(`${gaii} is not a person or agent on this node, so no replica is stored for it.`);
         // An agent of this node follows its owner's consent (the developer's ruling of 2026-10-22):
         // the person who let the peer sign them in may save their agent's records home too.
-        const person = `${parsed.owner.toLowerCase()}@${config.nodeId}`;
+        const account = localAccountOf(gaii);
+        if (!account) return notAnIdentity;
+        const person = `${account.toLowerCase()}@${config.nodeId}`;
         if (await peerMayActFor(storage, peer, person)) return null;
         return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, sourceNode, config.nodeId) };
     };

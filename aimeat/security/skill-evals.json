@@ -8,10 +8,10 @@
       "note": "Four rows added to references/language-context.md (group chat terms in en, fi, es), beside main's vault-secrets and content-class rows; no instruction text changed; Jouni decided to skip, 2026-10-21"
     },
     "aimeat-ai-capabilities": {
-      "digest": "sha256:0c076318d9a7159108354e5e",
+      "digest": "sha256:cd5753fef8b4cb9592d229b8",
       "decision": "skipped",
-      "on": "2026-10-18",
-      "note": "one added fact (on_done input.result and ctx.ai.result), no change to the skill's guidance; Jouni, 2026-10-18"
+      "on": "2026-10-22",
+      "note": "one added refusal code (SCOPE_DENIED for a private input the run may not read), no change to the skill's guidance; Jouni skipped evals for the secaudit wave 3 round, 2026-10-22"
     }
   }
 }

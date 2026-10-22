@@ -11,6 +11,8 @@
  *   origin); refusals with the balance and the budget unchanged; the uses that keep working; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-invoke-scope
  * @version-history
+ *   v1.0.1 — 2026-10-22 — A case that reads the narrowed agent's refusal as a 403 on both addresses
+ *     (check:denial-coverage).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v72).
  */
 import * as ed from '@noble/ed25519';
@@ -182,6 +184,12 @@ try {
       assert(refusedForWord(r), tool + ' on the app origin: ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
     }
     assert(await balance(buyer.token) === before && await spent(buyer) === budget, 'nothing moved');
+  });
+  await test('the narrowed agent\'s refusal is a 403 on both addresses, with the missing word in its details', async () => {
+    for (const r of [await call(narrowed.token, 'paced'), await onOrigin(narrowed.token, 'paced')]) {
+      assert(r.status === 403, 'expected 403, got ' + r.status + ' ' + JSON.stringify(r.body.error ?? r.body.data));
+      assert(decodeURIComponent(JSON.stringify(r.body.error?.details ?? {})).includes('exchange:write'), 'details: ' + JSON.stringify(r.body.error?.details));
+    }
   });
 
   await test('the owner in person calls both tools, with no word asked', async () => {
