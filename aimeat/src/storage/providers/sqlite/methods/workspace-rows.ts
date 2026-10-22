@@ -7,6 +7,7 @@
  * @structure workspaceRowMethods
  * @usage Object.assign(SqliteStorage.prototype, workspaceRowMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-10-22 — getWorkspaceRowsByIds and the row revision methods (secaudit 2026-10, v80).
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -18,8 +19,10 @@ import type {
   WorkspaceRowStats,
   WorkspaceRowUsage,
   WorkspaceRowScope,
+  WorkspaceRowRevision,
 } from '../../../interface.js';
 import * as repo from '../repos/workspace-rows.js';
+import * as revisionRepo from '../repos/workspace-row-revisions.js';
 
 export const workspaceRowMethods = {
   async appendWorkspaceRows(this: SqliteStorage, rows: WorkspaceRowRecord[]): Promise<void> {
@@ -55,5 +58,33 @@ export const workspaceRowMethods = {
   },
   async workspaceRowUsage(this: SqliteStorage, scope: WorkspaceRowScope): Promise<WorkspaceRowUsage> {
     return repo.workspaceRowUsage(this.db, scope);
+  },
+  async getWorkspaceRowsByIds(
+    this: SqliteStorage, organismId: string, wsId: string, namespace: string, rowIds: string[],
+  ): Promise<WorkspaceRowRecord[]> {
+    return repo.getWorkspaceRowsByIds(this.db, organismId, wsId, namespace, rowIds);
+  },
+  async appendWorkspaceRowRevisions(this: SqliteStorage, revisions: WorkspaceRowRevision[]): Promise<void> {
+    return revisionRepo.appendWorkspaceRowRevisions(this.db, revisions);
+  },
+  async listWorkspaceRowRevisions(
+    this: SqliteStorage, organismId: string, wsId: string, namespace: string, rowId: string,
+  ): Promise<WorkspaceRowRevision[]> {
+    return revisionRepo.listWorkspaceRowRevisions(this.db, organismId, wsId, namespace, rowId);
+  },
+  async getWorkspaceRowRevision(
+    this: SqliteStorage, organismId: string, wsId: string, namespace: string, revisionId: string,
+  ): Promise<WorkspaceRowRevision | null> {
+    return revisionRepo.getWorkspaceRowRevision(this.db, organismId, wsId, namespace, revisionId);
+  },
+  async deleteWorkspaceRowRevisions(
+    this: SqliteStorage, organismId: string, wsId: string, namespace: string, rowId: string,
+  ): Promise<number> {
+    return revisionRepo.deleteWorkspaceRowRevisions(this.db, organismId, wsId, namespace, rowId);
+  },
+  async pruneWorkspaceRowRevisions(
+    this: SqliteStorage, organismId: string, wsId: string, namespace: string, before: string, keepPerRow: number,
+  ): Promise<number> {
+    return revisionRepo.pruneWorkspaceRowRevisions(this.db, organismId, wsId, namespace, before, keepPerRow);
   },
 };

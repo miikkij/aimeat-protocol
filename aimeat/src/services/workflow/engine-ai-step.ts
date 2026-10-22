@@ -52,6 +52,9 @@
  *     a fan-out of thirty steps must not hit a per-minute request limit.
  *   v1.13.0 — 2026-10-08 — The answer written to result_to_key carries the provenance record the model
  *     call minted (aiProvenanceId), for every op, as an AI job's result does.
+ *   v1.14.0 — 2026-10-22 — A result_to_key that names an `organism.*` key is written through the shared
+ *     memory write as the run's principal, so the organism namespace rule applies; the owner's own keys
+ *     are written as before (step-write.ts; secaudit 2026-10, r66).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -66,6 +69,7 @@ import { readAiRecords, readAiFile } from '../ai-inputs.js';
 import { systemReader } from '../classification/reader.js';
 import { workflowAiCaller } from './ai-caller.js';
 import type { AiCallerContext } from '../ai/caller-context.js';
+import { writeStepValue } from './step-write.js';
 
 /**
  * Run a prompt on the owner's own model and land the answer in their namespace.
@@ -117,17 +121,13 @@ export function dispatchAiStep(
   const landValue = (value: unknown, provenanceId?: string): ResultWrite | undefined => {
     if (!action.result_to_key) return undefined;
     const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
-    return async () => {
-      const existing = await deps.storage.getMemory(ownerGhii, key);
-      const now = new Date().toISOString();
-      await deps.storage.setMemory({
-        key, ownerGaii: ownerGhii, value,
-        ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
-        visibility: 'owner', tags: ['workflow-ai-result'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now, updatedAt: now,
-      });
-    };
+    // An `organism.*` key goes through the shared memory write as the run's principal, so the
+    // organism namespace rule applies; the owner's own keys are written as before (step-write.ts).
+    return () => writeStepValue(deps, ownerGhii, run, {
+      key, value, visibility: 'owner', tags: ['workflow-ai-result'],
+      ...(provenanceId ? { provenanceId } : {}),
+      authorisingScope: 'ai:use', pipeline: `workflow:${workflowId}/${stepId}`,
+    });
   };
 
   // op 'transcribe': the audio file at audio_key, in the owner's own storage, becomes text. No

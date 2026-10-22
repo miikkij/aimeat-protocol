@@ -12,6 +12,12 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
+ *   2026-10-22 -- e2e-account-events-task-keep.ts joins the list (not the guard tier): an app grant made before the update keeps a task's title and reason in the event record, on its own node on 40987 (secaudit 2026-10, v89).
+ *   2026-10-22 -- e2e-workflow-organism-writes.ts and e2e-unattended-publish-gate.ts join the list (not the guard tier): a workflow step's answer to an organism key meets the organism rule, and an extension's or a workflow's public file or package meets the publish gate, the latter on its own node on 40949 (secaudit 2026-10, r66, v68, v69).
+ *   2026-10-22 -- e2e-workspace-row-revisions.ts joins the list (not the guard tier): a row replaced by another writer family is kept as a revision the delete authority lists and restores (secaudit 2026-10, v80).
+ *   2026-10-22 -- e2e-knowledge-link-owner.ts joins the list (not the guard tier): a knowledge link row belongs to the namespace of its source package, and owner erasure takes the person's rows (secaudit 2026-10, v78, v79).
+ *   2026-10-22 -- e2e-memory-hands-readers.ts and e2e-account-events-readers.ts join the list (not the guard tier): the readers of the hands on a key and of a task's title in the event record (secaudit 2026-10, v88, v89).
  *   2026-10-21 -- PURPOSE_SUITES and --purpose: the purpose tier, eleven suites that prove what AIMEAT
  *     is for still works, five of them new (test/e2e-purpose-*.ts); pnpm gate runs it with the guard
  *     tier, and a skipped test in it is red as in the guard tier (docs/pitfalls.md §126).
@@ -42,6 +48,9 @@
  *   2026-10-18 -- e2e-closed-node-levels.ts joins the list (not the guard tier): a public write on a node closed to strangers lands at the signed-in level, and the new-app feed.
  *   2026-10-20 -- e2e-consent-publish-gate.ts joins the list (not the guard tier): a consent whose
  *     recipient is `*` meets the publish gate, on a node that has it on (secaudit 2026-10).
+ *   2026-10-22 -- e2e-publish-request-content-swap.ts joins the list (not the guard tier): a skill or
+ *     cortex publish request publishes only the content it was filed for, on its own node with the
+ *     publish gate on, port 40954 (secaudit 2026-10).
  *   2026-10-20 -- e2e-publish-request-bin-takeover.ts joins the list (not the guard tier): a memory
  *     publish request publishes only the content it was filed for, across a bin and a re-create, on
  *     its own node with the publish gate on, port 40482 (secaudit 2026-10).
@@ -164,6 +173,8 @@
  *   2026-10-08 -- e2e-agent-checkout.ts joins the list: the product feeds for AI shopping agents.
  *   2026-10-08 -- e2e-ai-visibility.ts joins the list: channels, AI fetches, discovery files and
  *     purchases counted per owner with nothing that identifies a visitor at rest.
+ *   2026-10-22 -- e2e-app-tool-invoke-scope.ts joins the list: the app-tool invoke asks exchange:write
+ *     of an agent or ecosystem app on the apex and the app origin (secaudit 2026-10, v72).
  *   2026-10-06 -- e2e-app-tool-free-mcp.ts joins the list: unpriced calls agree with REST while
  *     private manifests, scoped actions and paid capabilities remain protected.
  *   v1.78.0 -- 2026-10-06 -- e2e-extension-workspace-batch.ts joins the list (ctx.workspace.publishRecords
@@ -536,6 +547,10 @@ const ALL_SUITES = [
     // Self-spawns its own node with the publish gate on and anonymous mode, port 40482: a memory
     // publish request publishes only the content it was filed for, across a bin and a re-create.
     'test/e2e-publish-request-bin-takeover.ts',
+    // Self-spawns its own node with the publish gate on and anonymous mode, port 40954: a skill or
+    // cortex publish request publishes only the content it was filed for, across a delete, a
+    // same-version redeploy and an install again.
+    'test/e2e-publish-request-content-swap.ts',
     'test/e2e-app-grants.ts',
     'test/e2e-app-grants-tasks.ts',
     'test/e2e-app-members.ts',
@@ -764,6 +779,9 @@ const ALL_SUITES = [
     // bulk/export/import/bulk-delete, discover and copy, TTL expiry on read, the anonymous
     // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
     'test/e2e-memory-doors.ts',
+    // Who sees the hands on a key, and who reads a task's title in the event record (secaudit 2026-10, v88, v89).
+    'test/e2e-memory-hands-readers.ts',
+    'test/e2e-account-events-readers.ts',
     'test/e2e-memory-batch-provenance.ts',
     // AI provenance on the content surfaces (aiprov workstream E, 2026-10-08): memory, workspace
     // shares, the Design Book, knowledge, skills, site passages and comments.
@@ -792,6 +810,13 @@ const ALL_SUITES = [
     // settlement lands, cross-node work is refused honestly, and the three outbound senders are
     // accepted by a real receiver.
     'test/e2e-federation-two-real-nodes.ts',
+    // A direct-message attachment crosses to another node, and to another person on one node, as the
+    // file that was sent and as nothing else (secaudit 2026-10 wave 3, v81 and v82).
+    'test/e2e-federation-dm-attachment-grant.ts',
+    // A linked peer lists or writes a person's records here only with that person's sign-in consent,
+    // and list-home, push-home and list-remote keep working, on two real nodes (secaudit 2026-10
+    // wave 3, v70 and v71).
+    'test/e2e-federation-peer-consent.ts',
     // The remote MCP proxy: attach against a real upstream MCP server this suite starts
     // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
     // not only in the unit suites because those run on SQLite alone, and this is what
@@ -861,6 +886,14 @@ const ALL_SUITES = [
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
     'test/e2e-scim-users.ts',
     'test/e2e-ai-jobs.ts',
+    // What a model may be handed of the owner's data, by whom (secaudit 2026-10, r49, v74, v75). Own node on 40963.
+    'test/e2e-ai-input-reach.ts',
+    // A scheduled AI job reads what its maker may read, and a schedule stored before that rule keeps
+    // reading as before until it is changed (secaudit 2026-10 wave 3, r49). In-process node on block 31700.
+    'test/e2e-schedule-ai-input-reach.ts',
+    // A group message attachment is delivered as the version that was sent or not at all (secaudit
+    // 2026-10 wave 3, v82). In-process node on block 31800.
+    'test/e2e-group-attachment-version.ts',
     // The AI paths BEHIND the gate. Spawns its own node on 40314 with a scriptable OpenAI-compatible
     // provider on 40315, because every other AI suite stops at the door for want of one.
     'test/e2e-ai-provider-stub.ts',
@@ -945,6 +978,8 @@ const ALL_SUITES = [
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',
+    // A link row belongs to the namespace of its source package; owner erasure takes the person's rows (secaudit 2026-10, v78, v79).
+    'test/e2e-knowledge-link-owner.ts',
     'test/e2e-libs.ts',
     'test/e2e-library-packs.ts',
     // Starts a real receiver on 127.0.0.1:40665 (E2E_LIVING_HOOKS_PORT), reachable because the
@@ -1184,6 +1219,8 @@ const ALL_SUITES = [
     // direct write, publish, reopen, delete and archive of an agent refused, the named extension let in.
     'test/e2e-workspace-fenced-space.ts',
     'test/e2e-workspace-rows.ts',
+    // A row replaced by another writer family is kept as a revision the delete authority restores (secaudit 2026-10, v80).
+    'test/e2e-workspace-row-revisions.ts',
     'test/e2e-workspace-doc-edit.ts',
     'test/e2e-workspace-member-changes.ts',
     'test/e2e-workspace-public-sharing.ts',
@@ -1208,6 +1245,8 @@ const ALL_SUITES = [
     // A tool published over MCP lands under the app filename, so both catalogues show it.
     'test/e2e-app-tools-key.ts',
     'test/e2e-app-tool-free-mcp.ts',
+    // The app-tool invoke asks exchange:write of an agent or ecosystem app, as its MCP twin (secaudit 2026-10, v72).
+    'test/e2e-app-tool-invoke-scope.ts',
     // An MCP OAuth token on REST routes: counted with Deprecation on 3.x, and the three MCP tools
     // that reach REST over loopback carry the node's pass, so they count nothing.
     'test/e2e-mcp-token-rest.ts',
@@ -1431,6 +1470,15 @@ const ALL_SUITES = [
     // The step kind a workflow was missing: an extension action, run on this node with no agent
     // online and no model in the path, gated by the same success_signal as every other step.
     'test/e2e-workflow-extension-step.ts',
+    // A workflow step's answer to an organism key meets the organism namespace rule (secaudit 2026-10, r66).
+    'test/e2e-workflow-organism-writes.ts',
+    // Self-spawns its own node with the publish gate on, port 40949 (E2E_UNATTENDED_GATE_PORT): an
+    // extension's files and data packages, and a workflow's datapackage step, meet the publish gate
+    // (secaudit 2026-10, v68, v69).
+    'test/e2e-unattended-publish-gate.ts',
+    // Self-spawns its own node twice on one database, port 40987 (E2E_TASK_KEEP_PORT): an app grant
+    // made before the update keeps a task's title and reason in the event record (secaudit 2026-10, v89).
+    'test/e2e-account-events-task-keep.ts',
     // The realtime rooms and the WebSocket at /v1/realtime/ws: every route, every message type and
     // every refusal on the upgrade. Nothing had ever opened that socket.
     'test/e2e-realtime-rooms.ts',
@@ -1749,6 +1797,7 @@ const PURPOSE_SUITES = [
     'test/e2e-workflow-extension-step.ts',   // a workflow's extension step runs with no agent online; an agent's run finishes (13c); a run started before the update finishes (13e)
     'test/e2e-app-scope-allowance.ts',       // a published app keeps working across 3.x to 4.0 without its author republishing it
     'test/e2e-rest-scope-keep-working.ts',   // the agents and ecosystem apps that existed at 4.0 keep their routes
+    'test/e2e-federation-peer-consent.ts',   // a person signed in on a peer lists their records at home and saves one home; a peer's own people replicate (secaudit 2026-10 wave 3)
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

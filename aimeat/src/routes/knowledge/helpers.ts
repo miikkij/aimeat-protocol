@@ -6,6 +6,9 @@
  *   owner-scope memory lookup (GHII + all agents). Extracted from src/routes/knowledge.ts so the
  *   split route-group modules can share them. Extracted to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — findReadableManifest takes `preferOwn`: the caller's own account is asked before the
+ *     public scan, so the links read lists the caller's own package's rows even when another account
+ *     holds a public record at the same key (secaudit 2026-10, v78).
  *   2026-10-21 — signedIn asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — findOwnerScopeMemory batches the agent scan into one listMemoryForOwners
@@ -37,6 +40,7 @@ export type KnowledgeHelpers = {
   findReadableManifest: (
     req: Express.Request,
     manifestKey: string,
+    opts?: { preferOwn?: boolean },
   ) => Promise<{ record: MemoryRecord; own: boolean } | null>;
 };
 
@@ -74,17 +78,26 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
   // whether the manifest is the caller's account's, which is who sees the moderation record. The
   // reputation read had its own lookup with no visibility filter, so an unlisted package answered to
   // anybody with its id (feature-list audit 207).
-  async function findReadableManifest(req: Express.Request, manifestKey: string): Promise<{ record: MemoryRecord; own: boolean } | null> {
+  // `preferOwn` asks the caller's own account first. The links read uses it: a link row belongs to the
+  // namespace of the record found here, and another account's public record at the same key must not
+  // stand in for the caller's own package (secaudit 2026-10, v78).
+  async function findReadableManifest(req: Express.Request, manifestKey: string, opts?: { preferOwn?: boolean }): Promise<{ record: MemoryRecord; own: boolean } | null> {
     let record: MemoryRecord | undefined;
     let own = false;
-    const allOwners = await storage.listOwners();
-    record = (await storage.listMemoryForOwners(allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' }))[0];
+    const signedIn = !!req.auth && !isAnonymousPrincipal(req.auth);
+    if (opts?.preferOwn && signedIn) {
+      const found = await findOwnerScopeMemory(req, manifestKey);
+      if (found) { record = found.record; own = true; }
+    }
+    if (!record) {
+      const allOwners = await storage.listOwners();
+      record = (await storage.listMemoryForOwners(allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' }))[0];
+    }
     if (!record) {
       const allAgents = await storage.listAgents();
       record = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' }))[0];
     }
-    const signedIn = !!req.auth && !isAnonymousPrincipal(req.auth);
-    if (!record && signedIn) {
+    if (!record && signedIn && !opts?.preferOwn) {
       const found = await findOwnerScopeMemory(req, manifestKey);
       if (found) { record = found.record; own = true; }
     }

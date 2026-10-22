@@ -17,6 +17,8 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   v1.5.0 — 2026-10-22 — KnowledgeLink joins the per-identity cascade: the links of the identity's
+ *     packages and the ones it contributed (secaudit 2026-10, v79).
  *   v1.4.0 — 2026-10-09 — Connection, ConnectionDelegation and ProviderClient join the per-identity
  *     cascade, so deleteAgent takes an agent's outside accounts and its own app clients (secrets
  *     audit 2026-10-09, chapter 2).
@@ -149,6 +151,11 @@ export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<v
   // The classification audit log of this person's own content (TARGET-082 V4). Rows in which they
   // were only the reader of someone else's content are that person's record and stay.
   await db.deleteFrom('ClassificationAudit').where('ownerGaii', '=', gaii).execute();
+
+  // The knowledge links of this identity's packages (ownerGaii, the namespace of the source manifest,
+  // which the Memory delete above takes) and the ones it contributed (linkedBy, the full identity).
+  // Another owner's links TO this person's packages are that owner's and stay (secaudit 2026-10, v79).
+  await db.deleteFrom('KnowledgeLink').where(eb => eb.or([eb('ownerGaii', '=', gaii), eb('linkedBy', '=', gaii)])).execute();
 
   // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
   // ownerGaii for this person's own shares, then by the id of each group being removed, because a

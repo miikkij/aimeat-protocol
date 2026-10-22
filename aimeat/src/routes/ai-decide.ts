@@ -19,6 +19,10 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.0 — 2026-10-22 — The run routes carry whether the caller reads as the owner (readsAsOwner):
+ *     any other caller's keys and prefix read only what the memory route shows it, and it lists,
+ *     reads, resumes and stops only the runs it started; a list with runs left out carries `omitted`
+ *     and the note, and a hidden run is 404 with the note (secaudit 2026-10, v83, v84).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *     decide, runs and resume lose the path limiter (decideForOwner, startDecideRun and
  *     resumeDecideRun count); the two key tests count the account on the route (aiCallLimit).
@@ -63,9 +67,11 @@ import {
   decideSettingsView, writeDecideSettings, clearOwnDecideKey,
 } from '../services/decide/settings.js';
 import {
-  startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary,
+  startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, runViewerOf,
   type RunItem,
 } from '../services/decide/runs.js';
+import { callerOf } from '../middleware/caller.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
 import {
   providersView, providerView, putOwnerProvider, deleteOwnerProvider,
 } from '../services/decide/providers.js';
@@ -143,6 +149,19 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     return res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', (e as Error).message));
   };
 
+  // A decision run reads the owner's records and holds what others of the owner sent, so its routes
+  // carry whether the caller reads as the owner (owner-scope-read.ts): the owner in person, an app
+  // grant, an agent holding memory:read-as-owner. Any other caller reads what the memory route would
+  // show it and sees the runs it started (secaudit 2026-10, v83, v84).
+  const runCallerOf = (req: Request, bodyAppId?: unknown): DecideCaller => {
+    // No real auth (none, or the anonymous identity) reads as nobody; callerOf refuses both.
+    const readsAll = req.auth && !req.auth.anonymous ? readsAsOwner(callerOf(req, config.nodeId, storage)) : false;
+    return { ...decideCallerOf(req, config.nodeId, bodyAppId), readsAll };
+  };
+  /** A run that is absent, or hidden from this caller, answers the same; a narrowed caller is told why. */
+  const noSuchRun = (res: Response, caller: DecideCaller) => res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+    runViewerOf(caller).all ? 'No such run.' : `No such run. ${READ_AS_OWNER_NOTE}`));
+
   // ── POST /v1/ai/decide ── ask the decision model
   router.post('/v1/ai/decide', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
@@ -199,7 +218,7 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
     const body = (req.body ?? {}) as Record<string, unknown>;
     try {
       const input = decideInputOf(body);
-      const run = await startDecideRun(storage, config, decideCallerOf(req, config.nodeId, body.app_id), {
+      const run = await startDecideRun(storage, config, runCallerOf(req, body.app_id), {
         ...(input.rule !== undefined ? { rule: input.rule } : {}),
         ...(input.provider !== undefined ? { provider: input.provider } : {}),
         ...(input.questions !== undefined ? { questions: input.questions } : {}),
@@ -221,7 +240,9 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai/decide/runs', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      res.json(success(config.nodeId, { runs: await listDecideRuns(storage, decideOwnerOf(req.auth!, config.nodeId)) }));
+      const caller = runCallerOf(req);
+      const { runs, omitted } = await listDecideRuns(storage, caller.gaii, runViewerOf(caller));
+      res.json(success(config.nodeId, { runs, ...(omitted > 0 ? { omitted, note: READ_AS_OWNER_NOTE } : {}) }));
     } catch (e) { fail(res, e); }
   });
 
@@ -229,8 +250,9 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/ai/decide/runs/:id', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const run = await getDecideRun(storage, decideOwnerOf(req.auth!, config.nodeId), req.params.id as string);
-      if (!run) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such run.'));
+      const caller = runCallerOf(req);
+      const run = await getDecideRun(storage, caller.gaii, req.params.id as string, runViewerOf(caller));
+      if (!run) return noSuchRun(res, caller);
       res.json(success(config.nodeId, run));
     } catch (e) { fail(res, e); }
   });
@@ -239,8 +261,9 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/ai/decide/runs/:id/resume', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const run = await resumeDecideRun(storage, config, decideCallerOf(req, config.nodeId), req.params.id as string);
-      if (!run) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such run.'));
+      const caller = runCallerOf(req);
+      const run = await resumeDecideRun(storage, config, caller, req.params.id as string);
+      if (!run) return noSuchRun(res, caller);
       res.status(202).json(success(config.nodeId, runSummary(run)));
     } catch (e) { fail(res, e); }
   });
@@ -249,8 +272,9 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/ai/decide/runs/:id/stop', requireAuth(), async (req: Request, res: Response) => {
     if (!assertAiUseAllowed(req, res, config.nodeId)) return;
     try {
-      const run = await stopDecideRun(storage, decideOwnerOf(req.auth!, config.nodeId), req.params.id as string);
-      if (!run) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such run.'));
+      const caller = runCallerOf(req);
+      const run = await stopDecideRun(storage, caller.gaii, req.params.id as string, runViewerOf(caller));
+      if (!run) return noSuchRun(res, caller);
       res.json(success(config.nodeId, runSummary(run)));
     } catch (e) { fail(res, e); }
   });

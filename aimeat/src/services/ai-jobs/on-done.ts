@@ -30,6 +30,9 @@
  * @structure OnDoneOutcome · ON_DONE_RESULT_MAX_BYTES · onDoneResultFields(value) · fireOnDone(deps, job, value)
  * @usage const outcome = await fireOnDone({ storage, config, service, emailService }, job, value);
  * @version-history
+ *   v1.2.0 -- 2026-10-22 -- The callback's ctx.ai is built from the run's reader: on an extension the
+ *     owner set to read as its installer, the next job reads as that agent, so its answer cannot
+ *     carry back a private record the run's ctx.files is refused (secaudit 2026-10, v75).
  *   v1.1.0 — 2026-10-18 — The input carries the answer as `result`, or `result_too_large: true` past
  *     64 kB. Before this, the action was told where the answer was and could not read it there.
  *   v1.0.0 — 2026-08-31 — Initial.
@@ -96,11 +99,16 @@ export async function fireOnDone(deps: OnDoneDeps, job: AiJobRecord, value: unkn
             logLabel: `ai-job:${job.id.slice(0, 8)}`,
             producerKind: 'extension',
             producerRef: `${job.on_done.extension}/${job.on_done.action}`,
-            ai: buildExtensionAi({
+            // Built once the run knows who it reads as: when the owner set this extension to read as
+            // the agent that wrote it, the next job reads as that agent too, as ctx.files does on the
+            // same run (extension-system-run.ts unattendedExtensionReader). On the default setting
+            // `narrowed` is undefined and the job reads with the owner's reach, as before.
+            ai: (narrowed) => buildExtensionAi({
                 service,
-                extName: job.on_done.extension,
+                extName: job.on_done!.extension,
                 ownerGhii: job.owner,
                 createdBy: job.owner,
+                ...(narrowed ? { readAs: { principal: narrowed.gaii, owner: narrowed.owner, roles: [...narrowed.roles], scopes: [...narrowed.scopes] } } : {}),
                 chain: {
                     parentJob: job.id,
                     parentDepth: job.chain_depth,

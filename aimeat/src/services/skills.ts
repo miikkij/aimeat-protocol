@@ -32,6 +32,8 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.13.0 -- 2026-10-22 -- deleteSkill settles a user skill's waiting publish requests `outdated`
+ *     (secaudit 2026-10, apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate).
  *   v1.12.0 -- 2026-10-20 -- The workspace readers (listSkills, listSkillLibraryPlain,
  *     resolveSkillRef) leave out a copy whose OWNER may not write that workspace's content
  *     (writtenByWsWriters in skill-records.ts), before freshest-wins. Defence in depth for secaudit
@@ -98,6 +100,7 @@ import { showSkillRecords } from './skill-reader.js';
 import { listAcrossOwners, freshestByKey, writtenByWsWriters } from './skill-records.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
 import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
+import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
 import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
@@ -415,6 +418,8 @@ export async function deleteSkill(
   const snapshots = await storage.listMemory(ownerGaii, { prefix: versionPrefix(name) });
   for (const s of snapshots) await storage.deleteMemory(ownerGaii, s.key);
   await storage.deleteMemory(ownerGaii, manifestKey(name));
+  // A request waiting to make it public names content that is gone; one created again starts at 1.0.0.
+  if (scope === 'user' && opts.owner) await settleRequestsForRemovedTarget({ storage, config }, ownerGaii, 'skill', { owner: opts.owner, name }, `the skill ${name}`);
   return true;
 }
 

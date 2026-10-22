@@ -13,9 +13,13 @@
  *   scrubber unless the owner's policy says agents may.
  *
  *   One of three surfaces. See tool-catalog/definitions/decide.ts for the other two.
- * @structure registerDecideTools(mcp, storage, config, getAgentGaii)
- * @usage registerDecideTools(mcp, storage, config, () => agentGaii);
+ * @structure registerDecideTools(mcp, storage, config, getAgentGaii, sessionCaller)
+ * @usage registerDecideTools(mcp, storage, config, () => agentGaii, caller);
  * @version-history
+ *   2026-10-22 — aimeat_decide_run asks the session caller whether it reads as the owner
+ *     (readsAsOwner): without memory:read-as-owner its keys and prefix read only what the memory route
+ *     shows it, and it lists, reads, resumes and stops only the runs it started (secaudit 2026-10,
+ *     v83, v84). Takes the session caller as a fifth parameter.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -47,16 +51,21 @@ import { getRule, useAllows, rulesRunnableBy, listRuleProposals, proposeRule } f
 import { agentNameOf } from '../services/agent-ai-keys.js';
 import { decideSettingsView } from '../services/decide/settings.js';
 import {
-  startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, type RunItem,
+  startDecideRun, getDecideRun, listDecideRuns, resumeDecideRun, stopDecideRun, runSummary, runViewerOf, type RunItem,
 } from '../services/decide/runs.js';
 import type { JevQuestion } from '../services/decide/limits.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { readsAsOwner, READ_AS_OWNER_NOTE } from '../services/owner-scope-read.js';
+import type { CallerContext } from '../services/caller-context.js';
 
 export function registerDecideTools(
   mcp: McpServer,
   storage: Storage,
   config: AimeatConfig,
   getAgentGaii: () => string,
+  /** The session's caller (services/caller-context.ts), asked per call whether it reads as the owner.
+   *  Absent, the session reads as an agent without memory:read-as-owner. */
+  sessionCaller?: () => CallerContext,
 ): void {
   const agentGaii = getAgentGaii();
   const owner = localAccountName(agentGaii);
@@ -74,6 +83,13 @@ export function registerDecideTools(
   const caller = (appId?: string): DecideCaller => ({
     gaii: ownerGhii, principal: agentGaii, isOwner: false, ...(appId ? { appId } : {}),
   });
+  // A decision run reads the owner's records and holds what others of the owner sent: it carries
+  // whether this session reads as the owner, asked per call so a permission the owner grants or
+  // removes takes effect at once (secaudit 2026-10, v83, v84).
+  const runCaller = (appId?: string): DecideCaller => {
+    const session = sessionCaller?.();
+    return { ...caller(appId), readsAll: session ? readsAsOwner(session) : false };
+  };
 
   // ── aimeat_decide ──
   mcp.registerTool(
@@ -177,10 +193,15 @@ export function registerDecideTools(
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
       try {
-        if (a.action === 'list') return text({ runs: await listDecideRuns(storage, ownerGhii) });
+        const rc = runCaller(a.app_id);
+        const viewer = runViewerOf(rc);
+        if (a.action === 'list') {
+          const { runs, omitted } = await listDecideRuns(storage, ownerGhii, viewer);
+          return text({ runs, ...(omitted > 0 ? { omitted, note: READ_AS_OWNER_NOTE } : {}) });
+        }
         if (a.action === 'start') {
           if (!a.questions && a.rule === undefined) return err('INVALID_BODY: start needs questions, or a rule.');
-          const run = await startDecideRun(storage, config, caller(a.app_id), {
+          const run = await startDecideRun(storage, config, rc, {
             ...(a.rule !== undefined ? { rule: a.rule } : {}),
             ...(a.provider !== undefined ? { provider: a.provider } : {}),
             ...(a.questions ? { questions: a.questions as Record<string, JevQuestion> } : {}),
@@ -195,10 +216,11 @@ export function registerDecideTools(
           return text(runSummary(run));
         }
         if (!a.run_id) return err(`INVALID_BODY: ${a.action} needs run_id.`);
-        const run = a.action === 'get' ? await getDecideRun(storage, ownerGhii, a.run_id)
-          : a.action === 'resume' ? await resumeDecideRun(storage, config, caller(a.app_id), a.run_id)
-            : await stopDecideRun(storage, ownerGhii, a.run_id);
-        if (!run) return err('No such run.');
+        const run = a.action === 'get' ? await getDecideRun(storage, ownerGhii, a.run_id, viewer)
+          : a.action === 'resume' ? await resumeDecideRun(storage, config, rc, a.run_id)
+            : await stopDecideRun(storage, ownerGhii, a.run_id, viewer);
+        // Absent, or started by another of the owner's identities: the same answer, and the reason.
+        if (!run) return err(viewer.all ? 'No such run.' : `No such run. ${READ_AS_OWNER_NOTE}`);
         return text(a.action === 'get' ? run : runSummary(run));
       } catch (e) {
         return failed(e);

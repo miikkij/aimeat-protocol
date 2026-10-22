@@ -24,6 +24,11 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-decide.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-ai-decide.ts
  * @version-history
+ *   v1.9.0 — 2026-10-22 — Phase 13 (secaudit 2026-10, v83 and v84): a run started by an agent without
+ *     memory:read-as-owner does not read the owner's private records by keys or prefix, and that agent
+ *     does not list, read, resume or stop a run the owner started; the owner, an app grant and an
+ *     agent holding the word keep every use, and the agent keeps its own runs. 13b to 13d and 13f
+ *     failed on the code before the fix.
  *   v1.8.0 — 2026-09-26 — 4e2: a provider's answer past 4 MB is PROVIDER_ERROR on REST and on MCP
  *     with one sentence naming the limit, and is neither recorded nor metered (secaudit 2026-09, N3).
  *   v1.7.0 — 2026-09-25 — 9f: the agent the gate stopped is refused a review of its own decision on
@@ -1082,6 +1087,163 @@ const QUESTIONS = {
     const by = Object.fromEntries((r.body.data.groups as any[]).map(g => [g.key, g]));
     assert(by['mine-local']?.decisions >= 3 && by['mine-local'].costUsd === 0, `local: ${JSON.stringify(by['mine-local'])}`);
     assert(by.typesafe?.decisions >= 1 && by.typesafe.costUsd > 0, `typesafe: ${JSON.stringify(by.typesafe)}`);
+  });
+
+  console.log('\nPhase 13: a run reads and shows only what its caller may read (secaudit 2026-10, v83, v84)');
+  // An agent without memory:read-as-owner gets 404 for the owner's private record on the memory
+  // route. A decision run read the same record by keys or prefix, and the run store showed that agent
+  // every run the owner, an app or a sibling agent started. Both now answer it as the memory route
+  // does, and name the permission the owner can tick. The owner in person, an app grant and an agent
+  // holding memory:read-as-owner see and run everything, as before.
+  const SECRET = 'vis13.secret.note';
+  const SHARED = 'vis13.shared.note';
+  const SECRET_TEXT = 'sell-the-boat';
+  const scoped = await connectAgent(A, 'scopedbot', ['ai:use', 'memory:read']);
+  const trusted = await connectAgent(A, 'trustedbot', ['ai:use', 'memory:read', 'memory:read-as-owner']);
+  const putRecord = (key: string, value: unknown, visibility: string) =>
+    json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key, value, visibility }) });
+  const startRun = (token: string, body: Record<string, unknown>) =>
+    json('/v1/ai/decide/runs', { method: 'POST', headers: auth(token), body: JSON.stringify({ questions: { q: QUESTIONS.urgent }, ...body }) });
+  // A run reads as `interrupted` for the moment between leaving the process's active set and its
+  // final save (runs.ts work()), which Postgres makes long enough to see: wait for a final state.
+  const FINAL = new Set(['done', 'stopped']);
+  const settled = async (token: string, id: string): Promise<any> => {
+    let run: any;
+    for (let i = 0; i < 60; i++) {
+      const r = await json(`/v1/ai/decide/runs/${id}`, { headers: auth(token) });
+      run = r.body.data;
+      if (r.status !== 200 || FINAL.has(run?.state)) return run;
+      await sleep(250);
+    }
+    return run;
+  };
+  const toolText = (r: any) => String(r.result?.content?.[0]?.text ?? r.error?.message ?? '');
+  const toolData = (r: any) => { try { return JSON.parse(toolText(r)); } catch { return null; } };
+  const mcpSettled = async (token: string, id: string): Promise<any> => {
+    let run: any;
+    for (let i = 0; i < 60; i++) {
+      run = toolData(await mcpCall(token, 'aimeat_decide_run', { action: 'get', run_id: id }));
+      if (!run || FINAL.has(run.state)) return run;
+      await sleep(250);
+    }
+    return run;
+  };
+  const w1 = await putRecord(SECRET, { plan: SECRET_TEXT, topic: 'boat' }, 'private');
+  const w2 = await putRecord(SHARED, { plan: 'buy-a-car', topic: 'car' }, 'owner');
+  assert(w1.status === 201 && w2.status === 201, `records written: ${w1.status} ${w2.status} ${JSON.stringify(w1.body.error ?? w2.body.error)}`);
+
+  await test('13a. control: the memory route hides the private record from the agent without memory:read-as-owner, and shows it to the one with it', async () => {
+    const hidden = await json(`/v1/memory/${SECRET}?owner_scope=true`, { headers: auth(scoped) });
+    assert(hidden.status === 404, `scoped agent, got ${hidden.status}`);
+    const shown = await json(`/v1/memory/${SECRET}?owner_scope=true`, { headers: auth(trusted) });
+    assert(shown.status === 200 && shown.body.data?.value?.plan === SECRET_TEXT, `agent with memory:read-as-owner, got ${shown.status}`);
+  });
+
+  let scopedRun = '';
+  await test('13b. v83 REST keys: the private record is NOT_FOUND with the permission note, nothing of it reaches the model, and the owner-visible record is decided', async () => {
+    const before = seen.length;
+    const r = await startRun(scoped, { keys: [SECRET, SHARED], fields: ['plan'] });
+    assert(r.status === 202, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    scopedRun = r.body.data.id;
+    const run = await settled(scoped, scopedRun);
+    const hidden = run?.results?.[SECRET];
+    assert(hidden?.error?.code === 'NOT_FOUND' && String(hidden.error.message).includes('memory:read-as-owner'),
+      `private record: ${JSON.stringify(hidden)}`);
+    assert(hidden.values === undefined && hidden.decision_id === undefined, 'no answer about the private record');
+    assert(typeof run.results?.[SHARED]?.decision_id === 'string', `owner-visible record: ${JSON.stringify(run?.results?.[SHARED])}`);
+    assert(!JSON.stringify(seen.slice(before)).includes(SECRET_TEXT), 'the private value reached the decision model');
+  });
+
+  await test('13c. v83 REST prefix: the private key is not among the items, and a prefix that covers only it says what to ask for', async () => {
+    const r = await startRun(scoped, { prefix: 'vis13.' });
+    assert(r.status === 202, `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    const run = await settled(scoped, r.body.data.id);
+    const subjects = (run?.items ?? []).map((i: any) => i.subject);
+    assert(!subjects.includes(SECRET), `the private key is listed: ${subjects}`);
+    assert(subjects.includes(SHARED), `the owner-visible key is listed: ${subjects}`);
+    const only = await startRun(scoped, { prefix: 'vis13.secret' });
+    assert(only.status === 400 && only.body.error?.code === 'INVALID_BODY' && String(only.body.error?.message).includes('memory:read-as-owner'),
+      `got ${only.status} ${JSON.stringify(only.body.error ?? only.body.data?.id)}`);
+  });
+
+  await test('13d. v83 MCP keys: the same refusal, and an absent key answers exactly as the hidden one', async () => {
+    const before = seen.length;
+    const started = toolData(await mcpCall(scoped, 'aimeat_decide_run', {
+      action: 'start', keys: [SECRET, 'vis13.absent.note'], fields: ['plan'], questions: { q: QUESTIONS.urgent },
+    }));
+    assert(typeof started?.id === 'string', `started: ${JSON.stringify(started)}`);
+    const run = await mcpSettled(scoped, started.id);
+    const hidden = run?.results?.[SECRET];
+    const absent = run?.results?.['vis13.absent.note'];
+    assert(hidden?.error?.code === 'NOT_FOUND' && String(hidden.error.message).includes('memory:read-as-owner'), `private record: ${JSON.stringify(hidden)}`);
+    assert(JSON.stringify(absent?.error) === JSON.stringify(hidden?.error), `absent ${JSON.stringify(absent)} vs hidden ${JSON.stringify(hidden)}`);
+    assert(!JSON.stringify(seen.slice(before)).includes(SECRET_TEXT), 'the private value reached the decision model');
+  });
+
+  await test('13e. v83 kept: the owner in person, an app grant and an agent with memory:read-as-owner (REST and MCP) decide the private record; the scoped agent runs what it sends', async () => {
+    for (const [who, token] of [['owner', A.token], ['app', appToken], ['trusted', trusted]] as const) {
+      const r = await startRun(token, { keys: [SECRET], fields: ['plan'] });
+      assert(r.status === 202, `${who}: got ${r.status} ${JSON.stringify(r.body.error)}`);
+      const run = await settled(token, r.body.data.id);
+      assert(typeof run?.results?.[SECRET]?.decision_id === 'string', `${who}: ${JSON.stringify(run?.results?.[SECRET])}`);
+    }
+    const viaTool = toolData(await mcpCall(trusted, 'aimeat_decide_run', { action: 'start', keys: [SECRET], questions: { q: QUESTIONS.urgent } }));
+    const toolRun = await mcpSettled(trusted, viaTool?.id);
+    assert(typeof toolRun?.results?.[SECRET]?.decision_id === 'string', `trusted over MCP: ${JSON.stringify(toolRun?.results)}`);
+    const sent = await startRun(scoped, { items: [{ subject: 'vis13.sent', state: 'Pay the invoice today.' }] });
+    assert(sent.status === 202, `items run: ${sent.status}`);
+    const sentRun = await settled(scoped, sent.body.data.id);
+    assert(typeof sentRun?.results?.['vis13.sent']?.decision_id === 'string', `items run: ${JSON.stringify(sentRun?.results)}`);
+  });
+
+  let ownerRun = '';
+  await test('13f. v84: the agent without memory:read-as-owner neither lists, reads, resumes nor stops a run the owner started', async () => {
+    const r = await startRun(A.token, { items: [{ subject: 'vis13.lead', state: { note: 'v84 private text' } }] });
+    assert(r.status === 202, `owner start: ${r.status}`);
+    ownerRun = r.body.data.id;
+    await settled(A.token, ownerRun);
+    const list = await json('/v1/ai/decide/runs', { headers: auth(scoped) });
+    const ids = (list.body.data?.runs ?? []).map((x: any) => x.id);
+    assert(list.status === 200 && !ids.includes(ownerRun), `the list shows the owner's run: ${ids}`);
+    assert(list.body.data.omitted >= 1 && String(list.body.data.note).includes('memory:read-as-owner'), `the list says runs were left out: ${JSON.stringify(list.body.data.omitted)}`);
+    const get = await json(`/v1/ai/decide/runs/${ownerRun}`, { headers: auth(scoped) });
+    assert(get.status === 404 && String(get.body.error?.message).includes('memory:read-as-owner'), `get: ${get.status} ${JSON.stringify(get.body.data?.items ?? get.body.error)}`);
+    const resume = await json(`/v1/ai/decide/runs/${ownerRun}/resume`, { method: 'POST', headers: auth(scoped), body: '{}' });
+    const stop = await json(`/v1/ai/decide/runs/${ownerRun}/stop`, { method: 'POST', headers: auth(scoped), body: '{}' });
+    assert(resume.status === 404 && stop.status === 404, `resume ${resume.status}, stop ${stop.status}`);
+    const toolGet = await mcpCall(scoped, 'aimeat_decide_run', { action: 'get', run_id: ownerRun });
+    assert(toolGet.result?.isError === true && toolText(toolGet).includes('No such run.') && !toolText(toolGet).includes('v84 private text'),
+      `MCP get: ${toolText(toolGet).slice(0, 200)}`);
+    const toolList = toolData(await mcpCall(scoped, 'aimeat_decide_run', { action: 'list' }));
+    assert(!(toolList?.runs ?? []).some((x: any) => x.id === ownerRun), 'the MCP list shows the owner\'s run');
+    for (const action of ['resume', 'stop']) {
+      const t = await mcpCall(scoped, 'aimeat_decide_run', { action, run_id: ownerRun });
+      assert(t.result?.isError === true && toolText(t).includes('No such run.'), `MCP ${action}: ${toolText(t).slice(0, 200)}`);
+    }
+  });
+
+  await test('13g. v84 kept: the owner, an app grant and an agent with memory:read-as-owner see every run; the scoped agent follows, stops and resumes its own', async () => {
+    const owners = await json('/v1/ai/decide/runs', { headers: auth(A.token) });
+    const ownerIds = (owners.body.data?.runs ?? []).map((x: any) => x.id);
+    assert(ownerIds.includes(ownerRun) && ownerIds.includes(scopedRun), 'the owner lists every run');
+    assert(owners.body.data.omitted === undefined, 'nothing is left out for the owner');
+    for (const [who, token] of [['owner', A.token], ['app', appToken], ['trusted', trusted]] as const) {
+      const g = await json(`/v1/ai/decide/runs/${ownerRun}`, { headers: auth(token) });
+      assert(g.status === 200 && g.body.data?.items?.[0]?.state?.note === 'v84 private text', `${who}: ${g.status}`);
+    }
+    const toolGet = toolData(await mcpCall(trusted, 'aimeat_decide_run', { action: 'get', run_id: ownerRun }));
+    assert(toolGet?.id === ownerRun, `trusted over MCP: ${JSON.stringify(toolGet)?.slice(0, 200)}`);
+    const mine = await json('/v1/ai/decide/runs', { headers: auth(scoped) });
+    assert((mine.body.data?.runs ?? []).some((x: any) => x.id === scopedRun), 'the scoped agent lists its own run');
+    const own = await json(`/v1/ai/decide/runs/${scopedRun}`, { headers: auth(scoped) });
+    assert(own.status === 200 && own.body.data.id === scopedRun, `its own run: ${own.status}`);
+    const stop = await json(`/v1/ai/decide/runs/${scopedRun}/stop`, { method: 'POST', headers: auth(scoped), body: '{}' });
+    const resume = await json(`/v1/ai/decide/runs/${scopedRun}/resume`, { method: 'POST', headers: auth(scoped), body: '{}' });
+    assert(stop.status === 200 && resume.status === 202, `stop ${stop.status}, resume ${resume.status} ${JSON.stringify(resume.body.error)}`);
+    for (const action of ['get', 'stop', 'resume']) {
+      const t = await mcpCall(scoped, 'aimeat_decide_run', { action, run_id: scopedRun });
+      assert(t.result?.isError !== true && toolData(t)?.id === scopedRun, `MCP ${action} of its own run: ${toolText(t).slice(0, 200)}`);
+    }
   });
 
   // ── Phase 12: a public node reaches its own local models by the operator's list, and nothing else ──

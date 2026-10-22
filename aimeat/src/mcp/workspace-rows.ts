@@ -2,8 +2,8 @@
  * @file src/mcp/workspace-rows.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The four MCP tools for workspace ROW spaces. Extracted from mcp/workspaces.ts at the
- *   max-file-lines boundary; a move, not a rewrite.
+ * @description The MCP tools for workspace ROW spaces: append, read, stats, delete, and a row's kept
+ *   revisions with their restore. Extracted from mcp/workspaces.ts at the max-file-lines boundary.
  *
  *   THESE HOLD NO LOGIC OF THEIR OWN. services/workspace-rows/row-service.ts is what the REST routes
  *   call too, so the manifest gate, the access rule, the quota ceilings and the retention sweep
@@ -13,6 +13,8 @@
  * @structure registerWorkspaceRowTools(mcp, deps, caller)
  * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, scopes }, caller);
  * @version-history
+ *   2026-10-22 — aimeat_workspace_rows_revisions and aimeat_workspace_rows_restore, on the delete's two
+ *     words, and `revisions_kept` in the append answer (secaudit 2026-10, v80; developer ruling 2026-10-22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9). The deps no longer carry ownerName.
@@ -32,7 +34,7 @@ import { annotationsFor } from './annotations.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import {
-    appendRows, readRows, spaceStats, deleteRow, deleteRowsBefore,
+    appendRows, readRows, spaceStats, deleteRow, deleteRowsBefore, listRowRevisions, restoreRowRevision,
     WorkspaceRowError, type RowCaller,
 } from '../services/workspace-rows/row-service.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -89,7 +91,7 @@ export function registerWorkspaceRowTools(
                 const res = await appendRows(rowDeps, rowCaller(), {
                     organismId: organism_id, wsId: ws, space, rows: list,
                 });
-                return ok({ written: res.written, row_ids: res.rowIds, pruned: res.pruned });
+                return ok({ written: res.written, row_ids: res.rowIds, pruned: res.pruned, revisions_kept: res.revisionsKept });
             } catch (err) { return rowFail(err); }
         });
 
@@ -142,6 +144,37 @@ export function registerWorkspaceRowTools(
                 }
                 const removed = await deleteRowsBefore(rowDeps, rowCaller(), organism_id, ws, space, before!);
                 return ok({ removed });
+            } catch (err) { return rowFail(err); }
+        });
+
+    // A row's kept revisions (services/workspace-rows/row-revisions.ts): the same two words as the
+    // delete, memory:purge as the catalog gate and organism:write asked here, as REST asks both.
+    const purgeWordsHeld = (): TextResult | null => scopeIsCovered(scopes, 'organism:write') ? null
+        : fail('SCOPE_DENIED: a row\'s kept revisions are for whoever may remove rows, which needs the organism:write permission beside memory:purge. Ask the owner for it.');
+
+    mcp.registerTool('aimeat_workspace_rows_revisions', { description: descriptionFor('aimeat_workspace_rows_revisions'),
+        inputSchema: zodShapeFor('aimeat_workspace_rows_revisions'),
+        annotations: annotationsFor('aimeat_workspace_rows_revisions') },
+        async ({ organism_id, ws, space, row_id }): Promise<TextResult> => {
+            const refused = purgeWordsHeld();
+            if (refused) return refused;
+            try {
+                const out = await listRowRevisions(rowDeps, rowCaller(), organism_id, ws, space, row_id,
+                    readerForAgent({ storage, config }, agentGaii));
+                return ok({ space: out.space, row_id: out.rowId, revisions: out.revisions });
+            } catch (err) { return rowFail(err); }
+        });
+
+    mcp.registerTool('aimeat_workspace_rows_restore', { description: descriptionFor('aimeat_workspace_rows_restore'),
+        inputSchema: zodShapeFor('aimeat_workspace_rows_restore'),
+        annotations: annotationsFor('aimeat_workspace_rows_restore') },
+        async ({ organism_id, ws, space, row_id, revision_id }): Promise<TextResult> => {
+            const refused = purgeWordsHeld();
+            if (refused) return refused;
+            try {
+                const out = await restoreRowRevision(rowDeps, rowCaller(), organism_id, ws, space, row_id, revision_id,
+                    readerForAgent({ storage, config }, agentGaii));
+                return ok({ row_id: out.rowId, restored: out.restored, revision_kept: out.revisionKept });
             } catch (err) { return rowFail(err); }
         });
 }

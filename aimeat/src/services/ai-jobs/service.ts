@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.16.0 -- 2026-10-22 -- The start and a restart hold the job's inputs to its viewer (starter.ts
+ *     jobReadViewer) and keep `read_as` (secaudit 2026-10, r49, v75).
  *   v1.15.0 — 2026-10-21 — A gated image job's private picture gets its publish request after the
  *     answer's record is written, as a part of the record's request (picture-request.ts), so one press
  *     decides both; on its own when the record asked nothing, failed or the job was cancelled.
@@ -98,7 +100,7 @@ import { aiJobKeyRefusal } from '../ai-job-keys.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
-import { jobReader, jobWriter, starterMayInvokeExtensions, onDoneScopeRefusal } from './starter.js';
+import { jobReader, jobWriter, jobReadViewer, starterMayInvokeExtensions, onDoneScopeRefusal } from './starter.js';
 import { writeMemoryRecord } from '../memory-write.js';
 import { resultWriteRefusal } from './result-precheck.js';
 import { warningsNote } from '../classification/reader.js';
@@ -218,7 +220,7 @@ export class AiJobService implements AiJobStarter {
         // over the cap. A transcription has no prompt: its read is the audio file's metadata, which
         // answers 404 for a key that is not in the owner's own storage.
         const { prompt, warnings } = await this.prepareInput(ownerGhii, {
-            ...input, op, ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
+            ...input, op, ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}), ...(ctx.readAs ? { read_as: ctx.readAs } : {}),
         });
 
         // The account's AI call limit (services/account-limits.ts): POST /v1/ai/jobs and
@@ -259,6 +261,7 @@ export class AiJobService implements AiJobStarter {
             queued_at: now,
             created_by: ctx.createdBy,
             ...(ctx.startedBy ? { started_by: ctx.startedBy } : {}),
+            ...(ctx.readAs ? { read_as: ctx.readAs } : {}),
             ...(warnings ? { classification_warnings: warnings } : {}),
         };
 
@@ -647,17 +650,19 @@ export class AiJobService implements AiJobStarter {
      */
     private async prepareInput(
         ownerGhii: string,
-        spec: Pick<AiJobRecord, 'op' | 'prompt' | 'prompt_key' | 'input_keys' | 'audio_key' | 'started_by'>,
+        spec: Pick<AiJobRecord, 'op' | 'prompt' | 'prompt_key' | 'input_keys' | 'audio_key' | 'started_by' | 'read_as'>,
     ): Promise<{ prompt: string; warnings?: AiJobClassificationWarnings }> {
         const deps = { storage: this.storage, config: this.config };
+        // Which same-owner records and files the model may be handed (starter.ts jobReadViewer).
+        const viewer = jobReadViewer(spec);
         if (aiOpOf(spec.op) === 'transcribe') {
-            await assertAudioInReach(deps, ownerGhii, spec.audio_key ?? '');
+            await assertAudioInReach(deps, ownerGhii, spec.audio_key ?? '', viewer);
             return { prompt: '' };
         }
         // The job reads as whoever started it; a job with no starter recorded reads as an unattended
         // AI run (starter.ts). The same reader at the start and when a restart rebuilds the prompt.
         const reader = jobReader(deps, { owner: ownerGhii, started_by: spec.started_by });
-        const prompt = await assembleJobPrompt(deps, reader, ownerGhii, spec);
+        const prompt = await assembleJobPrompt(deps, reader, ownerGhii, spec, viewer);
         // The warning-classified records the prompt holds go on the job, so the caller is told.
         const warnings = warningsNote(reader).classification_warnings;
         return { prompt, ...(warnings ? { warnings } : {}) };

@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-22 — The delegated-settings check moved unchanged to app-publish-delegate.ts (line limit), which also refuses a developer of another account without the full right who adds the ?format=md declaration or changes which extension action it names (secaudit 2026-10, r54).
  *   2026-10-19 — A display version the caller states is refused when it breaks the one rule (services/app-display-version.ts); a carried one is not re-judged (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 — The data-map stamp is checked against the scopes the version declares, so an app asking for organism:invite whose map does not say it invites people is stamped with DATAMAP_INVITES_UNSTATED (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-18 — A first publish's default exposure is narrowed to the app's label's audience cap
@@ -117,7 +118,6 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a. Extracted from routes/apps/publish.ts,
  *     routes/upload.ts and routes/apps/drafts.ts, which each held a partial copy of it.
  */
-import { isDeepStrictEqual } from 'node:util';
 import { classifyContainerAfterWrite } from './classify-on-write.js';
 import { appTarget } from './classification/containers.js';
 import { accountOf } from './app-members.js';
@@ -161,6 +161,7 @@ import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
+import { delegatedSettingsRefusal } from './app-publish-delegate.js';
 import { publishExposure } from './app-publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 import type { PublishAsk } from './publish-requests/ask.js';
@@ -408,16 +409,13 @@ export async function publishApp(
     const managed = await managedChangeRefusal(storage, ownerName, 'app', filename, 'code');
     if (managed) return { refusal: managed };
   }
+  // What a developer of another account may not change (services/app-publish-delegate.ts), the
+  // ?format=md handler among it: the node runs that action in the owner's name for every reader.
   if (delegated) {
-    const forbidden = (requested.tollMorsels !== undefined && requested.tollMorsels !== (prev?.tollMorsels ?? 0))
-      || (requested.licenseType !== undefined && requested.licenseType !== prev?.licenseType)
-      || (!mayAct(delegate!.level, 'operate') && (
-        (requested.protection !== undefined && !isDeepStrictEqual(requested.protection, prev?.protection ?? {}))
-        || (requested.cortexAgents !== undefined && !isDeepStrictEqual(requested.cortexAgents, prev?.cortex?.agents ?? []))
-        || (requested.usesCortex !== undefined && !isDeepStrictEqual(requested.usesCortex, prev?.usesCortex ?? []))
-        || (input.accessCode.mode === 'explicit' && input.accessCode.value !== live?.accessCode)
-      ));
-    if (forbidden) return { refusal: { status: 403, code: 'FORBIDDEN', message: 'Your development right does not permit changing these app settings.' } };
+    const refused = delegatedSettingsRefusal({
+      ownerName, level: delegate!.level, requested, prev, liveAccessCode: live?.accessCode, accessCode: input.accessCode, formatMd: formatMdDecl,
+    });
+    if (refused) return { refusal: refused };
   }
 
   // A description is REQUIRED for a NEW app so the catalogue and the landing wall always have one.

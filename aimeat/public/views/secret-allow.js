@@ -14,6 +14,8 @@
  * @structure default export SecretAllow() — signed out: sign in; gone; ready: the question; done
  * @usage routed at /v1/secret-allow by spa.html (and a spaRoute in routes/portal.ts)
  * @version-history
+ *   v1.2.0 — 2026-10-22 — A decline the node did not record (allowed meanwhile) reloads the question
+ *     instead of saying "Not allowed" (found by the eco-capability-allow browser check).
  *   v1.1.0 — 2026-10-21 — Browser check: buttons at the control size, the tag at the label size, a
  *     `why` that starts with "to" reads once, and the way back opens the Secrets section.
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59 follow-up; pattern of agent-allow.js).
@@ -48,27 +50,32 @@ export default function SecretAllow() {
   const [failed, setFailed] = useState('');
   const path = `/v1/secrets/${encodeURIComponent(secret)}`;
 
+  const load = useCallback(() => api(`${path}/approval?extension=${encodeURIComponent(extension)}&host=${encodeURIComponent(host)}`, { retries: 0 })
+    .then((res) => ({ status: 'ready', data: res?.data || null }))
+    .catch((err) => { swallowed('secret-allow: load', err); return { status: 'gone', data: null }; }), [path, extension, host]);
+
   useEffect(() => {
     if (!session) { setView({ status: 'signin', data: null }); return undefined; }
     if (!secret || !extension || !host) { setView({ status: 'gone', data: null }); return undefined; }
     let live = true;
-    api(`${path}/approval?extension=${encodeURIComponent(extension)}&host=${encodeURIComponent(host)}`, { retries: 0 })
-      .then((res) => { if (live) setView({ status: 'ready', data: res?.data || null }); })
-      .catch((err) => { swallowed('secret-allow: load', err); if (live) setView({ status: 'gone', data: null }); });
+    load().then((v) => { if (live) setView(v); });
     return () => { live = false; };
-  }, [secret, extension, host, session, path]);
+  }, [secret, extension, host, session, load]);
 
   const answer = useCallback(async (allow) => {
     setBusy(true); setFailed('');
     try {
-      await api(`${path}/approvals${allow ? '' : '/decline'}`, { method: 'POST', body: JSON.stringify({ extension, host }) });
-      setView((v) => ({ ...v, status: allow ? 'allowed' : 'declined' }));
+      const res = await api(`${path}/approvals${allow ? '' : '/decline'}`, { method: 'POST', body: JSON.stringify({ extension, host }) });
+      // A decline the node did not record (allowed meanwhile in another tab or from the bell, or no
+      // longer waiting) shows the question as the node holds it now, never "Not allowed".
+      if (!allow && res?.data?.declined === false) setView(await load());
+      else setView((v) => ({ ...v, status: allow ? 'allowed' : 'declined' }));
     } catch (err) {
       swallowed('secret-allow: answer', err);
       setFailed(t('secretAllow.failed'));
     }
     setBusy(false);
-  }, [path, extension, host]);
+  }, [path, extension, host, load]);
 
   // The row label at its normal size (browser check: the tag's 10.88px was too small to read).
   const tag = html`<${Label}>${t('secretAllow.badge')}<//>`;

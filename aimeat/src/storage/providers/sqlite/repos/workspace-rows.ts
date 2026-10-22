@@ -13,8 +13,11 @@
  *   A REPEATED rowId REPLACES. `createdAt` and the surrogate `id` survive the replacement, so a
  *   re-run of a scheduled ingest updates what it already wrote instead of duplicating it, and the
  *   row's history of when it first arrived is not rewritten by the re-run.
- * @structure append / get / list / delete / deleteBefore / trim / stats / usage
+ * @structure append / get / getByIds / list / delete / deleteBefore / trim / stats / usage
  * @version-history
+ *   v1.2.0 — 2026-10-22 — updatedBy is written and read, and getWorkspaceRowsByIds answers what an
+ *     append is about to replace (secaudit 2026-10, v80). The revisions are in
+ *     ./workspace-row-revisions.ts.
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -58,6 +61,7 @@ function toRow(r: Row): WorkspaceRowRecord {
     createdAt: r.createdAt as string,
     updatedAt: r.updatedAt as string,
     createdBy: (r.createdBy as string) ?? '',
+    updatedBy: (r.updatedBy as string | null) ?? '',
     body: parseBody(r.body),
     bytes: Number(r.bytes ?? 0),
   };
@@ -77,21 +81,25 @@ function spaceWhere(organismId: string, wsId: string, namespace: string): { sql:
 export function appendWorkspaceRows(db: Database.Database, rows: WorkspaceRowRecord[]): void {
   if (!rows.length) return;
   // ON CONFLICT keeps id and createdAt: the row's first arrival is a fact a re-run does not rewrite.
+  // createdBy is written as the service settled it (row-service.ts appendRows keeps the first
+  // author when another writer family replaces the row), and updatedBy names the last writer.
   const stmt = db.prepare(
     `INSERT INTO workspace_rows
        (id, organismId, wsId, namespace, rowId, k1, k2, k3,
-        occurredAt, createdAt, updatedAt, createdBy, body, bytes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        occurredAt, createdAt, updatedAt, createdBy, updatedBy, body, bytes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(organismId, wsId, namespace, rowId) DO UPDATE SET
        k1 = excluded.k1, k2 = excluded.k2, k3 = excluded.k3,
        occurredAt = excluded.occurredAt, updatedAt = excluded.updatedAt,
-       createdBy = excluded.createdBy, body = excluded.body, bytes = excluded.bytes`
+       createdBy = excluded.createdBy, updatedBy = excluded.updatedBy,
+       body = excluded.body, bytes = excluded.bytes`
   );
   const run = db.transaction((batch: WorkspaceRowRecord[]) => {
     for (const r of batch) {
       stmt.run(
         r.id, r.organismId, r.wsId, r.namespace, r.rowId, r.k1, r.k2, r.k3,
-        r.occurredAt, r.createdAt, r.updatedAt, r.createdBy, JSON.stringify(r.body), r.bytes,
+        r.occurredAt, r.createdAt, r.updatedAt, r.createdBy, r.updatedBy || r.createdBy,
+        JSON.stringify(r.body), r.bytes,
       );
     }
   });
@@ -105,6 +113,24 @@ export function getWorkspaceRow(
   const row = db.prepare(`SELECT * FROM workspace_rows WHERE ${w.sql} AND rowId = ?`)
     .get(...w.params, rowId) as Row | undefined;
   return row ? toRow(row) : null;
+}
+
+export function getWorkspaceRowsByIds(
+  db: Database.Database, organismId: string, wsId: string, namespace: string, rowIds: string[],
+): WorkspaceRowRecord[] {
+  const ids = [...new Set(rowIds)];
+  if (!ids.length) return [];
+  const w = spaceWhere(organismId, wsId, namespace);
+  const out: WorkspaceRowRecord[] = [];
+  // In slices, so a batch of 500 stays far under SQLite's bound-parameter ceiling.
+  for (let i = 0; i < ids.length; i += 200) {
+    const slice = ids.slice(i, i + 200);
+    const rows = db.prepare(
+      `SELECT * FROM workspace_rows WHERE ${w.sql} AND rowId IN (${slice.map(() => '?').join(',')})`,
+    ).all(...w.params, ...slice) as Row[];
+    out.push(...rows.map(toRow));
+  }
+  return out;
 }
 
 export function listWorkspaceRows(db: Database.Database, filter: WorkspaceRowFilter): WorkspaceRowPage {

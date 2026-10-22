@@ -20,6 +20,9 @@
  *   summary and resolve · 5 package repository doors
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-limits
  * @version-history
+ *   2026-10-22 — R2 gives the person's sign-in consent for M before the push-home replicate, and R2a
+ *     shows the same replicate without it is 403 CONSENT_REQUIRED with nothing stored (secaudit
+ *     2026-10 wave 3, v71; test change approved by the developer on 2026-10-22).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit S6-02, S6-03, S6-04, S6-09, S10-02).
  */
 
@@ -119,7 +122,20 @@ await test('R1. A replicate under one of M\'s own agents is stored, under the re
     assert(!!(await V.storage.getMemory(gaii, `replica:${M_NODE}:shared-pref`)), 'the replica is stored');
 });
 
+await test('R2a. REFUSED — a replicate into V\'s own person who gave M no sign-in consent, and nothing is stored', async () => {
+    const r = await asM('/v1/federation/replicate', replicateBody(V.ownerGhii, 'home-pref-unconsented'));
+    assert(r.status === 403 && r.body.error?.code === 'CONSENT_REQUIRED', `expected 403 CONSENT_REQUIRED, got ${r.status} ${JSON.stringify(r.body)}`);
+    assert(!(await V.storage.getMemory(V.ownerGhii, `replica:${M_NODE}:home-pref-unconsented`)), 'nothing is stored under the person');
+});
+
 await test('R2. A replicate into V\'s own person (the push-home case) is stored', async () => {
+    // The person lets M sign them in first, the consent push-home's visitor session needs (secaudit
+    // 2026-10 wave 3, v71; the developer's ruling of 2026-10-22).
+    const consent = await V.json('/v1/consent', {
+        method: 'POST', headers: auth(V.ownerToken),
+        body: JSON.stringify({ data_pattern: '_identity', recipient: `node:${M_NODE}`, scope: 'auth', purpose: 'federation_login' }),
+    });
+    assert(consent.status === 201, `the person's sign-in consent for M: ${consent.status} ${JSON.stringify(consent.body?.error)}`);
     const r = await asM('/v1/federation/replicate', replicateBody(V.ownerGhii, 'home-pref'));
     assert(r.status === 200, `push-home replicate: ${r.status} ${JSON.stringify(r.body)}`);
 });

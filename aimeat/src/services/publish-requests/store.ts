@@ -25,12 +25,18 @@
  *   owner, the owner is told: a person must see when their AI acted for them.
  * @structure PUBLISH_REQUEST_PREFIX · PublishKind · PublishRequest · PublishRequester ·
  *   inPublishQueue · readPublishRequest · listPublishRequests · effectiveState · summarizePublishRequest ·
- *   filePublishRequest · settlePublishRequest · settleRequestsForBinnedRecord · memoryValueDigest ·
+ *   filePublishRequest · settlePublishRequest · settleRequestsForBinnedRecord ·
+ *   settleRequestsForRemovedTarget · memoryValueDigest ·
  *   requesterName · approveUrl · PublishApplyResult · PublishApplier
  * @usage
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-22 — settleRequestsForRemovedTarget(): a deleted user skill or an uninstalled cortex
+ *     settles every request still waiting on it `outdated`, and `digest` binds a skill's or a
+ *     cortex's content beside its version (secaudit 2026-10,
+ *     apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate,
+ *     apply-cortex.ts:applyCortexPublish:version-not-bound-to-manifest-or-reinstalled-libs).
  *   2026-10-21 — A request may be filed as a PART of another (`part_of` on the part, `parts` on the
  *     parent; parts.ts): the part gets no item and no notification of its own, waits as long as the
  *     parent, and the parent's item and notification name it. A parent that ends declined, expired or
@@ -455,6 +461,39 @@ export async function settleRequestsForBinnedRecord(
     });
   } catch (err) {
     logger.warn('Publish request: could not settle the requests on a deleted record', { owner: ownerGhii, namespace, key, error: String(err) });
+    return 0;
+  }
+}
+
+/**
+ * A user skill was deleted or a cortex uninstalled: every request still waiting on it is settled
+ * `outdated`, and the one who asked is told. `where` names the target by the fields its kind files
+ * (a skill: owner and name; a cortex: name). A skill created again under the same name starts at
+ * version 1.0.0 again, and a cortex installed again may take the same version, so an approval of the
+ * old request would publish content written after it; a request filed before the content digest
+ * existed has only its version to hold it (secaudit 2026-10,
+ * apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate,
+ * apply-cortex.ts:applyCortexPublish:version-not-bound-to-manifest-or-reinstalled-libs).
+ * Best-effort, as settleRequestsForBinnedRecord: the removal stays done either way.
+ */
+export async function settleRequestsForRemovedTarget(
+  ctx: PublishStoreCtx, ownerGhii: string, kind: 'skill' | 'cortex', where: Record<string, string>, what: string,
+): Promise<number> {
+  try {
+    return await inPublishQueue(ownerGhii, async () => {
+      const now = Date.now();
+      const waiting = (await listPublishRequests(ctx.storage, ownerGhii))
+        .filter(r => r.kind === kind && r.state === 'awaiting_owner' && !publishRequestExpired(r, now)
+          && Object.entries(where).every(([field, value]) => String(r.target[field] ?? '') === value));
+      for (const r of waiting) {
+        await settlePublishRequest(ctx, ownerGhii, r, 'outdated', {
+          by: null, outcome: { reason: `${what} was removed after the request was made` },
+        });
+      }
+      return waiting.length;
+    });
+  } catch (err) {
+    logger.warn('Publish request: could not settle the requests on a removed target', { owner: ownerGhii, kind, ...where, error: String(err) });
     return 0;
   }
 }

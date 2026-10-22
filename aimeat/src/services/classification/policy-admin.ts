@@ -24,6 +24,10 @@
  * @usage
  *   const out = await writePolicy(deps, actor, 'owner', null, { enabled: true });
  * @version-history
+ *   v1.6.0 — 2026-10-22 — The owner's audit log follows memory:read-as-owner: for a caller that does
+ *     not read every record of its owner, a row on a record of the owner or a sibling it may not read
+ *     with owner_scope is left out and the answer carries `note` (owner-scope-labels.ts; secaudit
+ *     2026-10, v77).
  *   v1.5.0 — 2026-09-30 — The node level asks askOperator() about the PRINCIPAL: an operator's agent,
  *     app or ecosystem app passes only with "operator:admin". It asked whether the account behind the
  *     credential was an operator, so any of them read every owner's audit and exceptions and could
@@ -48,6 +52,7 @@ import { isOrgManager } from '../workspace-access.js';
 import { askOperator } from '../operator-principal.js';
 import type { ClassificationPolicy } from './defaults.js';
 import { appNameOf, ClassificationError, isAppActor, type ClassificationDeps, type LabelActor } from './labels.js';
+import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 import { levelScope, recordAutoException } from './exceptions.js';
 import { loosenings, mergePolicy, PolicyError, validateLayer, validateNodePolicy, type PolicyLayer } from './levels.js';
 import {
@@ -251,7 +256,7 @@ export async function auditSubjectFor(
 export async function readAuditLog(
   deps: ClassificationDeps, actor: LabelActor, level: PolicyLevel, organismId: string | null | undefined,
   filter: { since?: string; action?: string; limit?: number } = {},
-): Promise<{ level: PolicyLevel; subject: string; rows: ClassificationAuditRow[] }> {
+): Promise<{ level: PolicyLevel; subject: string; rows: ClassificationAuditRow[]; note?: string }> {
   const subject = await auditSubjectFor(deps, actor, level, organismId);
   const limit = Math.min(Math.max(Number(filter.limit) || 200, 1), 1000);
   const common = { since: filter.since, action: filter.action, limit };
@@ -270,10 +275,16 @@ export async function readAuditLog(
     holders.push(...agents.map(a => a.gaii), ...apps.map(a => a.geai));
   }
   const lists = await Promise.all([...new Set(holders)].map(ownerGaii => listClassificationAuditMerged(deps.storage, { ownerGaii, ...common })));
-  const rows = lists.flat()
+  const merged = lists.flat()
     .sort((a, b) => (a.lastAt < b.lastAt ? 1 : a.lastAt > b.lastAt ? -1 : 0))
     .slice(0, limit);
-  return { level, subject, rows };
+  // memory:read-as-owner (owner-scope-labels.ts): a row on a record of the owner or a sibling that
+  // this caller may not read with owner_scope is left out, and the answer names the permission.
+  const ownerView = ownerScopeLabelView(deps.storage, actor);
+  if (ownerView.readsAll) return { level, subject, rows: merged };
+  const rows: ClassificationAuditRow[] = [];
+  for (const row of merged) if (!(await ownerView.hidden(row))) rows.push(row);
+  return { level, subject, rows, ...(rows.length < merged.length ? { note: READ_AS_OWNER_NOTE } : {}) };
 }
 
 /** A person accepts or rejects the AI's waiting proposal, in their own session. */

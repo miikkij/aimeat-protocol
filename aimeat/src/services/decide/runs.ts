@@ -24,11 +24,25 @@
  *
  *   THE KEY CEILING. One record per run, and only the newest RUNS_KEPT per owner are kept, so a
  *   scheduled run every day does not fill the owner's 1000 keys in three years.
+ *
+ *   WHO READS WHAT. A run lives in the owner's namespace whoever started it, and reads `keys` and
+ *   `prefix` there. A caller that does not read as the owner (owner-scope-read.ts: an agent without
+ *   memory:read-as-owner) reads only the records the memory route would show it: a private record of
+ *   the owner is left out of a prefix and answers as an absent one on keys, with the note that names
+ *   the permission. It sees, resumes and stops only the runs it started itself (RunViewer). The owner
+ *   in person, an app grant and an agent holding the word read and see everything, as before.
  * @structure
- *   startDecideRun · getDecideRun · resumeDecideRun · stopDecideRun · listDecideRuns
+ *   startDecideRun · getDecideRun · resumeDecideRun · stopDecideRun · listDecideRuns · runViewerOf
  * @usage
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
+ *   const run = await getDecideRun(storage, caller.gaii, id, runViewerOf(caller));
  * @version-history
+ *   v1.7.0 — 2026-10-22 — A caller that does not read as the owner reads only the records the memory
+ *     route shows it (ownerScopeView), on keys, on prefix and again at each item's read, so a run
+ *     stored before the change resumes under the caller's current rights; it sees, resumes and stops
+ *     only the runs it started (RunViewer, runViewerOf). listDecideRuns answers { runs, omitted }
+ *     (secaudit 2026-10, v83 startDecideRun:keys-prefix-read-as-owner and v84
+ *     getDecideRun:runs-keyed-by-owner-ghii).
  *   v1.6.1 — 2026-10-20 — stopDecideRun reads the run under the owner before it sets the stop flag
  *     (test/unit/decide-run-stop-owner.test.ts).
  *   v1.6.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -66,6 +80,7 @@ import { readAiRecords } from '../ai-inputs.js';
 import { systemReader, warningsNote, type ContentReader } from '../classification/reader.js';
 import { ClassificationError } from '../classification/labels.js';
 import { requireAiCallTurn } from '../account-limits.js';
+import { ownerScopeView, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
 
 const RUN_PREFIX = 'decide.runs.';
 const RUNS_KEPT = 50;
@@ -134,6 +149,32 @@ const active = new Map<string, { stop: boolean }>();
 // builders by name read this one as the workflows prefix.
 const decideRunKey = (id: string) => `${RUN_PREFIX}${id}`;
 
+/**
+ * True when the caller reads every record and every run in the owner's namespace: it reads as the
+ * owner (`readsAll`, set by the REST route and the MCP tool from owner-scope-read.ts readsAsOwner),
+ * or the namespace is its own (the owner's own sessions, a visitor whose runs are keyed by its home
+ * GHII). Absent, a caller of another identity reads only what the memory route would show it.
+ */
+function readsEverything(caller: Pick<DecideCaller, 'gaii' | 'principal' | 'readsAll'>): boolean {
+  return caller.readsAll === true || caller.principal === caller.gaii;
+}
+
+/** Who is reading runs under an owner GHII: every run, or only the runs this principal started. */
+export interface RunViewer { principal: string; all: boolean }
+
+/** The viewer a caller reads runs as. */
+export function runViewerOf(caller: Pick<DecideCaller, 'gaii' | 'principal' | 'readsAll'>): RunViewer {
+  return { principal: caller.principal, all: readsEverything(caller) };
+}
+
+/** A run another same-owner principal started is a private owner record: hidden as the memory route hides it. */
+function runVisible(run: DecideRun, viewer?: RunViewer): boolean {
+  return !viewer || viewer.all || run.principal === viewer.principal;
+}
+
+/** What a hidden record and an absent one answer to a caller that does not read as the owner: the same. */
+const NOT_YOURS_OR_GONE = `No such record. ${READ_AS_OWNER_NOTE}`;
+
 /** Why a run does not send these records: the node reads them to decide what it does. */
 function reservedSubjectMessage(keys: string[]): string {
   return `${keys.map(k => `"${k}"`).join(', ')}: this node reads ${keys.length === 1 ? 'that record' : 'those records'} `
@@ -195,6 +236,16 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
       if (isReservedServerKey(item.subject)) {
         run.results[item.subject] = { error: { code: 'RESERVED_KEY', message: reservedSubjectMessage([item.subject]) } };
         return;
+      }
+      // The memory route's rule for a caller that does not read as the owner (memory:read-as-owner),
+      // checked at each read so a resumed run follows the resuming caller's current rights. A hidden
+      // record answers exactly as an absent one, so the run is no way to learn which keys exist.
+      if (!readsEverything(caller)) {
+        const raw = await storage.getMemory(caller.gaii, item.subject);
+        if (!raw || !ownerScopeView([raw], caller.principal, false).length) {
+          run.results[item.subject] = { error: { code: 'NOT_FOUND', message: NOT_YOURS_OR_GONE } };
+          return;
+        }
       }
       // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
       // classification check, with the run's reader.
@@ -339,10 +390,17 @@ export async function startDecideRun(
       throw new DecideError('INVALID_BODY', 400, 'prefix must name a key prefix of your own records.');
     }
     const meta = await storage.listMemoryMeta(caller.gaii, { prefix: input.prefix });
-    items = meta.filter(m => !isReservedServerKey(m.key)).map(m => ({ subject: m.key }));
+    // The keys the memory route would list for this caller: a private record of the owner is not
+    // named to an agent that does not read as the owner.
+    const listed = readsEverything(caller) ? meta : ownerScopeView(meta, caller.principal, false);
+    items = listed.filter(m => !isReservedServerKey(m.key)).map(m => ({ subject: m.key }));
     source = 'prefix';
   }
-  if (items.length === 0) throw new DecideError('INVALID_BODY', 400, 'There is nothing to decide: no items.');
+  if (items.length === 0) {
+    // Said to every caller that does not read as the owner, whether or not anything was left out.
+    throw new DecideError('INVALID_BODY', 400,
+      `There is nothing to decide: no items.${readsEverything(caller) ? '' : ` ${READ_AS_OWNER_NOTE}`}`);
+  }
   if (new Set(items.map(i => i.subject)).size !== items.length) {
     throw new DecideError('INVALID_BODY', 400, 'Two items share a subject. Each item needs its own.');
   }
@@ -365,11 +423,15 @@ export async function startDecideRun(
   return run;
 }
 
-/** One run as stored. A `running` run this process is not working on reads as `interrupted`. */
-export async function getDecideRun(storage: Storage, owner: string, id: string): Promise<DecideRun | null> {
+/**
+ * One run as stored. A `running` run this process is not working on reads as `interrupted`. With a
+ * viewer, a run it may not see reads as absent. The REST routes and the MCP tool always pass one.
+ */
+export async function getDecideRun(storage: Storage, owner: string, id: string, viewer?: RunViewer): Promise<DecideRun | null> {
   const rec = await storage.getMemory(owner, decideRunKey(id));
   const run = rec?.value as DecideRun | undefined;
   if (!run || typeof run !== 'object') return null;
+  if (!runVisible(run, viewer)) return null;
   if (run.state === 'running' && !active.has(id)) run.state = 'interrupted';
   return run;
 }
@@ -385,20 +447,29 @@ export function runSummary(run: DecideRun): RunSummary {
   return copy as RunSummary;
 }
 
-export async function listDecideRuns(storage: Storage, owner: string): Promise<RunSummary[]> {
+/** The runs this viewer may see, newest first, and how many under the owner it may not. */
+export async function listDecideRuns(storage: Storage, owner: string, viewer?: RunViewer): Promise<{ runs: RunSummary[]; omitted: number }> {
   const recs = await storage.listMemory(owner, { prefix: RUN_PREFIX });
-  return recs
+  const all = recs
     .map(r => r.value as DecideRun)
-    .filter(r => r && typeof r === 'object' && typeof r.id === 'string')
-    .map(r => ({ ...runSummary(r), state: r.state === 'running' && !active.has(r.id) ? 'interrupted' as const : r.state }))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    .filter(r => r && typeof r === 'object' && typeof r.id === 'string');
+  const shown = all.filter(r => runVisible(r, viewer));
+  return {
+    runs: shown
+      .map(r => ({ ...runSummary(r), state: r.state === 'running' && !active.has(r.id) ? 'interrupted' as const : r.state }))
+      .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    omitted: all.length - shown.length,
+  };
 }
 
-/** Carry on from the first item without a result. The caller's current rights apply, not the old ones. */
+/**
+ * Carry on from the first item without a result. The caller's current rights apply, not the old ones:
+ * a run it may not see is absent to it, and the items are read under its rights.
+ */
 export async function resumeDecideRun(
   storage: Storage, config: AimeatConfig, caller: DecideCaller, id: string,
 ): Promise<DecideRun | null> {
-  const run = await getDecideRun(storage, caller.gaii, id);
+  const run = await getDecideRun(storage, caller.gaii, id, runViewerOf(caller));
   if (!run) return null;
   if (active.has(id)) return run;
   if (run.state === 'done') return run;
@@ -415,10 +486,10 @@ export async function resumeDecideRun(
 /**
  * Stop a run after the requests already open finish. What was decided stays decided and recorded.
  * The run is read under the owner FIRST: `active` is keyed by run id alone, so the flag is set only
- * on a run this owner has.
+ * on a run this owner has, and with a viewer only on a run that viewer may see.
  */
-export async function stopDecideRun(storage: Storage, owner: string, id: string): Promise<DecideRun | null> {
-  const run = await getDecideRun(storage, owner, id);
+export async function stopDecideRun(storage: Storage, owner: string, id: string, viewer?: RunViewer): Promise<DecideRun | null> {
+  const run = await getDecideRun(storage, owner, id, viewer);
   if (!run) return null;
   const flag = active.get(id);
   if (flag) flag.stop = true;

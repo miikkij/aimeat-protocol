@@ -12,6 +12,8 @@
  * @structure cascadeMethods.cascadeDeleteAgentData(gaii) — every owner-scoped table for one identity
  * @usage Object.assign(SqliteStorage.prototype, cascadeMethods) in providers/sqlite/index.ts
  * @version-history
+ *   v1.7.0 — 2026-10-22 — knowledge_links joins the cascade: the links of the identity's packages and
+ *     the ones it contributed (secaudit 2026-10, v79).
  *   v1.6.0 — 2026-09-29 — classification_audit joins the cascade (TARGET-082 V4).
  *   v1.5.0 — 2026-09-29 — content_labels joins the cascade (TARGET-082).
  *   v1.5.0 — 2026-10-09 — connections, connection_delegations and provider_clients join the
@@ -129,6 +131,11 @@ export const cascadeMethods = {
     // The classification audit log of this person's own content (TARGET-082 V4). Rows in which they
     // were only the reader of someone else's content are that person's record and stay.
     this.db.prepare('DELETE FROM classification_audit WHERE ownerGaii = ?').run(gaii);
+    // The knowledge links of this identity's packages (ownerGaii, the namespace of the source
+    // manifest, which the memory delete above takes) and the ones it contributed (linked_by, the full
+    // identity). Another owner's links TO this person's packages are that owner's and stay
+    // (secaudit 2026-10, v79).
+    this.db.prepare('DELETE FROM knowledge_links WHERE ownerGaii = ? OR linked_by = ?').run(gaii, gaii);
 
     // Sharing groups, and the key-space shares inside them. The shares go first and by two keys: by
     // ownerGaii for this person's own shares, then by the id of each group being removed, because a

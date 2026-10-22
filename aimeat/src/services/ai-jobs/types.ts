@@ -14,6 +14,9 @@
  *   AiJobError · AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-22 -- `read_as` on the record and `readAs` on the start context: the principal
+ *     an extension's ctx.ai.start reads the owner scope as, when narrower than the owner (secaudit
+ *     2026-10, v75).
  *   v1.11.0 — 2026-10-20 — `result_visibility` on the record is the level the answer was STORED at,
  *     which the shared memory write decides (a raise to public waiting for the owner keeps the level
  *     the record had; a closed node stores 'members'), and `started_by.federated` marks a visitor from another node
@@ -135,6 +138,12 @@ export interface AiJobRecord {
      *  (starter.ts jobReader). Absent on a job started before 2026-09-29, by an extension, or by a
      *  chain: such a job reads as an unattended AI run, the strictest reader. */
     started_by?: AiJobStartedBy;
+    /** Who the job reads its prompt record, input records and audio file AS, when that is narrower
+     *  than the owner: the principal that wrote an extension's code, on a run the owner narrowed to
+     *  it or on that principal's own invoke (ext-capability.ts). Used only to decide which same-owner
+     *  records and files the job may read (starter.ts jobReadViewer); who pays, who writes the answer
+     *  and who may bind on_done still read `owner` and `started_by`. */
+    read_as?: AiJobStartedBy;
     /** The warning-classified items the job gave its model: the prompt's records when the job was
      *  started, the audio when it ran. Absent when there were none. */
     classification_warnings?: AiJobClassificationWarnings;
@@ -263,6 +272,8 @@ export interface StartAiJobContext {
     startedBy?: AiJobStartedBy;
     /** Set when ctx.ai.start() created it. */
     extension?: string;
+    /** The principal the extension's code reads as, when narrower than the owner (AiJobRecord.read_as). */
+    readAs?: AiJobStartedBy;
     parentJob?: string;
     chainDepth?: number;
     onRefused?: (reason: AiJobChainStop) => void;

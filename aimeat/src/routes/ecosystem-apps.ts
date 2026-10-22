@@ -22,6 +22,8 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.9.0 — 2026-10-22 — Mounts the capability-approval routes (ecosystem-apps-capability-approvals.ts)
+ *     and GET /v1/ecosystem-apps returns `capability_approvals` (secaudit 2026-10, r45).
  *   v1.8.0 — 2026-10-09 — The approval token carries `auth_time`, the start of the app's refresh chain.
  *     A refresh at POST /v1/auth/refresh now needs a signature by the key pinned here, and the chain
  *     ends a year after the approval (services/ecosystem-refresh.ts; secrets audit 2026-10-09, S-2).
@@ -75,6 +77,7 @@ import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
 import { logger } from '../utils/logger.js';
 import { pendingPrefix, PENDING_TYPE, type PendingAdvisoryRecord } from '../services/ecosystem-automation-advisories.js';
 import { registerEcosystemAdvisoryRoutes } from './ecosystem-apps-advisories.js';
+import { registerEcoCapabilityApprovalRoutes } from './ecosystem-apps-capability-approvals.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
 
@@ -463,6 +466,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
         capabilities: a.capabilities ?? [],
         automation: a.automation ?? null,
         setup: a.setup ?? null,
+        // What the owner allowed other accounts' capabilities to have this app run, and what waits.
+        capability_approvals: a.capabilityApprovals ?? [],
         created_at: a.createdAt,
         last_seen: a.lastSeen,
       })),
@@ -668,6 +673,8 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
   });
   // Advisory approval gate + delivery — moved to ecosystem-apps-advisories.ts (max-file-lines).
   registerEcosystemAdvisoryRoutes(router, config, storage);
+  // Another account's capability over this owner's app: the owner's one-press answer.
+  registerEcoCapabilityApprovalRoutes(router, config, storage);
 
 
   // ── DELETE /v1/ecosystem-apps/:app — owner HARD-DELETES a GEAI binding ──

@@ -22,8 +22,12 @@
  *   - trimWorkspaceRows(...)                  -- retention by count
  *   - workspaceRowStats(...)                  -- count/bytes/span without reading rows
  *   - workspaceRowUsage(scope)                -- what the quota gate reads
+ *   - getWorkspaceRowsByIds(...)              -- the rows an append is about to replace
+ *   - *WorkspaceRowRevision(s)                -- earlier contents kept on a cross-writer replacement
  * @usage import type { WorkspaceRowRepository } from './repositories/workspace-row.repository.js';
  * @version-history
+ *   v1.2.0 — 2026-10-22 — getWorkspaceRowsByIds and the revision methods: a replacement by another
+ *     writer family keeps the old content (secaudit 2026-10, v80; developer ruling 2026-10-22).
  *   v1.1.0 — 2026-09-09 — deleteWorkspaceRowSpace deleted: no caller outside its own unit test.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
@@ -34,6 +38,7 @@ import type {
   WorkspaceRowStats,
   WorkspaceRowUsage,
   WorkspaceRowScope,
+  WorkspaceRowRevision,
 } from '../interface.js';
 
 export interface WorkspaceRowRepository {
@@ -77,4 +82,37 @@ export interface WorkspaceRowRepository {
 
   /** Rows and bytes for a scope. The quota gate's only read. */
   workspaceRowUsage(scope: WorkspaceRowScope): Promise<WorkspaceRowUsage>;
+
+  /**
+   * The stored rows among `rowIds`, in one statement: what an append is about to replace. A rowId
+   * with no row is simply absent from the answer.
+   */
+  getWorkspaceRowsByIds(
+    organismId: string, wsId: string, namespace: string, rowIds: string[],
+  ): Promise<WorkspaceRowRecord[]>;
+
+  /** Keep earlier contents of rows (row-service.ts appendRows, restoreRowRevision). */
+  appendWorkspaceRowRevisions(revisions: WorkspaceRowRevision[]): Promise<void>;
+
+  /** One row's kept revisions, newest replacement first, at most 100. */
+  listWorkspaceRowRevisions(
+    organismId: string, wsId: string, namespace: string, rowId: string,
+  ): Promise<WorkspaceRowRevision[]>;
+
+  getWorkspaceRowRevision(
+    organismId: string, wsId: string, namespace: string, revisionId: string,
+  ): Promise<WorkspaceRowRevision | null>;
+
+  /** Remove one row's revisions, with the row. Returns the count. */
+  deleteWorkspaceRowRevisions(
+    organismId: string, wsId: string, namespace: string, rowId: string,
+  ): Promise<number>;
+
+  /**
+   * Age the revisions of one space: those replaced before `before`, those whose row is gone, and all
+   * but the newest `keepPerRow` of each row. Returns the count.
+   */
+  pruneWorkspaceRowRevisions(
+    organismId: string, wsId: string, namespace: string, before: string, keepPerRow: number,
+  ): Promise<number>;
 }

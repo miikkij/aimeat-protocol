@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-22 — setStepMemoryWrite(writeMemoryRecord): a workflow step's answer to an `organism.*` key
+ *     is written through the shared memory write (services/workflow/step-write.ts; secaudit 2026-10, r66).
  *   2026-10-21 — The once-only keep steps (keepAppExtensionSchedulesOnce and the scope chain through
  *     keepOnDoneForAppsOnce) moved unchanged to once-only-keep-steps.ts (max-file-lines), and the
  *     whole of it is awaited before the node serves requests.
@@ -142,6 +144,8 @@ import { RealtimeManager } from '../services/realtime-manager.js';
 import { MailboxNotificationService } from '../services/mailbox-notification.js';
 import { Scheduler, setActiveScheduler } from '../services/scheduler.js';
 import { WorkflowEngine, setActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { setStepMemoryWrite } from '../services/workflow/step-write.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 import { AiJobService, setActiveAiJobService } from '../services/ai-jobs/index.js';
 import { createEmailService, setActiveEmailService } from '../services/email.js';
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
@@ -211,6 +215,9 @@ export async function initializeServices(
   // task-terminal events (agent-tasks route), and its own watchdog sweep.
   const workflowEngine = new WorkflowEngine(config, storage);
   setActiveWorkflowEngine(workflowEngine);
+  // A step's answer to an `organism.*` key goes through the shared memory write (step-write.ts),
+  // handed in here because memory-write.ts imports the engine.
+  setStepMemoryWrite(writeMemoryRecord);
 
   // AI jobs — a background model call with a handle. Constructed here rather than per request
   // because the QUEUE is process-wide: the routes, the MCP tools and the sandbox's ctx.ai must all

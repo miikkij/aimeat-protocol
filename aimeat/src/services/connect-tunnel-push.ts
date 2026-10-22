@@ -17,6 +17,8 @@
  * @structure PushContext · sendBacklog() · pushTaskCancellations() · onMemoryWrite()
  * @usage import { sendBacklog, pushTaskCancellations } from './connect-tunnel-push.js';
  * @version-history
+ *   v1.3.0 — 2026-10-22 — A cancel marker pushes task.cancelled only for a task of the marker's own
+ *     account or one the marker's writer created (markerMayCancel; secaudit 2026-10, r48).
  *   v1.2.0 — 2026-10-12 — A record is not sent to an agent whose engagements in that workspace
  *     are all retired (services/workspace-engagements.ts retiredFromWorkspace).
  *   v1.1.0 — 2026-10-11 — A stopped agent (./agent-stop-rules.ts): the backlog carries only its active
@@ -32,6 +34,7 @@ import type { MemoryWriteEvent } from './event-bus.js';
 import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
 import { isStopped } from './agent-stop-rules.js';
 import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace-engagements.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 
 /**
  * Just enough of a connection for a push: whose it is, whether its socket is still open, and whether
@@ -125,6 +128,21 @@ export async function sendBacklog(ctx: PushContext, conn: PushConn): Promise<voi
 
 
 /**
+ * May a cancel marker held in `markerNamespace` cancel `task`? The same two parties the task routes
+ * let stop a task: the task's own account (the owner in person, the owner's apps, which write into
+ * the owner's namespace, and the owner's agents, a coordinator among them) and the exact principal
+ * that created the task. A marker key is open to every principal with memory:write in its own
+ * namespace, so without this an account that learned another account's task id (a buyer reads the
+ * seller's fulfilment task ids in its own checkout) could stop that task through the connector
+ * (secaudit 2026-10, r48). The legacy marker scan in aimeat-crewai read only owner-scoped markers,
+ * which is the boundary this restores.
+ */
+export function markerMayCancel(markerNamespace: string, task: { ownerGaii: string; createdBy?: string | null }): boolean {
+  if (ownerGhiiOf(markerNamespace) === ownerGhiiOf(task.ownerGaii)) return true;
+  return typeof task.createdBy === 'string' && task.createdBy !== '' && task.createdBy === markerNamespace;
+}
+
+/**
  * P3: resolve a cancel marker (its value is a list of task ids) to the owning agents and push a
  * `task.cancelled` wake to each online one. The agent records it locally and skips dispatch — no
  * more per-dispatch `agents.cancel.*` memory scan. Best-effort; a missed push is caught by the
@@ -137,6 +155,7 @@ export async function pushTaskCancellations(ctx: PushContext, ownerGaii: string,
     for (const taskId of ids) {
       const task = await ctx.storage.getAgentTask(taskId);
       if (!task) continue;
+      if (!markerMayCancel(ownerGaii, task)) continue;
       const conn = ctx.connections.get(task.agentGaii);
       if (!conn || conn.ws.readyState !== WebSocket.OPEN) continue;
       ctx.stats.deliveriesTotal++;

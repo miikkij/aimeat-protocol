@@ -152,6 +152,8 @@ What an export leaves out, and why:
   across the person and all their agents and apps: what they saved themselves, what their agents
   saved, workspace writes, extensions and scheduled jobs. The answer's \`not_covered\` says what it
   cannot see: writes from before counting started, and writes the node makes on its own behalf.
+  An agent without \`memory:read-as-owner\` sees the hands only on records it may read; the answer's
+  \`note\` then says so.
 - **Whether a model wrote it:** a record written by an AI carries an AI provenance record; reading the
   record returns it under \`meta.provenance\`, and \`GET /v1/provenance/{id}\` shows the level (original,
   assisted, synthesized, ai-generated), the model and how much a person was involved. When you write

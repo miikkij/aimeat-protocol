@@ -45,6 +45,10 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-22 — deleteCortex settles the cortex's waiting publish requests `outdated` after the
+ *     uninstall: an install again at the same version with other libraries was published by the old
+ *     request (secaudit 2026-10,
+ *     apply-cortex.ts:applyCortexPublish:version-not-bound-to-manifest-or-reinstalled-libs).
  *   2026-10-18 — installCortex takes `publishGate`, the door's caller: a manifest asking for `public`
  *     by an agent without publish:public installs the cortex private and the answer carries `asked`,
  *     the request the owner approves (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
@@ -94,6 +98,8 @@ import { accountPrincipals } from './db/owner-identity.js';
 import { logger } from '../utils/logger.js';
 import { cortexPublishAsk, fileCortexAsk } from './cortex-visibility.js';
 import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
+import { accountGhii } from './publish-requests/ask.js';
+import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -472,6 +478,9 @@ export async function deleteCortex(
     }
 
     await removeCortex(storage, ext, caller);
+    // A request waiting to make it public names content that is gone, and an install again may take
+    // the same version: settle it, so its approval publishes nothing written after it.
+    await settleRequestsForRemovedTarget(deps, accountGhii(ext.installedBy, deps.config.nodeId), 'cortex', { name }, `the cortex library ${name}`);
     return { ok: true, value: { name } };
 }
 

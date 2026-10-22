@@ -20,6 +20,7 @@
  * @structure memoryHandsRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-22 — The answer comes from handsOnKey, the function MCP aimeat_memory_hands calls, and follows the owner-scope read rule: an agent without memory:read-as-owner gets no row for a record of the owner or a sibling agent that GET /v1/memory/:key answers as absent, and an ecosystem app or a visitor gets its own namespace only. A `note` says what such an answer leaves out (secaudit 2026-10, v88).
  *   2026-10-15 — The hands from all the caller's namespaces are sorted by last_at, newest first, as openapi.yaml states (feature-list audit #50).
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 10.
  */
@@ -28,8 +29,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { callerOf } from '../middleware/caller.js';
 import { TALLY_DOORS } from '../services/data-map/write-tally-buffer.js';
+import { handsOnKey } from '../services/data-map/data-map-access.js';
 
 /** Said the same way wherever a tally number is rendered, so the number is never read as complete. */
 const NOT_COVERED = [
@@ -45,34 +47,27 @@ export function memoryHandsRouter(config: AimeatConfig, storage: Storage): Route
     const key = req.params.key as string;
     // Resolved from the caller's own session, never from anything they supplied: there is no key to
     // name here that reaches an account the caller is not in.
-    const gaii = resolveIdentity(req.auth!, config.nodeId);
-    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
-
-    // OWNER SCOPE, because a namespace is not an account. An agent writing its own copy of a key
-    // lands under the AGENT's namespace, so an owner asking about their own key would otherwise be
-    // told nobody had touched it while their agent was writing it every minute. Same union the
-    // owner-scope memory reads use: the person's own identity plus every agent acting in their name.
-    const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-    const namespaces = [...new Set([ownerGhii, gaii, ...agents.map(a => a.gaii)])];
-    const rows = (await Promise.all(
-      namespaces.map(ns => storage.listMemoryWriteTally({ ownerGaii: ns, key })),
-    )).flat();
-    // Each namespace query is ordered on its own; the merged list is ordered here, newest first, as
-    // the contract states (feature-list audit #50).
-    rows.sort((a, b) => (b.lastAt ?? '').localeCompare(a.lastAt ?? ''));
+    //
+    // OWNER SCOPE, because a namespace is not an account: an agent writing its own copy of a key
+    // lands under the AGENT's namespace. Which namespaces this caller gets, and which of their rows,
+    // is the owner-scope read rule GET /v1/memory/:key applies, decided once in handsOnKey
+    // (services/data-map/data-map-access.ts), which MCP aimeat_memory_hands calls too (secaudit
+    // 2026-10, v88).
+    const out = await handsOnKey(storage, config, callerOf(req, config.nodeId, storage), key);
 
     res.json(success(config.nodeId, {
       key,
-      hands: rows.map(r => ({
-        writer: r.writerPrincipal,
-        writes: r.writeCount,
-        deletes: r.deleteCount,
-        first_at: r.firstAt,
-        last_at: r.lastAt,
-        namespace: r.ownerGaii,
+      hands: out.hands.map(h => ({
+        writer: h.writer,
+        writes: h.writes,
+        deletes: h.deletes,
+        first_at: h.firstAt,
+        last_at: h.lastAt,
+        namespace: h.namespace,
       })),
       counted_doors: TALLY_DOORS,
       not_covered: NOT_COVERED,
+      ...(out.note ? { note: out.note } : {}),
     }));
   });
 

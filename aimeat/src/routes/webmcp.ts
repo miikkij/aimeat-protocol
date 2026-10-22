@@ -17,6 +17,11 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   v1.11.0 — 2026-10-22 — The invoke asks exchange:write of an agent or an ecosystem app on both paths,
+ *     before anything is metered, paced or run (routes/webmcp-invoke-gate.ts), as its MCP twin does. An
+ *     agent narrowed below it spent its person's contract budget and pacing here (secaudit 2026-10, v72).
+ *     The owner in person and an app grant pass as before; an agent or ecosystem app that called app
+ *     tools here before the change is kept by services/app-tool-invoke-keep.ts.
  *   2026-10-21 — The owner-free check and the pacing ask isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.10.0 — 2026-10-20 — Both invoke paths refuse an `action_id` whose capability the app's owner
  *     does not own (CAPABILITY_NOT_OWNED_BY_APP, 403), on the metered path after the price is
@@ -80,6 +85,7 @@ import { publicManifestTools, toolPacing, paceFreeToolUse } from '../commerce/ap
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
+import { refuseAppToolInvokeWithoutWord } from './webmcp-invoke-gate.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { respondMeteredRefusal } from './extensions/metered-response.js';
 import { mintInternalPass } from './extensions/internal-pass.js';
@@ -244,6 +250,11 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         { missing: inputCheck.missing, violations: inputCheck.violations }));
       return;
     }
+
+    // The word the MCP twin asks, asked of an agent or an ecosystem app before anything is metered,
+    // paced or run, on both paths below (routes/webmcp-invoke-gate.ts). The owner in person and an
+    // app grant pass as they did; the app grant's metered call keeps its contract:spend check.
+    if (await refuseAppToolInvokeWithoutWord(req, res, config, storage, toolName)) return;
 
     // ── The metered path: one question, asked of the one place that answers it ──
     // This route's job is to name the PRODUCT — which it alone knows, because a price belongs to a

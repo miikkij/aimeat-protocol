@@ -6,6 +6,12 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-22 — An extension step's result_to_key that names an `organism.*` key is written
+ *     through the shared memory write as the run's principal, so the organism namespace rule applies
+ *     (step-write.ts; secaudit 2026-10, r66). A datapackage step, and an extension step's ctx.files and
+ *     ctx.datapackage, ask the node's publish gate about the run's principal; a definition saved
+ *     before this keeps publishing as it did until its next save (publish-actors.ts runActor;
+ *     secaudit 2026-10, v68).
  *   v1.11.0 — 2026-10-09 — An `input_from` value is the value the generic memory routes show
  *     (shownMemoryValue), so a credential record reaches extension code as { configured: true } even
  *     where the save-time check could not see the finished key (secrets audit 2026-10-09, 1.1).
@@ -77,6 +83,9 @@ import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
 import { emitDelivery } from '../event-bus.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
+import { datapackageGateOf, fileDatapackageAsk } from '../datapackage/publish-ask.js';
+import { askActors, runActor, type PublishActor } from '../publish-actors.js';
+import { writeStepValue } from './step-write.js';
 import { loc, template } from './engine-util.js';
 import { templateInput, runPaged, runForEach, mapColumns, atPath } from './engine-step-rows.js';
 import { reportOutcome, type ResultWrite } from './engine-answer.js';
@@ -282,6 +291,9 @@ export function dispatchExtensionStep(
   const { workflowId, runId } = run;
   const stepId = step.id;
   const ownerName = localAccountName(ownerGhii);
+  // Beside the extension's installer, the run's principal is who a public file or package of this
+  // step is published for: the node's publish gate is asked about both (publish-actors.ts runActor).
+  let alsoPublishFor: PublishActor[] = [];
   const runOnce = (input: Record<string, unknown>, label: string) => runExtensionActionAsSystem(
     { storage: deps.storage, config: deps.config, emailService: deps.emailService },
     {
@@ -296,10 +308,13 @@ export function dispatchExtensionStep(
       producerKind: 'workflow',
       producerRef: `${workflowId}/${stepId}`,
       ...(run.defSnapshot.trigger?.kind === 'schedule' ? { producerSchedule: run.defSnapshot.trigger.cron } : {}),
+      alsoPublishFor,
     },
   );
 
   const fire = async (): Promise<ResultWrite | undefined> => {
+    const forRun = await runActor(deps.storage, deps.config.nodeId, ownerName, run);
+    if (forRun) alsoPublishFor = [forRun];
     const base = templateInput(action.input, run.vars);
     // input_from: an earlier step's deliverable or a person's answer, read from the owner's memory
     // here because the sandbox cannot read it. Over `input`, so a vars default cannot shadow it.
@@ -323,19 +338,15 @@ export function dispatchExtensionStep(
     // therefore lands the return value in the owner's namespace — the same move `answer_to_key`
     // makes for a human-input step — before the signal is asked anything, and only while the step
     // still waits for this answer: once the step has ended, a later answer writes nothing.
+    // An `organism.*` key is written through the shared memory write, as the run's principal, so the
+    // organism namespace rule applies; the owner's own keys are written as before (step-write.ts).
     let write: ResultWrite | undefined;
     if (action.result_to_key) {
       const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
-      write = async () => {
-        const existing = await deps.storage.getMemory(ownerGhii, key);
-        const now = new Date().toISOString();
-        await deps.storage.setMemory({
-          key, ownerGaii: ownerGhii, value: out.result ?? null,
-          visibility: 'private', tags: ['workflow-extension-result'], ttlHours: null,
-          version: existing ? existing.version + 1 : 1,
-          createdAt: existing?.createdAt ?? now, updatedAt: now,
-        });
-      };
+      write = () => writeStepValue(deps, ownerGhii, run, {
+        key, value: out.result ?? null, visibility: 'private', tags: ['workflow-extension-result'],
+        authorisingScope: 'ext:invoke', pipeline: `workflow:${workflowId}/${stepId}`,
+      });
     }
     // Reaching here means the sandbox returned rather than threw. Whether the step actually
     // DELIVERED is the success_signal's question, and onPushTerminal asks it — a script that returns
@@ -434,10 +445,19 @@ export function dispatchDataPackageStep(
 
   /** Publish one version from rows that are already flat, and turn a refusal into a red step. */
   const publishRows = async (rows: Array<Record<string, unknown>>): Promise<void> => {
+    // The node's publish gate, asked about the run's principal as POST /v1/datapackages asks about its
+    // caller (publish-actors.ts runActor): one the owner is asked about publishes the version at the
+    // level the package had and files a request. The owner in person, a run started before runs
+    // recorded a principal, and a definition saved under older rules ask nothing, as before.
+    const store = { storage: deps.storage, config: deps.config };
+    const forRun = await runActor(deps.storage, deps.config.nodeId, localAccountName(ownerGhii), run);
+    const gate = forRun ? await datapackageGateOf(store, () => askActors(store, [forRun]), ownerGhii, name, undefined) : null;
+    if (gate?.kind === 'refused') throw new Error(`${gate.code}: ${gate.message}`);
     const out = await publishPackage(
-      { storage: deps.storage, config: deps.config },
+      store,
       ownerGhii,
       {
+        ...(gate?.kind === 'go' && gate.visibility !== undefined ? { visibility: gate.visibility } : {}),
         name,
         changes: template(action.changes, run.vars),
         resources: [{
@@ -470,8 +490,13 @@ export function dispatchDataPackageStep(
       await recordFailure({ storage: deps.storage, config: deps.config }, ownerGhii, name, out.message + detail);
       throw new Error(`${out.code}: ${out.message}${detail}`);
     }
+    // Published at the level the package had: making it public waits for the owner's approval.
+    const asked = gate?.kind === 'go' && gate.requester
+      ? await fileDatapackageAsk(store, localAccountName(ownerGhii), gate.requester, ownerGhii, name, out.contentHash, gate.from)
+      : null;
     logger.info(`workflow ${workflowId} run ${runId}: published ${out.descriptor.aimeat.packageId}`,
-      { contentHash: out.contentHash, unchanged: out.unchanged, rows: out.resources[0]?.rowCount });
+      { contentHash: out.contentHash, unchanged: out.unchanged, rows: out.resources[0]?.rowCount,
+        ...(asked ? { visibility: gate?.kind === 'go' ? gate.visibility : undefined, publishRequest: asked.publish_request?.request_id ?? null, warnings: asked.warnings } : {}) });
   };
 
   reportOutcome(fire(),

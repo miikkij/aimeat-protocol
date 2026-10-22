@@ -6,6 +6,8 @@
 // a retired engagement stops the push and a member who owns neither side cannot retire it (403);
 // and the SECURITY invariant — an agent that cannot READ the workspace (member but no read grant on a
 // private workspace) is REJECTED at subscribe and receives NO record push (push == REST-read access).
+// 8b-8d (secaudit 2026-10, r48): a cancel marker pushes task.cancelled only for a task of its own
+// account; another account's marker pushes nothing, and a same-owner coordinator agent's still does.
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -317,6 +319,69 @@ await test('8. Writing a cancel marker pushes task.cancelled to the task\'s agen
   assert(d !== null && d!.kind === 'task.cancelled', `expected task.cancelled, got ${JSON.stringify(d)}`);
   assert((d!.payload as any)?.id === taskId, `cancelled id ${(d!.payload as any)?.id} != ${taskId}`);
   await t.close();
+});
+
+// secaudit 2026-10, r48: a marker cancels only a task of its own account or one its writer created.
+async function queuedTaskOfA(title: string): Promise<string> {
+  const ct = await json('/v1/agents/recbota/tasks', {
+    method: 'POST', headers: auth(A.token),
+    body: JSON.stringify({ title, description: 'x', status: 'queued', allow_duplicate: true }),
+  });
+  assert(ct.status === 201, `create task ${ct.status}: ${JSON.stringify(ct.body)}`);
+  return ct.body.data.task.id as string;
+}
+async function writeMarker(tok: string, key: string, ids: string[]): Promise<void> {
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(tok), body: JSON.stringify({ key, value: ids, visibility: 'owner' }) });
+  assert(w.status === 201 || w.status === 200, `cancel marker write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+}
+
+await test('8b. A marker another account writes listing A\'s task pushes NO task.cancelled (r48)', async () => {
+  const taskId = await queuedTaskOfA('Not yours to cancel');
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  await writeMarker(B.token, `agents.cancel.task.r48-${Date.now()}`, [taskId]);
+  const d = await t.waitForDeliver(1500);
+  assert(d === null, `another account's marker must not cancel A's task, got ${JSON.stringify(d)}`);
+  // The same holds for the other account's agent writing into its own namespace.
+  await writeMarker(bAgent.token, `agents.cancel.run.r48-${Date.now()}`, [taskId]);
+  const d2 = await t.waitForDeliver(1500);
+  assert(d2 === null, `another account's agent marker must not cancel A's task, got ${JSON.stringify(d2)}`);
+  const still = await json(`/v1/agents/recbota/tasks/${taskId}`, { headers: auth(A.token) });
+  assert(still.body?.data?.task?.status === 'queued', `A's task is untouched, got ${still.body?.data?.task?.status}`);
+  await t.close();
+});
+
+await test('8c. A coordinator agent of the same owner cancels a sibling\'s task with a marker in its own namespace', async () => {
+  const coord = await setupAgent(A.name, A.token, `recbotc${Date.now() % 100000}`);
+  const taskId = await queuedTaskOfA('Delegated, then abandoned');
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  await writeMarker(coord.token, `agents.cancel.run.coord-${Date.now()}`, [taskId]);
+  const d = await t.waitForDeliver(2000);
+  assert(d !== null && d!.kind === 'task.cancelled', `expected task.cancelled, got ${JSON.stringify(d)}`);
+  assert((d!.payload as any)?.id === taskId, `cancelled id ${(d!.payload as any)?.id} != ${taskId}`);
+  await t.close();
+});
+
+await test('8d. A run marker of the owner listing its own task and a foreign one pushes only its own', async () => {
+  const own = await queuedTaskOfA('Own, in a run');
+  const bTask = await json('/v1/agents/recbotb/tasks', {
+    method: 'POST', headers: auth(B.token),
+    body: JSON.stringify({ title: 'B\'s own', description: 'x', status: 'queued' }),
+  });
+  assert(bTask.status === 201, `B task ${bTask.status}`);
+  const foreign = bTask.body.data.task.id as string;
+  const ta = await TunnelClient.connect(BASE, aAgent.token);
+  const tb = await TunnelClient.connect(BASE, bAgent.token);
+  await ta.waitForBacklog(1000);
+  await tb.waitForBacklog(1000);
+  await writeMarker(A.token, `agents.cancel.run.mixed-${Date.now()}`, [foreign, own]);
+  const d = await ta.waitForDeliver(2000);
+  assert(d !== null && (d!.payload as any)?.id === own, `A's agent is told about its own task, got ${JSON.stringify(d)}`);
+  const leak = await tb.waitForDeliver(1500);
+  assert(leak === null, `B's agent hears nothing from A's marker, got ${JSON.stringify(leak)}`);
+  await ta.close();
+  await tb.close();
 });
 
 // ─── Federated DM push (event-based, no poll) ───

@@ -30,6 +30,8 @@
  * @usage
  *   for (const rule of ERASED_ACCOUNT_RECORDS) { … rule.pg or rule.sqlite, rule.column, rule.action }
  * @version-history
+ *   v1.1.0 — 2026-10-22 — WorkspaceRow.updatedBy and the three writer columns of WorkspaceRowRevision,
+ *     pseudonymised like WorkspaceRow.createdBy (secaudit 2026-10, v80).
  *   v1.0.0 — 2026-10-14 — Initial: the 28 relations left "required" (QA audit 2026-10-14, K3).
  */
 
@@ -50,6 +52,11 @@ export const ERASED_ACCOUNT_RECORDS: readonly ErasedAccountRecordRule[] = [
   { pg: 'McpServer', sqlite: 'mcp_servers', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'SsoConnection', sqlite: 'sso_connections', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'WorkspaceRow', sqlite: 'workspace_rows', column: 'createdBy', action: 'pseudonymise' },
+  // A row's last writer and its kept revisions name people the same way (secaudit 2026-10, v80).
+  { pg: 'WorkspaceRow', sqlite: 'workspace_rows', column: 'updatedBy', action: 'pseudonymise' },
+  { pg: 'WorkspaceRowRevision', sqlite: 'workspace_row_revisions', column: 'createdBy', action: 'pseudonymise' },
+  { pg: 'WorkspaceRowRevision', sqlite: 'workspace_row_revisions', column: 'updatedBy', action: 'pseudonymise' },
+  { pg: 'WorkspaceRowRevision', sqlite: 'workspace_row_revisions', column: 'replacedBy', action: 'pseudonymise' },
   // Version and publication history.
   { pg: 'ComponentVersion', sqlite: 'component_versions', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'PublishAttempt', sqlite: 'publish_attempts', column: 'publisher', action: 'pseudonymise' },

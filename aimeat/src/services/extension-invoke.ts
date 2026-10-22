@@ -27,6 +27,11 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.2.1 -- 2026-10-22 -- ctx.ai is told who wrote the code and who calls: the writer invoking its
+ *     own extension starts jobs that read what it may read (ai-jobs/ext-capability.ts attendedReadAs;
+ *     secaudit 2026-10, v75).
+ *   v1.2.0 — 2026-10-22 — ctx.files and ctx.datapackage ask the node's publish gate about the caller
+ *     before a write or a publish makes something public (secaudit 2026-10, v68 and v69).
  *   v1.1.0 — 2026-10-18 — A visitor (caller kind `anonymous`) runs an action the manifest marks public,
  *     with no paywall, a read-only memory and none of the capabilities that act for a person;
  *     ctx.caller says `anonymous` and, for everyone, `adult` and `subscriptions` (Comicland v3 A-7, A-3, A-5).
@@ -43,6 +48,7 @@ import { executeExtensionAction } from './extension-runtime.js';
 import { emitChange } from './event-bus.js';
 import { makeExtensionFiles } from './extension-files.js';
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
+import { invokingActor } from './publish-actors.js';
 import { logger } from '../utils/logger.js';
 import { redactCredentialText } from '../utils/redact-credentials.js';
 import { getMember, accountOf } from './app-members.js';
@@ -253,18 +259,24 @@ export async function invokeExtensionAction(args: {
       } : undefined,
       logPrefix: instanceId ? `[ext:${ext.name}:${instanceId}]` : `[ext:${ext.name}]`,
       wallet: buildExtensionWallet({ config, storage, callerGaii: caller.gaii, extName: ext.name, ...(instanceId ? { trackingScope: instanceId } : {}) }),
-      files: makeExtensionFiles({ config, storage, callerGaii: caller.gaii, callerOwner: caller.owner, callerRoles: [...caller.roles], callerScopes: [...caller.scopes], extName: ext.name }),
+      // A public file or package asks the node's publish gate about the caller, as the upload and
+      // data package routes do (services/publish-actors.ts; secaudit 2026-10, v68 and v69).
+      files: makeExtensionFiles({ config, storage, callerGaii: caller.gaii, callerOwner: caller.owner, callerRoles: [...caller.roles], callerScopes: [...caller.scopes], extName: ext.name,
+        publishers: [invokingActor(storage, config.nodeId, caller)] }),
       // Data packages land in the OWNER's namespace whichever principal called, so one package has
       // one permanent address; `producedBy` still records the exact principal.
       datapackage: makeExtensionDataPackage({
         config, storage,
         ownerGhii: ownerGhiiOf(caller.gaii),
         producedBy: { gaii: caller.gaii, kind: producerKindOf(caller.kind), ref: `${ext.name}/${action.id}` },
+        publishers: [invokingActor(storage, config.nodeId, caller)],
       }),
       // Background model calls are billed to the INSTALLER, read from the record, never the caller.
       ai: maybeExtensionAi({
         service: getActiveAiJobService(), extName: ext.name, extOwner: ext.installedBy,
         nodeId: config.nodeId, createdBy: caller.gaii,
+        // The code's writer invoking its own extension: its jobs read what it may read (v75).
+        installedByPrincipal: ext.installedByPrincipal, caller,
       }),
       buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
         const { buyForExtension } = await import('./extension-purchase.js');

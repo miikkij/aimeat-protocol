@@ -12,6 +12,8 @@
  * @structure registerHomeFeedRoutes(router, ctx): GET /v1/home/feed, POST /v1/home/room
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.2.1 — 2026-10-22 — The reader comes from accountEventReader: an app grant that existed before v1.2.0, held memory:read and not task:read, keeps the title and reason while its token covers what it held then (services/account-event-task-keep.ts; the developer's ruling, 2026-10-22).
+ *   v1.2.0 — 2026-10-22 — GET /v1/home/feed passes its reader to readHomeFeed: a task row's title and decline reason reach only the owner in person, an app grant holding task:read and the task's own agent. Every other reader with memory:read keeps every row, its kind, time, link and agent name, and the answer carries a `note` when fields were taken out (secaudit 2026-10, v89).
  *   v1.1.0 — 2026-08-17 — GET /v1/home/feed is gated on `memory:read` rather than restricted to an
  *     owner session. Whether an agent may read its owner's own history is the owner's decision, and
  *     the node's job is to give them a word for it, not to answer it for them. POST /v1/home/room is
@@ -27,6 +29,9 @@ import { ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingRoom } from '../
 import { ROOMS, openRooms } from '../../services/home-rooms.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
+import { callerOf } from '../../middleware/caller.js';
+import { TASK_CONTENT_NOTE } from '../../services/account-event-view.js';
+import { accountEventReader } from '../../services/account-event-task-keep.js';
 
 export function registerHomeFeedRoutes(router: Router, ctx: HomeRouteCtx): void {
     const { config, storage } = ctx;
@@ -51,8 +56,18 @@ export function registerHomeFeedRoutes(router: Router, ctx: HomeRouteCtx): void 
             // "An agent is knocking" is live state rather than a marker: it is the one row that
             // disappears again, and the one the person most needs to act on.
             const pending = await storage.listPendingDeviceAuthByOwner(owner);
-            const items = await readHomeFeed(storage, config, owner, { pendingAgents: pending.length });
-            res.json(success(config.nodeId, { items, total: items.length }));
+            // The rows that derive from agent_tasks carry a task's title and decline reason, which
+            // only the readers the task route admits see; every other reader keeps the row
+            // (services/account-event-view.ts, secaudit 2026-10, v89).
+            // An app grant that existed before that rule keeps reading them (services/account-event-task-keep.ts).
+            const items = await readHomeFeed(storage, config, owner, {
+                pendingAgents: pending.length,
+                reader: await accountEventReader(callerOf(req, config.nodeId, storage), req.auth!, storage, config.nodeId),
+            });
+            const withheld = items.some(i => !!i.withheld);
+            res.json(success(config.nodeId, {
+                items, total: items.length, ...(withheld ? { note: TASK_CONTENT_NOTE } : {}),
+            }));
         });
 
     /**

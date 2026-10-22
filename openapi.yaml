@@ -690,6 +690,15 @@ components:
         data:
           type: object
           description: Values the translated line interpolates.
+        withheld:
+          type: array
+          items: { type: string }
+          description: >-
+            The `data` fields taken out for this reader. A task row (agent_task_done,
+            agent_task_failed, agent_task_declined) carries the task's `title` and, on a decline, its
+            `reason` only for the readers GET /v1/agents/{name}/tasks admits: the owner in person, an
+            app holding `task:read` and the task's own agent. Every other reader gets the row without
+            them, and this names what was taken out. Absent when nothing was.
     EcoDataAreaGrant:
       type: object
       description: |
@@ -5883,6 +5892,11 @@ components:
           enum: [reference, duplicate]
           description: duplicate = recipient's local copy (the norm); reference = transient (pending/awaiting quota).
         localKey: { type: string }
+        version:
+          type: string
+          description: >-
+            The sent file's createdAt at the send, stamped by the sending node. A copy or a storage
+            grant serves this version only. Absent on attachments stored before 2026-10-22.
         mime: { type: string }
         size: { type: integer }
         name: { type: string }
@@ -7905,10 +7919,128 @@ paths:
                               properties:
                                 fi: { type: string, description: Finnish Markdown setup guide. }
                                 en: { type: string, description: English Markdown setup guide. }
+                            capability_approvals:
+                              type: array
+                              description: |
+                                Capabilities of OTHER accounts the owner allowed to run one action of this app
+                                (`approvedAt` set), and the questions still waiting. See
+                                `/v1/ecosystem-apps/{app}/capability-approvals`. Empty when none.
+                              items:
+                                type: object
+                                properties:
+                                  capability: { type: string, description: The capability record id. }
+                                  action: { type: string, description: The app action it asks for. }
+                                  registrant: { type: string, description: The owner GHII behind the capability. }
+                                  name: { type: string }
+                                  input: { type: string, description: The asking call's input as JSON text, cut to 500 characters. }
+                                  requestedAt: { type: string, format: date-time }
+                                  requestedBy: { type: string }
+                                  approvedAt: { type: string, format: date-time }
+                                  approvedBy: { type: string }
                             created_at: { type: string, format: date-time }
                             last_seen: { type: string, format: date-time }
         '403':
           description: Owner role required.
+  /v1/ecosystem-apps/{app}/capability-approval:
+    get:
+      operationId: ecosystemCapabilityApprovalRead
+      summary: The question another account's capability filed on the owner's outside app (account holder in person)
+      description: |
+        `?capability=` names it. A capability with the source `eco:{app}:{action}` registered by ANOTHER
+        account runs over the caller's own connected app only for an action the app declared and after
+        the account holder allowed it once; a call without that answer is refused with 403
+        ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL and files this question. Answers the app, the capability's
+        name and registrant account, the action, the asking call's input (cut to 500 characters), when
+        and by whom the call was made, whether it is already allowed (`approved_at`), whether the app
+        still declares the action (`action_declared`) and whether the capability still asks for it
+        (`still_asks`). Only the account holder signed in reads it; an agent or an app gets 403
+        IN_PERSON_ONLY.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: app, in: path, required: true, schema: { type: string } }
+        - { name: capability, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The question and its facts }
+        '400': { description: INVALID_INPUT (no capability) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY, or owner role required }
+        '404': { description: APPROVAL_NOT_FOUND }
+  /v1/ecosystem-apps/{app}/capability-approvals:
+    post:
+      operationId: ecosystemCapabilityApprovalAllow
+      summary: Allow another account's capability to run one action of the owner's outside app (account holder in person)
+      description: |
+        Answers a waiting question. From then on that capability, registered by that account, may ask
+        this app to run that action, with the input its call carries. A capability changed since it
+        asked (another action, another registrant, or deleted) is a different question, answered 404.
+        The refusal's text and the bell notice carry the page that asks
+        (`/v1/eco-capability-allow?app=&capability=`).
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: app, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capability]
+              properties:
+                capability: { type: string }
+      responses:
+        '200': { description: 'The approval: { capability, action, registrant, name, input, requestedAt, requestedBy, approvedAt, approvedBy }' }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY, or owner role required }
+        '404': { description: 'APPROVAL_NOT_FOUND: the question no longer waits (the app was removed, the question was answered, or the capability changed); nothing is allowed' }
+    delete:
+      operationId: ecosystemCapabilityApprovalWithdraw
+      summary: Withdraw what the owner allowed a capability on this app, and drop its waiting questions
+      description: |
+        `?capability=` names it. Its next call is refused and asks again. Withdrawing only narrows, so
+        the owner role is enough.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: app, in: path, required: true, schema: { type: string } }
+        - { name: capability, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Withdrawn }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Owner role required }
+        '404': { description: APPROVAL_NOT_FOUND }
+  /v1/ecosystem-apps/{app}/capability-approvals/decline:
+    post:
+      operationId: ecosystemCapabilityApprovalDecline
+      summary: Say no to a waiting question (account holder in person)
+      description: |
+        Removes the waiting questions of `{ capability }`. Nothing ran and nothing is allowed; its next
+        call asks again.
+      tags: [Ecosystem Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: app, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capability]
+              properties:
+                capability: { type: string }
+      responses:
+        '200': { description: '{ declined: true } when a question was removed, false when none waited' }
+        '400': { description: INVALID_INPUT }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: IN_PERSON_ONLY, or owner role required }
   /v1/ecosystem-apps/{app}/data:
     get:
       operationId: ecosystemAppData
@@ -16448,7 +16580,14 @@ paths:
                                 data:
                                   type: object
                                   description: Values the translated line interpolates (an agent's name, which room).
+                                withheld:
+                                  type: array
+                                  items: { type: string }
+                                  description: The `data` fields taken out for this reader, as on `AccountEvent.withheld`. Absent when nothing was.
                           total: { type: integer }
+                          note:
+                            type: string
+                            description: Present when a row's task title or reason was taken out for this reader, and says who sees them.
         '403':
           description: Not the account holder's own session
 
@@ -16495,6 +16634,9 @@ paths:
                           window:
                             type: integer
                             description: How many rows this node keeps before moving them to the archive.
+                          note:
+                            type: string
+                            description: Present when a row's task title or reason was taken out for this reader (see `AccountEvent.withheld`), and says who sees them.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -16620,6 +16762,9 @@ paths:
                           total:
                             type: integer
                             description: How many rows the archive holds in total.
+                          note:
+                            type: string
+                            description: Present when a row's task title or reason was taken out for this reader (see `AccountEvent.withheld`), and says who sees them.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -17883,6 +18028,10 @@ paths:
         then the decision model or the text model the policy names, with personal data removed before
         anything leaves. The classifier's label follows the AI rules: it never lowers a label and never
         changes a person's.
+        A caller that does not read every record of its owner (an agent without
+        `memory:read-as-owner`) judges only its own records and the owner's and siblings' records of
+        visibility owner, members or public: a hidden named key reads as missing, a prefix leaves
+        hidden keys out, and the answer carries `note` naming the permission.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -17895,7 +18044,7 @@ paths:
                 keys: { type: array, items: { type: string }, maxItems: 500 }
                 prefix: { type: string }
       responses:
-        '200': { description: "classified, queued and missing keys." }
+        '200': { description: "classified, queued and missing keys; note when the caller does not read every record of its owner and a key is missing or a prefix left one out." }
         '400': { description: Neither keys nor a prefix. }
         '409': { description: CLASSIFICATION_OFF. }
 
@@ -17907,7 +18056,9 @@ paths:
         classifications changed. One row per reader, item and action per minute, with a count;
         newest first. Level owner is the caller's own content, organism needs its creator or an
         admin, node needs the operator in person or an operator's agent or app with the
-        "operator:admin" permission.
+        "operator:admin" permission. At level owner, a caller without `memory:read-as-owner` does
+        not get rows on a record of the owner or a sibling it may not read with owner_scope; `note`
+        then names the permission.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -17917,7 +18068,7 @@ paths:
         - { name: action, in: query, schema: { type: string, enum: [shown, used, refused, changed, exception] }, description: 'exception: an entry of the exceptions list made, used or withdrawn; its purpose names the exception, the act and the reason.' }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
-        '200': { description: The rows. }
+        '200': { description: '{ level, subject, rows, note? }.' }
         '403': { description: Not an operator (node level). }
         '404': { description: No such organism, or not its creator or an admin. }
 
@@ -17933,7 +18084,9 @@ paths:
         automatically (auto true: `lower`, `policy`, `review`, `leave`). The same authorization as the
         audit log: level owner is the caller's owner's content, organism needs its creator or an
         admin, node needs the operator in person or an operator's agent or app with the
-        "operator:admin" permission, and lists the whole node.
+        "operator:admin" permission, and lists the whole node. At level owner, a caller without
+        `memory:read-as-owner` does not get an exception on a record of the owner or a sibling it may
+        not read with owner_scope; `note` then names the permission.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -17943,7 +18096,7 @@ paths:
         - { name: since, in: query, schema: { type: string, format: date-time } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000, default: 200 } }
       responses:
-        '200': { description: '{ level, subject, exceptions }. Each: id, at, by, byKind (human|app|ai), scope, ownerGaii, organismId, target { kind, key } or null, label, action, reason, auto, until, count, lastAt, destination, app, withdrawnAt, withdrawnBy.' }
+        '200': { description: '{ level, subject, exceptions, note? }. Each: id, at, by, byKind (human|app|ai), scope, ownerGaii, organismId, target { kind, key } or null, label, action, reason, auto, until, count, lastAt, destination, app, withdrawnAt, withdrawnBy.' }
         '400': { description: action or since is not valid. }
         '403': { description: Not an operator (node level). }
         '404': { description: No such organism, or not its creator or an admin. }
@@ -18016,7 +18169,10 @@ paths:
         or an admin. Only stored classifications are listed: content without one reads as the
         policy's default. `pending=true` keeps the items where a suggestion waits for a person.
         Where classification is on, an AI caller is not shown an item hidden from AI, and nobody is
-        shown an item whose label's audience leaves them out. Pass `next` back as `cursor`.
+        shown an item whose label's audience leaves them out. At level owner, a caller without
+        `memory:read-as-owner` is not shown an item on a record of the owner or a sibling it may not
+        read with owner_scope, and the page carries `note` naming the permission. Pass `next` back
+        as `cursor`.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -18029,7 +18185,7 @@ paths:
         - { name: cursor, in: query, schema: { type: string } }
       responses:
         '200':
-          description: '{ level, subject, items, next, scanned }. Each item: kind, key, scope, organismId, owner, label, labelDetail, source, locked, suggestion (with its labelDetail), justification, humanSaid, setBy, updatedAt.'
+          description: '{ level, subject, items, next, scanned, note? }. Each item: kind, key, scope, organismId, owner, label, labelDetail, source, locked, suggestion (with its labelDetail), justification, humanSaid, setBy, updatedAt.'
         '400': { description: A field is not valid, or the cursor is not one this list gave out. }
         '401': { description: Not signed in. }
         '404': { description: No such organism, or not its creator or an admin. }
@@ -18070,7 +18226,8 @@ paths:
         Personal content is always the caller's own; organism content needs membership. A container
         is named by kind: organism (organism_id), workspace (organism_id and ws), board (board_id),
         app (app). Any member reads an organism's or a workspace's; a board's and an app's owner reads
-        theirs.
+        theirs. A record of the owner that a caller without `memory:read-as-owner` may not read with
+        owner_scope answers as one with no stored classification, with `note` naming the permission.
       tags: [Memory]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -18084,7 +18241,7 @@ paths:
         - { name: board_id, in: query, schema: { type: string }, description: 'kind board: the board id.' }
         - { name: app, in: query, schema: { type: string }, description: "kind app: the filename of the caller's hosted app or the name of their ecosystem app." }
       responses:
-        '200': { description: '{ target, label, labelDetail, effective: { label, from, labelDetail }, source, locked, suggestion, history }.' }
+        '200': { description: '{ target, label, labelDetail, effective: { label, from, labelDetail }, source, locked, suggestion, history, note? }.' }
         '403': { description: "NOT_ALLOWED: a member who is not the organism's creator or an admin, or another owner's board everyone can read." }
         '404': { description: No such content, or not the caller's to read. }
     put:
@@ -18227,6 +18384,15 @@ paths:
                             type: array
                             description: What this number cannot see. Travels with every answer.
                             items: { type: string }
+                          note:
+                            type: string
+                            description: >-
+                              Present on every answer to a caller that does not read every record of
+                              the owner, and says what such an answer leaves out. An agent without
+                              `memory:read-as-owner` gets the hands on its own records and on the
+                              owner's and sibling agents' records whose visibility is owner, members
+                              or public, as GET /v1/memory/{key}?owner_scope=true reads them; an
+                              ecosystem app or a session from another node gets its own records only.
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: The session does not carry memory:read }
 
@@ -19994,7 +20160,10 @@ paths:
             business. `RESERVED_KEY` — `prompt_key`, an `input_keys` entry or `result_key` names a
             record this node keeps for itself, such as an AI key, a payout setting or a spend limit.
             `SCOPE_DENIED` — `on_done` is set and the caller is not the owner in person and does not
-            hold `ext:invoke`. `ACCESS_DENIED` or `CONSENT_REQUIRED` — `result_key` is an
+            hold `ext:invoke`; or `prompt_key`, an `input_keys` entry or `audio_key` names a record
+            or file the owner or another of their agents keeps private, and the caller is an agent
+            without `memory:read-as-owner` (the message says where the owner grants it).
+            `ACCESS_DENIED` or `CONSENT_REQUIRED` — `result_key` is an
             `organism.*` key the caller may not write, as POST /v1/memory would answer. Refused at
             the start, before the model is called.
           content:
@@ -20875,6 +21044,13 @@ paths:
         RESERVED_KEY, and a `prefix` runs over the records it covers less those.
 
 
+        `keys` and `prefix` read what the memory route shows the caller. The owner in person, an app
+        grant and an agent holding `memory:read-as-owner` read every record of the owner. Any other
+        agent reads its owner's `owner`, `members` and `public` records: a `prefix` leaves the
+        owner's private records out, and on `keys` such a record answers that item as an absent one
+        does, NOT_FOUND with a note that names the permission.
+
+
         Requires an owner session or a token carrying `ai:use`.
       tags: [Memory]
       security:
@@ -20914,6 +21090,11 @@ paths:
     get:
       operationId: listDecideRuns
       summary: This owner's runs, newest first (without per-item results)
+      description: >
+        The owner in person, an app grant and an agent holding `memory:read-as-owner` see every run of
+        the owner. Any other caller sees the runs it started; when runs were left out, the answer
+        carries `omitted` (how many) and `note` (the permission that shows them). The same rule
+        applies to reading, resuming and stopping one run: a run the caller may not see is 404.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -29218,7 +29399,12 @@ paths:
         400 INVALID_INPUT naming every missing field at once (`details.missing`,
         `details.violations`). A schema that does not compile is not enforced. A tool whose
         backing extension serves an app with access `members-only` answers 403 MEMBERS_ONLY to a
-        caller who is not a member, before anything is settled.
+        caller who is not a member, before anything is settled. An agent or an ecosystem app needs
+        the scope exchange:write, as the MCP tool aimeat_app_tool_invoke does, before anything is
+        metered, paced or run; without it the call answers 403 SCOPE_DENIED, and
+        `details.allow_url` is where its person allows the word with one press (an agent) or
+        approves the app's new request (an ecosystem app). The owner in person and an app grant are
+        not asked; an app grant's contracted call still needs contract:spend.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -29242,7 +29428,7 @@ paths:
         '402':
           description: Priced tool — pay via the checkout (x402-style accepts + checkout item)
         '403':
-          description: MEMBERS_ONLY — the app serves its members only; nothing was charged
+          description: MEMBERS_ONLY — the app serves its members only; nothing was charged. SCOPE_DENIED — an agent or ecosystem app without exchange:write; nothing was charged or run
         '404':
           description: No public manifest / unknown tool / missing backing capability
         '422':
@@ -30519,7 +30705,11 @@ paths:
         be an active peer. Memory is stored with a `replica:{source}:` key prefix, in the
         namespace `gaii` names, which must be a person or agent of `source_node` or a person or
         agent that exists on this node (a visitor's push-home); any other namespace is refused
-        with 403 NAMESPACE_NOT_ALLOWED before anything is written. When a newer write replaces
+        with 403 NAMESPACE_NOT_ALLOWED before anything is written. A person of this node is
+        written to only while they hold an active, unexpired sign-in consent (scope `auth`,
+        recipient `node:{source_node}`, `*` or `domain:*`), the consent their visitor session on
+        the source node needed; without it the answer is 403 CONSENT_REQUIRED and nothing is
+        written. An agent of this node follows its owner's consent. When a newer write replaces
         a replica, the earlier value is kept for seven days under
         `replica:{source}:{key}._conflict_{ms}`.
       tags: [Federation]
@@ -43608,7 +43798,7 @@ paths:
                       row_id: { type: string }
                       occurred_at: { type: string }
       responses:
-        '200': { description: '{ written, row_ids, pruned } — pruned is what the retention sweep removed' }
+        '200': { description: '{ written, row_ids, pruned, revisions_kept } — pruned is what the retention sweep removed; revisions_kept names the rows whose earlier content, last written by another writer family, the node kept as a revision (GET .../{rowId}/revisions)' }
         '400': { description: No rows, a batch over 500, a malformed row, or a space that is not a row space }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not a member, no consent, or the space's writeRole refuses this caller }
@@ -43716,7 +43906,7 @@ paths:
       summary: Remove one row
       description: |
         Needs `memory:purge` beside `organism:write`: a row space keeps no version history, so a
-        removed row cannot be restored.
+        removed row cannot be restored. The row's kept revisions are removed with it.
       tags: [Organisms]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -43729,6 +43919,56 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not a member, or the space's writeRole refuses this caller }
         '404': { description: No such workspace, space or row }
+
+  /v1/organisms/{id}/workspace/rows/{space}/{rowId}/revisions:
+    get:
+      operationId: listWorkspaceRowRevisions
+      summary: A row's kept earlier contents
+      description: |
+        When an append replaces a row whose last writer is of another writer family (another
+        person, or another person's agent, app or extension), the node keeps the replaced content
+        as a revision, the row keeps its first author in `createdBy`, and `updatedBy` names the new
+        writer. A writer family is the owner behind a principal: a person, their agents and their
+        apps are one family; an extension is its own. A revision is kept for the space's retention
+        window, or 30 days, and at most 20 are kept per row. Newest replacement first.
+
+        For whoever may remove rows: `memory:purge` beside `organism:write`, and the space's write
+        rule. An app never reads or restores revisions.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: rowId, in: path, required: true, schema: { type: string }, description: The caller-visible row id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ space, row_id, revisions: [{ revisionId, rowId, occurredAt, createdAt, updatedAt, createdBy, updatedBy, body, bytes, replacedAt, replacedBy }] }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing }
+        '404': { description: No such workspace or space }
+
+  /v1/organisms/{id}/workspace/rows/{space}/{rowId}/revisions/{revisionId}/restore:
+    post:
+      operationId: restoreWorkspaceRowRevision
+      summary: Put a kept revision back as a row's content
+      description: |
+        The content the restore replaces is kept as a revision in turn, so a restore can be undone
+        the same way. The row keeps its first author in `createdBy`, and `updatedBy` names the
+        restorer. Same permission as listing the revisions.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: rowId, in: path, required: true, schema: { type: string }, description: The caller-visible row id }
+        - { name: revisionId, in: path, required: true, schema: { type: string }, description: The kept revision, from the revisions list }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ row_id, restored, revision_kept } — revision_kept says the replaced content was kept' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, the space's writeRole refuses this caller, or memory:purge or organism:write is missing }
+        '404': { description: No such workspace, space or revision of this row }
+        '413': { description: The workspace or organism row quota is reached }
 
   /v1/organisms/{id}/workspace/documents/{space}/{docId}/append:
     post:
@@ -49411,7 +49651,10 @@ paths:
       summary: Get knowledge entry links
       description: >
         The links of a package the caller may read, on the terms of GET /v1/knowledge/{id}. A package
-        the caller may not read answers 404 like a missing one.
+        the caller may not read answers 404 like a missing one. Outgoing links are those of the account
+        that holds the package (the caller's own package first); incoming links are every account's
+        links to it. `linked_by` is the contributor's full identity (`name@node`); rows written before
+        2026-10-22 may carry the bare account name.
       tags: [Knowledge]
       parameters:
         - name: id
@@ -49430,6 +49673,11 @@ paths:
       x-aimeat-scope: { word: 'memory:read', enforcedIn: '4.0.0' }
       operationId: getKnowledgeBrokenLinks
       summary: Find broken links in knowledge package
+      description: >
+        The links of this package, held in the caller's own account (the owner in person also reaches a
+        package one of their agents holds), whose source or target is gone. A target counts as present
+        when it is a record in the same account, a public record, or a package the caller may read. A
+        package outside the caller's account answers an empty list.
       tags: [Knowledge]
       security:
         - BearerAuth: []
@@ -60216,9 +60464,17 @@ paths:
         '401':
           description: Missing or invalid signature
         '403':
-          description: Source not an active peer, or no matching message/attachment
+          description: >-
+            Source not an active peer, or no matching message/attachment. The match is the SENDER's
+            own outbound copy on this node, addressed to a recipient on the requesting node, with the
+            storage key attached as a file of the sender's account on this node; a recipient's inbound
+            copy is never a match.
         '404':
           description: Attachment file not found
+        '409':
+          description: >-
+            FILE_CHANGED: the file under the key is no longer the version that was sent (it was
+            changed or removed after the send). Final; the recipient asks the sender to send it again.
 
   # ============================================================
   # Agent Capabilities & Activity
@@ -72408,8 +72664,13 @@ paths:
       summary: List a user's memory entries for a peer node
       description: |
         Peer-to-peer endpoint. Return memory-entry metadata (key, visibility, tags, updatedAt,
-        version) for a given GAII to a requesting active peer node. Authorized by peer status, not a
-        bearer token.
+        version) for a given GAII to a requesting active peer node. Authorized by peer status and
+        the peer's signature, not a bearer token, and by whose inventory it is: a principal of the
+        requesting node is listed (list-remote); a person of this node only while they hold an
+        active, unexpired sign-in consent (scope `auth`, recipient `node:{requesting_node}`, `*` or
+        `domain:*`) on a link that may carry a sign-in, the consent their visitor session on the
+        requesting node needed (list-home), else 403 CONSENT_REQUIRED; an agent of this node follows
+        its owner's consent; a third node's principal is 403 NAMESPACE_NOT_ALLOWED.
       requestBody:
         required: true
         content:

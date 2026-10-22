@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-22 — registerDecideTools takes the session's caller, so a decision run reads and shows only what the session may read (secaudit 2026-10, v83, v84).
  *   2026-10-21 — registerAiImageTool takes the session's caller, for the publish gate on a public picture.
  *   2026-10-21 — ServerToolDeps.stateless reaches the chat surface's finder, which answers a
  *     2026-07-28 request without promising a list change it cannot keep.
@@ -273,7 +274,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAgentScheduleTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerWorkflowTools(mcp, storage, config, agentGaii, scopes, caller);
     registerAiJobTools(mcp, storage, config, agentGaii, scopes, caller);
-    registerDecideTools(mcp, storage, config, agentGaii);
+    registerDecideTools(mcp, storage, config, agentGaii, caller);
     registerAiVoiceTools(mcp, storage, config, agentGaii);
     registerAiPolicyTools(mcp, storage, config, agentGaii);
     registerAiProviderTools(mcp, storage, config, agentGaii);

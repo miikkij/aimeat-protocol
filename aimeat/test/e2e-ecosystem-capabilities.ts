@@ -11,6 +11,10 @@
  * @version-history
  *   v1.0.0 — 2026-06-14 — Initial creation (ecosystem capability & data-access, chunk 3).
  *   v1.1.0 — 2026-07-02 — Phase 6: data-area READ allowlist (ecoMayReadKey, model A / strict).
+ *   v1.2.0 — 2026-10-22 — Phase 7: another account's capability over the caller's own outside app is
+ *     refused on the app tool's REST, MCP and checkout paths until the caller's app declares the
+ *     action and the account holder allows it with one press; then all three run, and the
+ *     registrant's own use never asks (secaudit 2026-10, capability-invoke.ts ecosystem source).
  */
 import { TunnelClient } from './helpers/tunnel-harness.js';
 
@@ -38,6 +42,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 }
 
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 const ownerName = `ecocapowner${Date.now()}`;
@@ -330,10 +335,217 @@ async function run() {
     assert(r.status === 200 && r.body.data?.value?.n === 1, `flat read should succeed, got ${r.status}: ${JSON.stringify(r.body)}`);
   });
 
+  await phaseCrossOwner();
+
   console.log('\n' + '─'.repeat(48));
   console.log(`Ecosystem Capability & Data-Access E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
   if (failed > 0) process.exit(1);
   console.log('✅ All tests passed!\n');
+}
+
+// ── Phase 7: another account's capability over the caller's own outside app ──
+//
+// secaudit 2026-10, capability-invoke.ts:ecosystem-source:app-slug-resolved-in-caller-reach. A
+// capability `eco:{app}:{action}` runs over the CALLER's connected app. The suite's first owner (the
+// registrant, M, the operator on this fresh database) binds such a capability in its own public
+// app-tool manifest with lockedInput; a second owner (V) who calls that tool must not have their own
+// app run M's chosen action until V allowed it once with one press. M's own use stays as it was.
+async function connectGeaiFor(owner: string, ownerAuth: Record<string, string>, app: string, declared: string[]): Promise<{ geai: string; token: string }> {
+  const pub = Buffer.from(`vk-${owner}-${app}`).toString('base64');
+  const scopes = ['memory:read'];
+  const manifest = declared.length ? { app, scopes, capabilities: declared.map(id => ({ id })) } : undefined;
+  const hello = await json('/v1/ecosystem-apps/hello', { method: 'POST', body: JSON.stringify({ owner, app, public_key: pub, scopes, ...(manifest ? { manifest } : {}) }) });
+  assert(hello.body.ok === true, `hello ${app}: ${JSON.stringify(hello.body.error)}`);
+  const { user_code, device_code } = hello.body.data;
+  const approve = await json(`/v1/ecosystem-apps/${user_code}/approve`, { method: 'POST', headers: ownerAuth, body: JSON.stringify({ action: 'approve', scopes }) });
+  assert(approve.body.data?.status === 'approved', `approve ${app}: ${JSON.stringify(approve.body)}`);
+  const tok = await json('/v1/ecosystem-apps/token', { method: 'POST', body: JSON.stringify({ device_code, grant_type: GRANT }) });
+  return { geai: approve.body.data.geai, token: tok.body.access_token };
+}
+
+async function phaseCrossOwner(): Promise<void> {
+  console.log('\nPhase 7 — Another account\'s capability over the caller\'s own outside app');
+  const FILE = 'eco-tools.html';
+  const VAPP = 'vaultdesk';
+  const victimName = `ecocapv${Date.now()}`;
+  let victimAuth: Record<string, string> = {};
+  let victimToken = '';
+  let vTunnel: TunnelClient | null = null;
+  let mTunnel: TunnelClient | null = null;
+  let declaredCap = '';
+  let undeclaredCap = '';
+  let allowEndpoint = '';
+  let allowBody: Record<string, unknown> = {};
+  const tool = (who: Record<string, string>, name: string) =>
+    json(`/v1/apps/${ownerName}/${FILE}/webmcp/tools/${name}`, { method: 'POST', headers: who, body: JSON.stringify({ input: {} }) });
+  const framesToV = () => vTunnel?.invokes.length ?? 0;
+
+  try {
+    await test('Setup: V connects an outside app that declares one action; M binds capabilities over it in a public app tool', async () => {
+      victimToken = (await registerOwner(BASE, victimName)).token;
+      victimAuth = { Authorization: `Bearer ${victimToken}` };
+      const g = await connectGeaiFor(victimName, victimAuth, VAPP, ['dangerousAction']);
+      vTunnel = await TunnelClient.connect(BASE, g.token);
+      vTunnel.onInvoke(f => ({ ok: true, result: { stub_saw: { capability: f.capability, input: f.input, caller: f.caller } } }));
+      const reg = async (ref: string) => {
+        const r = await json('/v1/capabilities', { method: 'POST', headers: auth, body: JSON.stringify({
+          name: `Probe ${ref}`, summary: 'cross-owner probe', callable: true, visibility: 'private',
+          source: { type: 'ecosystem', ref, version: '1.0.0' }, inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
+        }) });
+        assert(r.status === 201, `register ${ref}: ${r.status} ${JSON.stringify(r.body.error)}`);
+        return r.body.data.id as string;
+      };
+      declaredCap = await reg(`eco:${VAPP}:dangerousAction`);
+      undeclaredCap = await reg(`eco:${VAPP}:secretWipe`);
+      const m = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({
+        key: `apps.${FILE}.tools`, visibility: 'public',
+        value: { version: 1, tools: [
+          { name: 't', description: 'Locked call', action_id: declaredCap, lockedInput: { marker: 'from-M' } },
+          { name: 'u', description: 'Undeclared action', action_id: undeclaredCap },
+          { name: 'paid', description: 'Paced, bought at checkout', action_id: declaredCap, tollMorsels: 2, lockedInput: { marker: 'from-M' } },
+        ] },
+      }) });
+      assert(m.status === 200 || m.status === 201, `manifest ${m.status}: ${JSON.stringify(m.body.error)}`);
+    });
+
+    await test('REFUSED: V calling M\'s tool does not run M\'s chosen action on V\'s app; the refusal names the one-press page', async () => {
+      const r = await tool(victimAuth, 't');
+      assert(r.status === 403 && r.body.error?.code === 'ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL',
+        `expected 403 ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL, got ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+      const msg = String(r.body.error?.message ?? '');
+      assert(msg.includes(`/v1/eco-capability-allow?app=${VAPP}&capability=${declaredCap}`), `no allow page in: ${msg}`);
+      await sleep(150);
+      assert(framesToV() === 0, `V's app received ${framesToV()} frame(s): ${JSON.stringify(vTunnel?.invokes)}`);
+    });
+
+    await test('REFUSED: the MCP twin (aimeat_app_tool_invoke) by V\'s own agent', async () => {
+      const agent = await makeAgent(BASE, { name: victimName, token: victimToken }, ['exchange:write', 'ext:invoke', 'memory:read']);
+      const s = await openSession(BASE, agent.token);
+      const r = await callTool(s, 'aimeat_app_tool_invoke', { owner: ownerName, app: FILE, tool: 't', input: {} });
+      assert(r.offered && r.isError && (r.text.includes('ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL') || r.text.includes('/v1/eco-capability-allow')),
+        `MCP twin not refused with the approval: ${r.text.slice(0, 400)}`);
+      assert(framesToV() === 0, `V's app received a frame over MCP: ${JSON.stringify(vTunnel?.invokes)}`);
+    });
+
+    await test('REFUSED: a checkout of the paced tool runs nothing on V\'s app, and the session stays open', async () => {
+      const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: victimAuth,
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: `${ownerName}/${FILE}`, tool: 'paid', input: {} }] }) });
+      assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
+      const id = create.body.data.session.id;
+      const done = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: victimAuth, body: JSON.stringify({}) });
+      assert(done.status !== 200, `checkout completed: ${JSON.stringify(done.body.data?.session?.fulfillment)}`);
+      const back = await json(`/v1/commerce/checkout-sessions/${id}`, { headers: victimAuth });
+      assert(back.body.data?.session?.status === 'open', `session ${back.body.data?.session?.status}`);
+      assert(framesToV() === 0, `V's app received a frame from the checkout: ${JSON.stringify(vTunnel?.invokes)}`);
+    });
+
+    await test('REFUSED: an action V\'s app does not declare cannot be allowed at all (ECOSYSTEM_CAPABILITY_NOT_YOURS)', async () => {
+      const r = await tool(victimAuth, 'u');
+      assert(r.status === 403 && r.body.error?.code === 'ECOSYSTEM_CAPABILITY_NOT_YOURS', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+      assert(framesToV() === 0, 'V\'s app received the undeclared action');
+    });
+
+    await test('REFUSED: an account with no such app connected (ECO_APP_NOT_FOUND)', async () => {
+      const w = await registerOwner(BASE, `ecocapw${Date.now()}`);
+      const r = await tool({ Authorization: `Bearer ${w.token}` }, 't');
+      assert(r.status === 404 && r.body.error?.code === 'ECO_APP_NOT_FOUND', `got ${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('V hears it in the bell, with Allow on the notice', async () => {
+      const n = await json('/v1/notifications', { headers: victimAuth });
+      const ask = (n.body?.data?.notifications ?? []).filter((x: any) => x.type === 'eco_capability_ask');
+      assert(ask.length === 1, `expected one notice (the question is filed once), got ${ask.length}`);
+      const allow = (ask[0].actions ?? []).find((a: any) => a.id === 'allow');
+      assert(!!allow && String(allow.endpoint) === `/v1/ecosystem-apps/${VAPP}/capability-approvals` && allow.body?.capability === declaredCap,
+        `no Allow: ${JSON.stringify(ask[0].actions)}`);
+      allowEndpoint = allow.endpoint; allowBody = allow.body;
+    });
+
+    await test('Only V in person reads and answers the question: not V\'s agent, not M', async () => {
+      const agent = await makeAgent(BASE, { name: victimName, token: victimToken }, ['memory:read', 'memory:write']);
+      const agentAuth = { Authorization: `Bearer ${agent.token}` };
+      const q = `/v1/ecosystem-apps/${VAPP}/capability-approval?capability=${encodeURIComponent(declaredCap)}`;
+      const asAgent = await json(q, { headers: agentAuth });
+      assert(asAgent.status === 403, `an agent read the question: ${asAgent.status}`);
+      const agentAllow = await json(`/v1/ecosystem-apps/${VAPP}/capability-approvals`, { method: 'POST', headers: agentAuth, body: JSON.stringify(allowBody) });
+      assert(agentAllow.status === 403, `an agent allowed it: ${agentAllow.status}`);
+      const agentNo = await json(`/v1/ecosystem-apps/${VAPP}/capability-approvals/decline`, { method: 'POST', headers: agentAuth, body: JSON.stringify(allowBody) });
+      assert(agentNo.status === 403, `an agent answered no: ${agentNo.status}`);
+      const mAllow = await json(`/v1/ecosystem-apps/${VAPP}/capability-approvals`, { method: 'POST', headers: auth, body: JSON.stringify(allowBody) });
+      assert(mAllow.status === 404, `the registrant answered on V's app: ${mAllow.status} ${JSON.stringify(mAllow.body.error)}`);
+      const view = await json(q, { headers: victimAuth });
+      const d = view.body.data ?? {};
+      assert(view.status === 200 && d.registrant === ownerName && d.action === 'dangerousAction' && d.approved_at === null
+        && d.still_asks === true && d.action_declared === true && String(d.input).includes('from-M'), `view: ${view.status} ${JSON.stringify(view.body)}`);
+      assert(framesToV() === 0, 'a frame reached V\'s app before the answer');
+    });
+
+    await test('KEEPS WORKING: after V\'s one press, M\'s tool runs on V\'s app over REST, MCP and the checkout', async () => {
+      const ok = await json(allowEndpoint, { method: 'POST', headers: victimAuth, body: JSON.stringify(allowBody) });
+      assert(ok.status === 200 && typeof ok.body.data?.approval?.approvedAt === 'string', `allow: ${ok.status} ${JSON.stringify(ok.body)}`);
+      const r = await tool(victimAuth, 't');
+      assert(r.status === 200 && r.body.data?.result?.stub_saw?.capability === 'dangerousAction'
+        && r.body.data.result.stub_saw.input?.marker === 'from-M', `REST after the press: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+      const agent = await makeAgent(BASE, { name: victimName, token: victimToken }, ['exchange:write', 'ext:invoke', 'memory:read']);
+      const viaMcp = await callTool(await openSession(BASE, agent.token), 'aimeat_app_tool_invoke', { owner: ownerName, app: FILE, tool: 't', input: {} });
+      assert(!viaMcp.isError, `MCP after the press: ${viaMcp.text.slice(0, 300)}`);
+      const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: victimAuth,
+        body: JSON.stringify({ items: [{ kind: 'app-tool', app: `${ownerName}/${FILE}`, tool: 'paid', input: {} }] }) });
+      const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, { method: 'POST', headers: victimAuth, body: JSON.stringify({}) });
+      assert(done.status === 200 && done.body.data.session.status === 'completed', `checkout after the press: ${done.status} ${JSON.stringify(done.body.error)}`);
+      assert(framesToV() === 3, `V's app received ${framesToV()} frames, expected 3`);
+      const listed = await json('/v1/ecosystem-apps', { headers: victimAuth });
+      const app = (listed.body.data?.ecosystem_apps ?? []).find((a: any) => a.app === VAPP);
+      assert((app?.capability_approvals ?? []).some((a: any) => a.capability === declaredCap && a.approvedAt), `listing: ${JSON.stringify(app?.capability_approvals)}`);
+    });
+
+    await test('KEEPS WORKING: M\'s own tool over M\'s own app needs no declaration and no press', async () => {
+      const g = await connectGeaiFor(ownerName, auth, 'mydesk', []);
+      mTunnel = await TunnelClient.connect(BASE, g.token);
+      mTunnel.onInvoke(f => ({ ok: true, result: { own: f.capability } }));
+      const reg = await json('/v1/capabilities', { method: 'POST', headers: auth, body: JSON.stringify({
+        name: 'Own desk', summary: 'own app', callable: true, visibility: 'private',
+        source: { type: 'ecosystem', ref: 'eco:mydesk:anything', version: '1.0.0' }, inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
+      }) });
+      assert(reg.status === 201, `register own: ${reg.status}`);
+      const FILE2 = 'own-tools.html';
+      const m = await json('/v1/memory', { method: 'POST', headers: auth, body: JSON.stringify({
+        key: `apps.${FILE2}.tools`, visibility: 'public', value: { version: 1, tools: [{ name: 'own', description: 'Own', action_id: reg.body.data.id }] } }) });
+      assert(m.status === 200 || m.status === 201, `own manifest ${m.status}`);
+      const r = await json(`/v1/apps/${ownerName}/${FILE2}/webmcp/tools/own`, { method: 'POST', headers: auth, body: JSON.stringify({ input: {} }) });
+      assert(r.status === 200 && r.body.data?.result?.own === 'anything', `own tool: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data)}`);
+    });
+
+    await test('A changed capability is a new question; Don\'t allow and withdraw both leave V\'s app untouched', async () => {
+      const patched = await json(`/v1/capabilities/${declaredCap}`, { method: 'PUT', headers: auth,
+        body: JSON.stringify({ source: { type: 'ecosystem', ref: `eco:${VAPP}:dangerousAction2`, version: '1.0.1' } }) });
+      assert(patched.status === 200, `patch: ${patched.status} ${JSON.stringify(patched.body.error)}`);
+      const before = framesToV();
+      const r = await tool(victimAuth, 't');
+      // dangerousAction2 is not declared by V's app, so it is refused outright, never on the old press.
+      assert(r.status === 403 && r.body.error?.code === 'ECOSYSTEM_CAPABILITY_NOT_YOURS', `changed action: ${r.status} ${JSON.stringify(r.body.error)}`);
+      const back = await json(`/v1/capabilities/${declaredCap}`, { method: 'PUT', headers: auth,
+        body: JSON.stringify({ source: { type: 'ecosystem', ref: `eco:${VAPP}:dangerousAction`, version: '1.0.2' } }) });
+      assert(back.status === 200, `patch back: ${back.status}`);
+      const w = await json(`/v1/ecosystem-apps/${VAPP}/capability-approvals?capability=${encodeURIComponent(declaredCap)}`, { method: 'DELETE', headers: victimAuth });
+      assert(w.status === 200 && w.body.data?.withdrawn === true, `withdraw: ${w.status} ${JSON.stringify(w.body)}`);
+      const again = await tool(victimAuth, 't');
+      assert(again.status === 403 && again.body.error?.code === 'ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL', `after withdraw: ${again.status} ${again.body.error?.code}`);
+      const no = await json(`/v1/ecosystem-apps/${VAPP}/capability-approvals/decline`, { method: 'POST', headers: victimAuth, body: JSON.stringify({ capability: declaredCap }) });
+      assert(no.status === 200 && no.body.data?.declined === true, `decline: ${no.status} ${JSON.stringify(no.body)}`);
+      const gone = await json(allowEndpoint, { method: 'POST', headers: victimAuth, body: JSON.stringify(allowBody) });
+      assert(gone.status === 404 && gone.body.error?.code === 'APPROVAL_NOT_FOUND', `a declined question was allowed: ${gone.status}`);
+      assert(framesToV() === before, `V's app received ${framesToV() - before} frame(s) after the change`);
+    });
+  } finally {
+    // A test of its own and the file's last block, so check:denial-coverage does not read the call
+    // that starts the suite, at the end of the file, as part of a block that asserts a refusal
+    // (scripts/lib/route-refusals.ts reads a block up to the next test).
+    await test('Phase 7 cleanup: both outside apps disconnect from the tunnel', async () => {
+      await (vTunnel as TunnelClient | null)?.close();
+      await (mTunnel as TunnelClient | null)?.close();
+    });
+  }
 }
 
 run().catch(err => { console.error(err); process.exit(1); });

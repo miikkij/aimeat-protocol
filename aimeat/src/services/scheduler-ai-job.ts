@@ -15,6 +15,11 @@
  * @structure runAiJob(storage, config, job)
  * @usage scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
  * @version-history
+ *   v1.1.0 -- 2026-10-22 -- The inputs are read for the schedule's maker (services/schedule-ai-read.ts
+ *     aiScheduleFireViewer): a private record of the owner or of a sibling agent is refused, naming
+ *     memory:read-as-owner, to a maker that does not read as the owner, and the maker is asked before
+ *     the reads rather than after them. A schedule the once-only step kept reads as before until its
+ *     input changes (secaudit 2026-10 wave 3, r49 the scheduled variant).
  *   v1.0.0 — 2026-10-20 — Moved out of services/scheduler-remote-jobs.ts unchanged, except for the
  *     write: the answer goes through writeMemoryRecord as the schedule's maker instead of a raw
  *     storage.setMemory at whatever string the schedule carried as its visibility (secaudit 2026-10,
@@ -32,7 +37,11 @@ import { readAiRecords } from './ai-inputs.js';
 import { unattendedReader } from './ai-jobs/starter.js';
 import { scheduleActor } from './schedule-actor.js';
 import { writeMemoryRecord } from './memory-write.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
+import { AiInputHiddenError } from './ai-read-viewer.js';
+import { aiScheduleFireViewer } from './schedule-ai-read.js';
+import { noteAgentRefusal } from './agent-refusals.js';
+import { agentSessionCaller, callerFromAuth } from './caller-context.js';
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -74,10 +83,38 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
     named.push({ key, namespace: ns });
     reads.push(ns === owner ? key : `${ns}::${key}`);
   }
+  // As whoever made the schedule, asked now (services/schedule-actor.ts): an agent's cap and the
+  // owner's rules for that agent or app apply, and a maker that is gone or lost ai:use stops it.
+  // Until 2026-10-05 it asked as the owner in person (secaudit 2026-10, AI-3). Asked before the
+  // reads since 2026-10-22, because the maker is also who the inputs are read for.
+  const actor = await scheduleActor(storage, job);
+  if (!actor.ok) throw new Error(actor.reason);
+  if (!actor.isOwner && !scopeIsCovered(actor.scopes, 'ai:use')) {
+    throw new Error('What made this schedule no longer holds ai:use, so it does not run. Approve it again, or delete this schedule.');
+  }
+
   // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
   // classification check. A schedule fires with nobody present, so it always reads as an unattended
-  // AI run (TARGET-082 V4, decided 2026-09-29), whoever saved it.
-  const inputs = await readAiRecords({ storage, config }, unattendedReader({ storage, config }, owner), owner, named, { capability: 'text' });
+  // AI run (TARGET-082 V4, decided 2026-09-29), whoever saved it. And it hands the model only the
+  // same-owner records its maker may read (services/schedule-ai-read.ts): a private record of the
+  // owner or of a sibling agent is refused to an agent without memory:read-as-owner before any model
+  // is called (secaudit 2026-10 wave 3, r49 the scheduled variant). A schedule kept by the once-only
+  // step reads as before until its input changes.
+  const viewer = await aiScheduleFireViewer(storage, config, job, actor);
+  let inputs: Awaited<ReturnType<typeof readAiRecords>>;
+  try {
+    inputs = await readAiRecords({ storage, config }, unattendedReader({ storage, config }, owner), owner, named, { capability: 'text' }, viewer);
+  } catch (err) {
+    // On the agent's card and in the owner's bell, once while the refusal stays open, as a fire
+    // refused for a missing word is (services/schedule-fire-refusal.ts).
+    if (err instanceof AiInputHiddenError) {
+      const caller = callerFromAuth({ sub: actor.principal, owner: '', roles: actor.roles, scopes: actor.scopes }, config.nodeId, storage);
+      if (caller.kind === 'agent') {
+        noteAgentRefusal(agentSessionCaller(actor.principal, '', actor.scopes, config.nodeId, storage).auth, [READ_AS_OWNER_SCOPE], false, `schedule ${job.id}`);
+      }
+    }
+    throw err;
+  }
   for (const { key, value } of inputs) {
     const valueText = value === undefined
       ? '(empty)'
@@ -86,14 +123,6 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   }
   const composedPrompt = parts.join('\n');
 
-  // As whoever made the schedule, asked now (services/schedule-actor.ts): an agent's cap and the
-  // owner's rules for that agent or app apply, and a maker that is gone or lost ai:use stops it.
-  // Until 2026-10-05 it asked as the owner in person (secaudit 2026-10, AI-3).
-  const actor = await scheduleActor(storage, job);
-  if (!actor.ok) throw new Error(actor.reason);
-  if (!actor.isOwner && !scopeIsCovered(actor.scopes, 'ai:use')) {
-    throw new Error('What made this schedule no longer holds ai:use, so it does not run. Approve it again, or delete this schedule.');
-  }
   const result = await completeForOwner(storage, config, owner, {
     prompt: composedPrompt,
     systemPrompt: cfg.systemPrompt,

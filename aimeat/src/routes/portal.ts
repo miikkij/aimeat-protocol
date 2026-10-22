@@ -14,6 +14,9 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-22 — /v1/eco-capability-allow joins the SPA routes: the owner allows another account's
+ *     capability to run one action of their outside app (views/eco-capability-allow.js,
+ *     services/eco-capability-approvals.ts).
  *   2026-10-18 — /v1/app-open joins the SPA routes: the page that opens an app, a welcome page or a company front page needing a sign-in.
  *   2026-10-18 — /v1/portfolio/:username gives a page that is not open to anyone the generic head (V3.10).
  *   2026-10-11 — GET /v1/build also says which commit runs, when the process started and whether
@@ -597,6 +600,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
     '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)
     '/v1/secret-allow', // The owner allows an extension to send a secret to one address (SPA, ?secret=&extension=&host=)
+    '/v1/eco-capability-allow', // The owner allows another account's capability to run one action of their outside app (SPA, ?app=&capability=)
   ];
 
   // The short address of the whole feature list, the one the front page and the footer hand out.

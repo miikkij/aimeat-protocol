@@ -16,12 +16,15 @@
  *   in services/memory-write.ts) and decides whether the job may name an extension action as its
  *   `on_done` (starterMayInvokeExtensions).
  * @structure startedByOf(auth, principal) · jobReader(deps, job) · jobCaller(job) · unattendedReader(deps, ownerGaii) ·
- *   jobWriter(job) · starterMayInvokeExtensions(startedBy) · onDoneScopeRefusal(startedBy)
+ *   jobWriter(job) · starterMayInvokeExtensions(startedBy) · onDoneScopeRefusal(startedBy) · jobReadViewer(job)
  * @usage
  *   startJob(input, { ownerGhii, createdBy, startedBy: startedByOf(req.auth!, ownerGhii) });
  *   const reader = jobReader({ storage, config }, job);
  *   const written = await writeMemoryRecord(deps, jobWriter(job), { ... });
  * @version-history
+ *   v1.4.0 -- 2026-10-22 -- jobReadViewer(): the job hands its model only the same-owner records and
+ *     files its starter, or the principal an extension's code reads as (`read_as`), may read; the
+ *     owner in person, an app grant and memory:read-as-owner read all (secaudit 2026-10, r49, v75).
  *   v1.3.0 — 2026-10-21 — onDoneScopeRefusal(): an app is told what its author declares, an agent to
  *     ask its owner.
  *   v1.2.0 — 2026-10-20 — jobWriter(): the answer is written through the shared memory write as the
@@ -43,6 +46,7 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { readerForCaller, type ContentReader } from '../classification/reader.js';
 import { aiCallerFromCredential, aiCallerOfPrincipal, type AiCallerContext } from '../ai/caller-context.js';
 import type { MemoryWriteCaller } from '../memory-write.js';
+import { aiReadViewerOf, type AiReadViewer } from '../ai-read-viewer.js';
 import type { AiJobRecord, AiJobStartedBy } from './types.js';
 
 type ReaderDeps = { storage: Storage; config: AimeatConfig };
@@ -139,6 +143,21 @@ export function jobCaller(job: Pick<AiJobRecord, 'owner' | 'started_by'>): AiCal
  */
 export function unattendedReader(deps: ReaderDeps, ownerGaii: string): ContentReader {
     return readerForCaller(deps, { gaii: ownerGaii, owner: localAccountName(ownerGaii), roles: ['operator'], scopes: [] });
+}
+
+/**
+ * Which same-owner records and files the job may hand its model (services/ai-inputs.ts): the
+ * principal an extension's code reads as when one is recorded (`read_as`), else the starter. No
+ * starter and no `read_as` (ctx.ai.start on the owner's reach, a chain, a job stored before
+ * starters) is no viewer, which reads the owner scope as before.
+ */
+export function jobReadViewer(job: Pick<AiJobRecord, 'started_by' | 'read_as'>): AiReadViewer | undefined {
+    const r = job.read_as;
+    if (r) {
+        return aiReadViewerOf(r, `This job was started by extension code that ${r.principal} wrote, so it reads what ${r.principal} may read. `
+            + 'When the extension runs on its own, you choose what it reads on its page at /profile?tab=extensions.');
+    }
+    return aiReadViewerOf(job.started_by);
 }
 
 /** The reader an AI job reads its prompt record, its input records and its audio file with. */

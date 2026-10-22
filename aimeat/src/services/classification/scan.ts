@@ -13,9 +13,21 @@
  *   A prefix reads keys only, at most PREFIX_MAX of them, and queues each under the identity that
  *   holds it (the owner, or one of the owner's agents or apps), which is where the queue job reads
  *   its value.
+ *
+ *   WHAT A CALLER MAY JUDGE (secaudit 2026-10, v76). Only what it may read with owner_scope
+ *   (services/owner-scope-read.ts): the owner in person, an app grant and a credential holding
+ *   memory:read-as-owner judge the whole owner scope. Any other caller (an agent, an ecosystem app)
+ *   judges its own records and the owner's and siblings' records whose visibility is owner, members
+ *   or public. A named key whose record is hidden from it reads as its own copy, or as missing when
+ *   it has none, exactly as GET /v1/memory/:key?owner_scope=true answers; a hidden key is queued, if
+ *   at all, under the caller's own identity; a prefix leaves hidden keys out. Such an answer carries
+ *   READ_AS_OWNER_NOTE in `note`: always when a prefix left something out, and for named keys
+ *   whenever one is missing, so the note does not tell a hidden record from an absent one.
  * @structure ScanResult · scanContent()
  * @usage const out = await scanContent(deps, actor, { keys: ['notes.2026-09'] });
  * @version-history
+ *   v1.3.0 — 2026-10-22 — The owner-scope read rule: a caller without memory:read-as-owner judges
+ *     only the records it may read, and the answer names the permission (secaudit 2026-10, v76).
  *   v1.2.0 — 2026-09-30 — An organism item is authorized one by one, not once per scope: a member
  *     named a key of a workspace they cannot read after one they can, and it was queued for the
  *     classifier (TARGET-082 second review, S5).
@@ -29,6 +41,8 @@ import { getOwnerScopeMemory, listOwnerScopeMemoryMeta } from '../owner-memory.j
 import { ClassificationError, memoryTarget, readContentLabel, type LabelActor } from './labels.js';
 import { classifyText, enqueue, type ClassifyOutcome } from './classifier.js';
 import { scopeOrganism } from './policy.js';
+import { ownerScopeView, visibleToSameOwnerReader } from '../owner-scope-read.js';
+import { labelActorReadsAll, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 
 /** Named personal keys judged inside the request; each may be a model call. */
 const NOW_MAX = 3;
@@ -38,6 +52,8 @@ export interface ScanResult {
   classified: Array<{ key: string } & ClassifyOutcome>;
   queued: string[];
   missing: string[];
+  /** READ_AS_OWNER_NOTE, for a caller that does not read every record of its owner (see the header). */
+  note?: string;
 }
 
 /** Judge up to 3 named personal keys now and queue the rest, or queue a whole prefix. */
@@ -52,11 +68,16 @@ export async function scanContent(
   const name = actor.ownerName;
   if (!name) throw new ClassificationError('NOT_FOUND', 404, 'Only an account of this server scans its content.');
 
+  // Does this caller read every record of its owner (owner-scope-labels.ts)? When not, it judges
+  // only what GET /v1/memory?owner_scope=true would show it.
+  const readsAll = labelActorReadsAll(actor);
   let targets: ContentLabelTarget[];
   const byPrefix = typeof input.prefix === 'string' && !!input.prefix.trim();
   if (byPrefix) {
     // Keys only: the prefix scan queues work and reads no value.
-    const rows = await listOwnerScopeMemoryMeta(deps.storage, deps.config.nodeId, name, { prefix: (input.prefix as string).trim() });
+    const all = await listOwnerScopeMemoryMeta(deps.storage, deps.config.nodeId, name, { prefix: (input.prefix as string).trim() });
+    const rows = ownerScopeView(all, actor.principal, readsAll);
+    if (rows.length < all.length) out.note = READ_AS_OWNER_NOTE;
     const seen = new Set<string>();
     targets = [];
     for (const r of rows) {
@@ -84,10 +105,26 @@ export async function scanContent(
   const toQueue: ContentLabelTarget[] = [];
   let inline = 0;
   for (const target of targets) {
-    if (byPrefix || scopeOrganism(target.scope) || inline >= NOW_MAX) { toQueue.push(target); continue; }
+    if (byPrefix || scopeOrganism(target.scope)) { toQueue.push(target); continue; }
+    if (inline >= NOW_MAX) {
+      // The queue job reads (scope, key) exactly. An owner record hidden from this caller is not
+      // queued for it: the key is queued under the caller's own identity, its own copy or nothing.
+      const owned = readsAll ? null : await deps.storage.getMemory(target.scope, target.key);
+      toQueue.push(owned && !visibleToSameOwnerReader(owned, actor.principal) ? memoryTarget(actor.principal, target.key) : target);
+      continue;
+    }
     inline++;
-    const rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, name, target.key);
-    if (!rec) { out.missing.push(target.key); continue; }
+    let rec = await getOwnerScopeMemory(deps.storage, deps.config.nodeId, name, target.key);
+    // A record hidden from this caller answers as an absent one; a hidden owner copy that shadowed
+    // the caller's own record leaves the caller its own (routes/memory/key.ts does the same).
+    if (rec && !ownerScopeView([rec], actor.principal, readsAll).length) {
+      rec = await deps.storage.getMemory(actor.principal, target.key);
+    }
+    if (!rec) {
+      out.missing.push(target.key);
+      if (!readsAll) out.note = READ_AS_OWNER_NOTE;
+      continue;
+    }
     const text = typeof rec.value === 'string' ? rec.value : JSON.stringify(rec.value ?? '');
     out.classified.push({ key: target.key, ...(await classifyText(deps, memoryTarget(rec.ownerGaii, target.key), text)) });
   }

@@ -14,6 +14,7 @@
  * @structure dataMapTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-10-22 — aimeat_memory_hands says that it covers the records the caller may read, and that its note names memory:read-as-owner (secaudit 2026-10, v88).
  *   2026-10-18 — The `data_map` parameter of aimeat_datamap_set names the machinery word `invites-people` and the optional app-level `invites`, and the finding an app asking for organism:invite gets without them.
  *   2026-10-05 —The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
@@ -103,7 +104,7 @@ export const dataMapTools = [
     },
     {
         name: 'aimeat_memory_hands',
-        description: 'How many hands have been on one memory key, and whose. A key gets rewritten and the value changes; who touched it was never written down anywhere until this existed, and a field on the record could not hold it because the next write would overwrite it. Worth asking before overwriting something you did not write, and it is the answer somebody needs when a person asks what happened to their data. The answer carries what it cannot see: counting began the day it was switched on, so a key written before that and never written since has no hands here, and it counts the endpoints and tools a principal comes through rather than the places AIMEAT writes on its own behalf.',
+        description: 'How many hands have been on one memory key, and whose. A key gets rewritten and the value changes; who touched it was never written down anywhere until this existed, and a field on the record could not hold it because the next write would overwrite it. Worth asking before overwriting something you did not write, and it is the answer somebody needs when a person asks what happened to their data. The answer carries what it cannot see: counting began the day it was switched on, so a key written before that and never written since has no hands here, and it counts the endpoints and tools a principal comes through rather than the places AIMEAT writes on its own behalf. It covers the records you may read: without the memory:read-as-owner permission, a record the owner or another of their agents keeps private has no hands here, as it reads as absent, and the answer\'s note says so.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Memory: who has written here', readOnlyHint: true },

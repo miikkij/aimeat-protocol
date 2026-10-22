@@ -40,6 +40,10 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-22 — An `ai` schedule's input may name no record of the owner or a sibling agent that the
+ *     caller may not read itself (services/schedule-ai-read.ts aiScheduleInputRefusal), at create and
+ *     at edit: 403 SCOPE_DENIED naming memory:read-as-owner. The owner in person and an app grant read
+ *     every record, as before (secaudit 2026-10 wave 3, r49 the scheduled variant).
  *   2026-10-21 — triggerScheduleRecord: the app or ecosystem app that made an `extension` schedule on
  *     the once-only keep list (services/schedule-extension-keep.ts) may run it now without ext:invoke,
  *     as its fire runs; an edit by that app still asks the word.
@@ -86,6 +90,7 @@ import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constr
 import { scheduleFileDenial } from './schedule-file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
 import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
+import { aiScheduleInputRefusal } from './schedule-ai-read.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
@@ -469,6 +474,10 @@ export async function createScheduleRecord(
         // rules here as well as at the fire (secaudit 2026-10).
         const badVisibility = await aiOutputVisibilityRefusal(storage, body.output_visibility, caller.identity);
         if (badVisibility) return badVisibility;
+        // The schedule reads for its maker (services/schedule-ai-read.ts): no record of the owner or a
+        // sibling that the maker may not read itself. The fire asks again, for records written later.
+        const hidden = await aiScheduleInputRefusal(storage, caller, owner, { inputKeys: body.input_keys, inputNamespaces: body.input_namespaces });
+        if (hidden) return { ok: false, ...hidden };
         base.input = {
             inputKeys: Array.isArray(body.input_keys) ? body.input_keys : [],
             inputNamespaces: Array.isArray(body.input_namespaces) ? body.input_namespaces : undefined,
@@ -629,6 +638,9 @@ export async function updateScheduleRecord(
                 storage, p.outputVisibility ?? p.output_visibility, caller.identity,
             );
             if (badVisibility) return badVisibility;
+            // And the create's rule about whose records it reads, asked of whoever gives the new input.
+            const hidden = await aiScheduleInputRefusal(storage, caller, job.ownerScope ?? ownerScope, p as Record<string, unknown>);
+            if (hidden) return { ok: false, ...hidden };
         }
         updates.input = patch.input as Record<string, unknown>;
     }

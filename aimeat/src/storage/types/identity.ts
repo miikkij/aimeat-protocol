@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-22 — EcoCapabilityApproval and EcosystemAppRecord.capabilityApprovals: the
+ *     capabilities of other accounts the owner allowed to run an action of their outside app
+ *     (migration 0112; secaudit 2026-10, capability-invoke.ts:ecosystem-source).
  *   v1.10.0 — 2026-10-20 — GrantsToIdentityCleared: what Storage.clearGrantsToIdentity() took away
  *     when an agent ended (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   v1.9.0 — 2026-10-18 — AgentRecord.clearance: the highest classification label the agent may read
@@ -421,8 +424,39 @@ export interface EcosystemAppRecord {
    * the old hardcoded playbook). Stored as a JSON column in both backends, mirroring `automation`.
    */
   setup?: { fi: string; en: string };
+  /**
+   * The capabilities of OTHER accounts the owner allowed to run an action of this app, and the
+   * requests still waiting for the owner's answer (services/eco-capability-approvals.ts). Absent or
+   * empty when there are none. Written only through swapEcosystemAppCapabilityApprovals, never by
+   * updateEcosystemApp, so a reconnect keeps what the owner allowed.
+   */
+  capabilityApprovals?: EcoCapabilityApproval[];
   createdAt: string;
   lastSeen: string;
+}
+
+/**
+ * One capability of another account that asks the owner's outside app to run one of its actions.
+ * An entry without `approvedAt` waits for the owner. The key is (capability, action, registrant): a
+ * capability whose source is changed to another action, or that another account registers, is a new
+ * question.
+ */
+export interface EcoCapabilityApproval {
+  /** The capability record id (its registrant's). */
+  capability: string;
+  /** The action of this app the capability asks it to run (the `{capId}` of `eco:{app}:{capId}`). */
+  action: string;
+  /** The owner GHII behind the capability's registrant. */
+  registrant: string;
+  /** The capability's name when it asked, for the question page. */
+  name?: string;
+  /** The input of the call that asked, as JSON text cut to 500 characters, for the question page. */
+  input?: string;
+  requestedAt: string;
+  /** The principal whose call was refused (the owner, one of their agents or apps). */
+  requestedBy: string;
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 /**

@@ -1,0 +1,22 @@
+-- 0112_ecosystem_capability_approvals.sql
+--
+-- Which capabilities of OTHER accounts the owner allowed to run an action of their outside
+-- (ecosystem) app, and the requests still waiting for the owner's answer.
+--
+-- WHY. A capability whose source is `eco:{app}:{action}` runs over the CALLER's own connected app,
+-- so another account could register one, bind it to its app tool with locked arguments, and choose
+-- which action the caller's own app performed as the caller (secaudit 2026-10,
+-- capability-invoke.ts:ecosystem-source:app-slug-resolved-in-caller-reach). Such a call now runs
+-- only for an action the app declared and after the owner allowed it once with one press; the
+-- answer is kept on the app's row.
+--
+--   capabilityApprovals  JSON text, '[]' when none:
+--              [{ "capability", "action", "registrant", "name"?, "input"?, "requestedAt",
+--                 "requestedBy", "approvedAt"?, "approvedBy"? }]
+--              An entry without approvedAt waits for the owner. Text, not jsonb, so a
+--              compare-and-swap compares the bytes it wrote (as "Secret"."approvals", 0110).
+--
+-- Every row that exists before this migration gets '[]': nothing was asked or allowed yet, and a
+-- call by the app's own owner never reads this column.
+
+ALTER TABLE "EcosystemApp" ADD COLUMN IF NOT EXISTS "capabilityApprovals" TEXT NOT NULL DEFAULT '[]';

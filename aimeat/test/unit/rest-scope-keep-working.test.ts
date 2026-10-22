@@ -97,6 +97,10 @@ function restGateUses(): GateUse[] {
 const INLINE_NOT_KEPT: Record<string, string> = {
     // routes/connections-read-through.ts, READ_THROUGH_SCOPE: a route made on 2026-10-05 with the check in place.
     'connections:read-through': 'the read-through route asked it from its first day',
+    // routes/webmcp-invoke-gate.ts (secaudit 2026-10, v72): the word also accepts contracts and places
+    // bids, so it is not given wholesale; the callers of the app-tool route are kept by their own step
+    // (services/app-tool-invoke-keep.ts, test/unit/app-tool-invoke-keep.test.ts).
+    'exchange:write': 'the app-tool route keeps its earlier callers through services/app-tool-invoke-keep.ts',
 };
 const INLINE_CONSTANTS: Record<string, string> = {
     READ_THROUGH_SCOPE: 'connections:read-through',
