@@ -378,7 +378,7 @@
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.6",
     "@types/ini": "^4.1.1",
-    "@types/node": "^25.9.9",
+    "@types/node": "^24.19.2",
     "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
     "@types/qrcode": "^1.5.6",
