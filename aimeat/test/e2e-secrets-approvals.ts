@@ -315,6 +315,14 @@ await test('8. the owner hears it in the bell, with an Allow button on the notic
     assert((ask.actions ?? []).some((a: any) => a.id === 'allow' && String(a.endpoint).includes('/v1/secrets/K_FOREIGN/approvals')), `no Allow: ${JSON.stringify(ask.actions)}`);
 });
 
+await test('8b. the notice also carries Don\'t allow, which answers the same question no', async () => {
+    const n = await json('/v1/notifications', { headers: auth(owner.token) });
+    const ask = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'secret_use_ask' && String(x.body ?? '').includes(FOREIGN_EXT));
+    const deny = (ask?.actions ?? []).find((a: any) => a.id === 'deny');
+    assert(!!deny && String(deny.endpoint) === '/v1/secrets/K_FOREIGN/approvals/decline'
+        && deny.body?.extension === FOREIGN_EXT && deny.body?.host === RECEIVER_HOST, `no Don't allow: ${JSON.stringify(ask?.actions)}`);
+});
+
 await test('9. only the owner in person reads and answers the question', async () => {
     const q = `extension=${encodeURIComponent(FOREIGN_EXT)}&host=${encodeURIComponent(RECEIVER_HOST)}`;
     const asAgent = await json(`/v1/secrets/K_FOREIGN/approval?${q}`, { headers: auth(chatAgent.token) });

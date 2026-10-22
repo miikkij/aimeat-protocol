@@ -33,6 +33,8 @@
  *   const refusal = await ecosystemCallRefusal({ storage, config }, { capability, app, action, callerGhii, input });
  *   if (refusal) throw Object.assign(new Error(refusal.message), refusal);
  * @version-history
+ *   v1.1.0 — 2026-10-22 — The bell notice carries Don't allow beside Allow (the developer: a question
+ *     with only Allow cannot be answered no).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, capability-invoke.ts ecosystem source, r45).
  */
 import type { AimeatConfig } from '../config.js';
@@ -109,10 +111,16 @@ function askNotice(baseUrl: string, app: string, entry: EcoCapabilityApproval): 
   return {
     type: ECO_CAPABILITY_ASK_TYPE,
     title: `${registrant} wants your outside app ${app} to run ${entry.action}`,
-    body: `The capability "${name}" of ${registrant} asks your outside app ${app} to run its action ${entry.action} for you. Open this to see what it sends, or allow it here.`,
+    body: `The capability "${name}" of ${registrant} asks your outside app ${app} to run its action ${entry.action} for you. Open this to see what it sends, or answer here.`,
     link: url.slice(url.indexOf('/v1/')),
     i18n: { key: ECO_CAPABILITY_ASK_TYPE, vars: { registrant, app, action: entry.action, name } },
+    // Both answers on the notice, as on the page: a question with only Allow cannot be answered no.
     actions: [{
+      id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST',
+      endpoint: `/v1/ecosystem-apps/${encodeURIComponent(app)}/capability-approvals/decline`,
+      body: { capability: entry.capability }, style: 'default',
+      i18n: { key: `${ECO_CAPABILITY_ASK_TYPE}.deny` },
+    }, {
       id: 'allow', label: 'Allow', kind: 'api', method: 'POST',
       endpoint: `/v1/ecosystem-apps/${encodeURIComponent(app)}/capability-approvals`,
       body: { capability: entry.capability }, style: 'primary',
