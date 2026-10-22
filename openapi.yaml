@@ -73224,7 +73224,7 @@ paths:
                       data:
                         type: object
                         properties:
-                          ghii_user: { type: object }
+                          ghii_user: { type: object, description: 'The person as GET /v1/admin/ghii lists them (no credential fields)' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }

@@ -12,6 +12,9 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.4.1 — 2026-10-22 — PUT /v1/admin/ghii/:ghii answers with the list row (adminGhiiRow) instead of the
+ *     stored identity row, which carried the password hash and second-factor material to the operator
+ *     and an operator agent (secaudit2026oct22, put-admin-ghii:returns-stored-identity-row).
  *   v1.4.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.3.0 — 2026-09-12 — GET /v1/admin/csm carries each CSM's description, schema mode and field
  *     counts. They sit in the definition the record already holds, and without them a list row
@@ -25,6 +28,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { GHIIRecord } from '../storage/types/identity.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -70,32 +74,37 @@ export function adminFeaturesRouter(
 
     // ── GHII Users ──────────────────────────────────────────
 
+    // The one shape an admin answer gives a person's identity: an allowlist, so a credential the
+    // stored row carries (password hash, TOTP secret and backup codes, the plain address) never
+    // reaches the operator or an operator agent (secaudit2026oct22).
+    const adminGhiiRow = (u: GHIIRecord) => {
+        let maskedEmail: string | null = null;
+        if (u.notificationEmail) {
+            const [local, domain] = u.notificationEmail.split('@');
+            maskedEmail = (local?.[0] ?? '') + '***@' + (domain ?? '');
+        }
+        return {
+            ghii: u.ghii,
+            username: u.username,
+            display_name: u.displayName,
+            verification_level: u.verificationLevel,
+            totp_enabled: u.totpEnabled,
+            email_hash: u.emailHash ?? null,
+            email_verified: !!u.emailVerifiedAt,
+            masked_email: maskedEmail,
+            owner_name: u.ownerName,
+            allowed_origins: u.allowedOrigins ?? null,
+            last_login_at: u.lastLoginAt ?? null,
+            login_count: u.loginCount ?? 0,
+            created_at: u.createdAt,
+            updated_at: u.updatedAt,
+        };
+    };
+
     router.get('/v1/admin/ghii', ...auth, handle(async (_req, res) => {
         const users = await storage.listGHIIs();
         res.json(success(config.nodeId, {
-            ghii_users: users.map(u => {
-                let maskedEmail: string | null = null;
-                if (u.notificationEmail) {
-                    const [local, domain] = u.notificationEmail.split('@');
-                    maskedEmail = (local?.[0] ?? '') + '***@' + (domain ?? '');
-                }
-                return {
-                    ghii: u.ghii,
-                    username: u.username,
-                    display_name: u.displayName,
-                    verification_level: u.verificationLevel,
-                    totp_enabled: u.totpEnabled,
-                    email_hash: u.emailHash ?? null,
-                    email_verified: !!u.emailVerifiedAt,
-                    masked_email: maskedEmail,
-                    owner_name: u.ownerName,
-                    allowed_origins: u.allowedOrigins ?? null,
-                    last_login_at: u.lastLoginAt ?? null,
-                    login_count: u.loginCount ?? 0,
-                    created_at: u.createdAt,
-                    updated_at: u.updatedAt,
-                };
-            }),
+            ghii_users: users.map(adminGhiiRow),
             total: users.length,
         }));
     }));
@@ -115,7 +124,7 @@ export function adminFeaturesRouter(
             return;
         }
 
-        res.json(success(config.nodeId, { ghii_user: updated }));
+        res.json(success(config.nodeId, { ghii_user: adminGhiiRow(updated) }));
         emitChange('features');
     }));
 
