@@ -5,6 +5,15 @@
  * @description AimeatRealtime — browser client for AIMEAT P2P realtime rooms (WS rooms +
  *   WebRTC data channels + Yjs CRDT sync) and SharedClock (network-synced timeline).
  * @version-history
+ *   v1.5.0 — 2026-10-22 — What Band Jam had to build itself, for every realtime app. A broadcast or a
+ *     signal whose JSON is over FRAME_LIMIT (10 000 characters; the relay refuses frames over 16 KB) is
+ *     sent as 'part' frames and joined again on the other side before any handler sees it. pace(n)
+ *     keeps broadcasts and signals under n frames a second (the relay drops a peer's frames over 50 a
+ *     second) by queueing instead of dropping. SharedClock measures every peer's clock offset
+ *     (measure(rt): clock-ping / clock-pong signals, the shortest round trip wins), converts a peer's
+ *     t0 to this clock (adopt(payload, fromPeerId)), and schedules steps ahead of time
+ *     (schedule(cb, { lookahead, audio }): each step once, early enough to place it on an
+ *     AudioContext with AIMEAT.audio.play(..., { when })).
  *   v1.4.0 — 2026-10-09 — connect() no longer puts the session token in the socket URL, where reverse
  *     proxies logged it (secrets audit 2026-10-09, d3): it POSTs /v1/ws/ticket for a single-use
  *     ticket and connects with ?ticket=. connect() now returns a promise (it never rejects); frames
@@ -219,6 +228,9 @@ class AimeatRealtime {
     }
     this._lastJoined = null;
     this._outbox = [];
+    if (this._paceTimer) { clearTimeout(this._paceTimer); this._paceTimer = null; }
+    this._paceQueue = [];
+    this._parts = new Map();
     this._closeAllPeerConnections();
     this._yjsDocs.clear();
   }
@@ -226,11 +238,58 @@ class AimeatRealtime {
   // ── Messaging ──
 
   broadcast(payload) {
+    const parts = this._chunk(payload);
+    if (parts) { for (const p of parts) this._send({ type: 'broadcast', payload: p }); return; }
     this._send({ type: 'broadcast', payload });
   }
 
   signal(toPeerId, payload) {
+    const parts = this._chunk(payload);
+    if (parts) { for (const p of parts) this._send({ type: 'signal', to: toPeerId, payload: p }); return; }
     this._send({ type: 'signal', to: toPeerId, payload });
+  }
+
+  /**
+   * Keep broadcasts and signals under `perSecond` frames a second: the relay drops a peer's frames
+   * over 50 a second, so a burst (a big song split in parts, a held key) waits its turn instead.
+   * 0 turns pacing off (the default: a game sending every frame wants them now or never).
+   */
+  pace(perSecond) {
+    this._paceMs = perSecond > 0 ? 1000 / perSecond : 0;
+    return this;
+  }
+
+  // A payload too big for one relay frame → 'part' frames ({type:'part', mid, i, n, s}); null when it fits.
+  _chunk(payload) {
+    let text;
+    try { text = JSON.stringify(payload); } catch { return null; }
+    if (typeof text !== 'string' || text.length <= AimeatRealtime.FRAME_LIMIT) return null;
+    const n = Math.ceil(text.length / AimeatRealtime.FRAME_LIMIT);
+    if (n > AimeatRealtime.MAX_PARTS) {
+      this._emit('error', { type: 'error', code: 'MESSAGE_TOO_LARGE', message: 'A frame of ' + text.length + ' characters is more than ' + AimeatRealtime.MAX_PARTS + ' parts.' });
+      return [];
+    }
+    const mid = Math.random().toString(36).slice(2, 10);
+    const out = [];
+    for (let i = 0; i < n; i++) out.push({ type: 'part', mid, i, n, s: text.slice(i * AimeatRealtime.FRAME_LIMIT, (i + 1) * AimeatRealtime.FRAME_LIMIT) });
+    return out;
+  }
+
+  // A 'part' frame: kept until its frame is whole, then the whole frame (or null while waiting).
+  _join(from, p) {
+    if (!this._parts) this._parts = new Map();
+    const now = Date.now();
+    for (const [k, v] of this._parts) if (now - v.at > 30000) this._parts.delete(k);
+    if (typeof p.mid !== 'string' || !Number.isInteger(p.i) || !Number.isInteger(p.n) || p.n < 1
+      || p.n > AimeatRealtime.MAX_PARTS || p.i < 0 || p.i >= p.n || typeof p.s !== 'string') return null;
+    const key = from + ':' + p.mid;
+    let e = this._parts.get(key);
+    if (!e) { e = { at: now, n: p.n, got: 0, chunks: new Array(p.n) }; this._parts.set(key, e); }
+    if (e.n !== p.n || e.chunks[p.i] !== undefined) return null;
+    e.chunks[p.i] = p.s; e.got++;
+    if (e.got < e.n) return null;
+    this._parts.delete(key);
+    try { return JSON.parse(e.chunks.join('')); } catch { return null; }
   }
 
   presence(state) {
@@ -401,6 +460,10 @@ class AimeatRealtime {
   // ── Internal ──
 
   _send(msg) {
+    if (this._paceMs && this.ws && this.ws.readyState === WebSocket.OPEN && (msg.type === 'broadcast' || msg.type === 'signal')) {
+      this._paced(msg);
+      return;
+    }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(msg));
     } else if ((this._opening || (this.ws && this.ws.readyState === WebSocket.CONNECTING)) && this._outbox.length < 200) {
@@ -410,7 +473,32 @@ class AimeatRealtime {
     }
   }
 
+  // Paced sending: one frame per _paceMs, the rest in order behind it (at most 400 waiting).
+  _paced(msg) {
+    if (!this._paceQueue) this._paceQueue = [];
+    if (this._paceQueue.length >= 400) { this._emit('error', { type: 'error', code: 'RATE_LIMITED', message: 'More than 400 frames are waiting to be sent.' }); return; }
+    this._paceQueue.push(msg);
+    const pump = () => {
+      this._paceTimer = null;
+      while (this._paceQueue.length) {
+        const now = Date.now();
+        if ((this._nextSendAt || 0) > now) { this._paceTimer = setTimeout(pump, this._nextSendAt - now); return; }
+        const m = this._paceQueue.shift();
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) { this._paceQueue.length = 0; return; }
+        this.ws.send(JSON.stringify(m));
+        this._nextSendAt = Math.max(now, this._nextSendAt || 0) + this._paceMs;
+      }
+    };
+    if (!this._paceTimer) pump();
+  }
+
   _handleMessage(msg) {
+    // A frame that came in parts is handled once it is whole, as the frame it was.
+    if ((msg.type === 'broadcast' || msg.type === 'signal') && msg.payload && msg.payload.type === 'part') {
+      const whole = this._join(msg.from, msg.payload);
+      if (!whole) return;
+      msg = { ...msg, payload: whole };
+    }
     switch (msg.type) {
       case 'joined':
         this.peerId = msg.peerId;
@@ -652,11 +740,19 @@ class AimeatRealtime {
  *   clock.onStep((step) => { ... play or draw this step ... });
  *   // leader:  rt.broadcast(clock.start());      // {type:'transport',state:'play',t0,bpm}
  *   // joiner:  rt.broadcast({ type: 'sync-request' });
- *   rt.on('broadcast', ({ payload }) => {
+ *   rt.on('broadcast', ({ from, payload }) => {
  *     if (payload.type === 'sync-request' && clock.playing) rt.broadcast(clock.syncState());
- *     if (payload.type === 'sync-state' || payload.type === 'transport') clock.adopt(payload);
+ *     if (payload.type === 'sync-state' || payload.type === 'transport') clock.adopt(payload, from);
  *     if (payload.type === 'bpm') clock.setBpm(payload.bpm);
  *   });
+ *
+ * Two machines' clocks disagree by tens or hundreds of ms. clock.measure(rt) pings every peer
+ * (clock-ping / clock-pong signals, the shortest round trip wins) so adopt(payload, from) turns the
+ * sender's t0 into this machine's. To play in time, schedule a little ahead on the audio clock:
+ *
+ *   clock.measure(rt);
+ *   clock.schedule((n, atMs, atAudio) => AIMEAT.audio.play('drums', n % 4 ? 'hihat' : 'kick', { when: atAudio }),
+ *     { audio: AIMEAT.audio.context });
  */
 class SharedClock {
   /** @param {{bpm?:number, steps?:number, subdiv?:number, now?:()=>number}} [opts] */
@@ -670,6 +766,109 @@ class SharedClock {
     this._lastStep = -1;
     this._timer = null;
     this._cbs = [];
+    this._offsets = new Map();          // peerId → { off, rtt }: their clock minus mine
+    this._sched = null;
+  }
+
+  // ── Clock offsets ──
+
+  /**
+   * Measure this machine's clock against every peer in `rt` (an AimeatRealtime): on join, on each
+   * new peer, and again every `every` ms (default 15 s). Answers the peers' pings too.
+   */
+  measure(rt, opts = {}) {
+    if (this._rt) return this;
+    this._rt = rt;
+    const pingAll = (times) => { for (const id of rt.peers.keys()) this.ping(id, times); };
+    this._onSignal = (msg) => {
+      const p = msg && msg.payload;
+      if (!p || !msg.from) return;
+      if (p.type === 'clock-ping' && typeof p.t === 'number') rt.signal(msg.from, { type: 'clock-pong', t1: p.t, t2: this._now() });
+      else if (p.type === 'clock-pong' && typeof p.t1 === 'number' && typeof p.t2 === 'number') this._pong(msg.from, p.t1, p.t2);
+    };
+    this._onJoined = () => pingAll(5);
+    this._onPeerJoined = (msg) => { if (msg && msg.peerId) this.ping(msg.peerId, 5); };
+    this._onPeerLeft = (msg) => { if (msg && msg.peerId) this._offsets.delete(msg.peerId); };
+    rt.on('signal', this._onSignal);
+    rt.on('joined', this._onJoined);
+    rt.on('peer-joined', this._onPeerJoined);
+    rt.on('peer-left', this._onPeerLeft);
+    if (typeof setInterval === 'function') this._pingTimer = setInterval(() => pingAll(2), opts.every || 15000);
+    return this;
+  }
+
+  /** Send `times` clock pings to one peer, 150 ms apart. */
+  ping(peerId, times = 3) {
+    if (!this._rt) return;
+    for (let i = 0; i < times; i++) {
+      const send = () => this._rt && this._rt.signal(peerId, { type: 'clock-ping', t: this._now() });
+      if (i === 0 || typeof setTimeout !== 'function') send(); else setTimeout(send, i * 150);
+    }
+  }
+
+  _pong(peerId, t1, t2) {
+    const now = this._now();
+    const rtt = now - t1;
+    if (!(rtt >= 0 && rtt < 10000)) return;
+    const off = t2 - (t1 + now) / 2;
+    const cur = this._offsets.get(peerId);
+    if (!cur || rtt <= cur.rtt * 1.2) this._offsets.set(peerId, { off: cur && rtt > cur.rtt ? (cur.off + off) / 2 : off, rtt: cur ? Math.min(rtt, cur.rtt) : rtt });
+  }
+
+  /** A peer's clock minus this one, in ms (0 until measured). */
+  offsetOf(peerId) { const o = this._offsets.get(peerId); return o ? o.off : 0; }
+  /** The shortest round trip to a peer, in ms (null until measured). */
+  rttOf(peerId) { const o = this._offsets.get(peerId); return o ? o.rtt : null; }
+  /** An instant on a peer's clock, on this machine's. */
+  toLocal(t, peerId) { return peerId ? t - this.offsetOf(peerId) : t; }
+
+  // ── Steps on the clock ──
+
+  /** Absolute step n (not wrapped to the bar) → the local ms it starts at. */
+  stepTime(n) { return this.t0 == null ? null : this.t0 + n * this.stepMs(); }
+  /** The absolute step at a local instant (fractional), or null before start. */
+  stepAt(t = this._now()) { return this.t0 == null ? null : (t - this.t0) / this.stepMs(); }
+
+  /**
+   * Call cb(n, atMs, atAudio) once for every absolute step n, `lookahead` ms before it starts
+   * (default 120; 1600 while the tab is hidden, whose timers fire about once a second). With
+   * opts.audio (an AudioContext), atAudio is that step on its clock, for play(..., { when }).
+   * cb null stops scheduling. A tempo change or a new t0 re-plans from the next step.
+   */
+  schedule(cb, opts = {}) {
+    if (this._sched) { clearInterval(this._sched.timer); this._sched = null; }
+    if (!cb || typeof setInterval !== 'function') return this;
+    const sc = { cb, opts, next: null, key: '' };
+    sc.timer = setInterval(() => this._tick(sc), opts.interval || 25);
+    this._sched = sc;
+    this._tick(sc);
+    return this;
+  }
+
+  _tick(sc) {
+    if (!this.playing || this.t0 == null) { sc.next = null; sc.last = null; return; }
+    const key = this.t0 + ':' + this.bpm;
+    const now = this._now();
+    const hidden = typeof document !== 'undefined' && document.hidden;
+    const ahead = sc.opts.lookahead != null ? sc.opts.lookahead : (hidden ? 1600 : 120);
+    if (sc.key !== key) { sc.key = key; sc.next = null; }   // a new anchor or tempo: plan again
+    if (sc.next === null) {
+      const from = Math.max(0, Math.ceil(this.stepAt(now) - 0.05));   // nothing before step 0
+      // A tempo change keeps the step count running (setBpm re-anchors): carry on right after the
+      // last step already placed instead of placing it twice. A new start begins where the clock is.
+      sc.next = sc.last != null && sc.last + 1 >= from - 2 && sc.last + 1 <= from + 8 ? sc.last + 1 : from;
+    }
+    for (let guard = 0; guard < 256; guard++) {
+      const at = this.stepTime(sc.next);
+      if (at > now + ahead) break;
+      if (at >= now - 40) {
+        const audio = sc.opts.audio;
+        const atAudio = audio ? audio.currentTime + Math.max(0, (at - now) / 1000) : null;
+        try { sc.cb(sc.next, at, atAudio); } catch { /* a step's error does not stop the clock */ }
+      }
+      sc.last = sc.next;
+      sc.next++;
+    }
   }
 
   /** ms per step at the current tempo. */
@@ -707,10 +906,13 @@ class SharedClock {
     if (cur >= 0 && this.t0 != null) this.t0 = this._now() - cur * this.stepMs();
   }
 
-  /** Adopt a peer's transport/sync-state (only takes t0/bpm you're given). */
-  adopt(payload = {}) {
+  /**
+   * Adopt a peer's transport/sync-state (only takes t0/bpm you're given). With the sender's peer id,
+   * its t0 is turned into this machine's clock (measure() first).
+   */
+  adopt(payload = {}, fromPeerId) {
     if (payload.bpm) this.bpm = payload.bpm;
-    if (payload.t0 != null) this.t0 = payload.t0;
+    if (payload.t0 != null) this.t0 = this.toLocal(payload.t0, fromPeerId);
     if ('transportPlaying' in payload) this.playing = !!payload.transportPlaying;
     else if ('state' in payload) this.playing = payload.state === 'play';
     if (this.playing) this._ensureTimer();
@@ -723,8 +925,18 @@ class SharedClock {
   transport(state) { return { type: 'transport', state, t0: this.t0, bpm: this.bpm }; }
   syncState() { return { type: 'sync-state', t0: this.t0, bpm: this.bpm, transportPlaying: this.playing }; }
 
-  /** Stop the internal ticker (call on teardown). */
-  destroy() { if (this._timer) { clearInterval(this._timer); this._timer = null; } this._cbs = []; }
+  /** Stop the internal tickers and the measuring (call on teardown). */
+  destroy() {
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    if (this._sched) { clearInterval(this._sched.timer); this._sched = null; }
+    if (this._pingTimer) { clearInterval(this._pingTimer); this._pingTimer = null; }
+    if (this._rt) {
+      this._rt.off('signal', this._onSignal); this._rt.off('joined', this._onJoined);
+      this._rt.off('peer-joined', this._onPeerJoined); this._rt.off('peer-left', this._onPeerLeft);
+      this._rt = null;
+    }
+    this._cbs = [];
+  }
 
   _ensureTimer() {
     if (this._timer || typeof setInterval !== 'function') return;
@@ -736,6 +948,11 @@ class SharedClock {
     }, 8);
   }
 }
+
+// The relay refuses frames over 16 KB: a payload's JSON over FRAME_LIMIT characters goes in parts
+// (escaping inside a part can grow it, hence the margin), at most MAX_PARTS of them.
+AimeatRealtime.FRAME_LIMIT = 10000;
+AimeatRealtime.MAX_PARTS = 200;
 
 // Export for both ESM and script tag usage
 if (typeof globalThis !== 'undefined') {

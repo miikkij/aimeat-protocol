@@ -67,12 +67,53 @@
     return freq;
   }
   var _masterGain = null;
+  var _limiter = null;
+  var _limiterOn = true;
+  var _masterRouted = false;
+  function routeMaster() {
+    var c = ctx();
+    if (_masterRouted) _masterGain.disconnect();
+    if (_limiterOn && _limiter) _masterGain.connect(_limiter);
+    else _masterGain.connect(c.destination);
+    _masterRouted = true;
+  }
   function masterNode() {
     if (!_masterGain) {
-      _masterGain = ctx().createGain();
-      _masterGain.connect(ctx().destination);
+      var c = ctx();
+      _masterGain = c.createGain();
+      if (typeof c.createDynamicsCompressor === "function") {
+        _limiter = c.createDynamicsCompressor();
+        _limiter.threshold.value = -3;
+        _limiter.knee.value = 3;
+        _limiter.ratio.value = 20;
+        _limiter.attack.value = 2e-3;
+        _limiter.release.value = 0.15;
+        _limiter.connect(c.destination);
+      }
+      routeMaster();
     }
     return _masterGain;
+  }
+  var _buses = {};
+  function bus(name) {
+    name = String(name || "main");
+    if (!_buses[name]) {
+      var g = ctx().createGain();
+      g.connect(masterNode());
+      _buses[name] = g;
+    }
+    return _buses[name];
+  }
+  function startTime(opts) {
+    var now = ctx().currentTime;
+    var w = opts && typeof opts.when === "number" && isFinite(opts.when) ? opts.when : 0;
+    return w > now ? w : now;
+  }
+  function destOf(opts) {
+    var d = opts && opts.destination;
+    if (typeof d === "string") return bus(d);
+    if (d && typeof d.connect === "function" && (!d.context || d.context === ctx())) return d;
+    return masterNode();
   }
   var master = {
     get volume() {
@@ -83,6 +124,13 @@
     },
     _muted: false,
     _premuteVol: 1,
+    get limiter() {
+      return _limiterOn;
+    },
+    set limiter(v) {
+      _limiterOn = !!v;
+      if (_masterGain) routeMaster();
+    },
     get mute() {
       return master._muted;
     },
@@ -98,13 +146,41 @@
     }
   };
   var _active = {};
-  function registerActive(instrument, note, nodes, stopFn) {
+  var _pending = [];
+  function registerActive(instrument, note, nodes, stopFn, at) {
     var key = instrument + ":" + (note || "*");
+    var delay = typeof at === "number" ? at - ctx().currentTime : 0;
+    if (delay > 5e-3 && typeof setTimeout === "function") {
+      var p = { key, entry: { nodes, stop: stopFn } };
+      p.timer = setTimeout(function() {
+        var i = _pending.indexOf(p);
+        if (i < 0) return;
+        _pending.splice(i, 1);
+        if (_active[p.key]) _active[p.key].stop();
+        _active[p.key] = p.entry;
+      }, delay * 1e3);
+      _pending.push(p);
+      return;
+    }
     if (_active[key]) _active[key].stop();
     _active[key] = { nodes, stop: stopFn };
   }
+  function dropPending(match) {
+    _pending = _pending.filter(function(p) {
+      if (!match(p.key)) return true;
+      clearTimeout(p.timer);
+      p.entry.stop();
+      return false;
+    });
+  }
   function rekeyActive(fromInstrument, toInstrument, note) {
     var from = fromInstrument + ":" + (note || "*");
+    for (var k = _pending.length - 1; k >= 0; k--) {
+      if (_pending[k].key === from) {
+        _pending[k].key = toInstrument + ":" + (note || "*");
+        return;
+      }
+    }
     var entry = _active[from];
     if (!entry) return;
     delete _active[from];
@@ -113,6 +189,10 @@
     _active[to] = entry;
   }
   function stopActive(instrument, note) {
+    dropPending(function(k) {
+      if (!instrument) return true;
+      return note ? k === instrument + ":" + note : k.indexOf(instrument + ":") === 0;
+    });
     if (!instrument) {
       Object.keys(_active).forEach(function(k) {
         _active[k].stop();
@@ -144,7 +224,7 @@
     play: function(note, opts) {
       var freq = noteToFreq(note);
       if (!freq) return;
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.7;
       var dur = opts && opts.duration || 2;
       var mod = ctx().createOscillator();
@@ -164,7 +244,7 @@
       env.gain.exponentialRampToValueAtTime(vel * 0.15, t + 0.1);
       env.gain.exponentialRampToValueAtTime(1e-3, t + dur);
       car.connect(env);
-      env.connect(masterNode());
+      env.connect(destOf(opts));
       mod.start(t);
       car.start(t);
       mod.stop(t + dur + 0.1);
@@ -178,14 +258,14 @@
           car.stop(ctx().currentTime + 0.1);
         } catch {
         }
-      });
+      }, t);
     }
   };
   instruments.guitar = {
     play: function(note, opts) {
       var freq = noteToFreq(note);
       if (!freq) return;
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.7;
       var dur = opts && opts.duration || 1.5;
       var bufSize = Math.round(ctx().sampleRate / freq);
@@ -204,7 +284,7 @@
       env.gain.exponentialRampToValueAtTime(1e-3, t + dur);
       noise.connect(filter);
       filter.connect(env);
-      env.connect(masterNode());
+      env.connect(destOf(opts));
       noise.start(t);
       noise.stop(t + dur + 0.05);
       registerActive("guitar", note, [noise], function() {
@@ -214,14 +294,14 @@
           noise.stop(ctx().currentTime + 0.1);
         } catch {
         }
-      });
+      }, t);
     }
   };
   instruments.bass = {
     play: function(note, opts) {
       var freq = noteToFreq(note);
       if (!freq) return;
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.7;
       var dur = opts && opts.duration || 0.8;
       var osc = ctx().createOscillator();
@@ -248,7 +328,7 @@
       env.gain.exponentialRampToValueAtTime(1e-3, t + dur);
       mix.connect(filter);
       filter.connect(env);
-      env.connect(masterNode());
+      env.connect(destOf(opts));
       osc.start(t);
       sub.start(t);
       osc.stop(t + dur + 0.05);
@@ -261,12 +341,12 @@
           sub.stop(ctx().currentTime + 0.1);
         } catch {
         }
-      });
+      }, t);
     }
   };
   instruments.drums = {
     play: function(hit, opts) {
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.7;
       function makeTom(freq) {
         var osc = ctx().createOscillator();
@@ -277,7 +357,7 @@
         g.gain.setValueAtTime(vel * 0.5, t);
         g.gain.exponentialRampToValueAtTime(1e-3, t + 0.3);
         osc.connect(g);
-        g.connect(masterNode());
+        g.connect(destOf(opts));
         osc.start(t);
         osc.stop(t + 0.4);
         return [osc];
@@ -292,7 +372,7 @@
           g.gain.setValueAtTime(vel, t);
           g.gain.exponentialRampToValueAtTime(1e-3, t + 0.4);
           osc.connect(g);
-          g.connect(masterNode());
+          g.connect(destOf(opts));
           var click = ctx().createOscillator();
           click.type = "square";
           click.frequency.value = 800;
@@ -300,7 +380,7 @@
           cg.gain.setValueAtTime(vel * 0.3, t);
           cg.gain.exponentialRampToValueAtTime(1e-3, t + 0.02);
           click.connect(cg);
-          cg.connect(masterNode());
+          cg.connect(destOf(opts));
           osc.start(t);
           osc.stop(t + 0.5);
           click.start(t);
@@ -322,7 +402,7 @@
           ng.gain.exponentialRampToValueAtTime(1e-3, t + 0.15);
           noise.connect(nf);
           nf.connect(ng);
-          ng.connect(masterNode());
+          ng.connect(destOf(opts));
           var osc = ctx().createOscillator();
           osc.type = "sine";
           osc.frequency.value = 200;
@@ -330,7 +410,7 @@
           og.gain.setValueAtTime(vel * 0.5, t);
           og.gain.exponentialRampToValueAtTime(1e-3, t + 0.08);
           osc.connect(og);
-          og.connect(masterNode());
+          og.connect(destOf(opts));
           noise.start(t);
           osc.start(t);
           osc.stop(t + 0.2);
@@ -351,7 +431,7 @@
           g.gain.exponentialRampToValueAtTime(1e-3, t + 0.05);
           noise.connect(f);
           f.connect(g);
-          g.connect(masterNode());
+          g.connect(destOf(opts));
           noise.start(t);
           return [noise];
         },
@@ -370,7 +450,7 @@
           g.gain.exponentialRampToValueAtTime(1e-3, t + 0.3);
           noise.connect(f);
           f.connect(g);
-          g.connect(masterNode());
+          g.connect(destOf(opts));
           noise.start(t);
           return [noise];
         },
@@ -389,7 +469,7 @@
           g.gain.exponentialRampToValueAtTime(1e-3, t + 1);
           noise.connect(f);
           f.connect(g);
-          g.connect(masterNode());
+          g.connect(destOf(opts));
           noise.start(t);
           return [noise];
         },
@@ -409,7 +489,7 @@
           g.gain.exponentialRampToValueAtTime(1e-3, t + 0.8);
           noise.connect(f);
           f.connect(g);
-          g.connect(masterNode());
+          g.connect(destOf(opts));
           noise.start(t);
           return [noise];
         },
@@ -441,7 +521,7 @@
             g.gain.exponentialRampToValueAtTime(1e-3, t + delay + 0.08);
             noise.connect(f);
             f.connect(g);
-            g.connect(masterNode());
+            g.connect(destOf(opts));
             noise.start(t + delay);
             nodes2.push(noise);
           }
@@ -464,7 +544,7 @@
           osc1.connect(g);
           osc2.connect(g);
           g.connect(f);
-          f.connect(masterNode());
+          f.connect(destOf(opts));
           osc1.start(t);
           osc2.start(t);
           osc1.stop(t + 0.5);
@@ -485,14 +565,14 @@
           } catch {
           }
         });
-      });
+      }, t);
     }
   };
   instruments.flute = {
     play: function(note, opts) {
       var freq = noteToFreq(note);
       if (!freq) return;
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.6;
       var dur = opts && opts.duration || 1.5;
       var vibDepth = opts && opts.vibrato !== void 0 ? opts.vibrato : 0.15;
@@ -527,7 +607,7 @@
       env.gain.linearRampToValueAtTime(0, t + dur);
       osc.connect(env);
       noiseGain.connect(env);
-      env.connect(masterNode());
+      env.connect(destOf(opts));
       lfo.start(t);
       osc.start(t);
       noiseNode.start(t);
@@ -541,14 +621,14 @@
           lfo.stop(ctx().currentTime + 0.1);
         } catch {
         }
-      });
+      }, t);
     }
   };
   instruments.synth = {
     play: function(note, opts) {
       var freq = noteToFreq(note);
       if (!freq) return;
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.7;
       var dur = opts && opts.duration || 1;
       var wave = opts && opts.wave || "sawtooth";
@@ -575,7 +655,7 @@
       osc.connect(filter);
       osc2Gain.connect(filter);
       filter.connect(env);
-      env.connect(masterNode());
+      env.connect(destOf(opts));
       osc.start(t);
       osc2.start(t);
       osc.stop(t + dur + 0.05);
@@ -588,7 +668,7 @@
           osc2.stop(ctx().currentTime + 0.1);
         } catch {
         }
-      });
+      }, t);
     }
   };
 
@@ -624,8 +704,8 @@
       var gain = ctx().createGain();
       gain.gain.value = opts && opts.volume !== void 0 ? opts.volume : 1;
       source.connect(gain);
-      gain.connect(masterNode());
-      source.start();
+      gain.connect(destOf(opts));
+      source.start(startTime(opts));
       _soundboardSources[name] = source;
       source.onended = function() {
         if (_soundboardSources[name] === source) delete _soundboardSources[name];
@@ -709,14 +789,15 @@
     var gain = ctx().createGain();
     gain.gain.value = vel;
     source.connect(gain);
-    gain.connect(masterNode());
-    source.start();
+    gain.connect(destOf(opts));
+    var t = startTime(opts);
+    source.start(t);
     registerActive(instrument, note, [source], function() {
       try {
         source.stop();
       } catch {
       }
-    });
+    }, t);
     return true;
   }
   function createCustomSynth(config) {
@@ -846,7 +927,7 @@
       play: function(note, opts) {
         var freq = noteToFreq(note);
         if (!freq) return;
-        var t = ctx().currentTime;
+        var t = startTime(opts);
         var vel = opts && opts.velocity !== void 0 ? opts.velocity : 0.7;
         var dur = opts && opts.duration || 1;
         var allOscs = [];
@@ -890,7 +971,7 @@
           env.gain.linearRampToValueAtTime(0, t + dur);
         }
         chain.connect(env);
-        env.connect(masterNode());
+        env.connect(destOf(opts));
         if (pitchEnvConfig) {
           allOscs.forEach(function(o) {
             o.frequency.setValueAtTime(pitchEnvConfig.start || freq, t);
@@ -913,7 +994,7 @@
             });
           } catch {
           }
-        });
+        }, t);
       },
       stop: function(note) {
         stopActive(name, note);
@@ -1003,6 +1084,19 @@
     synth: createCustomSynth,
     soundboard,
     master,
+    /** A named bus (a GainNode into the master): pass its name or the node as opts.destination. */
+    bus,
+    /** The AudioContext clock now, in seconds: what opts.when counts in. */
+    now: function() {
+      return ctx().currentTime;
+    },
+    /** A wall-clock instant (unix ms, e.g. a shared t0 + n * stepMs) on the AudioContext clock. */
+    timeAt: function(epochMs) {
+      return ctx().currentTime + (epochMs - Date.now()) / 1e3;
+    },
+    get context() {
+      return ctx();
+    },
     connectRealtime,
     disconnectRealtime
   };

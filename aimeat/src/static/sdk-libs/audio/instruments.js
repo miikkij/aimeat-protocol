@@ -9,16 +9,18 @@
  * @structure side-effect: instruments.piano/guitar/bass/drums/flute/synth = { play(note, opts) }.
  * @usage import './instruments.js';  // registers the built-ins onto the shared registry
  * @version-history
+ *   v1.1.0 — 2026-10-22 — Every voice starts at opts.when (AudioContext seconds, default now) and plays
+ *     into opts.destination (a node or a bus name, default the master).
  *   v1.0.0 — 2026-07-19 — Extracted from lib-audio.ts + audio-lib-part2.ts (SDK-libs migration Phase 2).
  */
-import { ctx, noteToFreq, masterNode, registerActive, instruments } from './core.js';
+import { ctx, noteToFreq, registerActive, instruments, startTime, destOf } from './core.js';
 
 // ── Piano: 2-operator FM synthesis ──
 instruments.piano = {
   play: function (note, opts) {
     var freq = noteToFreq(note);
     if (!freq) return;
-    var t = ctx().currentTime;
+    var t = startTime(opts);
     var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.7;
     var dur = (opts && opts.duration) || 2.0;
 
@@ -39,7 +41,7 @@ instruments.piano = {
     env.gain.exponentialRampToValueAtTime(vel * 0.15, t + 0.1);
     env.gain.exponentialRampToValueAtTime(0.001, t + dur);
 
-    car.connect(env); env.connect(masterNode());
+    car.connect(env); env.connect(destOf(opts));
     mod.start(t); car.start(t);
     mod.stop(t + dur + 0.1); car.stop(t + dur + 0.1);
 
@@ -48,7 +50,7 @@ instruments.piano = {
         env.gain.setValueAtTime(env.gain.value, ctx().currentTime);
         env.gain.linearRampToValueAtTime(0, ctx().currentTime + 0.05);
         mod.stop(ctx().currentTime + 0.1); car.stop(ctx().currentTime + 0.1); } catch { /* already stopped */ }
-    });
+    }, t);
   },
 };
 
@@ -57,7 +59,7 @@ instruments.guitar = {
   play: function (note, opts) {
     var freq = noteToFreq(note);
     if (!freq) return;
-    var t = ctx().currentTime;
+    var t = startTime(opts);
     var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.7;
     var dur = (opts && opts.duration) || 1.5;
 
@@ -79,14 +81,14 @@ instruments.guitar = {
     env.gain.setValueAtTime(vel * 0.5, t);
     env.gain.exponentialRampToValueAtTime(0.001, t + dur);
 
-    noise.connect(filter); filter.connect(env); env.connect(masterNode());
+    noise.connect(filter); filter.connect(env); env.connect(destOf(opts));
     noise.start(t); noise.stop(t + dur + 0.05);
 
     registerActive('guitar', note, [noise], function () {
       try { env.gain.cancelScheduledValues(ctx().currentTime);
         env.gain.linearRampToValueAtTime(0, ctx().currentTime + 0.05);
         noise.stop(ctx().currentTime + 0.1); } catch { /* already stopped */ }
-    });
+    }, t);
   },
 };
 
@@ -95,7 +97,7 @@ instruments.bass = {
   play: function (note, opts) {
     var freq = noteToFreq(note);
     if (!freq) return;
-    var t = ctx().currentTime;
+    var t = startTime(opts);
     var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.7;
     var dur = (opts && opts.duration) || 0.8;
 
@@ -118,7 +120,7 @@ instruments.bass = {
     env.gain.setValueAtTime(vel * 0.5, t + dur * 0.7);
     env.gain.exponentialRampToValueAtTime(0.001, t + dur);
 
-    mix.connect(filter); filter.connect(env); env.connect(masterNode());
+    mix.connect(filter); filter.connect(env); env.connect(destOf(opts));
     osc.start(t); sub.start(t);
     osc.stop(t + dur + 0.05); sub.stop(t + dur + 0.05);
 
@@ -126,14 +128,14 @@ instruments.bass = {
       try { env.gain.cancelScheduledValues(ctx().currentTime);
         env.gain.linearRampToValueAtTime(0, ctx().currentTime + 0.05);
         osc.stop(ctx().currentTime + 0.1); sub.stop(ctx().currentTime + 0.1); } catch { /* already stopped */ }
-    });
+    }, t);
   },
 };
 
 // ── Drums: noise + sine bursts (per-hit) ──
 instruments.drums = {
   play: function (hit, opts) {
-    var t = ctx().currentTime;
+    var t = startTime(opts);
     var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.7;
 
     function makeTom(freq) {
@@ -143,7 +145,7 @@ instruments.drums = {
       var g = ctx().createGain();
       g.gain.setValueAtTime(vel * 0.5, t);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-      osc.connect(g); g.connect(masterNode());
+      osc.connect(g); g.connect(destOf(opts));
       osc.start(t); osc.stop(t + 0.4);
       return [osc];
     }
@@ -156,12 +158,12 @@ instruments.drums = {
         var g = ctx().createGain();
         g.gain.setValueAtTime(vel, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-        osc.connect(g); g.connect(masterNode());
+        osc.connect(g); g.connect(destOf(opts));
         var click = ctx().createOscillator(); click.type = 'square'; click.frequency.value = 800;
         var cg = ctx().createGain();
         cg.gain.setValueAtTime(vel * 0.3, t);
         cg.gain.exponentialRampToValueAtTime(0.001, t + 0.02);
-        click.connect(cg); cg.connect(masterNode());
+        click.connect(cg); cg.connect(destOf(opts));
         osc.start(t); osc.stop(t + 0.5);
         click.start(t); click.stop(t + 0.05);
         return [osc, click];
@@ -176,12 +178,12 @@ instruments.drums = {
         var ng = ctx().createGain();
         ng.gain.setValueAtTime(vel * 0.6, t);
         ng.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-        noise.connect(nf); nf.connect(ng); ng.connect(masterNode());
+        noise.connect(nf); nf.connect(ng); ng.connect(destOf(opts));
         var osc = ctx().createOscillator(); osc.type = 'sine'; osc.frequency.value = 200;
         var og = ctx().createGain();
         og.gain.setValueAtTime(vel * 0.5, t);
         og.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
-        osc.connect(og); og.connect(masterNode());
+        osc.connect(og); og.connect(destOf(opts));
         noise.start(t); osc.start(t); osc.stop(t + 0.2);
         return [noise, osc];
       },
@@ -195,7 +197,7 @@ instruments.drums = {
         var g = ctx().createGain();
         g.gain.setValueAtTime(vel * 0.3, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-        noise.connect(f); f.connect(g); g.connect(masterNode());
+        noise.connect(f); f.connect(g); g.connect(destOf(opts));
         noise.start(t);
         return [noise];
       },
@@ -209,7 +211,7 @@ instruments.drums = {
         var g = ctx().createGain();
         g.gain.setValueAtTime(vel * 0.3, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-        noise.connect(f); f.connect(g); g.connect(masterNode());
+        noise.connect(f); f.connect(g); g.connect(destOf(opts));
         noise.start(t);
         return [noise];
       },
@@ -223,7 +225,7 @@ instruments.drums = {
         var g = ctx().createGain();
         g.gain.setValueAtTime(vel * 0.5, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-        noise.connect(f); f.connect(g); g.connect(masterNode());
+        noise.connect(f); f.connect(g); g.connect(destOf(opts));
         noise.start(t);
         return [noise];
       },
@@ -237,7 +239,7 @@ instruments.drums = {
         var g = ctx().createGain();
         g.gain.setValueAtTime(vel * 0.3, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-        noise.connect(f); f.connect(g); g.connect(masterNode());
+        noise.connect(f); f.connect(g); g.connect(destOf(opts));
         noise.start(t);
         return [noise];
       },
@@ -257,7 +259,7 @@ instruments.drums = {
           var g = ctx().createGain();
           g.gain.setValueAtTime(vel * 0.4, t + delay);
           g.gain.exponentialRampToValueAtTime(0.001, t + delay + 0.08);
-          noise.connect(f); f.connect(g); g.connect(masterNode());
+          noise.connect(f); f.connect(g); g.connect(destOf(opts));
           noise.start(t + delay);
           nodes.push(noise);
         }
@@ -270,7 +272,7 @@ instruments.drums = {
         g.gain.setValueAtTime(vel * 0.3, t);
         g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
         var f = ctx().createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 3;
-        osc1.connect(g); osc2.connect(g); g.connect(f); f.connect(masterNode());
+        osc1.connect(g); osc2.connect(g); g.connect(f); f.connect(destOf(opts));
         osc1.start(t); osc2.start(t);
         osc1.stop(t + 0.5); osc2.stop(t + 0.5);
         return [osc1, osc2];
@@ -282,7 +284,7 @@ instruments.drums = {
     var nodes = fn();
     registerActive('drums', hit, nodes, function () {
       nodes.forEach(function (n) { try { n.stop(ctx().currentTime + 0.01); } catch { /* already stopped */ } });
-    });
+    }, t);
   },
 };
 
@@ -291,7 +293,7 @@ instruments.flute = {
   play: function (note, opts) {
     var freq = noteToFreq(note);
     if (!freq) return;
-    var t = ctx().currentTime;
+    var t = startTime(opts);
     var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.6;
     var dur = (opts && opts.duration) || 1.5;
     var vibDepth = (opts && opts.vibrato !== undefined) ? opts.vibrato : 0.15;
@@ -318,7 +320,7 @@ instruments.flute = {
     env.gain.setValueAtTime(vel * 0.3, t + dur - 0.1);
     env.gain.linearRampToValueAtTime(0, t + dur);
 
-    osc.connect(env); noiseGain.connect(env); env.connect(masterNode());
+    osc.connect(env); noiseGain.connect(env); env.connect(destOf(opts));
     lfo.start(t); osc.start(t); noiseNode.start(t);
     lfo.stop(t + dur + 0.1); osc.stop(t + dur + 0.1);
 
@@ -326,7 +328,7 @@ instruments.flute = {
       try { env.gain.cancelScheduledValues(ctx().currentTime);
         env.gain.linearRampToValueAtTime(0, ctx().currentTime + 0.05);
         osc.stop(ctx().currentTime + 0.1); lfo.stop(ctx().currentTime + 0.1); } catch { /* already stopped */ }
-    });
+    }, t);
   },
 };
 
@@ -335,7 +337,7 @@ instruments.synth = {
   play: function (note, opts) {
     var freq = noteToFreq(note);
     if (!freq) return;
-    var t = ctx().currentTime;
+    var t = startTime(opts);
     var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.7;
     var dur = (opts && opts.duration) || 1.0;
     var wave = (opts && opts.wave) || 'sawtooth';
@@ -356,7 +358,7 @@ instruments.synth = {
     env.gain.exponentialRampToValueAtTime(0.001, t + dur);
 
     osc.connect(filter); osc2Gain.connect(filter);
-    filter.connect(env); env.connect(masterNode());
+    filter.connect(env); env.connect(destOf(opts));
     osc.start(t); osc2.start(t);
     osc.stop(t + dur + 0.05); osc2.stop(t + dur + 0.05);
 
@@ -364,6 +366,6 @@ instruments.synth = {
       try { env.gain.cancelScheduledValues(ctx().currentTime);
         env.gain.linearRampToValueAtTime(0, ctx().currentTime + 0.05);
         osc.stop(ctx().currentTime + 0.1); osc2.stop(ctx().currentTime + 0.1); } catch { /* already stopped */ }
-    });
+    }, t);
   },
 };

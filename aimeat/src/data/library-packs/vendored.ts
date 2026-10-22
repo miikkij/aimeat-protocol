@@ -10,6 +10,8 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-10-22 — realtime aiDoc: frames over the relay limit go in parts and arrive whole (realtime.js
+ *     1.5.0), pace(n), and SharedClock's measure(rt), adopt(payload, from) and schedule(cb, opts).
  *   2026-10-17 — realtime aiDoc: createRoom needs social:write, an empty room is removed after an
  *     hour and the reconnect recreates it, an AI player is an agent on the same socket, and the rate
  *     limit's default and refusal code (pitfall-list round).
@@ -672,12 +674,23 @@ export const VENDORED_PACKS: LibraryPack[] = [
       "  clock.adopt(payload) on 'transport'/'sync-state', clock.setBpm(bpm) on 'bpm'. It anchors",
       "  every peer on one t0 so all clients land on the same step, and re-anchors on tempo change",
       '  so the beat never jumps. Not music-only — steps/subdiv are just a repeating-bar division.',
+      '  Two machines\' clocks disagree by tens or hundreds of ms: clock.measure(rt) pings every peer',
+      "  (clock-ping/clock-pong signals; offsetOf(peerId), rttOf(peerId)), and clock.adopt(payload, msg.from)",
+      "  turns the sender's t0 into this machine's clock. To play in time, place steps AHEAD instead of",
+      '  reacting in onStep: clock.schedule((n, atMs, atAudio) => …, { audio: AIMEAT.audio.context })',
+      '  calls once per absolute step n, ~120 ms early (1.6 s while the tab is hidden); pass atAudio as',
+      "  AIMEAT.audio.play(..., { when: atAudio }). clock.stepTime(n) / clock.stepAt(t) convert both ways.",
+      'Big frames: a broadcast or signal whose JSON is over 10 000 characters is sent as part frames',
+      "({type:'part', mid, i, n, s}) and joined before your handler runs (realtime.js v1.5.0); an agent on a",
+      "raw socket joins s for i = 0..n-1. rt.pace(40) keeps broadcasts under the relay's 50 a second by",
+      'queueing a burst instead of losing it (off by default: a game wants a frame now or never).',
       'Simpler apps can skip rooms entirely and observe shared AIMEAT.data keys instead.',
     ].join('\n'),
     changelog: [
       { version: '1', date: '2026-03-03', summary: 'Initial AIMEAT-authored realtime client at /lib/realtime.js (WS rooms + WebRTC + Yjs).' },
       { version: '1', date: '2026-07-18', summary: 'Added SharedClock (window.SharedClock) — a network-synced t0 timeline (start/stop/step/onStep, adopt, setBpm re-anchor, transport/sync-state payloads). Additive; existing AimeatRealtime API unchanged. Extracted from the Band Jam app pattern.' },
       { version: '1', date: '2026-07-19', summary: 'Constructor also accepts an options object ({ session } or { baseUrl, token }) — additive sugar; the positional (baseUrl, token) form is unchanged and existing apps are unaffected. ai_doc corrected: it previously showed a {session}-only constructor that did not exist (pitfall realtime/aimeatrealtime-constructor-is-baseurl-token), and now documents the full event list and find-or-create room guidance.' },
+      { version: '1', date: '2026-10-22', summary: 'realtime.js 1.5.0: a broadcast or signal over the relay frame limit is split into part frames and joined on arrival; pace(n) queues bursts under the relay rate; SharedClock measures peer clock offsets (measure, offsetOf, rttOf), adopts a peer t0 onto this clock (adopt(payload, from)) and schedules steps ahead (schedule(cb, { lookahead, audio }), stepTime, stepAt). Additive; existing apps unchanged.' },
       { version: '1', date: '2026-10-09', summary: 'connect() no longer puts the session token in the socket URL, where reverse proxies logged it: it POSTs /v1/ws/ticket for a single-use 60-second ticket and connects with ?ticket=. connect() now returns a promise (it never rejects; a refused ticket emits error then close), and frames sent while the ticket is fetched are queued like frames sent while the socket opens. Existing apps need no change.' },
     ],
     demoTemplateId: 'comp-realtime-room',

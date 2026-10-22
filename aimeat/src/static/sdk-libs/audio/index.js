@@ -12,6 +12,11 @@
  *   findNearestSample/playSample; createCustomSynth; realtime bridge; the `audio` API; attach('audio', …).
  * @usage <script src="/v1/libs/aimeat-audio.js"></script>  AIMEAT.audio.play('piano', 'C4');
  * @version-history
+ *   v1.2.0 — 2026-10-22 — Scheduled play: play(instrument, note, { when, destination }) starts a note at
+ *     an exact AudioContext time (now(), timeAt(epochMs) give that clock) and into any node or a named
+ *     bus (bus(name)); samples, custom synths and the soundboard take the same options. The master
+ *     has a limiter (master.limiter). For apps that place notes ahead on a shared clock (SharedClock
+ *     in /lib/realtime.js), the way Band Jam does.
  *   v1.1.0 — 2026-09-13 — A sample-only instrument (strings, organ, epiano, trumpet, guitar-steel,
  *     guitar-el) played before its bank has loaded sounds through the nearest built-in voice, with
  *     one console note naming loadSamples, instead of "Unknown instrument" and silence (appdev
@@ -20,7 +25,7 @@
  */
 import { NODE_URL } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
-import { ctx, noteToFreq, masterNode, master, registerActive, rekeyActive, stopActive, instruments, sampleBuffers, customSynths } from './core.js';
+import { ctx, noteToFreq, master, bus, startTime, destOf, registerActive, rekeyActive, stopActive, instruments, sampleBuffers, customSynths } from './core.js';
 import './instruments.js'; // side-effect: registers the 6 built-in instruments onto the shared registry
 
 // ══════════════════════════════════════════════════════
@@ -55,8 +60,8 @@ var soundboard = {
     source.loop = (opts && opts.loop) || false;
     var gain = ctx().createGain();
     gain.gain.value = (opts && opts.volume !== undefined) ? opts.volume : 1;
-    source.connect(gain); gain.connect(masterNode());
-    source.start();
+    source.connect(gain); gain.connect(destOf(opts));
+    source.start(startTime(opts));
     _soundboardSources[name] = source;
     source.onended = function () { if (_soundboardSources[name] === source) delete _soundboardSources[name]; };
   },
@@ -138,11 +143,12 @@ function playSample(instrument, note, opts) {
   source.buffer = s.buffer;
   source.playbackRate.value = s.rate;
   var gain = ctx().createGain(); gain.gain.value = vel;
-  source.connect(gain); gain.connect(masterNode());
-  source.start();
+  source.connect(gain); gain.connect(destOf(opts));
+  var t = startTime(opts);
+  source.start(t);
   registerActive(instrument, note, [source], function () {
     try { source.stop(); } catch { /* already stopped */ }
-  });
+  }, t);
   return true;
 }
 
@@ -232,7 +238,7 @@ function createCustomSynth(config) {
     play: function (note, opts) {
       var freq = noteToFreq(note);
       if (!freq) return;
-      var t = ctx().currentTime;
+      var t = startTime(opts);
       var vel = (opts && opts.velocity !== undefined) ? opts.velocity : 0.7;
       var dur = (opts && opts.duration) || 1.0;
       var allOscs = [];
@@ -277,7 +283,7 @@ function createCustomSynth(config) {
         env.gain.linearRampToValueAtTime(0, t + dur);
       }
 
-      chain.connect(env); env.connect(masterNode());
+      chain.connect(env); env.connect(destOf(opts));
 
       if (pitchEnvConfig) {
         allOscs.forEach(function (o) {
@@ -292,7 +298,7 @@ function createCustomSynth(config) {
         try { env.gain.cancelScheduledValues(ctx().currentTime);
           env.gain.linearRampToValueAtTime(0, ctx().currentTime + 0.05);
           allOscs.forEach(function (o) { try { o.stop(ctx().currentTime + 0.1); } catch { /* already stopped */ } }); } catch { /* already stopped */ }
-      });
+      }, t);
     },
     stop: function (note) { stopActive(name, note); },
   };
@@ -407,6 +413,13 @@ var audio = {
   synth: createCustomSynth,
   soundboard: soundboard,
   master: master,
+  /** A named bus (a GainNode into the master): pass its name or the node as opts.destination. */
+  bus: bus,
+  /** The AudioContext clock now, in seconds: what opts.when counts in. */
+  now: function () { return ctx().currentTime; },
+  /** A wall-clock instant (unix ms, e.g. a shared t0 + n * stepMs) on the AudioContext clock. */
+  timeAt: function (epochMs) { return ctx().currentTime + (epochMs - Date.now()) / 1000; },
+  get context() { return ctx(); },
   connectRealtime: connectRealtime,
   disconnectRealtime: disconnectRealtime,
 };
