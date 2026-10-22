@@ -104,8 +104,8 @@
       "sha": "19d6f996cb4ff8ae"
     },
     "test/e2e-sse.ts": {
-      "reason": "Reviewed 2026-10-18. The stream refuses a second principal by silence, not by a status: every signed-in account gets a ticket and its own stream, and the stream then leaves out what that account may not hear. The suite asserts that silence for each kind: an app grant without organism:read never hears `organisms` (Phase 3), another owner never hears a private record or file (Phase 6), and an account outside an organism never hears that organism's workspace domain until it joins (Phase 7). A frame that does not arrive is no 403 and no isError, which is all this detector reads.",
-      "sha": "7fa4c48b9d8f5852"
+      "reason": "Reviewed 2026-10-18. The stream refuses a second principal by silence, not by a status: every signed-in account gets a ticket and its own stream, and the stream then leaves out what that account may not hear. The suite asserts that silence for each kind: an app grant without organism:read never hears `organisms`, and one without social:read never hears `realtime-rooms` (Phase 3), another owner never hears a private record or file (Phase 6), and an account outside an organism never hears that organism's workspace domain until it joins (Phase 7). A frame that does not arrive is no 403 and no isError, which is all this detector reads.",
+      "sha": "98d61952a30a027d"
     },
     "test/e2e-calibrator.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
