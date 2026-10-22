@@ -51757,6 +51757,11 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: >
+            target_node or path is missing (INVALID_INPUT), or path is not an absolute path on the
+            peer starting with a single "/" or would leave the peer's address (INVALID_PATH). Refused
+            before the routing fee and before anything is sent.
         '402':
           $ref: '#/components/responses/PaymentRequired'
         '403':
