@@ -11,6 +11,10 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-22 — The 30-day dispute timeout takes back the toll delivery paid the provider
+ *     (takeBackFromProvider, disputedAmount), as every interactive resolution does, and leaves the
+ *     dispute escalated when the provider cannot cover it; it had refunded the whole escrow from
+ *     nowhere (secaudit2026oct22). runDisputeTimeoutJob is exported for its unit test.
  *   2026-10-20 — installContentIntake: the content class pipeline listens for stored files and memory
  *     writes (services/content/intake.ts; wish-sis-ll-n-purku-luokittelu-ja-owl).
  *   2026-10-16 — memory-ttl-cleanup is one provider DELETE over every owner (storage.deleteExpiredMemory);
@@ -321,7 +325,7 @@ async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {
   if (removed > 0) logger.info(`Board-post TTL cleanup: removed ${removed} expired posts`);
 }
 
-async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {
+export async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {
   const now = Date.now();
   const SEVEN_DAYS = 7 * 24 * 3_600_000;
   const THIRTY_DAYS = 30 * 24 * 3_600_000;
@@ -361,20 +365,26 @@ async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Pr
     }
 
     if (dispute.status === 'escalated' && disputeAge > THIRTY_DAYS) {
-      const { returnEscrow } = await import('./morsel.js');
+      const { takeBackFromProvider, disputedAmount } = await import('./morsel.js');
       // The refund, the dispute's resolution and the work's status in ONE transaction, with the
       // dispute read again inside it: written apart, a failing status write refunded the requester
       // again on the next round (QA audit E6-03).
+      //
+      // The refund re-divides what delivery paid the provider, as every interactive resolution does
+      // (routes/disputes.ts, QA audit S8-02): the toll, taken back from the provider. It had refunded
+      // the whole escrow from nowhere while the provider kept the toll (secaudit2026oct22). A provider
+      // whose balance cannot cover it leaves the dispute escalated for the operator's ruling.
+      const toRequester = disputedAmount(work);
       const resolved = await storage.transaction(async () => {
         const current = await storage.getDispute(dispute.id);
         if (!current || current.status !== 'escalated') return false;
-        await returnEscrow(storage, work);
+        if (!(await takeBackFromProvider(storage, work, { toRequester }))) return false;
 
         await storage.updateDispute(dispute.id, {
           status: 'resolved',
           ruling: {
             ruling: 'timeout',
-            distribution: { toRequester: work.cost.total, toProvider: 0, burned: 0 },
+            distribution: { toRequester, toProvider: 0, burned: 0 },
             reason: 'Auto-resolved: dispute timed out after 30 days',
           },
           updatedAt: new Date().toISOString(),
