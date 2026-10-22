@@ -461,6 +461,14 @@ async function phaseCrossOwner(): Promise<void> {
       allowEndpoint = allow.endpoint; allowBody = allow.body;
     });
 
+    await test('The notice also carries Don\'t allow, aimed at the same question', async () => {
+      const n = await json('/v1/notifications', { headers: victimAuth });
+      const ask = (n.body?.data?.notifications ?? []).filter((x: any) => x.type === 'eco_capability_ask');
+      const deny = (ask[0]?.actions ?? []).find((a: any) => a.id === 'deny');
+      assert(!!deny && String(deny.endpoint) === `/v1/ecosystem-apps/${VAPP}/capability-approvals/decline` && deny.body?.capability === declaredCap,
+        `no Don't allow: ${JSON.stringify(ask[0]?.actions)}`);
+    });
+
     await test('Only V in person reads and answers the question: not V\'s agent, not M', async () => {
       const agent = await makeAgent(BASE, { name: victimName, token: victimToken }, ['memory:read', 'memory:write']);
       const agentAuth = { Authorization: `Bearer ${agent.token}` };

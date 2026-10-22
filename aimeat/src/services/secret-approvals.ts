@@ -28,6 +28,8 @@
  * @usage
  *   const url = await requestSecretApproval({ storage, config }, { ownerGhii, secret, extension, installer, host, why, requestedBy });
  * @version-history
+ *   v1.2.0 — 2026-10-22 — The bell notice carries Don't allow beside Allow (the developer: a question
+ *     with only Allow cannot be answered no).
  *   v1.1.0 — 2026-10-21 — An Allow pressed on a notice whose question no longer waits (the secret was
  *     removed or stored again) answers APPROVAL_NOT_FOUND in plain words and allows nothing.
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59 follow-up).
@@ -91,7 +93,13 @@ function askNotice(baseUrl: string, secret: string, key: ApprovalKey, why: strin
         body: `Extension ${key.extension} by ${key.installer} wants to send your secret ${secret} to ${key.host}${purpose}. Allow?`,
         link: url.slice(url.indexOf('/v1/')),
         i18n: { key: SECRET_USE_ASK_TYPE, vars: { extension: key.extension, installer: key.installer, secret, host: key.host, why: why ?? '' } },
+        // Both answers on the notice, as on the page: a question with only Allow cannot be answered no.
         actions: [{
+            id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST',
+            endpoint: `/v1/secrets/${encodeURIComponent(secret)}/approvals/decline`,
+            body: { extension: key.extension, host: key.host }, style: 'default',
+            i18n: { key: `${SECRET_USE_ASK_TYPE}.deny` },
+        }, {
             id: 'allow', label: 'Allow', kind: 'api', method: 'POST',
             endpoint: `/v1/secrets/${encodeURIComponent(secret)}/approvals`,
             body: { extension: key.extension, host: key.host }, style: 'primary',
