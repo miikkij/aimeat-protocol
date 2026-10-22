@@ -19,6 +19,7 @@
  * @structure ThemeTokenKind · THEME_TOKENS · CORE_TOKENS · THEME_FACES · FACE_SLOTS · faceStack
  * @usage import { THEME_TOKENS, THEME_FACES } from './tokens.js';
  * @version-history
+ *   v1.6.0 — 2026-10-22 — Michroma, vendored for the TDR look (aimeat-fonts.css v1.6.0).
  *   v1.5.0 — 2026-10-17 — Newsreader, vendored for the kirjapaino look (aimeat-fonts.css v1.5.0).
  *   v1.4.0 — 2026-10-09 — IBM Plex Sans and IBM Plex Mono, vendored for the SOC console (aimeat-fonts.css v1.4.0).
  *   v1.3.0 — 2026-10-03 — Two more faces, Press Start 2P and Selawik, vendored for the C64 and AZURE themes.
@@ -121,6 +122,8 @@ export const THEME_FACES: Readonly<Record<string, string>> = {
     'IBM Plex Mono': "'IBM Plex Mono', 'JetBrains Mono', 'SF Mono', monospace",
     // Vendored on 2026-10-17 for the kirjapaino look (the newsletter's printed-letter design).
     'Newsreader': "'Newsreader', Georgia, 'Times New Roman', serif",
+    // Vendored on 2026-10-22 for the TDR look (the machine-room family of apps).
+    'Michroma': "'Michroma', 'IBM Plex Mono', 'JetBrains Mono', monospace",
 };
 
 /** The three faces a theme may choose, and the token each one sets. */
