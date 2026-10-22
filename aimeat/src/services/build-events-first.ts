@@ -33,6 +33,8 @@
  * @structure EVENTS_FIRST_DOMAINS · atelierEventsFirst() · classicLiveUpdatesSection()
  * @usage import { atelierEventsFirst, classicLiveUpdatesSection } from './build-events-first.js';
  * @version-history
+ *   v1.2.0 — 2026-10-22 — `realtime-rooms` (social:read) joins the list: a lobby follows the
+ *     realtime rooms through AIMEAT.live (Band Jam needed a Refresh to see a new room).
  *   v1.1.0 — 2026-10-11 — Both specifications say a delete emits its domain as a write does. The
  *     first version left the subject out, because the registry text denied it and the routes had
  *     not all been read.
@@ -44,7 +46,9 @@
 export const EVENTS_FIRST_DOMAINS =
   '`memory` (memory:read), `agent-tasks` (task:read), `files` (storage:read), `organisms` '
   + '(organism:read), `workflows` and `scheduler` (workflow:read), `messages` (messages:read), '
-  + '`boards` (social:read), `wallet` (wallet:read), `knowledge` and `packages` (knowledge:read)';
+  + '`boards` and `realtime-rooms` (social:read), `wallet` (wallet:read), `knowledge` and `packages` '
+  + '(knowledge:read). `realtime-rooms` says the realtime room list moved: a room opened or closed, a '
+  + 'player came or went';
 
 /** The three places a timer belongs, the same words in both specifications. */
 const TIMER_CASES =

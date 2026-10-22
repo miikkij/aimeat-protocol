@@ -238,6 +238,22 @@ async function main() {
             await app!.waitFor(t => domainsSeen(t).includes('memory'), 6_000, 'memory on the app stream');
             assert(!domainsSeen(app!.text()).includes('organisms'), 'organisms must still be absent');
         });
+        await test('a new realtime room reaches an app holding social:read as "realtime-rooms", and not the memory-only one', async () => {
+            // A lobby (Band Jam) re-reads the public room list on this domain instead of waiting for Refresh.
+            const tok = await appToken(ORIGIN, 'social:read social:write', A.rt);
+            const lobby = await openStream(tok);
+            try {
+                await lobby.waitFor(t => t.includes(':open'), 3_000, 'the :open comment on the lobby stream');
+                const room = await json('/v1/realtime/rooms', {
+                    method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
+                    body: JSON.stringify({ app_type: 'sse-lobby', name: 'SSE lobby room', is_public: true }),
+                });
+                assert(room.status === 201, `room create: ${room.status} ${JSON.stringify(room.body)}`);
+                await lobby.waitFor(t => domainsSeen(t).includes('realtime-rooms'), 6_000, 'realtime-rooms on the lobby stream');
+                assert(!domainsSeen(app!.text()).includes('realtime-rooms'), 'the memory-only app stream must not hear the room list');
+                assert(!domainsSeen(lobby.text()).includes('realtime'), 'the infra domain "realtime" must stay hidden from apps');
+            } finally { lobby.close(); }
+        });
 
         console.log('\nPhase 4: An app may not speak for the human');
         await test('with only the app stream open, the owner is not marked available', async () => {

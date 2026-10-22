@@ -29,6 +29,9 @@
  *   v1.5.0 — 2026-10-09 — The federation relay sends the remote node's token in an Authorization
  *     header on the upgrade instead of ?token= in the URL (secrets audit 2026-10-09, d3); the room id
  *     and nick in the URL are encoded.
+ *   v1.6.0 — 2026-10-22 — The room list's live domain `realtime-rooms`: a room created, closed or
+ *     cleaned up, and a player joining or leaving, emit it (apps holding social:read hear it through
+ *     AIMEAT.live), so a lobby follows the rooms instead of waiting for a Refresh.
  */
 import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
@@ -37,6 +40,10 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { runAsNode } from '../utils/gaii.js';
+import { emitChange } from './event-bus.js';
+
+/** Live domain for "the room list moved": a room appeared or closed, or a player came or went. */
+const ROOMS_DOMAIN = 'realtime-rooms';
 import { peerFetch } from '../utils/peer-fetch.js';
 import type {
   RealtimeMessage,
@@ -123,6 +130,7 @@ export class RealtimeManager {
     this.metricsRoomsCreated++;
     this.updatePeakPeers();
     logger.info('Realtime room created', { roomId: room.id, appType: room.appType });
+    emitChange(ROOMS_DOMAIN);
     return room;
   }
 
@@ -174,6 +182,7 @@ export class RealtimeManager {
     room.lastActivityAt = new Date();
     this.peerToRoom.set(peerId, roomId);
     this.wsToPerr.set(ws, peerId);
+    emitChange(ROOMS_DOMAIN);   // a lobby shows the player count
 
     // Update storage peer count
     this.storage.updateRealtimeRoom(roomId, {
@@ -310,6 +319,7 @@ export class RealtimeManager {
         this.storage.deleteRealtimeRoom(roomId).catch(err => { logger.warn('joinRoom: continuing after a suppressed failure', { error: String(err) }); });
         logger.info('Realtime room auto-deleted (empty)', { roomId });
       }
+      emitChange(ROOMS_DOMAIN);   // one player fewer, or the room is gone
     }
 
     this.peerToRoom.delete(peerId);
@@ -337,6 +347,7 @@ export class RealtimeManager {
     this.metricsRoomsClosed++;
     await this.storage.deleteRealtimeRoom(roomId);
     logger.info('Realtime room closed', { roomId });
+    emitChange(ROOMS_DOMAIN);
     return true;
   }
 
@@ -563,6 +574,7 @@ export class RealtimeManager {
 
     if (cleaned > 0) {
       logger.info(`Cleaned up ${cleaned} idle realtime rooms`);
+      emitChange(ROOMS_DOMAIN);
     }
     return cleaned;
   }
