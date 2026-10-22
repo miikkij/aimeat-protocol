@@ -15,7 +15,7 @@ Tell Claude, ChatGPT, Cursor or another AI to remember something, and it is stil
 AIMEAT (AI Memory Exchange and Action Transfer) is open source under the MIT licence. It runs on [aimeat.io](https://aimeat.io/), on your own server, or on your own computer.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/portal-landing.png" alt="The aimeat.io front page: Try it all. Then own it., with a box that asks what you want built and links to plug in the AI you already use" width="820" />
+  <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/portal-landing.png" alt="The aimeat.io front page: Accelerate your AI. Reach level 5., with Start free and Try the Experience Center buttons beside five steps from where you start to the goal" width="820" />
 </p>
 
 ## Three ways in
@@ -32,10 +32,10 @@ Sign in when your AI asks, and choose what it may do: read only, standard, full,
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/mcp_1_add_custom_connector.png" alt="claude.ai's Add custom connector dialog with the name aimeat.io and the address https://aimeat.io/v1/mcp" width="40%" />
-  <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/profile-mcp.png" alt="The MCP page in AIMEAT settings: every connected AI under its own name, what it may do, when it was last used, and a Disconnect link for each" width="56%" />
+  <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/profile-mcp.png" alt="The Connect your AI page in AIMEAT settings: every connected AI under its own name, what it may do, when it was last used, and a Disconnect link for each" width="56%" />
 </p>
 
-- **The steps for each AI tool**, with every field value, are on the [Connect your AI](https://aimeat.io/v1/connect-your-ai) page. The same table for software is served at [`/v1/ai-tools`](https://aimeat.io/v1/ai-tools). Signed in, the [MCP page](https://aimeat.io/v1/profile?tab=mcp) in your settings shows every connected AI and disconnects any of them.
+- **The steps for each AI tool**, with every field value, are on the [Connect your AI](https://aimeat.io/v1/connect-your-ai) page. The same table for software is served at [`/v1/ai-tools`](https://aimeat.io/v1/ai-tools). Signed in, the [Connect your AI page in your settings](https://aimeat.io/v1/profile?tab=mcp) shows every connected AI and disconnects any of them.
 - **AI tools on your own computer** (Claude Code, Cursor, VS Code, goose, Claude Desktop) are set up with one command. It registers the tool as an agent of yours, which you approve on the Agents page, and writes the tool's MCP settings without putting the token in them:
 
   ```bash
