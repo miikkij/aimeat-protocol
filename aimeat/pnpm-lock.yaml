@@ -111,8 +111,8 @@ importers:
         specifier: ^0.16.1
         version: 0.16.1
       '@sd-jwt/core':
-        specifier: ^0.20.1
-        version: 0.20.1
+        specifier: ^0.23.0
+        version: 0.23.0
       '@simplewebauthn/server':
         specifier: ^14.0.3
         version: 14.0.3
@@ -909,8 +909,8 @@ packages:
     resolution: {integrity: sha512-lMkyes8iHrG+mk6WH7X70MdCLI2RS0FwNBY1PyQ8UemaijE2m5mv5A0Niy3HtbYTFrgkUEQjFMXmSAk2hQDuPQ==}
     engines: {node: '>=8.0.0'}
 
-  '@owf/identity-common@0.3.2':
-    resolution: {integrity: sha512-XH5Bg6zuXc9SeimTe2ZD/+54GnhSyenFSy2Qe/z2HY1ul5j+6/lDNIhI83xct5aOkCD0uZ7zHbMhTI4Nq8YJOQ==}
+  '@owf/identity-common@0.5.0':
+    resolution: {integrity: sha512-h8lto+C1h6wYLe9HwF3C7NaZyB0wydstmdkgrGrpWhfCyyX+XfBZtIC494reAaj19pQTXIdEsNC91Gheo25T+Q==}
 
   '@oxc-project/types@0.155.0':
     resolution: {integrity: sha512-SeE8JPwW1xs1tHeNycjUtUBdhorRa8o4jlvjwk49R7/Z291i+4DQa7JJIgOm/TaYQZx+QrPQbVJ/9c8dMIZN8Q==}
@@ -1113,9 +1113,8 @@ packages:
   '@scure/bip39@1.6.0':
     resolution: {integrity: sha512-+lF0BbLiJNwVlev4eKelw1WWLaiKXw7sSl8T6FvBlWkdX+94aGJ4o8XjUdlyhTCjd8c+B3KT3JfS8P0bLRNU6A==}
 
-  '@sd-jwt/core@0.20.1':
-    resolution: {integrity: sha512-RUBZ3WxnjicKgQyUysaFNMuC88xXSQlNLK7V1vxSBKYHAoi/yCXtCGlxxj7JXISAJgFTkmPSV5ZEZp0Dt5bXyw==}
-    engines: {node: '>=20'}
+  '@sd-jwt/core@0.23.0':
+    resolution: {integrity: sha512-/9/z3Gpfd50hOUk/kj8QfUjhDcKU9sdrTxt9HqhG/YkjpGU+7iIU24qYYPagf0btUKN4jbUQ0uS7eWYdvdzhJg==}
 
   '@simplewebauthn/server@14.0.3':
     resolution: {integrity: sha512-D39/0fiDiYmGV+nraY9s63D1Ho2AX/waMLy22/9gUadTUuvbAnstfb4bpbHYbwZuV5ZLDYN1SmzDKuiHzKAA4Q==}
@@ -4302,7 +4301,7 @@ snapshots:
 
   '@opentelemetry/api@1.10.0': {}
 
-  '@owf/identity-common@0.3.2': {}
+  '@owf/identity-common@0.5.0': {}
 
   '@oxc-project/types@0.155.0': {}
 
@@ -4531,9 +4530,9 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/base': 1.2.6
 
-  '@sd-jwt/core@0.20.1':
+  '@sd-jwt/core@0.23.0':
     dependencies:
-      '@owf/identity-common': 0.3.2
+      '@owf/identity-common': 0.5.0
 
   '@simplewebauthn/server@14.0.3':
     dependencies:
