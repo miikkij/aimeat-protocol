@@ -32,6 +32,9 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.5.0 — 2026-10-22 — redeemLoginLink() takes an optional beforeSpend check that runs after every
+ *     other check and before the spend, and whose refusal leaves the link unspent: the program
+ *     endpoint asks a TOTP account for its code there (secaudit2026oct22, magic-link-verify).
  *   v1.4.1 — 2026-10-10 — Comment: why the raw-token branch has no flag (secaudit 2026-10-10 I19).
  *   v1.4.0 — 2026-10-09 — The token is stored as its SHA-256 (the row id), never as itself; a row
  *     written before, keyed by the raw token, is still redeemed for one release (findLoginLinkRow)
@@ -202,7 +205,11 @@ export async function sendWelcomeLink(
 
 export type RedeemResult =
     | { ok: true; ghii: GHIIRecord }
-    | { ok: false; code: 'INVALID_TOKEN' | 'EXPIRED' | 'ACCOUNT_DISABLED' };
+    | { ok: false; code: 'INVALID_TOKEN' | 'EXPIRED' | 'ACCOUNT_DISABLED' }
+    | { ok: false; code: 'REFUSED_BEFORE_SPEND'; refusal: { status: number; code: string; message: string } };
+
+/** A check the caller runs on the account after every other check and before the link is spent. */
+export type BeforeSpend = (ghii: GHIIRecord) => Promise<{ status: number; code: string; message: string } | null>;
 
 /**
  * Check and spend a sign-in link. Every refusal comes before the token is spent (invariant 14), so a
@@ -214,7 +221,7 @@ export type RedeemResult =
  * off, or changed their address, ends the links already in a mailbox, the seven-day welcome link
  * included. The spend is one conditional update, so two concurrent clicks cannot both sign in.
  */
-export async function redeemLoginLink(storage: Storage, config: AimeatConfig, token: string): Promise<RedeemResult> {
+export async function redeemLoginLink(storage: Storage, config: AimeatConfig, token: string, beforeSpend?: BeforeSpend): Promise<RedeemResult> {
     const found = token ? await findLoginLinkRow(storage, token) : null;
     const record = found?.record ?? null;
     if (!found || !record || record.status !== 'pending' || record.purpose !== 'login') return { ok: false, code: 'INVALID_TOKEN' };
@@ -230,6 +237,10 @@ export async function redeemLoginLink(storage: Storage, config: AimeatConfig, to
     if (!ghii.magicLinkEnabled || !ghii.notificationEmail || emailHashOf(ghii.notificationEmail) !== record.emailHash) {
         return { ok: false, code: 'INVALID_TOKEN' };
     }
+    // The caller's own condition (the program endpoint's second factor): a refusal leaves the link
+    // unspent, so the person can send it again with what was missing (invariant 14).
+    const refusal = beforeSpend ? await beforeSpend(ghii) : null;
+    if (refusal) return { ok: false, code: 'REFUSED_BEFORE_SPEND', refusal };
     if (!(await storage.spendEmailVerification(rowId, new Date().toISOString()))) return { ok: false, code: 'INVALID_TOKEN' };
     // Clicking the link proves the mailbox, as it always has.
     if ((ghii.verificationLevel ?? 0) < 1) await storage.updateGHII(ghii.ghii, { verificationLevel: 1 });

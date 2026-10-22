@@ -39759,7 +39759,9 @@ paths:
         a JWT session token on success. The token is single-use and expires
         after a short period. The emailed link points at the browser
         endpoint GET /v1/ghii/magic-link/open; this endpoint is for a
-        program that holds the token.
+        program that holds the token. An account with two-step sign-in
+        armed sends its code as `totp_code` or `backup_code`; without it
+        the answer is 401 TOTP_REQUIRED and the link stays usable.
       tags: [GHII-Web]
       parameters:
         - name: token
@@ -39768,6 +39770,18 @@ paths:
           schema:
             type: string
           description: Magic link token from the email
+        - name: totp_code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: The authenticator code, for an account with two-step sign-in armed
+        - name: backup_code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: One backup code, instead of totp_code
       responses:
         '200':
           description: Magic link verified, session created
