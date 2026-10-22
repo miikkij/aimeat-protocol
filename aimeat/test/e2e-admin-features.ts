@@ -244,6 +244,24 @@ await test('PUT /v1/admin/ghii level \u2192 the list comes back at the new level
     assert(back.status === 200, `restore ${back.status}`);
 });
 
+// secaudit2026oct22 (admin-features.ts put-admin-ghii:returns-stored-identity-row): the answer carried
+// the stored identity row, password hash and second-factor material included, to the operator and to
+// an operator agent. It now answers with the row the list shows.
+await test('PUT /v1/admin/ghii answers with the list row, never the stored credentials', async () => {
+    const ghii = `${nonOpName}@${NODE_ID}`;
+    const put = await json(`/v1/admin/ghii/${encodeURIComponent(ghii)}`, authed({
+        method: 'PUT',
+        body: JSON.stringify({ verificationLevel: 1 }),
+    }));
+    assert(put.status === 200, `PUT ${put.status}: ${JSON.stringify(put.body).slice(0, 200)}`);
+    const row = put.body.data?.ghii_user ?? {};
+    for (const k of ['passwordHash', 'totpSecret', 'totpBackupCodes', 'totpLastUsedCode', 'notificationEmail', 'googleSub', 'externalIdentities']) {
+        assert(!(k in row), `the answer carries ${k}`);
+    }
+    assert(row.verification_level === 1 && row.username === nonOpName, `the answer is the list row: ${JSON.stringify(row).slice(0, 300)}`);
+    await json(`/v1/admin/ghii/${encodeURIComponent(ghii)}`, authed({ method: 'PUT', body: JSON.stringify({ verificationLevel: 0 }) }));
+});
+
 await test('PUT /v1/admin/ghii/nonexistent \u2192 404', async () => {
     const { status, body } = await json('/v1/admin/ghii/nonexistent%40nowhere', authed({
         method: 'PUT',
