@@ -191,6 +191,11 @@ await test('setup/token refuses an account with two-step sign-in armed and names
 // (an account made on POST /v1/ghii or /v1/owners never hands out its private key).
 await test('setup/token refuses a deactivated account: its key no longer opens a session (403)', async () => {
     const second = await registerOwner(BASE, offName);
+    const selfGrant = await json('/v1/admin/roles/grant', {
+        method: 'POST', headers: { Authorization: `Bearer ${second.token}` },
+        body: JSON.stringify({ owner: offName, role: 'operator' }),
+    });
+    assert(selfGrant.status === 403, `an ordinary account granted itself the operator role: ${selfGrant.status} ${JSON.stringify(selfGrant.body).slice(0, 200)}`);
     const grant = await json('/v1/admin/roles/grant', op({ method: 'POST', body: JSON.stringify({ owner: offName, role: 'operator' }) }));
     assert(grant.status === 200, `grant ${grant.status}: ${JSON.stringify(grant.body)}`);
     const secondOp = await ownerToken(BASE, second.name);
