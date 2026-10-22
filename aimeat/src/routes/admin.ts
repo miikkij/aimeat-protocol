@@ -11,6 +11,10 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-22 — POST /v1/admin/setup/token keeps the rules of POST /v1/auth/token's owner branch: a
+ *     deactivated account is refused, an account with two-step sign-in armed gets 401
+ *     SECOND_FACTOR_REQUIRED naming the password sign-in, and the token is bound to a session row
+ *     (secaudit2026oct22, admin-setup-token/owner-key-sign-in-after-removal-without-second-factor).
  *   2026-10-19 — GET /v1/admin/owners gives every listed agent its `avatar` (services/agent-avatar.ts), one batched read for all owners' agents.
  *   2026-10-16 — The dashboard's checkout counts, money volume and platform-fee receivable read every
  *     record under their prefix (storage/memory-pages.ts), not the first 2000 in key order (QA audit S8-10).
@@ -57,7 +61,7 @@ import { success, error } from '../middleware/envelope.js';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName, resolveIdentity } from '../utils/gaii.js';
-import { issueJWT } from '../auth/jwt.js';
+import { issueJWT, generateSessionId } from '../auth/jwt.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
 import { hashPassword } from '../services/password.js';
@@ -332,17 +336,39 @@ export function adminRouter(
             return;
         }
 
+        // THE SAME RULES AS POST /v1/auth/token's owner branch, which signs in with the same key: a
+        // deactivated account is refused before the mint, an account with two-step sign-in armed does
+        // not sign in with the key alone, and the token is bound to a session row so signing out
+        // everywhere ends it. Without them the admin secret and a copied account key opened an
+        // owner (and operator) session past the account's own second factor (secaudit2026oct22).
+        if (ownerRecord.disabledAt) {
+            res.status(403).json({ ok: false, error: 'This account has been deactivated' });
+            return;
+        }
+        const ownerGhiiRecord = await storage.getGHII(`${ownerName}@${config.nodeId}`);
+        if (ownerGhiiRecord?.totpEnabled && ownerGhiiRecord.totpSecret) {
+            res.status(401).json({ ok: false, code: 'SECOND_FACTOR_REQUIRED', sign_in: 'POST /v1/ghii/login',
+                error: 'This account uses two-step sign-in, so the account key alone does not sign you in. Sign in with your password and the code from your app at /v1/ghii/login.' });
+            return;
+        }
+        const setupSessionId = generateSessionId();
+        const issuedAt = new Date();
+        const expiresAt = new Date(issuedAt.getTime() + config.jwtTtlSeconds * 1000);
         const token = await issueJWT({
             sub: ownerName,
             owner: ownerName,
             node: config.nodeId,
             roles: [...ownerRecord.roles],
-        }, config.jwtTtlSeconds);
+        }, config.jwtTtlSeconds, setupSessionId);
+        await storage.createSession({
+            sessionId: setupSessionId, gaii: ownerName, owner: ownerName,
+            issuedAt: issuedAt.toISOString(), expiresAt: expiresAt.toISOString(),
+        });
 
         res.json({
             ok: true,
             token,
-            expires_at: new Date(Date.now() + config.jwtTtlSeconds * 1000).toISOString(),
+            expires_at: expiresAt.toISOString(),
             roles: ownerRecord.roles,
             dashboard_url: '/v1/admin',
         });
