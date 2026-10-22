@@ -5,7 +5,9 @@
   This screen is the reason the app exists. A person installs one program and their own AI is
   attached, without a terminal and without walking a settings menu. The work is done by
   src-tauri/src/connectors.rs, which reads and edits each tool's own config file; this page shows
-  the state and offers the two verbs, connect and disconnect.
+  the state and offers the two verbs, add and remove. "Added" is all this page can know: the tool's
+  config file names the person's AIMEAT. Whether the person has signed in lives in the tool itself,
+  so the page says how to sign in and never claims that it happened.
 
   THE LOOK IS THE HOUSE POSTER FACE, from house.css, which this page shares with the machine room.
 
@@ -86,24 +88,26 @@
     const STRINGS = {
       en: {
         title: 'Your AI tools',
-        lead: 'These are the AI tools on this computer. Connected means the tool can read and write what is in your AIMEAT, as you.',
+        lead: 'These are the AI tools on this computer. Added means the tool knows the address of your AIMEAT. It reads and writes there as you after you sign in once, in the tool itself.',
         addrLabel: 'Your AIMEAT',
         addrHint: 'The address you sign in to. aimeat.io, unless you run your own server.',
         recheck: 'Check again',
         listTitle: 'On this computer',
         stAbsent: 'not on this computer',
-        stOff: 'not connected',
-        stOn: '✓ connected',
-        stOther: 'connected elsewhere',
+        stOff: 'not added',
+        stOn: '✓ added',
+        stOther: 'added for another address',
         stCloud: 'in its own settings',
-        connect: 'Connect',
-        disconnect: 'Disconnect',
+        connect: 'Add',
+        disconnect: 'Remove',
         copy: 'Copy the lines',
         copyAddress: 'Copy the address',
-        connectAll: 'Connect them all',
+        connectAll: 'Add them all',
         where: 'Its settings file:',
         restart: 'Restart {tool}, and it will find your AIMEAT. The first time it asks, sign in as yourself.',
-        restartAll: 'Restart the tools you connected, and they will find your AIMEAT. The first time each one asks, sign in as yourself.',
+        restartAll: 'Restart the tools you added, and they will find your AIMEAT. The first time each one asks, sign in as yourself.',
+        signIn: 'This app cannot see whether you have signed in. The first time you use {tool}, it asks you to sign in to your AIMEAT in your browser.',
+        'signIn.claude-code': 'This app cannot see whether you have signed in. To sign in, type /mcp in Claude Code, choose aimeat, then Authenticate. Your browser opens, and you sign in to your AIMEAT there.',
         removed: '{tool} no longer reaches your AIMEAT. Restart it to be sure.',
         copied: 'Copied. Paste it where {tool} asks for it, then restart {tool}.',
         failed: 'Did not work: {why}',
@@ -118,24 +122,26 @@
       },
       fi: {
         title: 'Tekoälysi',
-        lead: 'Nämä ovat tämän koneen tekoälyohjelmat. Kytketty tarkoittaa, että ohjelma lukee ja kirjoittaa AIMEATissasi sinun nimissäsi.',
+        lead: 'Nämä ovat tämän koneen tekoälyohjelmat. Lisätty tarkoittaa, että ohjelma tuntee AIMEATisi osoitteen. Ohjelma lukee ja kirjoittaa siellä sinun nimissäsi, kun olet kirjautunut kerran sisään ohjelmassa itsessään.',
         addrLabel: 'Oma AIMEATisi',
         addrHint: 'Osoite, johon kirjaudut. aimeat.io, jos et pidä omaa palvelinta.',
         recheck: 'Tarkista uudelleen',
         listTitle: 'Tällä koneella',
         stAbsent: 'ei tällä koneella',
-        stOff: 'ei kytketty',
-        stOn: '✓ kytketty',
-        stOther: 'kytketty muualle',
+        stOff: 'ei lisätty',
+        stOn: '✓ lisätty',
+        stOther: 'lisätty toiseen osoitteeseen',
         stCloud: 'omissa asetuksissaan',
-        connect: 'Kytke',
-        disconnect: 'Irrota',
+        connect: 'Lisää',
+        disconnect: 'Poista',
         copy: 'Kopioi rivit',
         copyAddress: 'Kopioi osoite',
-        connectAll: 'Kytke kaikki',
+        connectAll: 'Lisää kaikki',
         where: 'Sen asetustiedosto:',
         restart: 'Käynnistä {tool} uudelleen, niin se löytää AIMEATisi. Kun se ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
-        restartAll: 'Käynnistä kytkemäsi ohjelmat uudelleen, niin ne löytävät AIMEATisi. Kun ohjelma ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
+        restartAll: 'Käynnistä lisäämäsi ohjelmat uudelleen, niin ne löytävät AIMEATisi. Kun ohjelma ensimmäisen kerran kysyy, kirjaudu sisään omana itsenäsi.',
+        signIn: 'Tämä sovellus ei näe, oletko kirjautunut. Ensimmäisellä käyttökerralla {tool} pyytää sinua kirjautumaan AIMEATiisi selaimessa.',
+        'signIn.claude-code': 'Tämä sovellus ei näe, oletko kirjautunut. Kirjaudu näin: kirjoita Claude Codessa /mcp, valitse aimeat ja sitten Authenticate. Selain avautuu, ja kirjaudut siellä AIMEATiisi.',
         removed: '{tool} ei enää tavoita AIMEATiasi. Käynnistä se uudelleen varmuuden vuoksi.',
         copied: 'Kopioitu. Liitä se siihen mihin {tool} sitä pyytää ja käynnistä {tool} uudelleen.',
         failed: 'Ei onnistunut: {why}',
@@ -264,6 +270,14 @@
             row.appendChild(pre);
           }
         } else if (c.installed && c.config_path) {
+          // Added means the config file names this AIMEAT, nothing more. The sign-in lives in the
+          // tool (Claude Code keeps it in the system keychain), so the row says how to do it rather
+          // than claiming it happened. On 2026-10-21 a person read "connected" here while every
+          // sign-in was being refused.
+          if (c.connected) {
+            const key = 'signIn.' + c.id;
+            row.appendChild(el('div', 'why', t(STRINGS.en[key] ? key : 'signIn', { tool: c.name })));
+          }
           row.appendChild(el('div', 'path', c.config_path));
         }
 

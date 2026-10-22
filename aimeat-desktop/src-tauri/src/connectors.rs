@@ -34,7 +34,8 @@ pub struct Connector {
     pub name: String,
     /// Whether this machine has the tool at all.
     pub installed: bool,
-    /// Whether it is attached to the node that was asked about.
+    /// Whether its config file names the node that was asked about. Not whether the person has
+    /// signed in: that lives in the tool, and the screen says "added", never "connected".
     pub connected: bool,
     /// The AIMEAT endpoint it is attached to, when that is a different node.
     pub connected_url: Option<String>,
