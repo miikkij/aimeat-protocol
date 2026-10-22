@@ -12,6 +12,9 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-10-22 — endPersonSessionsAfterPasswordChange: a password reset ends every sign-in session of the
+ *     person, a password change every one but the session it was made from; agents keep theirs
+ *     (secaudit2026oct22, ghii/recovery.ts password-reset-keeps-owner-sessions).
  *   2026-10-16 — A refresh token presented again after its rotation (reuse) writes a warn log line and the
  *     account event session_token_reused, besides ending the session (QA audit S1-02).
  * v1.3.0 - 2026-10-05 - checkRefreshSession: the one read-only check of a refresh session (revoked,
@@ -33,6 +36,7 @@ import { issueJWT, AccountDisabledError } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
+import { isExternalPrincipal } from '../utils/gaii.js';
 
 /** Name of the httpOnly refresh-token cookie. Scoped to /v1/auth on the wire. */
 export const REFRESH_COOKIE = 'aimeat_rt';
@@ -295,4 +299,18 @@ export async function refreshOwnerSession(
     session.sessionId,
   );
   return { ok: true, token, expiresIn: config.accessTtlSeconds, rotated: true, displayName };
+}
+
+/**
+ * End the person's own sign-in sessions after their password changed, keeping `keepSessionId`
+ * (the session the change was made from) when given. Agent and ecosystem sessions stay: a password
+ * is how the person signs in, and an agent is ended from the Agents surface, one at a time, as
+ * DELETE /v1/auth/sessions does. Revoking the row also refuses the access JWTs minted for it,
+ * because credentialRevoked reads the session row on every request.
+ */
+export async function endPersonSessionsAfterPasswordChange(storage: Storage, owner: string, keepSessionId?: string): Promise<number> {
+  const mine = (await storage.listActiveSessions(owner)).filter(s => !isExternalPrincipal(s.gaii) && s.sessionId !== keepSessionId);
+  let count = 0;
+  for (const s of mine) if (await storage.revokeSession(s.sessionId)) count++;
+  return count;
 }

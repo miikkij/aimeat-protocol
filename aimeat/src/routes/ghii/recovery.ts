@@ -6,6 +6,9 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-22 — A password reset ends every sign-in session of the person, and a password change every
+ *     one but the session it was made from; the account's agents keep theirs (secaudit2026oct22,
+ *     password-reset-keeps-owner-sessions).
  *   2026-10-16 — A completed password reset or change writes the account event password_changed (how:
  *     reset, changed or set) and an info log line; a wrong reset code writes a refusal-log line (QA audit
  *     E2-03, S1-02).
@@ -57,6 +60,7 @@ import { recordAccountEvent } from '../../services/account-events.js';
 import { recordAuthFailure } from '../../services/auth-audit.js';
 import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
+import { endPersonSessionsAfterPasswordChange } from '../../services/owner-session.js';
 
 /**
  * Replace the owner's Ed25519 signing key and hand the new private half to nobody. The key signs in
@@ -377,6 +381,9 @@ export function registerRecoveryRoutes(
         // that also signs in (deprecated owner-key sign-in) is replaced with it, or whoever took the
         // key keeps the account through the reset (secrets audit 2026-10-09, S2).
         await replaceOwnerSigningKey(storage, username);
+        // ...and every sign-in session the person had ends, or whoever held one keeps the account
+        // through the reset. Agents keep theirs (secaudit2026oct22).
+        await endPersonSessionsAfterPasswordChange(storage, username);
 
         // Mark verification as used
         await storage.updateEmailVerification(record.id, {
@@ -450,6 +457,9 @@ export function registerRecoveryRoutes(
         await storage.updateGHII(ghii, { passwordHash: newHash });
         // Same as the reset above: a changed password retires the signing key that also signs in.
         await replaceOwnerSigningKey(storage, ownerName);
+        // The person's other sign-in sessions end; the one the change was made from stays, and
+        // agents keep theirs (secaudit2026oct22).
+        await endPersonSessionsAfterPasswordChange(storage, ownerName, req.auth!.sessionId);
         // `set` is the first password on an account made through Google or Entra sign-in: a new way in,
         // which the person must be able to see even though no current password was asked for.
         const how = ghiiRecord.passwordHash ? 'changed' : 'set';

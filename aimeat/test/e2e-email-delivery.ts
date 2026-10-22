@@ -318,7 +318,20 @@ async function run(): Promise<void> {
         assert(confirm.status === 200 && confirm.body.data.verified === true, `email/confirm ${confirm.status}: ${short(confirm.body)}`);
     });
 
+    // secaudit2026oct22 (ghii/recovery.ts password-reset-keeps-owner-sessions): a reset is what a person
+    // does when someone else may have had the account, so it ends every sign-in session of theirs. The
+    // account's agents keep theirs: they are ended from the Agents surface, one at a time.
+    let recAgentToken = '';
     await test('the password-reset door mails a code, and the reset it opens really changes the password', async () => {
+        const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'keeper', owner: recName }) });
+        const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: recToken }) });
+        assert(v.status === 200, `agent approve ${v.status}: ${short(v.body)}`);
+        const tk = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+        recAgentToken = tk.body.token as string;
+        assert(typeof recAgentToken === 'string', `agent token: ${short(tk.body)}`);
+        const before = await json('/v1/ghii/me', { headers: bearer(recToken) });
+        assert(before.status === 200, `the session works before the reset: ${before.status}`);
+
         smtp!.clear();
         const ask = await json('/v1/ghii/password/reset-request', { method: 'POST', body: JSON.stringify({ username: recName }) });
         assert(ask.status === 200, `reset-request ${ask.status}: ${short(ask.body)}`);
@@ -331,6 +344,11 @@ async function run(): Promise<void> {
         assert(reset.status === 200, `password/reset ${reset.status}: ${short(reset.body)}`);
         const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: newPassword }) });
         assert(login.status === 200, `the emailed code must produce a working password: ${login.status} ${short(login.body)}`);
+
+        const after = await json('/v1/ghii/me', { headers: bearer(recToken) });
+        assert(after.status === 401, `the session from before the reset must end: ${after.status} ${short(after.body)}`);
+        const agentStill = await json('/v1/memory', { headers: bearer(recAgentToken) });
+        assert(agentStill.status === 200, `the account's agent must keep working after the reset: ${agentStill.status} ${short(agentStill.body)}`);
     });
 
     await test('asked twice, only the newest reset code works, and the username may be typed in capitals', async () => {
@@ -366,6 +384,27 @@ async function run(): Promise<void> {
             body: JSON.stringify({ username: recName, code: '000000', newPassword: 'NotApplied9x' }),
         });
         assert(r.status === 429, `the fourth reset from one address must be refused whatever token it carries, got ${r.status} ${short(r.body)}`);
+    });
+
+    // secaudit2026oct22: a password change keeps the session it was made from and ends the person's
+    // other sign-in sessions; the agent keeps its session.
+    await test('a password change ends the other sign-in sessions and keeps this one and the agent', async () => {
+        const a = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: 'NewestWins9x' }) });
+        const b = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: recName, password: 'NewestWins9x' }) });
+        assert(a.status === 200 && b.status === 200, `two sign-ins: ${a.status} ${b.status}`);
+        const change = await json('/v1/ghii/password/change', {
+            method: 'POST', headers: bearer(a.body.data.token),
+            body: JSON.stringify({ current_password: 'NewestWins9x', new_password: 'ChangedHere9x' }),
+        });
+        assert(change.status === 200, `password/change ${change.status}: ${short(change.body)}`);
+        const meA = await json('/v1/ghii/me', { headers: bearer(a.body.data.token) });
+        assert(meA.status === 200, `the session the change was made from must stay: ${meA.status} ${short(meA.body)}`);
+        const meB = await json('/v1/ghii/me', { headers: bearer(b.body.data.token) });
+        assert(meB.status === 401, `the other sign-in session must end: ${meB.status} ${short(meB.body)}`);
+        const agentStill = await json('/v1/memory', { headers: bearer(recAgentToken) });
+        assert(agentStill.status === 200, `the agent must keep working after the change: ${agentStill.status}`);
+        // The later refusal tests sign in as this plain owner; the reset ended the earlier session.
+        recToken = a.body.data.token as string;
     });
 
     await test('account recovery mails a notification carrying the username', async () => {
