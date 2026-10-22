@@ -207,7 +207,7 @@ def sse_params(
 
     See `http_params()` for argument semantics. The only difference is the
     transport identifier. The default `mcp_path` is the node's one MCP path;
-    until 0.36.1 it was `/v1/mcp/sse`, a path the node never served.
+    until 0.37.0 it was `/v1/mcp/sse`, a path the node never served.
     """
     base = node_url.rstrip("/")
     return {
