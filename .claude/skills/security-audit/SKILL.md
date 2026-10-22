@@ -5,6 +5,8 @@ description: Security guidance and vulnerability review for codebases, APIs, ser
 
 # Security Audit
 
+**AIMEAT: before anything else, read `AIMEAT-PURPOSE.md` in this folder, and put its path in the brief of every agent you delegate to (hunter, verifier, critic, fix). It applies in both modes: a fix makes a use safe and never removes the use.**
+
 Find vulnerabilities that violate a real trust boundary, then give owners the source evidence, safe reproduction, priority, and smallest effective fix. This is a defensive, source-first workflow. A candidate without a concrete affected principal, resource, or security outcome is not a confirmed finding.
 
 ## Operating modes
