@@ -9,6 +9,8 @@
  *   and tells post_owner_registration once the account exists.
  * @usage cd aimeat && pnpm exec vitest run test/unit/registration-hook-every-route.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-23 — The allowed provisionOwner call is a request from loopback (fromLoopback): a call
+ *     with no request is asked for the setup code of a node without an operator (secaudit2026oct22).
  *   v1.0.0 — 2026-10-15 — Initial (feature-list audit 89).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -54,7 +56,7 @@ describe('provisionOwner asks the registration hook', () => {
   });
 
   it('creates the account and tells post_owner_registration when the hook allows', async () => {
-    const { owner } = await provisionOwner(storage, config, { via: 'oauth', username: 'dave', displayName: 'Dave' });
+    const { owner } = await provisionOwner(storage, config, { via: 'oauth', fromLoopback: true, username: 'dave', displayName: 'Dave' });
     expect(owner.name).toBe('dave');
     await new Promise(r => setTimeout(r, 0));
     expect(calls.map(c => c.hook)).toEqual(['pre_owner_registration', 'post_owner_registration']);
