@@ -11,6 +11,8 @@
  *   validates; and the boot step encrypts a stored plain secret when a key exists, and leaves
  *   anything it cannot prove is a plain secret alone.
  * @version-history
+ *   v1.0.1 — 2026-10-23 — provisionOwner is called as a request from loopback (fromLoopback): a call with
+ *     no request is asked for the setup code of a node without an operator (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -67,7 +69,7 @@ describe('the boot step that encrypts a stored plain secret', () => {
   const plain = new Secret({ size: 20 }).base32;
 
   async function withSecret(name: string, totpSecret: string): Promise<string> {
-    const { ghii } = await provisionOwner(storage, cfg(GENERAL, null), { via: 'direct', username: name, displayName: name });
+    const { ghii } = await provisionOwner(storage, cfg(GENERAL, null), { via: 'direct', fromLoopback: true, username: name, displayName: name });
     await storage.updateGHII(ghii.ghii, { totpSecret, totpEnabled: true });
     return ghii.ghii;
   }

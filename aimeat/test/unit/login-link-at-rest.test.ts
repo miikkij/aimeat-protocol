@@ -8,6 +8,8 @@
  *   link outstanding. A row written the old way (the raw token as id) is still redeemed for one
  *   release, because a welcome link lasts seven days.
  * @version-history
+ *   v1.0.1 — 2026-10-23 — provisionOwner is called as a request from loopback (fromLoopback): a call with
+ *     no request is asked for the setup code of a node without an operator (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -27,7 +29,7 @@ describe('the sign-in link token at rest', () => {
 
   async function person(name: string) {
     const email = `${name}@example.test`;
-    const { ghii } = await provisionOwner(storage, config, { via: 'direct', username: name, displayName: name, verifiedEmail: email });
+    const { ghii } = await provisionOwner(storage, config, { via: 'direct', fromLoopback: true, username: name, displayName: name, verifiedEmail: email });
     await storage.updateGHII(ghii.ghii, { notificationEmail: email, magicLinkEnabled: true });
     return { ghii: (await storage.getGHII(ghii.ghii))!, email };
   }
