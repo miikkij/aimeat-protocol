@@ -12,9 +12,16 @@
  *   the socket exactly the addresses it checked. safeFetch passes it on every hop it validates, so the
  *   address the request goes to is an address the guard accepted. A literal IP needs no lookup and
  *   is decided by validateOutboundUrl before the request.
+ *
+ *   The Agent comes from the npm `undici` package and is handed to Node's built-in fetch, which runs
+ *   on the undici Node bundles (`process.versions.undici`). The two must be the same major: undici 8's
+ *   Agent refuses the handler Node 24's fetch passes it ("invalid onRequestStart method"), so every
+ *   guarded fetch failed and test/unit/url-validator-dns.test.ts went red (measured 2026-10-23, Node
+ *   24.22.1 bundling undici 7.30.1). Move the package's major only when Node's bundled one moves.
  * @structure guardedLookup(hostname, options, callback) · guardedDispatcher() · connectRefusal(err)
  * @usage await fetch(url, { ...init, dispatcher: guardedDispatcher() });
  * @version-history
+ *   v1.0.1 — 2026-10-23 — The header says why the undici package stays on Node's bundled major.
  *   v1.0.0 — 2026-10-16 — Initial: the connection is pinned to the checked address (QA audit S4-02).
  */
 import { lookup as dnsLookup, type LookupAddress } from 'node:dns';

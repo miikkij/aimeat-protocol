@@ -7,6 +7,7 @@
  *   signature's colour door will stand on once mode-paired colours exist.
  * @usage cd aimeat && pnpm test -- atelier-contrast
  * @version-history
+ *   v1.1.1 — 2026-10-22 — The raw-coral exception names the tdr look's light card too (4.46, AK-TINT).
  *   v1.1.0 — 2026-09-05 — The lightness cap and the check it exists for: capLightness leaves a
  *     colour already under the line byte-identical and pulls a lighter one down keeping hue and
  *     chroma, and AK-SOLID refuses the raw house coral (3.58:1 under white) that AK-GRAD could
@@ -58,13 +59,19 @@ describe('atelier-contrast — the matrix as a callable service', () => {
     // so the RAW coral as text on it measures 4.44, under 4.5 (AK-TINT). The shipped coral is capped
     // and passes there (check:atelier), so the exception is about the raw value only, and the claim
     // under test still holds: the gradient checks see none of what the solid fill fails.
+    // A second of the same kind since 2026-10-22: the tdr look's light card is the TDR family kit's
+    // panel2 (#e7e3d8), a shade darker than the other cards, where the raw coral as text measures
+    // 4.46. The shipped, capped coral passes there too (check:atelier).
     const light = runMatrix({ '--ak-accent': '#e8564a' })
       .filter((r) => !r.ok && r.combo.endsWith('aimeat/light'));
     const solid = light.filter((f) => f.label.startsWith('AK-SOLID'));
     const other = light.filter((f) => !f.label.startsWith('AK-SOLID'));
     expect(solid.length).toBeGreaterThan(0);
     expect(light.some((f) => f.label.startsWith('AK-GRAD'))).toBe(false);
-    expect(other.map((f) => `${f.combo} ${f.label}`)).toEqual(['kirjapaino × aimeat/light AK-TINT accent-as-text on page']);
+    expect(other.map((f) => `${f.combo} ${f.label}`)).toEqual([
+      'kirjapaino × aimeat/light AK-TINT accent-as-text on page',
+      'tdr × aimeat/light AK-TINT accent-as-text on card',
+    ]);
     expect(light.every((f) => f.actual < f.min)).toBe(true);
   });
 });

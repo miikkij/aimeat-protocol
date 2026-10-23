@@ -11,6 +11,8 @@
  * @usage
  *   import { SIGNATURE_TOKENS } from './signature-tokens.js';
  * @version-history
+ *   v1.8.0 — 2026-10-22 — SERVED_FONT_FAMILIES takes Michroma (aimeat-fonts.css v1.6.0), the TDR
+ *     look's display face, so a look and a layout may name it in --ak-font-display.
  *   v1.7.0 — 2026-10-17 — SERVED_FONT_FAMILIES takes Newsreader (aimeat-fonts.css v1.5.0), the
  *     kirjapaino look's text face, so a look and a layout may name it in --ak-font.
  *   v1.6.0 — 2026-10-09 — SERVED_FONT_FAMILIES takes IBM Plex Sans and IBM Plex Mono (aimeat-fonts.css v1.4.0).
@@ -41,6 +43,7 @@ export const SERVED_FONT_FAMILIES: readonly string[] = [
   'Press Start 2P', 'Selawik',
   'IBM Plex Sans', 'IBM Plex Mono',
   'Newsreader',
+  'Michroma',
 ];
 
 /** Faces a browser has without a download, and the generic keywords. Lower case. */

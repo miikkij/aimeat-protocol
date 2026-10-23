@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description THE STRUCTURES — the named, reusable page-shape recipes a look composes with (the
  *   masthead, the joined frame, the press sheet, the marquee, the printed letter's rules, the
- *   full-bleed band). Extracted
+ *   machine room's console, the full-bleed band). Extracted
  *   whole from atelier-looks.ts on 2026-09-01 when the broadcast look pushed that file past the
  *   800-line cap: a pure move, nothing changed. atelier-looks.ts re-exports STRUCTURES, so the
  *   registry and the look builder import exactly what they imported before.
@@ -12,6 +12,10 @@
  * @usage
  *   import { STRUCTURES } from '../data/atelier-looks.js';   // the re-export, unchanged
  * @version-history
+ *   v1.2.0 — 2026-10-22 — operator-console, the machine room's page structure for the tdr look:
+ *     a solid bar with a wide capital title, the hero as a plate with two accent corner brackets,
+ *     letter-spaced capital labels, outlined actions that fill with the accent when touched, and
+ *     rows between dashed rules.
  *   v1.1.0 — 2026-10-17 — press-rule, the printed letter's page structure for the kirjapaino
  *     look: the double rule (3 px of ink, a 4 px gap, 1 px of ink) under the bar and the hero,
  *     paper cards ruled in ink, rows between rules, underlined fields, the ink slab as the loud
@@ -324,6 +328,123 @@ ${sel} .ak-form__label {
 ${sel} input[type='checkbox'], ${sel} input[type='radio'] { accent-color: var(--ak-ink); }
 ${sel} a { color: var(--ak-ink); text-underline-offset: 3px; }
 ${sel} a:hover { color: var(--ak-accent-text); }`,
+  },
+  {
+    id: 'operator-console',
+    summary: 'The MACHINE ROOM: a solid bar on a hairline with its title set wide in capitals, the hero as a square plate on a hairline with two accent corner brackets, letter-spaced capital labels, outlined actions that fill with the accent when touched, and rows between dashed rules.',
+    css: (sel) => `
+${sel} .ak-app__bar {
+  background: var(--ak-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+${sel} .ak-app__title {
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+${sel} .ak-hero:not(.ak-hero--image) {
+  min-height: unset;
+  background: var(--ak-surface);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: none;
+  overflow: visible;
+}
+${sel} .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+${sel} .ak-hero:not(.ak-hero--image)::before,
+${sel} .ak-hero:not(.ak-hero--image)::after {
+  content: '';
+  position: absolute;
+  inset: auto;
+  width: 22px;
+  height: 22px;
+  background: none;
+  animation: none;
+  pointer-events: none;
+}
+${sel} .ak-hero:not(.ak-hero--image)::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--ak-accent);
+  border-left: 2px solid var(--ak-accent);
+}
+${sel} .ak-hero:not(.ak-hero--image)::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--ak-accent);
+  border-right: 2px solid var(--ak-accent);
+}
+${sel} .ak-hero__title { line-height: 1.2; letter-spacing: 0.05em; }
+${sel} .ak-hero__sub {
+  font-size: var(--ak-text-fine);
+  line-height: 1.6;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+}
+${sel} .ak-hero__before { color: var(--ak-accent-text); letter-spacing: 0.14em; }
+${sel} .ak-section { box-shadow: none; }
+${sel} .ak-section__title,
+${sel} .ak-statrow__value {
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+${sel} .ak-section__title { font-size: 0.95rem; text-transform: uppercase; }
+${sel} .ak-form__label,
+${sel} .ak-statrow__label,
+${sel} .ak-table th {
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ak-ink-dim);
+}
+${sel} .ak-statrow__tile { box-shadow: none; transform: none; }
+${sel} .ak-list { gap: 0; }
+${sel} .ak-list__row {
+  border: 0;
+  border-top: var(--ak-line-w) dashed var(--ak-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+${sel} .ak-list__row:last-child { border-bottom: var(--ak-line-w) dashed var(--ak-line); }
+${sel} .ak-btn,
+${sel} .ak-tab {
+  font-size: var(--ak-text-fine);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+${sel} .ak-btn {
+  background: transparent;
+  transition: background-color var(--ak-motion) var(--ak-ease), color var(--ak-motion) var(--ak-ease), border-color var(--ak-motion) var(--ak-ease);
+}
+${sel} .ak-btn:hover { filter: none; border-color: var(--ak-accent-text); color: var(--ak-accent-text); }
+${sel} .ak-btn--primary {
+  background: transparent;
+  border-color: var(--ak-accent-text);
+  color: var(--ak-accent-text);
+  box-shadow: none;
+  font-weight: 600;
+}
+${sel} .ak-btn--primary:hover,
+${sel} .ak-btn--primary:active {
+  filter: none;
+  background: var(--ak-accent);
+  border-color: var(--ak-accent);
+  color: var(--ak-accent-ink);
+}
+${sel} .ak-btn--ghost { border-color: transparent; }
+${sel} .ak-btn--danger:hover { border-color: currentColor; color: color-mix(in oklab, var(--ak-err) 74%, var(--ak-ink)); }
+${sel} .ak-badge {
+  background: transparent;
+  border: var(--ak-line-w) solid currentColor;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+${sel} .ak-input:focus { border-color: var(--ak-accent-text); }
+${sel} ::selection { background: var(--ak-accent); color: var(--ak-accent-ink); }`,
   },
   {
     id: 'full-bleed-hero',

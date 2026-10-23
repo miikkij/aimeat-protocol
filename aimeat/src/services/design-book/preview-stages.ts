@@ -26,6 +26,8 @@
  * @structure lookStage · layerStage · wornStage · lookForShape · StageBody
  * @usage const body = lookStage(part.id, part.title, tokens, preset);
  * @version-history
+ *   v1.2.0 — 2026-10-22 — The tdr look (the TDR machine room) is shown on the operator's console
+ *     stage and, as a layer or a worn effect, in the dark theme, the family's own default.
  *   v1.1.0 — 2026-10-17 — A printed letter's stage (an issue's contents and the subscriber count),
  *     for the kirjapaino look and any part whose words name a letter, a newsletter or a gazette.
  *   v1.0.0 — 2026-09-20 — Initial (wish-design-book-n-ytt-osansa-niin-ett-ne-erottuvat-toisistaan-ja).
@@ -101,8 +103,8 @@ const STAGES: Stage[] = [
     },
   },
   {
-    // A machine that speaks: a terminal, a console, an operator's room.
-    match: /terminal|crt|console|machine|mono|brutalist|operator|system/,
+    // A machine that speaks: a terminal, a console, an operator's room, the TDR machine room.
+    match: /terminal|crt|console|machine|mono|brutalist|operator|system|(?:^|[^a-z])tdr(?:[^a-z]|$)/,
     night: true,
     blocks: [
       hero('night-batch // node 07', 'Four jobs, one of them unhappy. Last contact forty seconds ago.'),
@@ -236,7 +238,7 @@ export function layerStage(title: string, sub: string, look: string, tokens: Rec
 }
 
 /** The kit looks that are a lit thing in the dark: a part proven on one is shown in the dark theme. */
-const NIGHT_LOOKS = new Set(['neon-dense', 'lounge', 'terminal', 'stage', 'carnival', 'billboard']);
+const NIGHT_LOOKS = new Set(['neon-dense', 'lounge', 'terminal', 'stage', 'carnival', 'billboard', 'tdr']);
 const night = (look: string): { __theme?: 'dark' } => (NIGHT_LOOKS.has(look) ? { __theme: 'dark' } : {});
 
 /** A picture the node serves itself (the front page's arcade), so a picture effect has a picture to work on. */

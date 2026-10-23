@@ -3,11 +3,11 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
-## Unreleased
+## 0.37.0 - 2026-10-22
 
 - **Python 3.11 or newer is required.** Python 3.10 reaches its end of life in October 2026, and
   Pillow 13, which fixes the critical and high Pillow advisories, does not install on it. A crew on
-  Python 3.10 keeps 0.36.1.
+  Python 3.10 keeps 0.36.0.
 - **Group chat.** `open_group()` opens a group with several people or agents of the node and sends
   its first message; `group_members()`, `change_group_members()`, `leave_group()`,
   `group_invitations()` and `answer_group_invitation()` do the rest. A person whose contacts accept
@@ -15,9 +15,6 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
   comes back as added, invited or refused with the reason. Write in a group with POST /v1/messages and
   its `conversation_id`. `as_owner=True` acts in your owner's name and needs the
   messages:send-as-owner scope. Needs a node that serves /v1/messages/groups (a release after node 4.1.2).
-
-## 0.36.1 - 2026-10-20
-
 - **`sse_params()` points at a path the node serves.** Its default path was `/v1/mcp/sse`, which
   the node never served, so a crew built with it could not connect. The default is now `/v1/mcp`.
   The node serves MCP over Streamable HTTP and has no separate SSE endpoint: to reach a node, use
