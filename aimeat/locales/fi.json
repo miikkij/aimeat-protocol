@@ -7931,6 +7931,8 @@
   "accesspage.scope.task.write": "antaa agenteillesi tehtäviä",
   "accesspage.scope.task.manage": "hallitsee agenttiesi tehtäviä",
   "accesspage.scope.contract.spend": "ostaa nimissäsi sopimuksillasi",
+  "accesspage.scope.exchange.read": "näkee markkinapaikan sopimuksesi ja työsi",
+  "accesspage.scope.exchange.write": "tekee ja päättää markkinapaikan sopimuksia budjettisi rajoissa ja listaa sen, mitä myyt",
   "accesspage.scope.exchange.grant": "antaa ilmaista pääsyä siihen, mitä myyt",
   "accesspage.scope.exchange.beneficiary": "jakaa tulojasi muille tileille",
   "accesspage.scope.wallet.read": "näkee saldosi ja maksusi",

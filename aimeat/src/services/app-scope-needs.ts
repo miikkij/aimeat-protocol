@@ -31,6 +31,11 @@
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   v1.3.0 — 2026-10-23 — A marketplace call (exchangeNeeds): reading a person's contracts, work,
+ *     proposals or consumers needs exchange:read, every write exchange:write, a free-access grant
+ *     exchange:grant; offerings, open needs, bids and the info document stay public. The two words
+ *     became askable by an app the same day (routes/app-grant-vocabulary.ts), so the publish answer
+ *     can now name them; before, EXCHANGE's signed-in calls were refused without a word to declare.
  *   v1.2.1 — 2026-10-21 — A data package read (AIMEAT.datapackage.open, rows, versions, exportAs, list,
  *     or a /v1/datapackages/... or /v1/odata/... path) needs storage:read, rule 'datapackage-read': the
  *     owner's private packages ask it of an app since secaudit 2026-10 v41
@@ -136,7 +141,45 @@ function excerpt(text: string, at: number, length: number): string {
 }
 
 /** Every word a finding can name (the rules' and the schedule calls'), for the test that each is grantable. */
-export const SCOPE_NEED_WORDS: readonly string[] = [...new Set([...RULES.map(r => r.word), 'task:write', 'workflow:write', 'memory:write'])].sort();
+export const SCOPE_NEED_WORDS: readonly string[] = [...new Set([...RULES.map(r => r.word), 'task:write', 'workflow:write', 'memory:write',
+  'exchange:read', 'exchange:write', 'exchange:grant'])].sort();
+
+/**
+ * A `/v1/exchange/...` call: its word follows its HTTP method and its path (routes/exchange*.ts).
+ * Offerings, an offering's ODPS document, open needs and their bids, and the info document answer
+ * anyone, so a GET of those needs nothing. A person's contracts and their history, free-access
+ * grants, proposals, provider history, work and an offering's consumers are exchange:read; a
+ * free-access grant or its revoke is exchange:grant; every other write is exchange:write, except
+ * the operator's entitlement merge, which no app reaches.
+ */
+function exchangeNeeds(text: string, source: string): ScopeNeed[] {
+  const out: ScopeNeed[] = [];
+  const re = new RegExp(`${LIT}/v1/exchange/([a-z-]+)(?:/([a-z-]+))?`, 'g');
+  for (const m of text.matchAll(re)) {
+    const at = m.index ?? 0;
+    const after = text.slice(at, at + 200);
+    const before = text.slice(Math.max(0, at - 24), at);
+    // The rest of this one expression: a concatenated '/consumers' belongs to it, the next call does
+    // not. The method is read from the same statement only: in a Promise.all of reads, a POST two
+    // lines further down is another call's.
+    const expr = after.split(/[;\n]/)[0];
+    const statement = after.split(';')[0];
+    const method = /method\s*:\s*['"\x60](POST|PATCH|DELETE|PUT)['"\x60]/i.exec(statement)?.[1]?.toUpperCase()
+      ?? /\b(post|patch|put|del|delete)\w*\s*\(\s*['"\x60]?$/i.exec(before)?.[1]?.toUpperCase();
+    const [, head, sub] = m;
+    let word: string | null = null;
+    if (method) {
+      if (head === 'grants') word = 'exchange:grant';
+      else if (!(head === 'entitlements' && sub === 'merge')) word = 'exchange:write';
+    } else if (['entitlements', 'grants', 'proposals', 'work'].includes(head) || (head === 'provider' && sub === 'history')) {
+      word = 'exchange:read';
+    } else if (head === 'offerings' && /\/consumers\b/.test(expr)) {
+      word = 'exchange:read';
+    }
+    if (word) out.push({ word, evidence: excerpt(text, at, 40), source });
+  }
+  return out;
+}
 
 /** A `/v1/schedules` call: its word follows its HTTP method (routes/schedules.ts). */
 function scheduleNeeds(text: string, source: string): ScopeNeed[] {
@@ -194,6 +237,7 @@ export function scanScopeNeeds(sources: ReadonlyArray<{ source: string; text: st
       }
     }
     found.push(...scheduleNeeds(text, source));
+    found.push(...exchangeNeeds(text, source));
     found.push(...onDoneNeeds(text, source));
     for (const need of found) {
       // The rule is part of the key, so an on_done need is kept beside another call that needs the same word.

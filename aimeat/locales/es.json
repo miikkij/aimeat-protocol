@@ -6846,6 +6846,8 @@
   "accesspage.scope.task.write": "da tareas a tus agentes",
   "accesspage.scope.task.manage": "administra las tareas de tus agentes",
   "accesspage.scope.contract.spend": "compra en tu nombre con los contratos que tienes",
+  "accesspage.scope.exchange.read": "ve tus contratos y tu trabajo en el mercado",
+  "accesspage.scope.exchange.write": "hace y termina contratos en el mercado dentro de tu presupuesto, y publica lo que vendes",
   "accesspage.scope.exchange.grant": "reparte acceso gratuito a lo que vendes",
   "accesspage.scope.exchange.beneficiary": "comparte tus ganancias con otras cuentas",
   "accesspage.scope.wallet.read": "ve tu saldo y tus pagos",
