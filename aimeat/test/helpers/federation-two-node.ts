@@ -29,6 +29,8 @@
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
+ *   2026-10-23 — setupOperator registers through owner-login.ts setupOperator (a password and the
+ *     password sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — `modes.trust`: the fake peer answers POST /v1/federation/trust-advisory with 201, or
  *     403 when set to 'refuse', so a suite can see a peer refuse a trust notice (QA audit S6-06).
@@ -50,6 +52,7 @@ import { loadConfig } from '../../src/config.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
 import { ownNodeDb } from './own-node-db.js';
+import { setupOperator as registerOperator } from './owner-login.js';
 
 export type Json = (p: string, o?: RequestInit) => Promise<{ status: number; body: any }>;
 
@@ -138,17 +141,9 @@ export async function bootNode(
 
 /** Register the node's first owner through the admin setup door, which always grants operator. */
 export async function setupOperator(node: NodeState, ownerName: string): Promise<void> {
-    const reg = await node.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }),
-    });
-    if (reg.status !== 200 || reg.body.ok !== true) fail(`register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }),
-    });
-    if (tok.body.ok !== true) fail(`token ${ownerName}: ${JSON.stringify(tok.body)}`);
+    const op = await registerOperator(node.baseUrl, node.adminPw, ownerName);
     node.ownerName = ownerName;
-    node.ownerToken = tok.body.token;
+    node.ownerToken = op.token;
     node.ownerGhii = `${ownerName}@${node.nodeId}`;
 }
 

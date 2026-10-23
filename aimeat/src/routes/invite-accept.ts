@@ -24,6 +24,8 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-10-23 — An account made here passes whether the request came in on a loopback socket
+ *     (fromLoopback), for the setup code of a node without an operator (secaudit2026oct22).
  *   2026-10-22 — A signed-in accept joins and mints no session: only an account made here gets a token
  *     and a refresh cookie. The signed-in branch admits an owner-level PAT and an agent holding
  *     account:security, and it answered them with a fresh owner session carrying the account
@@ -60,6 +62,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { isLoopbackAddress } from '../auth/loopback-pass.js';
 import { optionalAuth, isOwnerPrincipal } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
@@ -251,6 +254,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       try {
         ({ owner } = await provisionOwner(storage, config, {
           via: 'invitation',
+          fromLoopback: isLoopbackAddress(req.socket.remoteAddress),
           username,
           displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
           passwordHash,

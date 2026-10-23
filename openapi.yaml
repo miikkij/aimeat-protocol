@@ -1742,7 +1742,7 @@ components:
           example: MCowBQYDK2VwAyEA...
         setupCode:
           type: string
-          description: The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it.
+          description: The one-time setup code from the start log. Needed only while the node has no operator, for the account that would become it; a request from loopback to a node whose base URL is loopback goes without it.
 
     AgentRegistration:
       type: object
@@ -3394,7 +3394,7 @@ components:
           example: jane@example.com
         setupCode:
           type: string
-          description: The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it.
+          description: The one-time setup code from the start log. Needed only while the node has no operator, for the account that would become it; a request from loopback to a node whose base URL is loopback goes without it.
         interests:
           type: array
           items:
@@ -30954,7 +30954,9 @@ paths:
       description: |
         Synchronise Ed25519 public keys between peered nodes. The peer must
         already exist in the federation registry, or have an approved peering request.
-        A key this node cannot check against an established one (an approval written by
+        Removing a peer (an emergency removal, the end of its de-peering grace, or a ban)
+        marks its approved requests `revoked`, so a removed node is refused here (403
+        FORBIDDEN) until an operator admits it again (Core FED-15). A key this node cannot check against an established one (an approval written by
         this node's own join carries none, and a peer may have none) is taken only when the
         card at the approved address (`/.well-known/aimeat`) publishes it for that node id;
         otherwise 403 KEY_NOT_PROVEN and nothing is admitted. Changing an established key
@@ -40624,9 +40626,11 @@ paths:
                           setupCodeRequired:
                             type: boolean
                             description: |
-                              True when the node still needs setup and its base URL is not a loopback
-                              address: POST /v1/setup/init then needs `setupCode`, the one-time code the
-                              node printed in its start log.
+                              True when the node still needs setup and this request would be asked for
+                              the code: always when the base URL is not a loopback address, and on a
+                              loopback node when the request did not come in on a loopback socket (from
+                              another machine, or from outside a container). POST /v1/setup/init then
+                              needs `setupCode`, the one-time code the node printed in its start log.
                           nodeId:
                             type: string
                             description: Current node identifier
@@ -40674,11 +40678,13 @@ paths:
         written to a new .env file and takes effect at the next start, or, when a .env file already
         exists, is not written at all. `settings` reports each one, and `message` says so.
 
-        On a node whose base URL is not a loopback address, the setup also needs `setupCode`: a
-        one-time code the node generates at start while it has no owner and prints in its start log,
-        on the line that starts with "Setup code". It is checked before anything else in the body,
-        used once, and kept in memory only as a hash. A restart issues a new code while the node still
-        has no owner. A node on a loopback address (local development) needs no code.
+        The setup also needs `setupCode`: a one-time code the node generates at start while it has
+        no operator and prints in its start log, on the line that starts with "Setup code". It is
+        checked before anything else in the body, used once, and kept in memory only as a hash. A
+        restart issues a new code while the node still has no operator. Only a request that comes in
+        on a loopback socket of a node whose base URL is a loopback address (local development) goes
+        without it; a node in Docker with the default http://localhost base URL asks a request from
+        outside the container for it.
       tags: [Setup]
       security: []
       requestBody:
@@ -71262,7 +71268,7 @@ paths:
                 locale: { type: string }
                 password: { type: string, description: 'Optional; min 8 chars plus upper/lower/digit and not a common password. A password failing any of those is refused with 400 WEAK_PASSWORD, whose message names the rule that failed.' }
                 email: { type: string, format: email, description: 'Optional; REQUIRED when the email gate is on. Recorded + a verification code sent.' }
-                setupCode: { type: string, description: 'The one-time setup code from the start log. Needed only while a node whose base URL is not loopback has no operator, for the account that would become it (GET /v1/setup/status says setupCodeRequired).' }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. Needed only while the node has no operator, for the account that would become it; a request from loopback to a node whose base URL is loopback goes without it (GET /v1/setup/status says setupCodeRequired).' }
       responses:
         '201':
           description: Identity created
@@ -71442,7 +71448,7 @@ paths:
                 totp_code: { type: string }
                 backup_code: { type: string }
                 request_owner_key: { type: boolean, description: Mint a fresh owner keypair (new device with no local key) }
-                setupCode: { type: string, description: 'The one-time setup code from the start log. On a node whose base URL is not loopback and that has no operator, an account signing in becomes the operator only with it; without it the sign-in goes on as a plain owner.' }
+                setupCode: { type: string, description: 'The one-time setup code from the start log. On a node that has no operator, an account signing in becomes the operator only with it (a request from loopback to a node whose base URL is loopback goes without it); without it the sign-in goes on as a plain owner.' }
       responses:
         '200':
           description: Authenticated
@@ -74367,17 +74373,20 @@ paths:
         410 `SETUP_CLOSED` before any write, and an operator adds another with
         `POST /v1/admin/roles/grant`. `AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR=true` keeps it
         open, for test nodes only.
+
+        `password` is required (400 without it): the new operator signs in with the name and this
+        password on `POST /v1/ghii/login`, because the account-key sign-in was removed in 4.0.0.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [name]
+              required: [name, password]
               properties:
                 name: { type: string }
                 display_name: { type: string }
-                password: { type: string }
+                password: { type: string, description: 'The password the new operator signs in with. Held to the password strength rule.' }
       responses:
         '200':
           description: Owner registered
@@ -74432,11 +74441,16 @@ paths:
     post:
       operationId: adminSetupToken
       tags: [Auth, Admin]
-      summary: Issue an owner JWT (setup wizard)
+      summary: Issue an owner JWT with the account key (removed in 4.0.0)
+      deprecated: true
       description: |
-        Admin-password-protected (session cookie/header or `X-Admin-Password`). Signs a challenge
-        with the supplied private key, verifies it against the owner's stored public key, and issues
-        an owner JWT. Rate limited.
+        Admin-password-protected (session cookie/header or `X-Admin-Password`). The account-key
+        sign-in of the setup wizard, under the same version gate as the owner branch of
+        `POST /v1/auth/token`: from 4.0.0 (OWNER_KEY_LOGIN_REMOVED_IN) it answers 410
+        `OWNER_KEY_LOGIN_OFF` after the admin password check, with `sign_in: POST /v1/ghii/login`.
+        Sign in with the password instead. Before 4.0.0 it signed a challenge with the supplied
+        private key, verified it against the owner's stored public key, and issued an owner JWT.
+        Rate limited.
       requestBody:
         required: true
         content:
@@ -74489,6 +74503,10 @@ paths:
                 properties:
                   ok: { type: boolean }
                   error: { type: string }
+        '410':
+          description: |
+            OWNER_KEY_LOGIN_OFF: the account-key sign-in was removed in 4.0.0. The answer names the
+            password sign-in (`sign_in: POST /v1/ghii/login`). No token is issued.
   /v1/admin/skill-bundles/{platform}/notify:
     post:
       operationId: notifyAdminSkillBundle

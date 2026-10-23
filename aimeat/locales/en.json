@@ -2163,6 +2163,7 @@
         "outcome_auto_approved": "approved automatically",
         "outcome_rejected": "refused",
         "outcome_pending": "waiting",
+        "outcome_revoked": "withdrawn when the peer was removed",
         "sentLabel": "You asked {n}",
         "sentWhy": "Waiting on them, not on you. There is nothing to approve here: they answer on their own page.",
         "sentAsked": "Asked {when}.",

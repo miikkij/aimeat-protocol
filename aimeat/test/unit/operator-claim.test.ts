@@ -7,6 +7,8 @@
  *   and rolesAtWrite drops a stale operator role unless the request took the code, reading with the
  *   claim form of operatorAccountState.
  * @version-history
+ *   2026-10-23 — The claim takes fromLoopback; a request from another machine on a loopback node is
+ *     asked for the code (secaudit2026oct22).
  *   2026-10-16 — Initial (Jouni, 2026-10-16: the no-operator self-heal needs the setup code too).
  */
 import { describe, it, expect } from 'vitest';
@@ -25,23 +27,29 @@ describe('claimOperatorSetupCode', () => {
     it('asks for the code on a public node that has owners but no operator', async () => {
         const config = publicConfig();
         setupCodeGateFor(config).issue();
-        await expect(claimOperatorSetupCode(stubStorage({ anyOwner: true, anyOperator: false }), config, ['owner', 'operator'], undefined))
+        await expect(claimOperatorSetupCode(stubStorage({ anyOwner: true, anyOperator: false }), config, ['owner', 'operator'], undefined, false))
             .rejects.toBeInstanceOf(SetupCodeRefusedError);
     });
     it('takes the right code once, and the claim says so', async () => {
         const config = publicConfig();
         const code = setupCodeGateFor(config).issue();
         const storage = stubStorage({ anyOwner: true, anyOperator: false });
-        const claim = await claimOperatorSetupCode(storage, config, ['owner', 'operator'], code);
+        const claim = await claimOperatorSetupCode(storage, config, ['owner', 'operator'], code, false);
         expect(claim.tookCode).toBe(true);
-        await expect(claimOperatorSetupCode(storage, config, ['owner', 'operator'], code)).rejects.toBeInstanceOf(SetupCodeRefusedError);
+        await expect(claimOperatorSetupCode(storage, config, ['owner', 'operator'], code, false)).rejects.toBeInstanceOf(SetupCodeRefusedError);
     });
-    it('asks nothing once an operator exists, for a role list without the operator, or on a loopback node', async () => {
+    it('asks nothing once an operator exists, for a role list without the operator, or from loopback on a loopback node', async () => {
         const config = publicConfig();
-        expect((await claimOperatorSetupCode(stubStorage({ anyOwner: true, anyOperator: true }), config, ['owner', 'operator'], undefined)).tookCode).toBe(false);
-        expect((await claimOperatorSetupCode(stubStorage({ anyOwner: true, anyOperator: false }), config, ['owner'], undefined)).tookCode).toBe(false);
+        expect((await claimOperatorSetupCode(stubStorage({ anyOwner: true, anyOperator: true }), config, ['owner', 'operator'], undefined, false)).tookCode).toBe(false);
+        expect((await claimOperatorSetupCode(stubStorage({ anyOwner: true, anyOperator: false }), config, ['owner'], undefined, false)).tookCode).toBe(false);
         const local = { baseUrl: 'http://localhost:40050' } as AimeatConfig;
-        expect((await claimOperatorSetupCode(stubStorage({ anyOwner: false, anyOperator: false }), local, ['owner', 'operator'], undefined)).tookCode).toBe(false);
+        expect((await claimOperatorSetupCode(stubStorage({ anyOwner: false, anyOperator: false }), local, ['owner', 'operator'], undefined, true)).tookCode).toBe(false);
+    });
+    it('asks a request from another machine on a loopback node (a node in Docker)', async () => {
+        const local = { baseUrl: 'http://localhost:40050' } as AimeatConfig;
+        setupCodeGateFor(local).issue();
+        await expect(claimOperatorSetupCode(stubStorage({ anyOwner: false, anyOperator: false }), local, ['owner', 'operator'], undefined, false))
+            .rejects.toBeInstanceOf(SetupCodeRefusedError);
     });
 });
 

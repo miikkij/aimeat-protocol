@@ -15,6 +15,8 @@
  *     the other reading their own. Measured with the key changed to a constant: owner B is served
  *     owner A's summary. NOT asserted: that a write leaves the other owner's ENTRY standing —
  *     invalidation is by domain tag, so any memory write drops every owner's usage entry.
+ *   v1.2.1 — 2026-10-23 — The admin-registered owners get a password and sign in with it; POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  */
 // Run: cd aimeat && pnpm exec tsx test/e2e-owner-usage.ts
 
@@ -23,6 +25,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
+import { ownerSignIn, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40261', 10);
 const BASE = process.env.E2E_BASE ?? `http://localhost:${TEST_PORT}`;
@@ -57,24 +60,21 @@ ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update
 
 const ownerName = `usageowner${Date.now()}`;
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? '';
-let ownerToken = '', ownerPrivKey = '', agentGaii = '';
+let ownerToken = '', agentGaii = '';
 
 console.log('\n=== Owner Usage E2E Tests ===\n');
 
 await test('Register owner', async () => {
     const { status, body } = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: ownerName }),
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    ownerPrivKey = body.private_key;
 });
 
 await test('Owner token', async () => {
-    const { body } = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ owner: ownerName, private_key: ownerPrivKey }),
-    });
+    const { body } = await ownerSignIn(BASE, ownerName);
     assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-    ownerToken = body.token;
+    ownerToken = body.data.token;
 });
 
 await test('Register an agent', async () => {
@@ -160,15 +160,7 @@ const otherName = `usageother${Date.now()}`;
 let otherToken = '';
 
 await test('A SECOND owner with a different amount of data', async () => {
-    const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: otherName }),
-    });
-    assert(reg.status === 200, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ owner: otherName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
-    otherToken = tok.body.token;
+    otherToken = (await setupOperator(BASE, ADMIN_PW, otherName)).token;
     // Deliberately a different count from owner A's, so the two summaries cannot be confused.
     for (const k of ['other.a', 'other.b', 'other.c', 'other.d', 'other.e']) {
         const { status } = await json('/v1/memory', {

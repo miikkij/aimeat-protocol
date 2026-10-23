@@ -25,7 +25,10 @@
  *     trusted package source (I18)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-set-grants
  * @version-history
- *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   v1.3.1 — 2026-10-23 — setupOwner and the repository's vendor use setupOperator, mintAgain the
+ *     password sign-in; the reserved-name refusal sends a password, so the name is what it refuses.
+ *     POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 — 2026-10-10 — Phase 7: a repository node, for secaudit 2026-10-10 I17 and I18.
  *   v1.2.0 — 2026-10-05 — Phase 3: an apply into an account that existed before leaves the operator
  *     trail (operator_acted) in its feed, and the first apply, which created it, leaves none
@@ -45,6 +48,7 @@ import { hostRequest } from './helpers/host-request.js';
 import { sign } from '../src/auth/keypair.js';
 import { installSetRepositories } from '../src/services/install-set-trust.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { ownerToken, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 let passed = 0;
 let failed = 0;
@@ -76,14 +80,8 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
-const ownerKeys = new Map<string, string>();
 async function setupOwner(name: string): Promise<string> {
-    const reg = await json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name }) });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    ownerKeys.set(name, reg.body.private_key);
-    const tok = await json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ owner: name, private_key: reg.body.private_key }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.token as string;
+    return (await setupOperator(BASE, adminPw, name)).token;
 }
 
 const mails: { to: string; method: string; args: unknown[] }[] = [];
@@ -443,11 +441,7 @@ const rJson = async (path: string, opts: RequestInit = {}) => {
     const res = await fetch(`${R_BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
     return { status: res.status, body: await res.json() as any };
 };
-const mintAgain = async (name: string): Promise<string> => {
-    const tok = await json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ owner: name, private_key: ownerKeys.get(name) }) });
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.token as string;
-};
+const mintAgain = (name: string): Promise<string> => ownerToken(BASE, name);
 const peersOfN = async () => ((await json('/v1/federation/peers', { headers: auth(opsToken) })).body.data?.peers ?? []) as any[];
 const rPublicKey = async () => (await rJson('/.well-known/aimeat')).body.data.public_key as string;
 const pullFromR = (token: string, group: string) => json('/v1/federation/packages/pull', { method: 'POST', headers: auth(token), body: JSON.stringify({ group_id: group, node_id: R_ID }) });
@@ -466,10 +460,7 @@ await test('Boot a repository node R that serves a public app package and a publ
     });
     const made = await createServer(rConfig);
     rServer = await new Promise<Server>((resolve) => { const s = made.app.listen(R_PORT, '127.0.0.1', () => resolve(s)); });
-    const reg = await rJson('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': rAdminPw }, body: JSON.stringify({ name: `rvendor${ts}` }) });
-    assert(reg.status === 200, `register on R: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await rJson('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': rAdminPw }, body: JSON.stringify({ owner: `rvendor${ts}`, private_key: reg.body.private_key }) });
-    rVendor = tok.body.token;
+    rVendor = (await setupOperator(R_BASE, rAdminPw, `rvendor${ts}`)).token;
     opsToken = await mintAgain(`ops${ts}`);
     const shop = await rJson('/v1/packages', { method: 'POST', headers: auth(rVendor),
         body: JSON.stringify({ name: `rshop${ts}`, description: 'A shop app', category: 'utility', visibility: 'public',
@@ -503,7 +494,7 @@ await test('I17: a real apply refused as NOT_A_BUNDLE links no repository and pu
 });
 
 await test('I18: an owner named "startup" cannot register', async () => {
-    const reg = await json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: 'startup' }) });
+    const reg = await json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: 'startup', password: OWNER_PASSWORD }) });
     assert(reg.status === 400 && /reserved/.test(JSON.stringify(reg.body)), `expected 400 reserved: ${reg.status} ${JSON.stringify(reg.body)}`);
 });
 

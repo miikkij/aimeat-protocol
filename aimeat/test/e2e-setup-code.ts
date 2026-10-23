@@ -21,13 +21,17 @@
  *   whose first owner was written without the operator role (as a directory sync makes one): the
  *   start log still carries a code, that owner signs in as a plain owner without it, a registration
  *   that would self-heal to operator is refused without the code and is the operator with it, and a
- *   later one is a plain owner. On a node with a loopback base URL: no code in the log, and the first
- *   registration works without one.
+ *   later one is a plain owner. On a node with a loopback base URL: the log carries a code and says it
+ *   is for other machines; a request from this machine's own network address is asked for it and its
+ *   first account and setup are refused without it; and the first registration from loopback works
+ *   without one.
  *
  *   It runs its own four nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
  *   (public, setup), 40535 (public, registration), 40536 (public, no operator) and 40534 (loopback).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
+ *   2026-10-23 — The loopback node prints a code, and a request from this machine's network address is
+ *     asked for it (secaudit2026oct22; Jouni, 2026-10-23).
  *   2026-10-16 — The password carries a fixed digit: a letters-only STAMP failed the password rule.
  *   2026-10-16 — A node on 40536 with an owner but no operator: the code is printed, sign-in and
  *     registration self-heal need it (Jouni, 2026-10-16).
@@ -38,6 +42,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -284,10 +289,31 @@ try {
     loop = await startNode(LOOPBACK_PORT, `http://127.0.0.1:${LOOPBACK_PORT}`, { AIMEAT_LOG_LEVEL: 'warn' });
     const local = loop;
 
-    await test('a loopback node prints no code and its status does not ask for one', async () => {
-        assert(!local.log.includes('Setup code:'), 'a loopback node printed a setup code');
+    const lcode = /Setup code: ([0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{4})/.exec(local.log)?.[1] ?? '';
+
+    await test('a loopback node prints a code for other machines, and its status does not ask this machine for one', async () => {
+        assert(lcode, `no "Setup code:" line in the start log:\n${local.log.split(/\r?\n/).slice(-20).join('\n')}`);
+        assert(local.log.includes('asked only from another machine'), 'the start log does not say the code is for other machines');
         const s = await json(local, '/v1/setup/status');
         assert(s.body.data.needsSetup === true && s.body.data.setupCodeRequired === false, `status: ${short(s.body.data)}`);
+    });
+
+    // secaudit2026oct22: a node in Docker keeps the default http://localhost base URL while compose
+    // publishes its port on every address of the host, and the base URL alone waived the code, so the
+    // first visitor from anywhere became the operator. The request below comes in on this machine's
+    // own network address, which is not loopback, as a request from another machine or from outside a
+    // container does.
+    const lan = Object.values(networkInterfaces()).flat().find(a => a && a.family === 'IPv4' && !a.internal)?.address;
+    const fromLan: OwnNode = { ...local, base: `http://${lan}:${LOOPBACK_PORT}` };
+
+    await test('from another address the loopback node asks for the code, and refuses the first account without it', async () => {
+        assert(lan, 'this machine has no IPv4 address other than loopback, so the request from another address cannot be made');
+        const s = await json(fromLan, '/v1/setup/status');
+        assert(s.body.data.setupCodeRequired === true, `status from ${lan}: ${short(s.body.data)}`);
+        const r = await json(fromLan, '/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `lanowner${STAMP}`, display_name: 'LAN Owner', password: PASSWORD }) });
+        assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_REQUIRED', `the first account from ${lan} without the code: ${r.status} ${short(r.body)}`);
+        const i = await init(fromLan, `laninit${STAMP}`);
+        assert(i.status === 403 && i.body.error?.code === 'SETUP_CODE_REQUIRED', `the setup from ${lan} without the code: ${i.status} ${short(i.body)}`);
     });
 
     await test('a loopback node registers its first account without a code, as the operator', async () => {

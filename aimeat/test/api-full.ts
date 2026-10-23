@@ -5,6 +5,8 @@
  *   broad happy-path sweep across the core API surface.
  * @usage cd aimeat && pnpm exec tsx test/api-full.ts
  * @version-history
+ *   v1.3.2 — 2026-10-23 — The admin-registered owner gets a password and signs in with it; POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.3.1 — 2026-10-15 — GET /v1/permissions/check refuses a repeated accessor parameter.
  *   v1.3.0 — 2026-10-12 — The 4.0.0 forms: actions carry pricing.toll_morsels, each introduction
  *     carries the audience proof `aimeat federation join` sends, and the maintenance test switches
@@ -23,7 +25,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { registerOwner, ownerSignIn, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 import { removedOn } from './helpers/node-release.js';
@@ -338,7 +340,7 @@ await test('POST /v1/owners — register owner', async () => {
         const { status, body } = await json('/v1/admin/setup/register', {
             method: 'POST',
             headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ name: ownerName }),
+            body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
         });
         assert(status === 200, `admin register status ${status}: ${JSON.stringify(body)}`);
         assert(body.ok === true, 'ok');
@@ -356,20 +358,11 @@ await test('POST /v1/owners — register owner', async () => {
 });
 
 await test('Owner auth — sign + token', async () => {
-    if (ADMIN_PW && isOperator) {
-        // Use admin setup token endpoint for admin-registered owners
-        const { body } = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: ownerName, private_key: ownerPrivKey }),
-        });
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        ownerToken = body.token;
-    } else {
-        const { body } = await ownerSignIn(BASE, ownerName);
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        ownerToken = body.data?.token;
-    }
+    // An operator from the admin setup route signs in with its password like any owner: the
+    // setup route's account-key sign-in answers 410 from 4.0.0 (secaudit2026oct22).
+    const { body } = await ownerSignIn(BASE, ownerName);
+    assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
+    ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');
 });
 
@@ -2565,20 +2558,9 @@ await test('Re-register an owner for the config tests (the previous one was just
     configOwnerName = `cfgowner${Date.now()}`;
     let privKey = '';
     if (ADMIN_PW && isOperator) {
-        const { status, body } = await json('/v1/admin/setup/register', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ name: configOwnerName }),
-        });
-        assert(status === 200, `admin re-register ${status}: ${JSON.stringify(body)}`);
-        privKey = body.private_key;
-        const tk = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: configOwnerName, private_key: privKey }),
-        });
-        assert(tk.body.ok === true, `admin re-token: ${JSON.stringify(tk.body.error)}`);
-        ownerToken = tk.body.token;
+        const op = await setupOperator(BASE, ADMIN_PW, configOwnerName);
+        privKey = op.privateKey;
+        ownerToken = op.token;
     } else {
         const owner = await registerOwner(BASE, configOwnerName);
         privKey = owner.privateKey;

@@ -11,6 +11,8 @@
  *   test/helpers/own-node-db.ts; in-process — same pattern as the federation-* suites, so the test
  *   shares the server's PresenceTracker instance).
  * @version-history
+ *   v1.2.2 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.2.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.2.0 -- 2026-10-12 -- pushPresence adds the audience proof (audienceProof) to every push. Node
@@ -37,6 +39,7 @@ import { presence, presenceSignString, type PresenceUpdate } from '../src/servic
 import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -83,15 +86,8 @@ async function bootNode(): Promise<Server> {
 }
 
 async function setupOwner(name: string): Promise<{ ghii: string; token: string }> {
-  const reg = await json('/v1/admin/setup/register', {
-    method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name }),
-  });
-  assert(reg.status === 200 && reg.body.ok === true, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const tok = await json('/v1/admin/setup/token', {
-    method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ owner: name, private_key: reg.body.private_key }),
-  });
-  assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-  return { ghii: `${name}@${NODE_ID}`, token: tok.body.token };
+  const op = await setupOperator(BASE, adminPw, name);
+  return { ghii: `${name}@${NODE_ID}`, token: op.token };
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

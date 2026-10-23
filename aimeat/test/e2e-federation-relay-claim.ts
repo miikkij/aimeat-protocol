@@ -18,6 +18,8 @@
  *
  *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
+ *   v1.5.2 -- 2026-10-23 -- The operator comes from setupOperator (a password and the password
+ *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.5.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite on both runs (QA audit P1-02).
  *   v1.5.0 -- 2026-10-12 -- Node 4.0.0 removes the relay-claim setting `optional`
@@ -50,6 +52,7 @@ import { RELAY_CLAIM_OPTIONAL_REMOVED_IN } from '../src/config-federation.js';
 import { removedOn } from './helpers/node-release.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -134,16 +137,7 @@ await test('Setup: a receiving node, an owner, and two peers — one permitted t
     const { app } = await createServer(config);
     server = await new Promise<Server>(resolve => { const s = app.listen(PORT, '127.0.0.1', () => resolve(s)); });
 
-    const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: 'relayowner' }),
-    });
-    assert(reg.status === 200 && reg.body.ok, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': adminPw },
-        body: JSON.stringify({ owner: 'relayowner', private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok, `token: ${JSON.stringify(tok.body)}`);
-    ownerToken = tok.body.token;
+    ownerToken = (await setupOperator(BASE, adminPw, 'relayowner')).token;
 
     okKeys = await generateKeyPair();
     demotedKeys = await generateKeyPair();

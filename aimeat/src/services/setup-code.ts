@@ -2,7 +2,7 @@
  * @file src/services/setup-code.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The one-time setup code that POST /v1/setup/init asks for on a node others can reach.
+ * @description The one-time setup code that POST /v1/setup/init asks for from a request others could make.
  *
  *   WHY. Until 2026-10-16 the first-owner setup was open to any address while the node had no owner,
  *   so on a fresh node with a public address whoever arrived first became its operator. Decision
@@ -11,9 +11,14 @@
  *   and the setup refuses without it. A loopback node (local development, the E2E runner, `pnpm
  *   sandbox`) needs no code. The operator runs no script.
  *
- *   WHICH NODES. The test is the loopback check the test-money warning uses (utils/test-money-guard.ts
- *   isLoopbackBaseUrl), not the security profile: a node on a private LAN address is on the local
- *   profile and still reachable by other people.
+ *   WHICH REQUESTS. A request goes without the code only when BOTH the base URL is loopback (the check
+ *   the test-money warning uses, utils/test-money-guard.ts isLoopbackBaseUrl, not the security profile:
+ *   a node on a private LAN address is on the local profile and still reachable by other people) AND
+ *   the request came in on a loopback socket. Until 2026-10-23 the base URL alone decided, so a node in
+ *   Docker, which keeps the default http://localhost base URL while compose publishes its port on every
+ *   address of the host, let whoever arrived first become its operator (secaudit2026oct22; Jouni,
+ *   2026-10-23). The code is therefore issued at start on every node that has no operator, and a
+ *   loopback node's start log says it is needed only from another machine.
  *
  *   HOW IT IS HELD. Only the SHA-256 digest of the code stays in memory, in one SetupCodeGate per
  *   config object (a process can serve more than one node), and a code is compared digest to digest
@@ -32,12 +37,15 @@
  *   POST /v1/ghii, POST /v1/ghii/register-web, POST /v1/owners, provisionOwner (an identity
  *   provider's first sign-in, an invitation) and the sign-in self-heal (routes/ghii/owner-session.ts).
  *   Once the node has an operator none of them asks for the code.
- * @structure setupCodeRequired(config) · SetupCodeGate · setupCodeGateFor(config) · setupCodeRefusal(config, input) ·
- *   SETUP_CODE_USED_MESSAGE · normalizeSetupCode(input)
+ * @structure setupCodeRequired(config, fromLoopback) · SetupCodeGate · setupCodeGateFor(config) ·
+ *   setupCodeRefusal(config, input, fromLoopback) · SETUP_CODE_USED_MESSAGE · normalizeSetupCode(input)
  * @usage
- *   if (setupCodeRequired(config) && !hasOperator) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
- *   const gate = setupCodeGateFor(config); if (!gate.matches(body.setupCode)) refuse();
+ *   if (!hasOperator) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
+ *   const refusal = setupCodeRefusal(config, body.setupCode, isLoopbackAddress(req.socket.remoteAddress));
  * @version-history
+ *   v1.3.0 -- 2026-10-23 -- setupCodeRequired and setupCodeRefusal take `fromLoopback`, the request's
+ *     socket address: a loopback base URL waives the code only for a request from loopback
+ *     (secaudit2026oct22; Jouni, 2026-10-23).
  *   v1.2.1 -- 2026-10-19 -- Each character of the code is drawn with crypto.randomInt instead of a random byte modulo the alphabet (CodeQL 1749).
  *   v1.2.0 — 2026-10-16 — The code is needed while the node has no operator, not only no owner; the
  *     refusals say "operator" (Jouni, 2026-10-16).
@@ -53,9 +61,17 @@ import { isLoopbackBaseUrl } from '../utils/test-money-guard.js';
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const CODE_LENGTH = 12;
 
-/** Whether the first-owner setup asks for the one-time code: on any node whose base URL is not loopback. */
-export function setupCodeRequired(config: Pick<AimeatConfig, 'baseUrl'>): boolean {
-  return !isLoopbackBaseUrl(config.baseUrl);
+/**
+ * Whether the first-owner setup asks this request for the one-time code. Only a request that came in
+ * on a loopback socket of a node whose base URL is loopback goes without it. `fromLoopback` is the
+ * route's reading of the request's SOCKET address (isLoopbackAddress(req.socket.remoteAddress)),
+ * never req.ip, which a forwarded-for header sets. A node in Docker keeps the default base URL
+ * http://localhost:40050 while its port is published on every address of the host, and a request
+ * from outside the container arrives from the container network, so it is asked for the code
+ * (secaudit2026oct22; Jouni, 2026-10-23).
+ */
+export function setupCodeRequired(config: Pick<AimeatConfig, 'baseUrl'>, fromLoopback: boolean): boolean {
+  return !(fromLoopback && isLoopbackBaseUrl(config.baseUrl));
 }
 
 /**
@@ -136,8 +152,8 @@ export const SETUP_CODE_USED_MESSAGE = 'The setup code was used a moment ago by 
  * Asks nothing of the store: the caller has already established that the node has no owner. Does
  * not use the code; take() does that just before the owner is created.
  */
-export function setupCodeRefusal(config: Pick<AimeatConfig, 'baseUrl'> & object, input: unknown): { code: 'SETUP_CODE_REQUIRED' | 'SETUP_CODE_INVALID'; message: string } | null {
-  if (!setupCodeRequired(config)) return null;
+export function setupCodeRefusal(config: Pick<AimeatConfig, 'baseUrl'> & object, input: unknown, fromLoopback: boolean): { code: 'SETUP_CODE_REQUIRED' | 'SETUP_CODE_INVALID'; message: string } | null {
+  if (!setupCodeRequired(config, fromLoopback)) return null;
   const gate = setupCodeGateFor(config);
   if (!gate.pending) {
     return { code: 'SETUP_CODE_REQUIRED', message: 'This node needs a one-time setup code to make its first operator, and none is waiting. Restart the node, then use the code its start log prints.' };

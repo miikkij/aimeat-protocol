@@ -15,7 +15,9 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capability-webhook-update
  * @version-history
- *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   v1.0.3 — 2026-10-23 — newOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.2 — 2026-10-08 — The allowlist node listens on 31100 + lane % 100 (suitePort).
  *   v1.0.1 — 2026-10-02 —The allowlist node listens on a port the operating system picks
  *     (helpers/free-port.ts); 41104 was held by a database connection on two Postgres sweeps.
@@ -29,6 +31,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { suitePort } from './helpers/free-port.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!';
@@ -66,16 +69,8 @@ async function json(path: string, opts: RequestInit = {}, base = BASE) {
 /** Register an owner through the admin door and come back with a token. */
 async function newOwner(prefix: string, base: string): Promise<{ name: string; token: string }> {
     const name = prefix + Math.random().toString(36).slice(2, 8);
-    const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name }),
-    }, base);
-    assert(reg.body.ok === true, `register ${name}: ${JSON.stringify(reg.body)}`);
-    const tok = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ owner: name, private_key: reg.body.private_key }),
-    }, base);
-    assert(tok.body.ok === true, `token ${name}: ${JSON.stringify(tok.body.error)}`);
-    return { name, token: tok.body.token };
+    const op = await setupOperator(base, ADMIN_PW, name);
+    return { name, token: op.token };
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

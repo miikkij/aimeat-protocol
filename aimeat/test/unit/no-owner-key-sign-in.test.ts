@@ -19,6 +19,8 @@
  *   owner-key sign-in. ALLOWED names the files whose subject is that sign-in itself.
  * @usage cd aimeat && pnpm exec vitest run test/unit/no-owner-key-sign-in.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-23 — A call to POST /v1/admin/setup/token is the owner-key sign-in too: it answers 410
+ *     from 4.0.0 (secaudit2026oct22). A suite gets an operator with setupOperator (helpers/owner-login.ts).
  *   v1.0.1 — 2026-10-13 — test/e2e-agent-ties.ts leaves ALLOWED: its owner signs in with the password now.
  *   v1.0.0 — 2026-10-12 — Initial (wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po).
  */
@@ -43,6 +45,10 @@ const ALLOWED: Record<string, string> = {
         'One test proves a deactivated account gets no session through the owner-key sign-in: 403 ACCOUNT_DISABLED while it is on, 410 OWNER_KEY_LOGIN_OFF once it is gone. Its owners sign in with the password.',
     'aimeat/test/unit/no-owner-key-sign-in.test.ts':
         'This guard: its own patterns and examples name the sign-in it looks for.',
+    'aimeat/test/e2e-admin-setup-closed.ts':
+        'Proves POST /v1/admin/setup/token answers 410 OWNER_KEY_LOGIN_OFF from 4.0.0 and names the password sign-in. Its operators sign in with the password.',
+    'aimeat/test/e2e-admin-doors-2.ts':
+        'Proves POST /v1/admin/setup/token still checks the admin password first, then answers 410 OWNER_KEY_LOGIN_OFF. Its operators sign in with the password.',
 };
 
 const SKIP_DIRS = new Set(['node_modules', 'fixtures', '.pytest_cache', '__pycache__']);
@@ -78,9 +84,17 @@ function codeOf(src: string): string {
     return src.split('\n').filter(line => !COMMENT_LINE.test(line)).join('\n');
 }
 
+/**
+ * A call to POST /v1/admin/setup/token, the admin setup page's account-key sign-in, which answers 410
+ * from 4.0.0 like the owner branch of /v1/auth/token (secaudit2026oct22): the path as the first
+ * argument of a call (`json('/v1/admin/setup/token'`, `fetch(\`${BASE}/v1/admin/setup/token\``).
+ */
+const SETUP_TOKEN_CALL = /\(\s*[`'"][^`'"\n]*\/v1\/admin\/setup\/token[`'"]/;
+
 /** Whether a file's code signs an owner in with the account key. */
 export function signsOwnerInWithKey(src: string): boolean {
     const code = codeOf(src);
+    if (SETUP_TOKEN_CALL.test(code)) return true;
     if (!code.includes('auth/token')) return false;
     if (OWNER_BODY.some(re => re.test(code))) return true;
     return [...code.matchAll(OWNER_MESSAGE)].some(m => !/gaii|agent/i.test(m[1]));
@@ -95,6 +109,8 @@ describe('no file signs an owner in with the account key (removed in node 4.0.0)
             `key = "gaii" if is_agent else "owner"\nrequests.post(f"{base}/v1/auth/token", json={key: ident})`,
             `const payload = isAgent ? { gaii: id, timestamp, signature } : { owner: id, timestamp, signature };\nawait json('/v1/auth/token', payload);`,
             `requests.post(f"{base}/v1/auth/token", json={"owner": name, "timestamp": ts, "signature": sig})`,
+            `const tok = await node.json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': pw }, body });`,
+            'const r = await fetch(`${BASE}/v1/admin/setup/token`, { method: \'POST\' });',
         ];
         for (const shape of ownerShapes) expect(signsOwnerInWithKey(shape), shape).toBe(true);
         const agentShapes = [
@@ -102,6 +118,8 @@ describe('no file signs an owner in with the account key (removed in node 4.0.0)
             `// an owner used to sign in here: { owner: name, timestamp: ts } to /v1/auth/token\nawait ownerToken(BASE, name);`,
             `await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: name, password }) });`,
             `const sig = await signMsg(priv, gaii + NODE_ID + ts); // the agent's MCP authorize\nawait json('/v1/auth/token', { body: JSON.stringify({ gaii, timestamp: ts, signature }) });`,
+            `const ROUTES = ['POST /v1/admin/setup/auth', 'POST /v1/admin/setup/token'];`,
+            `const op = await setupOperator(BASE, ADMIN_PW, name);`,
         ];
         for (const shape of agentShapes) expect(signsOwnerInWithKey(shape), shape).toBe(false);
     });

@@ -1106,6 +1106,7 @@
         "outcome_auto_approved": "aprobada automáticamente",
         "outcome_rejected": "rechazada",
         "outcome_pending": "esperando",
+        "outcome_revoked": "retirada al eliminar el par",
         "sentLabel": "Pediste {n}",
         "sentWhy": "Espera por ellos, no por ti. Aquí no hay nada que aprobar: responden en su propia página.",
         "sentAsked": "Pedido {when}.",

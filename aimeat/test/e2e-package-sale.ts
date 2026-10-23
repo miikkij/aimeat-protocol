@@ -28,7 +28,9 @@
  *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
- *   2026-10-18 — Phase 8: three sales and decisions fired at the same moment, each failing on the code
+ *   2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-18 —Phase 8: three sales and decisions fired at the same moment, each failing on the code
  *     before the holder and request records were written on their version (wish-rahapolkujen-kilpatilanteet).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-16 — Phase 7: the refused-sale assertion matched only the word "refunded", which the old
@@ -51,7 +53,7 @@ import type { PeerInfo } from '../src/services/federation.js';
 import { runAutoRenewals } from '../src/services/packages/sale/package-renewals.js';
 import { runAsNode } from '../src/utils/gaii.js';
 import { cleanupPackagePeers } from '../src/services/packages/peer/package-peer-limits.js';
-import { ownerSignIn } from './helpers/owner-login.js';
+import { ownerSignIn, setupOperator } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
 let passed = 0;
@@ -97,16 +99,7 @@ async function bootNode(port: number, nodeId: string, repository: boolean, extra
 
 /** An account through the admin setup door, and a token for it. The first one on a node is its operator. */
 async function setupOwner(node: NodeState, ownerName: string): Promise<string> {
-    const reg = await node.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.token as string;
+    return (await setupOperator(node.baseUrl, node.adminPw, ownerName)).token;
 }
 
 /** A person who signs up on the node: an owner, never an operator (the admin setup route makes operators). */

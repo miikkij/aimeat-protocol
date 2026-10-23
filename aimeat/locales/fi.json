@@ -2163,6 +2163,7 @@
         "outcome_auto_approved": "hyväksytty automaattisesti",
         "outcome_rejected": "kieltäydytty",
         "outcome_pending": "odottaa",
+        "outcome_revoked": "peruttu, kun vertainen poistettiin",
         "sentLabel": "Pyysit {n}",
         "sentWhy": "Odottaa heitä, ei sinua. Täällä ei ole mitään hyväksyttävää: he vastaavat omalla sivullaan.",
         "sentAsked": "Pyydetty {when}.",

@@ -9,7 +9,9 @@
  *   Node B: port 40271, aimeat-node-001-msgb
  *
  * @version-history
- *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   2026-10-23 -- setupOwner uses setupOperator and mintOwnerToken the password sign-in; POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 -- 2026-06-16 -- Initial cross-node direct messaging tests (layer 3: federation delivery).
  *   v1.1.0 -- 2026-06-23 -- Phase 5: cross-node interactive message (federated AskUserQuestion) — the
  *     question spec rides the signed wire payload and the structured answer round-trips back.
@@ -23,7 +25,7 @@ import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { registerOwner } from './helpers/owner-login.js';
+import { registerOwner, ownerToken, setupOperator } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -115,26 +117,17 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     return node;
 }
 
-/** The bootstrap token door: the admin password plus possession of the owner's private key. */
+/** A fresh session token for the node's operator: the password sign-in. */
 async function mintOwnerToken(node: NodeState): Promise<void> {
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST',
-        headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: node.ownerName, private_key: node.ownerPrivateKey }),
-    });
-    assert(tok.body.ok === true, `token on ${node.nodeId}: ${JSON.stringify(tok.body.error)}`);
-    node.ownerToken = tok.body.token;
+    node.ownerToken = await ownerToken(node.baseUrl, node.ownerName);
 }
 
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
-    const reg = await node.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `register owner on ${node.nodeId}: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const op = await setupOperator(node.baseUrl, node.adminPw, ownerName);
     node.ownerName = ownerName;
     node.ownerGhii = `${ownerName}@${node.nodeId}`;
-    node.ownerPrivateKey = reg.body.private_key;
-    await mintOwnerToken(node);
+    node.ownerPrivateKey = op.privateKey;
+    node.ownerToken = op.token;
 }
 
 /** The far node's published verification key, read the way any stranger would read it. */

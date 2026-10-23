@@ -6,6 +6,9 @@
  *   (Login + Register tabs) served by the admin setup routes. Extracted from
  *   src/routes/admin.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-10-23 — The account-key sign-in form is gone (removed from the node in 4.0.0); the
+ *     Register tab asks for a password and signs the new operator in with it on /v1/ghii/login
+ *     (secaudit2026oct22; Jouni, 2026-10-23).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/admin.ts (max-file-lines)
  */
 
@@ -132,21 +135,6 @@ a:hover{text-decoration:underline}
     <label>Password</label>
     <input type="password" id="loginPass" placeholder="Your password" autocomplete="current-password"/>
     <button class="btn-primary" id="btnPwLogin">Login</button>
-    <p class="toggle-link">
-      <a href="#" id="toggleToKeyLogin">Advanced: Login with private key</a>
-    </p>
-  </div>
-  <!-- Key Login (advanced, for developers/agents) -->
-  <div id="loginKeyMode" class="hidden">
-    <p class="desc">Sign in with your owner name and private key.</p>
-    <label>Owner Name</label>
-    <input type="text" id="loginOwner" placeholder="e.g. myname" autocomplete="off"/>
-    <label>Private Key</label>
-    <textarea id="loginKey" placeholder="Paste your private key here" rows="3"></textarea>
-    <button class="btn-primary" id="btnLogin">Login</button>
-    <p class="toggle-link">
-      <a href="#" id="toggleToPwLogin">Back to password login</a>
-    </p>
   </div>
   <div id="loginResult" class="hidden"></div>
   <div id="loginSuccess" class="hidden">
@@ -171,9 +159,9 @@ a:hover{text-decoration:underline}
   <input type="text" id="regOwner" placeholder="e.g. myname" autocomplete="off"/>
   <label>Display Name (optional)</label>
   <input type="text" id="regDisplay" placeholder="e.g. Node Operator"/>
-  <label>Password <span class="label-tag">(recommended)</span></label>
+  <label>Password</label>
   <input type="password" id="regPassword" placeholder="Set a login password" autocomplete="new-password"/>
-  <p class="pw-hint">With a password you can login from any device without keys.</p>
+  <p class="pw-hint">You sign in with your username and this password.</p>
   <button class="btn-primary" id="btnRegister">Create Account</button>
   <div id="regResult" class="hidden"></div>
   <div id="regKeys" class="hidden">
@@ -203,19 +191,13 @@ a:hover{text-decoration:underline}
 
 </div>
 <script>
-let regOwner='',regKey='';
+let regOwner='',regPass='';
 
 function switchTab(name){
   document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active')});
   document.querySelectorAll('.tab-panel').forEach(function(p){p.classList.remove('active')});
   document.querySelector('.tab[data-tab="'+name+'"]').classList.add('active');
   document.getElementById('panel-'+name).classList.add('active');
-}
-
-function toggleLoginMode(e){
-  e.preventDefault();
-  document.getElementById('loginPasswordMode').classList.toggle('hidden');
-  document.getElementById('loginKeyMode').classList.toggle('hidden');
 }
 
 async function api(method,path,body){
@@ -266,38 +248,18 @@ async function doPasswordLogin(){
   }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnPwLogin').disabled=false;document.getElementById('btnPwLogin').textContent='Login';}
 }
 
-/* ── KEY LOGIN ── */
-async function doLogin(){
-  const owner=document.getElementById('loginOwner').value.trim();
-  const key=document.getElementById('loginKey').value.trim();
-  if(!owner||!key){show('loginResult','Owner name and private key are required','result-err');return;}
-  document.getElementById('btnLogin').disabled=true;
-  document.getElementById('btnLogin').textContent='Signing in...';
-  document.getElementById('loginSuccess').classList.add('hidden');
-  try{
-    const r=await api('POST','/v1/admin/setup/token',{owner:owner,private_key:key});
-    if(!r.ok){show('loginResult',esc((r.error&&r.error.message)||r.error||'Login failed'),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';return;}
-    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load
-    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:owner,jwt:r.token,publicKey:''}));}catch(e){}
-    showLoginSuccess(r.token,r.roles,r.dashboard_url);
-    document.getElementById('btnLogin').textContent='Login';
-    document.getElementById('btnLogin').disabled=false;
-  }catch(e){show('loginResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnLogin').disabled=false;document.getElementById('btnLogin').textContent='Login';}
-}
-
 /* ── REGISTER ── */
 async function doRegister(){
   const name=document.getElementById('regOwner').value.trim();
   const dname=document.getElementById('regDisplay').value.trim();
   const password=document.getElementById('regPassword').value;
-  if(!name){show('regResult','Owner name is required','result-err');return;}
+  if(!name||!password){show('regResult','Owner name and password are required','result-err');return;}
   document.getElementById('btnRegister').disabled=true;
   try{
-    const body={name:name,display_name:dname||undefined};
-    if(password&&password.length>=4)body.password=password;
+    const body={name:name,display_name:dname||undefined,password:password};
     const r=await api('POST','/v1/admin/setup/register',body);
     if(!r.ok){show('regResult',esc((r.error&&r.error.message)||r.error||'Registration failed'),'result-err');document.getElementById('btnRegister').disabled=false;return;}
-    regOwner=r.owner.name;regKey=r.private_key;
+    regOwner=r.owner.name;regPass=password;
     var roles=r.owner.roles.join(', ');
     var msg='<strong>Account created!</strong> Roles: '+roles;
     if(r.has_password)msg+='<br/><span class="label-tag">Password login enabled — you can login with your username and password.</span>';
@@ -309,18 +271,20 @@ async function doRegister(){
 }
 
 async function doRegToken(){
-  if(!regOwner||!regKey){show('regTokenResult','Register first','result-err');return;}
+  if(!regOwner||!regPass){show('regTokenResult','Register first','result-err');return;}
   document.getElementById('btnRegToken').disabled=true;
   document.getElementById('btnRegToken').textContent='Signing in...';
   try{
-    const r=await api('POST','/v1/admin/setup/token',{owner:regOwner,private_key:regKey});
-    if(!r.ok){show('regTokenResult',esc((r.error&&r.error.message)||r.error||'Token request failed'),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';return;}
-    // Store session in localStorage so aimeat-auth.js picks it up on dashboard load
-    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:regOwner,jwt:r.token,publicKey:''}));}catch(e){}
+    // The password sign-in, as on the Login tab: the account-key sign-in was removed in 4.0.0.
+    const r=await apiNoAdmin('POST','/v1/ghii/login',{username:regOwner,password:regPass});
+    if(r.error_code||!r.data){show('regTokenResult',esc((r.error&&r.error.message)||r.error||'Sign-in failed'),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';return;}
+    var d=r.data;
+    try{localStorage.setItem('aimeat_session',JSON.stringify({owner:d.owner.name,gaii:d.agent.gaii,ghii:d.ghii.ghii,jwt:d.token}));}catch(e){}
+    regPass='';
     document.getElementById('regTokenResult').classList.add('hidden');
-    document.getElementById('regRoles').textContent='Roles: '+r.roles.join(', ');
-    document.getElementById('regDashLink').href=r.dashboard_url;
-    document.getElementById('regJwtBox').textContent=r.token;
+    document.getElementById('regRoles').textContent='Roles: '+((d.owner&&d.owner.roles)||['owner','operator']).join(', ');
+    document.getElementById('regDashLink').href='/v1/admin';
+    document.getElementById('regJwtBox').textContent=d.token;
     document.getElementById('regSuccess').classList.remove('hidden');
     document.getElementById('btnRegToken').classList.add('hidden');
   }catch(e){show('regTokenResult','Network error: '+esc(e.message),'result-err');document.getElementById('btnRegToken').disabled=false;document.getElementById('btnRegToken').textContent='Login & Open Dashboard';}
@@ -328,10 +292,7 @@ async function doRegToken(){
 
 /* ── Bind event listeners ── */
 document.querySelectorAll('.tab[data-tab]').forEach(function(t){t.addEventListener('click',function(){switchTab(t.getAttribute('data-tab'))})});
-document.getElementById('toggleToKeyLogin').addEventListener('click',toggleLoginMode);
-document.getElementById('toggleToPwLogin').addEventListener('click',toggleLoginMode);
 document.getElementById('btnPwLogin').addEventListener('click',doPasswordLogin);
-document.getElementById('btnLogin').addEventListener('click',doLogin);
 document.getElementById('btnRegister').addEventListener('click',doRegister);
 document.getElementById('btnRegToken').addEventListener('click',doRegToken);
 </script>

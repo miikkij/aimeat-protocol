@@ -10,6 +10,9 @@
  * @structure emailHashOf; ProvisionEmailTakenError; SetupCodeRefusedError; claimOperatorSetupCode; rolesAtWrite; creditWelcomeBonus; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.12.0 — 2026-10-23 — claimOperatorSetupCode, createAccountRows and provisionOwner take
+ *     `fromLoopback`, read by the route from the request's socket: a loopback base URL waives the setup
+ *     code only for a request from loopback (secaudit2026oct22; Jouni, 2026-10-23).
  *   v1.11.0 — 2026-10-16 — claimOperatorSetupCode (was claimFirstOwnerSetupCode) asks for the setup code
  *     while the node has no OPERATOR, so the no-operator self-heal needs it too, and says whether it took
  *     the code; rolesAtWrite decides the operator role again inside the account's transaction, so a role
@@ -123,20 +126,21 @@ const NO_CLAIM: OperatorClaim = { tookCode: false, commit: () => {}, release: ()
 /**
  * The setup code a request needs when it would grant the operator role on a node others can reach
  * that has no operator: the first owner, or the self-heal that makes the next account or sign-in the
- * operator (services/setup-code.ts). On a loopback node, for a role list without the operator, or
- * once an operator exists, nothing is asked and nothing is used. Otherwise the code is checked and
+ * operator (services/setup-code.ts). For a request from loopback to a loopback node (`fromLoopback`,
+ * read from the request's socket by the route), for a role list without the operator, or once an
+ * operator exists, nothing is asked and nothing is used. Otherwise the code is checked and
  * taken in one synchronous step, so of several requests only one becomes the operator.
  * @throws SetupCodeRefusedError when the code is missing, wrong or was used a moment ago
  */
 export async function claimOperatorSetupCode(
-  storage: Storage, config: AimeatConfig, roles: readonly string[], setupCode: unknown,
+  storage: Storage, config: AimeatConfig, roles: readonly string[], setupCode: unknown, fromLoopback: boolean,
 ): Promise<OperatorClaim> {
   // The role list the account is about to get, not a check of the caller (that is isOperatorCaller).
   const makesOperator = roles.indexOf('operator') >= 0;
-  if (!makesOperator || !setupCodeRequired(config)) return NO_CLAIM;
+  if (!makesOperator || !setupCodeRequired(config, fromLoopback)) return NO_CLAIM;
   const { anyOperator } = await storage.operatorAccountState();
   if (anyOperator) return NO_CLAIM;
-  const refusal = setupCodeRefusal(config, setupCode);
+  const refusal = setupCodeRefusal(config, setupCode, fromLoopback);
   if (refusal) throw new SetupCodeRefusedError(refusal.code, refusal.message);
   const gate = setupCodeGateFor(config);
   if (!gate.take(setupCode)) throw new SetupCodeRefusedError('SETUP_CODE_INVALID', SETUP_CODE_USED_MESSAGE);
@@ -257,9 +261,9 @@ export async function createAccountRows(
   config: AimeatConfig,
   ownerRow: OwnerRecord,
   profileRow: Omit<GHIIRecord, 'ownerName'>,
-  opts: { setupCode?: unknown } = {},
+  opts: { setupCode?: unknown; fromLoopback?: boolean } = {},
 ): Promise<ProvisionedOwner> {
-  const claim = await claimOperatorSetupCode(storage, config, ownerRow.roles, opts.setupCode);
+  const claim = await claimOperatorSetupCode(storage, config, ownerRow.roles, opts.setupCode, opts.fromLoopback === true);
   try {
     const rows = await storage.transaction(async () => {
       const owner = await storage.createOwner({ ...ownerRow, roles: await rolesAtWrite(storage, ownerRow.roles, claim) });
@@ -298,6 +302,9 @@ export interface ProvisionOwnerOpts {
    *  of a node others can reach (claimOperatorSetupCode). An identity provider's redirect carries
    *  none, so a first sign-in there is refused until the first owner exists. */
   setupCode?: unknown;
+  /** The request came in on a loopback socket (isLoopbackAddress(req.socket.remoteAddress)). With a
+   *  loopback base URL it waives the setup code; anything else, and a call with no request, is asked. */
+  fromLoopback?: boolean;
 }
 
 export interface ProvisionedOwner {
@@ -388,7 +395,7 @@ export async function provisionOwner(
     loginCount: 0,
     createdAt: now,
     updatedAt: now,
-  }, { setupCode: opts.setupCode });
+  }, { setupCode: opts.setupCode, fromLoopback: opts.fromLoopback });
 
   // An account created with an ALREADY-proven address is the third way a verified binding comes
   // into being, so it links address-book entries exactly as the two verification routes do
