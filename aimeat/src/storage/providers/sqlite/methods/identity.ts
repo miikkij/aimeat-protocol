@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.7.0 — 2026-10-23 — taskStartFloor on create, update and read, a JSON list in TEXT (migration 0115).
  *   v1.6.0 — 2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party
  *     made TO the agent end with it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   v1.5.0 — 2026-10-18 — setAgentScopesIf: the scope list written only if it still equals the list read (check:atomic-writes, boot migrations).
@@ -28,7 +29,7 @@
  *     mirrors postgres-kysely/methods/identity.ts (secaudit 2026-10, M8).
  */
 import type { OwnerRecord, AgentRecord, GHIIRecord, GHIIPatch, GrantsToIdentityCleared } from '../../../interface.js';
-import { sameScopeList } from '../../../scope-list.js';
+import { sameScopeList, floorListOf } from '../../../scope-list.js';
 import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import { pseudonymisePurchaseParties } from '../repos/app-purchase-erasure.js';
 import { pseudonymiseProvenanceOwner } from '../repos/ai-provenance-erasure.js';
@@ -259,8 +260,8 @@ export const identityMethods = {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
          webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy,
-         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart, stoppedAt, stoppedBy, clearance)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         runMode, runtimeSource, identityVersion, cardJws, cardIssuedAt, enrolledAt, mcpClient, mcpLastSeen, taskStart, stoppedAt, stoppedBy, clearance, taskStartFloor)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -292,6 +293,7 @@ export const identityMethods = {
         agent.stoppedAt ?? null,
         agent.stoppedBy ?? null,
         agent.clearance ?? null,
+        agent.taskStartFloor?.length ? JSON.stringify(agent.taskStartFloor) : null,
       );
       return agent;
     } catch (err: unknown) {
@@ -346,7 +348,7 @@ export const identityMethods = {
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
        dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
        runMode = ?, runtimeSource = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
-       mcpClient = ?, mcpLastSeen = ?, taskStart = ?, stoppedAt = ?, stoppedBy = ?, clearance = ?
+       mcpClient = ?, mcpLastSeen = ?, taskStart = ?, stoppedAt = ?, stoppedBy = ?, clearance = ?, taskStartFloor = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -391,6 +393,7 @@ export const identityMethods = {
       updated.stoppedAt ?? null,
       updated.stoppedBy ?? null,
       updated.clearance ?? null,
+      updated.taskStartFloor?.length ? JSON.stringify(updated.taskStartFloor) : null,
       gaii,
     );
     return updated;
@@ -490,6 +493,8 @@ export const identityMethods = {
     if (row.taskStart === 'automatic' || row.taskStart === 'confirm') record.taskStart = row.taskStart;
     if (row.stoppedAt) { record.stoppedAt = row.stoppedAt as string; record.stoppedBy = (row.stoppedBy as string | null) ?? null; }
     if (row.clearance) record.clearance = row.clearance as string;
+    const floor = floorListOf(row.taskStartFloor);
+    if (floor) record.taskStartFloor = floor;
     return record;
   },
 

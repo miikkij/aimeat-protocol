@@ -325,7 +325,7 @@
       "digest": "sha256:d5d56e4feb12045d38ef59c4"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-23",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:9a8f918f03a525756e510620"
+      "digest": "sha256:703554fc567d2fb767cfe0fa"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -743,7 +743,7 @@
       "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
-      "aimeat/src/services/agent-task-rules.ts": "b3fcbcce4708f37d"
+      "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
     },
     "node:aimeat-extension-builder": {
       "aimeat/src/services/build-extension-prompt.ts": "1c79998a65a291d4",

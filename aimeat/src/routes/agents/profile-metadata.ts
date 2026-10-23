@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-23 — PATCH /v1/agents/:name/task-start-floor (owner in person), and
+ *     `task_start_floor_accepted` on the agent list.
  *   2026-10-19 — `avatar` on GET /v1/agents and GET /v1/agents/:gaii (services/agent-avatar.ts), and
  *     `avatar_problem` on the profile when the agent's record cannot be shown.
  *   2026-10-18 — GET /v1/agents answers `invites_people` per agent: true when its permissions cover organism:invite (services/agent-invites.ts; wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
@@ -74,7 +76,8 @@ import { scopeIsCovered } from '../../utils/scope-coverage.js';
 import { refuseNeedsPermission } from '../../middleware/refusals.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, isForeignPrincipal, resolveIdentity } from '../../utils/gaii.js';
-import { setAgentTaskStart, taskStartView, scopeUseLookup } from '../../services/agent-task-start-write.js';
+import { setAgentTaskStart, setAgentTaskStartFloor, taskStartView, scopeUseLookup } from '../../services/agent-task-start-write.js';
+import { callerOf } from '../../middleware/caller.js';
 import { readOwnerAgentAccessOrMarker, agentAccessFields } from '../../services/agent-refusals.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -538,6 +541,26 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   router.patch('/v1/agents/:name/task-start', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const outcome = await setAgentTaskStart({ storage, config }, req.auth!.owner as string,
       resolveIdentity(req.auth!, config.nodeId), (req.params.name as string), req.body?.task_start);
+    if (!outcome.ok) {
+      res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+    res.json(success(config.nodeId, { gaii: outcome.agent.gaii, name: outcome.agent.name, ...taskStartView(outcome.agent) }));
+  });
+
+  // PATCH /v1/agents/:name/task-start-floor — the floor permissions this agent may start work with
+  // (body `{ task_start_floor: ["exchange:write"] | null }`): those stop holding its tasks, paid or
+  // free (Jouni 2026-10-23). The owner in person only, like pressing Start on a held task, so no MCP
+  // tool sets it; the rules are services/agent-task-start-write.ts setAgentTaskStartFloor.
+  router.patch('/v1/agents/:name/task-start-floor', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    if (!('task_start_floor' in body)) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send task_start_floor: a list of permissions, or null for none.'));
+      return;
+    }
+    const caller = callerOf(req, config.nodeId, storage);
+    const outcome = await setAgentTaskStartFloor({ storage, config }, caller.owner, caller.inPerson,
+      (req.params.name as string), body.task_start_floor);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
