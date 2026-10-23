@@ -1,5 +1,11 @@
 # AIMEAT node on SQLite (zero external services — the database is a file on a volume).
-#   docker compose -f docker-compose.sqlite.yml up --build
+#   AIMEAT_ADMIN_PASSWORD=<a password of your own> docker compose -f docker-compose.sqlite.yml up --build
+#
+# AIMEAT_ADMIN_PASSWORD has no default: the admin password creates the node's first operator, and a
+# default every copy of this file shares let anyone who reached the port do that first. Put it in a
+# .env file next to this one or in the shell. The node's start log prints a one-time setup code; the
+# setup wizard asks for it, because a request from outside the container is not from this machine.
+# (secaudit2026oct22)
 services:
   aimeat:
     build: .
@@ -8,7 +14,7 @@ services:
     environment:
       - AIMEAT_PORT=40050
       - AIMEAT_NODE_ID=${AIMEAT_NODE_ID:-aimeat-local-001-dev}
-      - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:-changeme}
+      - AIMEAT_ADMIN_PASSWORD=${AIMEAT_ADMIN_PASSWORD:?Set AIMEAT_ADMIN_PASSWORD to a password of your own, in a .env file next to docker-compose.sqlite.yml or in the shell}
       - AIMEAT_STORAGE=sqlite
       - AIMEAT_SQLITE_PATH=/data/aimeat.db
       - AIMEAT_WELCOME_BONUS=${AIMEAT_WELCOME_BONUS:-100}

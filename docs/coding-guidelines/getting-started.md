@@ -169,12 +169,16 @@ pnpm start
 Or with Docker, one compose file per storage backend, run from `aimeat/`:
 
 ```bash
+export AIMEAT_ADMIN_PASSWORD='<a password of your own>'    # no default; compose refuses to start without it
 docker compose up --build                                  # PostgreSQL with Kysely, the production backend
 docker compose -f docker-compose.sqlite.yml up --build     # SQLite, no external database
 ```
 
 A fresh node with no owner serves its setup page (`/v1/setup/wizard`) for every page address. The
-first owner created there gets the operator role.
+first owner created there gets the operator role. The wizard asks for the one-time setup code the
+start log prints (`docker compose logs aimeat`, the line that starts with "Setup code"), because a
+request from outside the container does not come from the node's own machine. The compose file
+publishes PostgreSQL on 127.0.0.1:5432 only.
 
 The `aimeat` CLI carries the operator commands: `aimeat config` prints every setting and where its
 value comes from (`config export` and `config import` move it), `aimeat validate` checks the
