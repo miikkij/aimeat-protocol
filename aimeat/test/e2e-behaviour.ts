@@ -14,6 +14,8 @@
  *   refused on REST and has no such tool on MCP; no token is 401; a beacon for an unknown app, for
  *   another node's owner or of the wrong shape counts nothing.
  * @version-history
+ *   2026-10-23 — Tests 2 and 3 read the report once the beacons are counted (behaviourOnce): the
+ *     beacon answers 204 before it counts, and the nightly Postgres sweep read before it had.
  *   2026-10-15 — 6b: a run on request reads the fixer switch (409 FIXER_OFF) and asks app:write; the
  *     writer agent holds app:write (feature-list audit 91).
  *   v1.0.0 — 2026-10-08 — Initial.
@@ -190,6 +192,21 @@ const behaviour = async (token: string, q = ''): Promise<any> => {
   assert(r.status === 200, `behaviour ${r.status} ${JSON.stringify(r.body)}`);
   return r.body.data;
 };
+/**
+ * The report once the beacons sent so far are counted. The beacon answers 204 before it is counted (a
+ * browser never waits on it), and the handler still reads the settings and the app before it adds the
+ * count, so a report read straight after a beacon can come before it: the nightly Postgres sweep read 3
+ * views where test 3 had sent the fourth (2026-10-23). Reads until `ready` holds, for up to five seconds.
+ */
+const behaviourOnce = async (token: string, q: string, ready: (app: any) => boolean): Promise<any> => {
+  let app: any;
+  for (let i = 0; i < 50; i++) {
+    app = (await behaviour(token, q)).apps[0];
+    if (app && ready(app)) return app;
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return app;
+};
 const page = async (): Promise<string> => {
   const r = await fetch(`${BASE}/v1/apps/${S.owner}/${filename}?mode=inline`);
   return await r.text();
@@ -214,8 +231,7 @@ await test('2. a dead click on the do-nothing button, sent three times from phon
     const r = await beacon({ o: S.ghii, a: filename, vc: 'phone', s: '25', h: { phone: { '5,2': 1 } }, d: { 'phone|button#buy': 1 } });
     assert(r.status === 204, `beacon ${r.status}`);
   }
-  const rep = await behaviour(S.token, `?app=${encodeURIComponent(filename)}`);
-  const app = rep.apps[0];
+  const app = await behaviourOnce(S.token, `?app=${encodeURIComponent(filename)}`, (a) => a.views >= 3);
   assert(app && app.app === filename && app.views === 3 && app.screens.phone === 3, `three phone views, got ${JSON.stringify(app)}`);
   assert(app.dead_clicks[0]?.element === 'button#buy' && app.dead_clicks[0].clicks === 3, `the dead clicks, got ${JSON.stringify(app.dead_clicks)}`);
   assert(app.heat.phone['5,2'] === 3, `the click grid, got ${JSON.stringify(app.heat)}`);
@@ -225,7 +241,7 @@ await test('2. a dead click on the do-nothing button, sent three times from phon
 
 await test('3. Sec-GPC: 1 counts a view and nothing else, whatever the body says', async () => {
   await beacon({ o: S.ghii, a: filename, vc: 'desktop', d: { 'desktop|button#buy': 5 } }, { 'Sec-GPC': '1' });
-  const app = (await behaviour(S.token, `?app=${encodeURIComponent(filename)}`)).apps[0];
+  const app = await behaviourOnce(S.token, `?app=${encodeURIComponent(filename)}`, (a) => a.views >= 4);
   assert(app.views === 4 && app.opted_out === 1, `a view, opted out; got ${app.views}/${app.opted_out}`);
   assert(app.screens.desktop === 0 && !app.dead_clicks.some((d: any) => d.screen === 'desktop'), 'no desktop count');
 });
