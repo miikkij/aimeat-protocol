@@ -25,6 +25,7 @@
  *   2026-10-18 -- aimeat-node-guide: a write with no visibility gets the node's starting level (plan doc-mvcn6c7e4e5q, V5).
  *   2026-10-18 -- use-app-bound-skills: a public app guide may wait for the owner's approval (publish_request; plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 -- manage-my-profile-data: the visibility ladder names organism:<id> (one organism's members) and says members and organism never leave the node (plan V3.2).
+ *   2026-10-23 -- aimeat-node-guide: the setup code is waived only for a request on the node's own machine to a localhost node; Docker asks for it (secaudit2026oct22).
  *   2026-10-16 -- aimeat-node-guide: the account that would become the operator of a node others can reach needs the one-time setup code while it has none (Jouni, 2026-10-16).
  *   2026-10-16 -- aimeat-node-guide: the first account of a node others can reach needs the one-time setup code (Jouni, 2026-10-16).
  *   2026-10-16 -- aimeat-html-page (builtin-skills.html-page.ts): an HTML page in a workspace in three calls, and its rules.
@@ -293,10 +294,12 @@ Fetch these in order of depth; each is self-describing:
 ## Humans: register and log in
 
 - Register: \`POST /v1/ghii\` with \`{ username, display_name, password, email }\` — it creates the
-  owner account and the GHII profile in one step — or use the web portal at \`/\`. While a node others
-  can reach has no operator, the account that would become it (the first one, or the next one when no
-  operator exists) needs \`setupCode\`, the one-time code the node printed in its start log; a 403
-  \`SETUP_CODE_REQUIRED\` says so. Once it has an operator, no account needs it.
+  owner account and the GHII profile in one step — or use the web portal at \`/\`. While a node has
+  no operator, the account that would become it (the first one, or the next one when no operator
+  exists) needs \`setupCode\`, the one-time code the node printed in its start log; a 403
+  \`SETUP_CODE_REQUIRED\` says so. Only a request made on the node's own machine, to a node whose
+  address is localhost, goes without it; a node in Docker asks for it from outside its container.
+  Once it has an operator, no account needs it.
 - Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
 - Sign in with the password, as above. The older sign-in with the account's Ed25519 key
   (\`POST /v1/auth/token\` with \`owner\`) is removed in node 4.0.0; a script uses a personal access

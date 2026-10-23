@@ -19,8 +19,9 @@
  *   changed more than a day before the step ran, so a join made a moment ago is not named.
  *
  *   WHEN. Once, recorded under `system@<nodeId>` (FEDERATION_ORPHAN_APPROVALS_KEY), on any version.
- * @structure FEDERATION_ORPHAN_APPROVALS_KEY · orphanPeerApprovals(storage, now) · flagOrphanPeerApprovalsOnce(storage, config)
- * @usage await flagOrphanPeerApprovalsOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
+ * @structure FEDERATION_ORPHAN_APPROVALS_KEY · orphanPeerApprovals(storage, peerIds, now) ·
+ *   flagOrphanPeerApprovalsOnce(storage, config, peerIds)
+ * @usage await flagOrphanPeerApprovalsOnce(storage, config, peers.keys());   // server-bootstrap/service-init.ts
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (secaudit2026oct22).
  */
@@ -36,12 +37,16 @@ export const FEDERATION_ORPHAN_APPROVALS_KEY = 'migrations.secaudit2026oct22.fed
 
 const DAY_MS = 24 * 3_600_000;
 
-/** The approved requests whose node has no peer row and that last changed more than a day before `now`. */
-export async function orphanPeerApprovals(storage: Storage, now: number = Date.now()): Promise<PeeringRequestRecord[]> {
-  const peerIds = new Set((await storage.listFederationPeers()).map(p => p.nodeId));
+/**
+ * The approved requests whose node is not among `peerIds` and that last changed more than a day before
+ * `now`. `peerIds` is the node ids of the peer registry the start already loaded
+ * (server-bootstrap/service-init.ts), so the step reads the peer table no second time.
+ */
+export async function orphanPeerApprovals(storage: Storage, peerIds: Iterable<string>, now: number = Date.now()): Promise<PeeringRequestRecord[]> {
+  const known = new Set(peerIds);
   return (await storage.listPeeringRequests()).filter(r =>
     (r.status === 'approved' || r.status === 'auto_approved')
-    && !!r.fromNodeId && !peerIds.has(r.fromNodeId)
+    && !!r.fromNodeId && !known.has(r.fromNodeId)
     && Date.parse(r.updatedAt || r.createdAt) + DAY_MS < now);
 }
 
@@ -51,12 +56,12 @@ export async function orphanPeerApprovals(storage: Storage, now: number = Date.n
  * @returns the requests named, or null on a node that ran the step before
  */
 export async function flagOrphanPeerApprovalsOnce(
-  storage: Storage, config: Pick<AimeatConfig, 'nodeId'>,
+  storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, peerIds: Iterable<string>,
 ): Promise<PeeringRequestRecord[] | null> {
   const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, FEDERATION_ORPHAN_APPROVALS_KEY);
   if (!claim) return null;
   try {
-    const orphans = await orphanPeerApprovals(storage);
+    const orphans = await orphanPeerApprovals(storage, peerIds);
     if (orphans.length) {
       const list = orphans.map(r => `${r.fromNodeId} (request ${r.id}, ${r.status}, ${r.fromNodeUrl})`).join('; ');
       await recordSecurityIncident(storage, config, {
