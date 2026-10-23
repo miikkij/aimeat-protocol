@@ -19,6 +19,8 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.0.1 — 2026-10-24 — "An access request", and one question or N questions, in the sentences; an
+ *     overdue request's evidence names its subject, which the pages show instead of its id.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.5, C1.6, C2, C3.6, C4, C5, C6).
  */
 import type { AimeatConfig } from '../config.js';
@@ -118,8 +120,8 @@ function requestGaps(scope: ComplianceScope, items: ComplianceRequest[], now: nu
     .filter(r => r.status === 'open' && Date.parse(r.extendedTo ?? r.dueAt ?? r.receivedAt) < now)
     .map(r => ({
       kind: 'request-overdue' as const,
-      detail: `A ${r.kind} request from ${r.subject}, received ${r.receivedAt.slice(0, 10)}, is past its deadline (GDPR art. 12(3)).`,
-      evidence: { ...scopeName(scope), request: r.id, dueAt: r.extendedTo ?? r.dueAt },
+      detail: `${/^[aeiou]/.test(r.kind) ? 'An' : 'A'} ${r.kind} request from ${r.subject}, received ${r.receivedAt.slice(0, 10)}, is past its deadline (GDPR art. 12(3)).`,
+      evidence: { ...scopeName(scope), request: r.id, subject: r.subject, dueAt: r.extendedTo ?? r.dueAt },
     }));
 }
 
@@ -171,7 +173,8 @@ export async function scopeGaps(deps: Deps, scope: ComplianceScope, opts: { now?
     const fw = await readDoc(storage, config.nodeId, 'frameworks', scope);
     for (const v of frameworkVerdicts(fw, scope.kind)) {
       if (v.verdict.class !== UNCLASSIFIED) continue;
-      out.push({ kind: 'framework-unanswered', detail: `${v.name.en}: ${v.verdict.unanswered.length} question(s) are unanswered, so nothing says whether it applies.`, evidence: { ...scopeName(scope), framework: v.id, unanswered: v.verdict.unanswered } });
+      const n = v.verdict.unanswered.length;
+      out.push({ kind: 'framework-unanswered', detail: `${v.name.en}: ${n === 1 ? 'one question is' : `${n} questions are`} unanswered, so nothing says whether it applies.`, evidence: { ...scopeName(scope), framework: v.id, unanswered: v.verdict.unanswered } });
     }
   }
   if (scope.kind === 'app') out.push(...await appGaps(deps, scope, regs.items));
