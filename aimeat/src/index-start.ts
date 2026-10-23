@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-23 — The setup code is issued on every node without an operator, loopback included: a
+ *     request from outside the machine is asked for it there too, and the line says so (secaudit2026oct22).
  *   2026-10-17 — A node set to signed-in content access refuses an anonymous realtime or echat
  *     upgrade, whatever the anonymous mode says (plan doc-mvcn6c7e4e5q V1).
  *   2026-10-16 — The setup code is issued while the node has no OPERATOR, not only no owner, because the
@@ -138,11 +140,13 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   } catch (err) {
     logger.warn(`Admin setup secret could not be written to a file: ${err instanceof Error ? err.message : String(err)}. Set AIMEAT_ADMIN_PASSWORD to choose the secret yourself.`);
   }
-  // A node others can reach that has no operator: every path that would make an account its operator
-  // (the first-owner setup, the first registration, the no-operator self-heal at registration or
-  // sign-in) asks for this one-time code, which only the start log carries (services/setup-code.ts;
-  // Jouni, 2026-10-16). Printed at warn level, so a node started with AIMEAT_LOG_LEVEL=warn shows it.
-  const setupCode = !hasOperator && setupCodeRequired(config) ? setupCodeGateFor(config).issue() : null;
+  // A node that has no operator: every path that would make an account its operator (the first-owner
+  // setup, the first registration, the no-operator self-heal at registration or sign-in) asks for this
+  // one-time code, which only the start log carries (services/setup-code.ts; Jouni, 2026-10-16). It is
+  // issued on a loopback node too, because a request from outside that machine is asked for it as well
+  // (secaudit2026oct22; Jouni, 2026-10-23). Printed at warn level, so a node started with
+  // AIMEAT_LOG_LEVEL=warn shows it.
+  const setupCode = !hasOperator ? setupCodeGateFor(config).issue() : null;
   const server = app.listen(config.port, (listenError?: Error) => {
     // Express 5 calls this for the server's 'error' event too, not only for 'listening'. Without
     // this check a node whose port was taken printed "AIMEAT node started", ran its schedulers and
@@ -199,6 +203,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       logger.warn(hasOwner
         ? `   Setup code: ${setupCode}. This node has no operator: send it as setupCode when you register or sign in, and that account becomes the operator; it works once.`
         : `   Setup code: ${setupCode}. Enter it in the setup wizard at ${config.baseUrl}/v1/setup/wizard to create this node's first owner; it works once.`);
+      if (!setupCodeRequired(config, true)) {
+        logger.warn(`   The code is asked only from another machine or from outside a container (Docker); the setup from this machine itself needs none.`);
+      }
     }
     logger.info(`──────────────────────────────────────────────────────────`);
 

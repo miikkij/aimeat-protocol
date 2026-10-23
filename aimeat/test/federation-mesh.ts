@@ -4,7 +4,9 @@
  *   federate flag, policy update persistence, and network directory (service summary,
  *   ping hash, cross-catalogue filtering).
  * @version-history
- *   2026-10-16 — The service summary is read as the peer signs it (signedGetHeaders), and an active
+ *   2026-10-23 — The admin-registered owner gets a password, and both owners sign in with the
+ *     password; POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The service summary is read as the peer signs it (signedGetHeaders), and an active
  *     peer that does not sign is refused 401 (QA audit S6-09). The old unsigned reads asserted the
  *     behaviour the audit found wrong.
  *   v1.7.0 -- 2026-10-12 -- Fixtures move to the 4.0.0 form, none of them this suite's subject: the two
@@ -40,7 +42,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
 
 // ─── Boot embedded server ───
@@ -142,7 +144,7 @@ await test('Register owner', async () => {
         const { status, body } = await json('/v1/admin/setup/register', {
             method: 'POST',
             headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ name: ownerName }),
+            body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
         });
         assert(status === 200, `admin register status ${status}: ${JSON.stringify(body)}`);
         assert(body.ok === true, 'ok');
@@ -157,19 +159,10 @@ await test('Register owner', async () => {
 });
 
 await test('Owner auth', async () => {
-    if (ADMIN_PW && isOperator) {
-        const { body } = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: ownerName, private_key: ownerPrivKey }),
-        });
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        ownerToken = body.token;
-    } else {
-        const { body } = await ownerSignIn(BASE, ownerName);
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        ownerToken = body.data?.token;
-    }
+    // The admin-registered operator signs in with its password too (setup/token answers 410 from 4.0.0).
+    const { body } = await ownerSignIn(BASE, ownerName);
+    assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
+    ownerToken = body.data?.token;
     assert(typeof ownerToken === 'string', 'got owner token');
 });
 
@@ -716,20 +709,9 @@ await test('Register GHII with password for federation auth tests', async () => 
 });
 
 await test('Authenticate federation login user', async () => {
-    // Use admin token endpoint if available, otherwise standard auth
-    if (ADMIN_PW) {
-        const { body } = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: fedLoginUser, private_key: fedLoginPrivKey }),
-        });
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        fedLoginToken = body.token;
-    } else {
-        const { body } = await ownerSignIn(BASE, fedLoginUser, fedLoginPassword);
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        fedLoginToken = body.data?.token;
-    }
+    const { body } = await ownerSignIn(BASE, fedLoginUser, fedLoginPassword);
+    assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
+    fedLoginToken = body.data?.token;
     assert(typeof fedLoginToken === 'string', 'got token');
 });
 

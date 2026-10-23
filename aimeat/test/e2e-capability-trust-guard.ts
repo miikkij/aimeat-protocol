@@ -19,6 +19,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-capability-trust-guard
  * @version-history
+ *   v1.1.1 — 2026-10-23 — The operator comes from setupOperator (a password and the password sign-in);
+ *     POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.1.0 — 2026-09-04 — Phase 5: a third principal who is neither the owner nor the operator.
  *     Everything before it was operator against owner, and its refusals are shaped like "the value
  *     did not change" rather than like a status — a real refusal, and an answer to a different
@@ -26,7 +28,7 @@
  *     security/denial-coverage-exemptions.json on 2026-08-15 (quality plan stream B).
  *   v1.0.0 — 2026-08-14 — Initial (August 2026 audit NEW-2).
  */
-import { registerOwner as registerWithPassword, ownerSignIn, tokenRoles } from './helpers/owner-login.js';
+import { registerOwner as registerWithPassword, ownerSignIn, tokenRoles, setupOperator } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -67,16 +69,9 @@ console.log('\n=== Capability: the fields the node owns ===\n');
 console.log('Phase 0 — Two principals and one capability');
 
 await test('Register the operator', async () => {
-    const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: operatorName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `admin register: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ owner: operatorName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `operator token: ${JSON.stringify(tok.body.error)}`);
-    operatorToken = tok.body.token;
+    const op = await setupOperator(BASE, ADMIN_PW, operatorName);
+    assert(op.roles.includes('operator'), `admin register gave no operator role: ${JSON.stringify(op.registration.body)}`);
+    operatorToken = op.token;
 });
 
 await test('Register an ordinary owner', async () => {

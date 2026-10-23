@@ -12,7 +12,9 @@
  *     shareCatalogue off, a stranger node, a changed key, federation off
  *   - Phase 5: scope and identity refusals
  * @version-history
- *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   v1.0.3 — 2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.2 — 2026-10-08 — The two nodes listen on 31200 and 31300 plus the lane's last two digits
  *     (suitePort): a port handed out by the system can be taken by another suite while a node boots.
  *   v1.0.1 — 2026-10-06 —The two nodes listen on ports the operating system hands out, so the suite
@@ -30,6 +32,7 @@ import { generateKeyPair } from '../src/auth/keypair.js';
 import type { Server } from 'node:http';
 import { suitePort } from './helpers/free-port.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -93,18 +96,9 @@ async function bootNode(port: number, nodeId: string, packageFederation: boolean
 }
 
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
-    const reg = await node.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ name: ownerName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
+    const op = await setupOperator(node.baseUrl, node.adminPw, ownerName);
     node.ownerName = ownerName;
-    node.ownerToken = tok.body.token;
+    node.ownerToken = op.token;
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

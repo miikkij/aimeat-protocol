@@ -10,7 +10,9 @@
  *   Node C (contributor):  port 40262, node ID aimeat-node-001-testc
  *
  * @version-history
- *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 -- 2026-05-21 -- Initial multi-node federation E2E tests
  *   v1.1.0 -- 2026-05-21 -- Add cross-catalogue discovery tests
  *   v1.2.0 -- 2026-08-12 -- Security audit H-14: the ping tests now sign the way the heartbeat
@@ -45,6 +47,7 @@ import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 // ─── Ed25519 setup ───
 ed.hashes.sha512 = (m: Uint8Array) =>
@@ -210,25 +213,12 @@ async function signedPingBody(
 
 /** Register owner via admin API and get token */
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
-    // Register owner
-    const { status, body } = await node.json('/v1/admin/setup/register', {
-        method: 'POST',
-        headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ name: ownerName }),
-    });
-    assert(status === 200, `register owner on ${node.config.nodeId}: status ${status}: ${JSON.stringify(body)}`);
-    assert(body.ok === true, `register ok on ${node.config.nodeId}`);
-    node.ownerPrivKey = body.private_key;
+    // Register the operator with a password and sign in with it: POST /v1/admin/setup/token
+    // answers 410 from 4.0.0.
+    const op = await setupOperator(node.baseUrl, node.adminPw, ownerName);
+    node.ownerPrivKey = op.privateKey;
     node.ownerName = ownerName;
-
-    // Get token
-    const tokenRes = await node.json('/v1/admin/setup/token', {
-        method: 'POST',
-        headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: node.ownerPrivKey }),
-    });
-    assert(tokenRes.body.ok === true, `token ok on ${node.config.nodeId}: ${JSON.stringify(tokenRes.body.error)}`);
-    node.ownerToken = tokenRes.body.token;
+    node.ownerToken = op.token;
     assert(typeof node.ownerToken === 'string' && node.ownerToken.length > 0, `got token on ${node.config.nodeId}`);
 }
 

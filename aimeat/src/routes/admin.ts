@@ -11,6 +11,9 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   2026-10-23 — POST /v1/admin/setup/token is behind OWNER_KEY_LOGIN_REMOVED_IN like POST /v1/auth/token's
+ *     owner branch (410 OWNER_KEY_LOGIN_OFF from 4.0.0), and POST /v1/admin/setup/register needs a
+ *     password, the new operator's only way to sign in (secaudit2026oct22; Jouni, 2026-10-23).
  *   2026-10-22 — POST /v1/admin/setup/token keeps the rules of POST /v1/auth/token's owner branch: a
  *     deactivated account is refused, an account with two-step sign-in armed gets 401
  *     SECOND_FACTOR_REQUIRED naming the password sign-in, and the token is bound to a session row
@@ -90,6 +93,8 @@ import { isOperatorCaller } from '../services/operator-override.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { adminSetupSecretDir, removeAdminSetupSecretFile } from '../services/admin-setup-secret.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
+import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
+import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { listAllMemoryPages } from '../storage/memory-pages.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
@@ -230,12 +235,16 @@ export function adminRouter(
         // Refuse before you write: until 2026-09-08 the owner row was created first and the
         // password judged after, so a weak password answered 400 and left a half-made account
         // behind with the name taken (e2e-admin-doors-2). The strength check comes first now.
-        if (password !== undefined && typeof password === 'string') {
-            const pwErr = validatePasswordStrength(password);
-            if (pwErr) {
-                res.status(400).json({ ok: false, error: pwErr });
-                return;
-            }
+        // The password is required: the account-key sign-in was removed in 4.0.0, so an account
+        // made here without one had no way to sign in (secaudit2026oct22; Jouni, 2026-10-23).
+        if (typeof password !== 'string' || password.length === 0) {
+            res.status(400).json({ ok: false, error: 'password is required: the new operator signs in with the name and this password (POST /v1/ghii/login).' });
+            return;
+        }
+        const pwErr = validatePasswordStrength(password);
+        if (pwErr) {
+            res.status(400).json({ ok: false, error: pwErr });
+            return;
         }
 
         const keyPair = await generateKeyPair();
@@ -311,6 +320,23 @@ export function adminRouter(
             res.status(401).json({ ok: false, error: 'Invalid admin password' });
             return;
         }
+
+        // The account-key sign-in, under the same version gate as POST /v1/auth/token's owner branch:
+        // removed in OWNER_KEY_LOGIN_REMOVED_IN (4.0.0) whatever the setting says. This route had kept
+        // signing owners in with the key after the removal (secaudit2026oct22; Jouni, 2026-10-23).
+        if (!ownerKeyLoginAllowed(config)) {
+            const removed = removedFrom(OWNER_KEY_LOGIN_REMOVED_IN);
+            res.status(410).json(error(config.nodeId, 'OWNER_KEY_LOGIN_OFF',
+                removed
+                    ? `Signing in with your account key was removed in ${OWNER_KEY_LOGIN_REMOVED_IN}. Sign in with your password instead.`
+                    : 'This service no longer signs you in with your account key. Sign in with your password instead.',
+                undefined, { sign_in: 'POST /v1/ghii/login', successor: '/v1/ghii/login', ...(removed ? { removed_in: OWNER_KEY_LOGIN_REMOVED_IN } : {}) }));
+            return;
+        }
+        noteDeprecatedUse({
+            kind: 'owner_key_login', removedIn: OWNER_KEY_LOGIN_REMOVED_IN, successor: '/v1/ghii/login',
+            notice: 'POST /v1/admin/setup/token was called with an owner name and an account key (the owner-key sign-in).',
+        });
 
         const { owner: ownerName, private_key } = req.body ?? {};
         if (!ownerName || !private_key) {

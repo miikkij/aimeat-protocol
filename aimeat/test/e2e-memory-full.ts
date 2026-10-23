@@ -22,6 +22,8 @@
  *     the single POST /v1/memory.
  *   v1.7.2 — 2026-09-27 — The second owner is deleted after the bundle test that writes with its
  *     token, since a deleted account's credentials no longer authenticate.
+ *   v1.7.3 — 2026-10-23 — The admin-registered owners get a password and sign in with it; POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-memory-full.ts
@@ -31,7 +33,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { registerOwner, ownerSignIn, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 // ─── Boot embedded server ───
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40251', 10);
@@ -120,7 +122,7 @@ await test('Register owner', async () => {
         const { status, body } = await json('/v1/admin/setup/register', {
             method: 'POST',
             headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ name: ownerName }),
+            body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
         });
         assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
         ownerPrivKey = body.private_key;
@@ -130,19 +132,10 @@ await test('Register owner', async () => {
 });
 
 await test('Owner auth token', async () => {
-    if (ADMIN_PW) {
-        const { body } = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: ownerName, private_key: ownerPrivKey }),
-        });
-        assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-        ownerToken = body.token;
-    } else {
-        const { body } = await ownerSignIn(BASE, ownerName);
-        assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
-        ownerToken = body.data?.token;
-    }
+    // Either way the owner signs in with its password (setup/token answers 410 from 4.0.0).
+    const { body } = await ownerSignIn(BASE, ownerName);
+    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
+    ownerToken = body.data?.token;
 });
 
 await test('Register agent 1', async () => {
@@ -923,19 +916,7 @@ await test('anonymous read of a members record → 404 (no existence leak)', asy
 
 await test('register second owner + token (different account)', async () => {
     if (ADMIN_PW) {
-        const { status, body } = await json('/v1/admin/setup/register', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ name: owner2Name }),
-        });
-        assert(status === 200, `owner2 register ${status}: ${JSON.stringify(body)}`);
-        const tok = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: owner2Name, private_key: body.private_key }),
-        });
-        assert(tok.body.ok === true, `owner2 token: ${JSON.stringify(tok.body.error)}`);
-        owner2Token = tok.body.token;
+        owner2Token = (await setupOperator(BASE, ADMIN_PW, owner2Name)).token;
     } else {
         owner2Token = (await registerOwner(BASE, owner2Name)).token;
     }

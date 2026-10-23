@@ -16,6 +16,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-doors-2
  * @version-history
+ *   v1.3.0 — 2026-10-23 — POST /v1/admin/setup/token answers 410 OWNER_KEY_LOGIN_OFF after the admin
+ *     password check, and POST /v1/admin/setup/register refuses a registration without a password
+ *     (secaudit2026oct22; Jouni, 2026-10-23).
  *   v1.2.0 — 2026-09-15 — The seed-examples collision is fixed, so its pinned test asserts the new
  *     rule: a second press answers 200 and publishes nothing unchanged.
  *   v1.1.0 — 2026-09-09 — The revoke test asserts live operator roles and the reachable
@@ -24,7 +27,7 @@
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
-import { registerOwner, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { registerOwner, ownerToken, ownerSignIn, tokenRoles, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -567,8 +570,16 @@ await test('POST /v1/admin/setup/register refuses a wrong password, a missing na
     });
     assert(taken.status === 409, `an existing name → expected 409, got ${taken.status}`);
 
+    // secaudit2026oct22: the password is required, because the account-key sign-in is gone from
+    // 4.0.0 and an account made here without one had no way to sign in.
+    const noPassword = await json('/v1/admin/setup/register', {
+        method: 'POST', headers: pwHeaders(agentToken), body: JSON.stringify({ name: `nopw${stamp}` }),
+    });
+    assert(noPassword.status === 400 && String(noPassword.body.error ?? '').includes('password'),
+        `no password → expected 400 naming the password, got ${noPassword.status} ${JSON.stringify(noPassword.body)}`);
+
     const owners = await json('/v1/admin/owners', op());
-    assert(!(owners.body.data.owners as any[]).some(o => o.name === `never${stamp}`),
+    assert(!(owners.body.data.owners as any[]).some(o => o.name === `never${stamp}` || o.name === `nopw${stamp}`),
         'the refused registration created an account');
 });
 
@@ -596,11 +607,13 @@ await test('POST /v1/admin/setup/register with a weak password → 400, and noth
         `and the name is still free: expected the registration to succeed, got ${again.status}: ${JSON.stringify(again.body)}`);
 });
 
-await test('POST /v1/admin/setup/token: password, arguments, owner and key are each checked', async () => {
+// secaudit2026oct22: POST /v1/admin/setup/token signed an owner in with the account key after 4.0.0
+// had removed that sign-in from POST /v1/auth/token. It answers 410 OWNER_KEY_LOGIN_OFF now, after
+// the admin password check, so a valid owner and key get no token either.
+await test('POST /v1/admin/setup/token: the admin password is checked first, then the account-key sign-in answers 410', async () => {
     const key = await registerOperator(`door2tok${stamp}`, plainToken);       // bucket: plain (1/5)
-    const otherKey = await registerOperator(`door2tok2${stamp}`, plainToken); // bucket: plain (2/5)
 
-    // bucket: the revoked second operator (1..5 of 5) — a valid token, and these doors read the
+    // bucket: the revoked second operator (1..2 of 5) — a valid token, and these doors read the
     // password rather than the token, so it serves only to give this test a bucket of its own.
     const wrongPw = await json('/v1/admin/setup/token', {
         method: 'POST', headers: pwHeaders(staleOperatorToken, 'not-the-password'),
@@ -608,41 +621,26 @@ await test('POST /v1/admin/setup/token: password, arguments, owner and key are e
     });
     assert(wrongPw.status === 401, `wrong password → expected 401, got ${wrongPw.status}`);
 
-    const noArgs = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: pwHeaders(staleOperatorToken), body: JSON.stringify({}),
-    });
-    assert(noArgs.status === 400, `no arguments → expected 400, got ${noArgs.status}`);
-
-    const noOwner = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: pwHeaders(staleOperatorToken),
-        body: JSON.stringify({ owner: 'nobody-at-all', private_key: key }),
-    });
-    assert(noOwner.status === 404, `unknown owner → expected 404, got ${noOwner.status}`);
-
-    const mismatch = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: pwHeaders(staleOperatorToken),
-        body: JSON.stringify({ owner: `door2tok${stamp}`, private_key: otherKey }),
-    });
-    assert(mismatch.status === 401, `a key for another owner → expected 401, got ${mismatch.status}`);
-
-    const ok = await json('/v1/admin/setup/token', {
+    const gone = await json('/v1/admin/setup/token', {
         method: 'POST', headers: pwHeaders(staleOperatorToken),
         body: JSON.stringify({ owner: `door2tok${stamp}`, private_key: key }),
     });
-    assert(ok.status === 200, `status ${ok.status}: ${JSON.stringify(ok.body)}`);
-    assert(ok.body.roles.includes('operator'), 'the roles come back with the token');
-    assert(ok.body.dashboard_url === '/v1/admin', 'and where to go next');
-    const use = await json('/v1/admin/stats', { headers: { Authorization: `Bearer ${ok.body.token}` } });
-    assert(use.status === 200, `the minted token must open an operator door, got ${use.status}`);
+    assert(gone.status === 410 && gone.body.error?.code === 'OWNER_KEY_LOGIN_OFF',
+        `a valid owner and key → expected 410 OWNER_KEY_LOGIN_OFF, got ${gone.status}: ${JSON.stringify(gone.body).slice(0, 300)}`);
+    assert(!gone.body.token, 'the refusal handed out a token');
+    assert(JSON.stringify(gone.body).includes('/v1/ghii/login'), 'the refusal names the password sign-in');
+    const signIn = await ownerSignIn(BASE, `door2tok${stamp}`);
+    assert(signIn.status === 200 && tokenRoles(signIn.body.data.token).includes('operator'),
+        `the operator signs in with the password instead: ${signIn.status} ${JSON.stringify(signIn.body).slice(0, 200)}`);
 });
 
-await test('POST /v1/admin/setup/token: a session cookie stands in for the password', async () => {
+await test('POST /v1/admin/setup/token: a session cookie stands in for the password, and meets the same 410', async () => {
     const ok = await json('/v1/admin/setup/token', {     // bucket: operator (4/5)
         method: 'POST', headers: { Cookie: adminSessionCookie, Authorization: `Bearer ${operatorToken}` },
         body: JSON.stringify({ owner: 'nobody-at-all', private_key: 'x' }),
     });
-    // 404 rather than 401: the session got past the door, and the owner is what was missing.
-    assert(ok.status === 404, `the cookie must authenticate the caller, got ${ok.status}`);
+    // 410 rather than 401: the session got past the password check.
+    assert(ok.status === 410, `the cookie must authenticate the caller, got ${ok.status}`);
 });
 
 console.log('\nSection D — seeding, redirects, translations, enable');

@@ -25,6 +25,8 @@
  *   routes the sweep found · cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-peer-registration-proof
  * @version-history
+ *   v1.2.3 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.2.2 -- 2026-10-16 -- The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02). Phase 6
  *     reads the incident list until the PEER_ID_HELD entry is there: the route records it after it
@@ -53,6 +55,7 @@ import { audienceProof } from '../src/services/signed-node-request.js';
 import type { AimeatConfig } from '../src/config.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 let passed = 0;
 let failed = 0;
@@ -153,16 +156,7 @@ let groupId = '';
 const stubs: Stub[] = [];
 
 async function setupOwner(ownerName: string): Promise<string> {
-    const reg = await R.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': R.adminPw }, body: JSON.stringify({ name: ownerName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await R.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': R.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.token as string;
+    return (await setupOperator(R.baseUrl, R.adminPw, ownerName)).token;
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

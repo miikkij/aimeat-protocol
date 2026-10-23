@@ -23,6 +23,9 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-23 — finalizeExternalSignup passes whether the sign-up request came in on a loopback socket,
+ *     so a loopback node's first identity-provider sign-up still needs no setup code from this machine
+ *     and needs it from any other (secaudit2026oct22).
  *   2026-10-15 — A refusal from an extension bound to pre_owner_registration answers 403 HOOK_REJECTED
  *     instead of a 500 (feature-list audit 89).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
@@ -39,6 +42,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
+import { isLoopbackAddress } from '../auth/loopback-pass.js';
 import { establishOwnerSession } from './owner-session.js';
 import { provisionOwner, registrationRefusal, RegistrationClosedError, type RegistrationVia } from './owner-provisioning.js';
 import { emitChange } from './event-bus.js';
@@ -227,11 +231,14 @@ export async function createOwnerForProvider(
   opts: {
     providerId: string; username: string; displayName: string; sub: string;
     email: string | null; emailVerified: boolean; via?: RegistrationVia; managedBy?: string | null;
+    /** The sign-up request came in on a loopback socket (provisionOwner's `fromLoopback`). */
+    fromLoopback?: boolean;
   },
 ): Promise<GHIIRecord> {
   const { providerId, username, displayName, sub, email, emailVerified } = opts;
   const { ghii } = await provisionOwner(storage, config, {
     via: opts.via ?? 'oauth',
+    fromLoopback: opts.fromLoopback,
     username,
     displayName,
     // The IdP asserts the email; record it as a verified email (level 1) when trusted.
@@ -432,6 +439,7 @@ export async function finalizeExternalSignup(
         emailVerified: pending.emailVerified,
         via: opts.via,
         managedBy: opts.managedBy ?? null,
+        fromLoopback: isLoopbackAddress(req.socket.remoteAddress),
       });
     } catch (e) {
       // An extension bound to pre_owner_registration refused the account (feature-list audit 89).

@@ -17,6 +17,8 @@
  * @structure completeOwnerLogin(config, storage, req, res, args) -> writes the response itself
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
+ *   2026-10-23 — The self-heal claim reads the request's socket address: a loopback base URL waives the
+ *     setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-16 — On a node whose base URL is not loopback, the no-operator self-heal promotes the account
  *     only with the one-time setup code (`setupCode` in the sign-in body, claimOperatorSetupCode); without
  *     it the sign-in goes on as a plain owner. The promotion is decided again in one transaction with
@@ -30,6 +32,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, GHIIRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
+import { isLoopbackAddress } from '../../auth/loopback-pass.js';
 import { isOperatorAccount } from '../../utils/operator-account.js';
 import { claimOperatorSetupCode, rolesAtWrite, SetupCodeRefusedError, type OperatorClaim } from '../../services/owner-provisioning.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -112,7 +115,8 @@ export async function completeOwnerLogin(
       // 2026-10-16). On a loopback node the claim asks nothing.
       let claim: OperatorClaim | null = null;
       try {
-        claim = await claimOperatorSetupCode(storage, config, ['operator'], (req.body as { setupCode?: unknown } | undefined)?.setupCode);
+        claim = await claimOperatorSetupCode(storage, config, ['operator'], (req.body as { setupCode?: unknown } | undefined)?.setupCode,
+          isLoopbackAddress(req.socket.remoteAddress));
       } catch (err) {
         if (!(err instanceof SetupCodeRefusedError)) throw err;
       }

@@ -6,6 +6,8 @@
  *   code matches only itself, that take() lets one caller through, and that release() puts a code
  *   back when the owner could not be created.
  * @version-history
+ *   2026-10-23 — Both functions take fromLoopback: a loopback base URL waives the code only for a request
+ *     from loopback (secaudit2026oct22).
  *   2026-10-16 — setupCodeRefusal: the refusal the setup and the registration routes answer (Jouni, 2026-10-16).
  *   2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
  */
@@ -13,14 +15,20 @@ import { describe, it, expect } from 'vitest';
 import { SetupCodeGate, normalizeSetupCode, setupCodeGateFor, setupCodeRefusal, setupCodeRequired } from '../../src/services/setup-code.js';
 
 describe('setupCodeRequired', () => {
-    it('asks on any base URL that is not loopback, a private LAN address included', () => {
-        expect(setupCodeRequired({ baseUrl: 'https://node.example' })).toBe(true);
-        expect(setupCodeRequired({ baseUrl: 'http://192.168.1.20:40050' })).toBe(true);
+    it('asks on any base URL that is not loopback, a private LAN address included, whoever asks', () => {
+        expect(setupCodeRequired({ baseUrl: 'https://node.example' }, false)).toBe(true);
+        expect(setupCodeRequired({ baseUrl: 'https://node.example' }, true)).toBe(true);
+        expect(setupCodeRequired({ baseUrl: 'http://192.168.1.20:40050' }, true)).toBe(true);
     });
-    it('does not ask on a loopback base URL', () => {
-        expect(setupCodeRequired({ baseUrl: 'http://localhost:40050' })).toBe(false);
-        expect(setupCodeRequired({ baseUrl: 'http://127.0.0.1:40050' })).toBe(false);
-        expect(setupCodeRequired({ baseUrl: 'http://[::1]:40050' })).toBe(false);
+    it('does not ask a request from loopback on a loopback base URL', () => {
+        expect(setupCodeRequired({ baseUrl: 'http://localhost:40050' }, true)).toBe(false);
+        expect(setupCodeRequired({ baseUrl: 'http://127.0.0.1:40050' }, true)).toBe(false);
+        expect(setupCodeRequired({ baseUrl: 'http://[::1]:40050' }, true)).toBe(false);
+    });
+    // secaudit2026oct22: a node in Docker keeps the default http://localhost base URL while compose
+    // publishes its port on every address of the host; the base URL alone let the first visitor in.
+    it('asks a request from another machine on a loopback base URL', () => {
+        expect(setupCodeRequired({ baseUrl: 'http://localhost:40050' }, false)).toBe(true);
     });
 });
 
@@ -77,16 +85,22 @@ describe('SetupCodeGate', () => {
 });
 
 describe('setupCodeRefusal', () => {
-    it('asks nothing of a loopback node', () => {
-        expect(setupCodeRefusal({ baseUrl: 'http://localhost:40050' }, undefined)).toBeNull();
+    it('asks nothing of a request from loopback on a loopback node', () => {
+        expect(setupCodeRefusal({ baseUrl: 'http://localhost:40050' }, undefined, true)).toBeNull();
+    });
+    it('asks a request from another machine on a loopback node, and takes the code the start log printed', () => {
+        const config = { baseUrl: 'http://localhost:40050' };
+        const code = setupCodeGateFor(config).issue();
+        expect(setupCodeRefusal(config, undefined, false)?.code).toBe('SETUP_CODE_REQUIRED');
+        expect(setupCodeRefusal(config, code, false)).toBeNull();
     });
     it('answers SETUP_CODE_REQUIRED with no code waiting or none sent, SETUP_CODE_INVALID for a wrong one, null for the right one', () => {
         const config = { baseUrl: 'https://node.example' };
-        expect(setupCodeRefusal(config, 'ABCD-EFGH-JKMN')?.code).toBe('SETUP_CODE_REQUIRED');
+        expect(setupCodeRefusal(config, 'ABCD-EFGH-JKMN', false)?.code).toBe('SETUP_CODE_REQUIRED');
         const code = setupCodeGateFor(config).issue();
-        expect(setupCodeRefusal(config, '')?.code).toBe('SETUP_CODE_REQUIRED');
-        expect(setupCodeRefusal(config, (code[0] === 'A' ? 'B' : 'A') + code.slice(1))?.code).toBe('SETUP_CODE_INVALID');
-        expect(setupCodeRefusal(config, code)).toBeNull();
+        expect(setupCodeRefusal(config, '', false)?.code).toBe('SETUP_CODE_REQUIRED');
+        expect(setupCodeRefusal(config, (code[0] === 'A' ? 'B' : 'A') + code.slice(1), false)?.code).toBe('SETUP_CODE_INVALID');
+        expect(setupCodeRefusal(config, code, false)).toBeNull();
     });
 });
 

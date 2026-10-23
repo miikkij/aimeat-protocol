@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-23 — POST /v1/ghii passes whether the request came in on a loopback socket (fromLoopback): a
+ *     loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-16 — POST /v1/ghii takes `setupCode`: the first account on a node whose base URL is not
  *     loopback, which becomes the operator, needs the one-time setup code from the start log and is
  *     refused 403 SETUP_CODE_REQUIRED / SETUP_CODE_INVALID without it (Jouni, 2026-10-16).
@@ -74,6 +76,7 @@ import type { EmailService } from '../../services/email.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { coerceTier, tierCeiling } from '../../services/federation-tiers.js';
 import { generateKeyPair, sign } from '../../auth/keypair.js';
+import { isLoopbackAddress } from '../../auth/loopback-pass.js';
 import { audienceProof } from '../../services/signed-node-request.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -281,7 +284,7 @@ export function registerRegisterLoginRoutes(
             morselBalance: config.welcomeBonus,
             createdAt: now,
             updatedAt: now,
-        }, { setupCode: req.body?.setupCode });
+        }, { setupCode: req.body?.setupCode, fromLoopback: isLoopbackAddress(req.socket.remoteAddress) });
         } catch (err) {
             if (err instanceof SetupCodeRefusedError) {
                 res.status(403).json(error(config.nodeId, err.code, err.message));

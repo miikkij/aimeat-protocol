@@ -14,7 +14,9 @@
  *   Nodes: V (vendor) 40288, two operators. C (customer) 40289, one owner who IS its operator, plus
  *   an agent — the principal that actually writes to support when something breaks.
  * @version-history
- *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   2026-10-23 — setupOperator registers through helpers/owner-login.ts setupOperator (a password and
+ *     the password sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-08-23 — Initial.
  */
 
@@ -25,7 +27,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
+import { registerOwner, ownerSignIn, setupOperator as registerOperator } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -77,13 +79,10 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 async function setupOperator(node: NodeState, ownerName: string): Promise<void> {
-    const reg = await node.json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }) });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }) });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
+    const op = await registerOperator(node.baseUrl, node.adminPw, ownerName);
     node.ownerName = ownerName;
     node.ownerGhii = `${ownerName}@${node.nodeId}`;
-    node.ownerToken = tok.body.token;
+    node.ownerToken = op.token;
 }
 
 async function signMsg(privKeyB64: string, message: string): Promise<string> {

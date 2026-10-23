@@ -12,7 +12,9 @@
  *   URL, the way the E2E runner and `pnpm sandbox` start a node: test.money works and nothing warns.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=test-money-guard
  * @version-history
- *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   v2.0.1 — 2026-10-23 — owner() uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v2.0.0 — 2026-10-13 — Ruling decision-testiraha-toimii-julkisella-nodella-kun-operaattori-kytkee-s:
  *     the flag works on a public node so the money path can be tested in production; the public
  *     node's Security page keeps it critical. A node with the flag off is the negative control.
@@ -23,6 +25,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 const PORT_PUBLIC = process.env.E2E_TMG_PUBLIC_PORT ?? '40486';
 const PORT_LOCAL = process.env.E2E_TMG_LOCAL_PORT ?? '40487';
@@ -83,11 +86,7 @@ async function json(node: Node, path: string, opts: RequestInit = {}) {
 
 /** An account through the admin setup route, and a token for it. The first one is the operator. */
 async function owner(node: Node, name: string): Promise<string> {
-  const reg = await json(node, '/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name }) });
-  assert(reg.status === 200 && reg.body.ok === true, `register ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const tok = await json(node, '/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ owner: name, private_key: reg.body.private_key }) });
-  assert(tok.status === 200, `token ${name}: ${tok.status} ${JSON.stringify(tok.body)}`);
-  return (tok.body.token ?? tok.body.data?.token) as string;
+  return (await setupOperator(node.base, ADMIN_PW, name)).token;
 }
 
 const handlerIds = async (node: Node) =>

@@ -24,7 +24,9 @@
  *   - Phase 3: the owner applies it
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-update-widening
  * @version-history
- *   2026-10-16 — The in-process nodes take the run's backend through ownNodeDb (QA audit P1-02).
+ *   v1.0.1 — 2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 —The in-process nodes take the run's backend through ownNodeDb (QA audit P1-02).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F08c-03).
  */
 
@@ -36,6 +38,7 @@ import type { Storage } from '../src/storage/interface.js';
 import type { Server } from 'node:http';
 import { suitePort } from './helpers/free-port.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -95,17 +98,9 @@ async function bootNode(port: number, nodeId: string, repository: boolean): Prom
 }
 
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
-    const reg = await node.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }),
-    });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
+    const op = await setupOperator(node.baseUrl, node.adminPw, ownerName);
     node.ownerName = ownerName;
-    node.ownerToken = tok.body.token;
+    node.ownerToken = op.token;
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

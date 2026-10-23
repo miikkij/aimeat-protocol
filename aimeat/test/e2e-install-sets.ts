@@ -28,6 +28,8 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-10-23 — setupOwner uses setupOperator and mintToken the password sign-in; POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   2026-10-15 — With no runner the bundled agent is proposed to the owner (result proposed, a waiting
  *     proposal); it asserted `pending`, which nobody could approve. The apply with a runner withdraws
@@ -65,6 +67,7 @@ import { signedPackageHeaders } from '../src/services/packages/peer/package-node
 import { refreshInstalledPackages, UPDATES_ENDED_SENTENCE } from '../src/services/packages/peer/package-upstream-refresh.js';
 import type { Storage } from '../src/storage/interface.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { ownerToken, setupOperator } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -119,26 +122,14 @@ async function bootNode(port: number, nodeId: string, repository: boolean, extra
     return { server, config, storage, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, json: makeJson(`http://127.0.0.1:${port}`) };
 }
 
-const ownerKeys = new Map<string, string>();
-
-/** A token for an account this test registered. */
+/** A token for an account this test registered: the password sign-in. */
 async function mintToken(node: NodeState, ownerName: string): Promise<string> {
-    const tok = await node.json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw },
-        body: JSON.stringify({ owner: ownerName, private_key: ownerKeys.get(`${node.nodeId}/${ownerName}`) }),
-    });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
-    return tok.body.token as string;
+    return ownerToken(node.baseUrl, ownerName);
 }
 
-/** An account with a key, through the admin setup door, and a token for it. */
+/** An operator account with a password, through the admin setup route, and a token for it. */
 async function setupOwner(node: NodeState, ownerName: string): Promise<string> {
-    const reg = await node.json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }),
-    });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    ownerKeys.set(`${node.nodeId}/${ownerName}`, reg.body.private_key);
-    return mintToken(node, ownerName);
+    return (await setupOperator(node.baseUrl, node.adminPw, ownerName)).token;
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });

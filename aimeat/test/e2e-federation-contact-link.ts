@@ -17,6 +17,9 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   2026-10-23 -- I9 is pinned: a removed peer's key exchange is refused and its approvals read revoked
+ *     (Core FED-15; secaudit2026oct22). I10: a new invitation lets it back in. setupOwner uses
+ *     setupOperator (a password and the password sign-in): POST /v1/admin/setup/token answers 410.
  *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.6.0 -- 2026-10-12 -- Node 4.0.0 refuses a federation message without the audience or delivery
  *     proof (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN). asPeer and the introduces of node I
@@ -51,6 +54,7 @@ import { audienceProof, deliveryProof } from '../src/services/signed-node-reques
 import { UNPROVEN_FORMAT_REMOVED_IN } from '../src/config-federation.js';
 import { removedOn } from './helpers/node-release.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -101,13 +105,10 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
 }
 
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
-    const reg = await node.json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }) });
-    assert(reg.status === 200 && reg.body.ok === true, `register ${ownerName}: ${reg.status} ${JSON.stringify(reg.body)}`);
-    const tok = await node.json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }) });
-    assert(tok.body.ok === true, `token ${ownerName}: ${JSON.stringify(tok.body.error)}`);
+    const op = await setupOperator(node.baseUrl, node.adminPw, ownerName);
     node.ownerName = ownerName;
     node.ownerGhii = `${ownerName}@${node.nodeId}`;
-    node.ownerToken = tok.body.token;
+    node.ownerToken = op.token;
 }
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
@@ -772,7 +773,7 @@ await test('I8. A refused re-introduction does not destroy the existing (depeeri
     assert(!!(await iRow()), 'the refused re-introduction must not have deleted the existing peer row');
 });
 
-await test('I9. THE LEAK: an unsigned key exchange cannot move a re-admitted peer to an address it chose', async () => {
+await test('I9. THE LEAK: an unsigned key exchange cannot bring a removed peer back, at its own address or one it chose', async () => {
     // A purged peer with an approved request is re-admitted by POST /v1/federation/key-exchange, which
     // is unauthenticated. It took the address from the REQUEST BODY, so anyone who knew the node id
     // and its published key pointed the peer at their own server and received what this node sends
@@ -786,18 +787,41 @@ await test('I9. THE LEAK: an unsigned key exchange cannot move a re-admitted pee
     assert(admitted.status === 200, `introduce: ${admitted.status} ${JSON.stringify(admitted.body)}`);
     await dropPeer(I_NODE);
 
-    const r = await V.json('/v1/federation/key-exchange', {
-        method: 'POST',
-        body: JSON.stringify({ node_id: I_NODE, node_url: 'http://attacker.invalid:49990', node_public_key: iKeys.publicKey, timestamp: new Date().toISOString() }),
-    });
+    // secaudit2026oct22 (Core FED-15): the removal revokes the approval, so the exchange is refused,
+    // with an address of the caller's choosing and with the approved one alike. Until 2026-10-23 this
+    // test accepted either a re-admission at the approved address or a refusal.
+    for (const nodeUrl of ['http://attacker.invalid:49990', I_URL]) {
+        const r = await V.json('/v1/federation/key-exchange', {
+            method: 'POST',
+            body: JSON.stringify({ node_id: I_NODE, node_url: nodeUrl, node_public_key: iKeys.publicKey, timestamp: new Date().toISOString() }),
+        });
+        // 403 FORBIDDEN, or 400 INVALID_URL first for an address this node does not send to.
+        assert(r.status === 403 || r.status === 400, `a key exchange re-admitted a removed peer from ${nodeUrl}: ${r.status} ${JSON.stringify(r.body)}`);
+    }
     const list = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
     const row = (list.body.data.peers as any[]).find(p => p.node_id === I_NODE);
-    if (r.status === 200) {
-        assert(!!row, 'a re-admitted peer is listed');
-        assert(row.url === I_URL, `the re-admitted peer must keep the address the operator approved, got ${row.url}`);
-    } else {
-        assert(!row || row.url !== 'http://attacker.invalid:49990', `a refused exchange moved the peer: ${JSON.stringify(row)}`);
-    }
+    assert(!row, `a removed peer is listed again: ${JSON.stringify(row)}`);
+    const reqs = await V.json('/v1/admin/peering/requests', { headers: auth(V.ownerToken) });
+    const mine = (reqs.body.data.requests as any[]).filter(q => q.from_node_id === I_NODE);
+    assert(mine.length > 0 && mine.every(q => q.status === 'revoked' || q.status === 'pending' || q.status === 'rejected'),
+        `the removed peer's approvals are not revoked: ${JSON.stringify(mine.map(q => q.status))}`);
+});
+
+await test('I10. The operator lets a removed peer back in with a new invitation', async () => {
+    const mint = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken), body: JSON.stringify({ tier: 'contact' }),
+    });
+    assert(mint.status === 201, `mint: ${mint.status}`);
+    const back = await introduce(mint.body.data.token);
+    assert(back.status === 200, `introduce with a new invitation: ${back.status} ${JSON.stringify(back.body)}`);
+    const list = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
+    const row = (list.body.data.peers as any[]).find(p => p.node_id === I_NODE);
+    assert(row?.status === 'active' && row.url === I_URL, `the invited peer is not active at its address: ${JSON.stringify(row)}`);
+    const exchange = await V.json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: I_NODE, node_url: I_URL, node_public_key: iKeys.publicKey, timestamp: new Date().toISOString() }),
+    });
+    assert(exchange.status === 200, `the admitted peer's own key exchange: ${exchange.status} ${JSON.stringify(exchange.body)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

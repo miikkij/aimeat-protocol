@@ -7,6 +7,8 @@
  *
  *   Node: 40277 aimeat-test-001-nodeinfo.
  * @version-history
+ *   v1.1.2 -- 2026-10-23 -- The operator comes from setupOperator (a password and the password
+ *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.1.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.1.0 -- 2026-10-12 -- Test 3's ping carries the audience proof (audienceProof). Node 4.0.0 refuses
@@ -24,6 +26,7 @@ import { loadConfig } from '../src/config.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -57,11 +60,7 @@ await test('Boot node + register operator', async () => {
   const { app } = await createServer(config);
   server = await new Promise<Server>(r => { const s = app.listen(PORT, '127.0.0.1', () => r(s)); });
   const opName = `niop${Date.now()}`;
-  const reg = await json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ name: opName }) });
-  assert(reg.status === 200 && reg.body.ok, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
-  const tok = await json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': adminPw }, body: JSON.stringify({ owner: opName, private_key: reg.body.private_key }) });
-  assert(tok.body.ok, `token: ${JSON.stringify(tok.body)}`);
-  ownerToken = tok.body.token;
+  ownerToken = (await setupOperator(BASE, adminPw, opName)).token;
 });
 
 console.log('\nPhase 1 — Well-known descriptor');

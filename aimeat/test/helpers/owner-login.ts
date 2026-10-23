@@ -21,13 +21,15 @@
  *   A guard keeps it this way: test/unit/no-owner-key-sign-in.test.ts refuses a test file that sends
  *   an owner signature to POST /v1/auth/token, except the files named there, which test the
  *   owner-key sign-in itself.
- * @structure OWNER_PASSWORD · OwnerAnswer · ownerSignIn · ownerToken · tokenRoles · RegisteredOwner · registerOwner
+ * @structure OWNER_PASSWORD · OwnerAnswer · ownerSignIn · ownerToken · tokenRoles · RegisteredOwner · setupOperator · registerOwner
  * @usage
  *   import { registerOwner, ownerSignIn, ownerToken, OWNER_PASSWORD } from './helpers/owner-login.js';
  *   const alice = await registerOwner(BASE, `alice${Date.now()}`);      // { name, ghii, token, privateKey, ... }
  *   const tok = await ownerSignIn(BASE, name, 'TheSuitesOwnPw1');        // { status, body } like json()
  *   const token = await ownerToken(BASE, name);                          // the token, or a throw naming why
  * @version-history
+ *   v1.1.0 — 2026-10-23 — setupOperator: an operator from POST /v1/admin/setup/register with a password,
+ *     signed in with it; POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.0.0 — 2026-10-12 — Initial (wish-e2e-testit-ja-sandbox-kirjautuvat-omistaja-avaimella-joka-po).
  */
 
@@ -116,6 +118,52 @@ export interface RegisteredOwner {
     roles: string[];
     /** The registration answer, for a suite that reads more of it. */
     registration: OwnerAnswer;
+}
+
+/**
+ * Make an operator through the admin setup route (POST /v1/admin/setup/register with the admin
+ * password, which grants the operator role) and sign them in with the password. The way a suite gets
+ * an operator token: POST /v1/admin/setup/token, the account-key sign-in it used before, answers 410
+ * from 4.0.0 (secaudit2026oct22). Throws unless the registration answers 200 and the sign-in gives a
+ * token. `displayName` is sent as display_name.
+ */
+export async function setupOperator(
+    base: string,
+    adminPassword: string,
+    username: string,
+    opts: { password?: string; displayName?: string } = {},
+): Promise<RegisteredOwner> {
+    const password = opts.password ?? OWNER_PASSWORD;
+    const send = () => fetch(`${base}/v1/admin/setup/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+        body: JSON.stringify({ name: username, password, ...(opts.displayName ? { display_name: opts.displayName } : {}) }),
+    });
+    // The setup routes share a limiter of five a minute per address; a suite is not testing it.
+    let res = await send();
+    for (let waited = 0; res.status === 429 && waited < 90_000;) {
+        const ms = Math.min(Math.max((Number(res.headers.get('retry-after')) || 0) * 1000, 1500), 30_000);
+        await new Promise(r => setTimeout(r, ms));
+        waited += ms;
+        res = await send();
+    }
+    const text = await res.text();
+    let body: any;
+    try { body = JSON.parse(text); } catch { body = { _raw: text }; }
+    if (res.status !== 200 || body?.ok !== true) {
+        throw new Error(`setup register ${username}: ${res.status} ${JSON.stringify(body?.error ?? body)}`);
+    }
+    const token = await ownerToken(base, body.owner.name, password);
+    return {
+        name: body.owner.name,
+        ghii: `${body.owner.name}@${JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')).node ?? ''}`,
+        token,
+        password,
+        privateKey: body.private_key,
+        publicKey: body.public_key,
+        roles: body.owner.roles ?? [],
+        registration: { status: res.status, body },
+    };
 }
 
 /**

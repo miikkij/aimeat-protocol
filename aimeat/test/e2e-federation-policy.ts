@@ -7,7 +7,9 @@
  *
  *   Nodes: A 40275 aimeat-test-001-pola; P 40276 aimeat-test-001-polp.
  * @version-history
- *   2026-10-16 -- The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
+ *   v1.2.1 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-16 --The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 -- 2026-10-12 -- introduce() adds the audience proof for the node it knocks on. Node 4.0.0
  *     refuses an introduce without it (401 AUDIENCE_REQUIRED, UNPROVEN_FORMAT_REMOVED_IN), which left
  *     no visiting peer for tests 2 to 5; the proof is not this suite's subject.
@@ -32,6 +34,7 @@ import { audienceProof } from '../src/services/signed-node-request.js';
 import { recordHeartbeatOutcome } from '../src/services/federation-availability.js';
 import type { PeerInfo } from '../src/services/federation.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
+import { setupOperator } from './helpers/owner-login.js';
 import type { Server } from 'node:http';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -85,10 +88,7 @@ async function bootNode(port: number, nodeId: string, openJoin: boolean): Promis
   return { server, baseUrl: `http://127.0.0.1:${port}`, nodeId, adminPw, ownerToken: '', json: makeJson(`http://127.0.0.1:${port}`) };
 }
 async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
-  const reg = await node.json('/v1/admin/setup/register', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ name: ownerName }) });
-  assert(reg.status === 200 && reg.body.ok, `register ${ownerName}: ${reg.status}`);
-  const tok = await node.json('/v1/admin/setup/token', { method: 'POST', headers: { 'X-Admin-Password': node.adminPw }, body: JSON.stringify({ owner: ownerName, private_key: reg.body.private_key }) });
-  assert(tok.body.ok, `token ${ownerName}`); node.ownerToken = tok.body.token;
+  node.ownerToken = (await setupOperator(node.baseUrl, node.adminPw, ownerName)).token;
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 

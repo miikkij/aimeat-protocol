@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-23 — register-web passes whether the request came in on a loopback socket (fromLoopback): a
+ *     loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-22 — GET /v1/ghii/magic-link/verify asks an account with TOTP armed for its code (totp_code or
  *     backup_code query parameter) before the link is spent, as the emailed link's endpoint does; the
  *     mailbox alone had yielded a lasting agent key (secaudit2026oct22, magic-link-verify:no-second-factor).
@@ -69,6 +71,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import { generateKeyPair } from '../../auth/keypair.js';
+import { isLoopbackAddress } from '../../auth/loopback-pass.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -293,7 +296,7 @@ export function registerWebVerifyRoutes(
                 loginCount: 0,
                 createdAt: now,
                 updatedAt: now,
-            }, { setupCode: req.body?.setupCode });
+            }, { setupCode: req.body?.setupCode, fromLoopback: isLoopbackAddress(req.socket.remoteAddress) });
         } catch (err) {
             if (err instanceof SetupCodeRefusedError) {
                 res.status(403).json(error(config.nodeId, err.code, err.message));

@@ -14,6 +14,7 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   v1.10.0 -- 2026-10-23 -- The status and POST /v1/setup/init read the request's socket address: a loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   v1.9.0 -- 2026-10-18 -- A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.8.0 -- 2026-10-18 -- The first account's app agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.7.2 -- 2026-10-16 -- ALREADY_CONFIGURED no longer clears the setup code: while the node has no
@@ -52,6 +53,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
+import { isLoopbackAddress } from '../auth/loopback-pass.js';
 import { issueJWT } from '../auth/jwt.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
@@ -101,7 +103,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
     const codeGate = setupCodeGateFor(config);
 
     // GET /v1/setup/status — Check if node needs setup
-    router.get('/v1/setup/status', async (_req, res) => {
+    router.get('/v1/setup/status', async (req, res) => {
         try {
             // The `anonymous` system owner is created at boot in anonymous mode and is nobody's:
             // counting it told a brand-new node it was already configured (2026-09-08,
@@ -109,10 +111,11 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             const owners = (await storage.listOwners()).filter(o => o.name !== 'anonymous');
             const needsSetup = owners.length === 0;
             // nodeType and port are the wizard's defaults, so an untouched form matches the running node.
-            // setupCodeRequired tells the wizard to ask for the code the start log printed.
+            // setupCodeRequired tells the wizard to ask for the code the start log printed. It is
+            // this request's answer: from outside the machine a loopback node asks for it too.
             res.json(success(config.nodeId, {
                 needsSetup,
-                setupCodeRequired: needsSetup && setupCodeRequired(config),
+                setupCodeRequired: needsSetup && setupCodeRequired(config, isLoopbackAddress(req.socket.remoteAddress)),
                 nodeId: config.nodeId,
                 nodeType: config.nodeType,
                 port: config.port,
@@ -156,7 +159,8 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
 
             // On a node others can reach, the one-time code from the start log, before anything else
             // is read (services/setup-code.ts; Jouni, 2026-10-16).
-            const codeRefusal = setupCodeRefusal(config, req.body?.setupCode);
+            const fromLoopback = isLoopbackAddress(req.socket.remoteAddress);
+            const codeRefusal = setupCodeRefusal(config, req.body?.setupCode, fromLoopback);
             if (codeRefusal) {
                 res.status(403).json(error(config.nodeId, codeRefusal.code, codeRefusal.message));
                 return;
@@ -236,7 +240,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             // one creates the first owner. Taken from the gate itself rather than through
             // claimOperatorSetupCode, because this route makes an operator whatever the owner count
             // says by now. It waits again if the owner cannot be created.
-            const codeNeeded = setupCodeRequired(config);
+            const codeNeeded = setupCodeRequired(config, fromLoopback);
             if (codeNeeded && !codeGate.take(req.body?.setupCode)) {
                 res.status(403).json(error(config.nodeId, 'SETUP_CODE_INVALID', SETUP_CODE_USED_MESSAGE));
                 return;

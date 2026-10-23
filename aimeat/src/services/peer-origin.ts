@@ -21,8 +21,11 @@
  *   (no identity resolves to a name without an `@`), the pattern package-entitlements.ts follows.
  *   Keys `origin.<nodeId>` and `pending.<nodeId>`.
  * @structure PeerOrigin · PendingPeer · pendingExpired() · recordPeerOrigin() · listPeerOrigins() · readPendingPeer() ·
- *   writePendingPeer() · deletePendingPeer() · listPendingPeers() · pendingRegistrationView() · forgetPeer()
+ *   writePendingPeer() · deletePendingPeer() · listPendingPeers() · pendingRegistrationView() · revokePeerApprovals() ·
+ *   forgetPeer()
  * @version-history
+ *   v1.2.0 — 2026-10-23 — revokePeerApprovals, called by forgetPeer: a removed peer's approved peering
+ *     requests are marked revoked, so a key exchange cannot re-admit it (Core FED-15; secaudit2026oct22).
  *   v1.1.0 — 2026-10-01 — forgetPeer also removes the markers of the peer's Security page events.
  *   v1.0.0 — 2026-10-01 — Initial (the peer-registration incident, finding F).
  */
@@ -122,10 +125,31 @@ export function pendingRegistrationView(p: PendingPeer): Record<string, unknown>
 }
 
 /**
+ * The approved peering requests of a removed peer stop being a way back in. POST
+ * /v1/federation/key-exchange takes no sign-in and admits a node that has an approved or auto-approved
+ * request and no peer row, so a request left standing let a node the operator removed come back with
+ * one key exchange, against Core FED-15 (secaudit2026oct22; Jouni, 2026-10-23). Each such request is
+ * marked `revoked`, never deleted: it stays in the history, and a node that is welcome again is
+ * introduced and approved again, or invited.
+ * @returns how many requests were revoked
+ */
+export async function revokePeerApprovals(storage: Storage, nodeId: string): Promise<number> {
+    let revoked = 0;
+    for (const r of await storage.listPeeringRequests()) {
+        if (r.fromNodeId !== nodeId || (r.status !== 'approved' && r.status !== 'auto_approved')) continue;
+        await storage.updatePeeringRequest(r.id, { status: 'revoked', updatedAt: new Date().toISOString() });
+        revoked++;
+    }
+    return revoked;
+}
+
+/**
  * An operator removed the peer: its origin, any pending registration and the markers of its Security
  * page events (peer-incidents.ts) go with it, so the name is free and a new event about it is recorded.
+ * Its approved peering requests are revoked (revokePeerApprovals), so it does not come back on its own.
  */
 export async function forgetPeer(storage: Storage, nodeId: string): Promise<void> {
+    await revokePeerApprovals(storage, nodeId);
     await storage.deleteMemory(NS_PEER_ORIGIN, originKey(nodeId));
     await storage.deleteMemory(NS_PEER_ORIGIN, pendingKey(nodeId));
     for (const r of await storage.listMemory(NS_PEER_ORIGIN, { prefix: `incident.${nodeId}.` })) {

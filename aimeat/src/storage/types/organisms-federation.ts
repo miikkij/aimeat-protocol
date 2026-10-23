@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.1 — 2026-10-23 — PeeringRequestRecord.status takes `revoked` (services/peer-origin.ts
+ *     revokePeerApprovals; secaudit2026oct22).
  *   v1.14.0 — 2026-10-20 — The Knowledge System types move to types/knowledge.ts (pure extraction at
  *     the 800-line limit). Their own history up to today stays in the lines below.
  *   v1.13.0 — 2026-10-20 — ExtensionRecord.unattendedReadAuthority: the owner's per-extension choice
@@ -50,7 +52,9 @@ export interface PeeringRequestRecord {
   targetUrl?: string;
   publicKey?: string;
   message?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'auto_approved';
+  /** `revoked`: the approval of a peer an operator removed (services/peer-origin.ts revokePeerApprovals);
+   *  a key exchange no longer admits on it. */
+  status: 'pending' | 'approved' | 'rejected' | 'auto_approved' | 'revoked';
   /** The tier this request was APPROVED at. Absent → 'member', which is what every request meant
    *  before the ladder had a floor. Load-bearing: de-peering does not delete the request, and the
    *  key-exchange auto-add reads it, so without this a de-peered contact link comes back as a

@@ -6,7 +6,9 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
- *   2026-10-18 — An agent that lost capability:write is refused DELETE of its own capability with 403
+ *   v1.2.1 — 2026-10-23 — The operators from POST /v1/admin/setup/register get a password and sign in
+ *     with it; POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *   2026-10-18 —An agent that lost capability:write is refused DELETE of its own capability with 403
  *     SCOPE_DENIED and the record stays; given the word back, it deletes. Red with
  *     requireScope('capability:write') removed from the route (wish-kolme-puuttuvaa-kieltotesti-maksuosoite-ty-nkulun-ajo-ja-kyv).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -69,7 +71,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { suitePort } from './helpers/free-port.js';
-import { registerOwner, ownerSignIn, tokenRoles } from './helpers/owner-login.js';
+import { registerOwner, ownerSignIn, tokenRoles, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { makeAgent } from './helpers/mcp-session.js';
 import * as ed from '@noble/ed25519';
 
@@ -90,7 +92,7 @@ await test('Register owner', async () => {
         const { status, body } = await json('/v1/admin/setup/register', {
             method: 'POST',
             headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ name: ownerName }),
+            body: JSON.stringify({ name: ownerName, password: OWNER_PASSWORD }),
         });
         assert(status === 200, `admin register status ${status}: ${JSON.stringify(body)}`);
         assert(body.ok === true, 'ok');
@@ -103,19 +105,10 @@ await test('Register owner', async () => {
 });
 
 await test('Owner auth', async () => {
-    if (ADMIN_PW && isOperator) {
-        const { body } = await json('/v1/admin/setup/token', {
-            method: 'POST',
-            headers: { 'X-Admin-Password': ADMIN_PW },
-            body: JSON.stringify({ owner: ownerName, private_key: ownerPrivKey }),
-        });
-        assert(body.ok === true, `token ok: ${JSON.stringify(body.error)}`);
-        ownerToken = body.token;
-    } else {
-        const { body } = await ownerSignIn(BASE, ownerName);
-        assert(body.ok === true, 'auth ok');
-        ownerToken = body.data.token;
-    }
+    // The admin-registered operator signs in with its password too (setup/token answers 410 from 4.0.0).
+    const { body } = await ownerSignIn(BASE, ownerName);
+    assert(body.ok === true, `auth ok: ${JSON.stringify(body.error)}`);
+    ownerToken = body.data.token;
 });
 
 // ─── Phase 1: Manual Capability CRUD ───
@@ -1063,16 +1056,7 @@ async function startAllowlistNode(): Promise<ChildProcess> {
 await test('Start a node with capabilityWebhooks=allowlist_only', async () => {
     altNode = await startAllowlistNode();
     const altOwner = 'capalw-' + Math.random().toString(36).slice(2, 8);
-    const reg = await json('/v1/admin/setup/register', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: altOwner }),
-    }, ALT_BASE);
-    assert(reg.body.ok === true, `register on alt node: ${JSON.stringify(reg.body)}`);
-    const tok = await json('/v1/admin/setup/token', {
-        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW },
-        body: JSON.stringify({ owner: altOwner, private_key: reg.body.private_key }),
-    }, ALT_BASE);
-    assert(tok.body.ok === true, `token on alt node: ${JSON.stringify(tok.body.error)}`);
-    altToken = tok.body.token;
+    altToken = (await setupOperator(ALT_BASE, ADMIN_PW, altOwner)).token;
     const { body } = await json('/v1/capabilities', {}, ALT_BASE);
     assert(body.data?.policy?.webhooks === 'allowlist_only', `alt node policy: ${body.data?.policy?.webhooks}`);
 });

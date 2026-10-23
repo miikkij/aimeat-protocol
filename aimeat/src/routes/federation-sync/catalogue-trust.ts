@@ -5,6 +5,8 @@
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.2 — 2026-10-23 — A ban that removes the peer also revokes its approved peering requests, so a key
+ *     exchange cannot re-admit it (Core FED-15; secaudit2026oct22).
  *   v1.5.1 — 2026-10-18 — A peer's trust notice is stored on the version read (setMemoryIfVersion), and
  *     a new one is claimed with createMemoryIfAbsent and MAX_RECEIVED_PER_PEER counted after the claim.
  *   v1.5.0 — 2026-10-16 — POST /v1/federation/trust-advisory takes a signed notice from a peer (gatePeer,
@@ -42,6 +44,7 @@ import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
 import { actionPricingFromPeer } from '../../services/action-pacing.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
+import { revokePeerApprovals } from '../../services/peer-origin.js';
 
 export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // POST /v1/federation/catalogue-sync — Receive catalogue updates from peer
@@ -267,6 +270,9 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
             if (targetPeer) {
                 peers.delete(targetPeer[0]);
                 await storage.deleteFederationPeer(targetPeer[1].nodeId);
+                // A banned node does not come back through a key exchange on its old approval (Core
+                // FED-15; secaudit2026oct22).
+                await revokePeerApprovals(storage, targetPeer[1].nodeId);
                 acted = 'removed';
             }
         }
