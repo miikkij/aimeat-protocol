@@ -1,0 +1,22 @@
+-- 0115_task_start_floor.sql
+--
+-- The floor permissions the owner in person lets an agent start work with.
+--
+-- An agent holding a permission on the task-start floor (exchange:write, commerce:buy, sending or
+-- deleting as the owner; services/agent-task-rules.ts) never starts a task by itself: every task waits
+-- for the owner's press, whatever the agent's own setting says. That is right as a default and wrong
+-- as the only answer: a daily agent that calls the owner's own app tools needs exchange:write and so
+-- waited every morning (CVE agent cve-vahti, 2026-10-23). The owner ruled: paid or free, it must be
+-- possible to run it automatically when that has been decided.
+--
+--   "Agent"."taskStartFloor"   a JSON list of scope words, or NULL. The floor permissions the owner in
+--                              person has accepted for this agent; the floor stops holding its tasks
+--                              for those words. NULL = none accepted, which is every existing agent,
+--                              so nothing changes for them. A floor permission granted later and not
+--                              named here still holds.
+--
+-- TEXT holding JSON, read by storage/scope-list.ts floorListOf on both providers. Who may write it is
+-- decided in code (services/agent-task-start-write.ts): the owner in person only.
+--
+-- Mirrors the SQLite column added in schema-columns-agents.ts.
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "taskStartFloor" TEXT;

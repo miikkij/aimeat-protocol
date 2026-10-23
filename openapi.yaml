@@ -12054,10 +12054,74 @@ paths:
                           task_start: { type: string, nullable: true, enum: [automatic, confirm, null] }
                           task_start_effective: { type: string, enum: [automatic, confirm] }
                           task_start_held_by: { type: array, items: { type: string } }
+                          task_start_floor_accepted: { type: array, items: { type: string } }
         '400':
           description: task_start is not one of the two values or null
         '403':
           description: Not your agent, or the agent itself asked
+        '404':
+          description: No such agent
+  /v1/agents/{name}/task-start-floor:
+    patch:
+      operationId: setAgentTaskStartFloor
+      summary: Let this agent start work although it holds a permission that can spend, send or delete
+      description: |
+        An agent that holds `commerce:buy`, `exchange:write`, `connections:use`, `outbound:send`,
+        `messages:send-as-owner`, `messages:delete-as-owner` or `memory:purge` normally never starts
+        a task by itself. With this call the owner names, per agent, which of those permissions may
+        start work without the owner's press, paid or free. A task plan that declares an effect of the
+        same kind (spend, send as the owner, delete) no longer holds the task either. A permission
+        the owner did not name still holds.
+
+        The list replaces the stored one; `null` or `[]` removes every acceptance. A word that is not
+        one of the seven is refused. The owner in person only: an agent, an app or a visitor gets 403,
+        so there is no MCP tool for it.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_start_floor]
+              properties:
+                task_start_floor:
+                  type: array
+                  nullable: true
+                  items:
+                    type: string
+                    enum: [commerce:buy, exchange:write, connections:use, outbound:send, messages:send-as-owner, messages:delete-as-owner, memory:purge]
+      responses:
+        '200':
+          description: The start settings after the change
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          task_start: { type: string, nullable: true, enum: [automatic, confirm, null] }
+                          task_start_effective: { type: string, enum: [automatic, confirm] }
+                          task_start_held_by: { type: array, items: { type: string } }
+                          task_start_floor_accepted: { type: array, items: { type: string } }
+        '400':
+          description: task_start_floor is missing, not a list, or names a permission outside the seven
+        '403':
+          description: Not the owner in person, or not your agent
         '404':
           description: No such agent
 
@@ -12987,6 +13051,10 @@ paths:
                                       type: array
                                       items: { type: string }
                                       description: The permissions that make every task of this agent wait for the owner, whatever the setting, read from the words it holds by name. `*` is never among them; an agent holding `*` is narrowed at its next task once its record is ready.
+                                    task_start_floor_accepted:
+                                      type: array
+                                      items: { type: string }
+                                      description: The permissions of that kind the owner in person let this agent start work with (PATCH .../task-start-floor). They no longer hold its tasks.
                                     stopped:
                                       type: boolean
                                       description: True while the owner has stopped the agent (POST .../stop). It starts no new work; what it is given waits until POST .../start.

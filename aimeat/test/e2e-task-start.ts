@@ -18,6 +18,8 @@
  *   The wake on Start is held by e2e-connect-tunnel-delivery (test 8).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=task-start
  * @version-history
+ *   v1.2.0 — 2026-10-23 — Section 9: the owner in person accepts floor permissions per agent
+ *     (PATCH .../task-start-floor), and only those stop holding its tasks (Jouni 2026-10-23).
  *   v1.1.0 — 2026-10-18 — Section 8: the node narrows a ready `*` agent itself instead of holding its
  *     tasks (Jouni, 2026-10-18). The record's start date is moved back in the server's database.
  *   v1.0.2 — 2026-10-12 — 6a: the workspace records delete asks memory:delete (into the bin), and
@@ -546,6 +548,70 @@ await test('8g. A `*` agent whose record is younger than two weeks is left as it
   assert(JSON.stringify(a.default_scopes) === JSON.stringify(['*']), `scopes ${JSON.stringify(a.default_scopes)}`);
   assert(a.task_start_wildcard?.ready === false && a.task_start_wildcard?.days_left === 11, `wildcard ${JSON.stringify(a.task_start_wildcard)}`);
   assert((await narrowedNotices(owner.token, 'youngstar')).length === 0, 'nobody told');
+});
+
+console.log('\n9. The owner lets an agent start work although it holds a floor permission');
+let payer!: Agent;
+async function setFloor(token: string, agent: string, value: unknown) {
+  return json(`/v1/agents/${encodeURIComponent(agent)}/task-start-floor`, { method: 'PATCH', headers: auth(token), body: JSON.stringify({ task_start_floor: value }) });
+}
+await test('9a. Nobody but the owner in person can accept: not the chat AI, not the agent, not another account', async () => {
+  payer = await newAgent(owner, 'payer', ['task:read', 'task:write', 'exchange:write']);
+  await setTaskStart(owner.token, 'payer', 'automatic');
+  const byChat = await setFloor(chat.token, 'payer', ['exchange:write']);
+  assert(byChat.status === 403, `chat AI ${byChat.status}`);
+  const bySelf = await setFloor(payer.token, 'payer', ['exchange:write']);
+  assert(bySelf.status === 403, `the agent itself ${bySelf.status}`);
+  const byOther = await setFloor(other.token, payer.gaii, ['exchange:write']);
+  assert(byOther.status === 403, `another account ${byOther.status}`);
+  const a = await listAgent(owner.token, 'payer');
+  assert(a.task_start_held_by.includes('exchange:write') && a.task_start_floor_accepted.length === 0, `unchanged ${JSON.stringify(a.task_start_floor_accepted)}`);
+});
+
+await test('9b. A word that is not on the floor, `*`, or no field at all is refused', async () => {
+  const bad = await setFloor(owner.token, 'payer', ['memory:read']);
+  assert(bad.status === 400, `not a floor word ${bad.status}`);
+  const star = await setFloor(owner.token, 'payer', ['*']);
+  assert(star.status === 400, `wildcard ${star.status}`);
+  const none = await json('/v1/agents/payer/task-start-floor', { method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({}) });
+  assert(none.status === 400, `missing field ${none.status}`);
+  const notList = await setFloor(owner.token, 'payer', 'exchange:write');
+  assert(notList.status === 400, `not a list ${notList.status}`);
+});
+
+await test('9c. Before: its task waits on the floor. After the owner accepts it, a task starts on its own', async () => {
+  const before = await createTask(owner.token, 'payer', 'Daily scan before');
+  assert(before.body.data.task.status === 'queued' && before.body.data.start.waits_because === 'floor', `before ${JSON.stringify(before.body.data.start)}`);
+  const set = await setFloor(owner.token, 'payer', ['exchange:write']);
+  assert(set.status === 200 && set.body.data.task_start_held_by.length === 0, `held_by ${JSON.stringify(set.body.data)}`);
+  assert(JSON.stringify(set.body.data.task_start_floor_accepted) === '["exchange:write"]', `accepted ${JSON.stringify(set.body.data.task_start_floor_accepted)}`);
+  const after = await createTask(owner.token, 'payer', 'Daily scan after');
+  assert(after.status === 201 && after.body.data.task.status === 'active', `after ${after.body.data?.task?.status}`);
+  const a = await listAgent(owner.token, 'payer');
+  assert(JSON.stringify(a.task_start_floor_accepted) === '["exchange:write"]', `list ${JSON.stringify(a.task_start_floor_accepted)}`);
+});
+
+await test('9d. A plan that says it will spend goes on; one that says it will delete still waits for the owner', async () => {
+  const spend = await createTask(owner.token, 'payer', 'Accept the offer');
+  const ps = await propose(payer, spend.body.data.task.id, [{ title: 'Accept the offer', effects: ['spend'] }]);
+  assert(ps.status === 200 && ps.body.data.task.status === 'active', `spend ${ps.status}: ${ps.body?.data?.task?.status}`);
+  const del = await createTask(owner.token, 'payer', 'Remove old offers');
+  const pd = await propose(payer, del.body.data.task.id, [{ title: 'Delete the old offers', effects: ['delete'] }]);
+  assert(pd.status === 200 && pd.body.data.task.status === 'queued', `delete ${pd.status}: ${pd.body?.data?.task?.status}`);
+});
+
+await test('9e. A floor permission the owner did not name still holds, and taking it back makes the work wait again', async () => {
+  const two = await newAgent(owner, 'payer2', ['task:read', 'task:write', 'exchange:write', 'commerce:buy']);
+  assert(!!two.token, 'payer2 token');
+  await setTaskStart(owner.token, 'payer2', 'automatic');
+  const set = await setFloor(owner.token, 'payer2', ['exchange:write']);
+  assert(JSON.stringify(set.body.data.task_start_held_by) === '["commerce:buy"]', `still held ${JSON.stringify(set.body.data.task_start_held_by)}`);
+  const r = await createTask(owner.token, 'payer2', 'Buy and accept');
+  assert(r.body.data.task.status === 'queued', `payer2 ${r.body.data.task.status}`);
+  const back = await setFloor(owner.token, 'payer', null);
+  assert(back.status === 200 && back.body.data.task_start_floor_accepted.length === 0 && back.body.data.task_start_held_by.includes('exchange:write'), `taken back ${JSON.stringify(back.body.data)}`);
+  const again = await createTask(owner.token, 'payer', 'Daily scan again');
+  assert(again.body.data.task.status === 'queued' && again.body.data.start.waits_because === 'floor', `again ${again.body.data.task.status}`);
 });
 
 console.log('\nCleanup');

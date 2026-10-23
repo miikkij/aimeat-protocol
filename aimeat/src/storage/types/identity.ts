@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-23 — AgentRecord.taskStartFloor: the floor permissions the owner in person
+ *     lets this agent start work with (migration 0115).
  *   v1.11.0 — 2026-10-22 — EcoCapabilityApproval and EcosystemAppRecord.capabilityApprovals: the
  *     capabilities of other accounts the owner allowed to run an action of their outside app
  *     (migration 0112; secaudit 2026-10, capability-invoke.ts:ecosystem-source).
@@ -290,6 +292,22 @@ export interface AgentRecord {
    * changes its own (services/agent-clearance.ts). Null clears it on both providers (see runMode).
    */
   clearance?: string | null;
+  /**
+   * THE FLOOR PERMISSIONS THE OWNER LETS THIS AGENT START WORK WITH, BY NAME (migration 0115).
+   *
+   * An agent holding a floor permission (`exchange:write`, `commerce:buy`, sending or deleting as
+   * the owner; services/agent-task-rules.ts TASK_START_FLOOR) never starts a task by itself: each
+   * one waits for the owner's press. When the owner has decided that this agent's work should run on
+   * its own anyway, paid or free, they name those permissions here, and the floor stops holding the
+   * agent for them (Jouni, 2026-10-23: "Oli se maksullinen tai ilmainen niin pitää olla mahdollista
+   * tehdä se automaattisesti jos niin on päätetty."). A floor permission granted later and not named
+   * here still holds, and so does a stopped agent.
+   *
+   * Set and cleared by the owner in person only: not by an app, not by another agent, never by the
+   * agent itself (services/agent-task-start-write.ts). Stored as a JSON list of scope words; null or
+   * absent = none accepted, which is every agent until its owner says otherwise.
+   */
+  taskStartFloor?: string[] | null;
 }
 
 /**

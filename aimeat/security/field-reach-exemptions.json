@@ -95,6 +95,7 @@
     "no-twin:GET /v1/tracked-responses": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (state) and no agent tool does the same job.",
     "no-twin:PATCH /v1/admin/prompts/:id": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (active, changeNote, locales) and no agent tool does the same job.",
     "no-twin:PATCH /v1/admin/scheduler/jobs/:id": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (enabled) and no agent tool does the same job.",
+    "no-twin:PATCH /v1/agents/:name/task-start-floor": "Only the owner in person may reach it, by design (decision-the-owner-can-let-an-agent-start-work-although-it-holds-a-fl, 2026-10-23): it lifts the task-start floor, the same act as pressing Start on a task the floor held, which no agent may do. An agent tool would let an agent loosen its own or a sibling's floor.",
     "no-twin:PATCH /v1/agents/:name/federate": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (federate) and no agent tool does the same job.",
     "no-twin:PATCH /v1/agents/:name/max-concurrent-tasks": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (max_concurrent_tasks) and no agent tool does the same job.",
     "no-twin:PATCH /v1/agents/:name/schedule-constraints": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (constraints, daily_spend_limit) and no agent tool does the same job.",

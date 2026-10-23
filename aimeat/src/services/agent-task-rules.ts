@@ -19,7 +19,11 @@
  *
  *     1. THE SAFETY FLOOR. An agent that can spend money, send mail as the owner, or speak or delete
  *        as the owner never starts a task by itself. Read from its permissions, live, on every call.
- *     2. THE PLAN'S OWN WORD. A proposed todo that declares a guarded effect holds the task too.
+ *        UNLESS THE OWNER DECIDED OTHERWISE: the owner in person may name, per agent, the floor
+ *        permissions it may start work with (`taskStartFloor`), and those stop holding it, paid or
+ *        free (Jouni, 2026-10-23). A floor permission they did not name still holds.
+ *     2. THE PLAN'S OWN WORD. A proposed todo that declares a guarded effect holds the task too,
+ *        except an effect whose floor permissions the owner accepted for this agent.
  *     3. The task's `startPolicy`, the creator's own word when the task was given ("check with me
  *        first", "just do it"). Absent on a task given without one.
  *     4. The agent's `taskStart`, the owner's standing answer, read when the decision is made, so a
@@ -45,6 +49,10 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.4.0 — 2026-10-23 — The owner's accepted floor (`taskStartFloor`): the floor permissions the
+ *     owner in person named for an agent stop holding its tasks, and so do the plan's effects of
+ *     those kinds. floorScopesOf() answers the permissions that still hold; acceptedFloorOf() the
+ *     ones the owner accepted (Jouni 2026-10-23, after the daily CVE agent waited every morning).
  *   v2.3.0 — 2026-10-18 — `*` stays on the floor only as the fallback for a narrowing that failed:
  *     a ready `*` agent is narrowed before the decision (services/scope-auto-narrow.ts, Jouni
  *     2026-10-18 superseding the hold half of ruling C).
@@ -100,7 +108,21 @@ export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }
  * startFactsOf() only when the agent holds `*`, its usage record is ready, and the narrowing it then
  * makes failed: the one case `*` still holds a task (fail closed).
  */
-type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt'>> & { wildcardReady?: boolean };
+type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt' | 'taskStartFloor'>> & { wildcardReady?: boolean };
+
+type FloorAgent = Partial<Pick<AgentRecord, 'defaultScopes' | 'taskStartFloor'>> & { wildcardReady?: boolean };
+
+/**
+ * The floor permissions this agent holds AND its owner in person accepted for it (`taskStartFloor`):
+ * the ones that no longer hold its tasks. A word the owner named that the agent does not hold is
+ * not answered, and `*` is never acceptable, so a wildcard agent cannot slip past the floor this way.
+ */
+export function acceptedFloorOf(agent: FloorAgent | null | undefined): string[] {
+    const accepted = new Set((agent?.taskStartFloor ?? []).filter(w => w !== '*'));
+    if (accepted.size === 0) return [];
+    const named = (agent?.defaultScopes ?? []).filter(s => s !== '*');
+    return TASK_START_FLOOR.filter(f => accepted.has(f.scope) && scopeIsCovered(named, f.scope)).map(f => f.scope);
+}
 
 /**
  * The floor permissions this agent's record grants BY NAME: the word itself or its domain wildcard
@@ -114,11 +136,15 @@ type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskSta
  * the owner rather than starting on `*`. Until the record is ready a `*` agent starts as it did. On
  * aimeat.io on 2026-10-02, 52 of the 53 task-runners of the busiest account held `*`; when the
  * floor held them all on 2026-10-16..18, the owner got one notice per task. `*` is reported as `'*'`.
+ *
+ * A floor permission the owner in person accepted for this agent (acceptedFloorOf) is not in the
+ * answer: it no longer holds the agent. Everything that reads "what holds this agent" reads this.
  */
-export function floorScopesOf(agent: (Partial<Pick<AgentRecord, 'defaultScopes'>> & { wildcardReady?: boolean }) | null | undefined): string[] {
+export function floorScopesOf(agent: FloorAgent | null | undefined): string[] {
     const held = agent?.defaultScopes ?? [];
     const named = held.filter(s => s !== '*');
-    const floor = TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope)).map(f => f.scope);
+    const accepted = new Set(acceptedFloorOf(agent));
+    const floor = TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope) && !accepted.has(f.scope)).map(f => f.scope);
     return held.includes('*') && agent?.wildcardReady ? ['*', ...floor] : floor;
 }
 
@@ -166,7 +192,10 @@ export function decideTaskStart(
     const policy = fromTask ? opts.policy as TaskStartPolicy : agentStartDefault(agent);
     const source = fromTask ? 'task' : (agent?.taskStart === 'automatic' || agent?.taskStart === 'confirm') ? 'agent' : 'mode';
     const floorScopes = floorScopesOf(agent);
-    const effects = declaredEffects(opts.todos);
+    // An effect of a kind the owner accepted a floor permission for does not hold the task. Any
+    // other floor permission of the same kind still held is in floorScopes and holds it there.
+    const acceptedKinds = new Set(TASK_START_FLOOR.filter(f => acceptedFloorOf(agent).includes(f.scope)).map(f => f.kind));
+    const effects = declaredEffects(opts.todos).filter(e => !acceptedKinds.has(e));
     const waitsBecause = agent?.stoppedAt ? 'stopped'
         : floorScopes.length > 0 ? 'floor'
         : effects.length > 0 ? 'effects'
