@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-23 — Sections 1 and 6: the account export and an erasure each leave one line in the node's
+ *     list of data subject requests (plan doc-mvlftkh9zmc9 C4.3; routes/owners/export.ts,
+ *     services/owner-erasure.ts v1.14.0).
  *   2026-10-22 — Section 4: payment holds and beneficiary shares are written only by the payment
  *     routes; the person in person deletes a finished one, and none is restored (secaudit2026oct22,
  *     utils/reserved-keys.ts, services/memory-bin.ts, routes/memory/bulk.ts).
@@ -121,6 +124,9 @@ What an export leaves out, and why:
 - **Credentials** (AI keys, payment keys, tokens) are written as "configured", never the secret. The
   person sets them again on the new system.
 - **Files** in the account export are listed, not included; take them with the bundle or one by one.
+- **The account export is logged** as an answered access request in the node's list of data subject
+  requests (the account name and when), so the people who run the node can show it was answered.
+  Nothing of the content goes there.
 - **Records under an organism's classification** are left behind by the memory export and the
   organism export and listed under \`left_out\`: they belong to the group's rules, not to one member.
   The account export includes them and names them, because the law gives a person their own records.
@@ -263,7 +269,9 @@ let knowledge age, and you should offer them, not wait to be asked:
   apps. It also takes their name out of every group's list of owners, admins and members, and takes
   back what other people granted to them and to their agents. What stays, under a pseudonym: finished
   work and disputes (the other party has a right to them), other people's ledger lines and receipts,
-  and AI provenance records. Their name becomes free for someone else.
+  and AI provenance records. One line stays in the node's list of data subject requests too: the
+  account name and when the erasure was done, as the proof that it was. Their name becomes free for
+  someone else.
 - **A group they alone own** cannot be left without an owner, and an erasure cannot ask. It goes to
   the first admin, or else to the first member, and that person becomes its creator. When nobody at
   all is left, nobody holds it and the people who run the node seat a new owner. Tell the person

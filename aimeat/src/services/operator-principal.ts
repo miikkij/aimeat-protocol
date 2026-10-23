@@ -34,6 +34,8 @@
  *   const name = await operatorName(storage, { sub: agentGaii, roles: ['agent'], scopes });
  *   if (!name) return refuse(OPERATOR_AGENT_REFUSAL);
  * @version-history
+ *   v1.0.2 — 2026-10-23 — actsForSomeone is exported, for the compliance documents' access check
+ *     (services/compliance-docs-access.ts). Nothing it answers changed.
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-09-24 — Initial (security audit A8-1): one question for every operator check.
  *     resolveOperatorAgentName and OPERATOR_AGENT_REFUSAL moved here from owner-lifecycle.ts, which
@@ -66,7 +68,8 @@ export type OperatorAnswer =
 /** The roles that mean the principal acts for someone rather than being them. */
 const ACTS_FOR_SOMEONE = ['agent', 'app', 'ecosystem'];
 
-function actsForSomeone(caller: OperatorCaller): boolean {
+/** Does this principal act for someone (an agent, an app, an ecosystem app) rather than being them? */
+export function actsForSomeone(caller: OperatorCaller): boolean {
   if (caller.roles) {
     const roles = caller.roles;
     return roles.some((r) => ACTS_FOR_SOMEONE.includes(r)) || !(roles.includes('owner') || roles.includes('operator'));

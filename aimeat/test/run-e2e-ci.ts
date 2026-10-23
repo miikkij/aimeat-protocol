@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-23 -- e2e-compliance-records.ts and e2e-classification-packs.ts join the list (not the guard tier): the records of processing and the documents beside them, and the TL and NATO label packs (plan doc-mvlftkh9zmc9).
  *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
  *   2026-10-22 -- e2e-account-events-task-keep.ts joins the list (not the guard tier): an app grant made before the update keeps a task's title and reason in the event record, on its own node on 40987 (secaudit 2026-10, v89).
  *   2026-10-22 -- e2e-workflow-organism-writes.ts and e2e-unattended-publish-gate.ts join the list (not the guard tier): a workflow step's answer to an organism key meets the organism rule, and an extension's or a workflow's public file or package meets the publish gate, the latter on its own node on 40949 (secaudit 2026-10, r66, v68, v69).
@@ -968,6 +969,12 @@ const ALL_SUITES = [
     // A label's audience cap: the refusal at every kind of place that sets who may read, the owner's
     // override with a reason, the publish request held to it again, a rise that lowers (plan doc-mvdipuyqraas, L3).
     'test/e2e-classification-audience-cap.ts',
+    // The records of processing, data domains, requests, breaches, frameworks and processors of the
+    // node, an organism and an app, over REST and MCP, and their refusals (plan doc-mvlftkh9zmc9).
+    'test/e2e-compliance-records.ts',
+    // The TL and NATO label packs: switching, the markings they recognise, and content that only a
+    // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
+    'test/e2e-classification-packs.ts',
     // Owns its node on 40492 and boots one database three times: a new node takes the default audience
     // caps, the same database made a pre-cap node is offered them on the Security page and takes each
     // on the operator's decision, with no content level changed (plan doc-mvdipuyqraas, L5).

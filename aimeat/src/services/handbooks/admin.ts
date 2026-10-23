@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.19.0 -- 2026-10-23 -- Security classes (the TL and NATO packs) and the records of processing (plan doc-mvlftkh9zmc9).
  *   v1.18.1 -- 2026-10-18 -- The default limits' offer waits until classification is switched on.
  *   v1.18.0 -- 2026-10-18 -- Classification: the default limits a new node takes, and the Security page
  *     incident that offers them on a node that ran before (plan doc-mvdipuyqraas, L5.1).
@@ -151,6 +152,23 @@ only as the operator says. No content changes either way. The node level (\`poli
 \`level: "node"\`) needs the operator in person, or you with the \`operator:admin\` permission the
 operator ticked for you. If this surface does not list
 \`aimeat_classification\`, it is on the agent surface and the full MCP endpoint.
+
+**Security classes (operator).** \`aimeat_classification\` with \`action: "pack_list"\` shows the two
+label packs, the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to
+COSMIC TOP SECRET), and \`pack_set\` (\`pack\`, \`on\`, \`up_to\`) switches one on up to a class. The
+two highest classes of each need \`acknowledge_not_accredited: true\`: tell the operator first that
+this node is not an accredited system (Katakri, Traficom, NATO), and set it only when they say so.
+Every class reaches only a model on this machine (\`externalAi: refused\`), never leaves its
+organism and is audited; the markings in upper case ("TL III", "NATO SECRET") raise what they are in.
+
+**Records of processing (operator).** \`aimeat_compliance_register_read\` with \`part: "catalog"\`
+lists the data domains, the frameworks with their questions and the packs. \`part: "registers_draft"\`
+gives the node's own registers as a draft; read it with the operator and save it with
+\`aimeat_compliance_register_write\` (\`part: "registers"\`, \`value: { items }\`, \`dry_run\` first).
+The same tools keep \`processors\` (add the contract date, country and transfer basis to each),
+\`requests\`, \`breaches\`, \`dpias\` and \`frameworks\`, and \`part: "gaps"\` says what is open. Pass
+\`scope: "organism"\` and \`organism_id\`, or \`scope: "app"\`, \`app\` and \`app_owner\`, to read an
+organism's or an app's; you read every one and write only the node's.
 
 **Install sets (operator).** \`aimeat_admin_install_set\` sets this node up for a customer from an
 install bundle bought from a package repository: the owner user, the packages, the organisms and
