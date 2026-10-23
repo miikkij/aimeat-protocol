@@ -11,6 +11,8 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-23 — flagOrphanPeerApprovalsOnce after the peer registry loads, with its node ids: the approved
+ *     peering requests no peer stands behind go to the Security page (secaudit2026oct22).
  *   2026-10-22 — setStepMemoryWrite(writeMemoryRecord): a workflow step's answer to an `organism.*` key
  *     is written through the shared memory write (services/workflow/step-write.ts; secaudit 2026-10, r66).
  *   2026-10-21 — The once-only keep steps (keepAppExtensionSchedulesOnce and the scope chain through
@@ -135,6 +137,7 @@ import { migrateMailReadConsent } from '../services/mail-read-consent.js';
 import { migrateBasicAgentsTaskStartOnce, grantPurgeToAppGrantsOnce } from '../services/task-start-migrations.js';
 import { migrateImplicitFreeModelOnce } from '../services/openrouter-settings-migration.js';
 import { runOnceOnlyKeepSteps } from './once-only-keep-steps.js';
+import { flagOrphanPeerApprovalsOnce } from '../services/federation-orphan-approvals.js';
 import { migrateOperatorAdminOnce } from '../services/operator-admin-migration.js';
 import { migrateAppToolsKeysOnce } from '../services/app-tools-key.js';
 import { sealStoredPspRecords } from '../commerce/psp-secrets.js';
@@ -481,6 +484,10 @@ export async function initializeServices(
   // The credential check reads this live registry on every visitor request, so a peer the operator
   // removes or restricts ends its visitors' sessions at once (auth/visitor-peer.ts).
   registerVisitorPeers(peers, config.nodeId);
+  // Once per node: the approved peering requests no peer stands behind are named on the Security page,
+  // none changed (services/federation-orphan-approvals.ts). Reads the registry loaded just above.
+  await flagOrphanPeerApprovalsOnce(storage, config, peers.keys())
+    .catch(err => logger.error('Failed to look for approved peering requests without a peer; the next boot tries again', { error: String(err) }));
 
   // The daily package update check needs the peers, so its handler is registered here rather than
   // with the other core handlers above (services/packages/peer/package-upstream-refresh.ts).

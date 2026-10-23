@@ -236,13 +236,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-23",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:fea493a0cd43398dfbe793c6"
+      "digest": "sha256:2644a91f0772f91b4c42d6f3"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-18",
@@ -325,7 +325,7 @@
       "digest": "sha256:d5d56e4feb12045d38ef59c4"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-23",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:9a8f918f03a525756e510620"
+      "digest": "sha256:f030b44047041152d7541e5a"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -618,7 +618,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "7c55889f06008cad",
-      "aimeat/src/routes/ghii/register-login.ts": "5f61c62761b5e510",
+      "aimeat/src/routes/ghii/register-login.ts": "c60b76bc22aaea67",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
@@ -741,7 +741,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/cli/connect/mcp/local-server.ts": "cebe16fc0210cc3e",
       "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d",
-      "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
+      "aimeat/src/routes/organisms/workspace-access.ts": "6bee2a50409a1cf7",
       "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
       "aimeat/src/services/agent-task-rules.ts": "b3fcbcce4708f37d"
     },

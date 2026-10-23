@@ -8,7 +8,8 @@
  *   Node: 40277 aimeat-test-001-nodeinfo.
  * @version-history
  *   v1.1.2 -- 2026-10-23 -- The operator comes from setupOperator (a password and the password
- *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22). Test 6: an
+ *     owner who is not an operator cannot add or change a peer (403).
  *   v1.1.1 -- 2026-10-16 -- The node this suite starts follows the run's backend
  *     (test/helpers/own-node-db.ts); it was SQLite in memory on both runs (QA audit P1-02).
  *   v1.1.0 -- 2026-10-12 -- Test 3's ping carries the audience proof (audienceProof). Node 4.0.0 refuses
@@ -26,7 +27,7 @@ import { loadConfig } from '../src/config.js';
 import { audienceProof } from '../src/services/signed-node-request.js';
 import type { Server } from 'node:http';
 import { ownNodeDb } from './helpers/own-node-db.js';
-import { setupOperator } from './helpers/owner-login.js';
+import { registerOwner, setupOperator } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -131,6 +132,14 @@ await test('5. the ping is refused unsigned and tampered, and the peer record do
   assert(afterRow?.software_version === '9.9.9', `a refused ping must not stamp the record: ${afterRow?.software_version}`);
   assert(afterRow?.last_seen === beforeSeen, `a refused ping must not move last_seen: ${beforeSeen} → ${afterRow?.last_seen}`);
   assert(afterRow?.status === 'active', `and must not change status: ${afterRow?.status}`);
+});
+
+await test('6. an owner who is not an operator cannot add a peer or change one (403)', async () => {
+  const plain = await registerOwner(BASE, `niplain${Date.now()}`);
+  const add = await json('/v1/federation/peers', { method: 'POST', headers: auth(plain.token), body: JSON.stringify({ node_id: 'aimeat-test-001-niother', url: 'http://localhost:49981', public_key: peerPubB64 }) });
+  assert(add.status === 403, `add a peer as a plain owner: expected 403, got ${add.status}: ${JSON.stringify(add.body)}`);
+  const put = await json(`/v1/federation/peers/${PEER}`, { method: 'PUT', headers: auth(plain.token), body: JSON.stringify({ status: 'suspended' }) });
+  assert(put.status === 403, `change a peer as a plain owner: expected 403, got ${put.status}: ${JSON.stringify(put.body)}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

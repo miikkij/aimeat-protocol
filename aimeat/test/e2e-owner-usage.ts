@@ -16,7 +16,8 @@
  *     owner A's summary. NOT asserted: that a write leaves the other owner's ENTRY standing —
  *     invalidation is by domain tag, so any memory write drops every owner's usage entry.
  *   v1.2.1 — 2026-10-23 — The admin-registered owners get a password and sign in with it; POST
- *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
+ *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22). An owner who is not an
+ *     operator cannot delete another owner's account (403).
  */
 // Run: cd aimeat && pnpm exec tsx test/e2e-owner-usage.ts
 
@@ -25,7 +26,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
-import { ownerSignIn, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { ownerSignIn, registerOwner, setupOperator, OWNER_PASSWORD } from './helpers/owner-login.js';
 
 const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40261', 10);
 const BASE = process.env.E2E_BASE ?? `http://localhost:${TEST_PORT}`;
@@ -200,6 +201,18 @@ await test('A write by one owner never turns the other owner\'s summary into the
     const aAgain = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });
     assert(aAgain.body.data.owner === ownerName, `A still gets A: ${aAgain.body.data.owner}`);
     assert(aAgain.body.data.memory.used_keys > cachedKeys, `A's count rose after A's write: ${aAgain.body.data.memory.used_keys}`);
+});
+
+// B above is an operator (setupOperator), and an operator may delete an account on the operator
+// trail; an owner who is not one may not.
+await test('An owner who is not an operator cannot delete another owner\'s account (403), and the account stays', async () => {
+    const plain = await registerOwner(BASE, `usageplain${Date.now()}`);
+    const r = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${plain.token}` } });
+    assert(r.status === 403, `a plain owner deletes A: expected 403, got ${r.status} ${JSON.stringify(r.body)}`);
+    const a = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(a.status === 200 && a.body.data.owner === ownerName, `A's account is still there: ${a.status}`);
+    const gone = await json(`/v1/owners/${encodeURIComponent(plain.name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${plain.token}` } });
+    assert(gone.status === 200, `the plain owner deletes their own account: ${gone.status}`);
 });
 
 await test('Cleanup owners', async () => {
