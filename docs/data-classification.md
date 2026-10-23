@@ -150,6 +150,11 @@ classification of every workspace, organism or app it names to that floor, never
 person set lower waits for them as a suggestion. Health, biometric, defence and export-controlled
 data refuse an outside model, and a domain that needs an impact assessment makes a missing one a gap.
 
+**What an app's users see.** An app's data map read (`GET /v1/datamap/apps/{owner}/{filename}`,
+`aimeat_datamap_get`) carries `records_of_processing`, each register's title, type, purpose, legal
+basis, data and retention, and `privacy_notice`, for the same readers as the map. The App Catalog's
+"Where this app puts what" shows them as "Personal data this app keeps".
+
 **Drafts and gaps.** `GET /v1/compliance/draft` hands a filled draft: the node's own registers
 (accounts, the sign-in and security log, the consent ledger, the AI usage ledger), an organism's member
 register, or an app's register read from its data map. `GET /v1/compliance/gaps` lists what a scope

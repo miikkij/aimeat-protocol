@@ -189,6 +189,11 @@ await test('APP: the data map says personal data, the draft makes a register of 
     assert(other.status === 404, `bob, alice's app: ${other.status} ${JSON.stringify(other.body?.error)}`);
     const opRead = await call('GET', `/v1/compliance/docs/registers?${q({ ...app, app_owner: alice.name })}`, op.token);
     assert(opRead.status === 200 && opRead.body.data.items.length === 1, `the operator reads it: ${opRead.status}`);
+    // C1.7: whoever may read the app's map reads what personal data it keeps, and whether it has a privacy notice.
+    const visitor = await call('GET', `/v1/datamap/apps/${alice.name}/${APP}`, bob.token);
+    assert(visitor.status === 200 && visitor.body.data.records_of_processing?.length === 1 && visitor.body.data.privacy_notice === false,
+        `the map's reader: ${visitor.status} ${JSON.stringify(visitor.body?.data?.records_of_processing)}`);
+    assert(visitor.body.data.records_of_processing[0].controller === undefined, 'the register\'s other fields stay with its owner');
 });
 
 // ─── Requests, breaches, frameworks, processors ───

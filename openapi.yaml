@@ -17879,6 +17879,12 @@ paths:
         operator hid, an app behind an access code and an unlisted app to its owner's account and an
         operator; an app listed to the community also to every signed-in member of this node.
         Everyone else gets the same 404 as for an app that does not exist.
+
+        `records_of_processing` is the app's records of processing as its owner wrote them (GDPR
+        art. 30; PUT /v1/compliance/docs/registers?scope=app): each register's title, type, purpose,
+        legal basis, data, regulated data and retention, for the same readers as the map. The
+        register's other fields stay with its owner and the operator. `privacy_notice` says whether
+        the app publishes a privacy notice of its own among its legal pages.
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }

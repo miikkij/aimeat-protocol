@@ -12,6 +12,9 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-10-24 — readProgramMap answers the app's records of processing (title, type, purpose, legal
+ *     basis, data, regulated data, retention) and whether it has a privacy notice, to whoever may read
+ *     the map (plan doc-mvlftkh9zmc9, C1.7).
  *   2026-10-22 — handsOnKey takes the CallerContext and answers by the owner-scope read rule: the full union for the owner in person, an app grant and an agent holding memory:read-as-owner; for any other same-owner caller its own namespace plus the records a same-owner reader may see; for an ecosystem app or a visitor its own namespace only. The organism rule applies, the rows are newest first, and the REST route calls it too (secaudit 2026-10, v88).
  *   2026-10-18 — The map carries the optional `invites` statement through a write, and every read and write checks the map against the app's declared scopes (declaredScopesOf), so an app asking for organism:invite whose map does not say it invites people has the finding DATAMAP_INVITES_UNSTATED. putProgramMap answers the findings too (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-16 — readProgramMap answers the map of an app an operator hid, an app behind an access code, an unlisted app or a community-listed app only to a caller who may see that app (the owner's account, an operator, and for a community listing any signed-in member of this node); everyone else gets the 404 of an app that does not exist. The caller 'node' is the node's own check (decide service) and passes. (QA audit list review).
@@ -39,6 +42,8 @@ import type { CallerContext } from '../caller-context.js';
 import { readsAsOwner, visibleToSameOwnerReader, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
 import { organismReadableRecords } from '../organism-namespace-access.js';
 import { ecoMayReadKey } from '../ecosystem-access.js';
+import { readDoc } from '../compliance-docs.js';
+import type { ComplianceRegister } from '../compliance-docs-schemas.js';
 
 export interface DataMapRefusal {
   refusal: { status: number; code: string; message: string };
@@ -51,6 +56,15 @@ export interface ProgramMapResult {
   stamp: DataMapStamp;
   /** Owner-only: everything still missing from the map, worst first. */
   findings?: { code: string; message: string }[];
+  /**
+   * The app's records of processing as whoever may read the map reads them (plan doc-mvlftkh9zmc9,
+   * C1.7): what personal data it keeps, why, on what basis and for how long. The register's other
+   * fields (controller details, processors, security) stay with its owner and the operator. Answered
+   * by the read; a write answers the map alone.
+   */
+  records?: Array<Pick<ComplianceRegister, 'title' | 'type' | 'purpose' | 'purposeText' | 'legalBasis' | 'dataCategories' | 'domains' | 'retentionMonths' | 'retentionText'>>;
+  /** Whether the app publishes a privacy notice of its own (its `legal.privacy` page). Read only. */
+  privacyNotice?: boolean;
 }
 
 /** Who is asking, in the terms every door already resolves. */
@@ -131,11 +145,17 @@ export async function readProgramMap(
   const stamp = stampFor(map, appId, at, scopes);
   if (!isOwn) delete stamp.gap;
 
+  const registers = (await readDoc(storage, config.nodeId, 'registers', { kind: 'app', ownerName: record.ownerName, app: ref.filename })).items;
   return {
     app: appRef,
     dataMap: map,
     stamp,
     ...(isOwn ? { findings: check.findings } : {}),
+    records: registers.map(r => ({
+      title: r.title, type: r.type, purpose: r.purpose, purposeText: r.purposeText, legalBasis: r.legalBasis,
+      dataCategories: r.dataCategories, domains: r.domains, retentionMonths: r.retentionMonths, retentionText: r.retentionText,
+    })),
+    privacyNotice: !!record.manifest?.legal?.privacy,
   };
 }
 
