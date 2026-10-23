@@ -17,6 +17,7 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.0.1 — 2026-10-24 — retentionMonths takes up to 2 400 months: a patient record's 120 years was refused.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.1, C4.1, C4.3, C5.1, C5.2, C6).
  */
 import { z } from 'zod';
@@ -63,8 +64,11 @@ export const RegisterSchema = z.object({
   recipients: list().optional(),
   processors: z.array(z.string().max(120)).max(50).optional(),
   transfers: z.array(z.object({ country: z.string().max(60), basis: z.enum(['adequacy', 'scc', 'dpf', 'bcr', 'derogation', 'none']) })).max(30).optional(),
-  /** How long, in months; null or absent while nobody has said. */
-  retentionMonths: z.number().int().min(0).max(1200).nullable().optional(),
+  /**
+   * How long, in months; null or absent while nobody has said. Up to 200 years: a Finnish patient
+   * record is kept 120 years from the patient's birth (1 440 months), which a 100-year cap refused.
+   */
+  retentionMonths: z.number().int().min(0).max(2400).nullable().optional(),
   retentionText: text().optional(),
   security: text().optional(),
   automatedDecisions: z.boolean().optional(),
