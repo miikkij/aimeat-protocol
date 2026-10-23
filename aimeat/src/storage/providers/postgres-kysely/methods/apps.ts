@@ -30,6 +30,9 @@
  *     listing return other owners' community apps (migration 0102).
  *   v1.8.0 — 2026-10-17 — `access` (who may open the app): createApp writes it, both readers carry
  *     it, and setAppAccess sets it on every version row (migration 0104).
+ *   v1.8.1 — 2026-10-23 — getApp, getAppByOwnerName, getLatestVersionNumber and updateAppMeta read
+ *     with LIMIT 1. executeTakeFirst() adds no LIMIT, so each read fetched every version row with its
+ *     content: 503 versions and 1 041 MB for one app, which stalled aimeat.io at 06:56 that day.
  */
 import { sql } from 'kysely';
 import { mergeLegal } from '../../../types/apps.js';
@@ -250,14 +253,14 @@ export const appMethods = {
   async getApp(this: PostgresKyselyStorage, ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {
     let q = this.db.selectFrom('App').selectAll().where('ownerGaii', '=', ownerGaii).where('filename', '=', filename);
     if (version !== undefined) q = q.where('versionNumber', '=', version);
-    const r = await q.orderBy('versionNumber', 'desc').executeTakeFirst();
+    const r = await q.orderBy('versionNumber', 'desc').limit(1).executeTakeFirst();
     return r ? toApp(r) : null;
   },
 
   async getAppByOwnerName(this: PostgresKyselyStorage, ownerName: string, filename: string, version?: number): Promise<AppRecord | null> {
     let q = this.db.selectFrom('App').selectAll().where('ownerName', '=', ownerName).where('filename', '=', filename);
     if (version !== undefined) q = q.where('versionNumber', '=', version);
-    const r = await q.orderBy('versionNumber', 'desc').executeTakeFirst();
+    const r = await q.orderBy('versionNumber', 'desc').limit(1).executeTakeFirst();
     return r ? toApp(r) : null;
   },
 
@@ -311,7 +314,7 @@ export const appMethods = {
   },
 
   async getLatestVersionNumber(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<number> {
-    const r = await this.db.selectFrom('App').select('versionNumber').where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).orderBy('versionNumber', 'desc').executeTakeFirst();
+    const r = await this.db.selectFrom('App').select('versionNumber').where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).orderBy('versionNumber', 'desc').limit(1).executeTakeFirst();
     return r?.versionNumber ?? 0;
   },
 
@@ -342,7 +345,7 @@ export const appMethods = {
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue shows). Read the current
     // manifest, merge only the supplied fields, write it back — the URL (owner/filename) is untouched.
-    const latest = await this.db.selectFrom('App').selectAll().where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).orderBy('versionNumber', 'desc').executeTakeFirst();
+    const latest = await this.db.selectFrom('App').selectAll().where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).orderBy('versionNumber', 'desc').limit(1).executeTakeFirst();
     if (!latest) return false;
     const manifest = { ...(latest.manifest as unknown as AppManifest) };
     if (meta.name !== undefined) manifest.name = meta.name;

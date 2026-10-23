@@ -8,6 +8,7 @@
  *   the owner's grant list, and revoke. Translated 1:1 from the SQLite/Prisma implementations — `scopes`
  *   is a native Postgres text[] column; timestamps are ISO on the record, Date in the column.
  * @version-history
+ *   v1.5.1 — 2026-10-23 — The freshest-grant read takes LIMIT 1 (check:unbounded-lists).
  *   v1.5.0 — 2026-10-18 — setAppGrantScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
  *   v1.4.0 — 2026-09-26 — ownerAddedScopes (migration 0084): the words the owner added by hand.
  *   v1.0.0 — 2026-07-16 — Phase 5: app-grant tokens on Postgres+Kysely.
@@ -62,6 +63,7 @@ export const appGrantMethods = {
     const r = await this.db.selectFrom('AppGrant').selectAll()
       .where('owner', '=', owner).where('app', '=', app).where('revoked', '=', false)
       .orderBy('lastUsedAt', (ob) => ob.desc().nullsLast()).orderBy('createdAt', 'desc')
+      .limit(1)
       .executeTakeFirst();
     return r ? toGrant(r) : null;
   },

@@ -10,6 +10,7 @@
  *   Mongo backend), a unique-version clash surfaces as PACKAGE_EXISTS, and archivePackageGroup flips every
  *   still-live version to archived.
  * @version-history
+ *   v1.3.1 — 2026-10-23 — getLatestPublished reads with LIMIT 1 (check:unbounded-lists).
  *   v1.3.0 — 2026-10-02 — countPackageGroups: the author's package groups with a version not archived,
  *     which the per-author quota counts (it counted version rows).
  *   v1.2.0 — 2026-09-28 — An instance carries `mode` (managed | editable) and `forkedAt` (migration 0087),
@@ -107,7 +108,7 @@ export const packageMethods = {
   async getLatestPublished(this: PostgresKyselyStorage, groupId: string): Promise<PackageRecord | null> {
     const r = await this.db.selectFrom('Package').selectAll()
       .where('packageGroupId', '=', groupId).where('status', '=', 'published')
-      .orderBy('version', 'desc').executeTakeFirst();
+      .orderBy('version', 'desc').limit(1).executeTakeFirst();
     return r ? toPackage(r) : null;
   },
 

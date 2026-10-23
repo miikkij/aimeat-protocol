@@ -10,6 +10,7 @@
  *   groups by agent then folds status/doneToday/lastTaskUpdateAt/lastFailedAt, findStalledTasks compares
  *   lastEventAt to a now-threshold. Delete cascades the event log and refuses an 'active' task.
  * @version-history
+ *   2026-10-23 — findLiveTaskByDedupeKey reads with LIMIT 1 (check:unbounded-lists).
  *   2026-10-02 — startPolicy on insert, update and read (migration 0092).
  *   2026-10-01 — countTasksByOwner also returns doneWeek, done tasks of the last 7 days.
  *   2026-08-15 — createdBy on insert and read (migration 0037).
@@ -113,6 +114,7 @@ export const agentTaskMethods = {
       .where('dedupeKey', '=', dedupeKey)
       .where('status', 'in', [...LIVE_TASK_STATUSES])
       .orderBy('createdAt', 'desc')
+      .limit(1)
       .executeTakeFirst();
     return r ? toTask(r) : null;
   },
