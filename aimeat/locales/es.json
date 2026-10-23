@@ -244,8 +244,7 @@
           "organism_import": "importación de organismo",
           "app_backup": "copia de seguridad de una app",
           "full_identity_move": "actualización al iniciar",
-          "workspace_schema_relock": "revisión de los bloqueos de los espacios de trabajo al iniciar",
-          "start": "arranque del servidor"
+          "workspace_schema_relock": "revisión de los bloqueos de los espacios de trabajo al iniciar"
         },
         "kept": "{size} guardados",
         "notKept": "no guardado, demasiado grande",
@@ -484,6 +483,25 @@
         "next": "Mostrar las 200 siguientes",
         "shown": "{n} filas mostradas",
         "shownOne": "1 fila mostrada"
+      },
+      "packs": {
+        "title": "Clases de seguridad",
+        "lead": "Las clases de seguridad finlandesas TL IV, TL III, TL II y TL I, y las clases de la OTAN. El contenido con una de estas clases solo lo lee un modelo en esta máquina, nunca sale de su lugar compartido y cada uso queda registrado. Una marca en mayúsculas, como \"TL III\" o \"NATO SECRET\", sube la clasificación del contenido en el que aparece.",
+        "upTo": "Clase más alta",
+        "acknowledge": "Entiendo que esta instalación no es un sistema acreditado para esta clase.",
+        "on": "Activar",
+        "change": "Cambiar",
+        "off": "Desactivar",
+        "nowOn": "Activadas: {classes}",
+        "nowOff": "Desactivadas.",
+        "stateOn": "Activadas",
+        "stateTop": "Activadas, clases superiores",
+        "stateOff": "Desactivadas",
+        "waits": "El cambio espera a que el operador lo apruebe en persona.",
+        "switchedOn": "Activadas.",
+        "switchedOff": "Desactivadas. El contenido que tiene una de estas clases la conserva.",
+        "failed": "El cambio no se guardó.",
+        "notAccredited": "Esta instalación marca y restringe el contenido clasificado. No es un sistema acreditado para ese contenido (Katakri, Traficom, OTAN)."
       }
     },
     "ext": {
@@ -2493,10 +2511,191 @@
         "owner-your-slice": "Solo lo tuyo. Nada en esta página describe la actividad de otra persona, y nadie más ve la tuya aquí.",
         "owner-register-is-the-operators": "El registro de para qué se usa la IA lo mantiene quien administra esta instalación, no tú. Abajo están las entradas que nombran tu cuenta. Si falta algo tuyo, eso es una conversación con esa persona y no algo que puedas arreglar aquí.",
         "owner-provenance-off": "El registro está desactivado en esta instalación, y eso no lo configuraste tú. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no hayas hecho nada.",
-        "shares-open-only": "Aquí cuenta como pública una página de un espacio de trabajo compartida con un enlace abierto. Una página compartida con contraseña o solo con cuentas que iniciaron sesión no cuenta: quienes la leen no son el público en general, así que no necesita la etiqueta de IA y no se cuenta como pública."
+        "shares-open-only": "Aquí cuenta como pública una página de un espacio de trabajo compartida con un enlace abierto. Una página compartida con contraseña o solo con cuentas que iniciaron sesión no cuenta: quienes la leen no son el público en general, así que no necesita la etiqueta de IA y no se cuenta como pública.",
+        "registers-are-statements": "Los registros de actividades de tratamiento, las evaluaciones de impacto y las respuestas sobre normas son lo que escribieron el operador, los administradores de los lugares compartidos y los dueños de las aplicaciones. Aquí se contrastan con lo que registra esta instalación (mapas de datos, clasificaciones, plazos). No se pueden contrastar con la realidad.",
+        "external-ai-claim-unverified": "Un agente que declara un modelo local lee contenido cuya clasificación rechaza un modelo externo. Esta instalación anota esa declaración y no puede comprobarla. Se da por hecho que un modelo cuyo nombre empieza por local: funciona en esta máquina.",
+        "not-accredited": "Las clases TL y OTAN marcan, reconocen y restringen el contenido clasificado. No convierten esta instalación en un sistema acreditado (Katakri, aprobación de Traficom, acreditación de la OTAN).",
+        "app-scan-listed-only": "El informe lee los mapas de datos de las aplicaciones que muestra el catálogo y de toda aplicación con un registro. Una aplicación apartada u oculta solo se lee cuando tiene un registro.",
+        "federation-peers-not-processors": "Las instalaciones socias no están en la lista de encargados. Una copia que va a otra instalación la detiene su clasificación (no puede salir de su lugar compartido) y no se anota como transferencia."
       },
       "gapFonts": "Fuentes sin datos de licencia",
-      "toFonts": "A Fuentes"
+      "toFonts": "A Fuentes",
+      "records": {
+        "title": "Registro de actividades de tratamiento",
+        "lead": "Qué datos personales guardan esta instalación, sus lugares compartidos y sus aplicaciones, de quién, para qué y durante cuánto tiempo, y los documentos que lo acompañan. Tu IA los escribe con el prompt de la sección 10. Esta sección muestra en qué punto están.",
+        "registers": "Registros",
+        "registersWhy": "{personal} contienen datos personales. Esta instalación {node}, lugares compartidos {organism}, aplicaciones {app}.",
+        "domains": "Datos regulados",
+        "domainsNone": "Ningún registro nombra datos regulados.",
+        "requests": "Solicitudes de las personas",
+        "requestsWhy": "{open} abiertas. Una exportación de cuenta y una eliminación de cuenta añaden aquí una línea por sí solas.",
+        "breaches": "Violaciones de datos",
+        "breachesWhy": "{open} abiertas.",
+        "dpias": "Evaluaciones de impacto",
+        "dpiasWhy": "Un registro con datos de salud, biométricos u otros datos especiales necesita una.",
+        "processors": "Encargados del tratamiento",
+        "processorsWhy": "{n} tratan datos fuera de la UE y del EEE, o nadie anotó dónde.",
+        "processorsNone": "Todos dentro de la UE y del EEE.",
+        "packs": "Clases de seguridad",
+        "packsNone": "Desactivadas. Las activas en la página Seguridad.",
+        "unanswered": "{n} sin responder",
+        "gapsTitle": "Lo que el registro deja pendiente",
+        "gapsNone": "No hay nada pendiente.",
+        "promptTitle": "Pide a tu IA que mantenga el registro",
+        "promptCopy": "Copiar el prompt",
+        "promptNote": "Pega esto en tu propio chat con una IA. Lee lo que hay aquí, te pregunta lo que solo tú sabes, te muestra el resultado y espera tu sí.",
+        "promptLabel": "El prompt",
+        "printTitle": "Registro de actividades de tratamiento (artículo 30 del RGPD)",
+        "printEmpty": "Aquí aún no hay ningún registro.",
+        "field": {
+          "type": "Tipo",
+          "purpose": "Finalidad",
+          "role": "Función",
+          "controller": "Responsable",
+          "legalBasis": "Base jurídica",
+          "subjects": "De quién son los datos",
+          "categories": "Datos",
+          "domains": "Datos regulados",
+          "recipients": "Destinatarios",
+          "processors": "Encargados",
+          "transfers": "Transferencias",
+          "retention": "Plazo de conservación",
+          "security": "Seguridad",
+          "reviewed": "Revisado"
+        },
+        "purpose": {
+          "customer": "Clientes",
+          "member": "Socios",
+          "employee": "Personal",
+          "patient": "Pacientes",
+          "marketing": "Marketing",
+          "research": "Investigación",
+          "camera": "Videovigilancia",
+          "service-operation": "Funcionamiento del servicio",
+          "other": "Otra"
+        },
+        "role": {
+          "controller": "Responsable del tratamiento",
+          "processor": "Encargado del tratamiento",
+          "joint-controller": "Corresponsable del tratamiento"
+        },
+        "basis": {
+          "consent": "Consentimiento",
+          "contract": "Contrato",
+          "legal-obligation": "Obligación legal",
+          "vital-interests": "Intereses vitales",
+          "public-task": "Misión de interés público",
+          "legitimate-interests": "Interés legítimo"
+        },
+        "type": {
+          "personal": "Datos personales",
+          "pseudonymised": "Seudonimizados",
+          "anonymised": "Anonimizados",
+          "none": "Sin datos personales"
+        },
+        "domain": {
+          "health": "Salud",
+          "special-category": "Categorías especiales",
+          "biometric-genetic": "Datos biométricos y genéticos",
+          "children": "Menores",
+          "criminal": "Infracciones penales",
+          "employment": "Relación laboral",
+          "payment-financial": "Pagos y finanzas",
+          "public-authority": "Datos de autoridades públicas",
+          "defence-classified": "Defensa e información clasificada",
+          "export-controlled": "Control de exportaciones",
+          "privileged-trade-secret": "Secreto profesional y comercial"
+        },
+        "framework": {
+          "gdpr": "RGPD",
+          "nis2": "NIS2",
+          "dora": "DORA",
+          "cra": "Ley de Ciberresiliencia",
+          "eaa": "Acta Europea de Accesibilidad",
+          "dsa": "Ley de Servicios Digitales",
+          "hipaa": "HIPAA",
+          "export-control": "Control de exportaciones"
+        },
+        "pack": {
+          "tl": "TL",
+          "nato": "OTAN"
+        },
+        "kind": {
+          "register-without-legal-basis": "Un registro sin base jurídica",
+          "register-without-special-basis": "Datos especiales sin fundamento del artículo 9",
+          "register-without-retention": "Un registro que no dice cuánto tiempo se guardan los datos",
+          "register-review-overdue": "Un registro sin revisar a tiempo",
+          "register-unknown-domain": "Un ámbito de datos desconocido",
+          "register-domain-without-container": "Datos regulados sin ningún lugar indicado",
+          "domain-label-below-floor": "Un lugar con una clasificación más baja de la que piden sus datos",
+          "dpia-missing": "Falta una evaluación de impacto",
+          "dpia-incomplete": "Una evaluación de impacto sin terminar",
+          "dpia-overdue": "Una evaluación de impacto sin revisar a tiempo",
+          "dpia-needs-prior-consultation": "Un riesgo alto que primero va a la autoridad",
+          "request-overdue": "Una solicitud fuera de plazo",
+          "breach-risk-unassessed": "Una violación cuyo riesgo nadie ha evaluado",
+          "breach-notification-overdue": "Una violación no notificada en 72 horas",
+          "breach-subjects-not-notified": "Personas a las que no se avisó de una violación de alto riesgo",
+          "breach-hipaa-overdue": "Una violación HIPAA de más de 60 días",
+          "framework-unanswered": "Una norma con preguntas sin responder",
+          "app-personal-data-without-register": "Una aplicación con datos personales y sin registro",
+          "app-personal-data-unstated": "Una aplicación que no dice qué son datos personales",
+          "app-register-without-privacy-notice": "Una aplicación sin aviso de privacidad",
+          "retention-conflict": "Un registro y un mapa de datos que no coinciden",
+          "processor-without-dpa": "Un encargado sin contrato",
+          "processor-country-unknown": "Un encargado en un país desconocido",
+          "transfer-without-basis": "Una transferencia fuera de la UE sin base",
+          "processor-without-baa": "Un encargado sin acuerdo HIPAA",
+          "processor-not-itar-eligible": "Un encargado que no puede tratar datos de exportación controlada",
+          "classification-pack-not-accredited": "Clases de seguridad superiores en una instalación no acreditada"
+        },
+        "csv": "Registros en CSV",
+        "months": "{n} meses",
+        "verdict": {
+          "gdpr": {
+            "out-of-scope": "No se aplica",
+            "applies": "Se aplica",
+            "dpo-required": "Se aplica, hace falta un delegado de protección de datos"
+          },
+          "nis2": {
+            "not-in-scope": "Fuera del ámbito",
+            "important": "Entidad importante",
+            "essential": "Entidad esencial"
+          },
+          "dora": {
+            "not-in-scope": "Fuera del ámbito",
+            "ict-third-party": "Proveedor de servicios TIC",
+            "financial-entity": "Entidad financiera"
+          },
+          "cra": {
+            "not-in-scope": "Fuera del ámbito",
+            "default": "Producto con elementos digitales",
+            "important": "Producto importante",
+            "critical": "Producto crítico"
+          },
+          "eaa": {
+            "not-in-scope": "Fuera del ámbito",
+            "applies": "Se aplica"
+          },
+          "dsa": {
+            "not-in-scope": "Fuera del ámbito",
+            "intermediary": "Mera transmisión o memoria caché",
+            "hosting": "Servicio de alojamiento",
+            "online-platform": "Plataforma en línea",
+            "vlop": "Plataforma en línea de muy gran tamaño"
+          },
+          "hipaa": {
+            "not-in-scope": "Fuera del ámbito",
+            "business-associate": "Socio comercial (business associate)",
+            "covered-entity": "Entidad cubierta (covered entity)"
+          },
+          "export-control": {
+            "not-in-scope": "Fuera del ámbito",
+            "dual-use": "Doble uso",
+            "itar": "ITAR"
+          }
+        }
+      }
     },
     "csm": {
       "listTitle": "Qué está bajo llave",
@@ -12481,6 +12680,17 @@
   "inbox.empty": "Aquí todavía no hay nada.",
   "inbox.expand": "Agrandar el editor",
   "inbox.failed": "No se pudo enviar el mensaje.",
+  "inbox.linkPreview.hide": "Ocultar esta vista previa",
+  "inbox.linkPreview.hideAll": "Ocultar las vistas previas de enlaces",
+  "inbox.linkPreview.label": "Vistas previas",
+  "inbox.linkPreview.showAll": "Mostrar las vistas previas de enlaces",
+  "inbox.loading": "Cargando…",
+  "inbox.markImportant": "Marcar como importante (necesita respuesta)",
+  "inbox.deleteMessage": "Borrar este mensaje",
+  "inbox.deleteMessageAction": "Borrar",
+  "inbox.deleteMessageConfirm": "¿Borrar este mensaje de tu buzón? Tu copia se pierde para siempre. La otra persona conserva la suya.",
+  "inbox.deleteMessageDone": "Mensaje borrado",
+  "inbox.deleteMessageFailed": "No se pudo borrar el mensaje",
   "inbox.group.new": "Grupo nuevo",
   "inbox.group.title": "Conversación de grupo nueva",
   "inbox.group.namePlaceholder": "Nombre del grupo",
@@ -12513,17 +12723,6 @@
   "inbox.group.leave": "Salir del grupo",
   "inbox.group.leaveConfirm": "¿Salir del grupo \"{name}\"? Ya no recibirás sus mensajes.",
   "inbox.group.leftToast": "Saliste del grupo.",
-  "inbox.linkPreview.hide": "Ocultar esta vista previa",
-  "inbox.linkPreview.hideAll": "Ocultar las vistas previas de enlaces",
-  "inbox.linkPreview.label": "Vistas previas",
-  "inbox.linkPreview.showAll": "Mostrar las vistas previas de enlaces",
-  "inbox.loading": "Cargando…",
-  "inbox.markImportant": "Marcar como importante (necesita respuesta)",
-  "inbox.deleteMessage": "Borrar este mensaje",
-  "inbox.deleteMessageAction": "Borrar",
-  "inbox.deleteMessageConfirm": "¿Borrar este mensaje de tu buzón? Tu copia se pierde para siempre. La otra persona conserva la suya.",
-  "inbox.deleteMessageDone": "Mensaje borrado",
-  "inbox.deleteMessageFailed": "No se pudo borrar el mensaje",
   "inbox.messageThis": "Enviar un mensaje",
   "inbox.modelClaimed": "El agente dice que esto lo escribió {model}. Lo declara él mismo: no se puede comprobar, y una plataforma puede pasarle el trabajo a otro modelo a mitad de sesión.",
   "inbox.new": "Mensaje nuevo",
@@ -13799,24 +13998,6 @@
     "insufficient": "Este uso necesita más morsels de ritmo de los que tiene tu saldo. Tu saldo crece cada día con la asignación diaria: pide los morsels de hoy en la página Cartera.",
     "insufficientPack": "También puedes comprarle más capacidad de ritmo a quien gestiona este servicio: {n} morsels por {price}."
   },
-  "news": {
-    "titleSince": "Actualizaciones del sistema desde tu última visita",
-    "titleWindow": "Las actualizaciones del sistema más importantes de los últimos {n} días",
-    "highlights": "Importante",
-    "others": "Otras actualizaciones del sistema",
-    "moreOne": "Hay una actualización del sistema más en el historial.",
-    "moreN": "Hay {n} actualizaciones del sistema más en el historial.",
-    "read": "Leído",
-    "history": "Todas las actualizaciones del sistema →",
-    "for": "Para: {who}",
-    "countTitle": "{n} actualizaciones del sistema nuevas en tu inicio",
-    "who": {
-      "user": "Tú",
-      "agent": "Tu IA y tus agentes",
-      "operator": "Operador",
-      "developer": "Quienes crean aplicaciones"
-    }
-  },
   "nav": {
     "devView": "Para desarrolladores",
     "signIn": "Iniciar sesión",
@@ -14620,7 +14801,23 @@
     "ownerRemoved": "Propiedad retirada",
     "confirmAddOwner": "¿Hacer a {member} propietario también? Podrá todo lo que puedes tú, y tú conservas lo tuyo.",
     "confirmRemoveOwner": "¿Quitar a {member} de los propietarios? Se queda como administrador.",
-    "roleOwner": "propietario"
+    "roleOwner": "propietario",
+    "records": {
+      "title": "Registro de actividades de tratamiento",
+      "leadEdit": "Qué datos personales guarda este lugar, de quién, para qué y durante cuánto tiempo. Copia el prompt a tu propia IA: te pregunta lo que solo tú sabes y te muestra el resultado antes de guardar nada.",
+      "leadRead": "Qué datos personales guarda este lugar, tal como lo anotaron su creador y sus administradores.",
+      "copy": "Copiar el prompt para tu IA",
+      "none": "Aún no hay ningún registro.",
+      "domains": "Datos regulados: {list}",
+      "noDomains": "Sin datos regulados.",
+      "gaps": "Hay {n} asuntos pendientes.",
+      "type": {
+        "personal": "Datos personales",
+        "pseudonymised": "Seudonimizados",
+        "anonymised": "Anonimizados",
+        "none": "Sin datos personales"
+      }
+    }
   },
   "organisms.accessNone": "Sin acceso",
   "organisms.accessUpdateFailed": "No se pudo actualizar el acceso",
@@ -20476,6 +20673,24 @@
           "label": "Palabras finales"
         }
       }
+    }
+  },
+  "news": {
+    "titleSince": "Actualizaciones del sistema desde tu última visita",
+    "titleWindow": "Las actualizaciones del sistema más importantes de los últimos {n} días",
+    "highlights": "Importante",
+    "others": "Otras actualizaciones del sistema",
+    "moreOne": "Hay una actualización del sistema más en el historial.",
+    "moreN": "Hay {n} actualizaciones del sistema más en el historial.",
+    "read": "Leído",
+    "history": "Todas las actualizaciones del sistema →",
+    "for": "Para: {who}",
+    "countTitle": "{n} actualizaciones del sistema nuevas en tu inicio",
+    "who": {
+      "user": "Tú",
+      "agent": "Tu IA y tus agentes",
+      "operator": "Operador",
+      "developer": "Quienes crean aplicaciones"
     }
   },
   "designLab": {
