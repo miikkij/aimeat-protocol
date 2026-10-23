@@ -8,8 +8,6 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
- *   2026-10-23 — bulkSetMemory records where its BEGIN was opened (txOpener, see ../index.ts
- *     noteForeignTransaction).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01); listAllMemory and
  *     listAllMemoryMeta filter expired rows in SQL and break order ties by owner (QA audit D4-05); key
@@ -560,16 +558,12 @@ export const memoryMethods = {
       return out;
     }
     this.db.exec('BEGIN');
-    this.txOpener = new Error('bulkSetMemory').stack ?? 'bulkSetMemory';
-    this.txOpenedAt = Date.now();
     try {
       for (const r of records) out.push(await this.setMemory(r));
       this.db.exec('COMMIT');
     } catch (err) {
       this.db.exec('ROLLBACK');
       throw err;
-    } finally {
-      this.txOpener = null;
     }
     return out;
   },
