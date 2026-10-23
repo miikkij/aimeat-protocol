@@ -14,6 +14,9 @@
  * @usage
  *   import { LOOKS } from '../data/atelier-looks.js';   // the composed list, worlds included
  * @version-history
+ *   v1.2.0 — 2026-10-22 — tdr, the machine-room world of the TDR family of apps (IBM Plex Mono,
+ *     Michroma titles, hairlines, an orange signal), light and dark from the family kit's own
+ *     palette, two values moved the least the matrix asks for.
  *   v1.1.0 — 2026-10-17 — kirjapaino, the printed-letter world: the newsletter design Jouni chose
  *     (paper, ink, Fraunces and Newsreader, the double rule), with the same grounds in both modes
  *     so the paper stays paper in dark mode, the way terminal, stage and lounge stay night.
@@ -512,5 +515,88 @@ export const WORLD_LOOKS: readonly AtelierLook[] = [
       '--ak-spring-mass': '1',
     },
     note: 'The printed-letter world Jouni chose for the AIMEAT newsletter on 2026-10-16: paper and ink that stay the same in dark mode, Fraunces for the masthead and titles, Newsreader for text, square corners, no shadow and no gradient. The press-rule structure draws the double rule under the bar and the hero and makes the loud action an ink slab; the accent is the palette\'s, or a Book look part\'s pair (the design\'s vermilion is #b3321c), and it is meant for one mark per screen.',
+  },
+  {
+    id: 'tdr',
+    feel: 'a machine-room operator console: IBM Plex Mono for everything, Michroma titles set wide and letter-spaced, an orange signal on near-black, hairlines and square plates with accent corner brackets, no shadow and no radius',
+    imagery: 'technical schematics and instrument panels, thin linework on near-black, one orange signal colour, no gradients, no photographs',
+    structures: ['operator-console'],
+    grounds: {
+      // The TDR family kit's default palette (aimeat-tdr.js, "orange"), dark: bg #0A0A0B, panel
+      // #0E0E10, panel2 #15151A, line #232327, ink #E8E5DE, dim #A29E95; light: bg #F4F2ED,
+      // panel #EFECE4, panel2 #E7E3D8, line #D9D5CA, ink #141414, dim #5C594F; its ok/warn/err.
+      // Two places the matrix refused the kit's own values, each moved the least it takes:
+      // the kit's panel sits 1.03 (dark) and 1.06 (light) off its page, under the 1.10 a card
+      // needs to read as raised, so the CARD is the kit's panel2 (lifted two steps in dark,
+      // #15151a to #17171c, to clear 1.10) and the kit's panel is the nested ground; and the
+      // kit's hairline measures 1.23 / 1.24 against that card, under the 1.30 edge, so it moves
+      // ten steps lighter in dark (#232327 to #2d2d31) and thirteen darker in light (#d9d5ca to
+      // #ccc8bd). Ink, dim ink, the page and the tones are the kit's exactly.
+      light: {
+        '--ak-bg': '#f4f2ed',
+        '--ak-surface': '#e7e3d8',
+        '--ak-surface-2': '#efece4',
+        '--ak-ink': '#141414',
+        '--ak-ink-dim': '#5c594f',
+        '--ak-line': '#ccc8bd',
+        '--ak-ok': '#1e7a45',
+        '--ak-warn': '#8a5a10',
+        '--ak-err': '#a33830',
+      },
+      dark: {
+        '--ak-bg': '#0a0a0b',
+        '--ak-surface': '#17171c',
+        '--ak-surface-2': '#0e0e10',
+        '--ak-ink': '#e8e5de',
+        '--ak-ink-dim': '#a29e95',
+        '--ak-line': '#2d2d31',
+        '--ak-ok': '#4caf6e',
+        '--ak-warn': '#d9962f',
+        '--ak-err': '#de5f55',
+      },
+    },
+    tokens: {
+      '--ak-font': "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace",
+      '--ak-font-mono': "'IBM Plex Mono', 'JetBrains Mono', ui-monospace, monospace",
+      '--ak-font-display': "Michroma, 'IBM Plex Mono', ui-monospace, monospace",
+      '--ak-weight-display': '400',
+      '--ak-text-hero': 'clamp(1.5rem, 4.4vw, 2.6rem)',
+      '--ak-radius': '0px',
+      '--ak-radius-sm': '0px',
+      '--ak-radius-pill': '0px',
+      '--ak-line-w': '1px',
+      '--ak-elev-1': 'none',
+      '--ak-elev-2': 'none',
+      '--ak-surface-image': 'none',
+      '--ak-page-image': 'none',
+      '--ak-hero-image': 'none',
+      '--ak-grain': 'none',
+      '--ak-page-grain': 'none',
+      '--ak-glass': 'var(--ak-bg)',
+      '--ak-blur': '0px',
+      '--ak-display-shadow': 'none',
+      '--ak-display-stroke': '0',
+      '--ak-tilt': '0deg',
+      '--ak-gap': '12px',
+      '--ak-pad': '14px',
+      '--ak-grad': 'linear-gradient(135deg, color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)), color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)))',
+      // Re-declared on the look so they resolve against the console's own ink: declared only at
+      // :root, they would mix with the palette's ink, not this one.
+      '--ak-accent-text': 'color-mix(in oklab, var(--ak-accent) 74%, var(--ak-ink))',
+      '--ak-ok-text': 'color-mix(in oklab, var(--ak-ok) 80%, var(--ak-ink))',
+      '--ak-warn-text': 'color-mix(in oklab, var(--ak-warn) 80%, var(--ak-ink))',
+      '--ak-err-text': 'color-mix(in oklab, var(--ak-err) 80%, var(--ak-ink))',
+      '--ak-focus': 'var(--ak-accent)',
+      '--ak-enter-distance': '0px',
+      '--ak-enter-stagger': '0ms',
+      '--ak-motion': 'var(--motion-fast, 120ms)',
+      '--ak-ease': 'linear',
+      '--ak-ambient': 'none',
+      // A machine hand: a state change rather than a movement, the way terminal switches.
+      '--ak-spring-stiffness': '380',
+      '--ak-spring-damping': '32',
+      '--ak-spring-mass': '0.8',
+    },
+    note: 'The machine-room world of the TDR family of apps (M-ROOM, DROP, LOOM, LINGUA, built on the aimeat-tdr cortex kit), taken in as one look on 2026-10-22: the kit\'s own page, ink and tones in both modes, IBM Plex Mono for every word, Michroma for titles, square corners, hairlines, no shadow, no gradient and no ambient. The operator-console structure sets the bar title and the labels in letter-spaced capitals, makes the hero a plate with two accent corner brackets, outlines the actions so they fill with the accent when touched, and rules lists with dashes. The accent is the palette\'s, or a Book look part\'s pair: the family\'s orange is "#d44500/#ff4d00" (the kit\'s light #e84a00 carries white words at 3.3, so the light half is the lightest orange on that line the matrix passes).',
   },
 ];

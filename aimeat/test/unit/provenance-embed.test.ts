@@ -8,6 +8,8 @@
  *   metadata it reads, with the original bytes untouched in front, and a CBZ whose pages are marked
  *   and whose other entries are copied as they were.
  * @version-history
+ *   v1.0.1 — 2026-10-23 — The PDF case reads the custom Info entries as a Map too (pdf.js in unpdf 1.9),
+ *     and asserts both entries by key instead of searching a JSON string, which a Map serialises to {}.
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-8).
  */
 import { describe, it, expect } from 'vitest';
@@ -136,7 +138,9 @@ describe('markPdf', () => {
     expect(info.Keywords).toBe('AI-generated, AI provenance');
     expect(info.Title).toBe('Harbour Lights 3');
     expect(info.Author).toBe('Studio');
-    expect(JSON.stringify(info.Custom ?? info)).toContain('compositeWithTrainedAlgorithmicMedia');
+    // pdf.js in unpdf 1.9 returns the custom Info entries as a Map; 1.8 returned a plain object.
+    const custom = info.Custom instanceof Map ? Object.fromEntries(info.Custom) : info.Custom;
+    expect(custom).toMatchObject({ AIDigitalSourceType: COMPOSITE, AIProvenance: 'https://node.test/v1/provenance/prov_1' });
     const xmpRead = meta.metadata as { getRaw?: () => string } | null;
     expect(xmpRead?.getRaw?.() ?? '').toContain('Iptc4xmpExt:DigitalSourceType');
   });

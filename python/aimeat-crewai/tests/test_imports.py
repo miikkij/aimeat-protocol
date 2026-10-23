@@ -74,7 +74,7 @@ def test_sse_params_shape() -> None:
     from aimeat_crewai import sse_params
 
     p = sse_params(node_url="http://localhost:40050", agent_token="tok-x")
-    # The node's one MCP path; /v1/mcp/sse, the default until 0.36.1, is a path no node serves.
+    # The node's one MCP path; /v1/mcp/sse, the default until 0.37.0, is a path no node serves.
     assert p["url"] == "http://localhost:40050/v1/mcp"
     assert p["transport"] == "sse"
     assert p["headers"]["Authorization"] == "Bearer tok-x"

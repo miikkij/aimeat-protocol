@@ -26,8 +26,11 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
-  0.36.1 -- 2026-10-20 -- `sse_params()` defaults to `/v1/mcp`, the node's one MCP path; it named
-    `/v1/mcp/sse`, which the node never served. `http_params()` is what reaches a node.
+  0.37.0 -- 2026-10-22 -- Python 3.11 or newer (Pillow 13 does not install on 3.10). Group chat:
+    `open_group()`, `group_members()`, `change_group_members()`, `leave_group()`,
+    `group_invitations()`, `answer_group_invitation()`. `sse_params()` defaults to `/v1/mcp`, the
+    node's one MCP path; it named `/v1/mcp/sse`, which the node never served. `http_params()` is
+    what reaches a node. (0.36.1 carried the sse_params fix and was never published.)
   0.36.0 -- 2026-10-18 -- `build_offer()` requires `deliverable`, as the node's OfferSchema does
     (offers.py, DELIVERABLE_FORMATS). It raised nothing before and the node's catalogue then left out
     the agent's whole offers document; now a missing deliverable or one that is not a dict is a
@@ -247,7 +250,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.36.1"
+__version__ = "0.37.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",

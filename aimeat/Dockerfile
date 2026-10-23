@@ -1,7 +1,7 @@
 # Both stages pin the same node:24-alpine image by digest (OpenSSF Scorecard PinnedDependencies).
 # To move to a newer image, take the new digest from `docker buildx imagetools inspect node:24-alpine`
 # and change it on both FROM lines together.
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS base
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS base
 RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 WORKDIR /app
 
@@ -23,7 +23,7 @@ RUN pnpm run build
 
 # Production image. Carries the full node_modules from the build stage (better-sqlite3
 # native bindings + the pg client for postgres-kysely).
-FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
