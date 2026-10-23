@@ -36,8 +36,8 @@
  *   res.json(success(config.nodeId, report));
  * @version-history
  *   v1.3.0 — 2026-10-23 — The node-wide report carries `processing` (records of processing, data
- *     domains, framework verdicts, processors, transfers, label packs), their gaps and their limits
- *     (compliance-processing.ts, plan doc-mvlftkh9zmc9).
+ *     domains, framework verdicts, processors, transfers, label packs) with its own `gaps`, and their
+ *     limits in `not_covered` (compliance-processing.ts, plan doc-mvlftkh9zmc9).
  *   v1.2.0 — 2026-10-16 — The roll-up and the unlabelled detail take the node's configuration, so
  *     content an open workspace share serves to anyone counts as public; both rings state the rule
  *     (`shares-open-only`).
@@ -58,7 +58,7 @@ import {
   type ComplianceQuestionnaire, type ComplianceRiskVerdict, type ComplianceUseCase,
 } from './compliance-register.js';
 import { buildProcessingSummary, type ProcessingSummary } from './compliance-processing.js';
-import type { ScopeGapKind } from './compliance-scope-gaps.js';
+import type { ScopeGap } from './compliance-scope-gaps.js';
 
 /** How far back the rollup's hot window reaches before rows move to the archive. */
 const USAGE_HOT_WINDOW_DAYS = 90;
@@ -93,9 +93,7 @@ export interface ComplianceGap {
     | 'unclassified-usecase'
     | 'unlabelled-public-content'
     | 'app-declares-generation-with-gap'
-    | 'font-licence-unknown'
-    // The records of processing, domains, frameworks, processors and packs (compliance-scope-gaps.ts).
-    | ScopeGapKind;
+    | 'font-licence-unknown';
   /** One sentence a person can act on, without needing the vocabulary of this file. */
   detail: string;
   /** What in the data says so — a model id, a filename, a count. Never a guess. */
@@ -146,8 +144,12 @@ export interface ComplianceReport {
     usecases: Array<ComplianceUseCase & { risk: ComplianceRiskVerdict }>;
     questionnaire: ComplianceQuestionnaire;
   };
-  /** The records of processing, domains, frameworks, processors and packs. Node-wide ring only. */
-  processing?: ProcessingSummary;
+  /**
+   * The records of processing, domains, frameworks, processors and packs, with their own gaps.
+   * Node-wide ring only. Their gaps stay here and not in `gaps`, which holds the AI-use gaps the
+   * page's first section counts and shows row by row.
+   */
+  processing?: ProcessingSummary & { gaps: ScopeGap[] };
   gaps: ComplianceGap[];
 }
 
@@ -483,8 +485,8 @@ export async function buildComplianceReport(
       : [...notCovered(config, transparency.scope.note), ...(processing?.limits ?? [])],
     derived: { ai_transparency: transparency, ai_usage: usage, consent },
     register: { usecases, questionnaire },
-    ...(processing ? { processing: processing.summary } : {}),
-    gaps: [...findGaps(usecases, usage, transparency), ...fontGaps, ...(processing?.gaps ?? [])],
+    ...(processing ? { processing: { ...processing.summary, gaps: processing.gaps } } : {}),
+    gaps: [...findGaps(usecases, usage, transparency), ...fontGaps],
   };
 }
 

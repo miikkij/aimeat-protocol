@@ -67,12 +67,16 @@ export const complianceCliTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_compliance_register_read',
         handler: ({ client }, input) => {
             // The records of processing and the documents beside them: /v1/compliance/* with the scope.
+            // since_days rides along on every part: the AI Act's draft reads it and the scoped routes
+            // ignore it, and a published parameter that never leaves the process is the defect the
+            // forwarding test exists for.
             const part = requiredString(input, 'part');
-            if (part === 'catalog') return client.get('/v1/compliance/catalog');
-            if (part === 'registers_draft') return client.get(`/v1/compliance/draft${complianceScopeQuery(input)}`);
-            if (part === 'gaps') return client.get(`/v1/compliance/gaps${complianceScopeQuery(input)}`);
+            const days = { since_days: optionalNumber(input, 'since_days') };
+            if (part === 'catalog') return client.get(`/v1/compliance/catalog${query(days)}`);
+            if (part === 'registers_draft') return client.get(`/v1/compliance/draft${complianceScopeQuery(input, days)}`);
+            if (part === 'gaps') return client.get(`/v1/compliance/gaps${complianceScopeQuery(input, days)}`);
             const kind = complianceDocKind(input);
-            if (kind) return client.get(`/v1/compliance/docs/${kind}${complianceScopeQuery(input)}`);
+            if (kind) return client.get(`/v1/compliance/docs/${kind}${complianceScopeQuery(input, days)}`);
             return client.get(`/v1/admin/compliance/${compliancePart(input, true)}${query({
                 since_days: optionalNumber(input, 'since_days'),
             })}`);

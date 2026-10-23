@@ -249,8 +249,10 @@ await test('REPORT: the node-wide report carries processing, the gaps of every s
     assert(r.status === 200, `report: ${r.status} ${JSON.stringify(r.body?.error)}`);
     const p = r.body.data.processing;
     assert(p?.registers?.by_scope?.organism >= 1 && p.registers.by_scope.app >= 1 && p.domains.health >= 1, `processing: ${JSON.stringify(p?.registers)}`);
-    const kinds = (r.body.data.gaps as Body[]).map(g => g.kind);
+    const kinds = (p.gaps as Body[]).map(g => g.kind);
     assert(kinds.includes('dpia-incomplete') && kinds.includes('transfer-without-basis'), `gaps: ${kinds}`);
+    // The AI-use gaps the page's first section counts stay apart from these.
+    assert(!(r.body.data.gaps as Body[]).some(g => g.kind === 'dpia-incomplete'), 'processing gaps stay in processing');
     assert((r.body.data.not_covered as Body[]).some(l => l.code === 'registers-are-statements'), 'limits');
 });
 
