@@ -14,15 +14,19 @@ Every AIMEAT security record lives in one place on aimeat.io: organism **AIMEAT 
 (`ec7a728f-ad61-4b05-b6f0-e5bf9b47c16c`), workspace **Security register** (`ws-mvkjtfqtfgn`). It
 holds every earlier audit's report and findings with their status, the fixes and their commits, the
 accepted exceptions with their expiry dates, the security and dependency changes, and the CVE rounds,
-whichever Claude account or machine did the work. Its guide document "How to use the Security
-register" gives the ids, the statuses and the import script.
+whichever Claude account or machine did the work. Its tools are the app tools of
+`tietoturvakartta.html` (`aimeat_app_tool_invoke { owner: "happydude500001", app:
+"tietoturvakartta.html", tool }`; skill `user:happydude500001/tietoturvakartta`), and the map for people
+is https://tietoturvakartta.apps.aimeat.io/. Its guide document "How to use the Security register"
+gives the ids, the statuses and the import script.
 
 - **Before a candidate becomes a finding,** look it up there by CVE, package, file, rule or the
-  finding's id. A finding already `fixed`, `by-design` or `dismissed`, or covered by an active
+  finding's id: tool `security_lookup`. A finding already `fixed`, `by-design` or `dismissed`, or covered by an active
   exception, is linked rather than filed again; a regression of a `fixed` one says so.
-- **The run writes there, not to a disk.** The report goes in as `report` documents, the run as a
-  `run` record, every finding as a `finding` record, and every fix updates its finding with
-  `fixCommits` and the two proofs (`proofs.attackRefused`, `proofs.useKept`). A local folder is a
+- **The run writes there, not to a disk.** The report goes in as `report` documents in the
+  workspace Security reports, the run with `run_add`, every finding with `finding_set`, and every
+  fix updates its finding with `fixCommits` and the two proofs (`proofs.attackRefused`,
+  `proofs.useKept`) through `finding_set`, and is recorded with `change_add`. A local folder is a
   working copy until the import, never the record: on 2026-10-23 three accounts' audits sat on three
   disks and no session could tell what had been done or why.
 

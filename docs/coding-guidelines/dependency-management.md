@@ -144,9 +144,10 @@ what a vulnerability feed matches on, so the licence work is what made the scan 
 - **After any of them:** `pnpm check:licenses && pnpm gen:notices`, then `pnpm gate --postgres`,
   which adds the production backend to the guard tier. A dependency bump is a change to what users run.
 - **And record it.** A security update, a runtime update or an accepted advisory goes into the
-  Security register on aimeat.io (organism AIMEAT SECURITY, workspace `ws-mvkjtfqtfgn`) as a `change`
-  record (package, from, to, the CVEs and advisories it closes, the commit) or an `exception` record
-  with an expiry date. Its guide document "How to use the Security register" has the fields.
+  Security register on aimeat.io (organism AIMEAT SECURITY, workspace `ws-mvkjtfqtfgn`) with the app
+  tool `change_add` of `tietoturvakartta.html` (package, from, to, the CVEs and advisories it closes,
+  the commit) or `exception_set` (with an end date). Skill `user:happydude500001/tietoturvakartta` has
+  the fields.
 
 ### Advisories we accept
 
