@@ -27,6 +27,8 @@
  *   (16), and the owner can widen it back (17).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scheduled-ext-files
  * @version-history
+ *   v1.5.3 -- 2026-10-24 -- 23d prints the test's and the server's view of the kept schedule before and
+ *     after its first fire, to tell an old read from an overwrite.
  *   v1.5.2 -- 2026-10-23 -- 23c and 23d: a direct database edit must land (landed()), and a refusal
  *     that did not happen says which maker the server saw. The nightly SQLite sweep fired schedules
  *     the test thought it had changed, on two runs in a row, and the edits answered null silently.
@@ -714,8 +716,17 @@ await test('23d. KEPT: an app schedule made before the rule from a grant without
   const laterId = await ownerExtSchedule('v52-later.csv', 'v52-later');
   await landed('give the later schedule its wide grant', storage.updateScheduledJob(laterId, { createdByAgent: true, createdByApp: wideGrant }));
 
+  // Both sides' view of the schedule around the fire, so a failure says whether the server read an old
+  // row or something wrote over the test's edit (incident 2026-10-23, nightly SQLite).
+  const views = async () => {
+    const mine = await storage.getScheduledJob(keptId);
+    const theirs = (await json(`/v1/schedules/${keptId}`, { headers: auth(owner.token) })).body?.data?.schedule ?? {};
+    return `test sees createdByApp=${mine?.createdByApp ?? 'none'}/${mine?.createdByAgent}, server GET sees createdByApp=${theirs.createdByApp ?? 'none'}/${theirs.createdByAgent}`;
+  };
+  const viewsBefore = await views();
   const before = await fire(keptId);
-  assert(before.lastRunResult === 'error' && /ext:invoke/.test(before.lastRunError ?? ''), `without the step it is refused: ${before.lastRunResult} ${before.lastRunError ?? ''}; ${makerSeen(before)}`);
+  assert(before.lastRunResult === 'error' && /ext:invoke/.test(before.lastRunError ?? ''),
+    `without the step it is refused: ${before.lastRunResult} ${before.lastRunError ?? ''}; ${makerSeen(before)}; before the fire: ${viewsBefore}; after it: ${await views()}`);
 
   // The node's first start with the rule, run here: the step's record is taken away and the step runs.
   await storage.deleteMemory(`system@${NODE_ID}`, EXTENSION_SCHEDULE_KEEP_KEY, `system@${NODE_ID}`);
