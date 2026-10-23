@@ -17,6 +17,9 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.12.0 -- 2026-10-24 -- "Records of processing" (compliance-records.js, plan doc-mvlftkh9zmc9
+ *     C7.4): the organism's registers and what they leave open; the creator and admins get the
+ *     paste for their AI, a member reads. Archive and delete is section 05.
  *   v1.11.0 -- 2026-10-18 -- "Who sees" shows the organism's classification, and its creator or an admin
  *     changes it there, while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v1.10.0 -- 2026-10-02 -- The question mark that explains the Agents choice: organism.agent_access (components/HelpTip.js).
@@ -63,6 +66,7 @@ import * as orgService from '/js/services/organisms.js';
 import { copyToClipboard } from '/js/utils.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { OrganismRecords } from '/views/profile/organisms/compliance-records.js';
 
 const TYPE_PRESETS = ['community', 'team', 'club', 'cooperative', 'project'];
 const JOIN = ['open', 'approval_required', 'invite_only'];
@@ -204,12 +208,13 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
   const label = (k, fb) => t(`organisms.${k}`) || fb;
 
   const settingsWord = t('organisms.settings') || 'Settings';
-  // The rail: the four sections (links that scroll, the first one marked), then the way back.
+  // The rail: the five sections (links that scroll, the first one marked), then the way back.
   const sectionLinks = [
     ['og-set-name', '01', label('setNameDesc', 'Name and description')],
     ['og-set-access', '02', label('setAccess', 'Who gets in')],
     ['og-set-vis', '03', label('setVisibility', 'Who sees')],
-    ['og-set-danger', '04', label('setDanger', 'Archive and delete')],
+    ['og-set-records', '04', t('organisms.records.title')],
+    ['og-set-danger', '05', label('setDanger', 'Archive and delete')],
   ].map(([id, num, words], i) => ({ section: id, href: '#' + id, mark: num, label: words, on: i === 0, key: id }));
   const back = { back: true, label: label('backToOrganism', 'Back to the organism'), onClick: leave, key: 'back' };
   const rail = {
@@ -278,7 +283,9 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
           <${Note} inline>${label('savesNote', 'Changes apply at once.')}<//>
         <//>
 
-        <${Section} id="og-set-danger" num="04" title=${label('setDanger', 'Archive and delete')}>
+        <${OrganismRecords} org=${org} canEdit=${canEdit} num="04" />
+
+        <${Section} id="og-set-danger" num="05" title=${label('setDanger', 'Archive and delete')}>
           <${SettingBox} label=${label('reversible', 'Reversible')}>
             <${SettingRow}>
               <span><b>${org.archived ? (t('organisms.unarchiveOrganismTitle') || 'Unarchive this organism') : (t('organisms.archiveOrganismTitle') || 'Archive this organism')}.</b> ${org.archived
@@ -303,8 +310,10 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
         <//>
       ` : null}
 
+      ${isMember && !canEdit ? html`<${OrganismRecords} org=${org} canEdit=${false} num="01" first />` : null}
+
       ${isMember && !isCreator ? html`
-        <${Section} plain first=${!canEdit}>
+        <${Section} plain first=${false}>
           <${SettingBox} irreversible>
             <${SettingRow}>
               <span><b>${t('organisms.leave') || 'Leave'}.</b></span>

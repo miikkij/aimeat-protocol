@@ -14,6 +14,8 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-24 — The security classes (TL and NATO packs) after the classification section
+ *     (security-tab.packs.js, plan doc-mvlftkh9zmc9 C7.5).
  *   2026-10-18 — An offered limit on who may see classified content is decided from its incident's
  *     row, Apply or Keep as it is, through the same resolve endpoint and { name, resolution } a held
  *     name uses (plan doc-mvdipuyqraas, L5.1).
@@ -60,6 +62,7 @@ import { authHeaders } from '/js/services/auth.js';
 import { RefusalsSection, ipText } from './security-tab.refusals.js';
 import { HeldSection, IncidentsSection, AccountsSection, SettingsSection, AskAiSection, isHeldIncident } from './security-tab.sections.js';
 import { ClassificationSection } from './security-tab.classification.js';
+import { PacksSection } from './security-tab.packs.js';
 import { Section } from '/components/Section.js';
 import { Verdict, Readings } from '/components/Readings.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -224,6 +227,7 @@ export default function SecurityTab(props) {
       <${SettingsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
     <//>
     <${ClassificationSection} number=${n()} switchPage=${switchPage} confirm=${confirm} onOk=${showOk} onError=${showErr} />
+    <${PacksSection} number=${n()} onOk=${showOk} onError=${showErr} />
     <${AskAiSection} number=${n()} />`;
 }
 
