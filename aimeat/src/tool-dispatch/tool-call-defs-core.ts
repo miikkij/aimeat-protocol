@@ -10,6 +10,7 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-23 — The four compliance tools moved unchanged to tool-call-defs-compliance.ts (max-file-lines).
  *   2026-10-18 — The aimeat_admin_incident_resolve comment names the offered default audience caps too
  *     (plan doc-mvdipuyqraas, L5.1); the handler is unchanged.
  *   2026-10-12 — aimeat_consent_grant sends `scope` only when given, as the catalog now marks it
@@ -51,25 +52,10 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord } from './tool-call-helpers.js';
 import { dataMapCliTools } from './tool-call-defs-data-map.js';
 import type { ApiResponse } from './api-client.js';
-
-/**
- * The compliance register's `part`, checked against the two documents that exist.
- *
- * It becomes a path segment, so an unchecked value would build a URL the route never declared and
- * the caller would read the resulting 404 as "the report is empty" rather than "you asked for
- * something that is not a thing".
- */
-function compliancePart(input: JsonObject, allowDraft = false): 'draft' | 'usecases' | 'questionnaire' {
-    const part = requiredString(input, 'part');
-    const allowed = allowDraft ? ['draft', 'usecases', 'questionnaire'] : ['usecases', 'questionnaire'];
-    if (!allowed.includes(part)) {
-        throw new Error(`part has to be one of ${allowed.map(a => `"${a}"`).join(', ')}, not "${part}"`);
-    }
-    return part as 'draft' | 'usecases' | 'questionnaire';
-}
+import { complianceCliTools } from './tool-call-defs-compliance.js';
 
 /**
  * Appended to the catalog description on both connector doors. An agent that learns this from the
@@ -472,60 +458,14 @@ export const coreTools: ConnectCliToolDefinition[] = [
             input.name !== undefined || input.resolution !== undefined
                 ? { name: optionalString(input, 'name'), resolution: optionalString(input, 'resolution') } : undefined),
     },
-    {
-        // `part` is validated against the two literals rather than interpolated, because it lands in
-        // a path segment. An unchecked value here would be a path the route never declared.
-        name: 'aimeat_compliance_report',
-        handler: ({ client }, input) => {
-            // Two doors for two reports: the owner slice asks wallet:read of an agent, the whole installation
-            // needs an operator account plus the exact word. Defaulting to the slice is least
-            // privilege, and it is what almost every caller means.
-            const scope = optionalString(input, 'scope');
-            const path = scope === 'node' ? '/v1/admin/compliance/report' : '/v1/compliance/report/mine';
-            return client.get(`${path}${query({
-                month: optionalString(input, 'month'),
-                since_days: optionalNumber(input, 'since_days'),
-            })}`);
-        },
-    },
+    // The compliance tools: tool-call-defs-compliance.ts (max-file-lines).
+    ...complianceCliTools,
     // The data map tools: tool-call-defs-data-map.ts (max-file-lines).
     ...dataMapCliTools,
     {
         name: 'aimeat_memory_hands',
         handler: ({ client }, input) =>
             client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}/hands`),
-    },
-    {
-        name: 'aimeat_compliance_register_read',
-        handler: ({ client }, input) => client.get(`/v1/admin/compliance/${compliancePart(input, true)}${query({
-            since_days: optionalNumber(input, 'since_days'),
-        })}`),
-    },
-    {
-        name: 'aimeat_compliance_register_write',
-        handler: ({ client }, input) => client.put(
-            `/v1/admin/compliance/${compliancePart(input)}${optionalBoolean(input, 'dry_run') ? '?dry_run=true' : ''}`,
-            requiredRecord(input, 'value'),
-        ),
-    },
-    {
-        name: 'aimeat_compliance_snapshot',
-        handler: ({ client }, input) => {
-            const action = requiredString(input, 'action');
-            if (action === 'save') {
-                const sinceDays = optionalNumber(input, 'since_days');
-                return client.post('/v1/admin/compliance/snapshot',
-                    sinceDays === undefined ? {} : { since_days: sinceDays });
-            }
-            // The id is forwarded whenever it is given, rather than only when action says "read".
-            // The route already branches on its presence, so gating it here would add a second
-            // opinion that can only ever drop a value the caller meant — which is the exact defect
-            // this dispatch table has produced three times. It goes through query(), which encodes
-            // it: it is caller text landing next to a stored key.
-            return client.get(`/v1/admin/compliance/reports${query({
-                id: optionalString(input, 'id'),
-            })}`);
-        },
     },
     {
         name: 'aimeat_capabilities_list',

@@ -13,6 +13,8 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   2026-10-23 — An export logs itself as a done data subject request in the node's request list
+ *     (plan doc-mvlftkh9zmc9, C4.3).
  *   2026-10-15 — Five parts the export lacked (export-sections.ts): `published_apps`,
  *     `ai_provenance`, `connections` (never the credential), `app_purchases`, and per agent
  *     `messages` (feature-list audit #160).
@@ -71,6 +73,8 @@ import { memoryTarget } from '../../services/classification/labels.js';
 import { scopeOrganism } from '../../services/classification/policy.js';
 import { isOperatorCaller, operatorOverride } from '../../services/operator-override.js';
 import { exportExtraSections, exportAgentMessages } from './export-sections.js';
+import { appendRequest } from '../../services/compliance-docs.js';
+import { logger } from '../../utils/logger.js';
 
 /** One work item this identity was to do, as the export shows it: the other side is the requester. */
 function workProvidedView(w: WorkRecord) {
@@ -497,6 +501,14 @@ export function registerOwnerExportRoute(router: Router, config: AimeatConfig, s
     // ── Published apps, AI provenance, outside-account connections (never the credential) and the
     //    apps taken (feature-list audit #160) ──
     const extra = await exportExtraSections(storage, ghii, agentGaiis);
+
+    // The export is an access and portability request the node answered (GDPR art. 15 and 20): it
+    // logs itself in the node's request list (plan doc-mvlftkh9zmc9, C4.3).
+    const answeredAt = new Date().toISOString();
+    await appendRequest(storage, config.nodeId, { kind: 'node' }, {
+      kind: 'portability', subject: name, receivedAt: answeredAt, status: 'done', closedAt: answeredAt,
+      channel: 'node', auto: true, ...(own ? {} : { notes: 'Exported by the operator.' }),
+    }).catch(err => logger.warn('export: the export was not logged as a data subject request', { name, error: String(err) }));
 
     res.json(success(config.nodeId, {
       owner: {

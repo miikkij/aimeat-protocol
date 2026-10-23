@@ -17,6 +17,8 @@
  * @structure classificationCall
  * @usage return envelopeResult(await classificationCall(client, args));
  * @version-history
+ *   v1.4.0 — 2026-10-23 — pack_list → GET /v1/classification/packs, pack_set → PUT
+ *     /v1/classification/packs (up_to as upTo, acknowledge_not_accredited as acknowledgeNotAccredited).
  *   v1.3.0 — 2026-10-18 — get, set and review pass board_id and app for a container (plan
  *     doc-mvdipuyqraas, L1.5); exception_set passes the content fields only.
  *   v1.2.0 — 2026-09-30 — exception_list → GET /v1/classification/exceptions (exception_action as
@@ -122,6 +124,14 @@ export async function classificationCall(client: Pick<AimeatClient, 'get' | 'pos
             return client.post('/v1/classification/exceptions', {
                 ...pick(input, [...CONTENT_TARGET, 'reason', 'until']),
                 ...(input.exception_action !== undefined && input.exception_action !== null ? { action: input.exception_action } : {}),
+            });
+        case 'pack_list':
+            return client.get('/v1/classification/packs');
+        case 'pack_set':
+            return client.put('/v1/classification/packs', {
+                ...pick(input, ['pack', 'on']), ...humanSaid(input),
+                ...(input.up_to !== undefined && input.up_to !== null ? { upTo: input.up_to } : {}),
+                ...(input.acknowledge_not_accredited !== undefined ? { acknowledgeNotAccredited: input.acknowledge_not_accredited } : {}),
             });
         default:
             return { ok: false, error: { code: 'INVALID_INPUT', message: `action "${checked.action}" has no endpoint.` } };

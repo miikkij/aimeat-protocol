@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-23 — AgentRuntimeSource.llm takes 'local': the model runs on the crew's own
+ *     machine (plan doc-mvlftkh9zmc9, C3.4).
  *   v1.12.0 — 2026-10-23 — AgentRecord.taskStartFloor: the floor permissions the owner in person
  *     lets this agent start work with (migration 0115).
  *   v1.11.0 — 2026-10-22 — EcoCapabilityApproval and EcosystemAppRecord.capabilityApprovals: the
@@ -81,8 +83,11 @@ export interface AgentRuntimeSource {
    * own token (the node then picks the key: the agent's own, the owner's own, then the node's), or
    * `machine` when the crew calls its provider itself with a key on the machine that runs it. Absent
    * means the runtime has not said. services/own-key-coverage.ts reads it (2026-10-02).
+   * `local` when the model runs on the machine that runs the crew and no prompt leaves it: the one
+   * value that lets the agent read content whose label refuses an outside model (2026-10-23, plan
+   * doc-mvlftkh9zmc9 C3.4). The node records the claim and cannot check it.
    */
-  llm?: 'node' | 'machine';
+  llm?: 'node' | 'machine' | 'local';
   /** When the node recorded this. The node's clock, not the runtime's. */
   reportedAt?: string;
 }

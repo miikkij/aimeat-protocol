@@ -13,6 +13,8 @@
  *   DEFAULT_LIMITS · defaultPolicy() · labelById()
  * @usage import { defaultPolicy } from './defaults.js';
  * @version-history
+ *   v1.8.0 — 2026-10-23 — A label's externalAi (plan doc-mvlftkh9zmc9, C3.4, decision 10.5). No default
+ *     label refuses; the TL and NATO packs do (data/classification-packs.ts).
  *   v1.7.0 — 2026-10-18 — DEFAULT_LABEL_CAPS, the default labels' audience caps of decision 10.1 (plan
  *     doc-mvdipuyqraas, L5.1), which a new node takes and a running node takes on its operator's approval.
  *   v1.6.0 — 2026-10-18 — A label's maxAudience, the widest audience its content may be given (plan
@@ -72,7 +74,18 @@ export interface ClassificationLabel {
    * already wider lowers it to the cap (services/classification/audience-settle.ts).
    */
   maxAudience?: AudienceLevel | null;
+  /**
+   * Whether content with this label may reach an AI model that runs somewhere else (plan
+   * doc-mvlftkh9zmc9, decision 10.5). 'refused': only a model on this machine reads it (a provider
+   * whose `leaves` is false), and an MCP client or another outside reader counts as somewhere else
+   * unless its agent declared a local model. An AI still sees everything; it has to run here.
+   * Absent: 'allowed', the behaviour before this field.
+   */
+  externalAi?: ExternalAi;
 }
+
+/** Whether a label's content may go to a model that runs somewhere else. */
+export type ExternalAi = 'allowed' | 'refused';
 
 /**
  * Where a rule applies. Absent fields mean all content (memory, files, rows). A container (organism,

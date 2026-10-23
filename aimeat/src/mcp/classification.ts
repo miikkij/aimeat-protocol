@@ -15,6 +15,8 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-23 — pack_list and pack_set: the TL and NATO label packs (services/classification/packs.ts,
+ *     plan doc-mvlftkh9zmc9 C3.2); pack_set needs memory:write and writes the node policy.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — get, set and review take a container (kind organism, workspace, board with
@@ -49,12 +51,14 @@ import { scanContent } from '../services/classification/scan.js';
 import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
 import { setClassificationSwitch } from '../services/classification/switch.js';
 import { makeException, readExceptions } from '../services/classification/exception-admin.js';
+import { activatePack, deactivatePack, packStatus } from '../services/classification/packs.js';
+import { readNodePolicy } from '../services/classification/policy.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 
-const WRITES = new Set(['set', 'review', 'policy_set', 'scan', 'switch_set', 'exception_set']);
+const WRITES = new Set(['set', 'review', 'policy_set', 'scan', 'switch_set', 'exception_set', 'pack_set']);
 
 export function registerClassificationTools(
   mcp: McpServer,
@@ -134,6 +138,15 @@ export function registerClassificationTools(
               kind: args.kind, key: args.key, owner: args.owner, organism_id: args.organism_id, ws: args.ws,
               space: args.space, row_id: args.row_id, action: args.exception_action, reason: args.reason, until: args.until,
             }));
+          case 'pack_list':
+            return text({ packs: packStatus(await readNodePolicy(storage, config.nodeId)) });
+          case 'pack_set': {
+            if (typeof args.on !== 'boolean') return toolError('INVALID_INPUT', 'on is true or false.');
+            const out = args.on
+              ? await activatePack(deps, actor, args.pack, { upTo: args.up_to, acknowledgeNotAccredited: args.acknowledge_not_accredited, humanSaid: args.human_said })
+              : await deactivatePack(deps, actor, args.pack, { humanSaid: args.human_said });
+            return text(out.pending ? { ...out, next: POLICY_PENDING_NEXT } : out);
+          }
         }
       } catch (err) {
         if (err instanceof ClassificationError) return toolError(err.code, err.message);

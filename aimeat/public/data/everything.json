@@ -5,7 +5,7 @@
   "date": "2026-10-18"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -3287,6 +3287,24 @@
      "plain": "Compliance register The operator's AI-use report, snapshots, use-case register and risk questionnaire; each account can read its own slice. The counts of public AI-made content include what an open workspace share serves to anyone, and the report says which shares count. /v1/admin/compliance/*, /v1/compliance/report/mine, aimeat_compliance_*"
     },
     {
+     "slug": "g-17-records-of-processing",
+     "cells": [
+      "<strong>Records of processing</strong>",
+      "The GDPR record of processing (art. 30) for the node, each organism and each app: one register per purpose with its type (personal, pseudonymised, anonymised, none), legal basis, data categories, retention and the places it covers. The operator keeps the node's, an organism's creator or admin keeps the organism's, an app's owner keeps the app's; the operator reads all of them and an organism's members read its own. The node hands a filled draft to start from: its own registers, an organism's member register, an app's register read from its data map. Beside them: the processors (the node lists its AI providers, mail and hosting; the operator adds the contract, country and transfer basis), transfers outside the EU, data subject requests with their deadline (an account export and an erasure log themselves), breaches with the 72-hour clock, impact assessments, and the answers to GDPR, NIS2, DORA, CRA, EAA, DSA, HIPAA and export-control question sets. The gaps (no legal basis, an overdue request or breach notice, a missing impact assessment, an unanswered framework, an app that keeps personal data with no register or privacy notice) come in one list, and the operator's report carries every scope's. Limits: the node checks the documents against its own records, not against the world; not legal advice.",
+      "<code>/v1/compliance/catalog</code>, <code>/v1/compliance/docs/{kind}</code>, <code>/v1/compliance/draft</code>, <code>/v1/compliance/gaps</code>, <code>aimeat_compliance_register_read</code>, <code>aimeat_compliance_register_write</code>"
+     ],
+     "plain": "Records of processing The GDPR record of processing (art. 30) for the node, each organism and each app: one register per purpose with its type (personal, pseudonymised, anonymised, none), legal basis, data categories, retention and the places it covers. The operator keeps the node's, an organism's creator or admin keeps the organism's, an app's owner keeps the app's; the operator reads all of them and an organism's members read its own. The node hands a filled draft to start from: its own registers, an organism's member register, an app's register read from its data map. Beside them: the processors (the node lists its AI providers, mail and hosting; the operator adds the contract, country and transfer basis), transfers outside the EU, data subject requests with their deadline (an account export and an erasure log themselves), breaches with the 72-hour clock, impact assessments, and the answers to GDPR, NIS2, DORA, CRA, EAA, DSA, HIPAA and export-control question sets. The gaps (no legal basis, an overdue request or breach notice, a missing impact assessment, an unanswered framework, an app that keeps personal data with no register or privacy notice) come in one list, and the operator's report carries every scope's. Limits: the node checks the documents against its own records, not against the world; not legal advice. /v1/compliance/catalog, /v1/compliance/docs/{kind}, /v1/compliance/draft, /v1/compliance/gaps, aimeat_compliance_register_read, aimeat_compliance_register_write"
+    },
+    {
+     "slug": "g-17-regulated-data-domains",
+     "cells": [
+      "<strong>Regulated data domains</strong>",
+      "A register names the law its data falls under: health, other special categories, biometric and genetic, children, criminal, employment, payments, public authority, defence and security-classified, export-controlled, legal privilege and trade secrets. Each raises the classification of the places the register covers to its floor, never lower, and a label a person set lower waits for them as a suggestion. Health, biometric, defence and export-controlled data reach only a model on this machine. Limits: raising needs classification on; with it off the gap list says so.",
+      "<code>registers</code> (<code>domains</code>, <code>containers</code>) on the routes above"
+     ],
+     "plain": "Regulated data domains A register names the law its data falls under: health, other special categories, biometric and genetic, children, criminal, employment, payments, public authority, defence and security-classified, export-controlled, legal privilege and trade secrets. Each raises the classification of the places the register covers to its floor, never lower, and a label a person set lower waits for them as a suggestion. Health, biometric, defence and export-controlled data reach only a model on this machine. Limits: raising needs classification on; with it off the gap list says so. registers (domains, containers) on the routes above"
+    },
+    {
      "slug": "g-17-gdpr-export-and-erasure",
      "cells": [
       "<strong>GDPR export and erasure</strong>",
@@ -4266,6 +4284,24 @@
      "plain": "Audit log off For each level: which classified items an AI was shown or used, which were refused, which classifications changed, and each exception made, used or withdrawn with its reason. One row per reader, item and action per minute, with a count. Data Wallet, Security page (the whole node), aimeat_classification (audit), GET /v1/classification/audit"
     },
     {
+     "slug": "g-24-content-only-a-model-on-this-machine-reads",
+     "cells": [
+      "<strong>Content only a model on this machine reads</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "A classification can refuse an outside model. Your AI still sees the content, but only a model that runs on this machine: an agent whose model runs elsewhere finds it absent on every read, an AI call with a model that is not local is refused (<code>CLASSIFIED</code>), and no exception opens it. An agent whose runtime report says its model is local reads it. Limits: the node records that report and cannot check it.",
+      "a label's <code>externalAi: refused</code>, <code>aimeat_agent_runtime_report</code> (<code>llm: &quot;local&quot;</code>)"
+     ],
+     "plain": "Content only a model on this machine reads off A classification can refuse an outside model. Your AI still sees the content, but only a model that runs on this machine: an agent whose model runs elsewhere finds it absent on every read, an AI call with a model that is not local is refused (CLASSIFIED), and no exception opens it. An agent whose runtime report says its model is local reads it. Limits: the node records that report and cannot check it. a label's externalAi: refused, aimeat_agent_runtime_report (llm: \"local\")"
+    },
+    {
+     "slug": "g-24-finnish-and-nato-security-classes",
+     "cells": [
+      "<strong>Finnish and NATO security classes</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
+      "The operator switches on the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to COSMIC TOP SECRET), up to the class they choose. Each class reaches only a model on this machine, never leaves its organism, is audited and is shown to at most the organism's members; the need to know is the class's reader list. The markings (&quot;TL III&quot;, &quot;NATO SECRET&quot;) are recognised in upper case and raise the content they are in. The two highest classes of each need the operator's acknowledgement that this node is not an accredited system, and the compliance report warns while they are on. Switching a pack off keeps labelled content as protected as it was.",
+      "Security page, <code>aimeat_classification</code> (<code>pack_list</code>, <code>pack_set</code>), <code>GET /v1/classification/packs</code>, <code>PUT /v1/classification/packs</code>"
+     ],
+     "plain": "Finnish and NATO security classes off The operator switches on the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to COSMIC TOP SECRET), up to the class they choose. Each class reaches only a model on this machine, never leaves its organism, is audited and is shown to at most the organism's members; the need to know is the class's reader list. The markings (\"TL III\", \"NATO SECRET\") are recognised in upper case and raise the content they are in. The two highest classes of each need the operator's acknowledgement that this node is not an accredited system, and the compliance report warns while they are on. Switching a pack off keeps labelled content as protected as it was. Security page, aimeat_classification (pack_list, pack_set), GET /v1/classification/packs, PUT /v1/classification/packs"
+    },
+    {
      "slug": "g-24-apps-state-the-classification-they-expect",
      "cells": [
       "<strong>Apps state the classification they expect</strong>",
@@ -4280,6 +4316,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 432
+  "rows": 436
  }
 }

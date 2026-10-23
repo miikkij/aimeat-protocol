@@ -25,6 +25,10 @@
  *   import { registerComplianceTools } from './compliance.js';
  *   registerComplianceTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-23 — The register tools also read and replace the documents of plan doc-mvlftkh9zmc9
+ *     (registers, processors, requests, breaches, dpias, frameworks) of the node, an organism or an
+ *     app, and read the catalog, a scope's draft and its gaps, through services/compliance-docs-ops.ts,
+ *     which the REST routes call too. The AI Act parts keep the operator gate.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-15 — aimeat_compliance_report with scope "mine" asks wallet:read, as the REST route does;
@@ -51,8 +55,15 @@ import {
 } from '../services/compliance-register.js';
 import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { toolError } from './tool-error.js';
+import {
+  ComplianceDocError, catalogOp, draftOp, gapsOp, readDocOp, writeDocOp,
+} from '../services/compliance-docs-ops.js';
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
+/** The parts that are the operator's AI Act register; every other part is a scoped document. */
+const OPERATOR_PARTS = new Set(['draft', 'usecases', 'questionnaire']);
+
+const text =(value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
 
 export function registerComplianceTools(
@@ -78,6 +89,8 @@ export function registerComplianceTools(
    * where the tool is offered.
    */
   const gate = (scope: string) => complianceRefusal(storage, { gaii: agentGaii, scopes: sessionScopes }, scope);
+  const docDeps = { storage, config };
+  const docCaller = { sub: agentGaii, scopes: sessionScopes };
 
   mcp.registerTool(
     'aimeat_compliance_report',
@@ -115,7 +128,20 @@ export function registerComplianceTools(
         inputSchema: zodShapeFor('aimeat_compliance_register_read'),
         annotations: annotationsFor('aimeat_compliance_register_read'),
     },
-    async ({ part, since_days }) => {
+    async ({ part, since_days, scope, organism_id, app, app_owner }) => {
+      // The documents of plan doc-mvlftkh9zmc9: the scope's own rule decides (compliance-docs-ops.ts).
+      if (!OPERATOR_PARTS.has(part)) {
+        const where = { scope, organism_id, app, app_owner };
+        try {
+          if (part === 'catalog') return text(await catalogOp(docDeps));
+          if (part === 'registers_draft') return text(await draftOp(docDeps, docCaller, where));
+          if (part === 'gaps') return text(await gapsOp(docDeps, docCaller, where));
+          return text(await readDocOp(docDeps, docCaller, part, where));
+        } catch (err) {
+          if (err instanceof ComplianceDocError) return toolError(err.code, err.message);
+          throw err;
+        }
+      }
       const denied = await gate(COMPLIANCE_READ_SCOPE);
       if (denied) return refuse(denied);
       if (part === 'draft') {
@@ -136,7 +162,15 @@ export function registerComplianceTools(
         inputSchema: zodShapeFor('aimeat_compliance_register_write'),
         annotations: annotationsFor('aimeat_compliance_register_write'),
     },
-    async ({ part, value, dry_run }) => {
+    async ({ part, value, dry_run, scope, organism_id, app, app_owner }) => {
+      if (!OPERATOR_PARTS.has(part)) {
+        try {
+          return text(await writeDocOp(docDeps, docCaller, part, { scope, organism_id, app, app_owner }, value, { dryRun: !!dry_run }));
+        } catch (err) {
+          if (err instanceof ComplianceDocError) return toolError(err.code, err.message);
+          throw err;
+        }
+      }
       const denied = await gate(COMPLIANCE_WRITE_SCOPE);
       if (denied) return refuse(denied);
 

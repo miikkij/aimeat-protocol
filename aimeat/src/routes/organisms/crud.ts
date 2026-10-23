@@ -6,6 +6,7 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-23 — Deleting an organism deletes its compliance documents (plan doc-mvlftkh9zmc9).
  *   2026-10-21 — The member filter's self test asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-18 — POST /v1/organisms and PUT /v1/organisms/:id ask the publish gate: a public organism
  *     by an agent without publish:public is made private (or keeps its level) and the answer is 202
@@ -77,6 +78,7 @@ import { localAccountName } from '../../utils/gaii.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
 import { purgeExceptions } from '../../services/classification/exceptions.js';
+import { removeComplianceDocs } from '../../services/compliance-docs.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -394,6 +396,8 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     purgeClassificationAudit({ scope: `organism:${id}` });
     // Its classification exceptions are records of system@<node>, which the cascade does not reach.
     await purgeExceptions(storage, config.nodeId, { organism: id });
+    // Its compliance documents (plan doc-mvlftkh9zmc9) are records of system@<node> too.
+    await removeComplianceDocs(storage, config.nodeId, { kind: 'organism', organismId: id });
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('organisms');
   });

@@ -33,6 +33,8 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-10-23 — setAgentRuntimeSource takes `llm: 'local'`, a model on the crew's own machine (plan
+ *     doc-mvlftkh9zmc9, C3.4).
  *   2026-10-15 — setAgentCapabilities verifies an mcp-type capability only when it names a server the node
  *     knows for the owner; the name alone made it verified (feature-list audit 74).
  *   v1.5.1 -- 2026-10-05 -- The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
@@ -504,9 +506,9 @@ export async function setAgentRuntimeSource(
             message: 'runtime_source needs a `kind` (e.g. "python" or "crew-def"), or null to clear it' };
     }
     const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
-    if (src.llm !== undefined && src.llm !== 'node' && src.llm !== 'machine') {
+    if (src.llm !== undefined && src.llm !== 'node' && src.llm !== 'machine' && src.llm !== 'local') {
         return { ok: false, code: 'INVALID_INPUT',
-            message: "runtime_source.llm is 'node' (the crew's model calls go through this node's /v1/llm) or 'machine' (the crew calls its provider with a key on its own machine)" };
+            message: "runtime_source.llm is 'node' (the crew's model calls go through this node's /v1/llm), 'machine' (the crew calls its provider with a key on its own machine) or 'local' (the model runs on the crew's own machine and no prompt leaves it)" };
     }
     const stored = {
         kind: src.kind.trim().slice(0, 64),
@@ -515,7 +517,7 @@ export async function setAgentRuntimeSource(
         ...(str(src.commit, 128) ? { commit: str(src.commit, 128) } : {}),
         ...(str(src.runtime, 128) ? { runtime: str(src.runtime, 128) } : {}),
         ...(Number.isInteger(src.definition_revision) ? { definitionRevision: src.definition_revision as number } : {}),
-        ...(src.llm === 'node' || src.llm === 'machine' ? { llm: src.llm as 'node' | 'machine' } : {}),
+        ...(src.llm === 'node' || src.llm === 'machine' || src.llm === 'local' ? { llm: src.llm as 'node' | 'machine' | 'local' } : {}),
         reportedAt: new Date().toISOString(),
     };
     const updated = await deps.storage.updateAgent(target.gaii, { runtimeSource: stored });
