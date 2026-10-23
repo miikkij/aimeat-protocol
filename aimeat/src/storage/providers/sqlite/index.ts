@@ -15,9 +15,6 @@
  *   held by `pnpm check:storage-file-parity`.
  * @usage new SqliteStorage(dbPath) — dbPath may be ':memory:' or a file path.
  * @version-history
- *   v1.16.0 — 2026-10-23 — A call from outside every transaction that finds the connection inside one
- *     is logged once per opener, with where the transaction was begun (txOpener), to find what kept a
- *     read snapshot open on the nightly SQLite sweep (incident 2026-10-23, e2e-scheduled-ext-files).
  *   2026-10-16 — chunkedUploads is the shared ChunkedUploadStore (QA audit F05b-02).
  *   v1.15.0 — 2026-10-16 — savepoint(): a tolerant step inside a transaction (QA audit E6-01).
  *   v1.14.0 — 2026-10-05 — The method groups are wired from files named after their
@@ -56,7 +53,6 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { Storage } from '../../interface.js';
-import { logger } from '../../../utils/logger.js';
 import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import { initializeSchema } from './schema.js';
 
@@ -149,14 +145,6 @@ export class SqliteStorage {
    */
   private txQueue: Promise<unknown> = Promise.resolve();
 
-  /**
-   * Where the transaction open on this connection was begun (a stack), or null when none of this
-   * storage's own BEGINs is open. Read by noteForeignTransaction below.
-   */
-  txOpener: string | null = null;
-  /** When that transaction was begun (epoch ms). */
-  txOpenedAt = 0;
-
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new Database(dbPath);
@@ -188,13 +176,9 @@ export class SqliteStorage {
    */
   async transaction<T>(fn: () => Promise<T>): Promise<T> {
     if (this.insideTransaction) return fn();
-    // Taken here, where the caller is still on the stack; inside `run` it would show only the queue.
-    const opener = new Error('transaction()').stack ?? 'transaction()';
     const run = async (): Promise<T> => {
       this.txDepth = 1;
       this.db.exec('BEGIN');
-      this.txOpener = opener;
-      this.txOpenedAt = Date.now();
       try {
         const out = await txContext.run(this, fn);
         this.db.exec('COMMIT');
@@ -207,7 +191,6 @@ export class SqliteStorage {
         throw err;
       } finally {
         this.txDepth = 0;
-        this.txOpener = null;
       }
     };
     // Queue behind any transaction already running, whether it succeeded or threw.
@@ -261,45 +244,15 @@ const WRITE_METHOD = /^(create|set|update|delete|add|remove|insert|upsert|write|
 
 function guardWrites(proto: Record<string, unknown>): void {
   for (const name of Object.keys(proto)) {
+    if (!WRITE_METHOD.test(name)) continue;
     const fn = proto[name];
     if (typeof fn !== 'function' || fn.constructor.name !== 'AsyncFunction') continue;
     const original = fn as (this: SqliteStorage, ...args: unknown[]) => Promise<unknown>;
-    if (WRITE_METHOD.test(name)) {
-      proto[name] = async function (this: SqliteStorage, ...args: unknown[]): Promise<unknown> {
-        if (!this.insideTransaction) await this.waitForNoTransaction();
-        noteForeignTransaction(this, name);
-        return original.apply(this, args);
-      };
-    } else {
-      proto[name] = function (this: SqliteStorage, ...args: unknown[]): Promise<unknown> {
-        noteForeignTransaction(this, name);
-        return original.apply(this, args);
-      };
-    }
+    proto[name] = async function (this: SqliteStorage, ...args: unknown[]): Promise<unknown> {
+      if (!this.insideTransaction) await this.waitForNoTransaction();
+      return original.apply(this, args);
+    };
   }
-}
-
-/** The openers already reported, so one stuck transaction is one log line. */
-const reportedOpeners = new Set<string>();
-/** A transaction open longer than this when a bystander reaches it is reported. Shorter ones are the design. */
-const FOREIGN_TX_REPORT_MS = 200;
-
-/**
- * A call from OUTSIDE every transaction of ours that finds the connection inside one. SQLite gives the
- * process one connection, so such a call reads that transaction's snapshot (and misses what another
- * process committed since it began) and, if it writes, writes into it. The write guard above should
- * make this impossible for writes; for reads nothing does. The nightly SQLite sweep saw the server read
- * a schedule as it was before another process changed it (incident 2026-10-23,
- * e2e-scheduled-ext-files 23c/23d), and this names the transaction that was open when that happened.
- */
-function noteForeignTransaction(storage: SqliteStorage, method: string): void {
-  if (!storage.db.inTransaction || storage.insideTransaction) return;
-  const openMs = storage.txOpener ? Date.now() - storage.txOpenedAt : -1;
-  if (openMs >= 0 && openMs < FOREIGN_TX_REPORT_MS) return;
-  const opener = storage.txOpener ?? 'no BEGIN recorded by this storage: a BEGIN from elsewhere, or one left open';
-  if (reportedOpeners.has(opener) || reportedOpeners.size >= 50) return;
-  reportedOpeners.add(opener);
-  logger.error(`SQLite: ${method} ran from outside a transaction while the connection was inside one for ${openMs} ms; it reads that transaction's snapshot`, { method, openMs, opener });
 }
 
 // Declaration merge: the class value provides fields + constructor + close();
