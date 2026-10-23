@@ -7932,6 +7932,8 @@
   "accesspage.scope.task.write": "gives your agents tasks",
   "accesspage.scope.task.manage": "manages your agents' tasks",
   "accesspage.scope.contract.spend": "buys in your name with the contracts you hold",
+  "accesspage.scope.exchange.read": "sees your marketplace contracts and work",
+  "accesspage.scope.exchange.write": "makes and ends marketplace contracts within your budget, and lists what you sell",
   "accesspage.scope.exchange.grant": "hands out free access to what you sell",
   "accesspage.scope.exchange.beneficiary": "shares your earnings with other accounts",
   "accesspage.scope.wallet.read": "sees your balance and payments",

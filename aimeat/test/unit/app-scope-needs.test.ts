@@ -8,6 +8,7 @@
  *   that 4.0.0 does not gate, an app that never signs in).
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-scope-needs.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-23 — Marketplace calls: reads of a person's contracts and work need exchange:read, writes exchange:write, free access exchange:grant; the public market asks nothing.
  *   v1.0.2 — 2026-10-17 — A realtime room made by the library or by POST needs social:write; a room list does not.
  *   v1.0.1 — 2026-10-15 — cortexLibRefs: a subfolder path, and linear time on a repeated prefix.
  *   v1.0.0 — 2026-10-13 — Initial.
@@ -58,6 +59,36 @@ describe('a call shape the 4.0.0 gates check', () => {
             expect(words(code)).toEqual(expected);
         });
     }
+
+    describe('a marketplace call', () => {
+        const market: Array<[string, string, string[]]> = [
+            ['the person\'s contracts', "sf('/v1/exchange/entitlements')", ['exchange:read']],
+            ['their contract history', "sf('/v1/exchange/entitlements/history?limit=50')", ['exchange:read']],
+            ['the provider\'s history', "api('/v1/exchange/provider/history')", ['exchange:read']],
+            ['an offering\'s consumers, joined to its id', "sf('/v1/exchange/offerings/' + id + '/consumers')", ['exchange:read']],
+            ['a contract accepted by method POST', "sf('/v1/exchange/entitlements', { method: 'POST', body })", ['exchange:write']],
+            ['a bid by a POST wrapper', "post('/v1/exchange/needs/' + id + '/bids', bid)", ['exchange:write']],
+            ['an offering withdrawn by method DELETE', "api('/v1/exchange/offerings/' + id, { method: 'DELETE' })", ['exchange:write']],
+            ['work delivered, the options on the next line', "s.fetch('/v1/exchange/work/' + id + '/deliver', {\n  method: 'POST', body })", ['exchange:write']],
+            ['free access handed out', "s.fetch('/v1/exchange/grants', { method: 'POST', body })", ['exchange:grant']],
+            ['work read and then started', "sf('/v1/exchange/work'); sf('/v1/exchange/work', { method: 'POST', body: b })", ['exchange:read', 'exchange:write']],
+        ];
+        for (const [name, code, expected] of market) {
+            it(`${name} needs ${expected.join(', ')}`, () => {
+                expect(words(code)).toEqual(expected);
+            });
+        }
+        it('the public market asks nothing: offerings, their ODPS, open needs, their bids, the info document', () => {
+            expect(words("sf('/v1/exchange/offerings?q=' + q); sf('/v1/exchange/offerings/' + id + '/odps'); sf('/v1/exchange/needs');"
+                + " sf('/v1/exchange/needs/' + id + '/bids'); fetch('/v1/exchange/info')")).toEqual([]);
+        });
+        it('a write further down is not the method of the public reads before it', () => {
+            expect(words("var r = await Promise.all([sf('/v1/exchange/offerings'), sf('/v1/exchange/needs')]);\nlog('x', { method: 'POST' });")).toEqual([]);
+        });
+        it('an app that declares the two words needs nothing more', () => {
+            expect(words("sf('/v1/exchange/entitlements'); sf('/v1/exchange/needs', { method: 'POST', body })", 'memory:read exchange:read exchange:write')).toEqual([]);
+        });
+    });
 
     it('a checkout completed by an app needs the app twin contract:spend, which a grant can hold', () => {
         expect(words('AIMEAT.commerce.completeCheckout(id)')).toEqual(['contract:spend']);
