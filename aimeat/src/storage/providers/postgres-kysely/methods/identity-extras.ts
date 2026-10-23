@@ -6,6 +6,7 @@
  *   Postgres+Kysely backend — the parts of the identity repository not in methods/identity.ts.
  *   Translated 1:1 from the Prisma provider.
  * @version-history
+ *   v1.2.1 — 2026-10-23 — getActiveEmailVerification reads with LIMIT 1 (check:unbounded-lists).
  *   v1.2.0 — 2026-10-05 — spendEmailVerification (secaudit 2026-10, AUTH-3).
  *   v1.1.0 — 2026-09-09 — getEmailVerificationsByOwner and deleteExpiredEmailVerifications deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: chat instances + email verifications on Postgres+Kysely.
@@ -84,7 +85,7 @@ export const identityExtraMethods = {
   },
   async getActiveEmailVerification(this: PostgresKyselyStorage, ownerName: string, purpose: string): Promise<EmailVerificationRecord | null> {
     const r = await this.db.selectFrom('EmailVerification').selectAll().where('ownerName', '=', ownerName).where('purpose', '=', purpose)
-      .where('status', '=', 'pending').where('expiresAt', '>', new Date()).orderBy('createdAt', 'desc').executeTakeFirst();
+      .where('status', '=', 'pending').where('expiresAt', '>', new Date()).orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
     return r ? toEmail(r) : null;
   },
   async updateEmailVerification(this: PostgresKyselyStorage, id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null> {
