@@ -34422,7 +34422,8 @@ paths:
             A signed draft-preview token (from POST .../draft/preview-token). When present and valid,
             the app's UNPUBLISHED draft is served instead of the live version (the live app is
             untouched). On a node with the app origin enabled an apex request is 301-redirected to the
-            isolated origin, preserving the token.
+            isolated origin, preserving the token. The token names one owner and one filename; on a
+            URL whose owner or filename differs it answers 403 TOKEN_INVALID.
       responses:
         '200': { description: "App HTML (inline or attachment; the draft when a valid preview token is supplied), or text/markdown when the request prefers markdown (Agent Face)" }
         '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
