@@ -316,6 +316,67 @@ components:
         link: { type: integer }
         signed-in: { type: integer }
         organism: { type: integer }
+    InternetOpeningForm:
+      type: object
+      description: One public intake form an opened app submits to (/v1/intake/{org}/{ws}/{form_id}).
+      properties:
+        org: { type: string }
+        ws: { type: string }
+        form_id: { type: string }
+    InternetOpeningRequest:
+      type: object
+      nullable: true
+      description: What waits for an operator on an opening.
+      properties:
+        kind: { type: string, enum: [open, extend, forms] }
+        reason: { type: string }
+        days: { type: integer }
+        requested_by: { type: string, description: The principal that asked. }
+        requested_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time, description: When the request lapses undecided. }
+        forms: { type: array, items: { $ref: '#/components/schemas/InternetOpeningForm' } }
+    InternetOpening:
+      type: object
+      description: >-
+        One app opened to the internet on a node with signed-in content access: who asked and why,
+        who approved, until when, the forms open with it, what waits for an operator, and the history
+        newest first.
+      properties:
+        id: { type: string, description: '`owner/filename`.' }
+        owner: { type: string }
+        app: { type: string, description: The app's filename. }
+        app_name: { type: string, nullable: true }
+        url: { type: string, nullable: true, description: The address everyone opens. }
+        state: { type: string, enum: [requested, open, declined, request_expired, expired, closed] }
+        reason: { type: string }
+        requested_by: { type: string }
+        requested_at: { type: string, format: date-time }
+        opened_under: { type: string, nullable: true, enum: [operator-approval, operator, trusted-opener, self-mode] }
+        decided_by: { type: string, nullable: true }
+        decided_at: { type: string, nullable: true, format: date-time }
+        decision_note: { type: string, nullable: true }
+        opened_at: { type: string, nullable: true, format: date-time }
+        opened_version: { type: integer, nullable: true }
+        current_version: { type: integer, nullable: true }
+        forms: { type: array, items: { $ref: '#/components/schemas/InternetOpeningForm' } }
+        until: { type: string, nullable: true, format: date-time }
+        days: { type: integer }
+        request: { $ref: '#/components/schemas/InternetOpeningRequest' }
+        forms_request: { $ref: '#/components/schemas/InternetOpeningRequest' }
+        closed_by: { type: string, nullable: true }
+        closed_at: { type: string, nullable: true, format: date-time }
+        close_reason: { type: string, nullable: true }
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              at: { type: string, format: date-time }
+              kind: { type: string }
+              by: { type: string, nullable: true }
+              note: { type: string, nullable: true }
+              version: { type: integer, nullable: true }
+              forms: { type: array, items: { $ref: '#/components/schemas/InternetOpeningForm' } }
     ExposureCounts:
       type: object
       description: The exposure counts, overall, by level and by kind (only the kinds with something exposed).
@@ -34736,6 +34797,228 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/apps/{owner}/{filename}/internet-opening:
+    get:
+      operationId: readAppInternetOpening
+      summary: Whether an app is open to the internet on a closed node
+      description: >-
+        The app's opening on a node with signed-in content access: `mode` (how this node opens apps:
+        operator, self, off, or not-needed on an open node), `max_days`, `may_open_directly` and
+        `opens_under` (why the caller opens without an operator), `declared_forms` (the intake forms
+        the live version names in its aimeat-intake meta) and `opening` (null when never opened).
+        The owner or an operator reads it; anyone else gets 404.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The app's opening
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mode: { type: string, enum: [off, operator, self, not-needed] }
+                          max_days: { type: integer }
+                          may_open_directly: { type: boolean }
+                          opens_under: { type: string, nullable: true }
+                          declared_forms: { type: array, items: { $ref: '#/components/schemas/InternetOpeningForm' } }
+                          opening: { allOf: [{ $ref: '#/components/schemas/InternetOpening' }], nullable: true }
+        '404': { description: Unknown app, or not the caller's }
+    post:
+      operationId: openAppToInternet
+      summary: Open the caller's own app to the internet, ask an operator, or extend it
+      description: >-
+        On a node with signed-in content access, opens the app page, its own documents and the
+        intake forms its live version declares to everyone, with a `reason` (required) for `days`
+        (default and maximum: visibility.app_internet_opening_max_days). Where the caller may open
+        without an operator (mode self, an operator, an owner the operators trust) it opens at once
+        (200, `outcome` opened, the operators are told); otherwise it waits for an operator (202,
+        `outcome` requested). On an app already open it extends the end date (extended or
+        extend_requested). An agent or app the publish gate asks about gets 202 `outcome`
+        owner_asked with `publish_request`. Refusals: 400 INVALID_INPUT, 403 OPENING_OFF, 403
+        APP_HIDDEN, 409 NOT_NEEDED, 409 APP_NOT_OPEN_TO_ANYONE, 409 APP_HAS_ACCESS_CODE, 409
+        APP_PARKED, 422 NOT_A_PAGE, 404 for an unknown app, 403 for another account's app.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 500 }
+                days: { type: integer, minimum: 1 }
+      responses:
+        '200': { description: Opened or extended }
+        '202': { description: Waits for an operator, or for the owner }
+        '400': { description: No reason, or days out of range }
+        '403': { description: Opening is off, the app was taken down, or it is another account's }
+        '409': { description: The app does not qualify, or the node needs no opening }
+    delete:
+      operationId: closeAppToInternet
+      summary: Close an app to the internet, or withdraw the waiting request
+      description: >-
+        The owner closes their own app; an operator closes any (the owner is told). `reason` in the
+        body or the query goes into the history. 409 NOT_OPEN when the app is neither open nor waiting.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: reason, in: query, required: false, schema: { type: string } }
+      responses:
+        '200': { description: Closed }
+        '403': { description: Not the owner and not an operator }
+        '409': { description: Not open and nothing waits }
+  /v1/admin/internet-openings:
+    get:
+      operationId: listInternetOpenings
+      summary: Every app open to the internet on this closed node, and what waits
+      description: >-
+        The node's `mode` and `max_days`, `counts` (open, waiting, ending within 7 days), `openings`
+        and `openers` (owners who open without asking). Without `state`: what is open, what waits,
+        and the last 30 days of the rest. Reserved to the node operator; an operator's agent also
+        needs the scope `operator:admin`.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [requested, open, declined, request_expired, expired, closed] } }
+      responses:
+        '200':
+          description: The list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          mode: { type: string }
+                          max_days: { type: integer }
+                          counts:
+                            type: object
+                            properties:
+                              open: { type: integer }
+                              waiting: { type: integer }
+                              ending_soon: { type: integer }
+                          openings: { type: array, items: { $ref: '#/components/schemas/InternetOpening' } }
+                          openers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                owner: { type: string }
+                                reason: { type: string }
+                                granted_by: { type: string }
+                                granted_at: { type: string, format: date-time }
+                                until: { type: string, nullable: true, format: date-time }
+  /v1/admin/internet-openings/{owner}/{filename}/decision:
+    post:
+      operationId: decideInternetOpening
+      summary: Approve or decline what waits on an app's opening
+      description: >-
+        The first opening, an extension, or forms a new version added (`which` forms). A decline
+        needs `note`. The owner is told; the decision is recorded on their account. 409
+        NOTHING_TO_DECIDE when nothing waits. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline] }
+                note: { type: string }
+                which: { type: string, enum: [request, forms] }
+      responses:
+        '200': { description: Decided }
+        '400': { description: No decision, or a decline without a note }
+        '409': { description: Nothing waits, or the app no longer qualifies }
+  /v1/admin/internet-openings/{owner}/{filename}/close:
+    post:
+      operationId: operatorCloseInternetOpening
+      summary: An operator closes any app to the internet
+      description: The owner is told and the act is recorded on their account. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { description: Closed }
+        '409': { description: Not open and nothing waits }
+  /v1/admin/internet-openers/{owner}:
+    put:
+      operationId: trustInternetOpener
+      summary: Let an owner open apps to the internet without an operator's approval
+      description: >-
+        `reason` is required; `until` ends the trust by itself. The operators still hear of every
+        opening. The owner is told. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+                until: { type: string, format: date-time }
+      responses:
+        '200': { description: The owners who open without asking }
+        '404': { description: No such account }
+    delete:
+      operationId: untrustInternetOpener
+      summary: An owner's openings wait for an operator again
+      description: What the owner opened stays open. The owner is told. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: The owners who open without asking }
   /v1/apps/{owner}/{filename}/open:
     post:
       operationId: openGatedApp

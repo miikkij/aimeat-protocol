@@ -39,6 +39,8 @@
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.5.0 — 2026-10-25 — On a closed node an app opened to the internet stays public in the report,
+ *     with how to close its opening (services/internet-opening/); the node note names the exception.
  *   v1.4.0 — 2026-10-18 — Each item's effective classification and audience cap, the conflicts listed
  *     first, and their number on the report and on the node-wide report (plan doc-mvdipuyqraas, L4.1).
  *   v1.3.0 — 2026-10-18 — The places carry a classification address too, and the reader decides on
@@ -52,6 +54,7 @@ import { logger } from '../../utils/logger.js';
 import { errorFields } from '../../utils/error-fields.js';
 import type { ContentReader } from '../classification/reader.js';
 import { signedInOnly } from '../../config-visibility.js';
+import { openingOfApp } from '../internet-opening/opening-registry.js';
 import {
   type ExposureContext, type ExposureFound, type ExposureItem, type ExposureKind, type ExposureLevel,
   KINDS, LEVELS, EXPOSURE_ITEM_CAP,
@@ -139,8 +142,21 @@ function emptyLevels(): Record<ExposureLevel, number> {
   return { public: 0, link: 0, 'signed-in': 0, organism: 0 };
 }
 
-/** An item as a node set to signed-in content access serves it: no wider than its own accounts. */
-function lowerToSignedIn(f: ExposureFound): ExposureFound {
+/**
+ * An item as a node set to signed-in content access serves it: no wider than its own accounts, except
+ * an app opened to the internet (services/internet-opening/), which everyone reads until its opening ends.
+ */
+function lowerToSignedIn(f: ExposureFound, ownerName: string): ExposureFound {
+  if (f.kind === 'app' && (f.level === 'public' || f.level === 'link')) {
+    const opening = openingOfApp(ownerName, f.id);
+    if (opening) {
+      return {
+        ...f, level: 'public',
+        how_to_close: `It is open to everyone on the internet until ${(opening.until ?? '').slice(0, 10)}, by an opening with its own reason and history. `
+          + `Close it with aimeat_app_internet_close (DELETE /v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(f.id)}/internet-opening); it then reads as signed-in again.`,
+      };
+    }
+  }
   return f.level === 'public' || f.level === 'link' ? { ...f, level: 'signed-in' } : f;
 }
 
@@ -151,7 +167,7 @@ function notesFor(ctx: ExposureContext): string[] {
     : [...EXPOSURE_NOTES];
 }
 
-export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts.';
+export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts. The one exception is an app opened to the internet, with the forms it uses: it is listed as public until its opening ends.';
 
 /**
  * An item as the report hands it out: the content address a source attached stays behind, and the
@@ -191,7 +207,7 @@ async function readAll(
   for (const source of EXPOSURE_SOURCES) {
     try {
       const items = await source.list(ctx, ownerName, ownerGhii);
-      found.set(source.kind, lower ? items.map(lowerToSignedIn) : items);
+      found.set(source.kind, lower ? items.map(f => lowerToSignedIn(f, ownerName)) : items);
     } catch (err) {
       logger.warn('exposure: a source could not be read', { ...errorFields(err), kind: source.kind, owner: ownerName });
       failed.push(source.kind);

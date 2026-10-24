@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.20.0 -- 2026-10-25 -- Apps open to the internet on a closed node: the list, the decision, the trusted owners.
  *   v1.19.1 -- 2026-10-24 -- The records of processing: scope "all", and item_id with set (C7.7).
  *   v1.19.0 -- 2026-10-23 -- Security classes (the TL and NATO packs) and the records of processing (plan doc-mvlftkh9zmc9).
  *   v1.18.1 -- 2026-10-18 -- The default limits' offer waits until classification is switched on.
@@ -153,6 +154,15 @@ only as the operator says. No content changes either way. The node level (\`poli
 \`level: "node"\`) needs the operator in person, or you with the \`operator:admin\` permission the
 operator ticked for you. If this surface does not list
 \`aimeat_classification\`, it is on the agent surface and the full MCP endpoint.
+
+**Apps open to the internet (operator).** On a node that shows its content to signed-in accounts
+only, one app and the forms it declares can be opened to everyone, as a watched exception.
+\`aimeat_admin_internet_openings\` lists what is open (who asked, why, who approved, until when, the
+version at opening and now), what waits for a decision, and the owners who open without asking.
+\`aimeat_admin_internet_opening_decide\` approves or declines (a decline names its reason for the
+owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimeat_admin_internet_opener_set\`
+lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
+opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
 
 **Security classes (operator).** \`aimeat_classification\` with \`action: "pack_list"\` shows the two
 label packs, the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to

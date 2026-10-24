@@ -18,6 +18,9 @@
  * @usage
  *   if (appNeedsSignIn(config, app) && !(await mayOpenApp(storage, config, app, req.auth))) → refuse
  * @version-history
+ *   v1.2.0 — 2026-10-25 — An app opened to the internet on a closed node keeps the audience anyone while
+ *     its opening is in force (services/internet-opening/); the app record's owner name and filename
+ *     name it.
  *   v1.1.0 — 2026-10-18 — appAccessLevelOf: the setting without the organism's id, for a listing row
  *     read by someone other than the owner (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V2.1).
@@ -27,6 +30,7 @@ import type { AimeatConfig } from '../config.js';
 import { appIsPaced } from './app-pacing.js';
 import { signedInOnly, type ContentAccess } from '../config-visibility.js';
 import { parseAudience, audienceAllows, type Audience, type AudienceAuth } from './audience.js';
+import { isAppOpenToInternet } from './internet-opening/opening-registry.js';
 
 /** What an owner writes, and what the settings answer carries. */
 export type AppAccess = 'anyone' | 'signed-in' | `organism:${string}`;
@@ -65,15 +69,20 @@ export function appAccessLevelOf(app: Pick<AppRecord, 'access'> | null | undefin
   return own === 'anyone' || own === 'signed-in' ? own : 'organism';
 }
 
+/** The app fields the decision reads: its own setting, and the name an opening is kept under. */
+type AppForAudience = Pick<AppRecord, 'access'> & Partial<Pick<AppRecord, 'ownerName' | 'filename'>>;
+
 /**
  * The audience that decides who opens the app, or null for anyone. The node's own setting raises
- * 'anyone' to the node's accounts.
+ * 'anyone' to the node's accounts, except for an app opened to the internet
+ * (services/internet-opening/), which stays open to anyone while its opening is in force.
  */
-export function appAudience(config: { contentAccess?: ContentAccess }, app: Pick<AppRecord, 'access'>): Audience | null {
+export function appAudience(config: { contentAccess?: ContentAccess }, app: AppForAudience): Audience | null {
   const own = appAccessOf(app);
   if (own === 'signed-in') return { level: 'members' };
   if (own !== 'anyone') return parseAudience(own);
-  return signedInOnly(config) ? { level: 'members' } : null;
+  if (!signedInOnly(config)) return null;
+  return app.ownerName && app.filename && isAppOpenToInternet(app.ownerName, app.filename) ? null : { level: 'members' };
 }
 
 /** True when the app needs a code or a payment before it is served (what a custom address may not hold). */
@@ -82,13 +91,13 @@ export function appNeedsCodeOrPayment(config: AimeatConfig, app: Pick<AppRecord,
 }
 
 /** True when opening the app needs a sign-in (its own setting, or the node's). */
-export function appNeedsSignIn(config: { contentAccess?: ContentAccess }, app: Pick<AppRecord, 'access'>): boolean {
+export function appNeedsSignIn(config: { contentAccess?: ContentAccess }, app: AppForAudience): boolean {
   return appAudience(config, app) !== null;
 }
 
 /** Does this caller pass the app's sign-in gate? True when the app has none. */
 export async function mayOpenApp(
-  storage: Storage, config: { contentAccess?: ContentAccess }, app: Pick<AppRecord, 'access'>,
+  storage: Storage, config: { contentAccess?: ContentAccess }, app: AppForAudience,
   auth: AudienceAuth | null | undefined,
 ): Promise<boolean> {
   const audience = appAudience(config, app);

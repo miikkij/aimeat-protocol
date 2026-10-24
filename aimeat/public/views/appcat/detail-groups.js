@@ -10,7 +10,7 @@
  *   - Edit: where the work is, editing with AI, the working-copy history, the versions, the actions;
  *   - What this is: about, the design spec, where the app puts what, what it needs, its skills;
  *   - Building together: the roadmap, who else may build it, the audit log;
- *   - Publishing and visibility: server settings, visitors, search, marks, legal pages, promotion;
+ *   - Publishing and visibility: server settings, opening to the internet on a closed node, visitors, search, marks, legal pages, promotion;
  *   - Money and agents: the EXCHANGE listing, tool sales, costs and contracts, bundled agents.
  *   Every group shows all its sections; nothing folds away (Jouni: "ettei aleta piilottelemaan mitään").
  *
@@ -21,6 +21,7 @@
  * @structure GROUPS · SECTION_IDS · attentionOf(d, flags)
  * @usage const att = attentionOf(d, kunto(row, bound)); att.spec → ['…'] or undefined
  * @version-history
+ *   v1.1.0 — 2026-10-25 — "Open to the internet" (internet) after Manage in Publishing and visibility.
  *   v1.0.0 — 2026-10-04 — Initial (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  */
 import { x } from '/views/appcat/i18n.js';
@@ -30,7 +31,7 @@ export const GROUPS = [
   { id: 'edit', title: 'detail.groupEdit', ids: ['work', 'ai', 'history', 'versions', 'actions'] },
   { id: 'what', title: 'detail.groupWhat', ids: ['about', 'spec', 'datamap', 'needs', 'skills'] },
   { id: 'together', title: 'detail.groupTogether', ids: ['roadmap', 'builders', 'audit'] },
-  { id: 'publish', title: 'detail.groupPublish', ids: ['manage', 'visitors', 'search', 'marks', 'legal', 'promote'] },
+  { id: 'publish', title: 'detail.groupPublish', ids: ['manage', 'internet', 'visitors', 'search', 'marks', 'legal', 'promote'] },
   { id: 'money', title: 'detail.groupMoney', ids: ['odps', 'monetize', 'cost', 'agents'] },
 ];
 

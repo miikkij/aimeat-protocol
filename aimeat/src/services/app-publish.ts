@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-25 — The aimeat-intake declaration is read from the bytes (services/app-intake-forms.ts): a form the publisher does not manage refuses the publish, a form the code calls undeclared is a warning, and the forms go on the manifest. A new version of an app open to the internet is handed to services/internet-opening/. The input types (RequestedManifest, PublishAppInput, PublishAppRefusal) moved unchanged to app-publish-types.ts (line limit) and are re-exported.
  *   2026-10-22 — The delegated-settings check moved unchanged to app-publish-delegate.ts (line limit), which also refuses a developer of another account without the full right who adds the ?format=md declaration or changes which extension action it names (secaudit 2026-10, r54).
  *   2026-10-19 — A display version the caller states is refused when it breaks the one rule (services/app-display-version.ts); a carried one is not re-judged (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 — The data-map stamp is checked against the scopes the version declares, so an app asking for organism:invite whose map does not say it invites people is stamped with DATAMAP_INVITES_UNSTATED (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
@@ -126,11 +127,11 @@ import { roadmapGate, addRoadmapEntry, roadmapStamp } from './app-roadmap.js';
 import { readAppDesignSpec, designSpecStamp, designSpecHint } from './app-design-spec.js';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../storage/interface.js';
+import type { Storage, AppManifest, AppManifestCortex } from '../storage/interface.js';
 import { emitAppVersion } from './event-bus.js';
 import { isAnnounceable, postAppBoardAnnouncement, recordAppActivity } from './app-announce.js';
 import { recordAccountEvent } from './account-events.js';
-import { provenanceForWrite, provenanceDeclarationRefusal, type DeclaredProvenance } from './ai-provenance.js';
+import { provenanceForWrite, provenanceDeclarationRefusal } from './ai-provenance.js';
 import { sanitizeDescriptions } from './app-publish-helpers.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { unknownModelHints, provenanceModelFindings } from './app-ai-model-hints.js';
@@ -160,87 +161,14 @@ import { refreshAppDependencies } from './dependency-map.js';
 import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseAppConfigSchema } from './app-config.js';
 import { parseAppWorkspaces, checkAppWorkspaces } from './app-workspaces.js';
+import { intakeDeclarationOf } from './app-intake-forms.js';
+import { onAppVersionPublished } from './internet-opening/opening-version.js';
 import { parseFormatMdMeta, formatMdRefusal } from './app-format-md.js';
 import { delegatedSettingsRefusal } from './app-publish-delegate.js';
 import { publishExposure } from './app-publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
-import type { PublishAsk } from './publish-requests/ask.js';
-
-/**
- * The manifest fields a caller may state. **`undefined` means "not mentioned"** and is filled from
- * the live app; it never means "clear". Every door maps its own payload onto this one shape, so the
- * carry-forward list is written once instead of once per door.
- */
-export interface RequestedManifest {
-  name?: string;
-  description?: string;
-  descriptions?: Record<string, string>;
-  version?: string;
-  category?: string;
-  tags?: string[];
-  icon?: string;
-  usesCortex?: string[];
-  /** Already validated against CrewDefSchema by the door. `[]` clears the section explicitly. */
-  cortexAgents?: Record<string, unknown>[];
-  /** The pacing amount: `0` clears it explicitly; `undefined` carries the live one forward. */
-  tollMorsels?: number;
-  licenseType?: AppManifest['licenseType'];
-  /** Already run through sanitizeProtection() by the door. */
-  protection?: AppProtection;
-}
-
-export interface PublishAppInput {
-  roadmap?: string;
-  /** Bare owner name — the display/URL form. Never the @node-suffixed GHII. */
-  ownerName: string;
-  /** The canonical app bucket key. Apps are OWNER-scoped whoever publishes them. */
-  ownerGhii: string;
-  /** WHO pressed publish, resolved server-side: GHII, GAII or GEAI. Audit + provenance principal. */
-  callerGaii: string;
-  filename: string;
-  data: Buffer;
-  mimeType: string;
-  requested: RequestedManifest;
-  /**
-   * `explicit` uses the value verbatim (the inline door, whose body carries `access_code`);
-   * `carry` keeps whatever the live app has (the presigned and draft doors, which cannot express
-   * one). Two modes rather than one nullable value, because "the caller sent nothing" and "the
-   * caller asked for no access code" are different acts and conflating them is how a re-publish
-   * silently unprotects an app.
-   */
-  accessCode: { mode: 'explicit'; value?: string } | { mode: 'carry' };
-  /**
-   * Which door this came through. Recorded in the change-log line so a reader can tell them apart.
-   *
-   * `package-install` is the app component of a package being registered. It is a publish in every
-   * way that matters — the same lints, the same provenance, its own address, the dependency map
-   * refreshed — with three announcements muted, because installing a copy of something that already
-   * exists is not the event those announcements are for, and a six-app package would put six rows in
-   * a feed that stops being read at that point. See `announces` below.
-   */
-  source: 'inline' | 'presigned' | 'draft' | 'package-install';
-  /** The publish gate's answer for the caller, asked by the door (null: a package install). Read on a first publish only (app-publish-gate.ts). */
-  publishGate: PublishAsk | null;
-  /** A provenance record the caller asked to attach — checked against their own account. */
-  declaredProvenanceId?: string;
-  /** What the caller said about how the bytes were made. Absent + non-human principal → MINT-3. */
-  declaredProvenance?: DeclaredProvenance;
-  /** The build-spec digest the caller says they built against (services/app-spec-gate.ts). */
-  specToken?: string;
-  /** `skipped-by-owner` when the owner decided to publish without the spec. Recorded, not silent. */
-  specAck?: string;
-  /** A NEW app counts against the per-owner quota. Always on; the parameter exists for tests. */
-  enforceQuota?: boolean;
-}
-
-/** A refusal the door turns into its own error envelope. */
-export interface PublishAppRefusal {
-  refusal: {
-    status: number; code: string; message: string;
-    /** Machine-readable reasons, for a refusal whose remedy is per-finding rather than per-message. */
-    details?: Record<string, unknown>;
-  };
-}
+export type { RequestedManifest, PublishAppInput, PublishAppRefusal } from './app-publish-types.js';
+import type { PublishAppInput, PublishAppRefusal } from './app-publish-types.js';
 
 export interface PublishAppResult {
   roadmapHint?: string;
@@ -391,6 +319,10 @@ export async function publishApp(
     const why = 'error' in workspaceDecl ? workspaceDecl.error : await checkAppWorkspaces(storage, workspaceDecl.workspaces);
     if (why) return { refusal: { status: 422, code: 'APP_WORKSPACE_INVALID', message: `The app's workspace declaration cannot be used: ${why}.` } };
   }
+  // The intake forms the app submits to (services/app-intake-forms.ts): each must be the publisher's
+  // to manage, because an app opened to the internet on a closed node opens them with it.
+  const intakeDecl = isHtml ? await intakeDeclarationOf(storage, ownerName, html) : null;
+  if (intakeDecl && 'refusal' in intakeDecl) return { refusal: intakeDecl.refusal };
 
   // Did whoever is publishing read the build spec that is in force NOW? This one only ever warns
   // (services/app-spec-gate.ts explains why), and an owner-declared skip is recorded on the change
@@ -497,6 +429,8 @@ export async function publishApp(
   if (configDecl) manifest.configSchema = configDecl.schema as unknown as Record<string, unknown>;
   // So is the workspace declaration.
   if (workspaceDecl && 'workspaces' in workspaceDecl) manifest.workspaces = workspaceDecl.workspaces;
+  // And the intake forms.
+  if (intakeDecl?.forms.length) manifest.intake = intakeDecl.forms;
   // And the ?format=md handler: a version that stops declaring it stops having it.
   if (formatMdDecl) manifest.formatMd = formatMdDecl;
   // Pacing amount: `0` clears it explicitly, silence keeps it. An update that omits the field must
@@ -707,6 +641,11 @@ export async function publishApp(
   }
 
   emitAppVersion(ownerName, filename, newVersion);
+  // An app open to the internet on a closed node: the operators hear of the new version, and the
+  // forms it opens follow the new declaration (services/internet-opening/). Never fails the publish.
+  void onAppVersionPublished({ storage, config }, {
+    ownerName, filename, version: newVersion, by: callerGaii, intake: manifest.intake ?? [],
+  });
   if (announces) {
     recordAppActivity(storage, config, {
       actor: callerGaii,
@@ -787,7 +726,9 @@ export async function publishApp(
       carriedAtelierToken: typeof input.specToken === 'string' && input.specToken.trim() === buildAtelierSpecToken(config),
     }) : []), ...(isHtml ? oneLanguageFindings({ isUpdate, html }) : []), ...(isHtml ? genreForkFindings(html) : []), ...(isHtml ? handRolledFindings(html) : []), ...(isHtml ? levelFindings(html) : []),
       // Only a record minted from THIS declaration; an attached record was written elsewhere.
-      ...(aiProvenanceId && !input.declaredProvenanceId ? provenanceModelFindings(input.declaredProvenance) : [])],
+      ...(aiProvenanceId && !input.declaredProvenanceId ? provenanceModelFindings(input.declaredProvenance) : []),
+      // A form the code submits to and the aimeat-intake meta leaves out.
+      ...(intakeDecl && 'warnings' in intakeDecl ? intakeDecl.warnings : [])],
     servedMarksRemoved,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.

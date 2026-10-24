@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — GET /v1/admin/apps carries open_to and open_to_internet, and GET /v1/apps open_to_internet (services/internet-opening/).
  *   2026-10-23 — The operator's app delete deletes the app's compliance documents (plan doc-mvlftkh9zmc9).
  *   2026-10-21 — GET /v1/apps asks isAnonymousPrincipal for own=true, building=true, the member listing
  *     and the access codes: the minted anonymous token carries no anonymous claim and counted as a
@@ -74,6 +75,7 @@ import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicAppManifest } from '../../services/app-public-manifest.js';
 import { appToll, presentAppManifest } from '../../services/app-pacing.js';
 import { appAccessOf, appAccessLevelOf } from '../../services/app-access.js';
+import { isAppOpenToInternet } from '../../services/internet-opening/opening-registry.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { appSeoState } from '../../services/app-seo.js';
@@ -241,6 +243,8 @@ export function registerCatalogueAdminRoutes(
                 // Who may open it (PATCH /v1/apps/:filename `open_to`): the owner reads the value they
                 // set, everyone else the level, without the organism's id.
                 open_to: isOwn ? appAccessOf(app) : appAccessLevelOf(app),
+                // Opened to everyone on a closed node (services/internet-opening/).
+                open_to_internet: isAppOpenToInternet(app.ownerName, app.filename),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 has_draft: buildingOnly ? !!sharedDrafts.get(app.ownerGaii)?.has(app.filename)
@@ -346,6 +350,10 @@ export function registerCatalogueAdminRoutes(
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
                 listing: appListingOf(app),
+                // Who may open it: its own setting, and whether a closed node opened it to the
+                // internet (services/internet-opening/), which the Apps tab marks.
+                open_to: appAccessLevelOf(app),
+                open_to_internet: isAppOpenToInternet(app.ownerName, app.filename),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 operator_hidden: !!app.operatorHidden,

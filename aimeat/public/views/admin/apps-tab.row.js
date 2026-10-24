@@ -16,6 +16,8 @@
  * @structure appChips · AppRow
  * @usage html`<${AppRow} app=${a} onHide=${fn} onRestore=${fn} onDelete=${fn} ... />` inside the page's List
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The chip "Open to the internet" on an app a closed node opens to everyone
+ *     (`open_to_internet` on GET /v1/admin/apps).
  *   v1.1.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an app name, filename, owner or take-down reason with a quote or an ampersand
  *     showed as &quot; / &amp;.
@@ -41,6 +43,8 @@ export function appChips(app) {
   if (app.operator_hidden) chips.push(html`<${Badge} key="d" type="critical" label=${A('chip.down')} />`);
   if (app.parked) chips.push(html`<${Badge} key="p" type="muted" label=${A('chip.parked')} />`);
   if (app.protected) chips.push(html`<${Badge} key="c" type="info" label=${A('chip.code')} />`);
+  // A closed node's watched exception: everyone on the internet sees this app (internet-openings-tab.js).
+  if (app.open_to_internet) chips.push(html`<${Badge} key="i" type="watch" label=${A('chip.internet')} />`);
   if (app.operator_seo_blocked) chips.push(html`<${Badge} key="s" type="watch" label=${A('chip.seoBlocked')} />`);
   if (!app.operator_hidden && !app.parked && (app.downloads || 0) === 0) {
     chips.push(html`<${Badge} key="n" type="muted" label=${A('chip.neverOpened')} />`);
