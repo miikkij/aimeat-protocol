@@ -326,6 +326,46 @@ await test('POST /v1/docsign/validate with a stored file: the minted token is 40
     assert(own.status !== 401, `owner is not refused as signed out: ${own.status} ${JSON.stringify(own.body.error)}`);
 });
 
+// ─── Phase 3c: Writes outside the anonymous namespace ───
+// secaudit2026oct22. The minted token passed requireAuth() and requireScope() as an ordinary agent,
+// and the anonymous.* fence lives only in the memory and storage write paths. Document signing
+// (create and sign), the Design Book, the portfolio page and knowledge packages persist elsewhere,
+// so each one refuses the shared anonymous principal by identity now. The signed-in owner keeps
+// every one of these writes, and the minted token keeps its anonymous.* memory write.
+console.log('\nPhase 3c — Writes outside anonymous.* refuse the minted token');
+
+const { createHash } = await import('node:crypto');
+const s3c = Date.now().toString(36);
+const docSha = createHash('sha256').update(`anon-docsign-${s3c}`).digest('hex');
+const docBody = { sha256: docSha, name: `anon-${s3c}.txt`, size: 24 };
+
+await test('POST /v1/docsign/requests: the minted token is 403, the owner creates (201)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const anon = await json('/v1/docsign/requests', anonAuth({ method: 'POST', body: JSON.stringify({ title: 'anon', document: docBody, parties: [ANON_GAII, dirOwner!.ghii] }) }));
+    assert(anon.status === 403 && anon.body.error?.code === 'FORBIDDEN', `minted token create: ${anon.status} ${JSON.stringify(anon.body.error ?? anon.body.data).slice(0, 200)}`);
+    const own = await json('/v1/docsign/requests', ownerAuth({ method: 'POST', body: JSON.stringify({ title: 'own', document: docBody, parties: [dirOwner!.ghii] }) }));
+    assert(own.status === 201, `owner create: ${own.status} ${JSON.stringify(own.body.error)}`);
+    await json(`/v1/docsign/requests/${own.body.data.request.id}`, ownerAuth({ method: 'DELETE' }));
+});
+
+await test('POST /v1/docsign/requests/:id/sign: the minted token is 403 as a named party, the owner signs (200)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const made = await json('/v1/docsign/requests', ownerAuth({ method: 'POST', body: JSON.stringify({ title: 'two parties', document: docBody, parties: [dirOwner!.ghii, ANON_GAII] }) }));
+    assert(made.status === 201, `owner create: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const id = made.body.data.request.id;
+    const anon = await json(`/v1/docsign/requests/${id}/sign`, anonAuth({ method: 'POST', body: JSON.stringify({ method: 'session' }) }));
+    assert(anon.status === 403 && anon.body.error?.code === 'FORBIDDEN', `minted token sign: ${anon.status} ${JSON.stringify(anon.body.error ?? anon.body.data).slice(0, 200)}`);
+    const own = await json(`/v1/docsign/requests/${id}/sign`, ownerAuth({ method: 'POST', body: JSON.stringify({ method: 'session' }) }));
+    assert(own.status === 200, `owner sign: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('The anonymous token still writes its own memory after the Phase 3c refusals', async () => {
+    const key = `anonymous.after-writes-${s3c}`;
+    const { status, body } = await json('/v1/memory', anonAuth({ method: 'POST', body: JSON.stringify({ key, value: { ok: true } }) }));
+    assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    await json(`/v1/memory/${encodeURIComponent(key)}`, anonAuth({ method: 'DELETE' }));
+});
+
 // ─── Phase 4: Anonymous Prompts ───
 console.log('\nPhase 4 — Anonymous Prompts');
 

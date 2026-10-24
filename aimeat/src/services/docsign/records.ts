@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-24 — refuseVisitor also refuses the shared anonymous principal by identity (isAnonymousPrincipal), so the token POST /v1/auth/anonymous mints no longer creates, signs or starts a signature on a request (secaudit2026oct22, caller-context.ts:kindOf:anonymous-by-flag-only:docsign-refuseVisitor).
  *   2026-10-19 — addToIndex and removeFromIndex change the index on its version (updateRecord): withLock is per request and per process (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-15 — signRequest takes the credential origin: method "session" is refused for an owner-level personal access token, which is a program and not the person at the node's page (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
@@ -52,6 +53,7 @@ import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
+import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
 import { beginSigning, finishSigning } from '../passkeys.js';
 import { notify } from '../notify.js';
@@ -222,8 +224,10 @@ function canRead(rec: DocSignRecord, caller: CallerContext): boolean {
     || ids.includes(caller.ownerGhii) || (caller.inPerson && ids.some((p) => ownsAgent(caller.ownerGhii, p)));
 }
 
+// The shared anonymous principal is asked by identity: the token POST /v1/auth/anonymous mints
+// carries no anonymous claim, so its kind is 'agent' and the kind check alone does not see it.
 function refuseVisitor(caller: CallerContext): void {
-  if (caller.visitor || caller.kind === 'anonymous') {
+  if (caller.visitor || caller.kind === 'anonymous' || isAnonymousPrincipal(caller.auth)) {
     throw new DocsignError('FORBIDDEN', 403, 'Sign in on this node to create or sign a request.');
   }
 }
