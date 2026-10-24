@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-24 — The "Agreements" tab (views/profile/agreements-tab.js): the data processing agreements in
+ *     which the person is the counterparty, and the four ways to sign them (plan doc-mvmr4i2wdk0p).
  *   2026-10-18 — The "What others can see" tab (views/profile/exposure-tab.js): what of the person's own
  *     a stranger can read, and how to close it (plan doc-mvcn6c7e4e5q, V6.2).
  *   2026-10-09 — The Visibility tab (views/profile/visibility-tab.js): AI visibility and on-page behaviour.
@@ -83,6 +85,7 @@ import FederationTab from './profile/federation-tab.js';
 import NodesTab from './profile/nodes-tab.js';
 import AccessTab from './profile/access-tab.js';
 import ExposureTab from './profile/exposure-tab.js';
+import AgreementsTab from './profile/agreements-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import AppDevTab from './profile/appdev-tab.js';
@@ -165,6 +168,7 @@ const TABS = [
   { id: 'nodes',         key: 'profile.tabs.nodes',          component: NodesTab,          minTier: 'experienced' },
   { id: 'access',        key: 'profile.tabs.access',         component: AccessTab,         minTier: 'new' },
   { id: 'exposure',      key: 'profile.tabs.exposure',       component: ExposureTab,       minTier: 'new' },
+  { id: 'agreements',    key: 'profile.tabs.agreements',     component: AgreementsTab,     minTier: 'new' },
   { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
   { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },
   // 'new', not 'experienced': this tab is where two-step sign-in is switched on, and that is not an

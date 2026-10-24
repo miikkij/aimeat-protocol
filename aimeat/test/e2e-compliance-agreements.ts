@@ -110,6 +110,9 @@ await test('The operator edits the draft: the notice period and a measure the no
     assert(r.status === 200, `patch: ${r.status} ${JSON.stringify(r.body?.error)}`);
     const v = r.body.data.versions[0];
     assert(v.options.noticeDays === 14 && v.options.breachNoticeHours === 24, 'the options merged');
+    // A change of one part leaves the rest as it was: the product and language stay (a partial schema with defaults reset them).
+    assert(r.body.data.product === 'place' && r.body.data.language === 'fi', `product and language kept: ${r.body.data.product} ${r.body.data.language}`);
+    assert(v.annexes.II.nature.includes('Hostattu'), `the place's Annex II kept: ${v.annexes.II.nature}`);
     assert(v.sources['III.physical'] === 'human', 'the written measure is marked human');
 });
 

@@ -4506,6 +4506,106 @@
     "public": "Public",
     "publicWho": "Anyone, signed in or not. It can show up in lists and searches."
   },
+  "agreements": {
+    "status": { "signed": "In force", "sent": "Waiting for signature", "review": "Being checked", "draft": "Draft", "expired": "Replaced", "ended": "Ended" },
+    "event": {
+      "created": "Draft made", "edited": "Draft changed", "version": "New version drafted", "sent": "Sent for signature", "reminder": "Reminder sent",
+      "signed": "Signed", "copy-received": "Signed copy received", "copy-accepted": "Signed copy accepted", "copy-rejected": "Signed copy rejected",
+      "in-force": "In force", "notice": "Change announced", "notice-reminder": "Change reminder sent", "notice-lapsed": "New version in force",
+      "objection": "Objection to the change", "breach-notice": "Breach notice sent", "ended": "Agreement ended", "deletion-done": "Data deleted or returned"
+    },
+    "next": {
+      "deletion": "Delete or return the data by {date}", "sendDraft": "Version {n} is a draft: send it for signature",
+      "review": "A signed copy waits for your decision", "reviewCp": "Your signed copy is being checked",
+      "objected": "The change was objected to and does not take effect", "notice": "The change takes effect on {date} unless objected to",
+      "waitingCp": "Waiting for the counterparty's signature", "signCp": "Waiting for your signature"
+    },
+    "colStep": "Step", "colWhen": "When", "colWith": "With", "colSubject": "What it covers", "colState": "State", "colNext": "Next step",
+    "noSteps": "Nothing has happened yet.", "waits": "waits",
+    "party": { "name": "Name", "businessId": "Business ID", "address": "Address", "contact": "Contact", "signer": "Signs", "dpo": "Data protection officer" },
+    "toComplete": "[to be completed]",
+    "annexes": "Annexes", "annexesSub": "The four annexes of the standard clauses, as AIMEAT filled them",
+    "annex": { "I": "I Parties", "II": "II Processing", "III": "III Security", "IV": "IV Sub-processors" },
+    "controller": "Controller", "processor": "Processor",
+    "ii": { "subjects": "Whose data", "categories": "What data", "sensitive": "Sensitive data", "nature": "What is done with it", "purposes": "Why", "duration": "For how long" },
+    "iii": { "area": "Area", "measure": "What is done", "assistance": "How the processor helps the controller" },
+    "source": { "evidence": "read from AIMEAT", "ai": "drafted by AI", "human": "written by a person" },
+    "area": {
+      "encryption": "Encryption", "confidentiality": "Confidentiality and availability", "restore": "Restore after an incident", "testing": "Regular testing",
+      "identification": "Sign-in and permissions", "transmission": "Data in transit", "storage": "Data at rest", "physical": "Physical security", "logging": "Logs",
+      "configuration": "Configuration", "governance": "IT security management", "certification": "Certification", "minimisation": "Data minimisation",
+      "quality": "Data quality", "retention": "Limited retention", "accountability": "Accountability", "portability": "Portability and erasure"
+    },
+    "iv": { "name": "Sub-processor", "what": "What it does", "none": "No sub-processors.", "added": "new in this version", "dropped": "removed in this version" },
+    "ob": {
+      "breach": "Breach notice", "breachV": "within {h} hours of discovery", "notice": "Change of sub-processors", "noticeV": "announced {d} days before, may be objected to",
+      "requests": "Data subject requests", "requestsV": "the processor helps through export and erasure", "deletion": "At the end", "deletionV": "data deleted or returned within {d} days"
+    },
+    "sum": {
+      "who": "Who processes", "whoV": "{name}, only on your instructions", "what": "What data", "where": "Where", "whereV": "with these sub-processors: {places}",
+      "whereOwn": "on your own server", "breach": "If something happens", "end": "When the agreement ends"
+    },
+    "way": {
+      "aimeat": "AIMEAT account", "fastest": "fastest", "aimeatText": "You are signed in. You sign with your passkey, and AIMEAT seals the signature.",
+      "aimeatGo": "Sign in the signing app", "aimeatNone": "The signing app is not set up here. Use one of the other ways.",
+      "wallet": "EU digital wallet", "strongest": "strongest", "walletText": "A qualified electronic signature, equal to a handwritten one across the EU. It works when your wallet supports signing.",
+      "walletGo": "Sign with the wallet",
+      "service": "Your own signing service", "serviceEg": "e.g. DocuSign", "serviceText": "Download the PDF, sign it in your own service and send the signed PDF back. AIMEAT checks the signature and that the text is unchanged.",
+      "serviceUpload": "Send the signed PDF",
+      "paper": "On paper", "slowest": "slowest", "paperText": "Print, sign and scan every page. AI checks the copy, and the operator confirms it. You get word by e-mail.",
+      "paperUpload": "Send the scan"
+    },
+    "downloadPdf": "Download the PDF", "print": "Print", "openPdf": "Open the whole agreement (PDF)",
+    "notice": {
+      "title": "A change is announced", "text": "Under the agreement, a change of sub-processors is announced {days} days in advance. It takes effect on {date}. You need to do nothing if it suits you.",
+      "objected": "You objected on {date}. The change does not take effect for you until it is settled.", "reasonLabel": "If it does not suit you, say why",
+      "object": "Object to the change", "sent": "Your objection was sent."
+    },
+    "cp": {
+      "title": "Agreements", "intro": "Data processing agreements in which you are the counterparty: what you are asked to sign, how to sign, and what has happened.",
+      "listTitle": "Your agreements", "empty": "Nobody has sent you an agreement.", "waitsYou": "Waits for your signature", "changeAnnounced": "A change is announced",
+      "whatTitle": "What you sign", "whatLead": "Agreement {id}, version {n}. The European Commission's standard clauses with the details of the service filled in.",
+      "signTitle": "Choose how to sign", "afterSign": "Once you have signed, the operator signs too. The finished agreement comes by e-mail.",
+      "inReview": "Your signed copy is being checked. You get word by e-mail.", "copySent": "Your signed copy was sent."
+    },
+    "stepsTitle": "Steps", "obligationsTitle": "What it promises",
+    "loading": "Reading the agreements…", "loadFailed": "The agreements could not be read.", "actionFailed": "That did not go through.",
+    "open": "Open", "cancel": "Cancel",
+    "product": { "place": "Hosted environment", "box": "Own server", "managed": "Managed", "custom": "Other" },
+    "op": {
+      "title": "Agreements", "lead": "Data processing agreements with your customers. AIMEAT fills them from its own data and follows every step.",
+      "inForce": "in force", "waitingCp": "wait for the counterparty", "waitingYou": "wait for you", "gaps": "open matters",
+      "announceNow": "Announce the change", "announce": "Announce the change", "announced": "The change was announced.",
+      "send": "Send for signature", "sent": "Sent for signature.", "previewPdf": "Look at the PDF",
+      "draftFirst": "This draft has not been sent. Check the annexes and send it for signature.",
+      "draftNext": "Version {n} is a draft. A change of only the sub-processors or the measures can be announced; anything else is signed again.",
+      "newVersion": "Make a new version", "versionMade": "A new version was drafted.", "inForceFrom": "In force from", "notYet": "not yet",
+      "end": "End the agreement", "endTitle": "End the agreement?", "endConfirm": "The agreement with {who} ends now, and their data must be deleted within {days} days.",
+      "ended": "The agreement ended.", "deletionDone": "Mark the data deleted", "deletionRecorded": "The deletion was recorded.",
+      "empty": "No agreements yet. Make the first one, or ask your AI to.", "copyForAi": "Copy for your AI", "copied": "Copied. Paste it into your own AI chat.",
+      "aiPrompt": "Use aimeat_compliance_agreement. Make a data processing agreement for my customer: action \"create\" with dry_run first, input { counterparty: { name, businessId, address, contactName, contactEmail, signerName, signerRole }, product, language }. Show me the missing_measures and ask me for them, write them with action \"update\", and send it with action \"send\" when I say yes.",
+      "next": { "draft": "Send for signature", "review": "Decide the signed copy", "waitingCp": "Waiting for the counterparty" }
+    },
+    "gap": {
+      "agreement-review-waiting": "{who}: a signed copy waits for your decision.", "subprocessor-change-unannounced": "{who}: a new sub-processor has not been announced.",
+      "agreement-objection-open": "{who} objected to a change.", "agreement-deletion-overdue": "{who}: the data should have been deleted.",
+      "breach-notice-overdue": "A breach has not been told to the counterparties."
+    },
+    "review": {
+      "pdfTitle": "Signed PDF", "scanTitle": "Scanned copy", "verdict": { "pass": "every check passed", "attention": "needs a look", "fail": "a check failed" },
+      "check": "Check", "found": "What was found", "unknown": "not checked",
+      "c": { "signature": "Signature", "version": "Right agreement and version", "signer": "Signer", "pages": "All pages", "date": "Date", "changes": "No handwritten changes", "notes": "Notes" },
+      "checkedBy": "Checked by {model}", "scanMeans": "A scanned signature meets the written form, but it proves less than an electronic one. The agreement records the level scanned, the check and you as the one who confirmed it.",
+      "pdfMeans": "Accepting records the signature with the level its certificate gives.", "reasonLabel": "Reason, if you reject it",
+      "accept": "Accept the signature", "reject": "Reject and ask for a new copy", "accepted": "The signature was accepted.", "rejected": "The copy was rejected, and the counterparty was told why."
+    },
+    "new": {
+      "open": "New agreement", "title": "New agreement", "lead": "Give the counterparty and the product. AIMEAT fills the clauses and the annexes from its own data and names the security measures you write yourself.",
+      "country": "Country", "contactName": "Contact person", "contactEmail": "Contact e-mail", "signerName": "Who signs", "signerRole": "Signer's role",
+      "account": "Their account here (optional)", "accountHint": "When they have an account here, write it as it reads on their profile (name@...). They then sign here and see the agreement in their Settings.",
+      "product": "Product", "language": "Language", "create": "Make the draft", "created": "The draft was made."
+    }
+  },
   "exposure": {
     "title": "What others can see of yours",
     "intro": "Everything of yours that someone outside can read: anyone at all, anyone with a link, every account signed in here, or the members of one shared place. Close what should not be open.",
@@ -17132,6 +17232,7 @@
       "nodes": "Nodes",
       "dataWallet": "Data Wallet",
       "exposure": "What others can see",
+      "agreements": "Agreements",
       "nodeStats": "Node Stats",
       "extensions": "Extensions",
       "security": "Security",

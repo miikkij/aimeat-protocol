@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.26.0 -- 2026-10-24 -- "Agreements" under Account, after What others can see: the data processing agreements a person is the counterparty of (plan doc-mvmr4i2wdk0p).
  *   v1.26.0 -- 2026-10-19 -- The Agents card's rows show the agent's own picture (components/AgentAvatar.js) in place of the robot sign, when the agent has set one.
  *   v1.25.0 -- 2026-10-18 -- "What others can see" (the exposure tab) under Account, after Access, and in the basic menu: what of the person's own a stranger can read is a question a newcomer asks before anything goes in (plan doc-mvcn6c7e4e5q, V6.2).
  *   v1.24.0 -- 2026-10-11 -- The Commerce card totals money per currency and the pacing apart ("15,00 € · pacing 10 morsels"), from a checkout session's total / receipt and its pacing (receipt.pacing, pacingMorsels); a 3.x session in currency 'morsel' counts as pacing. A morsel is never a currency.
@@ -662,6 +663,7 @@ export const SIDEBAR_GROUPS = [
     { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
     { id: 'access', labelKey: 'profile.tabs.access' },
     { id: 'exposure', labelKey: 'profile.tabs.exposure' },
+    { id: 'agreements', labelKey: 'profile.tabs.agreements' },
   ] },
   /* Operator-only: the group AND its routes are gated on the operator role (open()
    * refuses these ids for non-operators; the underlying APIs enforce server-side).

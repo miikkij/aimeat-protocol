@@ -3449,6 +3449,54 @@
     "public": "Público",
     "publicWho": "Cualquiera, con o sin sesión iniciada. Puede aparecer en listas y búsquedas."
   },
+  "agreements": {
+    "status": { "signed": "En vigor", "sent": "Pendiente de firma", "review": "En revisión", "draft": "Borrador", "expired": "Sustituido", "ended": "Terminado" },
+    "next": {
+      "deletion": "Borra o devuelve los datos antes del {date}", "reviewCp": "Estamos revisando tu copia firmada",
+      "objected": "Te has opuesto al cambio y no entra en vigor", "notice": "El cambio entra en vigor el {date} si nadie se opone",
+      "waitingCp": "Pendiente de la firma de la otra parte", "signCp": "Pendiente de tu firma"
+    },
+    "colStep": "Paso", "colWhen": "Cuándo", "colWith": "Con quién", "colSubject": "Qué cubre", "colState": "Estado",
+    "noSteps": "Todavía no ha pasado nada.", "waits": "pendiente",
+    "party": { "name": "Nombre", "businessId": "Identificación fiscal", "address": "Dirección", "contact": "Contacto", "signer": "Firma", "dpo": "Delegado de protección de datos" },
+    "toComplete": "[por completar]",
+    "annexes": "Anexos", "annexesSub": "Los cuatro anexos de las cláusulas tipo, tal como los rellenó AIMEAT",
+    "annex": { "I": "I Partes", "II": "II Tratamiento", "III": "III Seguridad", "IV": "IV Subencargados" },
+    "controller": "Responsable del tratamiento", "processor": "Encargado del tratamiento",
+    "sum": {
+      "who": "Quién trata los datos", "whoV": "{name}, solo según tus instrucciones", "what": "Qué datos", "where": "Dónde", "whereV": "con estos subencargados: {places}",
+      "whereOwn": "en tu propio servidor", "breach": "Si pasa algo", "end": "Cuando termina el contrato"
+    },
+    "ob": {
+      "breachV": "en las {h} horas siguientes a detectarlo", "deletionV": "los datos se borran o se devuelven en {d} días"
+    },
+    "way": {
+      "aimeat": "Cuenta AIMEAT", "fastest": "la más rápida", "aimeatText": "Ya has iniciado sesión. Firmas con tu passkey y AIMEAT sella la firma.",
+      "aimeatGo": "Firmar en la aplicación de firma", "aimeatNone": "La aplicación de firma no está configurada aquí. Usa otra de las formas.",
+      "wallet": "Cartera de la UE", "strongest": "la más sólida", "walletText": "Una firma electrónica cualificada, equivalente a la manuscrita en toda la UE. Funciona cuando tu cartera admite la firma.",
+      "walletGo": "Firmar con la cartera",
+      "service": "Tu propio servicio de firma", "serviceEg": "p. ej. DocuSign", "serviceText": "Descarga el PDF, fírmalo en tu propio servicio y envía el PDF firmado. AIMEAT comprueba la firma y que el texto no ha cambiado.",
+      "serviceUpload": "Enviar el PDF firmado",
+      "paper": "En papel", "slowest": "la más lenta", "paperText": "Imprime, firma y escanea todas las páginas. Una IA revisa la copia y el operador la confirma. Te avisamos por correo.",
+      "paperUpload": "Enviar el escaneo"
+    },
+    "downloadPdf": "Descargar el PDF", "print": "Imprimir", "openPdf": "Abrir el contrato completo (PDF)",
+    "notice": {
+      "title": "Se ha anunciado un cambio", "text": "Según el contrato, un cambio de subencargados se anuncia con {days} días de antelación. Entra en vigor el {date}. Si te parece bien, no tienes que hacer nada.",
+      "objected": "Te opusiste el {date}. El cambio no entra en vigor para ti hasta que se resuelva.", "reasonLabel": "Si no te parece bien, di por qué",
+      "object": "Oponerse al cambio", "sent": "Se ha enviado tu oposición."
+    },
+    "cp": {
+      "title": "Contratos", "intro": "Contratos de encargo del tratamiento en los que eres la otra parte: qué te piden firmar, cómo firmarlo y qué ha pasado.",
+      "listTitle": "Tus contratos", "empty": "Nadie te ha enviado un contrato.", "waitsYou": "Pendiente de tu firma", "changeAnnounced": "Se ha anunciado un cambio",
+      "whatTitle": "Qué firmas", "whatLead": "Contrato {id}, versión {n}. Las cláusulas tipo de la Comisión Europea con los datos del servicio.",
+      "signTitle": "Elige cómo firmar", "afterSign": "Cuando hayas firmado, el operador firma también. El contrato terminado llega por correo.",
+      "inReview": "Estamos revisando tu copia firmada. Te avisamos por correo.", "copySent": "Se ha enviado tu copia firmada."
+    },
+    "stepsTitle": "Pasos", "loading": "Leyendo los contratos…", "loadFailed": "No se pudieron leer los contratos.", "actionFailed": "No se pudo hacer.",
+    "open": "Abrir", "cancel": "Cancelar",
+    "product": { "place": "Entorno alojado", "box": "Servidor propio", "managed": "Managed", "custom": "Otro" }
+  },
   "exposure": {
     "title": "Lo que otros pueden ver de lo tuyo",
     "intro": "Todo lo tuyo que alguien de afuera puede leer: cualquiera, cualquiera con un enlace, cualquier cuenta con sesión iniciada aquí o los miembros de un lugar compartido. Cierra lo que no debe estar abierto.",
@@ -15362,6 +15410,7 @@
       "nodes": "Nodos",
       "dataWallet": "Cartera de datos",
       "exposure": "Lo que otros ven",
+      "agreements": "Contratos",
       "nodeStats": "Estadísticas del nodo",
       "extensions": "Extensiones",
       "security": "Seguridad",

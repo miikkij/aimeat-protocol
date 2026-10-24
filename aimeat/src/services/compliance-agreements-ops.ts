@@ -69,9 +69,15 @@ export function changedParts(a: AgreementVersion, b: AgreementVersion): Set<'I' 
   return out;
 }
 
-/** The agreement as its reader sees it: everything, with the state and what waits. */
-function view(a: Agreement, role: 'operator' | 'counterparty'): Record<string, unknown> {
-  return { ...a, status: statusOf(a), summary: summaryOf(a), viewer: role };
+/**
+ * The agreement as its reader sees it: everything, with the state, what waits, and where the newest
+ * version is signed in the signing app (passkey or the EU wallet) when the node names that app.
+ */
+function view(a: Agreement, role: 'operator' | 'counterparty', config?: AimeatConfig): Record<string, unknown> {
+  const v = newest(a);
+  const signLink = config?.docsignAppUrl && v.docsignId && (v.status === 'sent' || v.status === 'review')
+    ? `${config.docsignAppUrl}/?request=${encodeURIComponent(v.docsignId)}` : null;
+  return { ...a, status: statusOf(a), summary: summaryOf(a), viewer: role, sign_link: signLink };
 }
 
 /** Apply a caller's annex overrides, marking each written part with who wrote it. */
@@ -116,7 +122,7 @@ export async function getOp(deps: Deps, caller: CallerContext, id: string): Prom
   const a0 = await load(deps, id);
   const who = await agreementAccess(deps, caller.auth, a0, 'read');
   const a = await syncDocsign(deps, a0);
-  return view(a, who.role);
+  return view(a, who.role, deps.config);
 }
 
 // ── making and changing ──
