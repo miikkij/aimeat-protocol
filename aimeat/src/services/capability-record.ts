@@ -50,12 +50,16 @@
  *   v1.4.0 — 2026-10-20 — CAPABILITY_SOURCE_TYPES says why `mcp` stays acceptable here now that
  *     `invokeCapability` refuses another owner's `mcp` capability outside a shared server
  *     (secaudit 2026-10). Comment only; the registration rules are unchanged.
+ *   v1.5.0 — 2026-10-24 — An `extension` source ref must follow ext:<name>[@<version>][:<action>]
+ *     (services/capability-extension-ref.ts), and updateCapability normalises and checks a patched
+ *     source as createCapability does; both answer 400 INVALID_INPUT otherwise (secaudit2026oct22).
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { normalizeCapabilityCost } from './toll-morsels-names.js';
+import { extensionRefRefusal } from './capability-extension-ref.js';
 
 /** The fields a caller may set. Everything absent takes the shape's own default. */
 export interface CapabilityInput {
@@ -208,8 +212,22 @@ function normaliseSource(raw: unknown): CapabilityResult<CapabilityRecord['sourc
     }
     const ref = typeof obj.ref === 'string' && obj.ref ? obj.ref : (type === 'manual' ? 'manual' : '');
     if (!ref) return refuse(400, 'INVALID_INPUT', `source.ref is required for source.type '${type}'`);
+    // An extension ref becomes the path of a loopback request made with the caller's token
+    // (services/capability-invoke.ts), so it must name an extension and an action and nothing else
+    // (secaudit2026oct22, services/capability-extension-ref.ts).
+    if (type === 'extension') {
+        const refusal = extensionRefRefusal(ref);
+        if (refusal) return refuse(400, 'INVALID_INPUT', refusal);
+    }
     const version = typeof obj.version === 'string' && obj.version ? obj.version : '1.0.0';
     return { ok: true, value: { type, ref, version } };
+}
+
+/** True when a patched source names the stored type, ref and version exactly. */
+function sameSource(raw: unknown, stored: CapabilityRecord['source']): boolean {
+    if (!raw || typeof raw !== 'object') return false;
+    const obj = raw as Record<string, unknown>;
+    return obj.type === stored.type && obj.ref === stored.ref && (obj.version === undefined || obj.version === stored.version);
 }
 
 /** Register one capability. Policy first, then the shape, then the insert. */
@@ -319,6 +337,16 @@ export async function updateCapability(
     delete updates.id;
     delete updates.ownerGhii;
     delete updates.createdAt;
+
+    // A CHANGED source is normalised and checked as at create. It was stored as given, so a PUT put
+    // an extension ref on a record that create would have refused (secaudit2026oct22). A source
+    // equal to the stored one passes untouched: a client that PUTs the whole record back carries the
+    // node-written kinds (app-tool, offering) that a person may not name.
+    if ('source' in updates && !sameSource(updates.source, cap.source)) {
+        const source = normaliseSource(updates.source);
+        if (!source.ok) return source;
+        updates.source = source.value;
+    }
 
     // The same rename as at create: a patched cost is stored as cost.toll_morsels.
     if ('cost' in updates) {

@@ -5,6 +5,9 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.8.1 - 2026-10-24 - The cleanup step leaves a row whose operatorOverride.disabled is set as it
+ *     is: it neither disables nor deletes it, so the operator's switch and the note the extension-ref
+ *     boot step writes stay (secaudit2026oct22). Only a row the scan disabled itself is deleted later.
  *   v1.8.0 - 2026-10-16 - The cleanup step runs for a source type only when that type's scan
  *     completed: a scan that throws (or an owner's app manifests that cannot be read) changes no
  *     row of its type, and the result lists `failedScans`. An action row switches on again like
@@ -491,6 +494,11 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
     try {
       const existing = await storage.listCapabilitiesBySourceType(sourceType);
       for (const cap of existing) {
+        // A row the operator switched off (operatorOverride.disabled, also set by the extension-ref
+        // boot step in services/capability-extension-ref.ts) is the operator's decision and is left
+        // exactly as it is. The scan read it as "source gone", disabled it on one run and deleted it
+        // with its note on the next (secaudit2026oct22).
+        if (cap.operatorOverride?.disabled) continue;
         if (!seenRefs.has(cap.source.ref)) {
           if (cap.status === 'active') {
             await storage.updateCapability(cap.id, { status: 'disabled', updatedAt: now });
