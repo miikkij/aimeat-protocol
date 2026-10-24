@@ -32,6 +32,8 @@
  *   heartbeat timeout.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-tunnel
  * @version-history
+ *   2026-10-24 — Phase 1: an anchor listing an agent identity of another owner or another node is
+ *     refused with AGENT_GAII_NOT_YOURS (secaudit2026oct22, personal-anchor-agent-gaiis-claim-foreign-gaii).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.3.0 — 2026-10-12 — Phase 5: a second owner's node acks the first node's item id and the item
  *     stays. It failed on the source, where the ack deleted any id it was sent.
@@ -330,6 +332,47 @@ async function sharedNodePhases() {
         );
         assert(mail.body.data.items === 1, `one item should be waiting, got ${JSON.stringify(mail.body?.data)}`);
         assert(mail.body.data.by_type?.work_assignment === 1, `by_type: ${JSON.stringify(mail.body.data.by_type)}`);
+    });
+
+    // A personal node lists the agents that run on it, and work sent to a listed identity is queued
+    // for that node. The list was stored as given, so an owner could list an identity of another
+    // owner or another node and receive the work, input included, sent to it (secaudit 2026-10,
+    // personal-anchor-agent-gaiis-claim-foreign-gaii). An entry must be the anchoring owner's own
+    // agent on that node.
+    await test('POST /v1/personal/anchor refuses an agent identity of another owner or another node', async () => {
+        const claimNodeId = `personal-tunnel-c-${stamp}`;
+        const foreign = [
+            `futurebot#${ownerName}@${claimNodeId}`,          // another owner's name
+            `remotebot#${strangerName}@some-other-node`,      // the claimant's name on another node
+        ];
+        for (const gaii of foreign) {
+            const anchor = await json('/v1/personal/anchor', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${strangerToken}` },
+                body: JSON.stringify({ node_id: claimNodeId, owner_name: strangerName, public_key: 'test-key-c', agent_gaiis: [gaii], visibility: 'private' }),
+            });
+            if (anchor.status === 201) {
+                // Leave nothing behind for the phases that follow, then fail.
+                await json(`/v1/personal/anchor/${encodeURIComponent(claimNodeId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` } });
+            }
+            assert(anchor.status === 400 && anchor.body?.error?.code === 'AGENT_GAII_NOT_YOURS',
+                `an anchor listing ${gaii} must be refused: ${anchor.status} ${JSON.stringify(anchor.body?.error ?? anchor.body?.data)}`);
+        }
+    });
+
+    await test('…and still anchors the owner\'s own agents, in both forms the profile page accepts', async () => {
+        // The profile page asks for `name#owner`; the setup guide and this suite use the full
+        // `name#owner@personal-node`. Both name the anchoring owner, so both are accepted.
+        const ownNodeId = `personal-tunnel-d-${stamp}`;
+        const own = [`bot1#${strangerName}`, `bot2#${strangerName}@${ownNodeId}`];
+        const anchor = await json('/v1/personal/anchor', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${strangerToken}` },
+            body: JSON.stringify({ node_id: ownNodeId, owner_name: strangerName, public_key: 'test-key-d', agent_gaiis: own, visibility: 'private' }),
+        });
+        assert(anchor.status === 201, `the owner's own agents must anchor: ${anchor.status} ${JSON.stringify(anchor.body?.error)}`);
+        const gone = await json(`/v1/personal/anchor/${encodeURIComponent(ownNodeId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` } });
+        assert(gone.status === 200, `clean-up delete ${gone.status}: ${JSON.stringify(gone.body?.error)}`);
     });
 
     // ─── Phase 2: The handshake refuses before it upgrades ───

@@ -13,6 +13,9 @@
  *   - notifications: GET/PATCH preferences with channel/cooldown/quiet-hours/type validation
  *
  * @version-history
+ *   2026-10-24 — POST /v1/personal/anchor refuses an agent_gaiis entry that is not the anchoring
+ *     owner's own agent on that personal node, 400 AGENT_GAII_NOT_YOURS (secaudit2026oct22,
+ *     personal-anchor-agent-gaiis-claim-foreign-gaii).
  *   2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  *   v1.1.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -34,6 +37,7 @@ import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../mo
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { operatorOverride } from '../services/operator-override.js';
+import { isPersonalNodeAgentOf } from '../services/federation.js';
 
 export function personalRouter(
   config: AimeatConfig,
@@ -67,6 +71,15 @@ export function personalRouter(
       // Verify the requesting owner matches
       if (owner_name !== ownerFromAuth) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Can only anchor personal nodes for your own owner identity'));
+        return;
+      }
+
+      // Work sent to a listed identity is queued for this node, so the list names only the
+      // anchoring owner's own agents on it (services/federation.ts isPersonalNodeAgentOf).
+      const notYours = (agent_gaiis ?? []).filter(g => !isPersonalNodeAgentOf(g, owner_name, node_id));
+      if (notYours.length > 0) {
+        res.status(400).json(error(config.nodeId, 'AGENT_GAII_NOT_YOURS',
+          `agent_gaiis lists only your own agents on this personal node, written as name#${owner_name} or name#${owner_name}@${node_id}. Not accepted: ${notYours.slice(0, 5).join(', ')}`));
         return;
       }
 

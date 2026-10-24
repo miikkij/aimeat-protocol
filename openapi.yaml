@@ -68589,7 +68589,10 @@ paths:
         Registers a personal node against this operator node. Owner session; requires the
         `tunnel:connect` scope. The `owner_name` in the body must match the authenticated owner.
         Returns 503 when personal-node support is disabled, 409 if the node id is already anchored,
-        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached.
+        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. Work sent to an
+        identity in `agent_gaiis` is queued for this node, so each entry must be the owner's own
+        agent on it, `name#<owner_name>` or `name#<owner_name>@<node_id>`; any other entry is
+        refused with 400 `AGENT_GAII_NOT_YOURS`.
       security:
         - BearerAuth: []
       requestBody:
@@ -68606,6 +68609,7 @@ paths:
                 agent_gaiis:
                   type: array
                   items: { type: string }
+                  description: The owner's own agents on this personal node, as `name#<owner_name>` or `name#<owner_name>@<node_id>`.
                 visibility: { type: string, enum: [private, public] }
       responses:
         '201':
