@@ -27,17 +27,18 @@
  *   A SCOPE THAT GOES TAKES ITS DOCUMENTS. removeComplianceDocs() is called when an organism is
  *   deleted, an app is deleted or an owner is erased (their apps' documents).
  * @structure ComplianceScope · SCOPES_OF · scopeAllows() · docKey() · scopeOfKey() · readDoc() · writeDoc() ·
- *   appendRequest() · listDocs() · removeComplianceDocs() · removeAppDocsOfOwner()
+ *   patchDocItem() · appendRequest() · listDocs() · removeComplianceDocs() · removeAppDocsOfOwner()
  * @usage
  *   const doc = await readDoc(storage, nodeId, 'registers', { kind: 'organism', organismId });
  *   await writeDoc(storage, nodeId, 'registers', scope, { items }, 'alice@node');
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.2, C4.3, C5, C6).
+ *   v1.1.0 — 2026-10-24 — patchDocItem(): one entry changed in place, the rest untouched (C7.7).
  */
 import type { Storage } from '../storage/interface.js';
 import { appSlug } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
-import { updateRecord } from './record-cas.js';
+import { updateRecord, UNCHANGED } from './record-cas.js';
 import { systemGhiiFor } from './compliance-register.js';
 import {
   emptyDoc, COMPLIANCE_DOC_KINDS, type ComplianceDocKind, type ComplianceDocs, type ComplianceRequest,
@@ -121,6 +122,31 @@ export async function writeDoc<K extends ComplianceDocKind>(
   const out = await updateRecord(storage, systemGhiiFor(nodeId), key, parseDoc(kind), () => next, { tag: 'compliance', tags: ['compliance', kind] });
   emitChange('compliance');
   return out;
+}
+
+/**
+ * Change one entry of a document in place (C7.7): `change` gets the stored entry and answers the new
+ * one, `validate` checks the whole document before it is written, and only the changed entry is
+ * stamped. Atomic like writeDoc. Answers the stored entry, or null when no entry has that id.
+ */
+export async function patchDocItem<K extends Exclude<ComplianceDocKind, 'frameworks'>>(
+  storage: Storage, nodeId: string, kind: K, scope: ComplianceScope, itemId: string,
+  change: (item: Record<string, unknown>) => Record<string, unknown>,
+  validate: (doc: { items: Array<Record<string, unknown>> }) => ComplianceDocs[K], by: string,
+): Promise<Record<string, unknown> | null> {
+  const key = docKey(kind, scope);
+  if (!key) return null;
+  let found: Record<string, unknown> | null = null;
+  await updateRecord(storage, systemGhiiFor(nodeId), key, parseDoc(kind), (cur) => {
+    const items = (cur as { items: Array<Record<string, unknown>> }).items;
+    const at = items.findIndex(it => it.id === itemId);
+    if (at < 0) { found = null; return UNCHANGED; }
+    const next = { ...change(items[at]!), id: itemId, updatedAt: new Date().toISOString(), updatedBy: by };
+    found = next;
+    return validate({ items: items.map((it, i) => (i === at ? next : it)) });
+  }, { tag: 'compliance', tags: ['compliance', kind] });
+  if (found) emitChange('compliance');
+  return found;
 }
 
 /** One month after an ISO time, the GDPR art. 12(3) deadline. */

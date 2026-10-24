@@ -1027,6 +1027,15 @@ const GOOD_BODY = {
         // The preview is the app's own address and never a page of this node's.
         const prev = await fetch(`${BASE}/v1/designbook/${id}/preview`, { redirect: 'manual' });
         assert(prev.status === 302 && (prev.headers.get('location') ?? '').includes(f), `the preview redirects to the app: ${prev.status} ${prev.headers.get('location')}`);
+        // Inside a frame (the gallery's tile) the app's address refuses to stand, so the frame gets
+        // the node's own card of it: the screenshot, a link out, and no script.
+        for (const how of [{ q: '?view=frame', h: {} }, { q: '', h: { 'Sec-Fetch-Dest': 'iframe' } }]) {
+            const card = await fetch(`${BASE}/v1/designbook/${id}/preview${how.q}`, { redirect: 'manual', headers: how.h });
+            const text = await card.text();
+            assert(card.status === 200 && (card.headers.get('content-type') ?? '').includes('text/html'), `the framed preview is a page: ${card.status} ${how.q || 'Sec-Fetch-Dest'}`);
+            assert(text.includes(`/${encodeURIComponent(f)}/screenshot`) && text.includes(f) && !/<script/i.test(text) && !text.includes('LEDGERLINE-MARK'),
+                `… the node's card of the app, its screenshot and a link, no script and none of the app's page: ${text.slice(0, 200)}`);
+        }
         const adopt = await json(`/v1/designbook/${id}/adopt`, { method: 'POST', headers: auth(op.token), body: JSON.stringify({ filename: opApp }) });
         assert(adopt.status === 409 && adopt.body.error?.code === 'GENRE_IS_FORKED' && adopt.body.error.message.includes(id), `a genre is forked, under its own id: ${adopt.status}`);
 

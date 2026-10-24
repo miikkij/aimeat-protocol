@@ -1146,8 +1146,7 @@
           "organism_import": "organism import",
           "app_backup": "app backup",
           "full_identity_move": "update at start",
-          "workspace_schema_relock": "check of workspace locks at start",
-          "start": "server start"
+          "workspace_schema_relock": "check of workspace locks at start"
         },
         "kept": "{size} kept",
         "notKept": "not kept, too large",
@@ -1386,6 +1385,25 @@
         "next": "Show the next 200",
         "shown": "{n} rows shown",
         "shownOne": "1 row shown"
+      },
+      "packs": {
+        "title": "Security classes",
+        "lead": "The Finnish security classes TL IV, TL III, TL II and TL I, and the NATO classes. Content with one of these classes reaches only a model on this machine, never leaves its organism, and every use is logged. A marking in upper case, such as \"TL III\" or \"NATO SECRET\", raises the content it is in.",
+        "upTo": "Highest class",
+        "acknowledge": "I understand that this installation is not an accredited system for this class.",
+        "on": "Switch on",
+        "change": "Change",
+        "off": "Switch off",
+        "nowOn": "On: {classes}",
+        "nowOff": "Off.",
+        "stateOn": "On",
+        "stateTop": "On, top classes",
+        "stateOff": "Off",
+        "waits": "The change waits for the operator in person.",
+        "switchedOn": "Switched on.",
+        "switchedOff": "Switched off. Content that has one of these classes keeps it.",
+        "failed": "The change was not saved.",
+        "notAccredited": "This installation marks and restricts classified content. It is not an accredited system for it (Katakri, Traficom, NATO)."
       }
     },
     "ext": {
@@ -3551,10 +3569,416 @@
         "owner-your-slice": "Only yours. Nothing on this page describes anybody else's activity, and nobody else sees yours here.",
         "owner-register-is-the-operators": "The record of what AI is used for is kept by whoever runs this installation, not by you. Below are the entries that name your account. If something of yours is missing, that is a conversation with them rather than something you can fix here.",
         "owner-provenance-off": "Recording is switched off on this installation, which is not your setting. Nothing was recorded, so every number above is zero for that reason and not because you did nothing.",
-        "shares-open-only": "A workspace page shared on an open link counts as public here. A page shared behind a password or only with signed-in accounts does not: its readers are not the general public, so it owes no AI label and is not counted as public."
+        "shares-open-only": "A workspace page shared on an open link counts as public here. A page shared behind a password or only with signed-in accounts does not: its readers are not the general public, so it owes no AI label and is not counted as public.",
+        "registers-are-statements": "The records of processing, the impact assessments and the answers about laws are what the operator, the admins of shared places and app owners wrote. They are checked here against what this installation records (data maps, classifications, deadlines). They cannot be checked against the world.",
+        "external-ai-claim-unverified": "An agent that reports a local model reads content whose classification refuses an outside model. This installation records that report and cannot check it. A model named local: is taken to run on this machine.",
+        "not-accredited": "The TL and NATO classes mark, recognise and restrict classified content. They do not make this installation an accredited system (Katakri, Traficom approval, NATO accreditation).",
+        "app-scan-listed-only": "The report reads the data maps of the apps the catalogue lists, and of every app with a register. A parked or hidden app is read only when it has a register.",
+        "federation-peers-not-processors": "Partner installations are not in the list of processors. A copy that goes to another installation is stopped by its classification (it may not leave its shared place), not recorded as a transfer."
       },
       "gapFonts": "Faces without licence data",
-      "toFonts": "To Fonts"
+      "toFonts": "To Fonts",
+      "records": {
+        "title": "Records of processing",
+        "lead": "What personal data this installation, its shared places and its apps keep, about whom, why and for how long, and the documents that go with it. Your AI writes them with the prompt in section 10. This section shows where they stand.",
+        "registers": "Registers",
+        "registersWhy": "{personal} hold personal data. This installation {node}, shared places {organism}, apps {app}.",
+        "domains": "Regulated data",
+        "domainsNone": "No register names regulated data.",
+        "requests": "Requests from people",
+        "requestsWhy": "{open} open. An account export and an account deletion add a line here themselves.",
+        "breaches": "Data breaches",
+        "breachesWhy": "{open} open.",
+        "dpias": "Impact assessments",
+        "dpiasWhy": "A register with health, biometric or other special data needs one.",
+        "processors": "Processors",
+        "processorsWhy": "{n} process data outside the EU and the EEA, or nobody wrote where.",
+        "processorsNone": "All inside the EU and the EEA.",
+        "packs": "Security classes",
+        "packsNone": "Off. You switch them on on the Security page.",
+        "unanswered": "{n} unanswered",
+        "gapsTitle": "What the records leave open",
+        "gapsNone": "Nothing is open.",
+        "gapPlaces": "{name} (in {n} places)",
+        "promptTitle": "Ask your AI to keep the records",
+        "promptCopy": "Copy the prompt",
+        "promptNote": "Paste this into your own AI chat. It reads what is kept here, asks you what only you know, shows you the result and waits for your yes.",
+        "promptLabel": "The prompt",
+        "printTitle": "Record of processing activities (GDPR article 30)",
+        "printEmpty": "No register is kept here yet.",
+        "field": {
+          "type": "Type",
+          "purpose": "Purpose",
+          "role": "Role",
+          "controller": "Controller",
+          "legalBasis": "Legal basis",
+          "subjects": "Whose data",
+          "categories": "Data",
+          "domains": "Regulated data",
+          "recipients": "Recipients",
+          "processors": "Processors",
+          "transfers": "Transfers",
+          "retention": "Kept for",
+          "security": "Security",
+          "reviewed": "Reviewed"
+        },
+        "purpose": {
+          "customer": "Customers",
+          "member": "Members",
+          "employee": "Employees",
+          "patient": "Patients",
+          "marketing": "Marketing",
+          "research": "Research",
+          "camera": "Camera surveillance",
+          "service-operation": "Running the service",
+          "other": "Other"
+        },
+        "role": {
+          "controller": "Controller",
+          "processor": "Processor",
+          "joint-controller": "Joint controller"
+        },
+        "basis": {
+          "consent": "Consent",
+          "contract": "Contract",
+          "legal-obligation": "Legal obligation",
+          "vital-interests": "Vital interests",
+          "public-task": "Public task",
+          "legitimate-interests": "Legitimate interests"
+        },
+        "type": {
+          "personal": "Personal data",
+          "pseudonymised": "Pseudonymised",
+          "anonymised": "Anonymised",
+          "none": "No personal data"
+        },
+        "domain": {
+          "health": "Health",
+          "special-category": "Special categories",
+          "biometric-genetic": "Biometric and genetic",
+          "children": "Children",
+          "criminal": "Criminal offences",
+          "employment": "Employment",
+          "payment-financial": "Payments and finance",
+          "public-authority": "Public authority",
+          "defence-classified": "Defence and classified",
+          "export-controlled": "Export-controlled",
+          "privileged-trade-secret": "Legal privilege and trade secrets"
+        },
+        "framework": {
+          "gdpr": "GDPR",
+          "nis2": "NIS2",
+          "dora": "DORA",
+          "cra": "Cyber Resilience Act",
+          "eaa": "Accessibility Act",
+          "dsa": "Digital Services Act",
+          "hipaa": "HIPAA",
+          "export-control": "Export control"
+        },
+        "pack": {
+          "tl": "TL",
+          "nato": "NATO"
+        },
+        "kind": {
+          "register-without-legal-basis": "A register with no legal basis",
+          "register-without-special-basis": "Special data with no ground under article 9",
+          "register-without-retention": "A register that does not say how long",
+          "register-review-overdue": "A register not reviewed in time",
+          "register-unknown-domain": "An unknown data domain",
+          "register-domain-without-container": "Regulated data with no place named",
+          "domain-label-below-floor": "A place classified lower than its data asks",
+          "dpia-missing": "An impact assessment is missing",
+          "dpia-incomplete": "An impact assessment is not finished",
+          "dpia-overdue": "An impact assessment not reviewed in time",
+          "dpia-needs-prior-consultation": "A high risk that goes to the authority first",
+          "request-overdue": "A request past its deadline",
+          "breach-risk-unassessed": "A breach whose risk nobody assessed",
+          "breach-notification-overdue": "A breach not reported in 72 hours",
+          "breach-subjects-not-notified": "People not told of a high-risk breach",
+          "breach-hipaa-overdue": "A HIPAA breach older than 60 days",
+          "framework-unanswered": "A law with unanswered questions",
+          "app-personal-data-without-register": "An app with personal data and no register",
+          "app-personal-data-unstated": "An app that does not say what is personal data",
+          "app-register-without-privacy-notice": "An app with no privacy notice",
+          "retention-conflict": "A register and a data map that disagree",
+          "processor-without-dpa": "A processor with no agreement",
+          "processor-country-unknown": "A processor in an unknown country",
+          "transfer-without-basis": "A transfer outside the EU with no basis",
+          "processor-without-baa": "A processor with no HIPAA agreement",
+          "processor-not-itar-eligible": "A processor not allowed export-controlled data",
+          "classification-pack-not-accredited": "Top security classes on an installation that is not accredited"
+        },
+        "csv": "CSV of the registers",
+        "months": "{n} months",
+        "verdict": {
+          "gdpr": {
+            "out-of-scope": "Does not apply",
+            "applies": "Applies",
+            "dpo-required": "Applies, a data protection officer needed"
+          },
+          "nis2": {
+            "not-in-scope": "Not in scope",
+            "important": "Important entity",
+            "essential": "Essential entity"
+          },
+          "dora": {
+            "not-in-scope": "Not in scope",
+            "ict-third-party": "ICT service provider",
+            "financial-entity": "Financial entity"
+          },
+          "cra": {
+            "not-in-scope": "Not in scope",
+            "default": "Product with digital elements",
+            "important": "Important product",
+            "critical": "Critical product"
+          },
+          "eaa": {
+            "not-in-scope": "Not in scope",
+            "applies": "Applies"
+          },
+          "dsa": {
+            "not-in-scope": "Not in scope",
+            "intermediary": "Conduit or caching",
+            "hosting": "Hosting service",
+            "online-platform": "Online platform",
+            "vlop": "Very large online platform"
+          },
+          "hipaa": {
+            "not-in-scope": "Not in scope",
+            "business-associate": "Business associate",
+            "covered-entity": "Covered entity"
+          },
+          "export-control": {
+            "not-in-scope": "Not in scope",
+            "dual-use": "Dual-use",
+            "itar": "ITAR"
+          }
+        },
+        "open": {
+          "open": "Open",
+          "back": "← All",
+          "loading": "Loading…",
+          "loadFailed": "The list did not load. Try again in a moment.",
+          "changeFailed": "The change was not saved.",
+          "empty": "Nothing is kept here yet.",
+          "lawsTitle": "Laws and their questions",
+          "lead": {
+            "registers": "Every register this installation, its shared places and its apps keep. Open one to see what it says, what it leaves open and what you can do.",
+            "requests": "Requests from people to see, fix, move or delete their data. Each one is due one month after it arrived.",
+            "breaches": "Data breaches. The supervisory authority is told within 72 hours when people are at risk.",
+            "dpias": "Impact assessments. A register with health, biometric or other special data needs one.",
+            "processors": "Who processes data for this installation: the AI providers, mail and hosting the configuration names, and what you wrote about each.",
+            "frameworks": "Each law asks a few questions. The answers decide whether it applies and what it asks of you. An unanswered question leaves the law open."
+          },
+          "place": {
+            "node": "This installation",
+            "organism": "Shared place",
+            "app": "App"
+          },
+          "openPlace": {
+            "organism": "Open the shared place →",
+            "app": "Open the app →"
+          },
+          "printPlace": "Print the record of this place",
+          "printOne": "Print this register",
+          "gapsN": "{n} open",
+          "gapsNone": "Nothing open",
+          "openTitle": "What is open",
+          "dpiaOf": "Assessment of {register}",
+          "received": "arrived {at}",
+          "due": "due {at}",
+          "found": "found {at}",
+          "completed": "Done {at}",
+          "notCompleted": "Not done",
+          "notYet": "Not yet",
+          "countryUnknown": "Country not written",
+          "noAgreement": "No agreement recorded",
+          "dpaSigned": "Agreement signed {at}",
+          "signedOn": "signed {at}",
+          "autoYes": "Yes, this installation wrote it when it did the work",
+          "derivedYes": "Yes, read from this installation's configuration",
+          "yes": "Yes",
+          "no": "No",
+          "unansweredOne": "Not answered",
+          "answeredBy": {
+            "human": "Answered by a person",
+            "ai": "Answered by an AI",
+            "evidence": "Read from this installation's records"
+          },
+          "markReviewed": "Mark reviewed today",
+          "markDone": "Mark done",
+          "markRefused": "Mark refused",
+          "markAuthority": "The authority is told",
+          "markPeople": "The people are told",
+          "markCompleted": "Mark done",
+          "close": "Close",
+          "reopen": "Open again",
+          "doneReviewed": "Marked reviewed today.",
+          "doneDone": "The request is marked done.",
+          "doneRefused": "The request is marked refused.",
+          "doneReopened": "It is open again.",
+          "doneAuthority": "Recorded: the authority was told today.",
+          "donePeople": "Recorded: the people were told today.",
+          "doneClosed": "The breach is closed.",
+          "doneCompleted": "The assessment is marked done.",
+          "readOnly": {
+            "organism": "Only the shared place's creator or an admin changes this. You read it because you run this installation.",
+            "app": "Only the app's owner changes this. You read it because you run this installation.",
+            "node": "Your account does not change this installation's documents."
+          },
+          "promptTitle": "Ask your AI to bring it up to date",
+          "promptNote": "Paste this into your own AI chat. It reads this entry, asks you what has changed, shows the result and waits for your yes.",
+          "promptLabel": "The prompt",
+          "promptCopy": "Copy the prompt",
+          "request": {
+            "access": "See their data",
+            "erasure": "Delete their data",
+            "rectification": "Fix their data",
+            "restriction": "Limit the use",
+            "portability": "Take their data along",
+            "objection": "Object to the use"
+          },
+          "status": {
+            "open": "In progress",
+            "done": "Done",
+            "refused": "Refused",
+            "closed": "Closed"
+          },
+          "channel": {
+            "node": "On this installation",
+            "email": "By email",
+            "letter": "By letter",
+            "other": "Other"
+          },
+          "risk": {
+            "none": "No risk to people",
+            "risk": "A risk to people",
+            "high-risk": "A high risk to people",
+            "unknown": "Risk not assessed"
+          },
+          "residual": {
+            "low": "Low risk left",
+            "medium": "Medium risk left",
+            "high": "High risk left"
+          },
+          "service": {
+            "ai": "AI",
+            "email": "Email",
+            "payments": "Payments",
+            "storage": "Storage",
+            "hosting": "Hosting",
+            "analytics": "Analytics",
+            "other": "Other"
+          },
+          "transfer": {
+            "adequacy": "Adequacy decision",
+            "scc": "Standard contractual clauses",
+            "dpf": "EU–US Data Privacy Framework",
+            "bcr": "Binding corporate rules",
+            "derogation": "Derogation (art. 49)",
+            "none": "None"
+          },
+          "agreement": {
+            "draft": "Agreement in draft",
+            "sent": "Agreement sent",
+            "review": "Signed copy waits for a check",
+            "signed": "Agreement signed",
+            "expired": "Agreement expired",
+            "ended": "Agreement ended"
+          },
+          "field": {
+            "containers": "Where it is kept",
+            "requestKind": "What they ask",
+            "subject": "Who asks",
+            "received": "Arrived",
+            "due": "Due",
+            "channel": "How it came",
+            "status": "Status",
+            "closed": "Closed",
+            "auto": "Written by this installation",
+            "notes": "Notes",
+            "found": "Found",
+            "description": "What happened",
+            "categories": "Data",
+            "subjectsApprox": "People affected, about",
+            "risk": "Risk to people",
+            "authority": "Authority told",
+            "people": "People told",
+            "measures": "What was done",
+            "register": "Register",
+            "residual": "Risk left",
+            "priorConsultation": "Goes to the authority first",
+            "completed": "Done",
+            "reviewed": "Last reviewed",
+            "service": "Service",
+            "host": "Address",
+            "country": "Country",
+            "transferBasis": "Basis for the transfer",
+            "agreement": "Processing agreement",
+            "hipaaBaa": "HIPAA business associate agreement",
+            "itar": "May handle export-controlled data",
+            "derived": "Named by the configuration",
+            "type": "Type"
+          },
+          "domainsTitle": "Registers with regulated data",
+          "workspaceIn": "workspace {ws} in {place}",
+          "promptTitleRead": "Ask your AI to explain it",
+          "promptNoteRead": "Paste this into your own AI chat. It reads this entry, tells you what is open and writes a message for whoever keeps it. It changes nothing."
+        },
+        "q": {
+          "gdpr": {
+            "q-personal-data": "Is personal data processed here: anything that identifies a living person directly or indirectly?",
+            "q-public-authority": "Is the controller a public authority or body (other than a court)?",
+            "q-large-scale-monitoring": "Does the core activity regularly and systematically monitor people on a large scale (tracking, profiling, location)?",
+            "q-large-scale-special": "Does the core activity process special categories (art. 9) or criminal data (art. 10) on a large scale?"
+          },
+          "nis2": {
+            "q-sector-medium": "If the organisation has 50 or more people or over €10 million turnover, in which sector does it work?",
+            "q-annex1-large": "Is it in an Annex I sector AND has 250 or more people or over €50 million turnover?",
+            "q-always-in-scope": "Whatever its size, is it a DNS service, a top-level domain registry, a qualified trust service or a public electronic communications provider, or named by the authority?"
+          },
+          "dora": {
+            "q-financial-entity": "Is the organisation a financial entity (a bank, payment or e-money institution, investment firm, insurer, crypto-asset service provider, fund manager)?",
+            "q-ict-to-financial": "Does it provide ICT services, this installation included, to a financial entity?"
+          },
+          "cra": {
+            "q-places-product": "Does the organisation place software or hardware on the EU market in the course of a commercial activity?",
+            "q-annex3": "Is it an Annex III product: identity management, a browser, a password manager, a VPN, network or security management, an operating system, a router or firewall, a hypervisor?",
+            "q-annex4": "Is it an Annex IV product: a hardware security box, a smart meter gateway, a smartcard or secure element?"
+          },
+          "eaa": {
+            "q-consumer-service": "Does the organisation provide e-commerce or another listed service (banking, e-books, passenger transport, electronic communications) to consumers, AND employ 10 or more people or have over €2 million turnover?"
+          },
+          "dsa": {
+            "q-conduit": "Does it transmit or cache information its users send, for others?",
+            "q-hosting": "Does it store information its users provide, at their request (memory, files, apps, boards)?",
+            "q-public": "Does it make what users store available to the public (public apps, public boards, shared pages), and is it not a micro or small enterprise?",
+            "q-vlop": "Does it have 45 million or more monthly active users in the EU?"
+          },
+          "hipaa": {
+            "q-covered-entity": "Is the organisation a US health plan, a health care clearinghouse, or a provider that transmits health information electronically?",
+            "q-business-associate": "Does it create, receive, keep or send protected health information on behalf of a covered entity?"
+          },
+          "export-control": {
+            "q-usml": "Is technical data of a defence article on the US Munitions List (USML) stored or shared here?",
+            "q-ccl": "Is technology with a Commerce Control List number other than EAR99 stored or shared here?",
+            "q-eu-dual-use": "Is technology listed in Annex I of Regulation (EU) 2021/821 stored or shared here?",
+            "q-foreign-access": "Could a person outside what the licence allows (under ITAR, anyone who is not a US person) read it here, the installation's operator and its administrators included?"
+          }
+        },
+        "special": {
+          "explicit-consent": "Explicit consent (art. 9(2)(a))",
+          "employment-law": "Employment and social security law (art. 9(2)(b))",
+          "vital-interests": "Vital interests (art. 9(2)(c))",
+          "non-profit": "A non-profit body's members (art. 9(2)(d))",
+          "made-public": "Made public by the person (art. 9(2)(e))",
+          "legal-claims": "Legal claims (art. 9(2)(f))",
+          "public-interest": "Substantial public interest (art. 9(2)(g))",
+          "health-care": "Health or social care (art. 9(2)(h))",
+          "public-health": "Public health (art. 9(2)(i))",
+          "research": "Research, archives or statistics (art. 9(2)(j))"
+        }
+      }
     },
     "csm": {
       "listTitle": "What is locked",
@@ -16373,7 +16797,23 @@
     "ownerRemoved": "Owner removed",
     "confirmAddOwner": "Make {member} an owner too? They get everything you can do, and you keep it.",
     "confirmRemoveOwner": "Take {member} off the owners? They stay as an admin.",
-    "roleOwner": "owner"
+    "roleOwner": "owner",
+    "records": {
+      "title": "Records of processing",
+      "leadEdit": "What personal data this place keeps, about whom, why and for how long. Copy the prompt to your own AI: it asks you what only you know and shows you the result before it saves anything.",
+      "leadRead": "What personal data this place keeps, as its creator and admins wrote it down.",
+      "copy": "Copy the prompt for your AI",
+      "none": "No register yet.",
+      "domains": "Regulated data: {list}",
+      "noDomains": "No regulated data.",
+      "gaps": "{n} things are open.",
+      "type": {
+        "personal": "Personal data",
+        "pseudonymised": "Pseudonymised",
+        "anonymised": "Anonymised",
+        "none": "No personal data"
+      }
+    }
   },
   "organisms.accessNone": "No access",
   "organisms.accessUpdateFailed": "Access update failed",
@@ -23252,6 +23692,13 @@
     "dataMap.agentUntie": "Untie",
     "dataMap.agentUntied": "Untied. The app and the agent are as they were.",
     "dataMap.agentNote": "The tie says whose work matters to this app. It gives the app no new permission, and untying deletes neither the agent nor its work.",
+    "dataMap.recordsTitle": "Personal data this app keeps",
+    "dataMap.recordsNone": "The app's owner has not written down what personal data it keeps.",
+    "dataMap.recordsKept": "Kept: {how}",
+    "dataMap.recordsMonths": "{n} months",
+    "dataMap.recordsBasis": "Legal basis: {basis}",
+    "dataMap.recordsNoPrivacy": "This app keeps personal data and has no privacy notice of its own yet.",
+    "dataMap.recordsPrivacy": "The app's privacy notice is among its legal pages.",
     "dataMap.invitesLabel": "Who it invites",
     "dataMap.invites.lead": "This app can invite people into shared spaces. An invitation can create a new account for that person.",
     "dataMap.invites.sends-email-invitations": "Sends invitations by email",
