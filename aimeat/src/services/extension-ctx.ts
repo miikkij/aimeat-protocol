@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.19.0 — 2026-10-24 — ctx.fetch takes `responseType: 'base64'`: the bytes come back intact as
+ *     `base64`, scrubbed like text, and an unknown responseType is refused (jussil riistakartta).
  *   v1.18.3 — 2026-10-21 — The owner's approvals and the extension's declared uses reach the resolver;
  *     a refusal's text, with the allow page's address, comes from secretRefusalText.
  *   v1.18.2 — 2026-10-21 —v58 amended: the caller's vault serves any extension they run, to a bound
@@ -134,11 +136,11 @@ import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { extensionCrossNotify, safeNotificationLink } from './extension-notify.js';
 import { notify } from './notify.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
-import { decodeBody } from './extension-fetch-decode.js';
+import { decodeBody, fetchResponseType, readBodyBytes } from './extension-fetch-decode.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames } from './owner-secrets.js';
 import { vaultOwnerForCall, decideFirstUse, secretRefusalText } from './extension-secret-authority.js';
-import { scrubFormsOf, scrubResponse } from './extension-fetch-scrub.js';
+import { scrubBytes, scrubFormsOf, scrubResponse } from './extension-fetch-scrub.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { presentMemories, presentMemory, classificationWarningOf } from './classification/present-memory.js';
@@ -677,8 +679,12 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // The caller's deadline when it has one — the sandbox road hands over the run's own
             // timeout and its teardown signal — and this file's ceiling when it does not.
             const outer = host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS);
+            // Refused before the call goes out: an option ctx.fetch does not know was ignored until
+            // 2026-10-24, and the script then received a lossy text decode of a binary answer.
+            const asBase64 = fetchResponseType(opts?.responseType) === 'base64';
             let resp: Response;
-            let text: string;
+            let text = '';
+            let bytes: Buffer | null = null;
             try {
                 resp = await safeFetch(url, {
                     method: opts?.method || 'GET',
@@ -695,8 +701,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 // default and a package producer gets a failed run instead of a mojibake version.
                 // GUARD (2026-09-26): the answer is read up to the outbound ceiling and no further, and
                 // one past it throws RESPONSE_TOO_LARGE (decodeBody above).
-                text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true,
-                    { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes });
+                const read = { gunzip: opts?.gunzip === true, maxBytes: deps.capabilities.fetchMaxBytes };
+                if (asBase64) bytes = await readBodyBytes(resp, url, read);
+                else text = await decodeBody(resp, url, deps.extConfig?.strictCharset === true, read);
             } catch (err) {
                 // The script's own deadline passed and the run's did not: said by a code the script
                 // can test for. Any other failure, the run's deadline included, is thrown as it came.
@@ -710,6 +717,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // GUARD (2026-10-09): what the node inserted does not come back. A host that echoes the
             // request would hand the script the secret or key it never held (extension-fetch-scrub.ts).
             const forms = scrubFormsOf([...outbound.inserted, ...(inject ? [inject.value, inject.value.replace(/^Bearer\s+/i, '')] : [])]);
+            if (bytes) return { status: resp.status, ok: resp.ok, ...scrubResponse('', headers, forms), base64: scrubBytes(bytes, forms).toString('base64') };
             return { status: resp.status, ok: resp.ok, ...scrubResponse(text, headers, forms) };
         },
 
