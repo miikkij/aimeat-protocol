@@ -50571,7 +50571,9 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: VERSION_EXISTS. This version is already kept with other lib bytes.
+          description: >-
+            VERSION_EXISTS, this version is already kept with other lib bytes; or BOARD_ID_TAKEN, the
+            redeploy of an active cortex would make a board whose id is a board of another account.
         '413':
           description: Manifest, lib, or quota limit exceeded.
     delete:
@@ -50612,7 +50614,10 @@ paths:
         (403 SCHEMA_PATTERN_NODE_WIDE), another organism's namespace (403 SCHEMA_PATTERN_NOT_YOURS),
         or a lock another account holds on, beside or above the pattern (403 SCHEMA_LOCKED_BY_OTHER)
         refuses the activation. Deactivation removes only the lock rows the installing account
-        still holds.
+        still holds. A board-template makes the board `cortex-<name>-<component>`; when a board with
+        that id belongs to another account, the activation is refused with 409 BOARD_ID_TAKEN before
+        anything is written. A board of that id the installing account holds is taken as the
+        cortex's own.
       tags: [Cortex]
       security:
         - BearerAuth: []
@@ -50627,6 +50632,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          description: BOARD_ID_TAKEN, a board-template's board id is a board of another account.
 
   /v1/cortex/{name}/deactivate:
     post:
@@ -50634,6 +50641,7 @@ paths:
       summary: Deactivate cortex model
       description: >
         Removes what the activation made: its schema locks, boards, prompts, ontologies and actions.
+        A board is removed only when a principal of the installing account, or the caller, holds it.
         Its seed data and lib files stay. The cortex's actions are deleted under the identity the
         activation recorded (`actionProvider`), whichever of the owner's principals, or an
         operator, deactivates. A record that names no such identity has each action deleted under

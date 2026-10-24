@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-24 -- e2e-cortex-board-ownership.ts joins the list (not the guard tier): a cortex activation answers 409 for a board id another account holds, and a deactivation deletes only the installing account's boards (secaudit2026oct22).
  *   2026-10-24 -- e2e-capability-extension-ref.ts joins the list (not the guard tier): an extension-backed capability's ref names an extension and an action, and invoke resolves both before its loopback request (secaudit2026oct22).
  *   2026-10-23 -- e2e-compliance-records.ts and e2e-classification-packs.ts join the list (not the guard tier): the records of processing and the documents beside them, and the TL and NATO label packs (plan doc-mvlftkh9zmc9).
  *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
@@ -1391,6 +1392,9 @@ const ALL_SUITES = [
     // two fails was real: a schema key_pattern of the form `chart:*` matched nothing, so every
     // schema a cortex pack declared validated nothing.
     'test/cortex-e2e.ts',
+    // A cortex activation takes only a board its own account holds, and its deactivation deletes only
+    // those (secaudit2026oct22).
+    'test/e2e-cortex-board-ownership.ts',
     'test/openrouter.ts',
     // The audio/speech served libs and their sample files — also registered nowhere until now.
     'test/e2e-audio-speech.ts',

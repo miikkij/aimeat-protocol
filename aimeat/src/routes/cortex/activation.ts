@@ -6,6 +6,11 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-24 — activationRefusal answers 409 BOARD_ID_TAKEN when a board-template's derived board id
+ *     is a board of another account, activateExtension does not record such a board, and
+ *     deactivation deletes only the boards a principal of the installing account or the deactivator
+ *     holds (secaudit2026oct22, cortex-activation-adopts-foreign-board-id). activationRefusal takes
+ *     the record's installedBy.
  *   2026-10-16 — activationRefusal asks the schema lock rule for every schema component
  *     (services/schema-lock-rule.ts) and refuses a lock another account holds on the same pattern;
  *     deactivation deletes only the rows of its recorded patterns that the installing account still
@@ -79,7 +84,7 @@ export interface CortexActor {
  * its boards are deleted first, so they are neither "already there" nor held against the ceiling.
  */
 export async function activationRefusal(
-  ext: Pick<CortexExtensionRecord, 'name' | 'components'>,
+  ext: Pick<CortexExtensionRecord, 'name' | 'components' | 'installedBy'>,
   config: AimeatConfig,
   storage: Storage,
   gaii: string,
@@ -93,6 +98,9 @@ export async function activationRefusal(
   const schemaRefusal = await activationSchemaRefusal(ext, config, storage, gaii, isOperator);
   if (schemaRefusal) return schemaRefusal;
 
+  const boardRefusal = await foreignBoardRefusal(ext, storage, gaii);
+  if (boardRefusal) return boardRefusal;
+
   const leaving = new Set(replacing?.activationArtifacts.boardIds ?? []);
   let wanted = 0;
   for (const comp of ext.components) {
@@ -103,6 +111,46 @@ export async function activationRefusal(
   }
   if (wanted === 0) return null;
   return publicBoardCeiling({ storage, config }, { gaii, roles: isOperator ? ['operator'] : [] }, 'public', wanted, leaving);
+}
+
+/**
+ * The principals whose board an activation of a cortex installed by `installedBy` may take as its
+ * own and its teardown may delete: every principal of the installing account
+ * (services/db/owner-identity.ts) and the acting principal (an operator acting for the owner).
+ */
+async function boardHolders(storage: Storage, installedBy: string, gaii: string): Promise<Set<string>> {
+  return new Set([gaii, ...await accountPrincipals(storage, installedBy)]);
+}
+
+/**
+ * 409 BOARD_ID_TAKEN when a board-template's board id is already a board of another account.
+ *
+ * The id is derived, `cortex-<cortex>-<component>`, so two cortexes can derive the same one
+ * (`a-b` + `c` and `a` + `b-c`). Activation took an existing board of that id as its own and recorded
+ * it, and the deactivation of the second cortex then deleted the first account's board and its posts
+ * (secaudit2026oct22, cortex-activation-adopts-foreign-board-id). A board the installing account
+ * holds is still taken as its own, which is what a re-activation and a redeploy do.
+ */
+async function foreignBoardRefusal(
+  ext: Pick<CortexExtensionRecord, 'name' | 'components' | 'installedBy'>,
+  storage: Storage,
+  gaii: string,
+): Promise<BoardWriteRefusal | null> {
+  let holders: Set<string> | undefined;
+  for (const comp of ext.components) {
+    if (comp.type !== 'board-template') continue;
+    const boardId = `cortex-${ext.name}-${comp.name}`;
+    const board = await storage.getBoard(boardId);
+    if (!board) continue;
+    holders ??= await boardHolders(storage, ext.installedBy, gaii);
+    if (holders.has(board.ownerGaii)) continue;
+    return {
+      ok: false, status: 409, code: 'BOARD_ID_TAKEN',
+      message: `This cortex would make the board "${boardId}", and a board with that id belongs to another account. `
+        + `Rename the board-template component "${comp.name}" or the cortex.`,
+    };
+  }
+  return null;
 }
 
 /**
@@ -337,6 +385,11 @@ export async function activateExtension(
           }
 
           logger.info(`Cortex activated board: ${boardId}`, { extension: ext.name });
+        } else if (!(await boardHolders(storage, ext.installedBy, gaii)).has(existingBoard.ownerGaii)) {
+          // Another account's board of the same id, made after the pre-pass above asked: it is not
+          // this activation's, so it is not recorded and no teardown of this cortex reaches it.
+          logger.warn(`Cortex board id belongs to another account, not taken: ${boardId}`, { extension: ext.name });
+          break;
         } else {
           logger.info(`Cortex board already exists, skipping: ${boardId}`, { extension: ext.name });
         }
@@ -442,10 +495,21 @@ export async function deactivateExtension(
     logger.info(`Cortex deactivated action: ${actionId}`, { extension: ext.name });
   }
 
-  // Remove boards
-  for (const boardId of artifacts.boardIds) {
-    await storage.deleteBoard(boardId);
-    logger.info(`Cortex deactivated board: ${boardId}`, { extension: ext.name });
+  // Remove the boards this activation recorded, and only a board a principal of the installing
+  // account (or the deactivator) holds. An activation recorded another account's board of the same
+  // derived id as its own, and this loop deleted it with its posts (secaudit2026oct22).
+  if (artifacts.boardIds.length > 0) {
+    const holders = new Set([gaii, ...await installerPrincipals()]);
+    for (const boardId of artifacts.boardIds) {
+      const board = await storage.getBoard(boardId);
+      if (!board) continue;
+      if (!holders.has(board.ownerGaii)) {
+        logger.warn(`Cortex deactivation left a board another account holds: ${boardId}`, { extension: ext.name, owner: board.ownerGaii });
+        continue;
+      }
+      await storage.deleteBoard(boardId);
+      logger.info(`Cortex deactivated board: ${boardId}`, { extension: ext.name });
+    }
   }
 
   // Do NOT remove seed-data (preserve user data during deactivation)
