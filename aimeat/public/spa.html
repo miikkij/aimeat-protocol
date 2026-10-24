@@ -583,6 +583,7 @@
       "/js/services/knowledge.js": "/js/services/knowledge.js",
       "/js/services/living.js": "/js/services/living.js",
       "/js/services/skills.js": "/js/services/skills.js",
+      "/js/services/agreements.js": "/js/services/agreements.js",
       "/js/services/memory.js": "/js/services/memory.js",
       "/js/services/notebook.js": "/js/services/notebook.js",
       "/js/services/notebook-plan.js": "/js/services/notebook-plan.js",
@@ -1329,8 +1330,10 @@
 
       // Initial load + popstate
       useEffect(() => {
-        // Load initial route
-        const path = location.pathname + location.search;
+        // Load initial route. The hash stays in the address: a view reads it on mount to open one
+        // item (the admin Compliance page's #agreements/<id>), and the handoff script above has
+        // already removed the one hash that must not stay.
+        const path = location.pathname + location.search + location.hash;
         navigate(path, true);
 
         // Handle back/forward

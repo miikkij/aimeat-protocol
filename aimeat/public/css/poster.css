@@ -3,6 +3,7 @@
  * @description Shared poster and showroom shapes. Views compose these classes and own their layout.
  * @usage Linked immediately after theme.css in spa.html.
  * @version-history
+ *   v1.40.0 -- 2026-10-25 -- Library sizes (Jouni): the Status reads --text-2xs (11px, was .66rem, 10.6px); on a touch screen the action link and the tab take the finger in an area 44px high around their words, with no change to their look. Outside the app-catalog ranges.
  *   v1.39.0 -- 2026-10-21 -- .poster-action--control (Action `control`): the action link in a box as tall as the control cut, a touch target. Additive, outside the app-catalog ranges.
  *   v1.38.0 -- 2026-10-06 --.store-soon-ask ("Opens soon" pressed for the discount code, in the control's own shape) and .store-soon-code (the code in an ink frame with its copy button and when to use it). Additive: nothing carries them unless site.store_soon_code is set.
  *   v1.37.0 -- 2026-10-06 -- .store-soon (components/StoreDoor.js): a control into a store that does not take orders yet keeps its shape, does not answer the pointer, and a door loses its link underline; .store-soon-note, the line that says so. Additive: nothing carries the class while site.store_status is "open".
@@ -132,6 +133,13 @@
 .poster-action--lower { text-transform: none; letter-spacing: 0; font-size: .88rem; }
 .poster-action--lower.copied { color: var(--success-fg); border-color: var(--success-fg); }
 .poster-action--row { font-size: .72rem; }
+/* On a touch screen the action link and the tab keep their look, and an area 44px high around the
+   words takes the finger (the dialog footer's rule, dialog.css, for every action link and tab;
+   Jouni: library sizes, 2026-10-25). A mouse keeps the exact area of the words. */
+@media (pointer: coarse) {
+  .poster-action, .poster-tab { position: relative; }
+  .poster-action::after, .poster-tab::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: max(100%, 44px); transform: translateY(-50%); }
+}
 /* The action link's tones (Jouni's decision "Action link"): the looks he kept, each in its own
    values, so one component carries every quiet way on. A tone sets back what the base above sets
    and the look does not have. more: "Show all" under a list (formerly .poster-fold); quiet: the
@@ -400,7 +408,7 @@
    says a state; a fill, never a frame, so it stays apart from a tag in the same row. */
 .poster-status {
   display: inline-block; padding: 1px 7px; border-radius: var(--shape-corner-pill);
-  font-family: var(--font-mono); font-size: .66rem; font-weight: var(--weight-medium); text-transform: var(--shape-case-label);
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-medium); text-transform: var(--shape-case-label);
 }
 .poster-status--fine { background: var(--success-bg); color: var(--success-fg); }
 .poster-status--attention { background: var(--warn-bg); color: var(--warn-fg); }

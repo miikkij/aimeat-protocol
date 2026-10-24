@@ -229,8 +229,22 @@ export const CreateInputSchema = z.object({
   written_by: z.enum(['human', 'ai']).optional(),
 }).strict();
 
-/** What may change on the newest version while it is a draft. */
-export const PatchInputSchema = CreateInputSchema.omit({ ourRole: true }).partial().strict();
+/**
+ * What may change on the newest version while it is a draft. Written out, NOT a partial of
+ * CreateInputSchema: a partial keeps its defaults, so a change of one annex silently set the product
+ * back to `custom` and the language to `fi` and generated the annexes again.
+ */
+export const PatchInputSchema = z.object({
+  counterparty: PartySchema.optional(),
+  product: z.enum(['place', 'box', 'managed', 'custom']).optional(),
+  language: z.enum(['fi', 'en']).optional(),
+  subject: text(300).optional(),
+  registerId: z.string().max(120).optional(),
+  externalRef: z.string().max(200).optional(),
+  options: OptionsInputSchema.optional(),
+  annexes: CreateInputSchema.shape.annexes,
+  written_by: z.enum(['human', 'ai']).optional(),
+}).strict();
 
 export type AgreementParty = z.infer<typeof PartySchema>;
 export type AgreementOptions = z.infer<typeof OptionsSchema>;

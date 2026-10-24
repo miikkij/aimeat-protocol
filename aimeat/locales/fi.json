@@ -4506,6 +4506,106 @@
     "public": "Julkinen",
     "publicWho": "Kuka tahansa, kirjautuneena tai ilman. Se voi näkyä listoissa ja hauissa."
   },
+  "agreements": {
+    "status": { "signed": "Voimassa", "sent": "Odottaa allekirjoitusta", "review": "Tarkistettavana", "draft": "Luonnos", "expired": "Korvattu", "ended": "Päättynyt" },
+    "event": {
+      "created": "Luonnos tehty", "edited": "Luonnosta muutettu", "version": "Uusi versio luonnosteltu", "sent": "Lähetetty allekirjoitettavaksi", "reminder": "Muistutus lähetetty",
+      "signed": "Allekirjoitettu", "copy-received": "Allekirjoitettu kopio vastaanotettu", "copy-accepted": "Allekirjoitettu kopio hyväksytty", "copy-rejected": "Allekirjoitettu kopio hylätty",
+      "in-force": "Voimassa", "notice": "Muutoksesta ilmoitettu", "notice-reminder": "Muistutus muutoksesta lähetetty", "notice-lapsed": "Uusi versio voimaan",
+      "objection": "Muutosta vastustettu", "breach-notice": "Loukkausilmoitus lähetetty", "ended": "Sopimus päättyi", "deletion-done": "Tiedot poistettu tai palautettu"
+    },
+    "next": {
+      "deletion": "Poista tai palauta tiedot {date} mennessä", "sendDraft": "Versio {n} on luonnos: lähetä se allekirjoitettavaksi",
+      "review": "Allekirjoitettu kopio odottaa päätöstäsi", "reviewCp": "Allekirjoitettua kopiotasi tarkistetaan",
+      "objected": "Muutosta on vastustettu, eikä se tule voimaan", "notice": "Muutos tulee voimaan {date}, jos sitä ei vastusteta",
+      "waitingCp": "Odottaa vastapuolen allekirjoitusta", "signCp": "Odottaa sinun allekirjoitustasi"
+    },
+    "colStep": "Vaihe", "colWhen": "Milloin", "colWith": "Kenen kanssa", "colSubject": "Mitä koskee", "colState": "Tila", "colNext": "Seuraava vaihe",
+    "noSteps": "Mitään ei ole vielä tapahtunut.", "waits": "odottaa",
+    "party": { "name": "Nimi", "businessId": "Y-tunnus", "address": "Osoite", "contact": "Yhteyshenkilö", "signer": "Allekirjoittaa", "dpo": "Tietosuojavastaava" },
+    "toComplete": "[täydennettävä]",
+    "annexes": "Liitteet", "annexesSub": "Vakiolausekkeiden neljä liitettä sellaisina kuin AIMEAT ne täytti",
+    "annex": { "I": "I Osapuolet", "II": "II Käsittely", "III": "III Turvatoimet", "IV": "IV Alikäsittelijät" },
+    "controller": "Rekisterinpitäjä", "processor": "Henkilötietojen käsittelijä",
+    "ii": { "subjects": "Kenen tietoja", "categories": "Mitä tietoja", "sensitive": "Arkaluonteiset tiedot", "nature": "Mitä tiedoille tehdään", "purposes": "Miksi", "duration": "Kuinka kauan" },
+    "iii": { "area": "Alue", "measure": "Mitä tehdään", "assistance": "Miten käsittelijä avustaa rekisterinpitäjää" },
+    "source": { "evidence": "luettu AIMEATista", "ai": "tekoälyn luonnos", "human": "ihmisen kirjoittama" },
+    "area": {
+      "encryption": "Salaus", "confidentiality": "Luottamuksellisuus ja käytettävyys", "restore": "Palautus häiriön jälkeen", "testing": "Säännöllinen testaus",
+      "identification": "Kirjautuminen ja oikeudet", "transmission": "Tiedot siirrossa", "storage": "Tiedot tallessa", "physical": "Fyysinen turvallisuus", "logging": "Lokit",
+      "configuration": "Asetukset", "governance": "Tietoturvan hallinta", "certification": "Sertifioinnit", "minimisation": "Tietojen minimointi",
+      "quality": "Tietojen laatu", "retention": "Rajattu säilytys", "accountability": "Vastuuvelvollisuus", "portability": "Siirrettävyys ja poisto"
+    },
+    "iv": { "name": "Alikäsittelijä", "what": "Mitä tekee", "none": "Ei alikäsittelijöitä.", "added": "uusi tässä versiossa", "dropped": "poistuu tässä versiossa" },
+    "ob": {
+      "breach": "Loukkausilmoitus", "breachV": "{h} tunnin kuluessa havainnosta", "notice": "Alikäsittelijän muutos", "noticeV": "ilmoitetaan {d} päivää ennen, ja sitä voi vastustaa",
+      "requests": "Rekisteröityjen pyynnöt", "requestsV": "käsittelijä avustaa viennillä ja poistolla", "deletion": "Sopimuksen päättyessä", "deletionV": "tiedot poistetaan tai palautetaan {d} päivässä"
+    },
+    "sum": {
+      "who": "Kuka käsittelee", "whoV": "{name}, vain sinun ohjeidesi mukaan", "what": "Mitä tietoja", "where": "Missä", "whereV": "näillä alikäsittelijöillä: {places}",
+      "whereOwn": "omalla palvelimellasi", "breach": "Jos jotain sattuu", "end": "Kun sopimus päättyy"
+    },
+    "way": {
+      "aimeat": "AIMEAT-tunnus", "fastest": "nopein", "aimeatText": "Olet jo kirjautunut. Allekirjoitat passkeylla, ja AIMEAT sinetöi allekirjoituksen.",
+      "aimeatGo": "Allekirjoita allekirjoitussovelluksessa", "aimeatNone": "Allekirjoitussovellusta ei ole otettu käyttöön täällä. Valitse jokin muista tavoista.",
+      "wallet": "EU-lompakko", "strongest": "vahvin", "walletText": "Hyväksytty sähköinen allekirjoitus, joka vastaa käsin kirjoitettua koko EU:ssa. Toimii, kun lompakkosi tukee allekirjoitusta.",
+      "walletGo": "Allekirjoita lompakolla",
+      "service": "Oma allekirjoituspalvelu", "serviceEg": "esim. DocuSign", "serviceText": "Lataa PDF, allekirjoita se omassa palvelussasi ja lähetä allekirjoitettu PDF takaisin. AIMEAT tarkistaa allekirjoituksen ja sen, että teksti on muuttumaton.",
+      "serviceUpload": "Lähetä allekirjoitettu PDF",
+      "paper": "Paperilla", "slowest": "hitain", "paperText": "Tulosta, allekirjoita ja skannaa kaikki sivut. Tekoäly tarkistaa kopion, ja operaattori vahvistaa sen. Saat tiedon sähköpostiin.",
+      "paperUpload": "Lähetä skannaus"
+    },
+    "downloadPdf": "Lataa PDF", "print": "Tulosta", "openPdf": "Avaa koko sopimus (PDF)",
+    "notice": {
+      "title": "Muutoksesta on ilmoitettu", "text": "Sopimuksen mukaan alikäsittelijän muutoksesta ilmoitetaan {days} päivää etukäteen. Muutos tulee voimaan {date}. Sinun ei tarvitse tehdä mitään, jos se sopii.",
+      "objected": "Vastustit muutosta {date}. Se ei tule voimaan sinulle ennen kuin asia on ratkaistu.", "reasonLabel": "Jos muutos ei sovi, kerro miksi",
+      "object": "Vastusta muutosta", "sent": "Vastustuksesi lähti."
+    },
+    "cp": {
+      "title": "Sopimukset", "intro": "Käsittelijäsopimukset, joissa olet vastapuoli: mitä sinua pyydetään allekirjoittamaan, miten allekirjoitat ja mitä on tapahtunut.",
+      "listTitle": "Sopimuksesi", "empty": "Kukaan ei ole lähettänyt sinulle sopimusta.", "waitsYou": "Odottaa allekirjoitustasi", "changeAnnounced": "Muutoksesta on ilmoitettu",
+      "whatTitle": "Mitä allekirjoitat", "whatLead": "Sopimus {id}, versio {n}. EU-komission vakiolausekkeet, joihin on täytetty palvelun tiedot.",
+      "signTitle": "Valitse tapa", "afterSign": "Kun olet allekirjoittanut, operaattori allekirjoittaa myös. Valmis sopimus tulee sähköpostiin.",
+      "inReview": "Allekirjoitettua kopiotasi tarkistetaan. Saat tiedon sähköpostiin.", "copySent": "Allekirjoitettu kopio lähti."
+    },
+    "stepsTitle": "Vaiheet", "obligationsTitle": "Mitä sopimus lupaa",
+    "loading": "Luetaan sopimuksia…", "loadFailed": "Sopimuksia ei voitu lukea.", "actionFailed": "Se ei mennyt läpi.",
+    "open": "Avaa", "cancel": "Peruuta",
+    "product": { "place": "Hostattu ympäristö", "box": "Oma palvelin", "managed": "Managed", "custom": "Muu" },
+    "op": {
+      "title": "Sopimukset", "lead": "Käsittelijäsopimukset asiakkaidesi kanssa. AIMEAT täyttää ne omista tiedoistaan ja seuraa jokaista vaihetta.",
+      "inForce": "voimassa", "waitingCp": "odottaa vastapuolta", "waitingYou": "odottaa sinua", "gaps": "avointa asiaa",
+      "announceNow": "Ilmoita muutoksesta", "announce": "Ilmoita muutoksesta", "announced": "Muutoksesta ilmoitettiin.",
+      "send": "Lähetä allekirjoitettavaksi", "sent": "Lähetetty allekirjoitettavaksi.", "previewPdf": "Katso PDF",
+      "draftFirst": "Tätä luonnosta ei ole lähetetty. Tarkista liitteet ja lähetä se allekirjoitettavaksi.",
+      "draftNext": "Versio {n} on luonnos. Pelkän alikäsittelijän tai turvatoimien muutoksen voi ilmoittaa; muu muutos allekirjoitetaan uudelleen.",
+      "newVersion": "Tee uusi versio", "versionMade": "Uusi versio luonnosteltiin.", "inForceFrom": "Voimassa alkaen", "notYet": "ei vielä",
+      "end": "Päätä sopimus", "endTitle": "Päätetäänkö sopimus?", "endConfirm": "Sopimus {who}:n kanssa päättyy nyt, ja tiedot on poistettava {days} päivässä.",
+      "ended": "Sopimus päättyi.", "deletionDone": "Merkitse tiedot poistetuiksi", "deletionRecorded": "Poisto kirjattiin.",
+      "empty": "Sopimuksia ei vielä ole. Tee ensimmäinen, tai pyydä tekoälyäsi tekemään se.", "copyForAi": "Kopioi tekoälylle", "copied": "Kopioitu. Liitä se omaan tekoälykeskusteluusi.",
+      "aiPrompt": "Käytä aimeat_compliance_agreement-työkalua. Tee asiakkaalleni käsittelijäsopimus: action \"create\" ensin dry_run-tilassa, input { counterparty: { name, businessId, address, contactName, contactEmail, signerName, signerRole }, product, language }. Näytä minulle missing_measures ja kysy ne minulta, kirjoita ne action \"update\" -toiminnolla, ja lähetä sopimus action \"send\" -toiminnolla, kun sanon kyllä.",
+      "next": { "draft": "Lähetä allekirjoitettavaksi", "review": "Päätä allekirjoitetusta kopiosta", "waitingCp": "Odottaa vastapuolta" }
+    },
+    "gap": {
+      "agreement-review-waiting": "{who}: allekirjoitettu kopio odottaa päätöstäsi.", "subprocessor-change-unannounced": "{who}: uudesta alikäsittelijästä ei ole ilmoitettu.",
+      "agreement-objection-open": "{who} vastusti muutosta.", "agreement-deletion-overdue": "{who}: tiedot olisi pitänyt poistaa.",
+      "breach-notice-overdue": "Tietoturvaloukkauksesta ei ole kerrottu vastapuolille."
+    },
+    "review": {
+      "pdfTitle": "Allekirjoitettu PDF", "scanTitle": "Skannattu kopio", "verdict": { "pass": "kaikki tarkistukset läpi", "attention": "katso itse", "fail": "tarkistus ei mennyt läpi" },
+      "check": "Tarkistus", "found": "Mitä löytyi", "unknown": "ei tarkistettu",
+      "c": { "signature": "Allekirjoitus", "version": "Oikea sopimus ja versio", "signer": "Allekirjoittaja", "pages": "Kaikki sivut", "date": "Päiväys", "changes": "Ei käsin tehtyjä muutoksia", "notes": "Huomiot" },
+      "checkedBy": "Tarkisti {model}", "scanMeans": "Skannattu allekirjoitus täyttää kirjallisen muodon, mutta sen todistusarvo on pienempi kuin sähköisen. Sopimukseen kirjataan taso skannattu, tarkistuksen tulos ja sinut vahvistajana.",
+      "pdfMeans": "Hyväksyntä kirjaa allekirjoituksen sillä tasolla, jonka sen varmenne antaa.", "reasonLabel": "Syy, jos hylkäät",
+      "accept": "Hyväksy allekirjoitus", "reject": "Hylkää ja pyydä uusi kopio", "accepted": "Allekirjoitus hyväksyttiin.", "rejected": "Kopio hylättiin, ja vastapuolelle kerrottiin syy."
+    },
+    "new": {
+      "open": "Uusi sopimus", "title": "Uusi sopimus", "lead": "Anna vastapuoli ja tuote. AIMEAT täyttää lausekkeet ja liitteet omista tiedoistaan ja nimeää turvatoimet, jotka kirjoitat itse.",
+      "country": "Maa", "contactName": "Yhteyshenkilö", "contactEmail": "Yhteyshenkilön sähköposti", "signerName": "Kuka allekirjoittaa", "signerRole": "Allekirjoittajan rooli",
+      "account": "Tunnus täällä (valinnainen)", "accountHint": "Jos vastapuolella on tunnus täällä, kirjoita se niin kuin se lukee hänen profiilissaan (nimi@...). Silloin hän allekirjoittaa täällä ja näkee sopimuksen asetuksissaan.",
+      "product": "Tuote", "language": "Kieli", "create": "Tee luonnos", "created": "Luonnos tehtiin."
+    }
+  },
   "exposure": {
     "title": "Mitä muut näkevät sinun sisällöstäsi",
     "intro": "Tässä on kaikki sisältösi, jonka joku ulkopuolinen voi lukea: kuka tahansa, kuka tahansa linkillä, jokainen täällä kirjautunut tili tai yhden yhteisen paikan jäsenet. Sulje se, minkä ei kuulu olla auki.",
@@ -17131,6 +17231,7 @@
       "nodes": "Solmut",
       "dataWallet": "Tietolompakko",
       "exposure": "Mitä muut näkevät",
+      "agreements": "Sopimukset",
       "nodeStats": "Solmutilastot",
       "extensions": "Laajennukset",
       "security": "Turvallisuus",
