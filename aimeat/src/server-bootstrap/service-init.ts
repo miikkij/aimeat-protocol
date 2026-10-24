@@ -11,7 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
- *   2026-10-24 — sweepAgreements once an hour: the reminders, lapsed notices and signing reads of the
+ *   2026-10-24 — scheduleAgreementSweep: the hourly reminders, lapsed notices and signing reads of the
  *     data processing agreements (services/compliance-agreements-gaps.ts, plan doc-mvmr4i2wdk0p D4).
  *   2026-10-23 — flagOrphanPeerApprovalsOnce after the peer registry loads, with its node ids: the approved
  *     peering requests no peer stands behind go to the Security page (secaudit2026oct22).
@@ -160,7 +160,7 @@ import { errorFields } from '../utils/error-fields.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
-import { sweepAgreements } from '../services/compliance-agreements-gaps.js';
+import { scheduleAgreementSweep } from '../services/compliance-agreements-gaps.js';
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
@@ -614,14 +614,7 @@ export async function initializeServices(
   // reminders, a lapsed change notice turned into the version in force, and the AIMEAT signing
   // requests read so a version signed in the signing app comes into force without anyone opening it.
   // Hourly: the shortest clock is a day.
-  {
-    const agreements = () => {
-      sweepAgreements({ storage, config })
-        .catch(err => logger.warn('agreements sweep failed', { error: String(err) }));
-    };
-    setTimeout(agreements, 150_000);
-    setInterval(agreements, 3_600_000);
-  }
+  scheduleAgreementSweep({ storage, config });
 
   // Notifications the owner asked to be held or folded (services/notification-sweeps.ts): every
   // five minutes, the pushes held during quiet hours go out as one when the window has just ended;
