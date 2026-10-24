@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-24 — POST /v1/ghii/verify-email takes only rows of purpose 'registration' (the codes register-web
+ *     and attach-email mail); a sign-in link's or another code's row answers 404 and is left unspent
+ *     (secaudit2026oct22, verify-email:no-purpose-binding).
  *   2026-10-23 — register-web passes whether the request came in on a loopback socket (fromLoopback): a
  *     loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-22 — GET /v1/ghii/magic-link/verify asks an account with TOTP armed for its code (totp_code or
@@ -415,8 +418,15 @@ export function registerWebVerifyRoutes(
             return;
         }
 
+        // This route takes the codes it mails itself: the registration code (register-web) and the
+        // attach-email code (services/email-verification-start.ts), both stored with purpose
+        // 'registration'. The table also holds sign-in links (purpose 'login', keyed by the token's
+        // hash with the same hash as code), address-change and password-reset codes. A row of
+        // another purpose answers as not found and is left as it is, so a sign-in link token could
+        // not mint an agent key here past the second factor the link's own endpoints ask, nor bind
+        // an address the account has since changed (secaudit2026oct22, verify-email:no-purpose-binding).
         const record = await storage.getEmailVerification(verification_id);
-        if (!record) {
+        if (!record || record.purpose !== 'registration') {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Verification record not found'));
             return;
         }

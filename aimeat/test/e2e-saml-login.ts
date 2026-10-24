@@ -12,6 +12,8 @@
  *   asserted per-case in test/unit/saml-assertion.test.ts against the same router.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=saml-login
  * @version-history
+ *   2026-10-24 — A first sign-in onto an account with TOTP armed asks for the code before it links
+ *     (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-15 — The ACS refusals expect a redirect with ?auth_error= instead of JSON 401/403
  *     (feature-list audit #20, #22).
  *   v1.1.0 — 2026-09-04 — The suite puts `sso.enabled` and `sso.connections_locked` where it needs
@@ -22,6 +24,8 @@
  */
 import { buildSamlResponse, buildIdpMetadataXml, requestIdFromAuthorizeUrl } from './helpers/fake-saml-idp.js';
 import { requireCleanSsoState } from './helpers/sso-state.js';
+import { markEmailVerified } from './helpers/verified-email.js';
+import { TOTP, Secret } from 'otpauth';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -83,6 +87,35 @@ const cookieFrom = (setCookie: string[], name: string): string | null => {
     for (const c of setCookie) if (c.startsWith(name + '=')) return c.split(';')[0];
     return null;
 };
+
+/** A live `name=value` pair; a clearing header (empty value) does not count. */
+const liveCookie = (setCookie: string[], name: string): string | null => {
+    for (const c of setCookie) {
+        const pair = c.split(';')[0];
+        if (pair.startsWith(name + '=') && pair.length > name.length + 1) return pair;
+    }
+    return null;
+};
+
+/** The code an authenticator app shows now (or `offset` periods later) for this secret. */
+const totpAt = (secret: string, offset = 0): string =>
+    new TOTP({ secret: Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 }).generate({ timestamp: Date.now() + offset * 30_000 });
+
+/** A six-digit code outside the window the server accepts around now. */
+function wrongTotp(secret: string): string {
+    const near = new Set([-2, -1, 0, 1, 2].map(o => totpAt(secret, o)));
+    for (let n = 0; ; n++) { const c = String(n).padStart(6, '0'); if (!near.has(c)) return c; }
+}
+
+/** Arm two-step sign-in on the account the token is for, and return its base32 secret. */
+async function armTotp(token: string): Promise<string> {
+    const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: bearer(token), body: '{}' });
+    assert(setup.status === 200, `totp setup ${setup.status}: ${JSON.stringify(setup.body?.error)}`);
+    const secret = setup.body.data.totp_secret as string;
+    const verify = await json('/v1/ghii/totp/verify', { method: 'POST', headers: bearer(token), body: JSON.stringify({ code: totpAt(secret) }) });
+    assert(verify.status === 200, `totp verify ${verify.status}: ${JSON.stringify(verify.body?.error)}`);
+    return secret;
+}
 
 const CONN = `c${Date.now().toString(36)}`;
 const HIDDEN = `h${Date.now().toString(36)}`;
@@ -187,6 +220,49 @@ async function run() {
         const acs = await postAcs(CONN, { SAMLResponse: resp, RelayState: relayState });
         assert(acs.status === 302 && !acs.location.includes('aimeat_signup'), `ACS ${acs.status} ${acs.location}`);
         assert(!!cookieFrom(acs.setCookie, 'aimeat_rt'), 'session cookie set');
+    });
+
+    // secaudit2026oct22 (external-login-skips-second-factor): the first SAML sign-in that matches an
+    // account with two-step sign-in by its verified address saved the NameID on the account and
+    // opened a session without the code. Now the ACS leaves a code-step ticket and links nothing;
+    // the right code links the NameID, and the next sign-in with it is one click again.
+    await test('a first sign-in onto an account with TOTP armed asks for the code before it links', async () => {
+        const tf = await setupOwner('tf');
+        const tfEmail = `${tf.owner}@contoso.com`;
+        await markEmailVerified(tf.owner, tfEmail);
+        const secret = await armTotp(tf.ownerToken);
+        const nameId = `objectid-${tf.owner}`;
+        const signIn = async () => {
+            const authz = await rawGet(`/v1/ghii/login/saml/${CONN}?redirect=/`);
+            const requestId = requestIdFromAuthorizeUrl(authz.location);
+            const relayState = new URL(authz.location).searchParams.get('RelayState')!;
+            const resp = buildSamlResponse({ acsUrl: acsUrl(CONN), audience: audience(CONN), inResponseTo: requestId, nameId, email: tfEmail, displayName: 'Two Factor' });
+            return postAcs(CONN, { SAMLResponse: resp, RelayState: relayState });
+        };
+
+        const acs = await signIn();
+        assert(acs.status === 302 && acs.location.endsWith('/?auth_step=second_factor'), `expected the code step, got ${acs.status} ${acs.location}`);
+        assert(!liveCookie(acs.setCookie, 'aimeat_rt'), 'the address match alone must not set the refresh cookie');
+        const ticket = liveCookie(acs.setCookie, 'aimeat_link_2fa');
+        assert(!!ticket, `a code-step ticket cookie: ${acs.setCookie.join(' | ')}`);
+
+        const url = '/v1/ghii/magic-link/second-factor';
+        const wrong = await json(url, { method: 'POST', headers: { Cookie: ticket! }, body: JSON.stringify({ totp_code: wrongTotp(secret) }) });
+        assert(wrong.status === 401 && wrong.body.error?.code === 'INVALID_TOTP', `a wrong code: ${wrong.status} ${wrong.body.error?.code}`);
+        const stillNew = await signIn();
+        assert(stillNew.location.endsWith('/?auth_step=second_factor'), `nothing linked after a wrong code: ${stillNew.location}`);
+
+        const res = await fetch(`${BASE}${url}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: ticket! },
+            body: JSON.stringify({ totp_code: totpAt(secret, 1) }),
+        });
+        const body = await res.json() as any;
+        assert(res.status === 200, `the right code: ${res.status} ${JSON.stringify(body?.error)}`);
+        assert(!!liveCookie(res.headers.getSetCookie(), 'aimeat_rt'), 'the right code sets the refresh cookie');
+
+        const back = await signIn();
+        assert(back.status === 302 && back.location.endsWith('/') && !back.location.includes('auth_step'), `the linked NameID signs straight in: ${back.status} ${back.location}`);
+        assert(!!liveCookie(back.setCookie, 'aimeat_rt'), 'session cookie on the linked sign-in');
     });
 
     await test('a foreign-certificate response redirects with ?auth_error=SAML_INVALID_RESPONSE at the ACS', async () => {

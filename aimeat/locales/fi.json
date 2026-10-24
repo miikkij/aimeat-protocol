@@ -15879,7 +15879,7 @@
     "authErrorUsedLink": "Tämä kirjautumislinkki on jo käytetty, tai se ei kelpaa. Pyydä uusi linkki alta tai kirjaudu toisella tavalla.",
     "authErrorExpired": "Tämä kirjautumislinkki on vanhentunut. Pyydä uusi linkki alta.",
     "authErrorDisabled": "Tämä tili on suljettu. Ota yhteyttä palvelun ylläpitäjään.",
-    "authErrorSecondFactorExpired": "Tämä kirjautuminen on vanhentunut. Pyydä uusi kirjautumislinkki ja avaa se.",
+    "authErrorSecondFactorExpired": "Koodille varattu aika loppui. Kirjaudu uudelleen.",
     "authErrorGeneric": "Kirjautuminen ei onnistunut. Yritä uudelleen tai valitse toinen tapa kirjautua.",
     "resetPasswordTitle": "Palauta salasana",
     "resetPasswordDesc": "Kirjoita käyttäjänimesi saadaksesi palautuskoodin sähköpostiin.",
