@@ -6,9 +6,10 @@
  *   standing is read from, against a store that holds exactly what each case needs.
  * @version-history
  *   v1.0.0 — 2026-09-20 — Initial.
+ *   v1.1.0 — 2026-10-24 — The frame card (grownGenreFramePage): no script, every value escaped.
  */
 import { describe, it, expect } from 'vitest';
-import { validateGrownGenreBody, isGrownGenreBody, grownGenreStanding, grownGenrePublishing, type GrownGenreBody } from '../../src/services/design-book/grown-genre.js';
+import { validateGrownGenreBody, isGrownGenreBody, grownGenreStanding, grownGenrePublishing, grownGenreFramePage, type GrownGenreBody } from '../../src/services/design-book/grown-genre.js';
 import { validatePartInput } from '../../src/services/design-book/validate.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
@@ -76,5 +77,18 @@ describe('a genre that grew out of an app', () => {
     expect((await grownGenrePublishing(s, config, OWNER, BODY)).earned).toBe(true);
     const special = { ...BODY, judgement: { reach: 'special' as const, why: BODY.judgement.why } };
     expect(await grownGenrePublishing(s, config, OWNER, special)).toMatchObject({ earned: false, why: expect.stringMatching(/special to one app/) });
+  });
+
+  it('is shown in a frame as the node\'s own card of the app, with no script and every value escaped', () => {
+    const html = grownGenreFramePage({
+      title: 'Ledger <script>alert(1)</script>', summary: 'Rows "and" <b>dates</b>',
+      appUrl: 'https://ledger.apps.example/?a=1&b="x"', screenshotUrl: '/v1/apps/alice/ledger.html/screenshot',
+    });
+    expect(html).not.toMatch(/<script/i);
+    expect(html).toContain('Ledger &lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('&lt;b&gt;dates&lt;/b&gt;');
+    expect(html).toContain('<img src="/v1/apps/alice/ledger.html/screenshot"');
+    expect(html).toContain('href="https://ledger.apps.example/?a=1&amp;b=&quot;x&quot;"');
+    expect(grownGenreFramePage({ title: 'L', appUrl: 'https://x/', screenshotUrl: '/s' })).not.toContain('<span>');
   });
 });

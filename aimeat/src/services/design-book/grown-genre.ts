@@ -27,17 +27,24 @@
  *
  *   ITS PAGE IS NEVER SERVED FROM THE NODE'S OWN ORIGIN. A shipped genre is the node's own HTML;
  *   this one is a stranger's page with script in it, so the preview is a redirect to the app's
- *   own address (routes/designbook.ts) and the bench does not run it.
+ *   own address (routes/designbook.ts) and the bench does not run it. Inside a frame, where the
+ *   app's address refuses to stand, the preview is the node's own script-free card of it
+ *   (grownGenreFramePage).
  * @structure GrownGenreBody · isGrownGenreBody · validateGrownGenreBody · grownGenrePublishing ·
- *   grownGenrePage
+ *   grownGenrePage · grownGenreFramePage
  * @usage const page = await grownGenrePage(storage, config, body);   // null when it no longer stands
  * @version-history
  *   v1.0.0 — 2026-09-20 — Initial.
  *   v1.0.1 — 2026-09-26 — The proposer's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   v1.1.0 — 2026-10-24 — grownGenreFramePage: what the preview shows INSIDE A FRAME. The redirect to
+ *     the app left the Design Book's gallery tiles empty, because an app answers a frame from another
+ *     origin with SAMEORIGIN and frame-ancestors; in a frame the preview is now a page of the node's
+ *     own with no script at all: the app's screenshot, its name and a link to open it.
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName } from '../../utils/gaii.js';
+import { escapeHtml } from '../../utils/html-escape.js';
 import { DesignBookError } from './errors.js';
 import { DesignBookReasons } from './reasons.js';
 
@@ -126,6 +133,30 @@ export async function grownGenreStanding(
     return { page: null, why: `The head of ${name} says its register is ${register ? `"${register}"` : 'nothing'}. A page that grew a look of its own says so (<meta name="aimeat-register" content="custom:<name>">); a fork of an existing genre is that genre, and is not offered back as a new one.` };
   }
   return { page: { owner, filename, version: kept.versionNumber, html, register, light: metaOf(html, 'aimeat-light') === 'follows' ? 'follows' : 'fixed' } };
+}
+
+/**
+ * The preview of a grown genre when it is shown INSIDE A FRAME (the Design Book's gallery tiles). The
+ * app itself cannot stand there: it is a stranger's page with script, never served from this origin,
+ * and its own address refuses to be framed by another origin. So the frame gets a page of the node's
+ * own that carries no script at all: the app's screenshot filling the frame, its name, and a link to
+ * open it. Every value is escaped; the addresses are the node's own (the screenshot route and the
+ * app's resolved address).
+ */
+export function grownGenreFramePage(o: { title: string; summary?: string; appUrl: string; screenshotUrl: string }): string {
+  const e = escapeHtml;
+  return '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+    + '<meta name="robots" content="noindex"><title>' + e(o.title) + '</title><style>'
+    + 'html,body{margin:0;height:100%;background:#111;color:#f5f5f5;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
+    + 'img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}'
+    + '.cap{position:fixed;left:0;right:0;bottom:0;padding:18px 24px;background:linear-gradient(transparent,rgba(0,0,0,.85))}'
+    + '.cap b{display:block;font-size:22px}.cap span{display:block;opacity:.8;font-size:15px;margin-top:4px}'
+    + '.cap a{display:inline-block;margin-top:10px;color:#fff;font-weight:600}'
+    + '</style></head><body>'
+    + '<img src="' + e(o.screenshotUrl) + '" alt="' + e(o.title) + '">'
+    + '<div class="cap"><b>' + e(o.title) + '</b>' + (o.summary ? '<span>' + e(o.summary) + '</span>' : '')
+    + '<a href="' + e(o.appUrl) + '" target="_blank" rel="noopener noreferrer">Open the app</a></div>'
+    + '</body></html>';
 }
 
 export async function grownGenrePage(storage: Storage, config: AimeatConfig, ownerGhii: string, body: GrownGenreBody): Promise<GrownGenrePage | null> {
