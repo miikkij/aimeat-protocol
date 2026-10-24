@@ -547,7 +547,7 @@ async function runInSandbox(
         registerAsyncHostFn(vm, '__fetch',
             async (url, optsJson) => {
                 const opts = JSON.parse(optsJson || '{}') as {
-                    method?: string; headers?: Record<string, string>; body?: string;
+                    method?: string; headers?: Record<string, string>; body?: string; responseType?: 'text' | 'base64';
                 };
                 // ctx.fetch, not a second copy of it. This bridge used to call safeFetch itself and
                 // decode the body itself, which made buildExtensionCtx's fetch dead code and the two

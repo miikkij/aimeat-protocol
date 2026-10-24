@@ -22,9 +22,12 @@
  *       `user:password` of a Basic credential), which is how such a header is most often echoed
  *   A value shorter than MIN_SCRUB_LENGTH is not matched: it cannot be told apart from ordinary text,
  *   replacing it would garble every answer, and a credential that short is guessable anyway.
- * @structure SCRUB_PLACEHOLDER · MIN_SCRUB_LENGTH · scrubFormsOf · scrubText · scrubResponse
+ * @structure SCRUB_PLACEHOLDER · MIN_SCRUB_LENGTH · scrubFormsOf · scrubText · scrubBytes · scrubResponse
  * @usage const forms = scrubFormsOf(inserted); const clean = scrubResponse(text, headers, forms);
+ *   const cleanBytes = scrubBytes(bytes, forms);
  * @version-history
+ *   v1.1.0 — 2026-10-24 — scrubBytes: the same removal on a binary body read with
+ *     `responseType: 'base64'` (jussil riistakartta, support thread 1ac0a199).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, item 10).
  */
 
@@ -74,6 +77,29 @@ export function scrubText(text: string, forms: readonly string[]): string {
   let out = text;
   for (const form of forms) {
     if (out.includes(form)) out = out.split(form).join(SCRUB_PLACEHOLDER);
+  }
+  return out;
+}
+
+/**
+ * `bytes` with every form replaced, for an answer read with `responseType: 'base64'`. Every form is
+ * ASCII or UTF-8 text, so it is matched as its UTF-8 bytes inside the binary body, and the bytes
+ * around it stay exactly as they were. The same buffer comes back when nothing matched.
+ */
+export function scrubBytes(bytes: Buffer, forms: readonly string[]): Buffer {
+  let out = bytes;
+  const placeholder = Buffer.from(SCRUB_PLACEHOLDER, 'utf8');
+  for (const form of forms) {
+    const needle = Buffer.from(form, 'utf8');
+    if (out.indexOf(needle) === -1) continue;
+    const parts: Buffer[] = [];
+    let from = 0;
+    for (let at = out.indexOf(needle); at !== -1; at = out.indexOf(needle, from)) {
+      parts.push(out.subarray(from, at), placeholder);
+      from = at + needle.length;
+    }
+    parts.push(out.subarray(from));
+    out = Buffer.concat(parts);
   }
   return out;
 }
