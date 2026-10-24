@@ -13,7 +13,8 @@
  * @version-history
  *   2026-10-23 — POST /v1/admin/setup/token is behind OWNER_KEY_LOGIN_REMOVED_IN like POST /v1/auth/token's
  *     owner branch (410 OWNER_KEY_LOGIN_OFF from 4.0.0), and POST /v1/admin/setup/register needs a
- *     password, the new operator's only way to sign in (secaudit2026oct22; Jouni, 2026-10-23).
+ *     password, the new operator's only way to sign in (secaudit2026oct22; Jouni, 2026-10-23). GET
+ *     /v1/admin/setup opens on the Register tab while the node has no operator (Jouni, 2026-10-24).
  *   2026-10-22 — POST /v1/admin/setup/token keeps the rules of POST /v1/auth/token's owner branch: a
  *     deactivated account is refused, an account with two-step sign-in armed gets 401
  *     SECOND_FACTOR_REQUIRED naming the password sign-in, and the token is bound to a session row
@@ -179,11 +180,14 @@ export function adminRouter(
     });
 
     // GET /v1/admin/setup — setup wizard (password never embedded in HTML)
-    router.get('/v1/admin/setup', (req, res) => {
+    router.get('/v1/admin/setup', async (req, res) => {
         // Check if already authenticated via session cookie
         const sessionId = getCookie(req, 'admin_session');
         if (sessionId && validateAdminSession(sessionId)) {
-            res.type('text/html').send(injectCspNonce(ADMIN_SETUP_HTML.replace(/\{\{NODE_ID\}\}/g, config.nodeId), res));
+            // A node with no operator opens on the Register tab: the first visit is the one that makes it.
+            const { anyOperator } = await storage.operatorAccountState();
+            const page = ADMIN_SETUP_HTML.replace(/\{\{NODE_ID\}\}/g, config.nodeId).replace(/\{\{START_TAB\}\}/g, anyOperator ? 'login' : 'register');
+            res.type('text/html').send(injectCspNonce(page, res));
             return;
         }
         // Show login page (no password embedded anywhere)

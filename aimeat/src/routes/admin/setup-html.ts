@@ -8,7 +8,8 @@
  * @version-history
  *   v1.1.0 — 2026-10-23 — The account-key sign-in form is gone (removed from the node in 4.0.0); the
  *     Register tab asks for a password and signs the new operator in with it on /v1/ghii/login
- *     (secaudit2026oct22; Jouni, 2026-10-23).
+ *     (secaudit2026oct22; Jouni, 2026-10-23). The page opens on the tab the route fills in as
+ *     {{START_TAB}}: Register while the node has no operator, Login after (Jouni, 2026-10-24).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/admin.ts (max-file-lines)
  */
 
@@ -293,6 +294,8 @@ async function doRegToken(){
 /* ── Bind event listeners ── */
 document.querySelectorAll('.tab[data-tab]').forEach(function(t){t.addEventListener('click',function(){switchTab(t.getAttribute('data-tab'))})});
 document.getElementById('btnPwLogin').addEventListener('click',doPasswordLogin);
+// The route fills in the tab to open on: register while the node has no operator, login after.
+switchTab('{{START_TAB}}');
 document.getElementById('btnRegister').addEventListener('click',doRegister);
 document.getElementById('btnRegToken').addEventListener('click',doRegToken);
 </script>
