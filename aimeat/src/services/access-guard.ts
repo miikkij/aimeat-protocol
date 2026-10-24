@@ -17,6 +17,9 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.6.1 -- 2026-10-24 -- The 'members' tier does not admit a visitor from another node
+ *     (accessorFederated): it is decided by the consent layer as a private read is
+ *     (secaudit2026oct22, members-tier-admits-federated-visitor).
  *   v1.6.0 -- 2026-10-17 -- The 'organism:<id>' tier: the active members of one organism and the
  *     agents it admits (services/audience.ts audienceAllows), decided before the consent layer and
  *     audited on denial; `accessorFederated` marks a visitor (plan doc-mvcn6c7e4e5q, V3.2/V3.3).
@@ -77,7 +80,8 @@ export interface AuthorizeReadArgs {
   /** The accessor's bare owner name — needed for the workspace membership check. */
   accessorOwner?: string;
   action: 'read' | 'list' | 'search';
-  /** The reader is a visitor from another node (isForeignPrincipal); refused for 'organism:<id>'. */
+  /** The reader is a visitor from another node (isForeignPrincipal); refused for 'organism:<id>',
+   *  and for 'members' admitted only through a consent. */
   accessorFederated?: boolean;
   /** A simulation (GET /v1/permissions/check): answer as a read would, and write no audit row. */
   noAudit?: boolean;
@@ -147,7 +151,10 @@ export async function authorizeRead(
   // accessor is a real authenticated principal (not the anonymous-mode shared
   // identity) BEFORE calling — this guard cannot tell anonymity from a GAII
   // string. Like public, allowed member reads are not audited.
-  if (visibility === 'members') {
+  // A visitor from another node (accessorFederated) is not an account of this node
+  // (services/audience.ts isNodeAccount), so the tier does not admit it; it goes on to the
+  // consent layer below, which admits it only through a consent its owner gave.
+  if (visibility === 'members' && !args.accessorFederated) {
     return { allowed: true, reason: 'members_data' };
   }
 

@@ -16,6 +16,9 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   2026-10-24 — A 'members' record is read by this node's accounts and the agents and apps acting for
+ *     one; a visitor signed in on another node gets the miss unless a share or a consent admits it
+ *     (secaudit2026oct22, members-tier-admits-federated-visitor).
  *   2026-10-21 — The anonymous reader asks isAnonymousPrincipal, so the minted anonymous token reads as
  *     the anonymous internet (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-17 — An 'organism:<id>' record is read by that organism's active members and their
@@ -130,13 +133,18 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       // records to everyone. Anonymous behaves like other non-public records: a miss.
       if (!req.auth || isAnonymousPrincipal(req.auth)) { miss(); return; }
       if (refuseWithoutReadWord()) return;
-      await authorizeRead(storage, config, {
+      // A visitor signed in on another node is not an account of this node (services/audience.ts
+      // isNodeAccount): the guard admits it only through a share or a consent, and otherwise it
+      // gets the miss the anonymous reader gets, as the skill read does (routes/skills.ts).
+      const decision = await authorizeRead(storage, config, {
         ownerGaii: stored.ownerGaii,
         accessorGaii,
         resourceKey: key,
         visibility: 'members',
+        accessorFederated: isForeignPrincipal(req.auth),
         action: 'read',
       });
+      if (!decision.allowed) { miss(); return; }
       // Every signed-in account of the node is not every member of the organism (item 1).
       if (await keptInside('to every account of this node')) return;
     } else if (isOrganismVisibilityWord(stored.visibility)) {

@@ -3294,11 +3294,11 @@ components:
           maxLength: 256
           description: |
             Who receives access. Supported patterns:
-            - `*` — any accessor (wildcard)
+            - `*` — any accessor (wildcard), the anonymous reader included
             - `agent#owner@node` — specific agent GAII
             - `organism.{id}` — all members of an organism
             - `ghii:username@node` — all agents of a GHII user
-            - `domain:*.example.com` — all agents on matching node domains
+            - `domain:*.example.com` — all signed-in principals on matching node domains; never the anonymous reader, so `domain:*` is not `*`
             - `node:node-id` — all agents on a specific node
           examples:
             - "*"
@@ -25680,6 +25680,10 @@ paths:
         members and the agents it admits, whether or not the consent layer is on. A signed-in
         reader outside it gets 403 NOT_ORGANISM_MEMBER; an anonymous reader gets the 404 a
         `members` record gives.
+
+        A `members` record is read by the accounts of this node and the agents and apps acting for
+        one. A visitor signed in on another node gets the same 404 as the anonymous reader, unless a
+        key-space share or a consent its owner gave admits it.
       tags: [Memory]
       parameters:
         - name: gaii
@@ -51864,7 +51868,8 @@ paths:
         Public files need no auth. Non-public files apply the same consent/visibility rules as
         memory: `visibility:'owner'` admits every agent and app of the SAME owner (this is how a
         document an owner uploads reaches that owner's own agent — upload with `visibility: owner`,
-        then the agent reads it with its own token), `members` any authenticated node user,
+        then the agent reads it with its own token), `members` any authenticated node user (a
+        visitor signed in on another node only through a share or a consent),
         `group`/`workspace` their members, `organism:<organism id>` the active members of that
         organism and the agents it admits (decided whether or not the consent layer is on; a
         signed-in non-member gets 403 NOT_ORGANISM_MEMBER), and a private file only with a matching

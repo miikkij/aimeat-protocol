@@ -7,10 +7,11 @@
  *
  *   A person sees four levels. Private and public each kind already decides its own way, because what
  *   "private" admits differs by kind (an owner's agents, a roster, a sharing group). The two levels in
- *   between were written out separately in each place, and they disagreed: a visitor from another node
- *   passed the skill check for 'members' and the workspace share check for 'account' but not the
- *   memory check, which held only because a visitor carries no scope. This file is the answer for both,
- *   so a new kind asks here instead of writing a fifth version.
+ *   between were written out separately in each place, and none of them asked whether the reader was
+ *   a visitor: a visitor from another node passed the skill check for 'members', the workspace share
+ *   check for 'account' and the memory check for 'members' (the default visitor scope list carries
+ *   memory:read). This file is the answer for all of them, so a new kind asks here instead of
+ *   writing a fifth version.
  *
  *     members              any account of THIS node, and the agents and apps acting for one. Never
  *                          the anonymous identity, never a session signed in on another node.
@@ -27,6 +28,8 @@
  *   const a = parseAudience(app.access);          // { level: 'organism', organismId } | ...
  *   if (!(await audienceAllows(storage, a, req.auth))) → refuse
  * @version-history
+ *   v1.0.3 — 2026-10-24 — Header only: the memory 'members' check did admit a visitor; corrected
+ *     (secaudit2026oct22, members-tier-admits-federated-visitor).
  *   v1.0.2 — 2026-10-21 — isNodeAccount asks isAnonymousPrincipal, so the minted anonymous token is no
  *     account of this node (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.0.1 — 2026-10-17 — The organism id grammar is utils/visibility-words.ts ORGANISM_ID_RE, which

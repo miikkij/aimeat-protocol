@@ -4,7 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Pure consent-recipient matching and summary shared by storage and services.
  * @structure matchesRecipient; countConsentRecipients
- * @version-history 1.0.0 2026-09-27 Extract existing behavior without transport dependencies.
+ * @version-history
+ *   1.0.1 2026-10-24 A 'domain:' recipient matches only an accessor that names a node, so it never
+ *     admits the anonymous reader (secaudit2026oct22, domain-recipient-matches-anonymous-reader).
+ *   1.0.0 2026-09-27 Extract existing behavior without transport dependencies.
  */
 import { globMatchSimple } from './pattern-utils.js';
 
@@ -15,7 +18,8 @@ import { globMatchSimple } from './pattern-utils.js';
  * - `*`                      — wildcard, matches any accessor
  * - exact GAII               — matches only that specific GAII
  * - `ghii:username@node`     — matches all agents owned by that GHII user on that node
- * - `domain:*.pattern`       — matches all agents whose home node matches the glob
+ * - `domain:*.pattern`       — matches all agents whose home node matches the glob (never the
+ *                              anonymous reader, which names no node)
  * - `node:node-id`           — matches all agents on a specific node
  * - `organism.{id}`          — placeholder (requires async lookup, handled separately)
  */
@@ -41,10 +45,12 @@ export function matchesRecipient(
     return accessorOwner === username && accessorNode === node;
   }
 
-  // Domain glob — match accessor's home node ID
+  // Domain glob: match the accessor's home node ID. The accessor must name a node: the anonymous
+  // reader parses to node '', and a glob such as '*' matches the empty string, so without this test
+  // 'domain:*' admitted the unauthenticated reader. Only the recipient '*' means everyone.
   if (recipient.startsWith('domain:')) {
     const pattern = recipient.slice(7); // "*.health-network.fi"
-    return globMatchSimple(pattern, accessorNode);
+    return accessorNode.length > 0 && globMatchSimple(pattern, accessorNode);
   }
 
   // Specific node — all agents on that node
