@@ -359,6 +359,78 @@ await test('POST /v1/docsign/requests/:id/sign: the minted token is 403 as a nam
     assert(own.status === 200, `owner sign: ${own.status} ${JSON.stringify(own.body.error)}`);
 });
 
+const ownPart = `anon-guard-own-${s3c}`;
+const partBody = {
+    v: 1, look: 'editorial',
+    blocks: [
+        { id: 'top', component: 'hero', props: { title: '<App name>', sub: '<One line on what it is>' } },
+        { id: 'items', component: 'list', props: { source: '<prefix>.items' }, span: 'main' },
+    ],
+};
+const partOf = (id: string) => ({ part: { id, kind: 'fill', title: 'Anon guard fill', summary: 'A cover over a list.', body: partBody } });
+
+await test('POST /v1/designbook: the minted token is 401, the owner proposes (201)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const anon = await json('/v1/designbook', anonAuth({ method: 'POST', body: JSON.stringify(partOf(`anon-guard-anon-${s3c}`)) }));
+    assert(anon.status === 401 && anon.body.error?.code === 'AUTH_REQUIRED', `minted token propose: ${anon.status} ${JSON.stringify(anon.body.error ?? anon.body.data).slice(0, 200)}`);
+    const own = await json('/v1/designbook', ownerAuth({ method: 'POST', body: JSON.stringify(partOf(ownPart)) }));
+    assert(own.status === 201, `owner propose: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('POST /v1/designbook/:id/status: the minted token is 401, the proposer retires their own (200)', async () => {
+    const anon = await json(`/v1/designbook/${ownPart}/status`, anonAuth({ method: 'POST', body: JSON.stringify({ status: 'retired' }) }));
+    assert(anon.status === 401 && anon.body.error?.code === 'AUTH_REQUIRED', `minted token status: ${anon.status} ${JSON.stringify(anon.body.error ?? anon.body.data).slice(0, 200)}`);
+    const own = await json(`/v1/designbook/${ownPart}/status`, ownerAuth({ method: 'POST', body: JSON.stringify({ status: 'retired' }) }));
+    assert(own.status === 200, `owner retire: ${own.status} ${JSON.stringify(own.body.error)}`);
+    await json(`/v1/designbook/${ownPart}`, ownerAuth({ method: 'DELETE' }));
+});
+
+await test('MCP aimeat_designbook_propose: the minted token is AUTH_REQUIRED, an agent of the owner proposes', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const anonSession = await openSession(BASE, anonToken, 'e2e-anonymous-designbook');
+    const anon = await callTool(anonSession, 'aimeat_designbook_propose', partOf(`anon-guard-mcp-${s3c}`));
+    assert(anon.offered && anon.isError && /^AUTH_REQUIRED: /.test(anon.text), `minted token over MCP: ${anon.text.slice(0, 200)}`);
+    const agent = await makeAgent(BASE, dirOwner!, ['memory:read', 'memory:write']);
+    const session = await openSession(BASE, agent.token, 'e2e-anonymous-designbook-member');
+    const agentPart = `anon-guard-agent-${s3c}`;
+    const own = await callTool(session, 'aimeat_designbook_propose', partOf(agentPart));
+    assert(!own.isError, `agent of the owner over MCP: ${own.text.slice(0, 200)}`);
+    await json(`/v1/designbook/${agentPart}`, ownerAuth({ method: 'DELETE' }));
+});
+
+await test('PUT /v1/portfolio/upload: the minted token is 401, the owner uploads (200)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const page = JSON.stringify({ html: '<!doctype html><title>x</title><p>x</p>', enable: true });
+    const anon = await json('/v1/portfolio/upload', anonAuth({ method: 'PUT', body: page }));
+    assert(anon.status === 401 && anon.body.error?.code === 'AUTH_REQUIRED', `minted token upload: ${anon.status} ${JSON.stringify(anon.body.error ?? anon.body.data).slice(0, 200)}`);
+    const own = await json('/v1/portfolio/upload', ownerAuth({ method: 'PUT', body: page }));
+    assert(own.status === 200, `owner upload: ${own.status} ${JSON.stringify(own.body.error)}`);
+});
+
+await test('PUT /v1/portfolio/config and MCP aimeat_portfolio_publish: the minted token is refused', async () => {
+    const cfg = await json('/v1/portfolio/config', anonAuth({ method: 'PUT', body: JSON.stringify({ enabled: true }) }));
+    assert(cfg.status === 401 && cfg.body.error?.code === 'AUTH_REQUIRED', `minted token config: ${cfg.status} ${JSON.stringify(cfg.body.error ?? cfg.body.data).slice(0, 200)}`);
+    const session = await openSession(BASE, anonToken, 'e2e-anonymous-portfolio');
+    const r = await callTool(session, 'aimeat_portfolio_publish', { html: '<p>x</p>', enable: true });
+    assert(r.offered && r.isError && /^AUTH_REQUIRED: /.test(r.text), `minted token over MCP: ${r.text.slice(0, 200)}`);
+});
+
+await test('POST /v1/knowledge/import: the minted token is 401, the owner imports (201)', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const pkg = (name: string) => ({ package: { name, content_type: 'document', entries: [{ key: 'facts', title: 'Facts', visibility: 'owner', value: { text: 'A fact.' } }] } });
+    const anon = await json('/v1/knowledge/import', anonAuth({ method: 'POST', body: JSON.stringify({ ...pkg(`anon-pack-${s3c}`), overrides: { catalog_listed: true } }) }));
+    assert(anon.status === 401 && anon.body.error?.code === 'AUTH_REQUIRED', `minted token import: ${anon.status} ${JSON.stringify(anon.body.error ?? anon.body.data).slice(0, 200)}`);
+    const own = await json('/v1/knowledge/import', ownerAuth({ method: 'POST', body: JSON.stringify(pkg(`own-pack-${s3c}`)) }));
+    assert(own.status === 201, `owner import: ${own.status} ${JSON.stringify(own.body.error)}`);
+    const id = own.body.data.package_id;
+    const clone = await json(`/v1/knowledge/${id}/clone`, anonAuth({ method: 'POST', body: '{}' }));
+    assert(clone.status === 401, `minted token clone: ${clone.status} ${JSON.stringify(clone.body.error)}`);
+    const sharing = await json(`/v1/knowledge/${id}/sharing`, anonAuth({ method: 'PATCH', body: JSON.stringify({ catalog_listed: true }) }));
+    assert(sharing.status === 401, `minted token sharing: ${sharing.status} ${JSON.stringify(sharing.body.error)}`);
+    const entry = await json(`/v1/knowledge/${id}/entries/facts/visibility`, anonAuth({ method: 'PATCH', body: JSON.stringify({ visibility: 'public' }) }));
+    assert(entry.status === 401, `minted token entry visibility: ${entry.status} ${JSON.stringify(entry.body.error)}`);
+});
+
 await test('The anonymous token still writes its own memory after the Phase 3c refusals', async () => {
     const key = `anonymous.after-writes-${s3c}`;
     const { status, body } = await json('/v1/memory', anonAuth({ method: 'POST', body: JSON.stringify({ key, value: { ok: true } }) }));
