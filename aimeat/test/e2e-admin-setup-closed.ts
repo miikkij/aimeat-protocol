@@ -22,6 +22,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts \
  *     --test=e2e-admin-setup-closed
  * @version-history
+ *   v1.2.1 — 2026-10-24 — The setup page opens on Register before the first operator and on Login after (Jouni, 2026-10-24).
  *   v1.2.0 — 2026-10-23 — setup/token answers 410 OWNER_KEY_LOGIN_OFF from 4.0.0 like POST /v1/auth/token's
  *     owner branch, so the session, TOTP and deactivation cases of v1.1.0 give way to that one refusal;
  *     the wizard's next step is the password sign-in (secaudit2026oct22; Jouni, 2026-10-23).
@@ -63,7 +64,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 // /v1/admin/setup/auth, /register and /token share one limiter: five requests per sixty seconds per
-// IP (middleware/rate-limit.ts). This suite makes four of them.
+// IP (middleware/rate-limit.ts). This suite makes five of them.
 function register(name: string, password = ADMIN_PW) {
     return json('/v1/admin/setup/register', {
         method: 'POST',
@@ -95,6 +96,22 @@ async function ownerNames(): Promise<string[]> {
 
 console.log('\n=== AIMEAT admin setup closes after the first operator (secrets audit 1.4) ===\n');
 
+// The setup page opens on the tab the first visit needs: Register while the node has no operator,
+// Login once it has one (Jouni, 2026-10-24).
+let adminCookie = '';
+async function setupPage(): Promise<string> {
+    const res = await fetch(`${BASE}/v1/admin/setup`, { headers: { Cookie: adminCookie } });
+    return res.text();
+}
+
+await test('Before the first operator, the setup page opens on the Register tab', async () => {
+    const auth = await json('/v1/admin/setup/auth', { method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: '{}' });
+    assert(auth.status === 200 && typeof auth.body.session_id === 'string', `setup/auth ${auth.status}: ${JSON.stringify(auth.body)}`);
+    adminCookie = `admin_session=${auth.body.session_id}`;
+    const html = await setupPage();
+    assert(html.includes("switchTab('register')"), 'the page does not open on the Register tab');
+});
+
 await test('The first operator registers with the admin password → 200, with the operator role', async () => {
     const { status, body } = await register(firstName);
     assert(status === 200, `register ${status}: ${JSON.stringify(body)}`);
@@ -108,6 +125,11 @@ await test('The first operator registers with the admin password → 200, with t
 // /v1/auth/token, past the account's second factor; it answers 410 like that route now.
 await test('The setup wizard\'s next step works: the first operator signs in with the password, as the operator', async () => {
     assert(tokenRoles(operatorToken).includes('operator'), `roles: ${JSON.stringify(tokenRoles(operatorToken))}`);
+});
+
+await test('Once the node has an operator, the setup page opens on the Login tab', async () => {
+    const html = await setupPage();
+    assert(html.includes("switchTab('login')") && !html.includes('{{START_TAB}}'), 'the page does not open on the Login tab');
 });
 
 await test('setup/token no longer signs in with the account key: 410 OWNER_KEY_LOGIN_OFF, naming the password sign-in', async () => {
