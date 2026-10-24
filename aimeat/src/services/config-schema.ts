@@ -111,7 +111,7 @@
 // config-consul.ts, which config.ts also imports, would close a cycle through it (check:deps).
 import type { AimeatConfig } from '../config-types.js';
 import type { SiteLinksConfig } from '../config-types-site-links.js';
-import type { OperatorConfig } from '../config-types.js';
+import type { OperatorConfig } from '../config-types-operator.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf, isStringList, asList, relayClaimSetting, REMOVAL_SWITCHES } from './config-schema-validators.js';
 import { eudiwSettingAllowed, EUDIW_SETTING_REFUSAL } from '../config-eudiw-guard.js';
