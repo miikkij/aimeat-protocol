@@ -326,6 +326,55 @@ await test('POST /v1/docsign/validate with a stored file: the minted token is 40
     assert(own.status !== 401, `owner is not refused as signed out: ${own.status} ${JSON.stringify(own.body.error)}`);
 });
 
+// ─── Phase 3c: A members file over MCP aimeat_storage_download ───
+// secaudit2026oct22, services/file-refs.ts resolveFileRef members-tier-admits-anonymous-identity.
+// `members` means everyone with an account on this node. authorizeRead() allows the tier for any
+// accessor and leaves the anonymous check to its caller; GET /v1/pub makes it, resolveFileRef did not,
+// so the shared anonymous token read another owner's members file through the MCP download tool.
+console.log('\nPhase 3c — A members file is not read by the shared anonymous token over MCP');
+
+const sharedFileText = `members-only ${Date.now()}`;
+const membersFileKey = `anon-guard-members-${Date.now()}.txt`;
+const publicFileKey = `anon-guard-public-${Date.now()}.txt`;
+const anonOwnFileKey = `anonymous/own-${Date.now()}.txt`;
+
+await test('fixture: the owner uploads a members file and a public file; the anonymous token uploads its own file', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const data = Buffer.from(sharedFileText).toString('base64');
+    for (const [key, visibility] of [[membersFileKey, 'members'], [publicFileKey, 'public']] as const) {
+        const r = await json('/v1/storage', ownerAuth({ method: 'POST', body: JSON.stringify({ key, data, mime_type: 'text/plain', visibility }) }));
+        assert(r.status === 201, `upload ${visibility}: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    }
+    const own = await json('/v1/storage', anonAuth({ method: 'POST', body: JSON.stringify({ key: anonOwnFileKey, data, mime_type: 'text/plain', visibility: 'public' }) }));
+    assert(own.status === 201, `anonymous own upload: ${own.status} ${JSON.stringify(own.body).slice(0, 200)}`);
+});
+
+await test('Anonymous token → MCP aimeat_storage_download of another owner\'s members file is refused (handle and inline)', async () => {
+    const session = await openSession(BASE, anonToken, 'e2e-anonymous-members-file');
+    for (const inline of [false, true]) {
+        const r = await callTool(session, 'aimeat_storage_download', { key: membersFileKey, owner: dirOwner!.ghii, inline });
+        assert(r.isError, `inline=${inline}: expected a refusal, got ${r.text.slice(0, 200)}`);
+        assert(!r.text.includes(sharedFileText) && !r.text.includes('/v1/download/'), `inline=${inline}: the file leaked: ${r.text.slice(0, 200)}`);
+        assert(r.data?.access === 'denied', `inline=${inline}: expected access denied, got ${r.text.slice(0, 200)}`);
+    }
+});
+
+await test('Anonymous token still downloads a public file and its own anonymous/ file over MCP', async () => {
+    const session = await openSession(BASE, anonToken, 'e2e-anonymous-public-file');
+    const pub = await callTool(session, 'aimeat_storage_download', { key: publicFileKey, owner: dirOwner!.ghii, inline: true });
+    assert(!pub.isError && pub.data?.content_text === sharedFileText, `public file: ${pub.text.slice(0, 200)}`);
+    const own = await callTool(session, 'aimeat_storage_download', { key: anonOwnFileKey, inline: true });
+    assert(!own.isError && own.data?.content_text === sharedFileText, `own anonymous/ file: ${own.text.slice(0, 200)}`);
+});
+
+await test('An agent of another signed-in owner still downloads the members file over MCP (positive control)', async () => {
+    const other = await registerOwner(BASE, `anonmem${Date.now().toString(36)}`);
+    const agent = await makeAgent(BASE, other, ['storage:read']);
+    const session = await openSession(BASE, agent.token, 'e2e-anonymous-members-file-member');
+    const r = await callTool(session, 'aimeat_storage_download', { key: membersFileKey, owner: dirOwner!.ghii, inline: true });
+    assert(!r.isError && r.data?.content_text === sharedFileText, `signed-in member: ${r.text.slice(0, 200)}`);
+});
+
 // ─── Phase 4: Anonymous Prompts ───
 console.log('\nPhase 4 — Anonymous Prompts');
 

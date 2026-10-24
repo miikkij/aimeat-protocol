@@ -27,6 +27,9 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.1.2 — 2026-10-24 — A `members` file of another owner resolves as denied for the shared
+ *     anonymous principal, as GET /v1/pub answers it (secaudit2026oct22,
+ *     members-tier-admits-anonymous-identity).
  *   v1.1.1 — 2026-10-20 — A handle names the file version it was minted for (createdAt), so it stops
  *     serving once the key holds another version (secaudit 2026-10, token-not-bound-to-file-version).
  *   v1.0.1 — 2026-10-05 — The file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
@@ -38,6 +41,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { authorizeRead } from './access-guard.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { generateDownloadToken } from './download-token.js';
 import { fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
@@ -139,6 +143,13 @@ export async function resolveFileRef(
                 ? 'not_found_in_your_namespace'
                 : 'not_found',
         };
+    }
+
+    // 'members' = everyone with an account on this node. authorizeRead allows the tier for any
+    // accessor and leaves the anonymous check to its caller, as GET /v1/pub makes it: the shared
+    // anonymous principal reads another owner's members file nowhere (secaudit2026oct22).
+    if (!own && file.visibility === 'members' && isAnonymousPrincipal({ sub: accessor.sub ?? accessor.gaii, owner: accessor.owner })) {
+        return { access: 'denied', ref: canonical, ownerGaii: gaii, key, reason: 'members_only' };
     }
 
     const decision = await authorizeRead(storage, config, {
