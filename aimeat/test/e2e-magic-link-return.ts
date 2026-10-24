@@ -27,12 +27,14 @@
  *   it (default 40454, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-return
  * @version-history
+ *   2026-10-24 — POST /v1/ghii/verify-email refuses a sign-in link's token and leaves the link live (secaudit2026oct22, verify-email:no-purpose-binding).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 — 2026-10-09 — Two-step sign-in: the link, the code step and attach-email (secaudit
  *     2026-10-09, S1).
  *   v1.0.0 — 2026-09-29 — Initial (the emailed link returns to the place it was asked from).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -423,6 +425,21 @@ async function run() {
         const plain = new URL(await askLink(email)).searchParams.get('token')!;
         const noTotp = await json(`/v1/ghii/magic-link/verify?token=${plain}`, { headers: asClient() });
         assert(noTotp.status === 200 && typeof noTotp.body.data?.token === 'string', `an account without TOTP works as before: ${noTotp.status}`);
+    });
+
+    // secaudit2026oct22 (web-verify.ts verify-email:no-purpose-binding): POST /v1/ghii/verify-email
+    // took any pending row of the verification table, so a sign-in link's token, sent as its own
+    // hash and code, minted an agent key past the code step above. It takes the codes it mails
+    // (registration and attach-email) and answers a link's row as not found, without spending it.
+    await test('verify-email refuses a sign-in link token, and the link still works where it belongs', async () => {
+        const token = new URL(await askLink(totpEmail)).searchParams.get('token')!;
+        const id = createHash('sha256').update(token).digest('hex');
+        const r = await json('/v1/ghii/verify-email', { method: 'POST', body: JSON.stringify({ verification_id: id, code: token }) });
+        assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `expected 404 NOT_FOUND, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(!JSON.stringify(r.body).includes('agent_private_key'), 'no key from a sign-in link at verify-email');
+        // Not spent: the program endpoint still reads the link as live and asks for the code.
+        const still = await json(`/v1/ghii/magic-link/verify?token=${token}`, { headers: asClient() });
+        assert(still.status === 401 && still.body.error?.code === 'TOTP_REQUIRED', `the refused link stays live: ${still.status} ${still.body.error?.code}`);
     });
 
     await test('attach-email on an account with TOTP armed asks for the code', async () => {
