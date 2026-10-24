@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-10-24 — Moved from config-schema.ts, with the three agreement rows (dpo_contact, signer_name,
  *     signer_role; plan doc-mvmr4i2wdk0p D1.4).
  */
-import type { OperatorConfig } from '../config-types.js';
+import type { OperatorConfig } from '../config-types-operator.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
 
