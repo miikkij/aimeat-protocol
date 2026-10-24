@@ -22845,7 +22845,11 @@ paths:
       - name: scope
         in: query
         required: false
-        schema: { type: string, enum: [node, organism, app], default: node }
+        schema: { type: string, enum: [node, organism, app, all], default: node }
+        description: >
+          Whose document. `all` is read only and for the operator: every place that keeps this kind
+          (the installation, each organism, each app) as `places`, each with its name, `may_write`
+          and its entries.
       - name: organism_id
         in: query
         required: false
@@ -22912,6 +22916,55 @@ paths:
         content:
           application/json:
             schema: { type: object }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/compliance/docs/{kind}/{id}:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias] }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+        description: The entry's id.
+      - { name: scope, in: query, required: false, schema: { type: string, enum: [node, organism, app], default: node } }
+      - { name: organism_id, in: query, required: false, schema: { type: string } }
+      - { name: app, in: query, required: false, schema: { type: string } }
+      - { name: app_owner, in: query, required: false, schema: { type: string } }
+      - { name: dry_run, in: query, required: false, schema: { type: string, enum: ['true'] } }
+    patch:
+      operationId: patchComplianceDocumentEntry
+      summary: Change the fields of one entry of a compliance document
+      tags: [Compliance]
+      description: >
+        Merges `set` into one entry and keeps the rest of the document as stored, in one conditional
+        write: a status, a review date, a notice date. A field set to null is removed, and "now" in a
+        field whose name ends in At is the node's clock. A request set to done or refused gets its
+        closedAt. The whole document is validated as on PUT. The same writers as PUT, and something
+        acting for a person needs `compliance:write`. 404 when the scope has no entry with that id.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [set]
+              properties:
+                set: { type: object, additionalProperties: true }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

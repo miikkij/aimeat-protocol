@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.19.1 -- 2026-10-24 -- The records of processing: scope "all", and item_id with set (C7.7).
  *   v1.19.0 -- 2026-10-23 -- Security classes (the TL and NATO packs) and the records of processing (plan doc-mvlftkh9zmc9).
  *   v1.18.1 -- 2026-10-18 -- The default limits' offer waits until classification is switched on.
  *   v1.18.0 -- 2026-10-18 -- Classification: the default limits a new node takes, and the Security page
@@ -168,7 +169,9 @@ gives the node's own registers as a draft; read it with the operator and save it
 The same tools keep \`processors\` (add the contract date, country and transfer basis to each),
 \`requests\`, \`breaches\`, \`dpias\` and \`frameworks\`, and \`part: "gaps"\` says what is open. Pass
 \`scope: "organism"\` and \`organism_id\`, or \`scope: "app"\`, \`app\` and \`app_owner\`, to read an
-organism's or an app's; you read every one and write only the node's.
+organism's or an app's; you read every one and write only the node's. \`scope: "all"\` reads one
+part across every place at once, each place named. To change one entry (a register reviewed, a
+request done, a breach reported), pass \`item_id\` and \`set\` instead of \`value\`.
 
 **Install sets (operator).** \`aimeat_admin_install_set\` sets this node up for a customer from an
 install bundle bought from a package repository: the owner user, the packages, the organisms and

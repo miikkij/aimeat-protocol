@@ -9,11 +9,13 @@
  * @structure compliancePart() · complianceDocKind() · complianceScopeQuery() · complianceCliTools
  * @usage import { complianceCliTools } from './tool-call-defs-compliance.js';
  * @version-history
+ *   v1.1.0 — 2026-10-24 — The write sends item_id + set as PATCH /v1/compliance/docs/<kind>/<id>;
+ *     scope "all" on the read rides in the scope query as before (C7.7).
  *   v1.0.0 — 2026-10-23 — Moved from tool-call-defs-core.ts; the register read and write reach
  *     /v1/compliance/catalog, /draft, /gaps and /docs/<kind> with the scope (plan doc-mvlftkh9zmc9, C7.1).
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredRecord } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalBoolean, optionalRecord, requiredRecord } from './tool-call-helpers.js';
 import { COMPLIANCE_DOC_KINDS } from '../tool-catalog/definitions/compliance.js';
 
 /**
@@ -87,9 +89,15 @@ export const complianceCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const kind = complianceDocKind(input);
             if (kind) {
-                return client.put(`/v1/compliance/docs/${kind}${complianceScopeQuery(input, {
-                    dry_run: optionalBoolean(input, 'dry_run') ? 'true' : undefined,
-                })}`, requiredRecord(input, 'value'));
+                const q = complianceScopeQuery(input, { dry_run: optionalBoolean(input, 'dry_run') ? 'true' : undefined });
+                // item_id + set changes one entry (PATCH); value replaces the document (PUT).
+                const itemId = optionalString(input, 'item_id');
+                const set = optionalRecord(input, 'set');
+                if (itemId !== undefined || set !== undefined) {
+                    if (!itemId) throw new Error('item_id names the entry that set changes');
+                    return client.patch(`/v1/compliance/docs/${kind}/${encodeURIComponent(itemId)}${q}`, { set: set ?? {} });
+                }
+                return client.put(`/v1/compliance/docs/${kind}${q}`, requiredRecord(input, 'value'));
             }
             return client.put(
                 `/v1/admin/compliance/${compliancePart(input)}${optionalBoolean(input, 'dry_run') ? '?dry_run=true' : ''}`,

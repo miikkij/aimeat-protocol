@@ -19,6 +19,8 @@
  * @structure RecordsGapsSection · RecordsSection · recordsCsv() · buildRecordsPrompt() · RecordsPromptSection
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v1.1.0 — 2026-10-24 — Every row of section 09 but the security classes opens its list, and a law
+ *     row its questions (onOpen, compliance-tab.browse.js; C7.7).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.3, C7.6).
  */
 import { h } from 'preact';
@@ -64,7 +66,7 @@ export function recordsCsv(registers, nodeId) {
 }
 
 /** Section 09: what exists, one reading per document, and the laws' verdicts beside them. */
-export function RecordsSection({ processing, registers, nodeId }) {
+export function RecordsSection({ processing, registers, nodeId, onOpen }) {
   const p = processing || {};
   const reg = p.registers || { total: 0, personal: 0, by_scope: {} };
   const domains = Object.entries(p.domains || {}).sort((a, b) => b[1] - a[1]);
@@ -74,7 +76,13 @@ export function RecordsSection({ processing, registers, nodeId }) {
     return `${W('pack', x.id)}: ${(top?.name && (top.name[lang()] || top.name.en)) || x.upTo}`;
   };
   const transfers = p.transfers || [];
-  const row = (key, name, why, value, last) => ({ key, name, why, value, last });
+  // A row that opens (C7.7) carries the Open action in its middle column; the column is there on
+  // every row so the values stay in one line.
+  const opener = (target) => (onOpen && target
+    ? html`<${Action} small soft onClick=${() => onOpen(target)}>${R('open.open')}<//>` : null);
+  const OPENS = { registers: { kind: 'registers' }, domains: { kind: 'registers', domain: true }, requests: { kind: 'requests' },
+    breaches: { kind: 'breaches' }, dpias: { kind: 'dpias' }, processors: { kind: 'processors' } };
+  const row = (key, name, why, value, last) => ({ key, name, why, value, last, mark: opener(OPENS[key]) });
   const fw = p.frameworks || [];
   // Keyed by law and class: NIS2's "important" (an entity) is not the CRA's (a product).
   const verdict = (id, v) => (v?.class === 'unclassified'
@@ -104,6 +112,7 @@ export function RecordsSection({ processing, registers, nodeId }) {
             key: f.id,
             name: W('framework', f.id),
             why: (f.laws || []).join(' · '),
+            mark: opener({ kind: 'frameworks', item: f.id }),
             value: verdict(f.id, f.verdict),
             last: i === fw.length - 1,
           }))} />

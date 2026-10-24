@@ -3752,6 +3752,230 @@
             "dual-use": "Dual-use",
             "itar": "ITAR"
           }
+        },
+        "open": {
+          "open": "Open",
+          "back": "← All",
+          "loading": "Loading…",
+          "loadFailed": "The list did not load. Try again in a moment.",
+          "changeFailed": "The change was not saved.",
+          "empty": "Nothing is kept here yet.",
+          "lawsTitle": "Laws and their questions",
+          "lead": {
+            "registers": "Every register this installation, its shared places and its apps keep. Open one to see what it says, what it leaves open and what you can do.",
+            "requests": "Requests from people to see, fix, move or delete their data. Each one is due one month after it arrived.",
+            "breaches": "Data breaches. The supervisory authority is told within 72 hours when people are at risk.",
+            "dpias": "Impact assessments. A register with health, biometric or other special data needs one.",
+            "processors": "Who processes data for this installation: the AI providers, mail and hosting the configuration names, and what you wrote about each.",
+            "frameworks": "Each law asks a few questions. The answers decide whether it applies and what it asks of you. An unanswered question leaves the law open."
+          },
+          "place": {
+            "node": "This installation",
+            "organism": "Shared place",
+            "app": "App"
+          },
+          "openPlace": {
+            "organism": "Open the shared place →",
+            "app": "Open the app →"
+          },
+          "printPlace": "Print the record of this place",
+          "printOne": "Print this register",
+          "gapsN": "{n} open",
+          "gapsNone": "Nothing open",
+          "openTitle": "What is open",
+          "dpiaOf": "Assessment of {register}",
+          "received": "arrived {at}",
+          "due": "due {at}",
+          "found": "found {at}",
+          "completed": "Done {at}",
+          "notCompleted": "Not done",
+          "notYet": "Not yet",
+          "countryUnknown": "Country not written",
+          "noAgreement": "No agreement recorded",
+          "dpaSigned": "Agreement signed {at}",
+          "signedOn": "signed {at}",
+          "autoYes": "Yes, this installation wrote it when it did the work",
+          "derivedYes": "Yes, read from this installation's configuration",
+          "yes": "Yes",
+          "no": "No",
+          "unansweredOne": "Not answered",
+          "answeredBy": {
+            "human": "Answered by a person",
+            "ai": "Answered by an AI",
+            "evidence": "Read from this installation's records"
+          },
+          "markReviewed": "Mark reviewed today",
+          "markDone": "Mark done",
+          "markRefused": "Mark refused",
+          "markAuthority": "The authority is told",
+          "markPeople": "The people are told",
+          "markCompleted": "Mark done",
+          "close": "Close",
+          "reopen": "Open again",
+          "doneReviewed": "Marked reviewed today.",
+          "doneDone": "The request is marked done.",
+          "doneRefused": "The request is marked refused.",
+          "doneReopened": "It is open again.",
+          "doneAuthority": "Recorded: the authority was told today.",
+          "donePeople": "Recorded: the people were told today.",
+          "doneClosed": "The breach is closed.",
+          "doneCompleted": "The assessment is marked done.",
+          "readOnly": {
+            "organism": "Only the shared place's creator or an admin changes this. You read it because you run this installation.",
+            "app": "Only the app's owner changes this. You read it because you run this installation.",
+            "node": "Your account does not change this installation's documents."
+          },
+          "promptTitle": "Ask your AI to bring it up to date",
+          "promptNote": "Paste this into your own AI chat. It reads this entry, asks you what has changed, shows the result and waits for your yes.",
+          "promptLabel": "The prompt",
+          "promptCopy": "Copy the prompt",
+          "request": {
+            "access": "See their data",
+            "erasure": "Delete their data",
+            "rectification": "Fix their data",
+            "restriction": "Limit the use",
+            "portability": "Take their data along",
+            "objection": "Object to the use"
+          },
+          "status": {
+            "open": "In progress",
+            "done": "Done",
+            "refused": "Refused",
+            "closed": "Closed"
+          },
+          "channel": {
+            "node": "On this installation",
+            "email": "By email",
+            "letter": "By letter",
+            "other": "Other"
+          },
+          "risk": {
+            "none": "No risk to people",
+            "risk": "A risk to people",
+            "high-risk": "A high risk to people",
+            "unknown": "Risk not assessed"
+          },
+          "residual": {
+            "low": "Low risk left",
+            "medium": "Medium risk left",
+            "high": "High risk left"
+          },
+          "service": {
+            "ai": "AI",
+            "email": "Email",
+            "payments": "Payments",
+            "storage": "Storage",
+            "hosting": "Hosting",
+            "analytics": "Analytics",
+            "other": "Other"
+          },
+          "transfer": {
+            "adequacy": "Adequacy decision",
+            "scc": "Standard contractual clauses",
+            "dpf": "EU–US Data Privacy Framework",
+            "bcr": "Binding corporate rules",
+            "derogation": "Derogation (art. 49)",
+            "none": "None"
+          },
+          "agreement": {
+            "draft": "Agreement in draft",
+            "sent": "Agreement sent",
+            "review": "Signed copy waits for a check",
+            "signed": "Agreement signed",
+            "expired": "Agreement expired",
+            "ended": "Agreement ended"
+          },
+          "field": {
+            "containers": "Where it is kept",
+            "requestKind": "What they ask",
+            "subject": "Who asks",
+            "received": "Arrived",
+            "due": "Due",
+            "channel": "How it came",
+            "status": "Status",
+            "closed": "Closed",
+            "auto": "Written by this installation",
+            "notes": "Notes",
+            "found": "Found",
+            "description": "What happened",
+            "categories": "Data",
+            "subjectsApprox": "People affected, about",
+            "risk": "Risk to people",
+            "authority": "Authority told",
+            "people": "People told",
+            "measures": "What was done",
+            "register": "Register",
+            "residual": "Risk left",
+            "priorConsultation": "Goes to the authority first",
+            "completed": "Done",
+            "reviewed": "Last reviewed",
+            "service": "Service",
+            "host": "Address",
+            "country": "Country",
+            "transferBasis": "Basis for the transfer",
+            "agreement": "Processing agreement",
+            "hipaaBaa": "HIPAA business associate agreement",
+            "itar": "May handle export-controlled data",
+            "derived": "Named by the configuration",
+            "type": "Type"
+          },
+          "domainsTitle": "Registers with regulated data",
+          "workspaceIn": "workspace {ws} in {place}",
+          "promptTitleRead": "Ask your AI to explain it",
+          "promptNoteRead": "Paste this into your own AI chat. It reads this entry, tells you what is open and writes a message for whoever keeps it. It changes nothing."
+        },
+        "q": {
+          "gdpr": {
+            "q-personal-data": "Is personal data processed here: anything that identifies a living person directly or indirectly?",
+            "q-public-authority": "Is the controller a public authority or body (other than a court)?",
+            "q-large-scale-monitoring": "Does the core activity regularly and systematically monitor people on a large scale (tracking, profiling, location)?",
+            "q-large-scale-special": "Does the core activity process special categories (art. 9) or criminal data (art. 10) on a large scale?"
+          },
+          "nis2": {
+            "q-sector-medium": "If the organisation has 50 or more people or over €10 million turnover, in which sector does it work?",
+            "q-annex1-large": "Is it in an Annex I sector AND has 250 or more people or over €50 million turnover?",
+            "q-always-in-scope": "Whatever its size, is it a DNS service, a top-level domain registry, a qualified trust service or a public electronic communications provider, or named by the authority?"
+          },
+          "dora": {
+            "q-financial-entity": "Is the organisation a financial entity (a bank, payment or e-money institution, investment firm, insurer, crypto-asset service provider, fund manager)?",
+            "q-ict-to-financial": "Does it provide ICT services, this installation included, to a financial entity?"
+          },
+          "cra": {
+            "q-places-product": "Does the organisation place software or hardware on the EU market in the course of a commercial activity?",
+            "q-annex3": "Is it an Annex III product: identity management, a browser, a password manager, a VPN, network or security management, an operating system, a router or firewall, a hypervisor?",
+            "q-annex4": "Is it an Annex IV product: a hardware security box, a smart meter gateway, a smartcard or secure element?"
+          },
+          "eaa": {
+            "q-consumer-service": "Does the organisation provide e-commerce or another listed service (banking, e-books, passenger transport, electronic communications) to consumers, AND employ 10 or more people or have over €2 million turnover?"
+          },
+          "dsa": {
+            "q-conduit": "Does it transmit or cache information its users send, for others?",
+            "q-hosting": "Does it store information its users provide, at their request (memory, files, apps, boards)?",
+            "q-public": "Does it make what users store available to the public (public apps, public boards, shared pages), and is it not a micro or small enterprise?",
+            "q-vlop": "Does it have 45 million or more monthly active users in the EU?"
+          },
+          "hipaa": {
+            "q-covered-entity": "Is the organisation a US health plan, a health care clearinghouse, or a provider that transmits health information electronically?",
+            "q-business-associate": "Does it create, receive, keep or send protected health information on behalf of a covered entity?"
+          },
+          "export-control": {
+            "q-usml": "Is technical data of a defence article on the US Munitions List (USML) stored or shared here?",
+            "q-ccl": "Is technology with a Commerce Control List number other than EAR99 stored or shared here?",
+            "q-eu-dual-use": "Is technology listed in Annex I of Regulation (EU) 2021/821 stored or shared here?",
+            "q-foreign-access": "Could a person outside what the licence allows (under ITAR, anyone who is not a US person) read it here, the installation's operator and its administrators included?"
+          }
+        },
+        "special": {
+          "explicit-consent": "Explicit consent (art. 9(2)(a))",
+          "employment-law": "Employment and social security law (art. 9(2)(b))",
+          "vital-interests": "Vital interests (art. 9(2)(c))",
+          "non-profit": "A non-profit body's members (art. 9(2)(d))",
+          "made-public": "Made public by the person (art. 9(2)(e))",
+          "legal-claims": "Legal claims (art. 9(2)(f))",
+          "public-interest": "Substantial public interest (art. 9(2)(g))",
+          "health-care": "Health or social care (art. 9(2)(h))",
+          "public-health": "Public health (art. 9(2)(i))",
+          "research": "Research, archives or statistics (art. 9(2)(j))"
         }
       }
     },

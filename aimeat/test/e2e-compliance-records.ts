@@ -20,6 +20,8 @@
  *   The operator (the suite's first account) turns classification on for every owner and off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-records
  * @version-history
+ *   v1.1.0 — 2026-10-24 — Every place at once (scope all) and one entry changed in place (PATCH), with
+ *     their refusals (C7.7); an app's map read carries its registers (C1.7).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -39,7 +41,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 // Runtime assertions below check the HTTP contract at this untyped JSON boundary.
 type Body = Record<string, any>;
-async function call(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, token?: string, body?: unknown): Promise<{ status: number; body: Body }> {
+async function call(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, token?: string, body?: unknown): Promise<{ status: number; body: Body }> {
     const res = await fetch(BASE + path, {
         method,
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -259,6 +261,53 @@ await test('REPORT: the node-wide report carries processing, the gaps of every s
     // The AI-use gaps the page's first section counts stay apart from these.
     assert(!(r.body.data.gaps as Body[]).some(g => g.kind === 'dpia-incomplete'), 'processing gaps stay in processing');
     assert((r.body.data.not_covered as Body[]).some(l => l.code === 'registers-are-statements'), 'limits');
+});
+
+// ─── Every place at once, and one entry changed in place (C7.7) ───
+await test('ALL: the operator reads every place that keeps registers, each named, with may_write; anyone else is refused (403)', async () => {
+    const r = await call('GET', '/v1/compliance/docs/registers?scope=all', op.token);
+    assert(r.status === 200, `all: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const places = r.body.data.places as Body[];
+    const node = places.find(p => p.place.scope === 'node');
+    const org = places.find(p => p.place.scope === 'organism' && p.place.organism_id === orgId);
+    const app = places.find(p => p.place.scope === 'app' && p.place.owner === alice.name);
+    assert(node && node.may_write === true && node.items.length === 4, `the node: ${JSON.stringify(node?.place)} ${node?.may_write} ${node?.items?.length}`);
+    assert(org && org.place.name === `Cmp Records ${stamp}` && org.may_write === false && org.items[0]?.id === 'patients', `the organism: ${JSON.stringify(org?.place)} ${org?.may_write}`);
+    assert(app && app.place.app === APP && app.may_write === false && app.items.length === 1, `the app, by its filename: ${JSON.stringify(app?.place)}`);
+    const bobAll = await call('GET', '/v1/compliance/docs/registers?scope=all', bob.token);
+    assert(bobAll.status === 403, `DENIAL: a person who does not run the installation reads no places: ${bobAll.status}`);
+    const mcp = await callTool(bobMcp, 'aimeat_compliance_register_read', { part: 'registers', scope: 'all' });
+    assert(mcp.isError && mcp.text.startsWith('NOT_ALLOWED'), `DENIAL over MCP: ${mcp.text.slice(0, 200)}`);
+    const write = await call('PUT', '/v1/compliance/docs/registers?scope=all', op.token, { items: [] });
+    assert(write.status === 400, `scope all is not written: ${write.status}`);
+});
+
+await test('PATCH: one entry changes, the rest stays; a request closed gets closedAt; a stranger, a member and a fixed field are refused', async () => {
+    const before = (await call('GET', `/v1/compliance/docs/registers?${q(ORG())}`, alice.token)).body.data.items as Body[];
+    const p = await call('PATCH', `/v1/compliance/docs/registers/patients?${q(ORG())}`, alice.token, { set: { reviewedAt: 'now' } });
+    assert(p.status === 200 && typeof p.body.data.item.reviewedAt === 'string' && p.body.data.item.updatedBy, `review: ${p.status} ${JSON.stringify(p.body?.error)}`);
+    const after = (await call('GET', `/v1/compliance/docs/registers?${q(ORG())}`, alice.token)).body.data.items as Body[];
+    assert(after[0].title === before[0].title && after[0].domains?.[0] === 'health', 'POSITIVE CONTROL, the other fields stayed');
+    assert(!kindsOf((await call('GET', `/v1/compliance/gaps?${q(ORG())}`, alice.token)).body).includes('register-review-overdue'), 'reviewed, so not overdue');
+    const req = await call('PATCH', '/v1/compliance/docs/requests/late', op.token, { set: { status: 'done' } });
+    assert(req.status === 200 && req.body.data.item.closedAt && req.body.data.item.subject === 'a letter', `request: ${req.status} ${JSON.stringify(req.body?.data?.item ?? req.body?.error)}`);
+    assert(!kindsOf((await call('GET', '/v1/compliance/gaps', op.token)).body).includes('request-overdue'), 'closed, so not overdue');
+    const bad = await call('PATCH', '/v1/compliance/docs/requests/late', op.token, { set: { status: 'maybe' } });
+    assert(bad.status === 400 && bad.body.error.code === 'VALIDATION_ERROR', `an invalid value: ${bad.status}`);
+    const fixed = await call('PATCH', '/v1/compliance/docs/requests/late', op.token, { set: { id: 'other' } });
+    assert(fixed.status === 400, `the id is fixed: ${fixed.status}`);
+    const none = await call('PATCH', '/v1/compliance/docs/requests/nope', op.token, { set: { status: 'done' } });
+    assert(none.status === 404, `no such entry: ${none.status}`);
+    const member = await call('PATCH', `/v1/compliance/docs/registers/patients?${q(ORG())}`, bob.token, { set: { title: 'Mine' } });
+    assert(member.status === 403, `DENIAL: a member changes nothing: ${member.status}`);
+    const opOrg = await call('PATCH', `/v1/compliance/docs/registers/patients?${q(ORG())}`, op.token, { set: { title: 'Ops' } });
+    assert(opOrg.status === 403, `DENIAL: the operator reads an organism's documents and changes none: ${opOrg.status}`);
+    const stranger = await call('PATCH', `/v1/compliance/docs/registers/${'x'}?${q({ scope: 'app', app: APP, app_owner: alice.name })}`, carol.token, { set: { title: 'Mine' } });
+    assert(stranger.status === 404, `DENIAL: another owner's app is not there for a stranger: ${stranger.status}`);
+    const still = (await call('GET', `/v1/compliance/docs/registers?${q(ORG())}`, alice.token)).body.data.items as Body[];
+    assert(still[0].title === 'Patients', 'POSITIVE CONTROL, no refused change landed');
+    const mcp = await callTool(aliceMcp, 'aimeat_compliance_register_write', { part: 'dpias', scope: 'organism', organism_id: orgId, item_id: 'dpia-patients', set: { residualRisk: 'low' } });
+    assert(!mcp.isError && mcp.data?.item?.residualRisk === 'low', `over MCP: ${mcp.text.slice(0, 300)}`);
 });
 
 // ─── The MCP tools ───

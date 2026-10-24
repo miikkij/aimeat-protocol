@@ -2695,6 +2695,230 @@
             "dual-use": "Doble uso",
             "itar": "ITAR"
           }
+        },
+        "open": {
+          "open": "Abrir",
+          "back": "← Todo",
+          "loading": "Cargando…",
+          "loadFailed": "La lista no se cargó. Inténtalo de nuevo en un momento.",
+          "changeFailed": "El cambio no se guardó.",
+          "empty": "Aquí todavía no se guarda nada.",
+          "lawsTitle": "Las leyes y sus preguntas",
+          "lead": {
+            "registers": "Todos los registros que guardan esta instalación, sus lugares compartidos y sus aplicaciones. Abre uno para ver lo que dice, lo que deja pendiente y lo que puedes hacer.",
+            "requests": "Las solicitudes de las personas para ver, corregir, llevarse o eliminar sus datos. Cada una vence un mes después de su llegada.",
+            "breaches": "Violaciones de datos. Se informa a la autoridad de control en 72 horas cuando hay un riesgo para las personas.",
+            "dpias": "Evaluaciones de impacto. Un registro con datos de salud, biométricos u otros datos especiales necesita una.",
+            "processors": "Quién trata datos para esta instalación: los proveedores de IA, el correo y el alojamiento que nombra la configuración, y lo que anotaste de cada uno.",
+            "frameworks": "Cada ley hace unas pocas preguntas. Las respuestas deciden si se aplica y qué te pide. Una pregunta sin responder deja la ley pendiente."
+          },
+          "place": {
+            "node": "Esta instalación",
+            "organism": "Lugar compartido",
+            "app": "Aplicación"
+          },
+          "openPlace": {
+            "organism": "Abrir el lugar compartido →",
+            "app": "Abrir la aplicación →"
+          },
+          "printPlace": "Imprimir el registro de este lugar",
+          "printOne": "Imprimir este registro",
+          "gapsN": "{n} pendientes",
+          "gapsNone": "Nada pendiente",
+          "openTitle": "Lo que está pendiente",
+          "dpiaOf": "Evaluación de {register}",
+          "received": "llegó el {at}",
+          "due": "vence el {at}",
+          "found": "detectada el {at}",
+          "completed": "Terminada el {at}",
+          "notCompleted": "Sin terminar",
+          "notYet": "Todavía no",
+          "countryUnknown": "País sin anotar",
+          "noAgreement": "Ningún contrato anotado",
+          "dpaSigned": "Contrato firmado el {at}",
+          "signedOn": "firmado el {at}",
+          "autoYes": "Sí, esta instalación lo anotó al hacer el trabajo",
+          "derivedYes": "Sí, leído de la configuración de esta instalación",
+          "yes": "Sí",
+          "no": "No",
+          "unansweredOne": "Sin responder",
+          "answeredBy": {
+            "human": "Respondió una persona",
+            "ai": "Respondió una IA",
+            "evidence": "Leído de los registros de esta instalación"
+          },
+          "markReviewed": "Marcar revisado hoy",
+          "markDone": "Marcar hecha",
+          "markRefused": "Marcar rechazada",
+          "markAuthority": "Se informó a la autoridad",
+          "markPeople": "Se informó a las personas",
+          "markCompleted": "Marcar terminada",
+          "close": "Cerrar",
+          "reopen": "Reabrir",
+          "doneReviewed": "Marcado como revisado hoy.",
+          "doneDone": "La solicitud está marcada como hecha.",
+          "doneRefused": "La solicitud está marcada como rechazada.",
+          "doneReopened": "Está abierta de nuevo.",
+          "doneAuthority": "Anotado: hoy se informó a la autoridad.",
+          "donePeople": "Anotado: hoy se informó a las personas.",
+          "doneClosed": "La violación de datos está cerrada.",
+          "doneCompleted": "La evaluación está marcada como terminada.",
+          "readOnly": {
+            "organism": "Solo quien creó el lugar compartido o un administrador cambia esto. Lo ves porque gestionas esta instalación.",
+            "app": "Solo el propietario de la aplicación cambia esto. Lo ves porque gestionas esta instalación.",
+            "node": "Tu cuenta no cambia los documentos de esta instalación."
+          },
+          "promptTitle": "Pide a tu IA que lo ponga al día",
+          "promptNote": "Pega esto en tu propio chat con una IA. Lee esta entrada, te pregunta qué ha cambiado, te muestra el resultado y espera tu sí.",
+          "promptLabel": "El prompt",
+          "promptCopy": "Copiar el prompt",
+          "request": {
+            "access": "Ver sus datos",
+            "erasure": "Eliminar sus datos",
+            "rectification": "Corregir sus datos",
+            "restriction": "Limitar el tratamiento",
+            "portability": "Llevarse sus datos",
+            "objection": "Oponerse al tratamiento"
+          },
+          "status": {
+            "open": "En curso",
+            "done": "Hecha",
+            "refused": "Rechazada",
+            "closed": "Cerrada"
+          },
+          "channel": {
+            "node": "En esta instalación",
+            "email": "Por correo electrónico",
+            "letter": "Por carta",
+            "other": "Otro"
+          },
+          "risk": {
+            "none": "Sin riesgo para las personas",
+            "risk": "Un riesgo para las personas",
+            "high-risk": "Un riesgo alto para las personas",
+            "unknown": "Riesgo sin evaluar"
+          },
+          "residual": {
+            "low": "Riesgo residual bajo",
+            "medium": "Riesgo residual medio",
+            "high": "Riesgo residual alto"
+          },
+          "service": {
+            "ai": "IA",
+            "email": "Correo electrónico",
+            "payments": "Pagos",
+            "storage": "Almacenamiento",
+            "hosting": "Alojamiento",
+            "analytics": "Analítica",
+            "other": "Otro"
+          },
+          "transfer": {
+            "adequacy": "Decisión de adecuación",
+            "scc": "Cláusulas contractuales tipo",
+            "dpf": "Marco de Privacidad de Datos UE-EE. UU.",
+            "bcr": "Normas corporativas vinculantes",
+            "derogation": "Excepción (art. 49)",
+            "none": "Ninguna"
+          },
+          "agreement": {
+            "draft": "Contrato en borrador",
+            "sent": "Contrato enviado",
+            "review": "Una copia firmada espera revisión",
+            "signed": "Contrato firmado",
+            "expired": "Contrato caducado",
+            "ended": "Contrato terminado"
+          },
+          "field": {
+            "containers": "Dónde se guarda",
+            "requestKind": "Qué piden",
+            "subject": "Quién lo pide",
+            "received": "Llegó",
+            "due": "Vence",
+            "channel": "Cómo llegó",
+            "status": "Estado",
+            "closed": "Cerrada",
+            "auto": "Anotada por esta instalación",
+            "notes": "Notas",
+            "found": "Detectada",
+            "description": "Qué pasó",
+            "categories": "Datos",
+            "subjectsApprox": "Personas afectadas, aprox.",
+            "risk": "Riesgo para las personas",
+            "authority": "Se informó a la autoridad",
+            "people": "Se informó a las personas",
+            "measures": "Qué se hizo",
+            "register": "Registro",
+            "residual": "Riesgo residual",
+            "priorConsultation": "Va primero a la autoridad",
+            "completed": "Terminada",
+            "reviewed": "Última revisión",
+            "service": "Servicio",
+            "host": "Dirección",
+            "country": "País",
+            "transferBasis": "Base de la transferencia",
+            "agreement": "Contrato de encargo del tratamiento",
+            "hipaaBaa": "Contrato HIPAA (business associate agreement)",
+            "itar": "Puede tratar datos sujetos a control de exportaciones",
+            "derived": "Nombrado en la configuración",
+            "type": "Tipo"
+          },
+          "domainsTitle": "Registros con datos regulados",
+          "workspaceIn": "espacio de trabajo {ws} en {place}",
+          "promptTitleRead": "Pide a tu IA que te lo explique",
+          "promptNoteRead": "Pega esto en tu propio chat con una IA. Lee esta entrada, te dice lo que está pendiente y escribe un mensaje para quien la mantiene. No cambia nada."
+        },
+        "q": {
+          "gdpr": {
+            "q-personal-data": "¿Se tratan aquí datos personales, es decir, cualquier dato que identifique a una persona viva directa o indirectamente?",
+            "q-public-authority": "¿El responsable del tratamiento es una autoridad u organismo público (que no sea un tribunal)?",
+            "q-large-scale-monitoring": "¿La actividad principal observa a las personas de forma habitual, sistemática y a gran escala (seguimiento, perfiles, ubicación)?",
+            "q-large-scale-special": "¿La actividad principal trata a gran escala categorías especiales de datos (art. 9) o datos penales (art. 10)?"
+          },
+          "nis2": {
+            "q-sector-medium": "Si la organización tiene 50 personas o más o factura más de 10 millones de euros, ¿en qué sector trabaja?",
+            "q-annex1-large": "¿Está en un sector del anexo I Y tiene 250 personas o más o factura más de 50 millones de euros?",
+            "q-always-in-scope": "Sea cual sea su tamaño, ¿es un servicio DNS, un registro de dominios de primer nivel, un servicio de confianza cualificado o un proveedor de comunicaciones electrónicas públicas, o la ha designado la autoridad?"
+          },
+          "dora": {
+            "q-financial-entity": "¿La organización es una entidad financiera (un banco, una entidad de pago o de dinero electrónico, una empresa de servicios de inversión, una aseguradora, un proveedor de servicios de criptoactivos, una gestora de fondos)?",
+            "q-ict-to-financial": "¿Presta servicios TIC, esta instalación incluida, a una entidad financiera?"
+          },
+          "cra": {
+            "q-places-product": "¿La organización introduce software o hardware en el mercado de la UE en el marco de una actividad comercial?",
+            "q-annex3": "¿Es un producto del anexo III: gestión de identidades, un navegador, un gestor de contraseñas, una VPN, gestión de redes o de seguridad, un sistema operativo, un router o un cortafuegos, un hipervisor?",
+            "q-annex4": "¿Es un producto del anexo IV: una caja de seguridad de hardware, una pasarela de contador inteligente, una tarjeta inteligente o un elemento seguro?"
+          },
+          "eaa": {
+            "q-consumer-service": "¿La organización presta comercio electrónico u otro servicio de la lista (banca, libros electrónicos, transporte de viajeros, comunicaciones electrónicas) a consumidores, Y tiene 10 personas o más o factura más de 2 millones de euros?"
+          },
+          "dsa": {
+            "q-conduit": "¿Transmite o almacena temporalmente información que sus usuarios envían a otros?",
+            "q-hosting": "¿Almacena información que aportan sus usuarios, a petición de ellos (memoria, archivos, aplicaciones, tablones)?",
+            "q-public": "¿Pone al alcance del público lo que guardan los usuarios (aplicaciones públicas, tablones públicos, páginas compartidas) y no es una micro o pequeña empresa?",
+            "q-vlop": "¿Tiene 45 millones o más de usuarios activos al mes en la UE?"
+          },
+          "hipaa": {
+            "q-covered-entity": "¿La organización es un plan de salud de EE. UU., una cámara de compensación de información sanitaria o un proveedor que transmite información sanitaria por vía electrónica?",
+            "q-business-associate": "¿Crea, recibe, guarda o envía información sanitaria protegida en nombre de una de esas entidades?"
+          },
+          "export-control": {
+            "q-usml": "¿Se guardan o comparten aquí datos técnicos de un artículo de defensa de la lista de municiones de EE. UU. (USML)?",
+            "q-ccl": "¿Se guarda o comparte aquí tecnología con un número de la Commerce Control List distinto de EAR99?",
+            "q-eu-dual-use": "¿Se guarda o comparte aquí tecnología incluida en el anexo I del Reglamento (UE) 2021/821?",
+            "q-foreign-access": "¿Podría leerlos aquí alguien a quien la licencia no cubre (en ITAR, cualquiera que no sea una persona estadounidense), incluidos el operador de la instalación y sus administradores?"
+          }
+        },
+        "special": {
+          "explicit-consent": "Consentimiento explícito (art. 9.2.a)",
+          "employment-law": "Derecho laboral y seguridad social (art. 9.2.b)",
+          "vital-interests": "Intereses vitales (art. 9.2.c)",
+          "non-profit": "Miembros de una entidad sin ánimo de lucro (art. 9.2.d)",
+          "made-public": "Hechos públicos por la propia persona (art. 9.2.e)",
+          "legal-claims": "Reclamaciones judiciales (art. 9.2.f)",
+          "public-interest": "Interés público esencial (art. 9.2.g)",
+          "health-care": "Asistencia sanitaria o social (art. 9.2.h)",
+          "public-health": "Salud pública (art. 9.2.i)",
+          "research": "Investigación, archivo o estadística (art. 9.2.j)"
         }
       }
     },
