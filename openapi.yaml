@@ -39996,6 +39996,11 @@ paths:
         does for an account without TOTP, and answers the address to go
         to. The ticket lasts five minutes. Send the request with the
         browser's cookies (`credentials: 'include'`).
+        The OIDC callback and the SAML ACS set the same ticket when a first
+        external sign-in matches an account with TOTP armed by its verified
+        address. That ticket carries the provider identity, which the right
+        code saves on the account before the session opens (and, for SAML,
+        the connection's organism membership is added).
       tags: [GHII-Web]
       requestBody:
         required: false
@@ -40037,6 +40042,14 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '403':
           description: The account has been deactivated (`ACCOUNT_DISABLED`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '409':
+          description: |
+            `EXTERNAL_IDENTITY_TAKEN`: the external sign-in's provider identity was linked
+            to another account while the code was pending. Nothing is linked; sign in again.
           content:
             application/json:
               schema:
@@ -40164,7 +40177,11 @@ paths:
         The provider redirects the browser here with `code` and `state` after consent. The node
         exchanges the code and maps the provider identity to a GHII: a returning user (matched by
         provider subject) or a verified-email match links straight in and gets an owner session
-        (httpOnly refresh cookie + access token) before redirecting back to the SPA. A BRAND-NEW
+        (httpOnly refresh cookie + access token) before redirecting back to the SPA. A
+        verified-email match on an account with two-step sign-in (TOTP) armed links nothing and
+        opens no session: the node sets the code-step ticket cookie `aimeat_link_2fa` and
+        redirects to `/?auth_step=second_factor`, and POST /v1/ghii/magic-link/second-factor
+        saves the link and opens the session after a correct code. A BRAND-NEW
         user is NOT auto-created — the node stashes the verified identity in a short-lived signed
         cookie and redirects back with `?aimeat_signup=1`, and the SPA prompts for a one-time
         username choice (see `GET /v1/ghii/login/pending` + `POST /v1/ghii/login/{provider}/finalize`).
@@ -40189,8 +40206,9 @@ paths:
       responses:
         '302':
           description: |
-            Redirect back to the SPA on success (refresh cookie set), or to
-            `/?auth_error=<CODE>` on failure.
+            Redirect back to the SPA on success (refresh cookie set), to
+            `/?auth_step=second_factor` (ticket cookie set, nothing linked) for a first
+            sign-in onto an account with TOTP armed, or to `/?auth_error=<CODE>` on failure.
         '503':
           description: This provider's sign-in is not available on this node
   /v1/ghii/login/{provider}/finalize:
@@ -40450,7 +40468,11 @@ paths:
         and the validity window — and only then maps the identity: returning user by NameID, a
         SCIM-provisioned account whose externalId equals the NameID (adopted, never duplicated),
         a verified email inside the connection's domains, or the one-time username-choice step via
-        the pending-signup cookie. A browser posts this form, so every refusal is a 302 to the
+        the pending-signup cookie. A verified-email match on an account with two-step sign-in
+        (TOTP) armed links nothing and opens no session: the node sets the code-step ticket cookie
+        `aimeat_link_2fa` and redirects to `/?auth_step=second_factor`, and
+        POST /v1/ghii/magic-link/second-factor saves the link, opens the session and adds the
+        connection's membership after a correct code. A browser posts this form, so every refusal is a 302 to the
         front page with `?auth_error=<CODE>`, which opens the sign-in dialog with the reason:
         SAML_INVALID_RESPONSE when the Response did not validate (nothing was read or written),
         ACCOUNT_DISABLED for a deactivated account, and SAML_MISSING_RESPONSE, SAML_NO_ASSERTION,
@@ -40472,7 +40494,7 @@ paths:
                 SAMLResponse: { type: string, description: Base64 SAML 2.0 Response }
                 RelayState: { type: string }
       responses:
-        '302': { description: 'Signed in (session cookie set), sent to the username-choice step, or refused (front page with ?auth_error=<CODE>, no session)' }
+        '302': { description: 'Signed in (session cookie set), sent to the username-choice step, sent to the code step (?auth_step=second_factor, ticket cookie set, nothing linked), or refused (front page with ?auth_error=<CODE>, no session)' }
         '503': { description: Organisation sign-in is not enabled on this node }
 
   /v1/ghii/login/saml/{connectionId}/finalize:
