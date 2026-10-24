@@ -21,6 +21,9 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.2.5 -- 2026-10-24 -- disableMalformedExtensionRefsOnce, last: a stored extension capability whose
+ *     ref names no extension action gets the operator's disable switch with a note, nothing deleted
+ *     (secaudit2026oct22; services/capability-extension-ref.ts).
  *   v1.2.4 -- 2026-10-22 -- keepTaskContentForAppGrantsOnce, after the scope chain: an app grant made
  *     before a task's title and reason in the event record asked task:read keeps reading them while it
  *     holds what it held (secaudit 2026-10 wave 3, v89; services/account-event-task-keep.ts).
@@ -57,6 +60,7 @@ import { keepExtensionPublishOnce } from '../services/extension-publish-keep.js'
 import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
+import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -119,4 +123,9 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // awaited, so no kept app meets the new rule first.
   await keepTaskContentForAppGrantsOnce(storage, config, { existedBefore: scopeStepsBegan })
     .catch(err => logger.error('Failed to keep the task content reads of the earlier app grants; the next boot tries again', { error: String(err) }));
+  // A stored extension capability whose ref names no extension action gets the operator's disable
+  // switch with a note, and nothing is deleted (services/capability-extension-ref.ts). Awaited, so no
+  // invoke meets such a ref first.
+  await disableMalformedExtensionRefsOnce(storage, config)
+    .catch(err => logger.error('Failed to switch off the extension capabilities whose ref names no action; the next boot tries again', { error: String(err) }));
 }
