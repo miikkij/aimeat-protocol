@@ -7,6 +7,8 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.4.1 — 2026-10-24 — cortexArg and the bar's card markup moved to cortex-card.js; the card's
+ *     and the owner's edit button's onclick argument is JS-escaped with cortexArg (secaudit2026oct22).
  *   v1.4.0 — 2026-09-24 — The owner's edit door in the popup's footer is the library's action link
  *     (Jouni's decision "Dialog actions").
  *   v1.3.0 — 2026-09-13 — The popup, the editor and the prompt builder are the site's one dialog
@@ -28,6 +30,7 @@ import { showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 import { openDlg, closeDlg } from './dialogs.js';
+import { cortexArg, cortexCardHtml } from './cortex-card.js';
 
 // ── Cortex Extensions Bar ─────────────────────────
 
@@ -39,20 +42,8 @@ function cortexEsc(str) {
   return div.innerHTML;
 }
 
-// Escape extension content for a single-quoted JS arg inside a double-quoted onclick, the same
-// as jsArg but preserving newlines as a literal \n (cortexCopy restores them). Escaping '&'
-// FIRST is the security-critical bit: without it a payload like &#39; survives into the
-// attribute, the HTML parser decodes it to ' and breaks out of the JS string (entity smuggling).
-function cortexArg(str) {
-  return String(str == null ? '' : str)
-    .replace(/&/g, '&amp;')
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\r?\n/g, '\\n');
-}
+// cortexArg (the escaper for a single-quoted JS argument inside an onclick) and the bar's card
+// markup live in ./cortex-card.js, which has no DOM access so a unit test can run them.
 
 function loadCortexExtensions() {
   var config = loadConfig();
@@ -81,15 +72,7 @@ function loadCortexExtensions() {
 
       document.getElementById('cortex-bar').style.display = 'block';
       var grid = document.getElementById('cortex-bar-grid');
-      grid.innerHTML = exts.map(function(ext) {
-        var types = ext.component_types || [];
-        var libCount = types.filter(function(t) { return t === 'lib'; }).length;
-        var schemaCount = types.filter(function(t) { return t === 'schema'; }).length;
-        return '<div class="cortex-mini-card" onclick="showCortexPopup(\'' + encodeURIComponent(ext.name) + '\')">'
-          + '<div class="cortex-mini-name">&#x1F4E6; ' + cortexEsc(ext.short_name || ext.name) + '</div>'
-          + '<div class="cortex-mini-meta">' + libCount + ' lib &middot; ' + schemaCount + ' schema</div>'
-          + '</div>';
-      }).join('');
+      grid.innerHTML = exts.map(cortexCardHtml).join('');
     })
     .catch(function(e) { console.warn('Cortex bar load failed:', e); });
 }
@@ -163,7 +146,7 @@ function showCortexPopup(encodedName) {
       var isOwner = false;
       try { var _me = currentOwnerName(); isOwner = !!_me && ext.installed_by === _me; } catch(e) {}
       if (isOwner) {
-        ownerEl.innerHTML = '<button type="button" class="poster-action" onclick="window._launcher.openCortexEditor(\'' + encodedName + '\')">' + cortexEsc(t('cortex.edit')) + '</button>';
+        ownerEl.innerHTML = '<button type="button" class="poster-action" onclick="window._launcher.openCortexEditor(\'' + cortexArg(encodedName) + '\')">' + cortexEsc(t('cortex.edit')) + '</button>';
       }
 
       el.innerHTML = html;
