@@ -9113,7 +9113,12 @@ paths:
         app origin (never the apex), and when it lives on a **per-app subdomain** that subdomain
         must map to exactly the requesting `app` (else `INVALID_REDIRECT_URI`) — a bound request
         marks the pending request `origin_bound`, unlocking own-app auto-approve on the consent
-        page; `scope` must be drawn from the grantable scope set. With
+        page. On the bare app host (`apps.<apex>`, which serves every app by path) `redirect_uri`
+        must be the requesting app's own path-form address `/<owner>/<filename>`, or the host's root
+        `/` with `response_mode=web_message`; anything else there answers `INVALID_REDIRECT_URI`,
+        and such a request is never `origin_bound`. Only an `origin_bound` request skips the consent
+        screen, for the owner's own app and for a live grant that covers the request. `scope` must
+        be drawn from the grantable scope set. With
         `response_mode=web_message` the consent page postMessages the code back to the app
         popup-opener (so the user stays in the app); the default `query` mode full-redirects.
       tags: [Auth]
@@ -34483,7 +34488,8 @@ paths:
             A signed draft-preview token (from POST .../draft/preview-token). When present and valid,
             the app's UNPUBLISHED draft is served instead of the live version (the live app is
             untouched). On a node with the app origin enabled an apex request is 301-redirected to the
-            isolated origin, preserving the token.
+            isolated origin, preserving the token. The token names one owner and one filename; on a
+            URL whose owner or filename differs it answers 403 TOKEN_INVALID.
       responses:
         '200': { description: "App HTML (inline or attachment; the draft when a valid preview token is supplied), or text/markdown when the request prefers markdown (Agent Face)" }
         '301': { description: Redirect to the isolated app origin (H-2, when enabled) }

@@ -8,6 +8,9 @@
  *   subdomain-served app HTML and the bridge page is framable only by app origins.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
+ *   2026-10-25 — Phase 4: a bare app-host redirect is the app's own path-form address, or the host's root in
+ *     web_message mode; another app's address and an arbitrary path answer 400 INVALID_REDIRECT_URI. The
+ *     test that accepted `/apps/a/callback` now expects 400 (Jouni, 2026-10-25; secaudit2026oct22).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-06-20 — Initial (H-2 seamless secure app SSO).
  *   v1.1.0 — 2026-07-19 — Phase 4 (scope-upgrade + own-app visible flow, Band Jam findings):
@@ -128,12 +131,12 @@ async function silent(origin: string, scope: string, cookie: string | null, extr
     return body.data as { ok: boolean; error?: string; access_token?: string; scope?: string; refresh_token?: string; own?: boolean };
 }
 /** Start the VISIBLE authorize flow (PKCE) and return { status, requestId, body, verifier, redirect }. */
-async function authorize(app: string, scope: string, redirectUri: string) {
+async function authorize(app: string, scope: string, redirectUri: string, extra: Record<string, string> = {}) {
     const verifier = randomBytes(32).toString('base64url');
     const challenge = createHash('sha256').update(verifier).digest('base64url');
     const q = new URLSearchParams({
         app, response_type: 'code', scope, redirect_uri: redirectUri,
-        code_challenge: challenge, code_challenge_method: 'S256',
+        code_challenge: challenge, code_challenge_method: 'S256', ...extra,
     });
     const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
     const loc = res.headers.get('location') ?? '';
@@ -479,13 +482,34 @@ async function main() {
             const tok = await consentAndExchange(r.requestId!, r.verifier, `${ORIGIN_A}/callback`, B.token);
             assert(tok.own === false, `own should be false for a non-owner, got ${JSON.stringify(tok.own)}`);
         });
-        await test('bare app-host redirect (path-form app) stays allowed but NOT origin_bound', async () => {
+        // A bare app-host redirect in query mode carries the code in the URL to the page it names, and
+        // that host forwards /<owner>/<file> to that app's own origin with the query. So it is the
+        // requesting app's own path-form address or nothing (secaudit2026oct22; Jouni, 2026-10-25).
+        await test('bare app-host redirect naming ANOTHER app\'s path-form address → 400 INVALID_REDIRECT_URI', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `https://${APP_HOST}/${bn}/app-b.html`);
+            assert(r.status === 400, `expected 400, got ${r.status}`);
+            assert(r.body?.error?.code === 'INVALID_REDIRECT_URI', `expected INVALID_REDIRECT_URI, got ${JSON.stringify(r.body?.error)}`);
+        });
+        // Until 2026-10-25 this asserted that an arbitrary bare-host path was accepted (Jouni, 2026-10-25).
+        await test('bare app-host redirect on an arbitrary path → 400 INVALID_REDIRECT_URI', async () => {
             const r = await authorize(`${a}/app-a.html`, 'memory:read', `https://${APP_HOST}/apps/a/callback`);
-            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status}`);
+            assert(r.status === 400, `expected 400, got ${r.status}`);
+            assert(r.body?.error?.code === 'INVALID_REDIRECT_URI', `expected INVALID_REDIRECT_URI, got ${JSON.stringify(r.body?.error)}`);
+        });
+        await test('bare app-host redirect on the app\'s OWN path-form address stays allowed but NOT origin_bound', async () => {
+            const own = `https://${APP_HOST}/${a}/app-a.html`;
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', own);
+            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status} ${JSON.stringify(r.body?.error)}`);
             const det = await json(`/v1/app-grants/request/${r.requestId}`);
             assert(det.body.data.origin_bound === false, `origin_bound must be false, got ${det.body.data.origin_bound}`);
-            const tok = await consentAndExchange(r.requestId!, r.verifier, `https://${APP_HOST}/apps/a/callback`, A.token);
+            const tok = await consentAndExchange(r.requestId!, r.verifier, own, A.token);
             assert(tok.own === false, `unbound request never earns own even for the owner, got ${JSON.stringify(tok.own)}`);
+        });
+        await test('web_message mode with the bare app host\'s root (what the SDK popup sends) stays allowed', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `https://${APP_HOST}/`, { response_mode: 'web_message' });
+            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            const det = await json(`/v1/app-grants/request/${r.requestId}`);
+            assert(det.body.data.response_mode === 'web_message' && det.body.data.origin_bound === false, `web_message, unbound: ${JSON.stringify(det.body.data)}`);
         });
 
         // Reading a connected mailbox took its own word on 2026-09-24, and an app granted before
