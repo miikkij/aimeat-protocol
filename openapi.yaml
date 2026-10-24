@@ -9113,7 +9113,12 @@ paths:
         app origin (never the apex), and when it lives on a **per-app subdomain** that subdomain
         must map to exactly the requesting `app` (else `INVALID_REDIRECT_URI`) — a bound request
         marks the pending request `origin_bound`, unlocking own-app auto-approve on the consent
-        page; `scope` must be drawn from the grantable scope set. With
+        page. On the bare app host (`apps.<apex>`, which serves every app by path) `redirect_uri`
+        must be the requesting app's own path-form address `/<owner>/<filename>`, or the host's root
+        `/` with `response_mode=web_message`; anything else there answers `INVALID_REDIRECT_URI`,
+        and such a request is never `origin_bound`. Only an `origin_bound` request skips the consent
+        screen, for the owner's own app and for a live grant that covers the request. `scope` must
+        be drawn from the grantable scope set. With
         `response_mode=web_message` the consent page postMessages the code back to the app
         popup-opener (so the user stays in the app); the default `query` mode full-redirects.
       tags: [Auth]
