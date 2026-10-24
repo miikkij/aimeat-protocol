@@ -11,6 +11,7 @@
  *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer create/list, nonce CRUD + expiry
  *     sweep, realtime-room create/get/update/delete, site-change-log append + cursor-paginated list
  * @version-history
+ *   v1.3.1 — 2026-10-23 — The freshest push subscription read takes LIMIT 1 (check:unbounded-lists).
  *   v1.3.0 — 2026-10-09 — deleteVerificationNonce returns whether it removed the row.
  *   v1.2.0 — 2026-09-09 — getTrustedIssuer, getTrustedIssuerByUrl, deleteTrustedIssuer and
  *     listRealtimeRooms deleted: no caller.
@@ -93,7 +94,7 @@ export const nodeInfraMethods = {
     // descending order: without it "the most recently used device" would be a device that has never
     // received anything.
     const r = await this.db.selectFrom('PushSubscription').selectAll().where('ownerName', '=', ownerName)
-      .orderBy('lastUsedAt', sql`desc nulls last`).orderBy('endpoint', 'asc').executeTakeFirst();
+      .orderBy('lastUsedAt', sql`desc nulls last`).orderBy('endpoint', 'asc').limit(1).executeTakeFirst();
     return r ? toPushSub(r) : null;
   },
   async listPushSubscriptionsByOwner(this: PostgresKyselyStorage, ownerName: string): Promise<PushSubscriptionRecord[]> {

@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-23 — manage-my-agents: content whose classification refuses an outside model reaches only
+ *     an agent whose runtime report says llm "local" (plan doc-mvlftkh9zmc9 C3.4).
  *   2026-10-21 — manage-my-agents: an `owner_scope` read or list leaves out an organism's records when
  *     that organism does not let the agent in, as a read of the key does (secaudit 2026-10, v57).
  *   2026-10-19 — manage-my-agents: an agent's picture (`avatar` on aimeat_agents_list and
@@ -264,7 +266,11 @@ flowchart LR
   when that organism lets the agent in. An organism that admits only the agents on its list leaves
   its records out for every other agent, in a read and in a list, as a read of the key itself does;
   the fix is that the owner adds the agent in the Agents section of the organism's page, not another
-  permission.
+  permission. Content whose classification refuses an outside model (every TL and NATO class, and
+  what a register with health, biometric, defence or export-controlled data raises) is absent for
+  every agent whose model runs somewhere else, whatever its permissions. Only an agent whose runtime
+  report says \`llm: "local"\` (its model runs on its own machine, \`aimeat_agent_runtime_report\`)
+  reads it, and no exception opens it. Tell the owner it is the classification, not a permission.
   Making something public to anyone takes publish:public when this node asks the owner first: that
   permission is outside "Full access" and no agent has it unless the owner ticked it. Without it a
   change that makes something public (a record, a file, an app, a page, an organism, a board, a

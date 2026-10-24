@@ -18,6 +18,8 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.0 — 2026-10-23 — GET and PUT /v1/classification/packs: the TL and NATO label packs (plan
+ *     doc-mvlftkh9zmc9, C3.2).
  *   v1.6.0 — 2026-10-18 — The label routes take a container: kind organism, workspace, board
  *     (board_id) or app (`app`); GET /v1/classification/label answers `effective` (plan
  *     doc-mvdipuyqraas, L1.5).
@@ -48,6 +50,8 @@ import { scanContent } from '../services/classification/scan.js';
 import { explorerQueryOf, listLabels } from '../services/classification/explorer.js';
 import { setClassificationSwitch } from '../services/classification/switch.js';
 import { makeException, readExceptions, removeException } from '../services/classification/exception-admin.js';
+import { activatePack, deactivatePack, packStatus } from '../services/classification/packs.js';
+import { readNodePolicy } from '../services/classification/policy.js';
 
 const LEVELS = new Set(['node', 'owner', 'organism']);
 
@@ -220,6 +224,26 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
       const out = await reviewLabel(deps, actor, target, {
         decision, justification: body.justification as string | undefined, humanSaid: body.humanSaid as string | undefined,
       });
+      res.json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
+  // The TL and NATO label packs (plan doc-mvlftkh9zmc9, C3.2): which are on, and switching one.
+  // Anyone signed in reads them, as the node policy; switching one is a node policy write.
+  router.get('/v1/classification/packs', requireAuth(), requireScope('memory:read'), async (_req, res) => {
+    try {
+      res.json(success(config.nodeId, { packs: packStatus(await readNodePolicy(storage, config.nodeId)) }));
+    } catch (err) { fail(res, err); }
+  });
+
+  router.put('/v1/classification/packs', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      if (typeof body.on !== 'boolean') throw new ClassificationError('INVALID_INPUT', 400, 'on is true or false.');
+      const actor = labelActorOf(req.auth!, config.nodeId);
+      const out = body.on
+        ? await activatePack(deps, actor, body.pack, { upTo: body.upTo, acknowledgeNotAccredited: body.acknowledgeNotAccredited, humanSaid: body.humanSaid })
+        : await deactivatePack(deps, actor, body.pack, { humanSaid: body.humanSaid });
       res.json(success(config.nodeId, out));
     } catch (err) { fail(res, err); }
   });

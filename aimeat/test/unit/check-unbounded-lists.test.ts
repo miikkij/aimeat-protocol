@@ -10,9 +10,10 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/check-unbounded-lists.test.ts
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial, with the gate.
+ *   v1.1.0 — 2026-10-23 — takeFirstWithoutLimit, with the getApp read that stalled aimeat.io as a fixture.
  */
 import { describe, it, expect } from 'vitest';
-import { unboundedMethods, wholeTableCalls, compare, type Baseline } from '../../scripts/check-unbounded-lists.js';
+import { unboundedMethods, wholeTableCalls, takeFirstWithoutLimit, compare, type Baseline } from '../../scripts/check-unbounded-lists.js';
 import { storageRepositories } from '../../scripts/inventory/storage-methods.js';
 
 const repos = [{
@@ -53,6 +54,21 @@ describe('check:unbounded-lists', () => {
         expect(compare(methods, { 'src/a.ts': { listOwners: 1 } }, base).fallen).toEqual([{ file: 'src/a.ts', method: 'listOwners', was: 2, now: 1 }]);
         expect(compare(methods, {}, { ...base, methods: { listOwners: 'DEBT' } }).newMethods.map(m => m.name)).toEqual(['listPats']);
         expect(compare(methods.filter(m => m.name !== 'listPats'), { 'src/a.ts': { listOwners: 2 } }, base).staleMethods).toEqual(['listPats']);
+    });
+
+    it('finds an ordered take-first read with no limit, the outage\'s own getApp shape included, and passes one with a limit', () => {
+        const source = [
+            "let q = db.selectFrom('App').selectAll().where('filename', '=', f);",
+            "const a = await q.orderBy('versionNumber', 'desc').executeTakeFirst();",
+            "const b = await q.orderBy('versionNumber', 'desc').limit(1).executeTakeFirst();",
+            "const c = await db.selectFrom('X').selectAll()",
+            "  .orderBy('createdAt', 'desc')",
+            '  .executeTakeFirstOrThrow();',
+            "const d = await db.selectFrom('X').selectAll().where('id', '=', id).executeTakeFirst();",
+            "const e = await db.deleteFrom('X').where('id', '=', id).executeTakeFirst();",
+            "// q.orderBy('v').executeTakeFirst() in a comment",
+        ].join('\n');
+        expect(takeFirstWithoutLimit('x.ts', source)).toEqual([2, 4]);
     });
 
     it('reads the real Storage composite: every repository, and the two lists the audit named among the whole-table ones', () => {

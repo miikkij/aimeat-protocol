@@ -33,6 +33,7 @@
  *   const own_key = await ownKeyCoverage(storage, config, gaii);
  *   res.json(success(config.nodeId, { has_own_key: own_key.set, own_key }));
  * @version-history
+ *   v1.2.1 — 2026-10-23 — AgentRoad.llm may be `local` (a model on the crew's own machine).
  *   v1.2.0 — 2026-10-02 — `agents` lists only agents that have a runtime: enrolled (a key pinned at
  *     enrolment) or one that reported its runtime. The `app` principal and a v1 MCP agent run no
  *     crew, and the one named `app` sat in the list with llm null on every hosted place, so
@@ -64,8 +65,9 @@ export type OwnKeyGapReason = 'shared_chat_key' | 'runtime_uses_machine_key';
 export interface AgentRoad {
   agent: string;
   /** `node`: through this node's /v1/llm, so the own key reaches it. `machine`: its own machine's key.
+   *  `local`: a model on its own machine, which spends no key, and is read as `machine` here.
    *  null: the runtime has not said, which is read as `machine` (the crew's default). */
-  llm: 'node' | 'machine' | null;
+  llm: 'node' | 'machine' | 'local' | null;
 }
 
 export interface OwnKeyCoverage {

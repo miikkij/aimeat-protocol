@@ -62,6 +62,10 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.8.0 — 2026-10-23 — A label that refuses an outside model (externalAi, plan doc-mvlftkh9zmc9
+ *     C3.4): show() hides it from an AI reader that did not report a local model, useForAi() refuses
+ *     it for any model that is not `local:`, and leave() keeps it behind from such an AI reader. No
+ *     exception and no app rule opens it (external-ai.ts).
  *   v2.7.0 — 2026-10-18 — An agent's clearance is part of the one decision: show() hides what ranks
  *     above it, useForAi() refuses it and leave() keeps it behind (clearance.ts, plan
  *     doc-mvdipuyqraas L2.2).
@@ -102,6 +106,7 @@ import { ClassificationError, targetId } from './labels.js';
 import { effectiveLabels, type EffectiveFrom } from './effective.js';
 import { audienceCheck } from './audience.js';
 import { clearanceFor } from './clearance.js';
+import { externalAiFor, modelRefuses } from './external-ai.js';
 import { recordClassificationAudit, type ClassificationAuditEvent } from './audit.js';
 import { activeExceptionsFor, recordAutoException, recordExceptionUse, type ClassificationException } from './exceptions.js';
 
@@ -266,6 +271,8 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
   const inside = audienceCheck(deps.storage, { owner, ownerName });
   // An agent's clearance (plan doc-mvdipuyqraas, L2.2): one agent read per reader, only when asked.
   const clearance = clearanceFor(deps, who);
+  // A label that refuses an outside model (plan doc-mvlftkh9zmc9, C3.4): one agent read, only when asked.
+  const external = externalAiFor(deps, who);
   const warnings: ContentReader['warnings'] = [];
   const audit = (d: Decided, action: ClassificationAuditEvent['action'], purpose?: string) => recordClassificationAudit({
     scope: d.target.scope, ownerGaii: auditOwnerOf(d.target.scope), kind: d.target.kind, key: d.target.key,
@@ -315,6 +322,8 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         // Above the agent's clearance: hidden and counted, whatever exception the person made for
         // AI reading, because the clearance is the owner's limit on this one agent.
         if (await clearance.refuses(d.label, d.policy)) { audit(d, 'refused', `clearance${viaContainer(d)}`); continue; }
+        // Only a model on this machine reads it, and no exception opens that (external-ai.ts).
+        if (await external.refuses(d.label)) { audit(d, 'refused', `outside model${viaContainer(d)}`); continue; }
         // An anonymous reader is read the strictest way, as an AI (decided 2026-09-30): nothing
         // tells who is behind it, so what the label hides from an AI does not reach it either.
         if (who.kind === 'ai' || who.kind === 'anonymous') {
@@ -348,10 +357,13 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // app's AI call, and the act is recorded as an automatic exception, one per scope and label.
       const app = who.kind === 'human' && !!who.auth?.roles.includes('app');
       const appActs = new Map<string, { d: Decided; n: number }>();
+      let toOutsideModel = false;
       for (const d of decided) {
         if (!d) continue;
         const outside = who.kind !== 'system' && !(await inside(d.label.audience, d.target.scope));
         if (outside || await clearance.refuses(d.label, d.policy)) { refused.push(d); continue; }
+        // Where the model runs decides, whoever asked, and an app does not open it (external-ai.ts).
+        if (modelRefuses(d.label, use.model)) { refused.push(d); toOutsideModel = true; continue; }
         if (d.label.aiVisibility === 'hidden') {
           if (!app) { refused.push(d); continue; }
           const g = `${d.target.scope}\u0000${d.label.id}`;
@@ -365,7 +377,8 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
         for (const d of refused) audit(d, 'refused', purpose);
         const names = [...new Set(refused.map(d => d.label.name.en))].join(', ');
         throw new ClassificationError('CLASSIFIED', 403,
-          `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}. Leave them out, or ask the person who owns them.`);
+          `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}. Leave them out, or ask the person who owns them.`
+          + (toOutsideModel ? ' Content whose label refuses an outside model reaches only a model on this machine (a local: model).' : ''));
       }
       // Recorded only once the call is accepted: a refused call sends nothing to the AI, so it has
       // no automatic exception to record (secaudit 2026-10-10 I10).
@@ -386,9 +399,12 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // What stays behind, per item: the organism rule, or (for an AI) a label that hides it from AI.
       // Above an agent's clearance it stays behind too: an agent does not send out what it may not read.
       const aboveClearance = await Promise.all(decided.map(d => (d ? clearance.refuses(d.label, d.policy) : false)));
-      const why: Array<'organism' | 'ai' | 'clearance' | null> = decided.map((d, i) => {
+      // An AI that is a model elsewhere does not carry out what only a local model may read.
+      const outsideModel = await Promise.all(decided.map(d => (d ? external.refuses(d.label) : false)));
+      const why: Array<'organism' | 'ai' | 'clearance' | 'external' | null> = decided.map((d, i) => {
         if (!d) return null;
         if (aboveClearance[i]) return 'clearance';
+        if (outsideModel[i]) return 'external';
         // The rule is about leaving an ORGANISM, wherever the copy goes. A person's own content is
         // theirs to send: the default label (internal) may not leave an organism, and binding
         // personal content to it would stop every person's own public records at the border.
@@ -404,7 +420,7 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       // A person's exception in force lets an item through: 'leave' for any reader and destination,
       // 'ai-send' when the reader is an AI. Read only when something would stay behind.
       const active = app ? new Map<string, ClassificationException[]>()
-        : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i] && why[i] !== 'clearance'));
+        : await exceptionsFor(deps, decided.filter((d, i): d is Decided => !!d && !!why[i] && why[i] !== 'clearance' && why[i] !== 'external'));
       const kept: typeof items[number][] = [];
       const left: Array<{ item: typeof items[number]; label: string; reason: string; from: EffectiveFrom }> = [];
       const appActs = new Map<string, { d: Decided; n: number }>();
@@ -417,6 +433,12 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
           audit(d, 'refused', `${where.kind}: clearance${viaContainer(d)}`);
           left.push({ item: items[i], label: d.label.id, from: d.from,
             reason: `classified ${d.label.name.en}${viaContainer(d)}, above what this agent may read. Its owner sets what it may read on the agent's page.` });
+          continue;
+        }
+        if (rule === 'external') {
+          audit(d, 'refused', `${where.kind}: outside model${viaContainer(d)}`);
+          left.push({ item: items[i], label: d.label.id, from: d.from,
+            reason: `classified ${d.label.name.en}${viaContainer(d)}, which only a model on this machine may read.` });
           continue;
         }
         if (app) {

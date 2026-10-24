@@ -251,7 +251,9 @@ The \`contract\` row is absent when the agent carries only the \`workspace-contr
 To queue the same task yourself (\`POST /v1/agents/{name}/tasks\`), send \`status: "queued"\`: a task
 created without it is a draft and never starts. A queued task starts on its own only when the agent's
 owner lets that agent start tasks by itself (\`aimeat_agent_task_start_set\`, or a \`task-runner\` agent
-when the owner has said nothing); otherwise it waits for the owner's OK. For an agent of another
+when the owner has said nothing); otherwise it waits for the owner's OK. An agent that can spend money,
+or send or delete in its owner's name, waits for the owner whatever that setting says, unless the owner
+has let it start work with that permission on its card. For an agent of another
 account, the creator first gives its owner the contributor role; the adopt task itself is created by
 the agent's own owner.
 

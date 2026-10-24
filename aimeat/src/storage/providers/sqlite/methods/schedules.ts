@@ -8,12 +8,35 @@
  * @structure scheduleMethods
  * @usage Object.assign(SqliteStorage.prototype, scheduleMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-24 — updateScheduledJob writes only the columns it is given, as the Postgres twin
+ *     does. It read the whole row, awaited, and wrote the whole row back, so a change another request or
+ *     another process committed in between was written over with the old value: the nightly SQLite sweep
+ *     lost a schedule's createdByApp that way, and the schedule then fired as the owner
+ *     (e2e-scheduled-ext-files 23c/23d, 2026-10-23). A key given as undefined still clears its column,
+ *     as the spread `{ ...existing, ...updates }` did.
  *   v1.0.0 — 2026-10-05 — 12 methods (createScheduledJob, getScheduledJob, listScheduledJobs, …) moved here
  *     from federation-oauth.ts so the file mirrors postgres-kysely/methods/schedules.ts (secaudit 2026-10,
  *     M8).
  */
 import type { ScheduledJobRecord, ExecutionLogEntry } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+
+/**
+ * Each column updateScheduledJob may write, and how its value is stored. lastFireAt is not here:
+ * claimScheduledFire owns it. id is the key, never a value.
+ */
+const asText = (v: unknown): unknown => v ?? null;
+const asFlag = (v: unknown): number => (v ? 1 : 0);
+const asJson = (v: unknown): string | null => (v ? JSON.stringify(v) : null);
+const JOB_COLUMNS: Record<string, (v: unknown) => unknown> = {
+  name: asText, type: asText, extensionName: asText, instanceId: asText, actionId: asText,
+  coreHandler: asText, cron: asText, enabled: asFlag, input: asJson,
+  lastRunAt: asText, lastRunResult: asText, lastRunError: asText, lastRunDurationMs: asText,
+  nextRunAt: asText, createdBy: asText, createdAt: asText, updatedAt: asText,
+  ownerScope: asText, agentName: asText, agentGaii: asText, createdByAgent: asFlag,
+  displayName: asText, description: asText, purpose: asText, timezone: asText,
+  constraints: asJson, runCount: (v) => v ?? 0, createdByApp: asText,
+};
 
 export const scheduleMethods = {
 
@@ -74,32 +97,19 @@ export const scheduleMethods = {
   },
 
   async updateScheduledJob(this: SqliteStorage, id: string, updates: Partial<ScheduledJobRecord>): Promise<ScheduledJobRecord | null> {
-    const existing = await this.getScheduledJob(id);
-    if (!existing) return null;
-    const updated = { ...existing, ...updates };
-    this.db.prepare(
-      `UPDATE scheduled_jobs SET name = ?, type = ?, extensionName = ?, instanceId = ?,
-       actionId = ?, coreHandler = ?, cron = ?, enabled = ?, input = ?,
-       lastRunAt = ?, lastRunResult = ?, lastRunError = ?, lastRunDurationMs = ?,
-       nextRunAt = ?, createdBy = ?, createdAt = ?, updatedAt = ?,
-       ownerScope = ?, agentName = ?, agentGaii = ?, createdByAgent = ?,
-       displayName = ?, description = ?, purpose = ?, timezone = ?,
-       constraints = ?, runCount = ?, createdByApp = ? WHERE id = ?`
-    ).run(
-      updated.name, updated.type,
-      updated.extensionName ?? null, updated.instanceId ?? null, updated.actionId ?? null,
-      updated.coreHandler ?? null, updated.cron, updated.enabled ? 1 : 0,
-      updated.input ? JSON.stringify(updated.input) : null,
-      updated.lastRunAt ?? null, updated.lastRunResult ?? null, updated.lastRunError ?? null,
-      updated.lastRunDurationMs ?? null, updated.nextRunAt ?? null,
-      updated.createdBy, updated.createdAt, updated.updatedAt,
-      updated.ownerScope ?? null, updated.agentName ?? null, updated.agentGaii ?? null,
-      updated.createdByAgent ? 1 : 0, updated.displayName ?? null, updated.description ?? null,
-      updated.purpose ?? null, updated.timezone ?? null,
-      updated.constraints ? JSON.stringify(updated.constraints) : null,
-      updated.runCount ?? 0, updated.createdByApp ?? null, id,
-    );
-    return updated;
+    // One UPDATE of the given columns, with no read before it: a column nobody named keeps what is
+    // stored now, whoever wrote it last.
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    for (const [column, encode] of Object.entries(JOB_COLUMNS)) {
+      if (!Object.prototype.hasOwnProperty.call(updates, column)) continue;
+      sets.push(`${column} = ?`);
+      params.push(encode((updates as Record<string, unknown>)[column]));
+    }
+    if (sets.length === 0) return this.getScheduledJob(id);
+    const result = this.db.prepare(`UPDATE scheduled_jobs SET ${sets.join(', ')} WHERE id = ?`).run(...params, id);
+    if (result.changes === 0) return null;
+    return this.getScheduledJob(id);
   },
 
   async deleteScheduledJob(this: SqliteStorage, id: string): Promise<boolean> {

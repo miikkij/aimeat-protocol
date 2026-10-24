@@ -12054,10 +12054,74 @@ paths:
                           task_start: { type: string, nullable: true, enum: [automatic, confirm, null] }
                           task_start_effective: { type: string, enum: [automatic, confirm] }
                           task_start_held_by: { type: array, items: { type: string } }
+                          task_start_floor_accepted: { type: array, items: { type: string } }
         '400':
           description: task_start is not one of the two values or null
         '403':
           description: Not your agent, or the agent itself asked
+        '404':
+          description: No such agent
+  /v1/agents/{name}/task-start-floor:
+    patch:
+      operationId: setAgentTaskStartFloor
+      summary: Let this agent start work although it holds a permission that can spend, send or delete
+      description: |
+        An agent that holds `commerce:buy`, `exchange:write`, `connections:use`, `outbound:send`,
+        `messages:send-as-owner`, `messages:delete-as-owner` or `memory:purge` normally never starts
+        a task by itself. With this call the owner names, per agent, which of those permissions may
+        start work without the owner's press, paid or free. A task plan that declares an effect of the
+        same kind (spend, send as the owner, delete) no longer holds the task either. A permission
+        the owner did not name still holds.
+
+        The list replaces the stored one; `null` or `[]` removes every acceptance. A word that is not
+        one of the seven is refused. The owner in person only: an agent, an app or a visitor gets 403,
+        so there is no MCP tool for it.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+          description: The agent's name, or its full identity url-encoded.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_start_floor]
+              properties:
+                task_start_floor:
+                  type: array
+                  nullable: true
+                  items:
+                    type: string
+                    enum: [commerce:buy, exchange:write, connections:use, outbound:send, messages:send-as-owner, messages:delete-as-owner, memory:purge]
+      responses:
+        '200':
+          description: The start settings after the change
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          task_start: { type: string, nullable: true, enum: [automatic, confirm, null] }
+                          task_start_effective: { type: string, enum: [automatic, confirm] }
+                          task_start_held_by: { type: array, items: { type: string } }
+                          task_start_floor_accepted: { type: array, items: { type: string } }
+        '400':
+          description: task_start_floor is missing, not a list, or names a permission outside the seven
+        '403':
+          description: Not the owner in person, or not your agent
         '404':
           description: No such agent
 
@@ -12459,8 +12523,8 @@ paths:
                       description: 'For a JSON crew: which revision of the definition on this node was live.'
                     llm:
                       type: string
-                      enum: [node, machine]
-                      description: Where the crew's model calls go. `node` when they go through this node's `/v1/llm` with the agent's own token, so the node picks the key (the agent's own, the owner's own, then the node's); `machine` when the crew calls its provider with a key on the machine that runs it. The owner's `own_key` answer (GET /v1/chat/status, GET /v1/ai/capabilities) reads it per agent.
+                      enum: [node, machine, local]
+                      description: Where the crew's model calls go. `node` when they go through this node's `/v1/llm` with the agent's own token, so the node picks the key (the agent's own, the owner's own, then the node's); `machine` when the crew calls its provider with a key on the machine that runs it; `local` when the model runs on the crew's own machine and no prompt leaves it. The owner's `own_key` answer (GET /v1/chat/status, GET /v1/ai/capabilities) reads it per agent, and only `local` lets the agent read content whose classification label refuses an outside model (externalAi set to refused).
       responses:
         '200':
           description: What the node recorded, with its own `reported_at`
@@ -12987,6 +13051,10 @@ paths:
                                       type: array
                                       items: { type: string }
                                       description: The permissions that make every task of this agent wait for the owner, whatever the setting, read from the words it holds by name. `*` is never among them; an agent holding `*` is narrowed at its next task once its record is ready.
+                                    task_start_floor_accepted:
+                                      type: array
+                                      items: { type: string }
+                                      description: The permissions of that kind the owner in person let this agent start work with (PATCH .../task-start-floor). They no longer hold its tasks.
                                     stopped:
                                       type: boolean
                                       description: True while the owner has stopped the agent (POST .../stop). It starts no new work; what it is given waits until POST .../start.
@@ -18325,6 +18393,64 @@ paths:
         '403': { description: PERSON_REQUIRED. }
         '404': { description: NO_SUGGESTION, or no such content. }
 
+  /v1/classification/packs:
+    get:
+      operationId: listClassificationPacks
+      summary: The classification label packs (TL, NATO) and which of their classes are on
+      tags: [Classification]
+      description: >
+        The Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to COSMIC
+        TOP SECRET) the operator can switch on in the node policy. Each pack names its classes, which
+        are on, the highest one that is on (`upTo`), and whether a top class is on (`top`). Anyone
+        signed in reads it, as the node policy. The MCP tool aimeat_classification action pack_list
+        answers the same.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      operationId: setClassificationPack
+      summary: Switch a classification label pack on or off
+      tags: [Classification]
+      description: >
+        A node policy write, so the operator, or their agent with operator:admin; an AI's change that
+        gives protection away waits for the operator in person (PERSON_APPROVES). On adds the pack's
+        labels up to `upTo` (default: the highest that is not one of the two top classes) and the
+        detection rules that recognise its markings in upper case ("TL III", "NATO SECRET"); a
+        marking above `upTo` raises content to `upTo`. Every class refuses an outside model
+        (externalAi refused), never leaves its organism, is audited, shows an AI a warning and is
+        shown to at most the organism's members. A top class (TL II, TL I, NATO SECRET, COSMIC TOP
+        SECRET) needs `acknowledgeNotAccredited: true`, because this node is not an accredited
+        system (400 ACKNOWLEDGEMENT_REQUIRED). Off retires the pack's labels with every field kept
+        and takes its rules out, so content that carries one stays as protected as it was.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pack, on]
+              properties:
+                pack: { type: string, enum: [tl, nato] }
+                on: { type: boolean }
+                upTo: { type: string, description: 'The highest class to switch on, e.g. tl-iii or nato-confidential.' }
+                acknowledgeNotAccredited: { type: boolean }
+                humanSaid: { type: string, description: "The person's own words, when an AI relays their instruction." }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /v1/memory/{key}/hands:
     get:
       summary: Who has written to this key, and how often
@@ -22680,6 +22806,175 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+
+  /v1/compliance/catalog:
+    get:
+      operationId: getComplianceCatalog
+      summary: The regulated data domains, the frameworks with their questions, and the label packs
+      tags: [Compliance]
+      description: >
+        The reference data the records of processing are filled from: each data domain (health,
+        special categories, biometric and genetic, children, criminal, employment, payments, public
+        authority, defence, export control, legal privilege and trade secrets) with its laws, the
+        classification it raises its containers to and what it asks for; each framework (GDPR, NIS2,
+        DORA, CRA, EAA, DSA, HIPAA, export control) with its question set and the obligations of each
+        verdict; the label packs; and which scope keeps which document. Needs `compliance:read` of an
+        agent; no wildcard carries it. Not legal advice, and `note` says so.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/compliance/docs/{kind}:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks] }
+      - name: scope
+        in: query
+        required: false
+        schema: { type: string, enum: [node, organism, app], default: node }
+      - name: organism_id
+        in: query
+        required: false
+        schema: { type: string }
+      - name: app
+        in: query
+        required: false
+        schema: { type: string }
+        description: The app's filename, for scope app.
+      - name: app_owner
+        in: query
+        required: false
+        schema: { type: string }
+        description: The app owner's account name, when the operator reads another owner's app. Absent, the caller's own.
+    get:
+      operationId: getComplianceDocument
+      summary: One compliance document of the node, an organism or an app
+      tags: [Compliance]
+      description: >
+        The records of processing (`registers`, GDPR art. 30), the processors (`processors`, node
+        only), the data subject requests (`requests`), the personal data breaches (`breaches`), the
+        impact assessments (`dpias`) and the framework answers (`frameworks`, node and organism). Who
+        reads: the node's, the operator; an organism's, its active members and the operator; an
+        app's, its owner and the operator. Anyone else gets 404. Something acting for a person needs
+        `compliance:read`. `processors` comes merged with what the configuration names (the AI
+        providers whose prompts leave this machine, mail, hosting), with `transfers`; `frameworks`
+        with each framework's verdict and obligations; `registers` with `floors`, what each
+        register's data domains ask of its containers' classification.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      operationId: putComplianceDocument
+      summary: Replace one compliance document
+      tags: [Compliance]
+      description: >
+        REPLACES the document, so send every entry you keep. Who writes: the node's, the operator;
+        an organism's, its creator or an admin; an app's, its owner. Something acting for a person
+        needs `compliance:write`. The body is { items: [...] } (or { document: { items } }); for
+        frameworks, { answers: { <framework>: { <question>: answer } }, answerSources }. A register
+        with data domains raises each container it names to the domain's floor, only up, and a
+        label a person set lower waits for them as a suggestion; the answer lists each one under
+        `floors`. `dry_run=true` validates and answers what would be stored, storing nothing. The
+        node stamps updatedAt and updatedBy.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema: { type: string, enum: ['true'] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/compliance/draft:
+    get:
+      operationId: getComplianceRegistersDraft
+      summary: The node's draft of a scope's records of processing
+      tags: [Compliance]
+      description: >
+        Stored nowhere. The node's own registers (accounts, sign-in and security log, consent ledger,
+        AI usage ledger), an organism's member register, or an app's register read from its data map
+        (with the key families whose personal data is unstated). Every answer the node read from its
+        own records is marked `evidence`. Save it with PUT /v1/compliance/docs/registers. The same
+        scope parameters and readers as GET /v1/compliance/docs/{kind}.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: scope, in: query, required: false, schema: { type: string, enum: [node, organism, app] } }
+        - { name: organism_id, in: query, required: false, schema: { type: string } }
+        - { name: app, in: query, required: false, schema: { type: string } }
+        - { name: app_owner, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/compliance/gaps:
+    get:
+      operationId: getComplianceScopeGaps
+      summary: What a scope's compliance documents leave open
+      tags: [Compliance]
+      description: >
+        Each gap names its kind, one sentence a person can act on, and its evidence: a register with
+        no legal basis, retention or review; a container below its data domain's classification; a
+        missing or old impact assessment; a request or a breach notification past its deadline; an
+        unanswered framework; an app whose data map holds personal data with no register or no
+        privacy notice; and for the node, a processor with no agreement, country or transfer basis,
+        and a label pack whose top classes are on. The same scope parameters and readers as GET
+        /v1/compliance/docs/{kind}. The operator's node-wide report carries every scope's gaps.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: scope, in: query, required: false, schema: { type: string, enum: [node, organism, app] } }
+        - { name: organism_id, in: query, required: false, schema: { type: string } }
+        - { name: app, in: query, required: false, schema: { type: string } }
+        - { name: app_owner, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/ai-transparency/mine:
     get:

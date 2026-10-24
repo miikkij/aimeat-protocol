@@ -83,6 +83,8 @@ export interface Agent {
   stoppedBy: string | null;
   /** The highest classification label id the agent may read; null = no limit (migration 0107). */
   clearance: string | null;
+  /** JSON list of the floor permissions the owner in person lets the agent start work with; null = none (migration 0115). */
+  taskStartFloor: string | null;
   /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */
   runtimeSource: unknown | null;
   identityVersion: number | null;

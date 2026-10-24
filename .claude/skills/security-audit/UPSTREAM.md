@@ -35,6 +35,6 @@ Copy the folder again from a newer commit, repeat both edits, change the commit 
 
 ## How this project runs it
 
-- Output goes to the main checkout's `docs/internal/secaudit<yyyy><mon>/` (gitignored), never to the repo tree and never to a worktree's own `docs/internal/`, which is deleted with the worktree.
+- Output goes to the Security register on aimeat.io (organism AIMEAT SECURITY, workspace `ws-mvkjtfqtfgn`; `AIMEAT-PURPOSE.md` says how). While a run is in progress, its working files may sit in the main checkout's `docs/internal/secaudit<yyyy><mon>/` (gitignored), never in the repo tree and never in a worktree's own `docs/internal/`, which is deleted with the worktree; the run is finished when they are in the register.
 - The skill runs target code only inside an OS-enforced sandbox with no network. A Claude Code session on Windows has none, so hunters stay source-only and a claim that needs execution is recorded as `needs_validation`. Reproduction on a `pnpm sandbox` node is then a separate step, done by the parent after the run and written down as such in the report.
-- Prior evidence for a run: the last audit folder in `docs/internal/`, the open incidents on the Lifecycle Central board, and `docs/coding-guidelines/security-development-dna.md`.
+- Prior evidence for a run: the Security register (earlier runs, findings and their status, exceptions), the open incidents on the Lifecycle Central board, and `docs/coding-guidelines/security-development-dna.md`.

@@ -18,6 +18,9 @@
  * @structure complianceTools — the four definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-10-23 — The register read and write tools carry the records of processing and the documents
+ *     beside them, of the node, an organism or an app (part, scope, organism_id, app, app_owner; plan
+ *     doc-mvlftkh9zmc9 C7.1), so caller is owner: an organism's admin and an app's owner use them too.
  *   2026-10-16 — aimeat_compliance_snapshot's description says what the node MCP registration does:
  *     the tool is offered on compliance:write, so listing there takes both words (QA audit F17-01).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -29,10 +32,25 @@
 import { z } from 'zod';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
+/**
+ * The scoped compliance documents, as services/compliance-docs-schemas.ts COMPLIANCE_DOC_KINDS names
+ * them. Written here because the catalog imports nothing above utils/ (.dependency-cruiser.cjs,
+ * tool-catalog-is-a-bottom-layer); test/unit/compliance-docs.test.ts holds the two lists equal.
+ */
+export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks'] as const;
+
+/** The scope of a records-of-processing document, on the register read and write tools. */
+const SCOPE_INPUT = {
+    scope: { type: 'string', enum: ['node', 'organism', 'app'], description: 'Whose document: node (default, the operator\'s), organism (with organism_id), app (with app). Not for the AI Act parts.' },
+    organism_id: { type: 'string', description: 'scope "organism": the organism.' },
+    app: { type: 'string', description: 'scope "app": the app\'s filename, e.g. crm.html.' },
+    app_owner: { type: 'string', description: 'scope "app": the app owner\'s account name, when the operator reads another owner\'s app. Absent: your own owner\'s app.' },
+} as const;
+
 export const complianceTools = [
     {
         name: 'aimeat_compliance_report',
-        description: 'The compliance report: AI activity joined to the written record of what AI is used for, and the difference between them. Defaults to scope="mine" — your owner\'s own slice, which an agent reads with the permission "wallet:read" (the owner in person needs none). scope="node" is the whole installation across every account, and needs the exact permission "compliance:read" plus an account that runs the installation; no wildcard carries that word. Read `gaps` first — each entry is a model used and mentioned in no entry, an entry with unanswered questions and so no risk class, public content published without a label, or an app that says it generates content while the publish check found a disclosure gap. Read `not_covered` second, and note the two scopes state DIFFERENT limits: a total without its population reads as coverage. Use aimeat_compliance_register_read to see the written record raw, and aimeat_compliance_register_write to change it.',
+        description: 'The compliance report: AI activity joined to the written record of what AI is used for, and the difference between them. Defaults to scope="mine" — your owner\'s own slice, which an agent reads with the permission "wallet:read" (the owner in person needs none). scope="node" is the whole installation across every account, and needs the exact permission "compliance:read" plus an account that runs the installation; no wildcard carries that word. Read `gaps` first — each entry is a model used and mentioned in no entry, an entry with unanswered questions and so no risk class, public content published without a label, or an app that says it generates content while the publish check found a disclosure gap. Read `not_covered` second, and note the two scopes state DIFFERENT limits: a total without its population reads as coverage. scope="node" also carries `processing`: the records of processing of the node, its organisms and its apps, the regulated data domains in use, the framework verdicts, the processors and transfers, the security class packs, and `processing.gaps`, what those leave open. Use aimeat_compliance_register_read to see the written record raw, and aimeat_compliance_register_write to change it.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Compliance: Node Report', readOnlyHint: true },
@@ -48,8 +66,8 @@ export const complianceTools = [
     },
     {
         name: 'aimeat_compliance_register_read',
-        description: 'Operator-only. Read what the compliance report is built from. part="draft" is the one to start with: the node composes a first draft of the register out of what actually ran, grouped by which agent or app called the model rather than by the model, with each agent\'s own name and description as the entry, and the two questions it can answer from the record already answered and marked as evidence. Nothing in a draft is stored. part="usecases" is the register as stored; part="questionnaire" is the risk-classification question set — the classes, and each question with the answers that imply each class. The question set is DATA and can be edited without a release. Read before writing, because a write replaces the whole document. Needs the exact permission "compliance:read".',
-        caller: 'operator',
+        description: 'Read the compliance documents. TWO GROUPS. (1) The node\'s EU AI Act register, operator-only: part="draft" is the one to start with: the node composes a first draft of the register out of what actually ran, grouped by which agent or app called the model rather than by the model, with each agent\'s own name and description as the entry, and the two questions it can answer from the record already answered and marked as evidence. Nothing in a draft is stored. part="usecases" is the register as stored; part="questionnaire" is the risk-classification question set — the classes, and each question with the answers that imply each class. The question set is DATA and can be edited without a release. (2) The records of processing and the documents beside them, of a SCOPE: scope="node" (the operator), scope="organism" with organism_id (its members read, its creator and admins keep it; the operator reads every organism\'s), scope="app" with app (the app\'s filename; its owner keeps it, the operator reads it, and the operator names another owner\'s app with app_owner). part="catalog" first: the regulated data domains (health, special categories, biometric, children, criminal, employment, payments, public authority, defence, export control, secrets), each with the classification it raises its containers to; the frameworks (GDPR, NIS2, DORA, CRA, EAA, DSA, HIPAA, export control) with their questions; the label packs; and which scope keeps which document. part="registers_draft" is the node\'s draft of a scope\'s records of processing (the node\'s own registers, an organism\'s member register, an app\'s register from its data map), stored nowhere. part="registers" (GDPR art. 30: type personal/pseudonymised/anonymised/none, purpose, legal basis, data categories, domains, containers, retention, review date), "processors" (node only: the AI providers, mail and hosting the configuration names, merged with the contract, country and transfer basis the operator wrote; with `transfers`), "requests" (data subject requests; an export and an account erasure log themselves), "breaches", "dpias" (impact assessments) and "frameworks" (the answers, with each framework\'s verdict and its obligations) are the documents as stored. part="gaps" lists what the scope leaves open. Read before writing, because a write replaces the whole document. Needs the exact permission "compliance:read"; no wildcard carries it.',
+        caller: 'owner',
         visibility: agentEverywhere,
         annotations: { title: 'Compliance: Read Register', readOnlyHint: true },
         // The node-wide compliance report and the register behind it. The handler resolves the caller's
@@ -58,26 +76,30 @@ export const complianceTools = [
         // (SCOPES_OUTSIDE_WILDCARD). Read and write are separate words because they fail differently:
         // reading discloses every account's AI activity, writing changes what the report says.
         scope: 'compliance:read',
-        surfaces: ['admin'],
+        // On `agent` too since 2026-10-23: an organism's creator or admin and an app's owner keep their
+        // records of processing through their own agent (plan doc-mvlftkh9zmc9).
+        surfaces: ['agent', 'admin'],
         input: {
-            part: { type: 'string', required: true, enum: ['draft', 'usecases', 'questionnaire'], description: 'Which document to read. Start with "draft".' },
+            part: { type: 'string', required: true, enum: ['draft', 'usecases', 'questionnaire', 'catalog', 'registers_draft', 'gaps', ...COMPLIANCE_DOC_KINDS], description: 'Which document to read. The AI Act register: start with "draft". The records of processing: start with "catalog", then "registers_draft".' },
             since_days: { type: 'number', description: 'For "draft": how far back to look for activity (default 30).', zod: z.number().int().min(1).max(3650) },
+            ...SCOPE_INPUT,
         },
     },
     {
         name: 'aimeat_compliance_register_write',
-        description: 'Operator-only. Replace one of the two stored documents. REPLACES, does not merge: send every use case or every question you want to keep, so read first. Pass dry_run=true to get back exactly what WOULD be stored, validated, without storing it — show that to the person and let them approve it before the real write. part="usecases" expects { usecases: [...] }; part="questionnaire" expects the whole set with version, classes, defaultClass and questions. Mark each answer in answerSources as "human", "ai" or "evidence": an auditor\'s question is which of the three, and answers that all read as considered would answer it wrongly. A question set naming a class it does not define, a choice question with no options, or a duplicate id is refused rather than stored. Adding a question takes effect on the next report with no release. Saving re-classifies everything: an entry whose answers no longer cover every question becomes unclassified and appears in the gap list. Needs the exact permission "compliance:write" — "compliance:read" is refused here, and no wildcard carries either.',
-        caller: 'operator',
+        description: 'Replace one stored compliance document. REPLACES, does not merge: send every entry you want to keep, so read first. The records of processing and the documents beside them (part registers, processors, requests, breaches, dpias, frameworks) belong to a scope: scope="node" for the operator, scope="organism" with organism_id for its creator or an admin, scope="app" with app (the filename) for its owner. value is { items: [...] }, except frameworks: { answers: { <framework id>: { <question id>: answer } }, answerSources }. A register with domains raises the classification of the containers it names to the domain\'s floor (only up; a label a person set lower waits for them as a suggestion), and the answer lists each one under `floors`. Mark each answer the node or an AI produced in answerSources as "evidence" or "ai", and the person\'s own as "human". The EU AI Act register is operator-only, and it is two documents. Pass dry_run=true to get back exactly what WOULD be stored, validated, without storing it — show that to the person and let them approve it before the real write. part="usecases" expects { usecases: [...] }; part="questionnaire" expects the whole set with version, classes, defaultClass and questions. Mark each answer in answerSources as "human", "ai" or "evidence": an auditor\'s question is which of the three, and answers that all read as considered would answer it wrongly. A question set naming a class it does not define, a choice question with no options, or a duplicate id is refused rather than stored. Adding a question takes effect on the next report with no release. Saving re-classifies everything: an entry whose answers no longer cover every question becomes unclassified and appears in the gap list. Needs the exact permission "compliance:write" — "compliance:read" is refused here, and no wildcard carries either.',
+        caller: 'owner',
         visibility: agentEverywhere,
         // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
         // silently drops every entry the caller did not resend.
         annotations: { title: 'Compliance: Replace Register', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         scope: 'compliance:write',
-        surfaces: ['admin'],
+        surfaces: ['agent', 'admin'],
         input: {
-            part: { type: 'string', required: true, enum: ['usecases', 'questionnaire'], description: 'Which document to replace.' },
-            value: { type: 'object', required: true, description: 'The whole document. For "usecases", { usecases: [...] }. For "questionnaire", { version, note, classes, defaultClass, questions }.' },
+            part: { type: 'string', required: true, enum: ['usecases', 'questionnaire', ...COMPLIANCE_DOC_KINDS], description: 'Which document to replace.' },
+            value: { type: 'object', required: true, description: 'The whole document. For "usecases", { usecases: [...] }. For "questionnaire", { version, note, classes, defaultClass, questions }. For registers, processors, requests, breaches and dpias, { items: [...] }. For frameworks, { answers, answerSources }.' },
             dry_run: { type: 'boolean', description: 'Validate and return what would be stored, storing nothing. Use this to show somebody the result before it goes in.' },
+            ...SCOPE_INPUT,
         },
     },
     {

@@ -17,6 +17,8 @@
  *   AutonomyLine({ agent, showToast }) · StoppedLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.8.0 — 2026-10-23 — FloorLine under AutonomyLine: the person lets an agent start work although it
+ *     can spend, send or delete in their name, and takes that back (task_start_floor_accepted).
  *   v1.7.0 — 2026-10-18 — WildcardLine says the node narrows a ready `*` agent at its next task; its
  *     tasks no longer wait for the owner (the texts are in the locales, the code is unchanged).
  *   v1.6.0 — 2026-10-11 — StoppedLine: "Takes new work", the switch that stops an agent and starts
@@ -39,7 +41,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPatch, apiPut, apiPost } from '/js/api.js';
-import { areaLine } from '/js/consent-vocab.js';
+import { areaLine, scopeSentence } from '/js/consent-vocab.js';
 import { swallowed } from '/js/swallowed.js';
 import { timeAgo } from '/js/utils.js';
 import { CardLine } from '/components/OpenCard.js';
@@ -169,8 +171,13 @@ const effectiveOf = (agent) => agent.task_start_effective || (agent.mode === 'ta
 export function AutonomyLine({ agent, showToast }) {
   const [start, setStart] = useState(effectiveOf(agent));
   const [saving, setSaving] = useState(false);
+  // The node's answer after a floor change on this card; the list's own copy until then.
+  const [floor, setFloor] = useState(null);
+  useEffect(() => { setFloor(null); }, [agent.task_start_held_by, agent.task_start_floor_accepted]);
   if (agent.mode === 'workstation' || placeOf(agent) === 'chat') return null;
-  const held = (agent.task_start_held_by ?? []).length > 0;
+  const heldBy = floor?.held ?? agent.task_start_held_by ?? [];
+  const accepted = floor?.accepted ?? agent.task_start_floor_accepted ?? [];
+  const held = heldBy.length > 0;
   const on = !held && start === 'automatic';
 
   async function toggle() {
@@ -197,6 +204,58 @@ export function AutonomyLine({ agent, showToast }) {
       <${Switch} on=${on} disabled=${held} onToggle=${toggle} label=${on ? f('yes') : f('no')} ariaLabel=${f('selfStart')} />
       <span>${held ? f('selfStartHeld') : on ? f('selfStartOn') : f('selfStartOff')}</span>
     <//>
+    <${FloorLine} agent=${agent} heldBy=${heldBy} accepted=${accepted} onSaved=${setFloor} showToast=${showToast} />
+  `;
+}
+
+/**
+ * "Starts although it can": the permissions that can spend, send or delete in the person's name and
+ * that they let this agent start work with anyway (PATCH /v1/agents/:name/task-start-floor, the owner
+ * in person only, which this page is). Shown while such a permission holds the agent's work, with
+ * the press that lets it start, and while one is accepted, with the press that takes that back.
+ * `*` is never offered: the node narrows an agent holding it first (WildcardLine).
+ */
+function FloorLine({ agent, heldBy, accepted, onSaved, showToast }) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const offer = heldBy.filter(s => s !== '*');
+  if (offer.length === 0 && accepted.length === 0) return null;
+  // A permission's sentence is written as a command ("Accept marketplace offers."), so it is quoted
+  // as the permission's name rather than run on after a colon.
+  const sentences = (scopes) => scopes.map(s => f('floorQuote', { s: String(scopeSentence(s, t)).replace(/\.\s*$/, '') })).join(', ');
+
+  async function save(words) {
+    setSaving(true);
+    try {
+      const r = await apiPatch(`/v1/agents/${encodeURIComponent(agent.name)}/task-start-floor`, { task_start_floor: words });
+      onSaved({ held: r?.data?.task_start_held_by ?? [], accepted: r?.data?.task_start_floor_accepted ?? [] });
+      setOpen(false);
+      showToast?.(words.length > accepted.length ? f('floorAcceptedSaved') : f('floorWithdrawnSaved'), 'success');
+    } catch (err) {
+      swallowed('agent-card: task-start floor', err);
+      showToast?.(err?.message || f('selfStartFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return html`
+    ${offer.length > 0 && html`
+      <${CardLine} label=${f('floorLabel')} below=${open && html`
+        <${Stack} gap="medium">
+          <span>${f('floorConfirm', { what: sentences(offer) })}</span>
+          <${Actions}>
+            <${Loud} control disabled=${saving} onClick=${() => save([...accepted, ...offer])}>${f('floorAccept')}<//>
+          <//>
+        <//>`}>
+        <span>${f('floorHeldBy', { what: sentences(offer) })}</span>
+        <${Action} small soft onClick=${() => setOpen(v => !v)}>${open ? t('profile.agents.page.close') : `${f('floorOpen')} →`}<//>
+      <//>`}
+    ${accepted.length > 0 && html`
+      <${CardLine} label=${f('floorAcceptedLabel')}>
+        <span>${f('floorAcceptedLine', { what: sentences(accepted) })}</span>
+        <${Action} small soft disabled=${saving} onClick=${() => save([])}>${f('floorWithdraw')}<//>
+      <//>`}
   `;
 }
 

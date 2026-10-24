@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.42.0 -- 2026-10-23 -- Content that refuses an outside model, and the records of processing (plan doc-mvlftkh9zmc9).
  *   v1.41.1 -- 2026-10-22 -- Classification: private records of the owner and siblings show only with
  *     memory:read-as-owner, and an answer that left one out says so in `note` (secaudit 2026-10, v76/v77).
  *   v1.41.0 -- 2026-10-21 -- Group chats: the six aimeat_dm_group_* tools and how a group is written in.
@@ -145,7 +146,14 @@ service), what a classification hides from AI stays behind, and so does an organ
 may not leave it; the answer names each item. Only your owner can make an exception, signed in
 themselves in their Data Wallet with a written reason, so tell them what you wanted to send and why;
 \`exception_set\` answers \`PERSON_REQUIRED\` for you, and \`exception_list\` shows the exceptions and
-their reasons. \`aimeat_classification\` reads and changes classifications,
+their reasons. Some classifications (every TL and NATO class, and what a register with health,
+biometric, defence or export-controlled data raises) refuse an outside model: such content is absent
+for you unless your runtime report says your model runs on your own machine
+(\`llm: "local"\` in \`PATCH /v1/agents/{name}/runtime-source\`), and no exception opens it. When an organism's
+creator or admin, or an app's owner, asks you to write down what personal data they keep,
+\`aimeat_compliance_register_read\` (\`part: "registers_draft"\`, \`scope\`, \`organism_id\` or \`app\`)
+gives a draft and \`aimeat_compliance_register_write\` saves it; both need the words
+\`compliance:read\` and \`compliance:write\`. \`aimeat_classification\` reads and changes classifications,
 with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\`,
 \`explorer\` (a page of your owner's classified items, or with \`pending: true\` the suggestions that
 wait for them) and \`exception_list\`. Records your owner or their other agents keep private show in

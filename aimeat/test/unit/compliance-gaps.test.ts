@@ -17,6 +17,8 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-23 — The storage answers the listing of the records of processing (none), which
+ *     the node-wide report now reads (plan doc-mvlftkh9zmc9).
  *   v1.2.0 — 2026-10-16 — The storage answers the workspace share candidates the counts now read (none).
  *   v1.1.0 — 2026-10-03 — A face added without licence data is a finding (the font manager).
  *   v1.0.0 — 2026-08-23 — BR-02. Closes the hole the browser pass exposed: no test drove the
@@ -60,6 +62,8 @@ function storageWith(opts: {
 
   return {
     listAllMemoryMeta: async (q: { prefix: string }) => ({ items: Object.keys(memory).filter(k => k.startsWith(q.prefix)).map(key => ({ key })) }),
+    // The records of processing the report's `processing` half lists (services/compliance-docs.ts): none here.
+    listAllMemory: async () => ({ items: [], total: 0 }),
     queryUsageDailyAllOwners: async () => usageRows,
     queryUsageDaily: async () => usageRows,
     consentFacets: async () => [],

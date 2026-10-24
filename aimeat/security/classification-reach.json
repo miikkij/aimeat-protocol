@@ -1221,6 +1221,14 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
+    "src/services/compliance-docs.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemory": 1,
+        "listAllMemoryMeta": 1
+      },
+      "why": "Written 2026-10-23 (plan doc-mvlftkh9zmc9), the node's own read: the compliance documents are records of system@<node> (records of processing, processors, requests, breaches, impact assessments, framework answers), never anyone's content; who reads them is decided in services/compliance-docs-access.ts."
+    },
     "src/services/component-content.ts": {
       "reads": {
         "getMemory": 3
