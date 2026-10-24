@@ -27,6 +27,8 @@
  *   - PrintableReport (default export) — the print-only document
  * @usage rendered unconditionally by compliance-tab.js; the print sheet shows it only on paper
  * @version-history
+ *   v2.2.0 — 2026-10-24 — `only`: one register or one place's record printed alone, from the records
+ *     dialog (C7.7).
  *   v2.1.0 — 2026-10-24 — The node's records of processing print after the question set, one entry
  *     per register in the order GDPR art. 30(1) lists the contents (plan doc-mvlftkh9zmc9, C7.6).
  *   v2.0.0 — 2026-09-27 — The document is drawn by components/PrintPage.js (PrintOnly, PrintHead,
@@ -104,7 +106,7 @@ export function printableRegister(r) {
   const F = (k) => t('admin.compliance.records.field.' + k);
   const W = (group, v) => tOr(`admin.compliance.records.${group}.${v}`, v);
   const list = (v) => (Array.isArray(v) && v.length ? v.join(', ') : undefined);
-  const basis = [...(r.legalBasis || []).map(b => W('basis', b)), ...(r.specialBasis ? [r.specialBasis] : [])];
+  const basis = [...(r.legalBasis || []).map(b => W('basis', b)), ...(r.specialBasis ? [W('special', r.specialBasis)] : [])];
   return {
     title: r.title || r.id,
     tag: W('type', r.type),
@@ -134,10 +136,20 @@ export function printableRegister(r) {
  * and print from there. What it adds is the register in full and the question set behind it, plus a
  * heading and a generated-at stamp, because a printed page with no date is not evidence of anything.
  */
-export default function PrintableReport({ report, questionnaire, registers = [] }) {
+export default function PrintableReport({ report, questionnaire, registers = [], only = null }) {
   const questions = questionnaire?.questions || [];
   const usecases = report?.register?.usecases || [];
   const scope = report?.scope || {};
+  // One register or one place's record, chosen in the records dialog (C7.7): the art. 30 record of
+  // those registers alone, under the place's name and the node's clock.
+  if (only) {
+    const at = t('admin.compliance.printGenerated').replace('{at}', new Date().toISOString().replace('T', ' ').slice(0, 16));
+    return html`
+      <${PrintOnly}>
+        <${PrintHead} title=${t('admin.compliance.records.printTitle')} line=${[scope.node_id || '', only.title, at].filter(Boolean).join(' · ')} />
+        ${only.registers.map(r => html`<${PrintEntry} key=${r.id} ...${printableRegister(r)} />`)}
+      <//>`;
+  }
   const line = [
     scope.node_id || '',
     `${(scope.period?.from || '').slice(0, 10)}–${(scope.period?.to || '').slice(0, 10)}`,

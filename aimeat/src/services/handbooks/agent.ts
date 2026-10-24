@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.42.1 -- 2026-10-24 -- The register write changes one entry with item_id and set (C7.7).
  *   v1.42.0 -- 2026-10-23 -- Content that refuses an outside model, and the records of processing (plan doc-mvlftkh9zmc9).
  *   v1.41.1 -- 2026-10-22 -- Classification: private records of the owner and siblings show only with
  *     memory:read-as-owner, and an answer that left one out says so in `note` (secaudit 2026-10, v76/v77).
@@ -152,8 +153,8 @@ for you unless your runtime report says your model runs on your own machine
 (\`llm: "local"\` in \`PATCH /v1/agents/{name}/runtime-source\`), and no exception opens it. When an organism's
 creator or admin, or an app's owner, asks you to write down what personal data they keep,
 \`aimeat_compliance_register_read\` (\`part: "registers_draft"\`, \`scope\`, \`organism_id\` or \`app\`)
-gives a draft and \`aimeat_compliance_register_write\` saves it; both need the words
-\`compliance:read\` and \`compliance:write\`. \`aimeat_classification\` reads and changes classifications,
+gives a draft and \`aimeat_compliance_register_write\` saves it (\`item_id\` and \`set\` change one
+entry and keep the rest); both need the words \`compliance:read\` and \`compliance:write\`. \`aimeat_classification\` reads and changes classifications,
 with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\`,
 \`explorer\` (a page of your owner's classified items, or with \`pending: true\` the suggestions that
 wait for them) and \`exception_list\`. Records your owner or their other agents keep private show in

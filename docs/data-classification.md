@@ -155,6 +155,17 @@ data refuse an outside model, and a domain that needs an impact assessment makes
 basis, data and retention, and `privacy_notice`, for the same readers as the map. The App Catalog's
 "Where this app puts what" shows them as "Personal data this app keeps".
 
+**Every place, and one entry at a time.** `GET /v1/compliance/docs/{kind}?scope=all` (operator
+only; `aimeat_compliance_register_read` with `scope: "all"`) answers every place that keeps that
+kind: the installation, each organism and each app, each with its name, `may_write` and its
+entries. `PATCH /v1/compliance/docs/{kind}/{id}` with `{ set: {...} }` (`aimeat_compliance_register_write`
+with `item_id` and `set`) changes the fields of one entry in one conditional write and keeps the
+rest: a register reviewed, a request done or refused (closedAt is filled), a breach reported. A
+field set to null is removed and "now" in a date field is the node's clock. The admin Compliance
+page opens each row of its records section into that list, and its status actions use the same
+PATCH. A processor's `agreement` ({ agreementId, version, status, signedAt }) is the slot the
+processing agreements fill.
+
 **Drafts and gaps.** `GET /v1/compliance/draft` hands a filled draft: the node's own registers
 (accounts, the sign-in and security log, the consent ledger, the AI usage ledger), an organism's member
 register, or an app's register read from its data map. `GET /v1/compliance/gaps` lists what a scope

@@ -31,6 +31,8 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.3.0 — 2026-10-24 — A row of section 09 opens the records dialog (compliance-tab.browse.js,
+ *     C7.7), and one register or one place's record prints alone from it.
  *   v3.2.0 — 2026-10-24 — Sections 08 to 10, the records of processing (compliance-tab.records.js,
  *     plan doc-mvlftkh9zmc9 C7.3): what they leave open, what exists, and the paste for the
  *     operator's AI. The node's registers print as the art. 30 record and have a CSV of their own on
@@ -75,6 +77,7 @@ import { CompliancePromptSection } from './compliance-tab.prompt.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
 import SavedReports, { readableId } from './compliance-tab.saved.js';
 import { RecordsSection, RecordsGapsSection, RecordsPromptSection } from './compliance-tab.records.js';
+import { RecordsBrowser } from './compliance-tab.browse.js';
 import { PrintPage, ScreenOnly } from '/components/PrintPage.js';
 import { Section } from '/components/Section.js';
 import { Verdict, Readings } from '/components/Readings.js';
@@ -279,6 +282,8 @@ export default function ComplianceTab(props) {
   const [kept, setKept] = useState(0);
   const [draft, setDraft] = useState(null);       // the register as edited, null while untouched
   const [openId, setOpenId] = useState(null);
+  const [browse, setBrowse] = useState(null);      // the records dialog's target, { kind, item?, domain? }
+  const [printOnly, setPrintOnly] = useState(null); // { title, registers } while one record prints
   const [toastMsg, showError, showSuccess, clearToast] = useToast();
   const days = PERIODS.find(p => p.key === period)?.days ?? 30;
 
@@ -301,6 +306,13 @@ export default function ComplianceTab(props) {
 
   useEffect(() => { load(days); }, [days, load]);
   useEffect(() => onLiveUpdate(['compliance'], () => load(days)), [days, load]);
+  // One record prints after it has painted (the effect runs after the commit), and the page's own
+  // printout comes back once the print dialog closes.
+  useEffect(() => {
+    if (!printOnly) return;
+    window.print();
+    setPrintOnly(null);
+  }, [printOnly]);
 
   const saveRegister = async (list) => {
     setSaving(true);
@@ -446,10 +458,13 @@ export default function ComplianceTab(props) {
           <${CompliancePromptSection} nodeId=${scope.node_id} days=${days} />
         <//>
         <${RecordsGapsSection} gaps=${report.processing?.gaps} />
-        <${RecordsSection} processing=${report.processing} registers=${registers} nodeId=${scope.node_id} />
+        <${RecordsSection} processing=${report.processing} registers=${registers} nodeId=${scope.node_id} onOpen=${setBrowse} />
         <${RecordsPromptSection} nodeId=${scope.node_id} />
+        ${browse ? html`<${RecordsBrowser} target=${browse} gaps=${report.processing?.gaps} onClose=${() => setBrowse(null)}
+          onPrint=${(regs, title) => setPrintOnly({ registers: regs, title })}
+          onChanged=${() => load(days)} />` : null}
       <//>
-      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} />
+      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} only=${printOnly} />
     <//>
   `;
 }
