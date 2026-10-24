@@ -325,7 +325,7 @@
       "digest": "sha256:4c2331614a9e74a8e84aa391"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-23",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:666841cb08ce52e018fa09be"
+      "digest": "sha256:57542b77255e6389d50f3e2b"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -499,11 +499,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-19",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:0b6260f3762e8444a6297b6f"
+      "digest": "sha256:a3194a01834a12339ddbb06f"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -689,7 +689,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -740,7 +740,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/cli/connect/mcp/local-server.ts": "cebe16fc0210cc3e",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15",
       "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "27b8a03e2ea5d74c",
       "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
