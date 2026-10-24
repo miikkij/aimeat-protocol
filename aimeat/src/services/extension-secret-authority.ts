@@ -74,6 +74,9 @@
  *     shared secret map is chosen only through the operator's allow_hosts, the extension's declared
  *     hosts, or the operator in person; any other first use is refused, and secretRefusalText asks
  *     the operators once per secret and host (secaudit2026oct22; Jouni, 2026-10-24).
+ *   v1.6.1 — 2026-10-24 — Rule (c) of decideSharedFirstUse covers every principal of an operator
+ *     account (its agents and unattended runs included), not only the operator in person; a visitor
+ *     and an anonymous principal stay refused (secaudit2026oct22; Jouni, 2026-10-24).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -292,14 +295,14 @@ export async function decideFirstUse(deps: {
  *      account installed, that account sets both the map and the list);
  *   b. the extension declares the host for this secret (`uses_secrets`, or its `network:` hosts);
  *   c. for an extension an account installed, the call is that account's (it set the map); for a
- *      node-provided extension, the caller is the operator in person.
+ *      node-provided extension, the call is an operator account's, by any of its principals.
  * Anyone else is refused, nothing is sent or bound, and the operators are asked once
  * (services/shared-secret-ask.ts).
  */
 export async function decideSharedFirstUse(deps: {
     storage: Storage;
     config: AimeatConfig;
-    caller: Pick<ExtensionCtx['caller'], 'gaii' | 'roles'>;
+    caller: Pick<ExtensionCtx['caller'], 'gaii' | 'roles' | 'anonymous'>;
     extension: ExtensionCtx['extension'] | undefined;
     unattended: boolean;
     secretName: string;
@@ -315,14 +318,15 @@ export async function decideSharedFirstUse(deps: {
     if (extension && extension.owner !== NODE_INSTALLER && asGhii(config, extension.owner) === account) {
         return { allowed: true, by: caller.gaii };
     }
-    // The node's own map: the operator in person only, never an unattended run (its caller carries
-    // the role `operator` whoever owns it), an agent, an ecosystem app or an app grant.
-    if (deps.unattended || !isOwnerInPerson({ roles: caller.roles ?? [] }) || caller.gaii.includes('#')) {
-        return { allowed: false, by: caller.gaii };
-    }
-    // An account of THIS node: a name from another node must not find a local operator by its name.
+    // The node's own map: any principal acting in an OPERATOR's own account (the operator's session,
+    // their agents, ecosystem apps and app grants, their unattended runs), because each acts in the
+    // operator's name on permissions the operator granted (Jouni, 2026-10-24). The account is read
+    // from the stored record, never from the role list: an unattended run carries the role
+    // `operator` whoever owns it. A visitor is refused: its principal names its home node, so it is
+    // not an account of this node. An anonymous principal is refused.
+    if (caller.anonymous) return { allowed: false, by: caller.gaii };
     const name = localAccountOf(account);
-    if (!name || account !== `${name}@${config.nodeId}`) return { allowed: false, by: caller.gaii };
+    if (!name || name === 'anonymous' || account !== `${name}@${config.nodeId}`) return { allowed: false, by: caller.gaii };
     const record = await storage.getOwner(name);
     return { allowed: isOperatorAccount(record), by: caller.gaii };
 }

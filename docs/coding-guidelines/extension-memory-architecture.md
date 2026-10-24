@@ -237,8 +237,10 @@ Six rules, and each one closes a way the value could leak back:
 - **A value from the shared `secrets` field gets its first host from whoever set it.** Its first
   host then serves every account, so the first use binds by itself only toward a host on the
   extension's `allow_hosts`, a host the extension declares for that secret, or when the map's setter
-  makes the call: the operator in person for a node-provided extension such as living-hooks, any
-  call of the installing account for an account's own extension. Any other first use sends nothing,
+  makes the call: any principal of an operator's own account (the operator's session, agents and
+  unattended runs) for a node-provided extension such as living-hooks, any call of the installing
+  account for an account's own extension. A visitor from another node and an anonymous principal
+  never do. Any other first use sends nothing,
   is refused with `SECRET_HOST`, and tells every operator (and an installing account) once per
   secret and host; the operator approves by adding the host to `allow_hosts`
   (`PATCH /v1/extensions/:name/config` or `aimeat_extension_config_set`), and the same use then
