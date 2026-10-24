@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-23 — aimeat_agent_runtime_report's `llm` takes 'local' (plan doc-mvlftkh9zmc9, C3.4).
  *   2026-10-18 — aimeat_agents_list's description names `invites_people` (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-17 — aimeat_dm_send_as_owner's description: the message names the sending agent to the owner
  *     and the recipient, and a group address reaches its thread.
@@ -288,7 +289,7 @@ export const agentMessagingTools = [
             commit: { type: 'string', description: 'Commit the file came from.' },
             runtime: { type: 'string', description: "Which runtime read it, e.g. 'crewaimeat 0.7.0'." },
             definition_revision: { type: 'number', description: 'For a JSON crew: which revision of the definition on this node was live.' },
-            llm: { type: 'string', enum: ['node', 'machine'], description: "Where the crew's model calls go: 'node' when they go through this node's /v1/llm with the agent's own token (the owner's own key then pays before the node's), 'machine' when the crew calls its provider with a key on its own machine. The owner's AI settings read it to say whether their own key reaches this agent." },
+            llm: { type: 'string', enum: ['node', 'machine', 'local'], description: "Where the crew's model calls go: 'node' when they go through this node's /v1/llm with the agent's own token (the owner's own key then pays before the node's), 'machine' when the crew calls its provider with a key on its own machine, 'local' when the model runs on the crew's own machine and no prompt leaves it. The owner's AI settings read it to say whether their own key reaches this agent, and only 'local' lets the agent read content whose classification refuses an outside model." },
         },
     },
     {

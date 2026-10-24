@@ -8,6 +8,7 @@
  *   (mongodb methods/messaging.ts, work.ts, sessions.ts); mappers fold nullable columns back into the
  *   record shapes and jsonb columns (metadata / ruling / audit data / invite workspaces) round-trip.
  * @version-history
+ *   v1.1.1 — 2026-10-23 — getCodeInvitationByProvisionedOwner reads with LIMIT 1 (check:unbounded-lists).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: `AgentMessage.aiProvenanceId` round-trips
  *     (migration 0020), so the owner's client can render the label from the message itself.
  *   v1.0.0 — 2026-07-15 — Phase 5: agent-message + dispute + invitation domains on Postgres+Kysely.
@@ -240,7 +241,7 @@ export const invitationMethods = {
   async getCodeInvitationByProvisionedOwner(this: PostgresKyselyStorage, owner: string): Promise<InvitationRecord | null> {
     const r = await this.db.selectFrom('Invitation').selectAll()
       .where('type', '=', 'code').where('provisionedOwner', '=', owner)
-      .orderBy('createdAt', 'desc').executeTakeFirst();
+      .orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
     return r ? toInvitation(r) : null;
   },
   async updateInvitation(this: PostgresKyselyStorage, id: string, updates: Partial<InvitationRecord>): Promise<InvitationRecord | null> {

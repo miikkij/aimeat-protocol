@@ -27,6 +27,11 @@
  *   (16), and the owner can widen it back (17).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scheduled-ext-files
  * @version-history
+ *   v1.5.3 -- 2026-10-24 -- 23d prints the test's and the server's view of the kept schedule before and
+ *     after its first fire, to tell an old read from an overwrite.
+ *   v1.5.2 -- 2026-10-23 -- 23c and 23d: a direct database edit must land (landed()), and a refusal
+ *     that did not happen says which maker the server saw. The nightly SQLite sweep fired schedules
+ *     the test thought it had changed, on two runs in a row, and the edits answered null silently.
  *   v1.5.1 -- 2026-10-21 -- 23d: the app that made a kept schedule runs it now with its own token, as
  *     the fire runs it; its edit still asks ext:invoke, and run now on a schedule the list does not
  *     keep is still refused.
@@ -613,6 +618,24 @@ async function openBackend(): Promise<Storage> {
   backend = await createStorage({ provider, sqlitePath, dbUrl });
   return backend;
 }
+/**
+ * A direct edit that must land. updateScheduledJob and updateAppGrant answer null when this process's
+ * connection finds no such row, and the test then went on as if the edit had been made; on the nightly
+ * SQLite sweep the server then fired a schedule the test thought it had changed. This makes that
+ * visible, with what this connection sees.
+ */
+async function landed<T>(what: string, edit: Promise<T | null>): Promise<T> {
+  const got = await edit;
+  if (got !== null) return got;
+  const raw = (backend as unknown as { db?: { pragma(s: string): unknown; prepare(s: string): { get(): unknown } } } | null)?.db;
+  const view = raw
+    ? { journal: raw.pragma('journal_mode'), dataVersion: raw.pragma('data_version'), jobs: raw.prepare('SELECT count(*) AS n FROM scheduled_jobs').get(), grants: raw.prepare('SELECT count(*) AS n FROM app_grants').get() }
+    : 'no raw handle';
+  throw new Error(`${what}: this process's connection found no such row (database ${pinnedSqlitePath() || serverDbUrl()}; ${JSON.stringify(view)})`);
+}
+/** What the server holds as a schedule's maker, for the assertion messages. */
+const makerSeen = (s: { createdByApp?: string; createdByAgent?: boolean; createdBy?: string }) =>
+  `server sees createdByApp=${s.createdByApp ?? 'none'} createdByAgent=${s.createdByAgent ?? false} createdBy=${s.createdBy ?? 'none'}`;
 /** A live app grant of `owner`, written as the grant route would leave it. */
 async function grantOf(storage: Storage, scopes: string[]): Promise<string> {
   const grantId = `appgrant-e2e${Date.now().toString(36)}${Math.floor(Math.random() * 1e6)}`;
@@ -633,7 +656,7 @@ async function ownerExtSchedule(key: string, name: string): Promise<string> {
 const fire = async (id: string) => {
   const t = await json(`/v1/schedules/${id}/trigger`, { method: 'POST', headers: auth(owner.token), body: '{}' });
   assert(t.status === 200, `owner trigger: ${t.status} ${JSON.stringify(t.body?.error)}`);
-  return t.body.data.schedule as { lastRunResult: string; lastRunError?: string };
+  return t.body.data.schedule as { lastRunResult: string; lastRunError?: string; createdByApp?: string; createdByAgent?: boolean; createdBy?: string };
 };
 
 await test('23b. KEPT: the owner of a refused agent is asked with one press, and after Allow the schedule runs again', async () => {
@@ -664,7 +687,7 @@ await test('23c. KEPT: an app\'s schedule from before 2026-10-05 runs as the acc
   const storage = await openBackend();
   const oldId = await ownerExtSchedule('v52-oldapp.csv', 'v52-oldapp');
   // The pre-2026-10-05 shape: the owner's identity as the maker, marked as not the owner in person, no grant.
-  await storage.updateScheduledJob(oldId, { createdByAgent: true });
+  await landed('mark the old schedule app-made', storage.updateScheduledJob(oldId, { createdByAgent: true }));
   const old = await fire(oldId);
   assert(old.lastRunResult === 'success', `an old app schedule must keep firing: ${old.lastRunResult} ${old.lastRunError ?? ''}`);
   assert((await ownerFile('v52-oldapp.csv')).status === 200, 'and write its file');
@@ -672,12 +695,12 @@ await test('23c. KEPT: an app\'s schedule from before 2026-10-05 runs as the acc
   // The hole stays closed: a schedule that names its grant stops when the owner revokes the grant.
   const grantId = await grantOf(storage, ['task:write', 'workflow:write', 'ext:invoke']);
   const appId = await ownerExtSchedule('v52-revoked.csv', 'v52-revoked');
-  await storage.updateScheduledJob(appId, { createdByAgent: true, createdByApp: grantId });
+  await landed('give the schedule its grant', storage.updateScheduledJob(appId, { createdByAgent: true, createdByApp: grantId }));
   assert((await fire(appId)).lastRunResult === 'success', 'control: a live grant holding ext:invoke runs');
   await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-revoked.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
-  await storage.updateAppGrant(grantId, { revoked: true });
+  await landed('revoke the grant', storage.updateAppGrant(grantId, { revoked: true }));
   const revoked = await fire(appId);
-  assert(revoked.lastRunResult === 'error', `a revoked grant's schedule ran: ${revoked.lastRunResult}`);
+  assert(revoked.lastRunResult === 'error', `a revoked grant's schedule ran: ${revoked.lastRunResult}; ${makerSeen(revoked)}`);
   assert(/no longer holds your permission/.test(revoked.lastRunError ?? ''), `the reason: ${revoked.lastRunError}`);
   assert((await ownerFile('v52-revoked.csv')).status === 404, 'the refused fire wrote the file');
 });
@@ -687,14 +710,23 @@ await test('23d. KEPT: an app schedule made before the rule from a grant without
   // Made under the old rule: the grant holds task:write and not ext:invoke.
   const narrowGrant = await grantOf(storage, ['task:write', 'workflow:write']);
   const keptId = await ownerExtSchedule('v52-kept.csv', 'v52-kept');
-  await storage.updateScheduledJob(keptId, { createdByAgent: true, createdByApp: narrowGrant });
+  await landed('give the kept schedule its narrow grant', storage.updateScheduledJob(keptId, { createdByAgent: true, createdByApp: narrowGrant }));
   // A grant that held the word when the step ran, narrowed by the owner afterwards.
   const wideGrant = await grantOf(storage, ['task:write', 'workflow:write', 'ext:invoke']);
   const laterId = await ownerExtSchedule('v52-later.csv', 'v52-later');
-  await storage.updateScheduledJob(laterId, { createdByAgent: true, createdByApp: wideGrant });
+  await landed('give the later schedule its wide grant', storage.updateScheduledJob(laterId, { createdByAgent: true, createdByApp: wideGrant }));
 
+  // Both sides' view of the schedule around the fire, so a failure says whether the server read an old
+  // row or something wrote over the test's edit (incident 2026-10-23, nightly SQLite).
+  const views = async () => {
+    const mine = await storage.getScheduledJob(keptId);
+    const theirs = (await json(`/v1/schedules/${keptId}`, { headers: auth(owner.token) })).body?.data?.schedule ?? {};
+    return `test sees createdByApp=${mine?.createdByApp ?? 'none'}/${mine?.createdByAgent}, server GET sees createdByApp=${theirs.createdByApp ?? 'none'}/${theirs.createdByAgent}`;
+  };
+  const viewsBefore = await views();
   const before = await fire(keptId);
-  assert(before.lastRunResult === 'error' && /ext:invoke/.test(before.lastRunError ?? ''), `without the step it is refused: ${before.lastRunResult} ${before.lastRunError ?? ''}`);
+  assert(before.lastRunResult === 'error' && /ext:invoke/.test(before.lastRunError ?? ''),
+    `without the step it is refused: ${before.lastRunResult} ${before.lastRunError ?? ''}; ${makerSeen(before)}; before the fire: ${viewsBefore}; after it: ${await views()}`);
 
   // The node's first start with the rule, run here: the step's record is taken away and the step runs.
   await storage.deleteMemory(`system@${NODE_ID}`, EXTENSION_SCHEDULE_KEEP_KEY, `system@${NODE_ID}`);
@@ -725,9 +757,9 @@ await test('23d. KEPT: an app schedule made before the rule from a grant without
   assert(edit.status === 403, `an edit by the kept app still asks ext:invoke: ${edit.status} ${JSON.stringify(edit.body?.error)}`);
 
   // The hole stays closed: the owner narrows the other grant after the step, and its schedule stops.
-  await storage.updateAppGrant(wideGrant, { scopes: ['task:write', 'workflow:write'] });
+  await landed('narrow the wide grant', storage.updateAppGrant(wideGrant, { scopes: ['task:write', 'workflow:write'] }));
   const later = await fire(laterId);
-  assert(later.lastRunResult === 'error' && /ext:invoke/.test(later.lastRunError ?? ''), `a narrowing after the step must stop it: ${later.lastRunResult} ${later.lastRunError ?? ''}`);
+  assert(later.lastRunResult === 'error' && /ext:invoke/.test(later.lastRunError ?? ''), `a narrowing after the step must stop it: ${later.lastRunResult} ${later.lastRunError ?? ''}; ${makerSeen(later)}`);
   assert((await ownerFile('v52-later.csv')).status === 404, 'the refused fire wrote the file');
   const laterRunNow = await json(`/v1/schedules/${laterId}/trigger`, { method: 'POST', headers: auth(await appToken(wideGrant)), body: '{}' });
   assert(laterRunNow.status === 403 && laterRunNow.body?.error?.code === 'SCOPE_DENIED',

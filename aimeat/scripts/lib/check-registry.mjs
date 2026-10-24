@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-23: check:unbounded-lists also refuses a Postgres take-first read without LIMIT 1 (aimeat.io stalled on one that day).
  *  - 2026-10-20: check:unbounded-lists (QA audit P7-10) and check:storage-conformance (P4-09), two ratchets seeded from today's code.
  *  - 2026-10-20: check:unit-ports, a unit test uses port 0 and never a fixed one (three red CI runs in the week from 2026-10-12).
  *  - 2026-10-18: check:atomic-writes, a read of a record followed by an unconditional write of the same key.
@@ -83,7 +84,7 @@ export const FAST_CHECKS = [
     { script: 'check:mcp-test-calls', label: 'Every MCP tool is called by an E2E suite, or listed with a reason; the list only shrinks' },
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
     { script: 'check:unit-ports', label: 'No unit test listens on, connects to or names as dead a fixed port' },
-    { script: 'check:unbounded-lists', label: 'No new storage list without a bound and no new whole-table read; the list only shrinks' },
+    { script: 'check:unbounded-lists', label: 'No new storage list without a bound, no new whole-table read, and no Postgres take-first read without LIMIT 1; the list only shrinks' },
     { script: 'check:storage-conformance', label: 'No new storage repository without a two-provider case, and the methods those cases call only rise' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
     // 2026-10-01, after the peer-registration incident: who writes a federation peer, and who trusts

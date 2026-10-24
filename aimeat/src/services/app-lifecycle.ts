@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.10.0 — 2026-10-23 — Deleting every version of an app deletes its compliance documents (plan
+ *     doc-mvlftkh9zmc9).
  *   v1.9.0 — 2026-10-19 — The draft states its display version: stageAppDraft takes `version` (judged by
  *     services/app-display-version.ts when it differs from the live app's) and publishAppDraft takes a
  *     `version` that overrides the draft's (wish-the-app-draft-tools-can-set-the-display-version).
@@ -119,6 +121,7 @@ import type { AppOwnerScope } from './app-owner-scope.js';
 import { publishExposure } from './app-publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 import type { PublishAsk } from './publish-requests/ask.js';
+import { removeComplianceDocs } from './compliance-docs.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
 /**
@@ -665,6 +668,9 @@ export async function deleteOwnedApp(
         },
       };
     }
+    // The whole app went, so its compliance documents go (plan doc-mvlftkh9zmc9).
+    await removeComplianceDocs(storage, ownerGhii.slice(ownerGhii.indexOf('@') + 1), { kind: 'app', ownerName, app: filename })
+      .catch(err => logger.warn('deleteOwnedApp: compliance documents not removed', { filename, error: String(err) }));
   } else {
     // Single-version case: try the buckets in order, delete from the one that has it.
     let app = await storage.getApp(ownerGhii, filename, version);

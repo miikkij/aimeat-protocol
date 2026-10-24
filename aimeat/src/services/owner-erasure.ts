@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   v1.14.0 — 2026-10-23 — The compliance documents of the person's apps go (step compliance_docs),
+ *     and the erasure logs itself as a done data subject request (plan doc-mvlftkh9zmc9, C4.3).
  *   v1.13.0 — 2026-10-22 — The knowledge_links step deletes the person's link rows under the bare
  *     account name too: every link writer stored that form until 2026-10-22, so the step, which asked
  *     for the GHII only, found none (secaudit 2026-10, v79).
@@ -76,6 +78,7 @@ import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
+import { appendRequest, removeAppDocsOfOwner } from './compliance-docs.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -335,6 +338,14 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       return apps.length ? `apps:${apps.length}` : null;
     }, deletionLog, storage);
 
+    // The compliance documents of this person's apps (registers, requests, breaches, impact
+    // assessments; plan doc-mvlftkh9zmc9) are records of system@<node> keyed by the bare account
+    // name, which the cascade does not reach and which is released for reuse.
+    await step('compliance_docs', async () => {
+      const n = await removeAppDocsOfOwner(storage, nodeId, name);
+      return n ? `compliance_docs:${n}` : null;
+    }, deletionLog, storage);
+
     // App rosters, right after the apps: the roster of an app goes with the app. The records live in
     // platform namespaces keyed by the bare account name, which the cascade never sees and which is
     // released for reuse, so a surviving row hands the next holder of the name the previous person's
@@ -399,6 +410,14 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     // 3. The per-identity cascade, agents, GHIIs and the owner record.
     await storage.deleteOwner(name);
   });
+
+  // The erasure is a data subject request the node carried out (GDPR art. 17): it logs itself in the
+  // node's request list, so the operator can show it was done and when (plan doc-mvlftkh9zmc9, C4.3).
+  // The account name is kept there as the proof of the request, and nothing else about the person.
+  const at = new Date().toISOString();
+  await appendRequest(storage, nodeId, { kind: 'node' }, {
+    kind: 'erasure', subject: name, receivedAt: at, status: 'done', closedAt: at, channel: 'node', auto: true,
+  }).catch(err => logger.warn('owner-erasure: the erasure was not logged as a data subject request', { name, error: String(err) }));
 
   return { agentsDeleted: agents.length, deletionLog };
 }

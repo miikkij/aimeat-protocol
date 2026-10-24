@@ -10,6 +10,7 @@
  * @structure applyAgentRuntimeColumns(safeAddColumn)
  * @usage applyAgentRuntimeColumns(safeAddColumn) from sqlite/schema.ts initializeSchema.
  * @version-history
+ *   v1.3.0 — 2026-10-23 — agents.taskStartFloor (migration 0115).
  *   v1.2.0 — 2026-10-22 — ecosystem_apps.capabilityApprovals, the outside-app principal's twin of an
  *     agent's granted permissions (migration 0112; secaudit 2026-10, capability-invoke ecosystem source).
  *   v1.1.0 — 2026-10-18 — agents.clearance (migration 0107, plan doc-mvdipuyqraas L2).
@@ -70,6 +71,8 @@ export function applyAgentRuntimeColumns(safeAddColumn: SafeAddColumn): void {
   safeAddColumn('agents', 'mcpLastSeen', 'TEXT');
   // The highest classification label the agent may read; NULL = no limit (migration 0107).
   safeAddColumn('agents', 'clearance', 'TEXT');
+  // The floor permissions the owner in person lets the agent start work with; JSON list or NULL (migration 0115).
+  safeAddColumn('agents', 'taskStartFloor', 'TEXT');
 
   // The other principal kind beside agents: an outside (ecosystem) app. Which capabilities of other
   // accounts the owner allowed to run one of its actions, and the requests waiting for an answer.

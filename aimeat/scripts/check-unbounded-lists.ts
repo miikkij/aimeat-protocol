@@ -21,16 +21,25 @@
  *   - WHOLE-TABLE CALLS: every call outside src/storage/ of a list method with no parameters at all
  *     (`storage.listOwners()`), counted per file. A file whose count rises fails, and a file whose
  *     count falls fails until the baseline is lowered to match.
+ *   - TAKE-FIRST READS WITHOUT A LIMIT: every Kysely chain in the Postgres provider that orders its
+ *     rows and ends in `executeTakeFirst()` with no `.limit(...)` in the chain. Kysely adds no LIMIT
+ *     for a take-first, so Postgres sends every matching row and the driver holds them all before the
+ *     first is kept. The allowance is zero, so this part has no baseline.
+ *     WHY: on 2026-10-23 at 06:56, `getApp` read all 503 versions of one app, 1 041 MB with their
+ *     content, on each open of that app; aimeat.io went from 1.2 GB to 6.1 GB in five minutes and
+ *     stopped answering.
  *   The baseline is security/unbounded-lists-baseline.json. Its entries are seeded `DEBT`: a known
  *   unbounded read nobody has judged yet. Answering one means bounding it, or replacing DEBT with the
  *   reason it cannot grow (a node-wide table of fixed size, for instance).
- * @structure unboundedMethods(repos) · wholeTableCalls(file, source, names) · compare(...) · main()
+ * @structure unboundedMethods(repos) · wholeTableCalls(file, source, names) · takeFirstWithoutLimit(file, source) · compare(...) · main()
  * @usage
  *   cd aimeat && pnpm check:unbounded-lists          # the gate
  *   cd aimeat && pnpm check:unbounded-lists --seed   # rewrite the baseline from today's code (ask first)
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial (QA audit P7-10): 64 unbounded list methods, 10 of them whole-table,
  *     and 122 whole-table calls in 91 files.
+ *   v1.1.0 — 2026-10-23 — Take-first reads without a limit in the Postgres provider, zero allowed
+ *     (the aimeat.io outage of 2026-10-23: ten such reads, four of them on the App table).
  */
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -69,6 +78,27 @@ export function wholeTableCalls(file: string, source: string, names: ReadonlySet
         if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression) && n.arguments.length === 0) {
             const name = n.expression.name.text;
             if (names.has(name)) out[name] = (out[name] ?? 0) + 1;
+        }
+        ts.forEachChild(n, visit);
+    };
+    visit(sf);
+    return out;
+}
+
+/** The 1-based line of every ordered `executeTakeFirst()` chain with no `.limit(...)` in one source file. */
+export function takeFirstWithoutLimit(file: string, source: string): number[] {
+    const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const out: number[] = [];
+    const visit = (n: ts.Node): void => {
+        if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)
+            && /^executeTakeFirst(OrThrow)?$/.test(n.expression.name.text)) {
+            const chain = new Set<string>();
+            let e: ts.Expression = n.expression.expression;
+            while (ts.isCallExpression(e) && ts.isPropertyAccessExpression(e.expression)) {
+                chain.add(e.expression.name.text);
+                e = e.expression.expression;
+            }
+            if (chain.has('orderBy') && !chain.has('limit')) out.push(sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1);
         }
         ts.forEachChild(n, visit);
     };
@@ -123,6 +153,21 @@ function sourceFiles(root: string): string[] {
     return out.sort();
 }
 
+const POSTGRES_PROVIDER = 'src/storage/providers/postgres-kysely';
+
+function postgresProviderFiles(root: string): string[] {
+    const out: string[] = [];
+    const walk = (dir: string): void => {
+        for (const name of readdirSync(dir)) {
+            const full = path.join(dir, name);
+            if (statSync(full).isDirectory()) walk(full);
+            else if (name.endsWith('.ts') && !name.endsWith('.d.ts')) out.push(path.relative(root, full).replace(/\\/g, '/'));
+        }
+    };
+    walk(path.join(root, POSTGRES_PROVIDER));
+    return out.sort();
+}
+
 function main(): void {
     const root = process.cwd();
     const methods = unboundedMethods(storageRepositories(root));
@@ -149,14 +194,23 @@ function main(): void {
 
     const base = JSON.parse(readFileSync(path.join(root, BASELINE), 'utf-8')) as Baseline;
     const v = compare(methods, calls, base);
+    const takeFirst = postgresProviderFiles(root).flatMap(f =>
+        takeFirstWithoutLimit(f, readFileSync(path.join(root, f), 'utf-8')).map(line => `${f}:${line}`));
     const debt = Object.values(base.methods).filter(r => r.startsWith('DEBT')).length;
     console.log(`\n  Unbounded storage lists`);
     console.log(`  ───────────────────────`);
     console.log(`  list methods with nothing to bound them  ${String(methods.length).padStart(4)}   of which read the whole table ${whole.size}`);
     console.log(`  whole-table calls outside src/storage    ${String(totalCalls).padStart(4)}   in ${Object.keys(calls).length} files`);
     console.log(`  baseline entries still DEBT              ${String(debt).padStart(4)}`);
-    const bad = v.newMethods.length + v.staleMethods.length + v.emptyReasons.length + v.risen.length + v.fallen.length;
-    if (!bad) { console.log('\n  ✓ no new unbounded list and no new whole-table read; the list only shrinks\n'); return; }
+    console.log(`  Postgres take-first reads with no limit  ${String(takeFirst.length).padStart(4)}   allowed 0`);
+    const bad = v.newMethods.length + v.staleMethods.length + v.emptyReasons.length + v.risen.length + v.fallen.length + takeFirst.length;
+    if (!bad) { console.log('\n  ✓ no new unbounded list, no new whole-table read and no take-first read without a limit; the list only shrinks\n'); return; }
+
+    if (takeFirst.length) {
+        console.error('\n  ✖ Ordered take-first reads with no limit (Kysely adds none, so Postgres sends every matching row):');
+        for (const at of takeFirst) console.error(`    ${at}`);
+        console.error('    Put .limit(1) in the chain before .executeTakeFirst().');
+    }
 
     if (v.newMethods.length) {
         console.error('\n  ✖ New list methods with nothing to bound them:');

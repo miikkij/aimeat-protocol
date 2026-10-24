@@ -6,6 +6,7 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-23 — The operator's app delete deletes the app's compliance documents (plan doc-mvlftkh9zmc9).
  *   2026-10-21 — GET /v1/apps asks isAnonymousPrincipal for own=true, building=true, the member listing
  *     and the access codes: the minted anonymous token carries no anonymous claim and counted as a
  *     signed-in member (secaudit 2026-10, anonymous-claim-not-signed).
@@ -80,6 +81,7 @@ import { stripLegalContent } from '../../services/app-legal.js';
 import { dependencyIndex, appRef as depAppRef } from '../../services/dependency-map.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
+import { removeComplianceDocs } from '../../services/compliance-docs.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -487,6 +489,9 @@ export function registerCatalogueAdminRoutes(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
             return;
         }
+        // The app went, so its compliance documents go (plan doc-mvlftkh9zmc9).
+        await removeComplianceDocs(storage, config.nodeId, { kind: 'app', ownerName: owner, app: filename })
+            .catch(err => { logger.warn('DELETE /v1/admin/apps/:owner/:filename: compliance documents not removed', { error: String(err) }); });
 
         const { owner: operatorName } = await canonicalOwner(req);
         await storage.addSiteChangeLog({

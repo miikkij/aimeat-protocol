@@ -28,6 +28,9 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-10-24 — The start-up apply is awaited until its run claim is gone, not until its record
+ *     appears: the record is written first with `running` since 2026-10-18, and the nightly Postgres
+ *     sweep read the empty claim (2026-10-22 and 2026-10-23).
  *   2026-10-23 — setupOwner uses setupOperator and mintToken the password sign-in; POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -617,8 +620,11 @@ await test('A new node started with an install set links the repository, waits f
     const dOnR = (onR.body.data?.peers as any[] ?? []).find((p) => p.node_id === D!.nodeId);
     assert(dOnR?.status === 'active' && dOnR?.tier === 'contact' && dOnR?.share_catalogue === false,
         `D is a packages-only peer on R: ${JSON.stringify(dOnR)}`);
+    // Until the start-up run has FINISHED, not until the record exists: since 2026-10-18 the run writes
+    // the record first with its claim (`running`, services/install-set-run.ts) and fills it at the end,
+    // so a record that has appeared can still be the empty claim.
     let sets: any[] = [];
-    for (let i = 0; i < 40 && sets.length === 0; i++) {
+    for (let i = 0; i < 40 && (sets.length === 0 || sets[0].running); i++) {
         await new Promise(r => setTimeout(r, 500));
         sets = (await D.json('/v1/install-sets', { headers: auth(dToken) })).body.data?.install_sets ?? [];
     }

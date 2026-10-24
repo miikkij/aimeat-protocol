@@ -236,7 +236,7 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-23",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
@@ -260,12 +260,12 @@
       "digest": "sha256:d8c0ddd3f743e712f66442c1"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-23",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:c3437cd09b19402df2ea47e6"
+      "digest": "sha256:9713ff20493c0aaa62d5a0f6"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -325,7 +325,7 @@
       "digest": "sha256:d5d56e4feb12045d38ef59c4"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-23",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:f030b44047041152d7541e5a"
+      "digest": "sha256:3df4843b08d25be697c445b9"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -362,7 +362,7 @@
       "digest": "sha256:d44ff67446540a69424076cd"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-23",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -373,7 +373,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:8b78bcfd18eabc92e1600c73",
+      "digest": "sha256:b575c8ccf616a62a9b9744f4",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -630,7 +630,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "fec5c4713440926b",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "17a446c5b02e1805"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "40c81e6211e92fcb"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
@@ -742,8 +742,8 @@
       "aimeat/src/cli/connect/mcp/local-server.ts": "cebe16fc0210cc3e",
       "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d",
       "aimeat/src/routes/organisms/workspace-access.ts": "6bee2a50409a1cf7",
-      "aimeat/src/services/agent-profile-write.ts": "1d994833dc454b72",
-      "aimeat/src/services/agent-task-rules.ts": "b3fcbcce4708f37d"
+      "aimeat/src/services/agent-profile-write.ts": "27b8a03e2ea5d74c",
+      "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
     },
     "node:aimeat-extension-builder": {
       "aimeat/src/services/build-extension-prompt.ts": "1c79998a65a291d4",
@@ -759,8 +759,8 @@
       "aimeat/src/routes/memory/key.ts": "ee6eb5fd530c09d5",
       "aimeat/src/services/memory-bin.ts": "4674e2af0981fd35",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
-      "aimeat/src/routes/owners/export.ts": "86ef0669d00f4040",
-      "aimeat/src/services/owner-erasure.ts": "ddd5686027483180",
+      "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
+      "aimeat/src/services/owner-erasure.ts": "221669a172ec7e1c",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },

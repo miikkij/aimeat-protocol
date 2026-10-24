@@ -10,6 +10,7 @@
  *   2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party made TO the
  *     agent end with it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   2026-10-18 — setAgentScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
+ *   2026-10-23 — taskStartFloor on create, update and read as a JSON list in TEXT (migration 0115).
  *   2026-10-18 — clearance on create and read (migration 0107, plan doc-mvdipuyqraas L2). updateAgent passes it through.
  *   2026-10-16 — operatorAccountState({ claim: true }) takes a transaction-scoped advisory lock first, the
  *     single claim to the first operator (Jouni, 2026-10-16).
@@ -44,6 +45,7 @@ import type { AgentRecord, GHIIRecord, GHIIPatch, GrantsToIdentityCleared, Owner
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError, scopeListIs } from '../helpers.js';
+import { floorListOf } from '../../../scope-list.js';
 import { deleteOwnerCascade, cascadeDeleteIdentityData, settleDeletedAgentWorkDb } from './owner-cascade.js';
 import { clearGrantsToIdentityDb } from './grantee-erasure.js';
 
@@ -88,6 +90,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     ...(r.taskStart === 'automatic' || r.taskStart === 'confirm' ? { taskStart: r.taskStart } : {}),
     ...(r.stoppedAt ? { stoppedAt: r.stoppedAt, stoppedBy: r.stoppedBy ?? null } : {}),
     ...(r.clearance ? { clearance: r.clearance } : {}),
+    ...(floorListOf(r.taskStartFloor) ? { taskStartFloor: floorListOf(r.taskStartFloor) } : {}),
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -193,6 +196,7 @@ export const identityMethods = {
       cardJws: a.cardJws ?? null, cardIssuedAt: a.cardIssuedAt ?? null, enrolledAt: a.enrolledAt ?? null,
       mcpClient: a.mcpClient ?? null, mcpLastSeen: a.mcpLastSeen ?? null, taskStart: a.taskStart ?? null,
       stoppedAt: a.stoppedAt ?? null, stoppedBy: a.stoppedBy ?? null, clearance: a.clearance ?? null,
+      taskStartFloor: a.taskStartFloor?.length ? JSON.stringify(a.taskStartFloor) : null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
@@ -231,6 +235,8 @@ export const identityMethods = {
     for (const [k, v] of Object.entries(updates)) {
       if (v === undefined) continue;
       if (jsonCols.has(k)) data[k] = jsonb((v ?? null) as Parameters<typeof jsonb>[0]);
+      // A TEXT column holding a JSON list: pg would write a JS array as its own array literal.
+      else if (k === 'taskStartFloor') data[k] = Array.isArray(v) && v.length ? JSON.stringify(v) : null;
       else if (dateCols.has(k)) data[k] = v == null ? null : new Date(v as string);
       else data[k] = v;
     }

@@ -9,6 +9,10 @@
  * @structure APP_GRANTABLE_SCOPES — the one list, keyed by scope word.
  * @usage import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
  * @version-history
+ *   2026-10-23 — exchange:read and exchange:write, askable by an app. EXCHANGE (the marketplace app)
+ *     could not show a signed-in person's contracts, work or listings, nor contract, post a need or
+ *     list anything: those routes ask these two words, no app could hold them, and declaring one
+ *     refused the whole sign-in (wish-apps-cannot-hold-exchange-read-exchange-write-exchange-signe).
  *   2026-10-16 — The consent text says what memory:delete and memory:purge really do: a delete goes to
  *     the bin first; a purge also covers a whole workspace or organism (invariant 8, ruled by the
  *     developer on 2026-10-16).
@@ -128,6 +132,14 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // write your records would silently also be allowed to publish them to people you never named.
   // So it is asked for on its own, exactly as exchange:grant is for giving away what you sell.
   'share:manage': 'Share parts of your memory with people and groups you have set up (and stop sharing)',
+  // The marketplace as the person sees it: their contracts and their spend under each, the work they
+  // started or must deliver, the proposals on a contract, and who uses what they sell. Offerings and
+  // open needs are public and ask nothing.
+  'exchange:read': 'See your marketplace contracts, the work you started or must deliver, and who uses what you sell',
+  // Acting on the marketplace: accepting an offering under a budget cap, posting a need or a bid,
+  // proposing new terms, delivering work, listing and withdrawing what you sell. Spending under a
+  // contract is still contract:spend with its per-app ceiling; this word only opens or changes them.
+  'exchange:write': 'Make and end marketplace contracts within a budget you set, post needs and bids, deliver work, and list what you sell',
   'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
   // Declaring that part of your revenue goes to someone else, and paying it out, both move value out
   // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,

@@ -28,6 +28,9 @@
  *   const effective = mergePolicy(node, layer);
  *   const given = loosenings(before, after);         // [] when the change only tightens
  * @version-history
+ *   v1.5.0 — 2026-10-23 — A label's externalAi (plan doc-mvlftkh9zmc9, C3.4): read, inherited, kept
+ *     refused by a lower level, merged as refused when either says so, and a change to allowed counts
+ *     as a loosening and a weaker field.
  *   v1.4.0 — 2026-10-18 — A label's maxAudience (plan doc-mvdipuyqraas, L3.1): read, inherited by an
  *     own label, narrowed by a lower level and never widened (POLICY_DILUTES), merged as the narrower
  *     cap, and a wider cap counts as a loosening and a weaker field. The reader-audience helpers moved
@@ -126,6 +129,8 @@ function readLabel(v: unknown, i: number, problems: string[], base?: Classificat
   };
   const audience = readAudience(v.audience, `${where} (${id})`, problems);
   const cap = readCap(v.maxAudience, `${where} (${id})`, problems);
+  const externalAi = v.externalAi ?? base?.externalAi ?? 'allowed';
+  if (externalAi !== 'allowed' && externalAi !== 'refused') problems.push(`${where} (${id}).externalAi is allowed or refused.`);
   return {
     id, name, rank, color, status: status as ClassificationLabel['status'],
     description: str(v.description, 500) ?? base?.description ?? '',
@@ -133,6 +138,7 @@ function readLabel(v: unknown, i: number, problems: string[], base?: Classificat
     lowerNeedsJustification: bool('lowerNeedsJustification', false),
     audience: audience === undefined ? (base?.audience ?? null) : audience,
     maxAudience: cap === undefined ? (base?.maxAudience ?? null) : cap,
+    ...(externalAi === 'refused' ? { externalAi: 'refused' as const } : {}),
   };
 }
 
@@ -317,7 +323,13 @@ function stricterLabel(base: ClassificationLabel, over: ClassificationLabel): Cl
     lowerNeedsJustification: base.lowerNeedsJustification || over.lowerNeedsJustification,
     audience: narrower ?? null,
     maxAudience: narrowerCap(base.maxAudience, over.maxAudience),
+    ...(refusesExternalAi(base) || refusesExternalAi(over) ? { externalAi: 'refused' as const } : {}),
   };
+}
+
+/** Does content with this label stay away from a model that runs somewhere else (C3.4)? */
+export function refusesExternalAi(l: Pick<ClassificationLabel, 'externalAi'> | undefined | null): boolean {
+  return l?.externalAi === 'refused';
 }
 
 /** Every way `next` is less strict than `base`, as sentences naming `baseName`. */
@@ -329,6 +341,7 @@ function labelLoosenings(next: ClassificationLabel, base: ClassificationLabel, b
   if (base.lowerNeedsJustification && !next.lowerNeedsJustification) out.push(`${baseName} needs a reason for lowering, which cannot be dropped.`);
   if (!audienceWithin(next.audience, base.audience)) out.push(`${baseName} limits its readers, and a lower level may only narrow that list.`);
   if (capWider(next.maxAudience, base.maxAudience)) out.push(`${baseName} may be shown to at most "${base.maxAudience}", and a lower level may only narrow that.`);
+  if (refusesExternalAi(base) && !refusesExternalAi(next)) out.push(`${baseName} reaches only a model on this machine, which cannot be allowed elsewhere.`);
   return out;
 }
 
@@ -460,6 +473,7 @@ function tighterThan(n: ClassificationLabel, raw: Record<string, unknown>): Reco
   const narrowed = intersectAudience(n.audience, storedAudience(raw.audience));
   if (!audienceEmpty(narrowed) && JSON.stringify(narrowed) !== JSON.stringify(n.audience ?? null)) o.audience = narrowed;
   if (isAudienceLevel(raw.maxAudience) && capWider(n.maxAudience, raw.maxAudience)) o.maxAudience = raw.maxAudience;
+  if (raw.externalAi === 'refused' && !refusesExternalAi(n)) o.externalAi = 'refused';
   return Object.keys(o).length > 1 ? o : null;
 }
 
@@ -467,7 +481,8 @@ function tighterThan(n: ClassificationLabel, raw: Record<string, unknown>): Reco
 function saysMore(n: ClassificationLabel, raw: Record<string, unknown>): boolean {
   return (['aiVisibility', 'audit', 'mayLeaveOrganism', 'lowerNeedsJustification'] as const).some(f => raw[f] !== undefined && raw[f] !== n[f])
     || (raw.audience !== undefined && JSON.stringify(storedAudience(raw.audience)) !== JSON.stringify(n.audience ?? null))
-    || (raw.maxAudience !== undefined && (raw.maxAudience ?? null) !== (n.maxAudience ?? null));
+    || (raw.maxAudience !== undefined && (raw.maxAudience ?? null) !== (n.maxAudience ?? null))
+    || (raw.externalAi !== undefined && raw.externalAi !== (n.externalAi ?? 'allowed'));
 }
 
 /** An own label with every rule field that is now looser than its base raised to the base's. */
@@ -483,6 +498,7 @@ function raiseToBase(base: ClassificationLabel, raw: Record<string, unknown>): {
   if (!audienceWithin(aud, base.audience)) { o.audience = intersectAudience(base.audience, aud); raised.push('audience'); }
   const cap = raw.maxAudience;
   if (cap !== undefined && capWider(isAudienceLevel(cap) ? cap : null, base.maxAudience)) { o.maxAudience = base.maxAudience; raised.push('maxAudience'); }
+  if (refusesExternalAi(base) && raw.externalAi !== undefined && raw.externalAi !== 'refused') { o.externalAi = 'refused'; raised.push('externalAi'); }
   return { label: o, raised };
 }
 
@@ -655,6 +671,7 @@ export function mergePolicy(node: ClassificationPolicy, layer?: PolicyLayer | nu
 const FIELD_NAMES = {
   aiVisibility: 'what an AI sees', audit: 'the audit trail', mayLeaveOrganism: 'staying in the organism',
   lowerNeedsJustification: 'a reason for lowering', audience: 'the reader list', maxAudience: 'the widest audience',
+  externalAi: 'staying with a model on this machine',
 } as const;
 export type LabelField = keyof typeof FIELD_NAMES;
 
@@ -673,6 +690,7 @@ export function weakerFields(next: ClassificationLabel, base: ClassificationLabe
   if (base.lowerNeedsJustification && !next.lowerNeedsJustification) out.push('lowerNeedsJustification');
   if (!audienceWithin(next.audience, base.audience)) out.push('audience');
   if (capWider(next.maxAudience, base.maxAudience)) out.push('maxAudience');
+  if (refusesExternalAi(base) && !refusesExternalAi(next)) out.push('externalAi');
   return out;
 }
 

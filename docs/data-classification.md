@@ -1,8 +1,8 @@
 # Data classification, the compliance register and the cookie banner
 
 Three optional features an operator turns on when the node's people or the law need them: levels that
-decide what an AI may read and what may leave a group, a register of how the node uses AI, and a
-cookie consent banner. All three are off on a new node. This page describes them as implemented; it
+decide what an AI may read and what may leave a group, a register of how the node uses AI with the
+records of processing beside it, and a cookie consent banner. All three are off on a new node. This page describes them as implemented; it
 stands until AIMEAT Core 2026-11 specifies classification as an optional profile of the protocol.
 
 ## Data classification
@@ -38,8 +38,33 @@ audience of roles, groups or people) and detection rules:
 | `luottamuksellinen` (Confidential) | with a warning | yes | no | yes |
 | `erittain-luottamuksellinen` (Highly confidential) | with a warning | yes | no | yes |
 
-A level's AI visibility can also be `hidden`; none of the shipped levels uses it. New content gets the
-policy's default label (Internal). Policies are kept at three levels, node, owner and organism, and a
+A level's AI visibility can also be `hidden`; none of the shipped levels uses it. A level can also
+refuse an outside model (`externalAi: refused`): an AI still reads its content, but only a model on this
+machine. An agent whose model runs elsewhere finds such content absent, an AI call with a model that is
+not `local:` is refused (`CLASSIFIED`), and no exception opens it. Only an agent whose runtime report
+says `llm: "local"` (`aimeat_agent_runtime_report`) reads it; the node records that claim and cannot
+check it. New content gets the policy's default label (Internal).
+
+### Security class packs (TL and NATO)
+
+The operator switches two packs on from the admin Security page, or with `PUT /v1/classification/packs`
+(`aimeat_classification` action `pack_set`):
+
+| Pack | Classes, lowest first | Rank |
+|---|---|---|
+| `tl` (Finnish security classes, laki 906/2019, VNA 1101/2019) | TL IV Käyttö rajoitettu, TL III Luottamuksellinen, TL II Salainen, TL I Erittäin salainen | 40, 50, 60, 70 |
+| `nato` | NATO RESTRICTED, NATO CONFIDENTIAL, NATO SECRET, COSMIC TOP SECRET | 45, 55, 65, 75 |
+
+Every class: an AI sees it with a warning and only a model on this machine reads it, every use is
+audited, it never leaves its organism, lowering needs a reason, and it is shown to at most the
+organism's members. The need to know is the label's reader list (a group of cleared people). A pack's
+rules recognise its markings in upper case ("TL III", "ST II", "KÄYTTÖ RAJOITETTU", "NATO SECRET",
+"COSMIC TOP SECRET"), never the bare words LUOTTAMUKSELLINEN or SALAINEN. A pack is switched on up to
+a class (`upTo`); a marking above it raises content to the highest class that is on. The two highest
+classes of each pack need the operator's acknowledgement that this node is not an accredited system
+(Katakri, Traficom approval, NATO accreditation), and the compliance report warns for as long as they
+are on. Switching a pack off retires its classes with every field kept, so labelled content stays as
+protected as it was. Source: `aimeat/src/data/classification-packs.ts`. Policies are kept at three levels, node, owner and organism, and a
 lower level can only make the node's policy stricter (`aimeat/src/services/classification/levels.ts`).
 Defaults and limits: `aimeat/src/services/classification/defaults.ts`.
 
@@ -100,8 +125,41 @@ AI cannot make one). Routes: `/v1/classification/*` in [openapi.yaml](../openapi
 **What it gives.** A record of how the node uses AI: use cases, the systems and models behind each,
 its purpose, whose data it touches, and a risk class from a questionnaire (prohibited, high, limited,
 minimal; an unanswered use case reads unclassified). A report joins the register to what the node
-logged about AI use and names the gaps. The register covers AI use only. A GDPR record of processing
-activities is the operator's own document; the node does not keep one.
+logged about AI use and names the gaps. Beside it, the records of processing below.
+
+## Records of processing and the documents beside them
+
+**What it gives.** The GDPR record of processing activities (art. 30) and what goes with it, kept by
+whoever is the controller: the node's own by the operator, an organism's by its creator or an admin,
+an app's by its owner. The operator reads all of them; an organism's members read its own.
+
+| Document | What it holds | Scopes |
+|---|---|---|
+| `registers` | one register each: type (personal, pseudonymised, anonymised, none), purpose, role, legal basis (art. 6, and art. 9(2) for special data), subjects, data categories, data domains, recipients, processors, transfers, retention, the containers it covers, review date | node, organism, app |
+| `processors` | the contract, country, transfer basis, HIPAA BAA and ITAR eligibility the operator adds to each processor; the node lists the AI providers whose prompts leave the machine, mail and hosting itself | node |
+| `requests` | data subject requests with their one-month deadline; an account export and an erasure log themselves | node, organism, app |
+| `breaches` | personal data breaches with the 72-hour clock (GDPR) and the 60-day one (HIPAA) | node, organism, app |
+| `dpias` | data protection impact assessments (art. 35) | node, organism, app |
+| `frameworks` | answers to GDPR, NIS2, DORA, CRA, EAA, DSA, HIPAA and export-control question sets; an unanswered one reads unclassified, never "does not apply" | node, organism |
+
+**Data domains.** A register names the law its data falls under: health, other special categories,
+biometric and genetic, children, criminal, employment, payments, public authority, defence and
+security-classified, export-controlled, legal privilege and trade secrets
+(`aimeat/src/data/compliance-domains.ts`). Each has a floor label, and writing a register raises the
+classification of every workspace, organism or app it names to that floor, never lower; a label a
+person set lower waits for them as a suggestion. Health, biometric, defence and export-controlled
+data refuse an outside model, and a domain that needs an impact assessment makes a missing one a gap.
+
+**Drafts and gaps.** `GET /v1/compliance/draft` hands a filled draft: the node's own registers
+(accounts, the sign-in and security log, the consent ledger, the AI usage ledger), an organism's member
+register, or an app's register read from its data map. `GET /v1/compliance/gaps` lists what a scope
+leaves open, and the operator's report carries every scope's gaps under `processing`.
+
+**Where.** `GET /v1/compliance/catalog`, `GET`/`PUT /v1/compliance/docs/{kind}`, `/draft` and `/gaps`,
+with `scope=node|organism|app`, `organism_id`, `app` and `app_owner`. Something acting for a person
+needs `compliance:read` or `compliance:write`. An AI uses `aimeat_compliance_register_read` and
+`aimeat_compliance_register_write` with the same parts and scope. Not legal advice: the node checks
+the documents against its own records and cannot check them against the world.
 
 **Where.** The admin Compliance tab (`/v1/admin?tab=compliance`). Routes, operator only:
 `GET /v1/admin/compliance/report`, `GET /v1/admin/compliance/reports`,
