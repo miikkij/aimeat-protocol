@@ -16,6 +16,8 @@
  *   2026-10-18 — ctx.ai.result(jobId): the answer of a job this extension started, for its installer.
  *   2026-10-18 — ctx.caller.anonymous (a visitor on a public action), ctx.caller.adult (verified
  *     adult yes/no, method, time) and ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
+ *   v1.11.0 — 2026-10-24 — `fetch` takes `responseType: 'base64'` and answers `base64`: a binary
+ *     body intact (jussil riistakartta, support thread 1ac0a199).
  *   2026-10-16 — ExtensionLimits.wallClockMs: the wall-clock limit of a whole run (QA audit S7-02).
  *   v1.10.0 — 2026-10-13 — `ctx.calendar`: the calendar library's computation as host calls
  *     (services/extension-calendar.ts).
@@ -183,8 +185,13 @@ export interface ExtensionCtx {
      * `timeoutMs` is the script's own deadline for this one call, between 100 ms and 30 s and
      * inside the run's. Past it the call throws `FETCH_TIMEOUT: …`, which the script can catch and
      * go on from; without it an address that never answers holds the call until the run ends.
+     *
+     * `responseType: 'base64'` answers the body's bytes as they arrived, in `base64`, with `text`
+     * empty: a binary answer (a Garmin `.img`, an image) decoded as text loses every byte that is
+     * not valid UTF-8. The same ceiling, the same `gunzip` and the same removal of what the node
+     * put into the request apply. Any responseType other than 'text' or 'base64' throws.
      */
-    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string; gunzip?: boolean; timeoutMs?: number }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
+    fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string; gunzip?: boolean; timeoutMs?: number; responseType?: 'text' | 'base64' }, host?: { signal?: AbortSignal }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string>; base64?: string }>;
     /** Stored FILES, by reference. Optional the way notify/email are: a road that cannot offer it
      *  simply does not, and the guest sees undefined.
      *

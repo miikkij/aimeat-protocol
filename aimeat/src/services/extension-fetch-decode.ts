@@ -5,9 +5,13 @@
  * @description How ctx.fetch reads an answer into text: up to a byte ceiling, inflated when asked,
  *   decoded by the charset the header or the document declares. Moved out of
  *   services/extension-ctx.ts unchanged when that file passed 800 lines (pure extraction).
- * @structure looksLikeUtf8 · hostOfUrl · decodeBody (exported)
+ * @structure looksLikeUtf8 · hostOfUrl · fetchResponseType · readBodyBytes · decodeBody (the last three exported)
  * @usage const text = await decodeBody(resp, url, strictCharset, { gunzip, maxBytes });
+ *   const bytes = await readBodyBytes(resp, url, { gunzip, maxBytes });
  * @version-history
+ *   v1.1.0 — 2026-10-24 — readBodyBytes: the capped read and inflate without the decode, for
+ *     `responseType: 'base64'`, and fetchResponseType, which refuses an unknown value (jussil
+ *     riistakartta, support thread 1ac0a199).
  *   v1.0.0 — 2026-10-10 — Moved from services/extension-ctx.ts (800-line rule), no change in behaviour.
  */
 import { readBodyCapped, inflateCapped, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
@@ -40,6 +44,39 @@ function hostOfUrl(url: string): string | null {
 }
 
 /**
+ * How a script asked ctx.fetch to hand back the body: 'text' (the default) or 'base64'. Any other
+ * value throws, so a script that guessed an option name (`arraybuffer`, `latin1`) learns it at once
+ * instead of receiving a lossy text decode.
+ */
+export function fetchResponseType(value: unknown): 'text' | 'base64' {
+    if (value === undefined || value === null || value === 'text') return 'text';
+    if (value === 'base64') return 'base64';
+    throw new Error(`Fetch refused: responseType ${JSON.stringify(value) ?? String(value)} is not one ctx.fetch knows; it is 'text' or 'base64'.`);
+}
+
+/**
+ * Read a response body as bytes, up to the ceiling and inflated when asked: the half of decodeBody
+ * that does not decode. `ctx.fetch(url, { responseType: 'base64' })` hands these bytes to the script
+ * as they are, because a binary answer (a Garmin `.img`, an image) decoded as text is lost: every
+ * invalid UTF-8 sequence becomes U+FFFD. The ceiling and its RESPONSE_TOO_LARGE are the ones
+ * described under decodeBody below.
+ */
+export async function readBodyBytes(resp: Response, url: string, read: { gunzip?: boolean; maxBytes?: number } = {}): Promise<Buffer> {
+    const maxBytes = read.maxBytes ?? OUTBOUND_READ_MAX_BYTES;
+    const raw = await readBodyCapped(resp, maxBytes);
+    const buf = raw === null ? null : read.gunzip ? inflateCapped(raw, maxBytes) : raw;
+    if (buf === null) {
+        const host = hostOfUrl(url);
+        const mb = maxBytes / (1024 * 1024);
+        throw new Error(`RESPONSE_TOO_LARGE: The answer ${host ? `from ${host} ` : ''}is larger than `
+            + `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB, the most ctx.fetch reads of one answer`
+            + `${raw !== null ? ' once inflated' : ''}. Ask the source for less: fewer items, one page at a time, or a `
+            + 'shorter date range; or raise `limits.fetch_max_mb` in the manifest.');
+    }
+    return buf;
+}
+
+/**
  * Read a response body as text, honouring the charset from the header or the document prolog.
  * Extracted because each hand-built context carried its own copy and they had drifted: three had
  * the mislabelled-encoding guard below and the MCP one did not, so the same feed that reads
@@ -66,17 +103,7 @@ function hostOfUrl(url: string): string | null {
  * script calls several services can tell which one answered too much (hostOfUrl below).
  */
 export async function decodeBody(resp: Response, url: string, strictCharset = false, read: { gunzip?: boolean; maxBytes?: number } = {}): Promise<string> {
-    const maxBytes = read.maxBytes ?? OUTBOUND_READ_MAX_BYTES;
-    const raw = await readBodyCapped(resp, maxBytes);
-    const buf = raw === null ? null : read.gunzip ? inflateCapped(raw, maxBytes) : raw;
-    if (buf === null) {
-        const host = hostOfUrl(url);
-        const mb = maxBytes / (1024 * 1024);
-        throw new Error(`RESPONSE_TOO_LARGE: The answer ${host ? `from ${host} ` : ''}is larger than `
-            + `${Number.isInteger(mb) ? mb : mb.toFixed(1)} MB, the most ctx.fetch reads of one answer`
-            + `${raw !== null ? ' once inflated' : ''}. Ask the source for less: fewer items, one page at a time, or a `
-            + 'shorter date range; or raise `limits.fetch_max_mb` in the manifest.');
-    }
+    const buf = await readBodyBytes(resp, url, read);
     const ct = resp.headers.get('content-type') || '';
     let charset = (/charset=([^\s;]+)/i.exec(ct)?.[1] ?? '').toLowerCase();
     if (!charset) {

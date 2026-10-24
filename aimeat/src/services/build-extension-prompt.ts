@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.5 — 2026-10-24 — ADDITIVE: `ctx.fetch(url, { responseType: 'base64' })` reads a binary answer
+ *     intact (jussil riistakartta, support thread 1ac0a199).
  *   v1.7.4 — 2026-10-22 — ADDITIVE: ctx.files.write and ctx.datapackage.publish say that a public write
  *     by an agent without publish:public waits for the owner and returns `publishRequest` (secaudit
  *     2026-10, v68 and v69).
@@ -144,7 +146,7 @@ function sandboxSection(): string {
     '| `ctx.memory.search(prefix)` | `[{key, value}]` for every key under the prefix, private ones included |',
     '| `ctx.memory.delete(key)` | Remove one key; returns whether it existed |',
     '| `ctx.memory.getPublic(namespace, key)` | Read a PUBLIC key in another namespace (another `ext:` one, or an owner\'s), or null |',
-    `| \`ctx.fetch(url, {method, headers, body, gunzip, timeoutMs})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer (more with \`limits.fetch_max_mb\`, below), and throws \`RESPONSE_TOO_LARGE\` past that. \`gunzip: true\` inflates a gzipped answer (a \`.xml.gz\`, a compressed export) before it is decoded. \`timeoutMs\` (100 to 30000) is your own deadline for this one call: past it the call throws \`FETCH_TIMEOUT: …\`, which you catch and go on from. Give one whenever a run calls several addresses, because without it one address that never answers holds the call until the whole run times out |`,
+    `| \`ctx.fetch(url, {method, headers, body, gunzip, timeoutMs, responseType})\` | The only way out. Returns \`{status, ok, text, headers}\`. Reads at most ${FETCH_READ_MB} MB of one answer (more with \`limits.fetch_max_mb\`, below), and throws \`RESPONSE_TOO_LARGE\` past that. \`gunzip: true\` inflates a gzipped answer (a \`.xml.gz\`, a compressed export) before it is decoded. \`responseType: 'base64'\` returns a binary answer (an image, a map file, a PDF) intact as \`base64\`, with \`text\` empty; any other responseType than \`'text'\` or \`'base64'\` throws. \`timeoutMs\` (100 to 30000) is your own deadline for this one call: past it the call throws \`FETCH_TIMEOUT: …\`, which you catch and go on from. Give one whenever a run calls several addresses, because without it one address that never answers holds the call until the whole run times out |`,
     '| `ctx.files.read(ref)` | A stored file as `{base64, mime, size, key}`, or null. Read with the CALLER\'s rights |',
     '| `ctx.files.write(key, base64, {mime, visibility})` | Store bytes under `ext/{name}/`, private unless `visibility: \'public\'`. Returns `{key, gaii, owner, url, size}`; `owner` is whose storage it landed in. Public meets the node\'s publish gate: run by an agent without the owner\'s publish:public, the file is stored private and `publishRequest` says the owner approves it, after which `url` opens |',
     '| `ctx.datapackage.publish / validate / inferSchema / open / rows / fail` | AIMEAT Data Packages, built on the node. `publish` THROWS when the quality gate refuses; `validate` looks first without throwing. A public publish by an agent without the owner\'s publish:public lands at the level the package had and returns `publishRequest` for the owner to approve |',
@@ -317,6 +319,9 @@ function sandboxSection(): string {
     'a member through an EXCHANGE grant notifies them and an extension cannot.',
     '',
     '`ctx.fetch` returns `text`, never a parsed body. Parse it yourself and handle a non-ok status.',
+    'A binary answer read as text is lost, because every byte that is not valid UTF-8 becomes U+FFFD.',
+    'Read it with `ctx.fetch(url, { responseType: \'base64\' })`, which returns the bytes as `base64`',
+    'under the same ceiling (base64 is a third longer than the bytes it carries).',
     `It reads at most ${FETCH_READ_MB} MB of one answer. A longer answer makes the call throw`,
     '`RESPONSE_TOO_LARGE: …` and returns none of it, so ask a large source for one page at a time.',
     'A source that has no pages (a national TV guide, a full export) is read under a larger ceiling',
@@ -456,7 +461,8 @@ function filesSection(): string {
   return [
     '## Files, when text is not enough',
     '',
-    '`ctx.fetch` gives you text. For bytes (a PDF, an image, a spreadsheet) use the file surface:',
+    '`ctx.fetch` gives you text, or base64 with `responseType: \'base64\'`. For bytes that are already',
+    'stored on the node (a PDF, an image, a spreadsheet), and for bytes you produce, use the file surface:',
     '',
     '```js',
     'const f = await ctx.files.read(ref);            // { base64, mime, size, key } or null',

@@ -637,6 +637,9 @@ const ALL_SUITES = [
     // ctx.fetch with gunzip, under the ceiling a manifest declares (limits.fetch_max_mb): a 6 MB
     // guide read whole, the 4 MB default and a gzip bomb refused by name, a bad limit refused at install.
     'test/e2e-extension-fetch-gunzip.ts',
+    // ctx.fetch with responseType: 'base64': a binary map file read byte for byte, an unknown
+    // responseType refused by name, the ceiling the same as for text.
+    'test/e2e-extension-fetch-base64.ts',
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',
