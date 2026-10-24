@@ -15,6 +15,7 @@
  *   silence: an app's own element that only looks like a mark is never touched.
  * @usage pnpm exec vitest run test/unit/app-serve-marks-strip.test.ts
  * @version-history
+ *   v1.5.0 - 2026-10-25 - The internet-open line round-trips, alone and with every other mark.
  *   v1.4.0 - 2026-10-19 - Modern nonblocking cookie loader and both legacy banner shapes round-trip.
  *   2026-10-18 -- The app-info mark round-trips too, alone and with every other mark.
  *   v1.2.0 — 2026-10-09 — The "Use with your AI" mark round-trips alone and with every other mark.
@@ -76,6 +77,11 @@ const INFO: NonNullable<ServeMarksSpec['info']> = {
   tucked: true, moreUrl: 'https://aimeat.io/v1/appcat?q=demo.html', locale: 'fi',
 };
 
+/** The internet-open line as services/internet-opening/opening-mark.ts hands it over, with non-ASCII words. */
+const INTERNET_OPEN: NonNullable<ServeMarksSpec['internetOpen']> = {
+  text: 'Tämä sivu on auki kaikille internetissä.', who: 'Innokas Oy & <Kumppanit> · innokas.aimeat.io',
+};
+
 const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['every mark', FULL,
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-ref', 'badge', 'chrome-reserve']],
@@ -93,6 +99,9 @@ const SPECS: Array<[string, ServeMarksSpec, ServedMarkKind[]]> = [
   ['the app-info mark alone, in Finnish', { isDocument: true, info: INFO }, ['app-info', 'chrome-reserve']],
   ['every mark, the "Use with your AI" mark and the app-info mark', { ...FULL, aiUse: AI_USE, info: INFO },
     ['agent-discovery', 'ai-disclosure', 'ai-label', 'ai-use', 'app-info', 'app-ref', 'badge', 'chrome-reserve']],
+  ['the internet-open line alone, in Finnish', { isDocument: true, internetOpen: INTERNET_OPEN }, ['internet-open']],
+  ['every mark and the internet-open line', { ...FULL, info: INFO, internetOpen: INTERNET_OPEN },
+    ['agent-discovery', 'ai-disclosure', 'ai-label', 'app-info', 'app-ref', 'badge', 'chrome-reserve', 'internet-open']],
 ];
 
 describe('stripServedMarks: a served copy comes back as the author\'s bytes', () => {

@@ -36,6 +36,8 @@
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.2.0 — 2026-10-25 — On a node with signed-in content access, search visibility waits for an
+ *     operator's approval in either mode (services/internet-opening/).
  *   v1.1.2 — 2026-10-11 — `gated` reads the app's pacing amount (`tollMorsels`); a morsel is pacing,
  *     not a price, and the owner's note no longer calls it one.
  *   v1.1.1 — 2026-09-11 — The notice goes through announceApp, which sends each host under its own
@@ -55,6 +57,7 @@ import { announceApp } from './indexnow.js';
 import { resolveAppOwnerScope } from './app-lifecycle.js';
 import { emitChange } from './event-bus.js';
 import { appToll } from './app-pacing.js';
+import { signedInOnly } from '../config-visibility.js';
 
 /**
  * Why an app is or is not search-visible, in terms an operator can act on. `appSeoIndexable` is the
@@ -94,7 +97,10 @@ export function appSeoState(app: AppSummaryRecord, config: AimeatConfig): AppSeo
 
   const seo = app.manifest?.seo;
   if (seo?.index !== true) return 'off';
-  if (config.appsSeoMode === 'review' && !seo.approvedBy) return 'pending';
+  // A node that shows its content to signed-in accounts only reviews every app's search visibility,
+  // whatever its mode: an app opened to the internet there is found by search only on an operator's
+  // approval (services/internet-opening/), and its link is otherwise shared by hand.
+  if ((config.appsSeoMode === 'review' || signedInOnly(config)) && !seo.approvedBy) return 'pending';
   return 'on';
 }
 

@@ -12,6 +12,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   2026-10-25 — intake-form-undeclared: the forms a page submits to are named in <meta name="aimeat-intake"> (services/app-intake-forms.ts).
  *   2026-10-19 — no-max-tokens: a text job runs uncapped and its record says truncated (wish
  *     ai-jobs-run-uncapped-and-report-a-cut-answer). schedule-next-run-needs-the-year: a failed
  *     one-shot is turned off with no next run (wish a-failed-one-shot-schedule-does-not-wait-a-year).
@@ -132,6 +133,18 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     updatedAt: '2026-09-13',
     ...CHECKED,
+  }),
+  E({
+    id: 'intake-form-undeclared',
+    title: 'Name every intake form the page submits to in <meta name="aimeat-intake">',
+    symptom: 'The publish answer warns that the code submits to an intake form the page does not declare; on a node that shows its content to signed-in accounts only, the form of an app opened to the internet answers visitors 401 while the page itself opens.',
+    fix: 'Put `<meta name="aimeat-intake" content="<org>/<ws>/<formId> <org>/<ws>/<formId>">` in the head, one org/workspace/form id per form the page calls with AIMEAT.intake.submit, getForm or thread.*. Each must be a form you manage (the workspace\'s creator or an organism admin), or the publish is refused with APP_INTAKE_INVALID. An app opened to the internet opens exactly the forms its live version declares; a form a new version adds waits for the operator where the node asks for approval.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-10-25',
+    verifiedAt: '2026-10-25',
+    verifiedVersion: '4.1.2',
   }),
   E({
     id: 'app-declared-unused',

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-compliance-agreements.ts joins the list (not the guard tier): data processing agreements (plan doc-mvmr4i2wdk0p).
  *   2026-10-23 -- e2e-compliance-records.ts and e2e-classification-packs.ts join the list (not the guard tier): the records of processing and the documents beside them, and the TL and NATO label packs (plan doc-mvlftkh9zmc9).
  *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
@@ -533,6 +534,8 @@ const ALL_SUITES = [
     'test/e2e-content-access-gate.ts',
     // Self-spawns its own signed-in-only node: what a signed-in browser sends without a credential.
     'test/e2e-content-access-browser.ts',
+    // Self-spawns its own signed-in-only node: one app and its forms opened to the internet, watched.
+    'test/e2e-app-internet-opening.ts',
     // Self-spawns its own node with the app origin and strict new-app defaults.
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.

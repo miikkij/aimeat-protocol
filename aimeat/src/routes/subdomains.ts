@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.33.0 — 2026-10-25 — serveApp gives an app a closed node opened to the internet the line that says
+ *     so (internetOpenMarkFor, services/internet-opening/).
  *   v1.32.1 — 2026-10-20 — serveApp's viewer is the resolved caller (resolveIdentity), not the token's
  *     `sub`, so an owner's own app open lands in their per-owner usage rows and a watermark names the
  *     full identity.
@@ -155,6 +157,7 @@ import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { appAiUse } from '../services/app-ai-use.js';
 import { appInfoMarkFor } from '../services/app-news.js';
+import { internetOpenMarkFor } from '../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
@@ -388,6 +391,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     let buf = applyServeMarks(relaxed, {
       aiUse: aiUse && visible ? { use: aiUse, locale: visible.locale } : undefined,
       info,
+      // An app a closed node opened to the internet says so at its end (services/internet-opening/).
+      internetOpen: internetOpenMarkFor(protect.config, app, visible?.locale),
       // This branch is inside a `text/html` test, so the media type is already settled and the
       // marks pass does not have to guess from a closing tag the author never had to write.
       isDocument: true,

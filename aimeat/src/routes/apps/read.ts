@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-25 — An app a closed node opened to the internet carries the line that says so (internetOpenMarkFor, services/internet-opening/).
  *   2026-10-21 — The access-code exemption and the paced-app 401 ask isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-20 — An app open is recorded, and a watermark names, the resolved caller (resolveIdentity):
  *     an owner session's `sub` is the bare account name, which filed the owner's own opens outside
@@ -121,6 +122,7 @@ import { servedBadgeOn, appReviewedBy } from '../../services/app-marks.js';
 import { appToolNames } from '../../services/app-tool-names.js';
 import { appAiUse } from '../../services/app-ai-use.js';
 import { appInfoMarkFor } from '../../services/app-news.js';
+import { internetOpenMarkFor } from '../../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appOfRequestOrigin } from '../../services/app-origin-target.js';
 import { appCsp } from '../../utils/app-csp.js';
@@ -726,6 +728,7 @@ export function registerReadRoutes(
                 provenance: prov,
                 aiUse: aiUse ? { use: aiUse, locale } : undefined,
                 info,
+                internetOpen: internetOpenMarkFor(config, app, locale),
                 visibleLabel: {
                     config, locale,
                     // As the publish decides it: an access code or a park makes the app private.

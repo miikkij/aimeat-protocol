@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.13.0 — 2026-10-25 — One app open to everyone on a closed node: aimeat_app_internet_open.
  *   v1.12.0 — 2026-10-18 — Adult status, subscriptions, provenance in exported files (Comicland v3).
  *   v1.11.0 — 2026-10-18 — A write that answers publish_request waits for the person (plan doc-mvcn6c7e4e5q, V4.6).
  *   v1.10.0 — 2026-10-17 — What others can read of the person: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
@@ -70,6 +71,11 @@ they do not know, call \`aimeat_exposure_report\`. It lists everything of theirs
 can read (open to anyone, to anyone holding the link, to every signed-in account here, or to one
 organisation's members), each with how to close it. Say what is open to everyone first, and close
 nothing without asking.
+
+**When the person wants one app open to everyone on a closed node** (a campaign page, a consent or
+data-request form), call \`aimeat_app_internet_open\` with their reason. The page and the forms it
+names in \`<meta name="aimeat-intake">\` open; the rest of the node stays closed. It opens at once or
+waits for an operator, as \`aimeat_app_internet_opening_get\` says; it closes itself at its end date.
 
 **When a write answers with \`publish_request\`**, making it public waits for the person: this node
 asks them first, and you do not hold publish:public. It is stored as it was. Tell them in one

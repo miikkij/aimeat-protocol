@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.43.0 -- 2026-10-25 -- One app open to the internet on a closed node: aimeat_app_internet_open, _get, _close.
  *   v1.42.1 -- 2026-10-24 -- The register write changes one entry with item_id and set (C7.7).
  *   v1.42.0 -- 2026-10-23 -- Content that refuses an outside model, and the records of processing (plan doc-mvlftkh9zmc9).
  *   v1.41.1 -- 2026-10-22 -- Classification: private records of the owner and siblings show only with
@@ -113,6 +114,14 @@ everyone first, and close nothing without asking. Where classification is on, an
 \`classification\`, and one whose \`conflict\` is true is open to more people than its classification
 allows: these come first, with \`lower_to\`, the widest level within the cap. Name them first and offer
 to lower each one; an \`excepted\` item is one your owner chose to keep open.
+
+**One app open to the internet on a closed node.** Where this node shows its content to its signed-in
+accounts only, \`aimeat_app_internet_open\` opens one of your owner's apps, with the intake forms its
+page names in \`<meta name="aimeat-intake">\`, to everyone (a campaign page with a consent form). It
+takes a \`reason\` (who it is for, what they do there) and \`days\`; it opens at once where your owner
+may, and otherwise waits for an operator, who decides. \`aimeat_app_internet_opening_get\` says which,
+and \`aimeat_app_internet_close\` closes it. Ask your owner before you open anything, and tell them
+whether it is open now or waits, and until when.
 
 **Making something public may wait for your owner.** When this node asks the owner first and you do
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is

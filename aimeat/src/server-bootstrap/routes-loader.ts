@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-25 — internetOpeningRouter (routes/internet-opening.ts): one app opened to the internet on a closed node.
  *   2026-10-24 — complianceAgreementsRouter: data processing agreements, their signing and notices (plan doc-mvmr4i2wdk0p).
  *   2026-10-23 — complianceDocsRouter: the records of processing and the documents beside them (plan doc-mvlftkh9zmc9).
  *   2026-10-18 — registerAudienceSettle(): a label that rises lowers content over its audience cap
@@ -127,6 +128,7 @@ import { memoryRouter } from '../routes/memory.js';
 import { memoryHandsRouter } from '../routes/memory-hands.js';
 import { dataMapRouter } from '../routes/data-map.js';
 import { exposureRouter } from '../routes/exposure.js';
+import { internetOpeningRouter } from '../routes/internet-opening.js';
 import { classificationRouter } from '../routes/classification.js';
 import { librarianRouter } from '../routes/librarian.js';
 import { discoverRouter } from '../routes/discover.js';
@@ -500,6 +502,7 @@ export async function mountRoutes(
   app.use(memoryHandsRouter(config, storage));
   app.use(dataMapRouter(config, storage));
   app.use(exposureRouter(config, storage));   // what of a person someone outside can read (V6.3)
+  app.use(internetOpeningRouter(config, storage)); // one app opened to the internet on a closed node
   app.use(classificationRouter(config, storage)); // TARGET-082: content classification and its policy
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval

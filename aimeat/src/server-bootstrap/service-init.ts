@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/).
  *   2026-10-24 — scheduleAgreementSweep: the hourly reminders, lapsed notices and signing reads of the
  *     data processing agreements (services/compliance-agreements-gaps.ts, plan doc-mvmr4i2wdk0p D4).
  *   2026-10-23 — flagOrphanPeerApprovalsOnce after the peer registry loads, with its node ids: the approved
@@ -164,6 +165,7 @@ import { scheduleAgreementSweep } from '../services/compliance-agreements-gaps.j
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
+import { refreshOpenings } from '../services/internet-opening/opening-registry.js';
 import { runRefineryJob } from '../services/refinery/scheduled-job.js';
 import { runAiJob } from '../services/scheduler-ai-job.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
@@ -233,6 +235,8 @@ export async function initializeServices(
 
   // Register core job handlers
   registerCoreHandlers(scheduler, config, storage);
+  // The apps open to the internet on a closed node, loaded before the first request asks the gate.
+  void refreshOpenings({ storage, config });
   scheduler.registerKindExecutor('refinery', (job) => runRefineryJob(storage, config, job));
   // The `ai` kind for the same reason: it writes its answer through the shared memory write
   // service, which reaches the Scheduler, so the Scheduler cannot import it (secaudit 2026-10).

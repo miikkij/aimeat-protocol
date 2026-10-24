@@ -233,6 +233,7 @@
         { "id": "economy", "labelKey": "dashboard.economy" },
         { "id": "config", "labelKey": "dashboard.config" },
         { "id": "security", "labelKey": "admin.security.title" },
+        { "id": "internet-openings", "labelKey": "admin.internetOpenings.title" },
         { "id": "compliance", "labelKey": "admin.compliance.title" },
         { "id": "cors", "labelKey": "dashboard.cors" },
         { "id": "maintenance", "labelKey": "dashboard.maintenance" },
