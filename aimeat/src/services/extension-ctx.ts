@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.19.1 — 2026-10-24 — ctx.fetch asks decideSharedFirstUse before a value from the extension's
+ *     shared secret map is bound to its first host (secaudit2026oct22; Jouni, 2026-10-24).
  *   v1.19.0 — 2026-10-24 — ctx.fetch takes `responseType: 'base64'`: the bytes come back intact as
  *     `base64`, scrubbed like text, and an unknown responseType is refused (jussil riistakartta).
  *   v1.18.3 — 2026-10-21 — The owner's approvals and the extension's declared uses reach the resolver;
@@ -139,7 +141,7 @@ import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
 import { decodeBody, fetchResponseType, readBodyBytes } from './extension-fetch-decode.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { resolveSecretForHeaders, secretPlaceholderNames } from './owner-secrets.js';
-import { vaultOwnerForCall, decideFirstUse, secretRefusalText } from './extension-secret-authority.js';
+import { vaultOwnerForCall, decideFirstUse, decideSharedFirstUse, secretRefusalText } from './extension-secret-authority.js';
 import { scrubBytes, scrubFormsOf, scrubResponse } from './extension-fetch-scrub.js';
 import { logger } from '../utils/logger.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
@@ -456,6 +458,12 @@ async function resolveOutboundSecrets(
         firstUse: (secretName, host) => decideFirstUse({
             storage: deps.storage, config: deps.config, caller: deps.caller, extension: deps.extension,
             vaultOwnerGhii: vaultOwner, unattended: deps.unattended === true, secretName, host, extConfig: deps.extConfig,
+        }),
+        // Who may choose the first host of a value from the extension's shared map, which then serves
+        // every account (secaudit2026oct22; Jouni, 2026-10-24).
+        sharedFirstUse: (secretName, host) => decideSharedFirstUse({
+            storage: deps.storage, config: deps.config, caller: deps.caller, extension: deps.extension,
+            unattended: deps.unattended === true, secretName, host, extConfig: deps.extConfig,
         }),
         // The approvals the owner gave on a secret name this extension and the account that installed it.
         ...(deps.extension ? { approvedFor: { extension: deps.extension.name, installer: deps.extension.owner } } : {}),

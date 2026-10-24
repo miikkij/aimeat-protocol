@@ -44,6 +44,7 @@
  *   - vaultOwnerForCall() — whose vault a call reads: the caller's owner
  *   - decideFirstUse() — may this call choose a first host: refused for another account's
  *     extension, ruling 6 for the caller's own
+ *   - decideSharedFirstUse() — may this call choose the first host of a shared-map value
  * @usage
  *   const vaultOwner = vaultOwnerForCall(deps.caller);
  *   resolveSecretForHeaders({ ..., ownerGhii: vaultOwner, firstUse: () => decideFirstUse({ ... }) });
@@ -69,6 +70,10 @@
  *     update keeps the pre-audit first use (extension-first-use-keep.ts); through living-hooks only
  *     the operator's list binds by itself, a host only on the caller's own list asks once (the read
  *     of living-hooks.settings is gone).
+ *   v1.6.0 — 2026-10-24 — decideSharedFirstUse: the first host of a value from the extension's
+ *     shared secret map is chosen only through the operator's allow_hosts, the extension's declared
+ *     hosts, or the operator in person; any other first use is refused, and secretRefusalText asks
+ *     the operators once per secret and host (secaudit2026oct22; Jouni, 2026-10-24).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -76,11 +81,13 @@ import type { ExtensionCtx } from './extension-ctx-contract.js';
 import type { FirstUseDecision, ForeignExtension, SecretResolutionRefusal } from './owner-secrets.js';
 import { secretForeignExtensionMessage, secretFirstUseMessage, secretHostMessage, secretUnknownMessage } from './owner-secrets.js';
 import { requestSecretApproval } from './secret-approvals.js';
-import { isGEAI, isOwnerInPerson, ownerGhiiOf } from '../utils/gaii.js';
+import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
 import { saverAuthority } from './workflow/trigger-authority.js';
 import { declaredUse, declaresHost } from './extension-secret-uses.js';
 import { keepsPreAuditFirstUse } from './extension-first-use-keep.js';
+import { askOperatorsAboutSharedHost, sharedFirstUseMessage } from './shared-secret-ask.js';
+import { isOperatorAccount } from '../utils/operator-account.js';
 
 /** The installer a node-provided extension is recorded under (BUILTIN_EXTENSION_OWNER). */
 const NODE_INSTALLER = 'system';
@@ -163,6 +170,16 @@ export async function secretRefusalText(
     if (refusal.reason === 'unknown') return `SECRET_UNKNOWN: ${secretUnknownMessage(refusal.headerName, refusal.secretName)}`;
     if (!refusal.firstUse) {
         return `SECRET_HOST: ${secretHostMessage(refusal.headerName, refusal.secretName, refusal.boundTo, refusal.host)}`;
+    }
+    if (refusal.firstUse.shared) {
+        // The operator's shared value: the operators approve the host, never the caller's own vault page.
+        const allowHostsField = !!deps.extConfig && Object.hasOwn(deps.extConfig, 'allow_hosts');
+        const extName = deps.extension?.name ?? deps.extName;
+        await askOperatorsAboutSharedHost({ storage: deps.storage, config: deps.config }, {
+            extName, installer: deps.extension?.owner ?? '', secret: refusal.secretName, host: refusal.host,
+            requestedBy: deps.caller.gaii, allowHostsField,
+        });
+        return `SECRET_HOST: ${sharedFirstUseMessage(refusal.headerName, refusal.secretName, refusal.host, extName, allowHostsField)}`;
     }
     const why = declaredUse(deps.extConfig, refusal.secretName)?.why;
     const installer = deps.extension?.owner ?? refusal.firstUse.foreign?.installer ?? 'an unknown account';
@@ -265,4 +282,47 @@ export async function decideFirstUse(deps: {
     // Unattended: the code writer decides.
     const writer = await codeWriter(storage, config, extension, vaultOwnerGhii);
     return { allowed: writer.trusted, by: writer.by };
+}
+
+/**
+ * May this call choose `host` as the first host of a value from the extension's SHARED secret map
+ * (living-hooks' `secrets` config), which then serves every account? Asked only when such a value
+ * has no host yet (secaudit2026oct22; Jouni, 2026-10-24). In order:
+ *   a. the host is on the extension's `allow_hosts`, the operator's list (for an extension an
+ *      account installed, that account sets both the map and the list);
+ *   b. the extension declares the host for this secret (`uses_secrets`, or its `network:` hosts);
+ *   c. for an extension an account installed, the call is that account's (it set the map); for a
+ *      node-provided extension, the caller is the operator in person.
+ * Anyone else is refused, nothing is sent or bound, and the operators are asked once
+ * (services/shared-secret-ask.ts).
+ */
+export async function decideSharedFirstUse(deps: {
+    storage: Storage;
+    config: AimeatConfig;
+    caller: Pick<ExtensionCtx['caller'], 'gaii' | 'roles'>;
+    extension: ExtensionCtx['extension'] | undefined;
+    unattended: boolean;
+    secretName: string;
+    host: string;
+    extConfig: Record<string, unknown> | undefined;
+}): Promise<FirstUseDecision> {
+    const { storage, config, caller, extension } = deps;
+    if (onOperatorAllowlist(deps.extConfig, deps.host)) return { allowed: true, by: caller.gaii };
+    if (declaresHost(deps.extConfig, deps.secretName, deps.host)) return { allowed: true, by: caller.gaii };
+    const account = ownerGhiiOf(caller.gaii);
+    // An extension an account installed: its shared map is that account's own, set by that account,
+    // so a call of that account's (its AI provider runs and schedules included) chooses as before.
+    if (extension && extension.owner !== NODE_INSTALLER && asGhii(config, extension.owner) === account) {
+        return { allowed: true, by: caller.gaii };
+    }
+    // The node's own map: the operator in person only, never an unattended run (its caller carries
+    // the role `operator` whoever owns it), an agent, an ecosystem app or an app grant.
+    if (deps.unattended || !isOwnerInPerson({ roles: caller.roles ?? [] }) || caller.gaii.includes('#')) {
+        return { allowed: false, by: caller.gaii };
+    }
+    // An account of THIS node: a name from another node must not find a local operator by its name.
+    const name = localAccountOf(account);
+    if (!name || account !== `${name}@${config.nodeId}`) return { allowed: false, by: caller.gaii };
+    const record = await storage.getOwner(name);
+    return { allowed: isOperatorAccount(record), by: caller.gaii };
 }

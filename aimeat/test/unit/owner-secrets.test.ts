@@ -19,6 +19,8 @@
  *   services/owner-secrets.js — the module is not there. Every assertion below is new behaviour.
  * @usage pnpm test -- owner-secrets
  * @version-history
+ *   v1.5.0 — 2026-10-24 — A refused first use of a shared-map value binds nothing, the vault secret in
+ *     the same call included (secaudit2026oct22; Jouni, 2026-10-24).
  *   v1.4.0 — 2026-10-20 — The resolver asks who may make a first use and binds nothing on a refusal
  *     (ruling 6, secaudit 2026-10 v59), and reads no vault when given none (v58).
  *   v1.3.0 — 2026-10-09 —The summary carries `hostBinding` (who bound the secret to its host).
@@ -314,6 +316,27 @@ describe('the host binding — made only once the call is accepted', () => {
         });
         expect(out).toMatchObject({ ok: false, reason: 'host', secretName: 'SIXTH', host: 'author.example', firstUse: { by: 'mallory', foreign } });
         expect(await hostsOf(storage, 'SIXTH')).toEqual([]);
+    });
+
+    // secaudit2026oct22 (Jouni, 2026-10-24): the shared map's first host serves every account, so a
+    // refused shared first use binds nothing and sends nothing, the vault secret in the same call included.
+    it('a refused first use of a shared value binds neither it nor a vault secret in the same call', async () => {
+        const storage = new SqliteStorage(':memory:');
+        expect((await putOwnerSecret(storage as never, cfg, owner, 'SEVENTH', 'seventh-value')).ok).toBe(true);
+        const shared = (sharedFirstUse?: () => Promise<{ allowed: boolean; by: string }>) => resolveSecretForHeaders({
+            storage: storage as never, config: cfg, ownerGhii: owner, extConfig: { secrets: { OPS_KEY: 'ops-value' } }, extName: 'hooks',
+            headers: { 'X-Own': '{{secret:SEVENTH}}', 'X-Ops': '{{secret:OPS_KEY}}' }, url: 'https://caller-chosen.example/x',
+            firstUse: async () => ({ allowed: true, by: owner }),
+            ...(sharedFirstUse ? { sharedFirstUse } : {}),
+        });
+        for (const decide of [undefined, async () => ({ allowed: false, by: owner })]) {
+            const out = await shared(decide);
+            expect(out).toMatchObject({ ok: false, reason: 'host', secretName: 'OPS_KEY', boundTo: [], firstUse: { shared: true } });
+            expect(await hostsOf(storage, 'SEVENTH')).toEqual([]);
+        }
+        const ok = await shared(async () => ({ allowed: true, by: owner }));
+        expect(ok).toMatchObject({ ok: true });
+        expect(await hostsOf(storage, 'SEVENTH')).toEqual(['caller-chosen.example']);
     });
 
     // A null owner reads no vault at all, so a held name refuses exactly as an unheld one.
