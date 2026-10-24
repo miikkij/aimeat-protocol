@@ -20,6 +20,9 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-10-24 — The ACS sends a first sign-in that matches an account with two-step sign-in by address
+ *     to the code step (startLinkSecondFactor); it had linked and opened the session on the address
+ *     alone (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-15 — A refused SAML Response and a deactivated account at the ACS redirect to the front
  *     page with ?auth_error=SAML_INVALID_RESPONSE / ACCOUNT_DISABLED, as the OIDC callback does,
  *     instead of answering the browser with JSON 401/403 (feature-list audit #20, #22).
@@ -40,6 +43,7 @@ import {
   mapExternalIdentity, finalizeExternalSignup, establishForGhii,
   signPendingToken, setPendingCookie,
 } from '../services/external-login.js';
+import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
@@ -186,6 +190,15 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
           setPendingCookie(req, res, await signPendingToken(result.pending));
           const sep = postLoginPath.includes('?') ? '&' : '?';
           res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
+          return;
+        }
+
+        // A first sign-in matched an account with two-step sign-in by its address: the code step
+        // (routes/ghii/login-link-second-factor.ts) saves the link, opens the session and adds the
+        // connection's membership after a correct code (secaudit2026oct22, external-login-skips-second-factor).
+        if (result.outcome === 'second_factor') {
+          await startLinkSecondFactor(storage, config, req, res, result.ghii, `${config.baseUrl}${postLoginPath}`,
+            { ...result.link, sso: conn.id });
           return;
         }
 

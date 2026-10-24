@@ -17,6 +17,9 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-10-24 — The callback sends a first sign-in that matches an account with two-step sign-in by
+ *     address to the code step (startLinkSecondFactor); it had linked and opened the session on the
+ *     address alone (secaudit2026oct22, external-login-skips-second-factor).
  *   v3.1.0 — 2026-09-24 — safeRedirectPath comes from utils/same-origin-path.ts, its one home, where
  *     it also refuses a backslash and a control character in the post-login address.
  *   v3.0.0 — 2026-08-23 — Pure extraction (BR-04): the mapping tree, pending-cookie machinery and
@@ -45,6 +48,7 @@ import {
   signPendingToken, verifyPendingToken, readPendingCookie, setPendingCookie,
   normalizeUsername,
 } from '../services/external-login.js';
+import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
@@ -141,6 +145,14 @@ export function oauthLoginRouter(
           setPendingCookie(req, res, await signPendingToken(result.pending));
           const sep = postLoginPath.includes('?') ? '&' : '?';
           res.redirect(`${config.baseUrl}${postLoginPath}${sep}aimeat_signup=1`);
+          return;
+        }
+
+        // A first sign-in matched an account with two-step sign-in by its address: the code step
+        // (routes/ghii/login-link-second-factor.ts) saves the link and opens the session after a
+        // correct code (secaudit2026oct22, external-login-skips-second-factor).
+        if (result.outcome === 'second_factor') {
+          await startLinkSecondFactor(storage, config, req, res, result.ghii, `${config.baseUrl}${postLoginPath}`, result.link);
           return;
         }
 
