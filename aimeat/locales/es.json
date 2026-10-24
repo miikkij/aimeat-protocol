@@ -13691,7 +13691,7 @@
     "authErrorUsedLink": "Este enlace de acceso ya se usó o no es válido. Pide uno nuevo abajo o inicia sesión de otra forma.",
     "authErrorExpired": "Este enlace de acceso caducó. Pide uno nuevo abajo.",
     "authErrorDisabled": "Esta cuenta está desactivada. Contacta al administrador de este servicio.",
-    "authErrorSecondFactorExpired": "Este inicio de sesión caducó. Pide un nuevo enlace de acceso y ábrelo.",
+    "authErrorSecondFactorExpired": "Se acabó el tiempo para escribir el código. Vuelve a iniciar sesión.",
     "authErrorGeneric": "No se pudo iniciar sesión. Inténtalo de nuevo o elige otra forma de iniciar sesión.",
     "resetPasswordTitle": "Restablecer la contraseña",
     "resetPasswordDesc": "Escribe tu nombre de usuario para recibir un código por correo.",
