@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.5.0 — 2026-10-24 — Phase 3: owner B's preview token on owner A's app URL answers 403 TOKEN_INVALID,
+ *     and B's token on B's own URL still serves B's draft (secaudit2026oct22).
  *   v1.4.0 — 2026-10-19 — Phase 7: PUT .../draft and POST .../publish-draft take `version`; the live app
  *     carries it, a malformed or non-string one is refused with 400 before the slot is written, a refused
  *     promotion keeps the draft, and another owner's draft save and promotion on the app answer 403
@@ -245,6 +247,23 @@ await test('…and A\'s draft and live app are exactly what they were', async ()
     assert(preview.status === 200, `preview fetch status ${preview.status}`);
     assert(preview.text.includes('v2 DRAFT'), 'A\'s draft must still be A\'s v2');
     assert(!preview.text.includes('B OVERWROTE'), 'B\'s bytes must not be in A\'s draft');
+});
+
+// A preview token serves the draft of its own subject. On a node without per-app origins the URL
+// decides the address the code runs at, so B's token on A's URL ran B's draft under A's app address,
+// where a person who granted A's app is signed in (secaudit2026oct22, app-isolation/draft-preview-owner-unbound).
+await test('Owner B\'s preview token on owner A\'s app URL is refused (403 TOKEN_INVALID)', async () => {
+    const save = await json(`/v1/apps/${ownerBName}/${APP}/draft`, bAuthed({
+        method: 'PUT', body: JSON.stringify({ content: b64('<h1>B OWN DRAFT</h1>') }),
+    }));
+    assert(save.status === 200 || save.status === 201, `B saves its own draft: ${save.status} ${JSON.stringify(save.body?.error)}`);
+    const tok = await json(`/v1/apps/${ownerBName}/${APP}/draft/preview-token`, bAuthed({ method: 'POST' }));
+    assert(tok.status === 200, `B's own preview-token: ${tok.status}`);
+    const onB = await raw(`/v1/apps/${ownerBName}/${APP}?mode=inline&preview=${encodeURIComponent(tok.body.data.token)}`);
+    assert(onB.status === 200 && onB.text.includes('B OWN DRAFT'), `B's token on B's own URL serves B's draft: ${onB.status}`);
+    const onA = await json(`/v1/apps/${ownerAName}/${APP}?mode=inline&preview=${encodeURIComponent(tok.body.data.token)}`);
+    assert(onA.status === 403, `B's token on A's URL must be refused, got ${onA.status}`);
+    assert(onA.body?.error?.code === 'TOKEN_INVALID', `refusal code TOKEN_INVALID, got ${JSON.stringify(onA.body?.error)}`);
 });
 
 // ── Phase 4: publish the draft ──

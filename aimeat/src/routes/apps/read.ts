@@ -10,6 +10,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-24 — A draft preview token serves only on the URL of its own owner, else 403 TOKEN_INVALID (secaudit2026oct22).
  *   2026-10-21 — The access-code exemption and the paced-app 401 ask isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-20 — An app open is recorded, and a watermark names, the resolved caller (resolveIdentity):
  *     an owner session's `sub` is the bare account name, which filed the owner's own opens outside
@@ -447,8 +448,10 @@ export function registerReadRoutes(
                 res.status(403).json(error(config.nodeId, code, err instanceof Error ? err.message : 'Invalid draft preview token'));
                 return;
             }
-            // The token is scoped to one filename; the URL must match it.
-            if (claim.filename !== filename) {
+            // The token is scoped to one filename and one owner; the URL must name both. Without per-app
+            // origins the URL decides the app address the draft runs at, and every preview_url names the
+            // draft owner (services/app-draft-preview.ts; secaudit2026oct22).
+            if (claim.filename !== filename || !isSameAccount(claim.sub, owner)) {
                 res.status(403).json(error(config.nodeId, 'TOKEN_INVALID', 'Draft preview token does not match this app'));
                 return;
             }
