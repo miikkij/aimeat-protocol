@@ -56030,6 +56030,12 @@ paths:
         stores it. An app grant and an ecosystem app are refused with 403. The node's publishing policy
         decides the rest (403 PUBLISHING_DISABLED, 403 PUBLIC_DISABLED); the operator, or the operator's
         agent holding `operator:admin`, is exempt from it. The same caller rule holds on PUT and DELETE.
+
+
+        A `source` of type `extension` names an extension and its action:
+        `ext:<name>[@<version>][:<action>]`, the name in lowercase letters, digits and hyphens, the
+        action id in letters, digits, hyphens and underscores. Any other ref is 400 INVALID_INPUT, and
+        PUT checks a changed source the same way. Invoke resolves the extension and the action first.
       security:
         - BearerAuth: []
       requestBody:
@@ -56043,6 +56049,16 @@ paths:
                 id: { type: string }
                 name: { type: string }
                 summary: { type: string }
+                source:
+                  type: object
+                  description: >-
+                    Where the capability runs. `type` defaults to `manual`; `ref` is required for
+                    every other type; `version` defaults to 1.0.0. An `extension` ref is
+                    ext:<name>[@<version>][:<action>].
+                  properties:
+                    type: { type: string, enum: [extension, action, cortex, app, manual, ecosystem, mcp] }
+                    ref: { type: string }
+                    version: { type: string }
                 callable: { type: boolean }
                 visibility: { type: string, enum: [private, owner, group, public] }
                 webhookUrl: { type: string }
@@ -56066,6 +56082,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_INPUT, for example a source type a person may not name or an extension ref outside ext:<name>[@<version>][:<action>].
         '403':
           description: Not the owner or their agent, the agent lacks capability:write, or the publishing policy refuses.
 
@@ -56107,6 +56125,11 @@ paths:
 
         The owner, or their agent holding `capability:write`, on a capability stored under the
         caller's own identity (403 FORBIDDEN otherwise, unless the operator's override applies).
+
+
+        A `source` that differs from the stored one is normalised and checked as POST checks it, so
+        an extension ref outside ext:<name>[@<version>][:<action>] is 400 INVALID_INPUT. A source
+        equal to the stored one passes untouched.
       security:
         - BearerAuth: []
       parameters:
@@ -56121,6 +56144,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_INPUT, a changed source that POST would refuse.
         '403':
           description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner.
     delete:
@@ -56150,7 +56175,10 @@ paths:
       operationId: capabilityInvoke
       tags: [Capabilities]
       summary: Invoke a callable capability
-      description: Proxies to extension or webhook. Cortex returns BROWSER_ONLY. Non-callable returns NOT_CALLABLE with usage.
+      description: >-
+        Proxies to extension or webhook. Cortex returns BROWSER_ONLY. Non-callable returns
+        NOT_CALLABLE with usage. An extension capability runs only when its ref names an installed
+        extension and one of its actions; otherwise 404 EXTENSION_NOT_FOUND, before any request is made.
       security:
         - BearerAuth: []
       parameters:
@@ -56175,6 +56203,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: NOT_FOUND (no such capability, or another owner's private one), or EXTENSION_NOT_FOUND (the extension or the action its ref names is not installed).
 
   /v1/capabilities/{id}/telemetry:
     post:

@@ -6,6 +6,10 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.9.0 - 2026-10-24 - The `extension` case resolves the extension and the action its ref names
+ *     before the loopback request, answers 404 EXTENSION_NOT_FOUND when either is missing or the ref
+ *     does not follow ext:<name>[@<version>]:<action>, and builds the path from the encoded segments
+ *     (secaudit2026oct22, capability-invoke:extension-ref-unvalidated-in-loopback-url).
  *   v1.8.0 - 2026-10-22 - The `ecosystem` case refuses another account's capability unless the
  *     caller's outside app declared the action and the account holder allowed it once with one press
  *     (ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL with the address, ECOSYSTEM_CAPABILITY_NOT_YOURS,
@@ -55,6 +59,8 @@ import { verifyJWT } from '../auth/jwt.js';
 import { callAuthority, withCurrentScopes } from '../auth/effective-scopes.js';
 import { resolvePat, PAT_PREFIX } from './access-token.js';
 import { ecosystemCallRefusal } from './eco-capability-approvals.js';
+import { splitExtensionRef } from './capability-extension-ref.js';
+import { resolveExtensionForCall } from './component-versions.js';
 import { logger } from '../utils/logger.js';
 
 export interface InvokeResult {
@@ -179,9 +185,24 @@ export async function invokeCapability(
 
   switch (capability.source.type) {
     case 'extension': {
-      const parts = capability.source.ref.split(':');
-      const extName = parts[1];
-      const actionId = parts[2];
+      // The ref becomes the path of a request made with the caller's token, so the extension and the
+      // action it names are resolved first, and the path is built from the resolved segments with
+      // each one encoded. The ref was split on ':' into the path as written, so a ref the registrant
+      // wrote reached any REST route of the node as the caller (secaudit2026oct22,
+      // services/capability-extension-ref.ts). The segments are read with a plain split rather than
+      // the registration grammar, so an aggregated row over an installed action whose id the grammar
+      // would not admit still runs: what makes the request safe is that both segments name what is
+      // installed and are encoded into the path.
+      const segments = splitExtensionRef(capability.source.ref);
+      const resolved = segments ? await resolveExtensionForCall(storage, segments.pinned) : null;
+      if (!segments || !resolved?.ok || !resolved.ext.actions.some(a => a.id === segments.action)) {
+        throw Object.assign(
+          new Error(`Cannot invoke "${capability.id}": its source ref "${capability.source.ref}" does not name an action of an installed extension.`),
+          { statusCode: 404, code: 'EXTENSION_NOT_FOUND' },
+        );
+      }
+      const extName = encodeURIComponent(segments.pinned);
+      const actionId = encodeURIComponent(segments.action);
 
       // The extension runs behind the node's own AUTHENTICATED HTTP surface, so the caller's token
       // travels with the invocation. A caller that hands us no token cannot be served here — say so

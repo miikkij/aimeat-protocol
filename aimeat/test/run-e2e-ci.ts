@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-24 -- e2e-capability-extension-ref.ts joins the list (not the guard tier): an extension-backed capability's ref names an extension and an action, and invoke resolves both before its loopback request (secaudit2026oct22).
  *   2026-10-23 -- e2e-compliance-records.ts and e2e-classification-packs.ts join the list (not the guard tier): the records of processing and the documents beside them, and the TL and NATO label packs (plan doc-mvlftkh9zmc9).
  *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
  *   2026-10-22 -- e2e-account-events-task-keep.ts joins the list (not the guard tier): an app grant made before the update keeps a task's title and reason in the event record, on its own node on 40987 (secaudit 2026-10, v89).
@@ -1379,6 +1380,9 @@ const ALL_SUITES = [
     // Updating the webhook a capability is invoked through, which is the field that decides where a
     // paying caller's payload is delivered.
     'test/e2e-capability-webhook-update.ts',
+    // The ref of an extension-backed capability names an extension and an action, and invoke resolves
+    // both before its loopback request (secaudit2026oct22).
+    'test/e2e-capability-extension-ref.ts',
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',
     // The cortex CORE suite, as opposed to cortex-ui above. Left out on 2026-07-10 over "2
