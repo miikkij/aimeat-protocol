@@ -8,6 +8,9 @@
  *   - A2: a space declared `versioned:false` (e.g. a request queue) keeps only .latest — publishing it
  *     (even with real changes) never writes a .version.N.
  * @version-history
+ *   v1.2.0 — 2026-10-24 — A member's workspace role decides who publishes and reopens: a viewer and a
+ *     member with no grant are refused on REST, over MCP and through the batch route; the contributor,
+ *     an admin and the creator's agent still publish (secaudit2026oct22).
  *   v1.1.0 — 2026-09-04 — Who else may publish. The organism here is public and open-join on
  *     purpose, so "public" and "may write" have to be different answers, and nothing had asked.
  *     One of the 34 seeded into security/denial-coverage-exemptions.json on 2026-08-15
@@ -33,6 +36,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 async function setupOwner(label: string) {
     const name = `pg${label}${Date.now()}`;
@@ -199,6 +203,97 @@ await test('POSITIVE CONTROL: owner A still publishes, and the guard still skips
     });
     assert(r.status === 200, `owner publish ${r.status}: ${JSON.stringify(r.body)}`);
     assert(r.body.data.skipped === true, `an unchanged republish must skip, got ${JSON.stringify(r.body.data)}`);
+});
+
+// ── A member's workspace role decides who publishes and reopens ──
+//
+// secaudit2026oct22, routes/organisms/gates.ts publish-draft-without-workspace-write-role. Writing a
+// draft asks the workspace role (creator, organism admin, or the creator's contributor grant); the
+// publish and the reopen asked only membership and the meta.* rule. So a member with a viewer grant,
+// or with no grant, published another member's draft as their own and consumed it, and a viewer wrote
+// a draft through the reopen. Both ask the write rule of the draft's key now, on REST and over MCP.
+
+type Member = Awaited<ReturnType<typeof setupOwner>>;
+let C!: Member, V!: Member, N!: Member, D!: Member;
+const as = (m: Member) => ({ Authorization: `Bearer ${m.token}` });
+const publishAs = (m: Member, id: string) => json(`/v1/organisms/${orgId}/publish`, {
+    method: 'POST', headers: as(m), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id }),
+});
+const draftBy = async (m: Member, id: string, title: string) => {
+    const r = await json('/v1/memory', { method: 'POST', headers: as(m), body: JSON.stringify({ key: `${root()}.shared.notes.${id}.draft`, value: { id, title }, visibility: 'private' }) });
+    assert(r.status === 201 || r.status === 200, `draft ${id} by ${m.name}: ${r.status} ${JSON.stringify(r.body.error)}`);
+};
+const draftOwnedBy = async (m: Member, id: string): Promise<boolean> => {
+    const r = await json(`/v1/memory?prefix=${encodeURIComponent(`${root()}.shared.notes.${id}.`)}`, { headers: as(m) });
+    return ((r.body.data?.items ?? []) as any[]).some(i => i.key === `${root()}.shared.notes.${id}.draft`);
+};
+
+await test('fixture: C (contributor), V (viewer), N (no grant) and D (admin) join A\'s organism', async () => {
+    C = await setupOwner('c'); V = await setupOwner('v'); N = await setupOwner('n'); D = await setupOwner('d');
+    for (const m of [C, V, N, D]) {
+        const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: as(m), body: '{}' });
+        assert(j.status === 200 || j.status === 201, `join ${m.name}: ${j.status} ${JSON.stringify(j.body.error)}`);
+    }
+    for (const [m, role] of [[C, 'contributor'], [V, 'viewer']] as const) {
+        const g = await json(`/v1/organisms/${orgId}/workspace-access/grant`, { method: 'POST', headers: auth(), body: JSON.stringify({ ws: WS, grantee: m.name, role }) });
+        assert(g.status === 200 || g.status === 201, `grant ${role}: ${g.status} ${JSON.stringify(g.body.error)}`);
+    }
+    const p = await json(`/v1/organisms/${orgId}/admins`, { method: 'POST', headers: auth(), body: JSON.stringify({ target_ghii: D.name }) });
+    assert(p.status === 200, `promote D: ${p.status} ${JSON.stringify(p.body.error)}`);
+});
+
+await test('A viewer and a member with no grant cannot publish a contributor\'s draft (403), and the draft stays', async () => {
+    await draftBy(C, 'c1', 'by C');
+    for (const m of [V, N]) {
+        const r = await publishAs(m, 'c1');
+        assert(r.status === 403, `${m === V ? 'viewer' : 'no-grant member'} publish: expected 403, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    }
+    assert(await draftOwnedBy(C, 'c1'), 'C\'s draft must still exist after the refused publishes');
+});
+
+await test('A viewer\'s agent cannot publish over MCP, nor through the batch route', async () => {
+    const agent = await makeAgent(BASE, V, ['organism:read', 'organism:write']);
+    const session = await openSession(BASE, agent.token, 'e2e-publish-guard-viewer');
+    const r = await callTool(session, 'aimeat_workspace_publish', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'c1' });
+    assert(r.isError, `MCP publish by a viewer's agent: expected a refusal, got ${r.text.slice(0, 200)}`);
+    const b = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: as(V), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', instances: ['c1'] }) });
+    assert(b.status === 403, `batch publish by a viewer: expected 403, got ${b.status} ${JSON.stringify(b.body).slice(0, 200)}`);
+    assert(await draftOwnedBy(C, 'c1'), 'C\'s draft must still exist');
+});
+
+await test('POSITIVE CONTROL: the contributor publishes their own draft', async () => {
+    const r = await publishAs(C, 'c1');
+    assert(r.status === 200, `contributor publish: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+});
+
+await test('A viewer cannot reopen a published record into a draft, on REST or over MCP', async () => {
+    const r = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: as(V), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'c1' }) });
+    assert(r.status === 403, `viewer revert: expected 403, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+    const agent = await makeAgent(BASE, V, ['organism:read', 'organism:write']);
+    const session = await openSession(BASE, agent.token, 'e2e-publish-guard-viewer-revert');
+    const m = await callTool(session, 'aimeat_workspace_revert_to_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'c1' });
+    assert(m.isError, `MCP revert by a viewer's agent: expected a refusal, got ${m.text.slice(0, 200)}`);
+    assert(!(await draftOwnedBy(V, 'c1')), 'no draft may land under the viewer');
+});
+
+await test('POSITIVE CONTROL: the contributor reopens, the admin publishes, the creator\'s agent publishes', async () => {
+    const rv = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: as(C), body: JSON.stringify({ ws: WS, namespace: 'shared.notes', id: 'c1' }) });
+    assert(rv.status === 200, `contributor revert: ${rv.status} ${JSON.stringify(rv.body).slice(0, 200)}`);
+    await draftBy(C, 'c1', 'by C, edited');
+    const byAdmin = await publishAs(D, 'c1');
+    assert(byAdmin.status === 200, `admin publish: ${byAdmin.status} ${JSON.stringify(byAdmin.body).slice(0, 200)}`);
+    await draftBy(C, 'c2', 'second by C');
+    const agent = await makeAgent(BASE, A, ['organism:read', 'organism:write']);
+    const session = await openSession(BASE, agent.token, 'e2e-publish-guard-creator-agent');
+    const r = await callTool(session, 'aimeat_workspace_publish', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'c2' });
+    assert(!r.isError, `creator's agent MCP publish: ${r.text.slice(0, 200)}`);
+});
+
+await test('Cleanup owners C, V, N and D', async () => {
+    for (const m of [C, V, N, D]) {
+        const r = await json(`/v1/owners/${m.name}`, { method: 'DELETE', headers: as(m) });
+        assert(r.status === 200, `del ${m.name} ${r.status}`);
+    }
 });
 
 await test('Cleanup owner B', async () => { const r = await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: bAuth() }); assert(r.status === 200, `del ${r.status}`); });

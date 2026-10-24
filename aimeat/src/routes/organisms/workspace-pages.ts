@@ -15,6 +15,9 @@
  * @structure registerOrganismWorkspacePageRoutes(router, config, storage, H)
  * @usage registerOrganismWorkspacePageRoutes(router, config, storage, H) in routes/organisms.ts
  * @version-history
+ *   v1.0.1 — 2026-10-24 — The member's page gate asks canReadWorkspaceRecords instead of the manifest
+ *     alone, so a workspace creator removed from the organism gets no member frame token
+ *     (secaudit2026oct22, canReadWsManifest no-membership-gate).
  *   v1.0.0 — 2026-10-16 — Initial (HTML pages in workspaces).
  */
 import type { Router, Request, Response } from 'express';
@@ -31,10 +34,11 @@ import { isHtmlPageValue } from '../../services/html-page.js';
 import { frameUrlFor } from '../../services/page-frame.js';
 import { PAGE_FRAME_TTL_SECONDS } from '../../services/page-frame-token.js';
 import { markPageOpened } from '../../services/workspace-opened.js';
+import { canReadWorkspaceRecords } from '../../services/workspace-access.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismWorkspacePageRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-    const { canReadWs, readWsManifestValue } = H;
+    const { readWsManifestValue } = H;
 
     /** The page a member may read, with its space's namespace; or the error already sent. */
     const memberPage = async (req: Request, res: Response, role: 'latest' | 'draft'): Promise<{ ws: string; namespace: string; rec: MemoryRecord | null } | null> => {
@@ -42,7 +46,12 @@ export function registerOrganismWorkspacePageRoutes(router: Router, config: Aime
         const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
         if (!ws) { res.status(400).json(error(config.nodeId, 'WS_REQUIRED', 'Name the workspace with ?ws=<workspace id>.')); return null; }
         // 404 for a workspace the caller cannot read, the same no-disclosure answer the workspace read gives.
-        if (!(await canReadWs(id, ws, resolveIdentity(req.auth!, config.nodeId)))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return null; }
+        // The gate of the member records read (services/workspace-access.ts canReadWorkspaceRecords):
+        // the manifest alone admitted its own owner, a creator removed from the organism (secaudit2026oct22).
+        const organism = await storage.getOrganism(id);
+        if (!organism || !(await canReadWorkspaceRecords(storage, config, organism, req.auth!.sub, req.auth!.owner, resolveIdentity(req.auth!, config.nodeId), ws))) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return null;
+        }
         const space = req.params.space as string;
         const types = ((await readWsManifestValue(id, ws))?.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
         const ot = types.find(o => o && o.name === space && (o.mode === 'document' || (!o.mode && o.kind === 'document')) && typeof o.namespace === 'string');
