@@ -17,6 +17,8 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.1.0 — 2026-10-24 — A processor's `agreement` (the DPA plan doc-mvmr4i2wdk0p fills it).
+ *   v1.0.1 — 2026-10-24 — retentionMonths takes up to 2 400 months: a patient record's 120 years was refused.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.1, C4.1, C4.3, C5.1, C5.2, C6).
  */
 import { z } from 'zod';
@@ -63,8 +65,11 @@ export const RegisterSchema = z.object({
   recipients: list().optional(),
   processors: z.array(z.string().max(120)).max(50).optional(),
   transfers: z.array(z.object({ country: z.string().max(60), basis: z.enum(['adequacy', 'scc', 'dpf', 'bcr', 'derogation', 'none']) })).max(30).optional(),
-  /** How long, in months; null or absent while nobody has said. */
-  retentionMonths: z.number().int().min(0).max(1200).nullable().optional(),
+  /**
+   * How long, in months; null or absent while nobody has said. Up to 200 years: a Finnish patient
+   * record is kept 120 years from the patient's birth (1 440 months), which a 100-year cap refused.
+   */
+  retentionMonths: z.number().int().min(0).max(2400).nullable().optional(),
   retentionText: text().optional(),
   security: text().optional(),
   automatedDecisions: z.boolean().optional(),
@@ -83,6 +88,17 @@ export const ProcessorSchema = z.object({
   host: z.string().max(300).optional(),
   country: z.string().max(60).optional(),
   dpaSignedAt: iso.optional(),
+  /**
+   * The data processing agreement with this processor as the agreements document keeps it (plan
+   * doc-mvmr4i2wdk0p): which one, its version and where it stands. "review": a signed copy came in
+   * and waits for a person to confirm it. dpaSignedAt stays for a contract signed elsewhere.
+   */
+  agreement: z.object({
+    agreementId: z.string().min(1).max(120),
+    version: z.union([z.number().int().min(0), z.string().max(40)]).optional(),
+    status: z.enum(['draft', 'sent', 'review', 'signed', 'expired', 'ended']),
+    signedAt: iso.optional(),
+  }).optional(),
   transferBasis: z.enum(['adequacy', 'scc', 'dpf', 'bcr', 'derogation', 'none']).optional(),
   hipaaBaa: z.boolean().optional(),
   itarEligible: z.boolean().optional(),

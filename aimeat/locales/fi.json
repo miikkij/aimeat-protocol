@@ -1146,8 +1146,7 @@
           "organism_import": "organismin tuonti",
           "app_backup": "sovelluksen varmuuskopio",
           "full_identity_move": "päivitys käynnistyksessä",
-          "workspace_schema_relock": "työtilojen lukitusten tarkistus käynnistyksessä",
-          "start": "palvelimen käynnistys"
+          "workspace_schema_relock": "työtilojen lukitusten tarkistus käynnistyksessä"
         },
         "kept": "{size} säilytetty",
         "notKept": "ei säilytetty, liian suuri",
@@ -1386,6 +1385,25 @@
         "next": "Näytä seuraavat 200",
         "shown": "Näytetään {n} riviä",
         "shownOne": "Näytetään 1 rivi"
+      },
+      "packs": {
+        "title": "Turvallisuusluokat",
+        "lead": "Suomen turvallisuusluokat TL IV, TL III, TL II ja TL I sekä NATO-luokat. Sisältöä, jolla on jokin näistä luokista, lukee vain tällä koneella toimiva malli. Sisältö ei lähde organismista, ja jokainen käyttö kirjataan. Isoilla kirjaimilla kirjoitettu merkintä, kuten \"TL III\" tai \"NATO SECRET\", nostaa sen sisällön luokkaa, jossa merkintä on.",
+        "upTo": "Ylin luokka",
+        "acknowledge": "Ymmärrän, että tätä asennusta ei ole hyväksytty tämän luokan tiedoille.",
+        "on": "Kytke päälle",
+        "change": "Muuta",
+        "off": "Kytke pois",
+        "nowOn": "Päällä: {classes}",
+        "nowOff": "Pois päältä.",
+        "stateOn": "Päällä",
+        "stateTop": "Päällä, ylimmät luokat",
+        "stateOff": "Pois",
+        "waits": "Muutos odottaa, että ylläpitäjä hyväksyy sen itse.",
+        "switchedOn": "Kytketty päälle.",
+        "switchedOff": "Kytketty pois. Sisältö, jolla on jokin näistä luokista, säilyttää luokkansa.",
+        "failed": "Muutosta ei tallennettu.",
+        "notAccredited": "Tämä asennus merkitsee ja rajoittaa luokiteltua sisältöä. Sitä ei ole hyväksytty luokitellun tiedon käsittelyyn (Katakri, Traficom, NATO)."
       }
     },
     "ext": {
@@ -3551,10 +3569,416 @@
         "owner-your-slice": "Vain sinun omasi. Mikään tällä sivulla ei kerro kenenkään muun toiminnasta, eikä kukaan muu näe sinun tietojasi täältä.",
         "owner-register-is-the-operators": "Kirjaukset siitä mihin tekoälyä käytetään pitää se, joka pyörittää tätä asennusta, et sinä. Alla näkyvät ne merkinnät, jotka koskevat sinun tiliäsi. Jos jotain sinun toimintaasi puuttuu, se on keskustelu hänen kanssaan eikä asia jonka voit korjata täältä.",
         "owner-provenance-off": "Kirjaus on kytketty pois tästä asennuksesta, mikä ei ole sinun asetuksesi. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettet olisi tehnyt mitään.",
-        "shares-open-only": "Työtilan sivu, joka on jaettu avoimella linkillä, lasketaan tässä julkiseksi. Salasanan taakse tai vain kirjautuneille jaettua sivua ei lasketa: sen lukijat eivät ole suurta yleisöä, joten sivulle ei tarvita tekoälymerkintää eikä sitä lasketa julkiseksi."
+        "shares-open-only": "Työtilan sivu, joka on jaettu avoimella linkillä, lasketaan tässä julkiseksi. Salasanan taakse tai vain kirjautuneille jaettua sivua ei lasketa: sen lukijat eivät ole suurta yleisöä, joten sivulle ei tarvita tekoälymerkintää eikä sitä lasketa julkiseksi.",
+        "registers-are-statements": "Selosteet, vaikutustenarvioinnit ja vastaukset säädösten kysymyksiin ovat sitä, mitä ylläpitäjä, yhteisten paikkojen ylläpitäjät ja sovellusten omistajat kirjoittivat. Ne verrataan täällä siihen, mitä tämä asennus kirjaa (datakartat, luokitukset, määräajat). Todellisuuteen niitä ei voi verrata.",
+        "external-ai-claim-unverified": "Agentti, joka ilmoittaa paikallisen mallin, lukee sisältöä, jonka luokitus estää ulkoisen mallin. Tämä asennus kirjaa ilmoituksen mutta ei voi tarkistaa sitä. Mallin, jonka nimi alkaa local:, oletetaan toimivan tällä koneella.",
+        "not-accredited": "TL- ja NATO-luokat merkitsevät, tunnistavat ja rajoittavat luokiteltua sisältöä. Ne eivät tee tästä asennuksesta hyväksyttyä järjestelmää (Katakri, Traficomin hyväksyntä, NATO-akkreditointi).",
+        "app-scan-listed-only": "Raportti lukee niiden sovellusten datakartat, jotka luettelo näyttää, sekä jokaisen sovelluksen, jolla on rekisteri. Syrjään siirretty tai piilotettu sovellus luetaan vain, jos sillä on rekisteri.",
+        "federation-peers-not-processors": "Kumppaniasennukset eivät ole käsittelijöiden luettelossa. Toiseen asennukseen lähtevän kopion pysäyttää sen luokitus (se ei saa lähteä yhteisestä paikastaan). Sitä ei kirjata siirroksi."
       },
       "gapFonts": "Fontit ilman lisenssitietoa",
-      "toFonts": "Fontteihin"
+      "toFonts": "Fontteihin",
+      "records": {
+        "title": "Seloste käsittelytoimista",
+        "lead": "Mitä henkilötietoja tämä asennus, sen yhteiset paikat ja sen sovellukset pitävät, keistä, miksi ja kuinka kauan, sekä selosteeseen liittyvät asiakirjat. Tekoälysi kirjoittaa ne kohdan 10 kehotteella. Tämä kohta näyttää, missä ollaan.",
+        "registers": "Rekisterit",
+        "registersWhy": "Henkilötietoja on {personal} rekisterissä. Tämä asennus {node}, yhteiset paikat {organism}, sovellukset {app}.",
+        "domains": "Säännelty tieto",
+        "domainsNone": "Mikään rekisteri ei nimeä säänneltyä tietoa.",
+        "requests": "Rekisteröityjen pyynnöt",
+        "requestsWhy": "Avoinna {open}. Tilin tietojen vienti ja tilin poisto lisäävät tähän rivin itse.",
+        "breaches": "Tietoturvaloukkaukset",
+        "breachesWhy": "Avoinna {open}.",
+        "dpias": "Vaikutustenarvioinnit",
+        "dpiasWhy": "Rekisteri, jossa on terveystietoja, biometrisiä tietoja tai muita erityisiä tietoja, tarvitsee arvioinnin.",
+        "processors": "Käsittelijät",
+        "processorsWhy": "{n} käsittelee tietoja EU:n ja ETA:n ulkopuolella, tai kukaan ei ole kirjannut, missä.",
+        "processorsNone": "Kaikki EU:n ja ETA:n sisällä.",
+        "packs": "Turvallisuusluokat",
+        "packsNone": "Pois päältä. Kytket ne päälle Tietoturva-sivulla.",
+        "unanswered": "{n} vastaamatta",
+        "gapsTitle": "Mitä selosteesta puuttuu",
+        "gapsNone": "Mitään ei puutu.",
+        "gapPlaces": "{name} ({n} paikassa)",
+        "promptTitle": "Pyydä tekoälyäsi pitämään seloste ajan tasalla",
+        "promptCopy": "Kopioi kehote",
+        "promptNote": "Liitä tämä omaan tekoälykeskusteluusi. Tekoäly lukee, mitä täällä on, kysyy sinulta sen, minkä vain sinä tiedät, näyttää tuloksen ja odottaa hyväksyntääsi.",
+        "promptLabel": "Kehote",
+        "printTitle": "Seloste käsittelytoimista (tietosuoja-asetuksen 30 artikla)",
+        "printEmpty": "Täällä ei ole vielä rekisteriä.",
+        "field": {
+          "type": "Tyyppi",
+          "purpose": "Käyttötarkoitus",
+          "role": "Rooli",
+          "controller": "Rekisterinpitäjä",
+          "legalBasis": "Käsittelyperuste",
+          "subjects": "Keitä tiedot koskevat",
+          "categories": "Tiedot",
+          "domains": "Säännelty tieto",
+          "recipients": "Vastaanottajat",
+          "processors": "Käsittelijät",
+          "transfers": "Siirrot",
+          "retention": "Säilytysaika",
+          "security": "Suojaus",
+          "reviewed": "Tarkistettu"
+        },
+        "purpose": {
+          "customer": "Asiakkaat",
+          "member": "Jäsenet",
+          "employee": "Työntekijät",
+          "patient": "Potilaat",
+          "marketing": "Markkinointi",
+          "research": "Tutkimus",
+          "camera": "Kameravalvonta",
+          "service-operation": "Palvelun toiminta",
+          "other": "Muu"
+        },
+        "role": {
+          "controller": "Rekisterinpitäjä",
+          "processor": "Käsittelijä",
+          "joint-controller": "Yhteisrekisterinpitäjä"
+        },
+        "basis": {
+          "consent": "Suostumus",
+          "contract": "Sopimus",
+          "legal-obligation": "Lakisääteinen velvoite",
+          "vital-interests": "Elintärkeä etu",
+          "public-task": "Yleisen edun mukainen tehtävä",
+          "legitimate-interests": "Oikeutettu etu"
+        },
+        "type": {
+          "personal": "Henkilötietoja",
+          "pseudonymised": "Pseudonymisoitu",
+          "anonymised": "Anonymisoitu",
+          "none": "Ei henkilötietoja"
+        },
+        "domain": {
+          "health": "Terveys",
+          "special-category": "Erityiset henkilötiedot",
+          "biometric-genetic": "Biometriset ja geneettiset tiedot",
+          "children": "Lapset",
+          "criminal": "Rikostiedot",
+          "employment": "Työsuhde",
+          "payment-financial": "Maksut ja rahoitus",
+          "public-authority": "Viranomaisen tieto",
+          "defence-classified": "Puolustus ja turvallisuusluokiteltu tieto",
+          "export-controlled": "Vientivalvottu tieto",
+          "privileged-trade-secret": "Asianajo- ja liikesalaisuus"
+        },
+        "framework": {
+          "gdpr": "Tietosuoja-asetus (GDPR)",
+          "nis2": "NIS2",
+          "dora": "DORA",
+          "cra": "Kyberkestävyyssäädös",
+          "eaa": "Esteettömyysdirektiivi",
+          "dsa": "Digipalvelusäädös",
+          "hipaa": "HIPAA",
+          "export-control": "Vientivalvonta"
+        },
+        "pack": {
+          "tl": "TL",
+          "nato": "NATO"
+        },
+        "kind": {
+          "register-without-legal-basis": "Rekisterillä ei ole käsittelyperustetta",
+          "register-without-special-basis": "Erityisillä tiedoilla ei ole 9 artiklan perustetta",
+          "register-without-retention": "Rekisteri ei kerro säilytysaikaa",
+          "register-review-overdue": "Rekisteri on tarkistamatta",
+          "register-unknown-domain": "Tuntematon tietoalue",
+          "register-domain-without-container": "Säännellylle tiedolle ei ole nimetty paikkaa",
+          "domain-label-below-floor": "Paikan luokitus on alempi kuin sen tiedot vaativat",
+          "dpia-missing": "Vaikutustenarviointi puuttuu",
+          "dpia-incomplete": "Vaikutustenarviointi on kesken",
+          "dpia-overdue": "Vaikutustenarviointi on tarkistamatta",
+          "dpia-needs-prior-consultation": "Suuri riski menee ensin valvontaviranomaiselle",
+          "request-overdue": "Pyyntö on myöhässä",
+          "breach-risk-unassessed": "Kukaan ei ole arvioinut loukkauksen riskiä",
+          "breach-notification-overdue": "Loukkausta ei ole ilmoitettu 72 tunnissa",
+          "breach-subjects-not-notified": "Ihmisille ei ole kerrottu suuren riskin loukkauksesta",
+          "breach-hipaa-overdue": "HIPAA-loukkaus on yli 60 päivää vanha",
+          "framework-unanswered": "Säädös, jonka kysymyksiin ei ole vastattu",
+          "app-personal-data-without-register": "Sovelluksella on henkilötietoja mutta ei rekisteriä",
+          "app-personal-data-unstated": "Sovellus ei kerro, mikä on henkilötietoa",
+          "app-register-without-privacy-notice": "Sovelluksella ei ole tietosuojaselostetta",
+          "retention-conflict": "Rekisteri ja datakartta ovat ristiriidassa",
+          "processor-without-dpa": "Käsittelijän kanssa ei ole sopimusta",
+          "processor-country-unknown": "Käsittelijän maata ei tiedetä",
+          "transfer-without-basis": "Siirrolle EU:n ulkopuolelle ei ole perustetta",
+          "processor-without-baa": "Käsittelijän kanssa ei ole HIPAA-sopimusta",
+          "processor-not-itar-eligible": "Käsittelijä ei saa käsitellä vientivalvottua tietoa",
+          "classification-pack-not-accredited": "Ylimmät turvallisuusluokat ovat päällä asennuksessa, jota ei ole hyväksytty"
+        },
+        "csv": "Rekisterit CSV-tiedostona",
+        "months": "{n} kuukautta",
+        "verdict": {
+          "gdpr": {
+            "out-of-scope": "Ei koske",
+            "applies": "Koskee",
+            "dpo-required": "Koskee, tietosuojavastaava tarvitaan"
+          },
+          "nis2": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "important": "Tärkeä toimija",
+            "essential": "Keskeinen toimija"
+          },
+          "dora": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "ict-third-party": "ICT-palvelun tarjoaja",
+            "financial-entity": "Finanssialan toimija"
+          },
+          "cra": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "default": "Digitaalisia elementtejä sisältävä tuote",
+            "important": "Tärkeä tuote",
+            "critical": "Kriittinen tuote"
+          },
+          "eaa": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "applies": "Koskee"
+          },
+          "dsa": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "intermediary": "Pelkkä siirto tai välimuisti",
+            "hosting": "Säilytyspalvelu",
+            "online-platform": "Verkkoalusta",
+            "vlop": "Erittäin suuri verkkoalusta"
+          },
+          "hipaa": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "business-associate": "Liitännäistoimija (business associate)",
+            "covered-entity": "Velvoitettu toimija (covered entity)"
+          },
+          "export-control": {
+            "not-in-scope": "Ei soveltamisalassa",
+            "dual-use": "Kaksikäyttötuote",
+            "itar": "ITAR"
+          }
+        },
+        "open": {
+          "open": "Avaa",
+          "back": "← Kaikki",
+          "loading": "Ladataan…",
+          "loadFailed": "Lista ei latautunut. Yritä hetken päästä uudelleen.",
+          "changeFailed": "Muutosta ei tallennettu.",
+          "empty": "Täällä ei ole vielä mitään.",
+          "lawsTitle": "Säädökset ja niiden kysymykset",
+          "lead": {
+            "registers": "Kaikki rekisterit, joita tämä asennus, sen yhteiset paikat ja sen sovellukset pitävät. Avaa rekisteri, niin näet, mitä se kertoo, mitä siitä puuttuu ja mitä voit tehdä.",
+            "requests": "Ihmisten pyynnöt nähdä, korjata, siirtää tai poistaa tietonsa. Jokaiseen pyyntöön vastataan kuukauden kuluessa sen saapumisesta.",
+            "breaches": "Tietoturvaloukkaukset. Valvontaviranomaiselle ilmoitetaan 72 tunnin kuluessa, kun loukkaus aiheuttaa riskin ihmisille.",
+            "dpias": "Vaikutustenarvioinnit. Rekisteri, jossa on terveystietoja, biometrisiä tietoja tai muita erityisiä tietoja, tarvitsee arvioinnin.",
+            "processors": "Kuka käsittelee tietoja tämän asennuksen puolesta: asetuksissa nimetyt tekoälypalvelut, sähköposti ja palvelin, ja mitä olet kustakin kirjannut.",
+            "frameworks": "Jokainen säädös kysyy muutaman kysymyksen. Vastaukset ratkaisevat, koskeeko säädös sinua ja mitä se vaatii. Kun kysymykseen ei ole vastattu, säädöksen tilanne jää auki."
+          },
+          "place": {
+            "node": "Tämä asennus",
+            "organism": "Yhteinen paikka",
+            "app": "Sovellus"
+          },
+          "openPlace": {
+            "organism": "Avaa yhteinen paikka →",
+            "app": "Avaa sovellus →"
+          },
+          "printPlace": "Tulosta tämän paikan seloste",
+          "printOne": "Tulosta tämä rekisteri",
+          "gapsN": "{n} auki",
+          "gapsNone": "Ei mitään auki",
+          "openTitle": "Mitä on auki",
+          "dpiaOf": "Rekisterin {register} arviointi",
+          "received": "saapui {at}",
+          "due": "vastattava viimeistään {at}",
+          "found": "havaittu {at}",
+          "completed": "Valmis {at}",
+          "notCompleted": "Kesken",
+          "notYet": "Ei vielä",
+          "countryUnknown": "Maata ei ole kirjattu",
+          "noAgreement": "Sopimusta ei ole kirjattu",
+          "dpaSigned": "Sopimus allekirjoitettu {at}",
+          "signedOn": "allekirjoitettu {at}",
+          "autoYes": "Kyllä, tämä asennus kirjasi sen tehdessään työn",
+          "derivedYes": "Kyllä, luettu tämän asennuksen asetuksista",
+          "yes": "Kyllä",
+          "no": "Ei",
+          "unansweredOne": "Vastaamatta",
+          "answeredBy": {
+            "human": "Ihminen vastasi",
+            "ai": "Tekoäly vastasi",
+            "evidence": "Luettu tämän asennuksen kirjauksista"
+          },
+          "markReviewed": "Merkitse tarkistetuksi tänään",
+          "markDone": "Merkitse tehdyksi",
+          "markRefused": "Merkitse hylätyksi",
+          "markAuthority": "Viranomaiselle on ilmoitettu",
+          "markPeople": "Ihmisille on ilmoitettu",
+          "markCompleted": "Merkitse valmiiksi",
+          "close": "Sulje",
+          "reopen": "Avaa uudelleen",
+          "doneReviewed": "Merkitty tarkistetuksi tänään.",
+          "doneDone": "Pyyntö on merkitty tehdyksi.",
+          "doneRefused": "Pyyntö on merkitty hylätyksi.",
+          "doneReopened": "Avattu uudelleen.",
+          "doneAuthority": "Kirjattu: viranomaiselle ilmoitettiin tänään.",
+          "donePeople": "Kirjattu: ihmisille ilmoitettiin tänään.",
+          "doneClosed": "Tietoturvaloukkaus on suljettu.",
+          "doneCompleted": "Arviointi on merkitty valmiiksi.",
+          "readOnly": {
+            "organism": "Vain yhteisen paikan perustaja tai ylläpitäjä muuttaa tätä. Näet sen, koska ylläpidät tätä asennusta.",
+            "app": "Vain sovelluksen omistaja muuttaa tätä. Näet sen, koska ylläpidät tätä asennusta.",
+            "node": "Tilisi ei muuta tämän asennuksen asiakirjoja."
+          },
+          "promptTitle": "Pyydä tekoälyäsi päivittämään tämä",
+          "promptNote": "Liitä tämä omaan tekoälykeskusteluusi. Tekoäly lukee tämän kohdan, kysyy sinulta, mikä on muuttunut, näyttää tuloksen ja odottaa hyväksyntääsi.",
+          "promptLabel": "Kehote",
+          "promptCopy": "Kopioi kehote",
+          "request": {
+            "access": "Nähdä omat tietonsa",
+            "erasure": "Poistaa omat tietonsa",
+            "rectification": "Korjata omat tietonsa",
+            "restriction": "Rajoittaa käsittelyä",
+            "portability": "Siirtää omat tietonsa",
+            "objection": "Vastustaa käsittelyä"
+          },
+          "status": {
+            "open": "Käsittelyssä",
+            "done": "Tehty",
+            "refused": "Hylätty",
+            "closed": "Suljettu"
+          },
+          "channel": {
+            "node": "Tässä asennuksessa",
+            "email": "Sähköpostilla",
+            "letter": "Kirjeellä",
+            "other": "Muu"
+          },
+          "risk": {
+            "none": "Ei riskiä ihmisille",
+            "risk": "Riski ihmisille",
+            "high-risk": "Suuri riski ihmisille",
+            "unknown": "Riskiä ei ole arvioitu"
+          },
+          "residual": {
+            "low": "Pieni jäännösriski",
+            "medium": "Kohtalainen jäännösriski",
+            "high": "Suuri jäännösriski"
+          },
+          "service": {
+            "ai": "Tekoäly",
+            "email": "Sähköposti",
+            "payments": "Maksut",
+            "storage": "Tallennus",
+            "hosting": "Palvelin",
+            "analytics": "Analytiikka",
+            "other": "Muu"
+          },
+          "transfer": {
+            "adequacy": "Riittävyyspäätös",
+            "scc": "Vakiosopimuslausekkeet",
+            "dpf": "EU:n ja Yhdysvaltain tietosuojakehys",
+            "bcr": "Yritystä koskevat sitovat säännöt",
+            "derogation": "Poikkeus (49 artikla)",
+            "none": "Ei mitään"
+          },
+          "agreement": {
+            "draft": "Sopimus luonnoksena",
+            "sent": "Sopimus lähetetty",
+            "review": "Allekirjoitettu kopio odottaa tarkistusta",
+            "signed": "Sopimus allekirjoitettu",
+            "expired": "Sopimus vanhentunut",
+            "ended": "Sopimus päättynyt"
+          },
+          "field": {
+            "containers": "Missä tiedot ovat",
+            "requestKind": "Mitä pyydetään",
+            "subject": "Kuka pyytää",
+            "received": "Saapui",
+            "due": "Vastattava viimeistään",
+            "channel": "Miten pyyntö tuli",
+            "status": "Tila",
+            "closed": "Suljettu",
+            "auto": "Tämän asennuksen kirjaama",
+            "notes": "Huomiot",
+            "found": "Havaittu",
+            "description": "Mitä tapahtui",
+            "categories": "Tiedot",
+            "subjectsApprox": "Ihmisiä, noin",
+            "risk": "Riski ihmisille",
+            "authority": "Viranomaiselle ilmoitettu",
+            "people": "Ihmisille ilmoitettu",
+            "measures": "Mitä tehtiin",
+            "register": "Rekisteri",
+            "residual": "Jäännösriski",
+            "priorConsultation": "Viedään ensin viranomaiselle",
+            "completed": "Valmis",
+            "reviewed": "Tarkistettu viimeksi",
+            "service": "Palvelu",
+            "host": "Osoite",
+            "country": "Maa",
+            "transferBasis": "Siirron peruste",
+            "agreement": "Käsittelysopimus",
+            "hipaaBaa": "HIPAA-sopimus (business associate agreement)",
+            "itar": "Saa käsitellä vientivalvottuja tietoja",
+            "derived": "Nimetty asetuksissa",
+            "type": "Tyyppi"
+          },
+          "domainsTitle": "Rekisterit, joissa on säänneltyä tietoa",
+          "workspaceIn": "työtila {ws} paikassa {place}",
+          "promptTitleRead": "Pyydä tekoälyäsi selittämään tämä",
+          "promptNoteRead": "Liitä tämä omaan tekoälykeskusteluusi. Tekoäly lukee tämän kohdan, kertoo, mitä on auki, ja kirjoittaa viestin sille, joka kohtaa pitää. Se ei muuta mitään."
+        },
+        "q": {
+          "gdpr": {
+            "q-personal-data": "Käsitelläänkö täällä henkilötietoja eli mitä tahansa, mistä elävä ihminen voidaan tunnistaa suoraan tai välillisesti?",
+            "q-public-authority": "Onko rekisterinpitäjä viranomainen tai julkishallinnon elin (muu kuin tuomioistuin)?",
+            "q-large-scale-monitoring": "Seuraako ydintoiminta ihmisiä säännöllisesti, järjestelmällisesti ja laajasti (seuranta, profilointi, sijainti)?",
+            "q-large-scale-special": "Käsitteleekö ydintoiminta laajasti erityisiä henkilötietoryhmiä (9 artikla) tai rikostietoja (10 artikla)?"
+          },
+          "nis2": {
+            "q-sector-medium": "Jos organisaatiossa on vähintään 50 ihmistä tai liikevaihto on yli 10 miljoonaa euroa, millä toimialalla se toimii?",
+            "q-annex1-large": "Toimiiko se liitteen I toimialalla JA onko siinä vähintään 250 ihmistä tai liikevaihto yli 50 miljoonaa euroa?",
+            "q-always-in-scope": "Koosta riippumatta: onko se DNS-palvelu, ylätason verkkotunnusrekisteri, hyväksytty luottamuspalvelu tai yleisen viestintäverkon tarjoaja, tai onko viranomainen nimennyt sen?"
+          },
+          "dora": {
+            "q-financial-entity": "Onko organisaatio finanssialan yhteisö (pankki, maksu- tai sähkörahalaitos, sijoituspalveluyritys, vakuutusyhtiö, kryptopalvelujen tarjoaja, rahastonhoitaja)?",
+            "q-ict-to-financial": "Tarjoaako se tieto- ja viestintätekniikan palveluja, myös tämän asennuksen, finanssialan yhteisölle?"
+          },
+          "cra": {
+            "q-places-product": "Saattaako organisaatio ohjelmistoja tai laitteita EU:n markkinoille osana kaupallista toimintaa?",
+            "q-annex3": "Onko tuote liitteen III tuote: identiteetinhallinta, selain, salasanojen hallinta, VPN, verkon tai tietoturvan hallinta, käyttöjärjestelmä, reititin tai palomuuri, hypervisori?",
+            "q-annex4": "Onko tuote liitteen IV tuote: laitteistopohjainen turvamoduuli, älymittarin yhdyskäytävä, älykortti tai turvaelementti?"
+          },
+          "eaa": {
+            "q-consumer-service": "Tarjoaako organisaatio kuluttajille verkkokauppaa tai muuta lueteltua palvelua (pankkipalvelut, e-kirjat, henkilöliikenne, sähköinen viestintä) JA onko siinä vähintään 10 ihmistä tai liikevaihto yli 2 miljoonaa euroa?"
+          },
+          "dsa": {
+            "q-conduit": "Välittääkö tai tallentaako se väliaikaisesti tietoja, joita sen käyttäjät lähettävät muille?",
+            "q-hosting": "Säilyttääkö se käyttäjien antamia tietoja heidän pyynnöstään (muisti, tiedostot, sovellukset, ilmoitustaulut)?",
+            "q-public": "Tuoko se käyttäjien tallentamaa sisältöä julkisesti saataville (julkiset sovellukset, julkiset ilmoitustaulut, jaetut sivut), eikä se ole mikro- tai pienyritys?",
+            "q-vlop": "Onko sillä EU:ssa vähintään 45 miljoonaa kuukausittaista aktiivista käyttäjää?"
+          },
+          "hipaa": {
+            "q-covered-entity": "Onko organisaatio yhdysvaltalainen terveysvakuutus, terveystietojen välityspalvelu (clearinghouse) tai palveluntarjoaja, joka lähettää terveystietoja sähköisesti?",
+            "q-business-associate": "Luoko, vastaanottaako, säilyttääkö tai lähettääkö se suojattuja terveystietoja tällaisen organisaation puolesta?"
+          },
+          "export-control": {
+            "q-usml": "Säilytetäänkö tai jaetaanko täällä Yhdysvaltain puolustustarvikeluettelon (USML) tuotteen teknisiä tietoja?",
+            "q-ccl": "Säilytetäänkö tai jaetaanko täällä teknologiaa, jolla on muu Commerce Control List -numero kuin EAR99?",
+            "q-eu-dual-use": "Säilytetäänkö tai jaetaanko täällä teknologiaa, joka on asetuksen (EU) 2021/821 liitteessä I?",
+            "q-foreign-access": "Voisiko täällä tietoja lukea joku, jota lupa ei kata (ITARissa kuka tahansa, joka ei ole yhdysvaltalainen henkilö), myös asennuksen ylläpitäjä ja pääkäyttäjät?"
+          }
+        },
+        "special": {
+          "explicit-consent": "Nimenomainen suostumus (9 artiklan 2 kohdan a alakohta)",
+          "employment-law": "Työoikeus ja sosiaaliturva (9 artiklan 2 kohdan b alakohta)",
+          "vital-interests": "Elintärkeät edut (9 artiklan 2 kohdan c alakohta)",
+          "non-profit": "Voittoa tavoittelemattoman yhteisön jäsenet (9 artiklan 2 kohdan d alakohta)",
+          "made-public": "Henkilö on itse saattanut tiedot julkisiksi (9 artiklan 2 kohdan e alakohta)",
+          "legal-claims": "Oikeusvaateet (9 artiklan 2 kohdan f alakohta)",
+          "public-interest": "Tärkeä yleinen etu (9 artiklan 2 kohdan g alakohta)",
+          "health-care": "Terveyden- tai sosiaalihuolto (9 artiklan 2 kohdan h alakohta)",
+          "public-health": "Kansanterveys (9 artiklan 2 kohdan i alakohta)",
+          "research": "Tutkimus, arkistointi tai tilastointi (9 artiklan 2 kohdan j alakohta)"
+        }
+      }
     },
     "csm": {
       "listTitle": "Mikä on lukossa",
@@ -16372,7 +16796,23 @@
     "ownerRemoved": "Omistajuus poistettu",
     "confirmAddOwner": "Tehdäänkö {member} myös omistajaksi? Hän saa kaiken minkä sinäkin, ja sinä pidät omasi.",
     "confirmRemoveOwner": "Poistetaanko {member} omistajista? Hän jää adminiksi.",
-    "roleOwner": "omistaja"
+    "roleOwner": "omistaja",
+    "records": {
+      "title": "Seloste käsittelytoimista",
+      "leadEdit": "Mitä henkilötietoja tämä paikka pitää, keistä, miksi ja kuinka kauan. Kopioi kehote omalle tekoälyllesi: se kysyy sinulta sen, minkä vain sinä tiedät, ja näyttää tuloksen ennen kuin tallentaa mitään.",
+      "leadRead": "Mitä henkilötietoja tämä paikka pitää, niin kuin sen perustaja ja ylläpitäjät ovat sen kirjanneet.",
+      "copy": "Kopioi kehote tekoälyllesi",
+      "none": "Ei vielä rekisteriä.",
+      "domains": "Säännelty tieto: {list}",
+      "noDomains": "Ei säänneltyä tietoa.",
+      "gaps": "Avoinna on {n} asiaa.",
+      "type": {
+        "personal": "Henkilötietoja",
+        "pseudonymised": "Pseudonymisoitu",
+        "anonymised": "Anonymisoitu",
+        "none": "Ei henkilötietoja"
+      }
+    }
   },
   "organisms.accessNone": "Ei pääsyä",
   "organisms.accessUpdateFailed": "Oikeuksien päivitys epäonnistui",
@@ -23232,6 +23672,13 @@
     "dataMap.agentUntie": "Irrota",
     "dataMap.agentUntied": "Irrotettu. Sovellus ja agentti ovat ennallaan.",
     "dataMap.agentNote": "Liitos kertoo, kenen työ on tälle sovellukselle tärkeää. Se ei anna sovellukselle uusia oikeuksia, eikä irrottaminen poista agenttia tai sen töitä.",
+    "dataMap.recordsTitle": "Henkilötiedot, joita sovellus pitää",
+    "dataMap.recordsNone": "Sovelluksen omistaja ei ole kirjannut, mitä henkilötietoja sovellus pitää.",
+    "dataMap.recordsKept": "Säilytys: {how}",
+    "dataMap.recordsMonths": "{n} kuukautta",
+    "dataMap.recordsBasis": "Käsittelyperuste: {basis}",
+    "dataMap.recordsNoPrivacy": "Sovellus pitää henkilötietoja, eikä sillä ole vielä omaa tietosuojaselostetta.",
+    "dataMap.recordsPrivacy": "Sovelluksen tietosuojaseloste on sen oikeudellisten sivujen joukossa.",
     "dataMap.invitesLabel": "Ketä se kutsuu",
     "dataMap.invites.lead": "Tämä sovellus voi kutsua ihmisiä jaettuihin tiloihin. Kutsu voi luoda kutsutulle uuden tilin.",
     "dataMap.invites.sends-email-invitations": "Lähettää kutsuja sähköpostilla",

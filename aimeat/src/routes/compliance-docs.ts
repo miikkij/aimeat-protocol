@@ -13,13 +13,15 @@
  *   (the operator for the node, an organism's members and managers, an app's owner).
  * @structure complianceDocsRouter(config, storage)
  *   - GET  /v1/compliance/catalog           the data domains, the frameworks and the label packs
- *   - GET  /v1/compliance/docs/:kind        one document of a scope
+ *   - GET  /v1/compliance/docs/:kind        one document of a scope (scope=all: every place, operator)
  *   - PUT  /v1/compliance/docs/:kind        replace it (dry_run=true previews)
+ *   - PATCH /v1/compliance/docs/:kind/:id   change the fields of one entry
  *   - GET  /v1/compliance/draft             the node's draft of a scope's registers
  *   - GET  /v1/compliance/gaps              what a scope's documents leave open
  * @usage app.use(complianceDocsRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1–C7.1).
+ *   v1.1.0 — 2026-10-24 — scope=all on the read, PATCH of one entry (C7.7).
  */
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -30,8 +32,9 @@ import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-co
 import type { OperatorCaller } from '../services/operator-principal.js';
 import { callerOf } from '../middleware/caller.js';
 import {
-  ComplianceDocError, catalogOp, draftOp, gapsOp, readDocOp, writeDocOp,
+  ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,
 } from '../services/compliance-docs-ops.js';
+import { readAllPlacesOp } from '../services/compliance-docs-places.js';
 
 export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -50,9 +53,13 @@ export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Ro
 
   router.get('/v1/compliance/docs/:kind', requireAuth(), requireScope(COMPLIANCE_READ_SCOPE), async (req, res) => {
     try {
-      const out = await readDocOp(deps, operatorCallerOf(req), req.params.kind as string, {
-        scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner,
-      });
+      const kind = req.params.kind as string;
+      // scope=all: every place that keeps this kind, for the operator (compliance-docs-places.ts).
+      const out = req.query.scope === 'all'
+        ? await readAllPlacesOp(deps, operatorCallerOf(req), kind)
+        : await readDocOp(deps, operatorCallerOf(req), kind, {
+          scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner,
+        });
       res.json(success(config.nodeId, out, [
         { description: 'Replace it (send every entry you keep)', method: 'PUT', url: `/v1/compliance/docs/${req.params.kind as string}` },
         { description: 'What it leaves open', method: 'GET', url: '/v1/compliance/gaps' },
@@ -66,6 +73,17 @@ export function complianceDocsRouter(config: AimeatConfig, storage: Storage): Ro
       const out = await writeDocOp(deps, operatorCallerOf(req), req.params.kind as string, {
         scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner,
       }, req.body ?? {}, { dryRun: req.query.dry_run === 'true' });
+      res.json(success(config.nodeId, out));
+    } catch (err) { fail(res, err); }
+  });
+
+  router.patch('/v1/compliance/docs/:kind/:id', requireAuth(), requireScope(COMPLIANCE_WRITE_SCOPE), async (req, res) => {
+    try {
+      // The body is { set: { field: value } }, which aimeat_compliance_register_write carries as `set`.
+      const body = (req.body ?? {}) as { set?: unknown };
+      const out = await patchItemOp(deps, operatorCallerOf(req), req.params.kind as string, {
+        scope: req.query.scope, organism_id: req.query.organism_id, app: req.query.app, app_owner: req.query.app_owner,
+      }, req.params.id, body.set, { dryRun: req.query.dry_run === 'true' });
       res.json(success(config.nodeId, out));
     } catch (err) { fail(res, err); }
   });

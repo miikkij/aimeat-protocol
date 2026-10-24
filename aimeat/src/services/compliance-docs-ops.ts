@@ -11,14 +11,17 @@
  *     the configuration, framework verdicts, the domain floors of each register).
  *   - writeDocOp: replace one, validated; `dryRun` answers what would be stored and stores nothing. A
  *     registers write raises the containers its domains ask for (compliance-domain-floor.ts).
+ *   - patchItemOp: change the fields of one entry (a status, a review date) and leave the rest as
+ *     stored; the page's status actions and an AI use it alike.
  *   - draftOp: the node's draft of a scope's registers (compliance-derived.ts), stored nowhere.
  *   - gapsOp: the gaps of one scope (compliance-scope-gaps.ts).
  *   - catalogOp: the data domains, the frameworks with their questions, and the label packs.
- * @structure ComplianceDocError · ScopeInput · scopeFrom() · readDocOp() · writeDocOp() · draftOp() · gapsOp() · catalogOp()
+ * @structure ComplianceDocError · ScopeInput · scopeFrom() · readDocOp() · writeDocOp() · patchItemOp() · draftOp() · gapsOp() · catalogOp()
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1–C7.1).
+ *   v1.1.0 — 2026-10-24 — patchItemOp() (C7.7).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -30,7 +33,7 @@ import { readNodePolicy } from './classification/policy.js';
 import { packStatus } from './classification/packs.js';
 import type { OperatorCaller } from './operator-principal.js';
 import { complianceDocAccess } from './compliance-docs-access.js';
-import { readDoc, scopeAllows, writeDoc, SCOPES_OF, type ComplianceScope } from './compliance-docs.js';
+import { patchDocItem, readDoc, scopeAllows, writeDoc, SCOPES_OF, type ComplianceScope } from './compliance-docs.js';
 import { applyDomainFloors } from './compliance-domain-floor.js';
 import {
   appRegisterDraft, derivedProcessors, frameworkVerdicts, nodeRegistersDraft, organismRegisterDraft, processorsView, transfersOf,
@@ -133,6 +136,67 @@ export async function writeDocOp(
   const saved = await writeDoc(deps.storage, deps.config.nodeId, kind, scope, doc, a.by);
   const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (saved as ComplianceDocs['registers']).items) : undefined;
   return { kind, scope, stored: true, ...(saved as object), ...(floors ? { floors } : {}) };
+}
+
+/** Fields a change of one entry never sets: the id names it, the stamp is the node's. */
+const FIXED_FIELDS = new Set(['id', 'updatedAt', 'updatedBy']);
+
+/**
+ * Change the fields of one entry and leave the rest of the document as stored (C7.7): a status, a
+ * review date, a notice date. `set` merges into the entry; a field set to null is removed; "now" in
+ * a field ending in At is the node's clock. A request set to done or refused gets its closedAt. The
+ * whole document is validated as a replace is, so a change can leave nothing invalid behind.
+ */
+export async function patchItemOp(
+  deps: Deps, caller: OperatorCaller, rawKind: unknown, input: ScopeInput, itemId: unknown, set: unknown,
+  opts: { dryRun?: boolean } = {},
+): Promise<Record<string, unknown>> {
+  const kind = kindOf(rawKind);
+  if (kind === 'frameworks') throw new ComplianceDocError(400, 'INVALID_INPUT', 'frameworks has no entries to change one by one; replace its answers.');
+  const id = str(itemId);
+  if (!id) throw new ComplianceDocError(400, 'INVALID_INPUT', 'item_id names the entry to change.');
+  if (!set || typeof set !== 'object' || Array.isArray(set) || !Object.keys(set).length) {
+    throw new ComplianceDocError(400, 'INVALID_INPUT', 'set is an object of the fields to change, e.g. { "status": "done" }.');
+  }
+  const fixed = Object.keys(set).filter(k => FIXED_FIELDS.has(k));
+  if (fixed.length) throw new ComplianceDocError(400, 'INVALID_INPUT', `set cannot change ${fixed.join(', ')}.`);
+  const scope = scopeFrom(input, caller);
+  const a = await allowed(deps, caller, kind, scope, 'write');
+  const now = new Date().toISOString();
+  const change = (item: Record<string, unknown>): Record<string, unknown> => {
+    const next: Record<string, unknown> = { ...item };
+    for (const [k, v] of Object.entries(set as Record<string, unknown>)) {
+      if (v === null) delete next[k];
+      else next[k] = v === 'now' && k.endsWith('At') ? now : v;
+    }
+    if (kind === 'requests' && (next.status === 'done' || next.status === 'refused') && !next.closedAt) next.closedAt = now;
+    if (kind === 'requests' && next.status === 'open') delete next.closedAt;
+    return next;
+  };
+  const validate = (doc: { items: Array<Record<string, unknown>> }) => {
+    const parsed = DOC_SCHEMAS[kind].safeParse(doc);
+    if (!parsed.success) {
+      throw new ComplianceDocError(400, 'VALIDATION_ERROR', `That change to ${kind} was not stored: `
+        + parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+    }
+    return parsed.data as ComplianceDocs[typeof kind];
+  };
+  if (opts.dryRun) {
+    const stored = (await readDoc(deps.storage, deps.config.nodeId, kind, scope) as { items: Array<Record<string, unknown>> }).items;
+    const cur = stored.find(it => it.id === id);
+    if (!cur) throw new ComplianceDocError(404, 'NOT_FOUND', `No ${kind} entry ${id} in this scope.`);
+    const next = { ...change(cur), id };
+    validate({ items: stored.map(it => (it.id === id ? next : it)) });
+    return { kind, scope, item: next, stored: false, note: 'Nothing was written. Show this to the person, and send it again without dry_run to store it.' };
+  }
+  // Processors are stored without the merged view's `derived` flag, as writeDocOp stores them.
+  const saved = await patchDocItem(deps.storage, deps.config.nodeId, kind, scope, id,
+    (item) => { const next = change(item); delete next.derived; return next; }, validate, a.by);
+  if (!saved) throw new ComplianceDocError(404, 'NOT_FOUND', `No ${kind} entry ${id} in this scope. A processor the node lists from its configuration is changed by writing it into the document first.`);
+  const floors = kind === 'registers'
+    ? await applyDomainFloors(deps, scope, (await readDoc(deps.storage, deps.config.nodeId, 'registers', scope)).items.filter(r => r.id === id))
+    : undefined;
+  return { kind, scope, stored: true, item: saved, ...(floors ? { floors } : {}) };
 }
 
 /** The node's draft of a scope's registers. Stored nowhere. */

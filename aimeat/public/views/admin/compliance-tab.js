@@ -31,6 +31,12 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.3.0 — 2026-10-24 — A row of section 09 opens the records dialog (compliance-tab.browse.js,
+ *     C7.7), and one register or one place's record prints alone from it.
+ *   v3.2.0 — 2026-10-24 — Sections 08 to 10, the records of processing (compliance-tab.records.js,
+ *     plan doc-mvlftkh9zmc9 C7.3): what they leave open, what exists, and the paste for the
+ *     operator's AI. The node's registers print as the art. 30 record and have a CSV of their own on
+ *     section 09; the page's CSV carries what the records leave open.
  *   v3.1.0 — 2026-10-03 — A fifth gap row, faces added without licence data (the font manager), with
  *     the way to the Fonts tab of Themes & Styles.
  *   v3.0.0 — 2026-09-27 — Library components only: the page prints through PrintPage (the body mark,
@@ -70,6 +76,8 @@ import { RegisterSection, QuestionnaireSection, classWord } from './compliance-t
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
 import SavedReports, { readableId } from './compliance-tab.saved.js';
+import { RecordsSection, RecordsGapsSection, RecordsPromptSection } from './compliance-tab.records.js';
+import { RecordsBrowser } from './compliance-tab.browse.js';
 import { PrintPage, ScreenOnly } from '/components/PrintPage.js';
 import { Section } from '/components/Section.js';
 import { Verdict, Readings } from '/components/Readings.js';
@@ -266,6 +274,7 @@ export default function ComplianceTab(props) {
   const [period, setPeriod] = useState('30d');
   const [report, setReport] = useState(null);
   const [questionnaire, setQuestionnaire] = useState(null);
+  const [registers, setRegisters] = useState([]);   // the node's own records of processing, for print and CSV
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [drafting, setDrafting] = useState(false);
@@ -273,17 +282,21 @@ export default function ComplianceTab(props) {
   const [kept, setKept] = useState(0);
   const [draft, setDraft] = useState(null);       // the register as edited, null while untouched
   const [openId, setOpenId] = useState(null);
+  const [browse, setBrowse] = useState(null);      // the records dialog's target, { kind, item?, domain? }
+  const [printOnly, setPrintOnly] = useState(null); // { title, registers } while one record prints
   const [toastMsg, showError, showSuccess, clearToast] = useToast();
   const days = PERIODS.find(p => p.key === period)?.days ?? 30;
 
   const load = useCallback(async (d) => {
     try {
-      const [rep, qs] = await Promise.all([
+      const [rep, qs, regs] = await Promise.all([
         apiGet(`/v1/admin/compliance/report?since_days=${d}`),
         apiGet('/v1/admin/compliance/questionnaire'),
+        apiGet('/v1/compliance/docs/registers').catch((e) => { swallowed('compliance-tab: registers', e); return null; }),
       ]);
       if (rep?.data) setReport(rep.data);
       if (qs?.data) setQuestionnaire(qs.data.questionnaire);
+      setRegisters(regs?.data?.items || []);
       setFailed(false);
     } catch (e) {
       setFailed(true);
@@ -293,6 +306,13 @@ export default function ComplianceTab(props) {
 
   useEffect(() => { load(days); }, [days, load]);
   useEffect(() => onLiveUpdate(['compliance'], () => load(days)), [days, load]);
+  // One record prints after it has painted (the effect runs after the commit), and the page's own
+  // printout comes back once the print dialog closes.
+  useEffect(() => {
+    if (!printOnly) return;
+    window.print();
+    setPrintOnly(null);
+  }, [printOnly]);
 
   const saveRegister = async (list) => {
     setSaving(true);
@@ -376,6 +396,9 @@ export default function ComplianceTab(props) {
       }
     }
     for (const g of report.gaps) rows.push(pad(['gap', g.kind, g.detail]));
+    // What the records of processing leave open (plan doc-mvlftkh9zmc9), in the gap rows' own
+    // columns. The registers themselves have a CSV of their own on section 09.
+    for (const g of report.processing?.gaps || []) rows.push(pad(['records_gap', g.kind, g.detail]));
     // The limits ride along in the same file. A CSV of findings with the scope left behind in the
     // browser is the export that overstates coverage, which is the one thing this must not produce.
     for (const s of report.not_covered) rows.push(pad(['not_covered', s.code || '', limitText(s)]));
@@ -434,8 +457,14 @@ export default function ComplianceTab(props) {
           <${SavedReports} refresh=${kept} keeping=${keeping} onKeep=${keepNow} onError=${showError} />
           <${CompliancePromptSection} nodeId=${scope.node_id} days=${days} />
         <//>
+        <${RecordsGapsSection} gaps=${report.processing?.gaps} />
+        <${RecordsSection} processing=${report.processing} registers=${registers} nodeId=${scope.node_id} onOpen=${setBrowse} />
+        <${RecordsPromptSection} nodeId=${scope.node_id} />
+        ${browse ? html`<${RecordsBrowser} target=${browse} gaps=${report.processing?.gaps} onClose=${() => setBrowse(null)}
+          onPrint=${(regs, title) => setPrintOnly({ registers: regs, title })}
+          onChanged=${() => load(days)} />` : null}
       <//>
-      <${PrintableReport} report=${report} questionnaire=${questionnaire} />
+      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} only=${printOnly} />
     <//>
   `;
 }

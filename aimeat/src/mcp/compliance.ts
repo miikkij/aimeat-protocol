@@ -25,6 +25,8 @@
  *   import { registerComplianceTools } from './compliance.js';
  *   registerComplianceTools(mcp, storage, config, getAgentGaii);
  * @version-history
+ *   2026-10-24 — The read takes scope "all" (every place that keeps a kind, operator only), and the
+ *     write takes item_id with set to change one entry in place (plan doc-mvlftkh9zmc9, C7.7).
  *   2026-10-23 — The register tools also read and replace the documents of plan doc-mvlftkh9zmc9
  *     (registers, processors, requests, breaches, dpias, frameworks) of the node, an organism or an
  *     app, and read the catalog, a scope's draft and its gaps, through services/compliance-docs-ops.ts,
@@ -57,8 +59,9 @@ import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import {
-  ComplianceDocError, catalogOp, draftOp, gapsOp, readDocOp, writeDocOp,
+  ComplianceDocError, catalogOp, draftOp, gapsOp, patchItemOp, readDocOp, writeDocOp,
 } from '../services/compliance-docs-ops.js';
+import { readAllPlacesOp } from '../services/compliance-docs-places.js';
 
 /** The parts that are the operator's AI Act register; every other part is a scoped document. */
 const OPERATOR_PARTS = new Set(['draft', 'usecases', 'questionnaire']);
@@ -136,6 +139,7 @@ export function registerComplianceTools(
           if (part === 'catalog') return text(await catalogOp(docDeps));
           if (part === 'registers_draft') return text(await draftOp(docDeps, docCaller, where));
           if (part === 'gaps') return text(await gapsOp(docDeps, docCaller, where));
+          if (scope === 'all') return text(await readAllPlacesOp(docDeps, docCaller, part));
           return text(await readDocOp(docDeps, docCaller, part, where));
         } catch (err) {
           if (err instanceof ComplianceDocError) return toolError(err.code, err.message);
@@ -162,10 +166,16 @@ export function registerComplianceTools(
         inputSchema: zodShapeFor('aimeat_compliance_register_write'),
         annotations: annotationsFor('aimeat_compliance_register_write'),
     },
-    async ({ part, value, dry_run, scope, organism_id, app, app_owner }) => {
+    async ({ part, value, item_id, set, dry_run, scope, organism_id, app, app_owner }) => {
       if (!OPERATOR_PARTS.has(part)) {
         try {
-          return text(await writeDocOp(docDeps, docCaller, part, { scope, organism_id, app, app_owner }, value, { dryRun: !!dry_run }));
+          const where = { scope, organism_id, app, app_owner };
+          // item_id + set changes one entry; value replaces the whole document.
+          if (item_id !== undefined || set !== undefined) {
+            return text(await patchItemOp(docDeps, docCaller, part, where, item_id, set, { dryRun: !!dry_run }));
+          }
+          if (value === undefined) return toolError('INVALID_INPUT', 'Send value (the whole document), or item_id with set (one entry\'s fields).');
+          return text(await writeDocOp(docDeps, docCaller, part, where, value, { dryRun: !!dry_run }));
         } catch (err) {
           if (err instanceof ComplianceDocError) return toolError(err.code, err.message);
           throw err;

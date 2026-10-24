@@ -17,6 +17,7 @@
  * @structure dataMapRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-24 — GET carries records_of_processing and privacy_notice (plan doc-mvlftkh9zmc9, C1.7).
  *   2026-10-21 — The caller asks isAnonymousPrincipal, so the minted anonymous token is nobody here too (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-16 — GET answers the map of an app that is not public only to whoever may see that app (services/data-map/data-map-access.ts), and the caller comes from callerOf (middleware/caller.ts) with whether it is a member of this node and its session for the operator question (QA audit list review).
  *   v2.1.0 — 2026-10-11 — PUT and DELETE …/agents/:agent: tie an app to one of the owner's agents,
@@ -69,6 +70,7 @@ export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, {
       app: out.app, data_map: out.dataMap, stamp: out.stamp,
       ...(out.findings ? { findings: out.findings } : {}),
+      records_of_processing: out.records, privacy_notice: out.privacyNotice,
     }));
   });
 

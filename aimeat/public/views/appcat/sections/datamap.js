@@ -16,6 +16,8 @@
  * @structure meta · agentsOfMap(map) · DataMapSection({ d })
  * @usage const mod = await import('./sections/datamap.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.2.0 — 2026-10-24 — "Personal data this app keeps": the app's records of processing as the map
+ *     read answers them, and whether it has a privacy notice (plan doc-mvlftkh9zmc9, C1.7).
  *   v1.1.0 — 2026-10-11 — The agents whose work the app shows, above the map
  *     (wish-agentista-sovellukseen-sovelluksen-teko-agentin-j-lkeen-ja-a).
  *   v1.0.0 — 2026-09-27 — Initial: the old catalogue's js/data-map.js on components (appcat detail
@@ -34,6 +36,7 @@ import { swallowed } from '/js/swallowed.js';
 import { readHomeAgents } from '/js/services/agent-draft.js';
 import { untieApp } from '/js/services/agent-ties.js';
 import { x } from '/views/appcat/i18n.js';
+import { tOr } from '/js/i18n.js';
 
 const html = htm.bind(h);
 
@@ -104,8 +107,34 @@ function TiedAgents({ d, map, onChanged }) {
     <//>`;
 }
 
+/**
+ * What personal data the app keeps, as its owner wrote it in the app's records of processing (plan
+ * doc-mvlftkh9zmc9, C1.7): one row per register with its data, basis and how long it is kept, and
+ * whether the app has a privacy notice. Shown only when the app keeps a register or its map says it
+ * holds personal data, so an app with nothing personal says nothing here.
+ */
+function PersonalData({ records, privacyNotice, map }) {
+  const personal = (records || []).filter((r) => r.type === 'personal' || r.type === 'pseudonymised');
+  const mapSaysPersonal = !!map && Array.isArray(map.held) && map.held.some((row) => row && row.personalData === 'yes');
+  if (!personal.length && !mapSaysPersonal) return null;
+  const basisWord = (b) => tOr(`admin.compliance.records.basis.${b}`, b);
+  // The number and its unit stay on one line.
+  const kept = (r) => r.retentionText || (typeof r.retentionMonths === 'number' ? x('dataMap.recordsMonths', { n: String(r.retentionMonths) }).replace(/^(\S+) /, '$1 ') : '');
+  return html`
+    <${Space} below="part">
+      <${SubHeading} level=${3}>${x('dataMap.recordsTitle')}<//>
+      ${personal.length ? html`<${Facts} wide rows=${personal.map((r) => ({
+        k: r.title,
+        v: [(r.dataCategories || []).join(', '),
+          (r.legalBasis || []).length ? x('dataMap.recordsBasis', { basis: r.legalBasis.map(basisWord).join(', ') }) : '',
+          kept(r) ? x('dataMap.recordsKept', { how: kept(r) }) : ''].filter(Boolean).join(' · '),
+      }))} />` : html`<${Note} kind="quiet">${x('dataMap.recordsNone')}<//>`}
+      <${Note} kind=${privacyNotice ? 'quiet' : 'hint'}>${privacyNotice ? x('dataMap.recordsPrivacy') : x('dataMap.recordsNoPrivacy')}<//>
+    <//>`;
+}
+
 export default function DataMapSection({ d }) {
-  const [state, setState] = useState({ loading: true, map: null, findings: [] });
+  const [state, setState] = useState({ loading: true, map: null, findings: [], records: [], privacyNotice: false });
   const [round, setRound] = useState(0);
   const owner = d.owner;
   const filename = d.filename;
@@ -118,13 +147,17 @@ export default function DataMapSection({ d }) {
       .then((json) => {
         if (!live) return;
         const data = (json && json.data) || {};
-        setState({ loading: false, map: data.data_map || null, findings: data.findings || [] });
+        setState({
+          loading: false, map: data.data_map || null, findings: data.findings || [],
+          records: data.records_of_processing || [], privacyNotice: !!data.privacy_notice,
+        });
       })
       // eslint-disable-next-line aimeat/no-silent-catch -- as on the old page, a map that cannot be read is said as "no map yet"
-      .catch(() => { if (live) setState({ loading: false, map: null, findings: [] }); });
+      .catch(() => { if (live) setState({ loading: false, map: null, findings: [], records: [], privacyNotice: false }); });
     return () => { live = false; };
   }, [owner, filename, round]);
   return html`
     ${state.map ? html`<${TiedAgents} d=${d} map=${state.map} onChanged=${() => setRound((n) => n + 1)} />` : null}
+    ${state.loading ? null : html`<${PersonalData} records=${state.records} privacyNotice=${state.privacyNotice} map=${state.map} />`}
     <${DataMap} loading=${state.loading} map=${state.map} findings=${state.findings} say=${(k) => x(k)} />`;
 }

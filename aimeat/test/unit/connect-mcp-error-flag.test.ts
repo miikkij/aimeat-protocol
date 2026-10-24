@@ -23,6 +23,7 @@
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
+ *   2026-10-24 — PROBE_SETUP for aimeat_compliance_register_write, whose value is optional now.
  *   2026-10-21 — PROBE_SETUP conversation ids for the four aimeat_dm_group_* tools that take one (group chat).
  *   2026-10-09 — PROBE_SETUP entry for aimeat_docsign_lookup (a 64-hex SHA-256).
  *   2026-10-06 — PROBE_SETUP entries for seven tools that run their dispatch definition on the
@@ -71,6 +72,8 @@ const NEVER_CALLS_THE_NODE = new Map<string, string>([
  */
 const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_datapackage_export: { ref: 'pkg:someone/thing' },
+  // value became optional (item_id + set change one entry instead), so the probe sends the document.
+  aimeat_compliance_register_write: { part: 'registers', value: { items: [] } },
   // A conversation id is 8 to 128 of [A-Za-z0-9_.:-] on the node's schema, which the connector has
   // registered too since 2026-10-05 (secaudit 2026-10, M3); the generic 'probe' is too short.
   aimeat_dm_thread: { conversation_id: 'conv-probe-0001' },

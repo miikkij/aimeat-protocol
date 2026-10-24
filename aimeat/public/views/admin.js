@@ -6,6 +6,9 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.13.1 — 2026-10-24 — The live stream reaches the tabs: each change is relayed as the window
+ *     event 'aimeat-live-update' with its domains, as the profile page does. The tabs that listen for
+ *     it never heard one on this page (found with the Compliance records dialog, C7.7).
  *   v1.13.0 — 2026-10-14 — The menu find under the node id (components/MenuFind.js): typing narrows the
  *     operator menu to the pages, the Config settings and the Settings & Controls pages that match; a
  *     chosen setting opens Config searched for it (wish-pikahaku-settings-controls-ja-admin-sivuille).
@@ -392,8 +395,16 @@ export default function Admin({ navigate, locale }) {
       }, 1500);
     };
     onUpdate(debouncedReload);
+    // The tabs listen for the window event with the domains that changed, as on the profile page
+    // (frontend rule: every tab showing server data re-fetches on 'aimeat-live-update'); the admin
+    // page re-read its own data and told no tab, so a tab's list stayed as it was until a reload.
+    const notifyTabs = (domains) => {
+      window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domains } }));
+    };
+    onUpdate(notifyTabs);
     return () => {
       offUpdate(debouncedReload);
+      offUpdate(notifyTabs);
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
       disconnect();
     };
