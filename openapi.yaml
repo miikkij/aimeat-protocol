@@ -43541,7 +43541,8 @@ paths:
 
         `records` (direct values) are a write of new bytes, so an agent or app token of a member who
         did not create the workspace needs the creator's contributor grant (403 CONSENT_REQUIRED), as a
-        draft write does. Each record is decided alone and named in `results`; a record without an id
+        draft write does. `instances` (draft ids) in a workspace ask the same rule, as the single
+        publish does: a viewer or a member with no grant does not publish another member's drafts. Each record is decided alone and named in `results`; a record without an id
         or with an unknown visibility is named there as INVALID. `dry_run: true` decides every record
         and writes nothing, with the same answer shape and `dry_run: true` in it. `create_only: true`
         refuses an id that already has a published version (code EXISTS). An entry in
@@ -44854,6 +44855,11 @@ paths:
         if the objectType is declared `versioned: false` in the manifest (e.g. a transient request
         queue), publish writes only `.latest` and never appends a `.version.N`. Default is `versioned:
         true` (full revision history).
+
+        Who may publish in a workspace (`ws`): whoever may write the draft, in person or through an
+        agent: the workspace's creator, an organism admin, or a holder of the creator's contributor
+        grant. A viewer or a member with no grant is refused 403 (CONSENT_REQUIRED) before a publish
+        gate files an approval.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -44959,7 +44965,9 @@ paths:
         can be edited and re-published via the normal edit → publish flow. The published `.latest`
         stays live (and keeps serving readers) until the edited draft is re-published. Refuses with 409
         if a draft already exists for the instance (edit that draft directly instead of clobbering it).
-        Same write access as publish (active member; admin/creator for a `meta.*` namespace). Not gated.
+        Same write access as publish (active member; admin/creator for a `meta.*` namespace; in a
+        workspace, the creator, an organism admin or a contributor: a member who cannot read the
+        workspace gets 404, a viewer 403). Not gated.
       tags: [Organisms]
       security:
         - BearerAuth: []

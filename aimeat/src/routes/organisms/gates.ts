@@ -6,6 +6,10 @@
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-10-24 — POST /publish and POST /revert ask the organism rule's write test with the
+ *     record's draft key (refusedWorkspaceWrite), so a viewer or a member with no grant neither
+ *     publishes another member's draft nor writes one through a reopen (secaudit2026oct22,
+ *     publish-draft-without-workspace-write-role).
  *   v1.7.0 — 2026-10-18 — POST /publish and POST /revert take a space by its name as well as its
  *     namespace (resolveSpaceNamespace), as the write tools do, before the role check and the fence.
  *   v1.6.1 — 2026-10-13 — POST /publish, POST /revert and the suggestion decision hand the session's
@@ -62,6 +66,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, publishRecordsBatchOp } from '../../services/workspace-tool-ops.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { fencedSpaceRefusal } from '../../services/fenced-space.js';
+import { checkOrganismNamespaceAccess } from '../../services/organism-namespace-access.js';
 
 /**
  * The policy for an action in a workspace: the workspace manifest's autonomy when it sets one, else the
@@ -103,6 +108,23 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       orgId, wsId, { key: `organism.${orgId}.w.${wsId}.${namespace}.${instance}.latest` });
     if (!fenced) return false;
     res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
+    return true;
+  };
+  /**
+   * The organism rule's write test for the record's draft key (services/organism-namespace-access.ts):
+   * in a workspace, its creator, an organism admin, or a holder of the creator's contributor grant.
+   * A publish consumes the draft and writes the record, and a reopen writes a draft, so both ask the
+   * test a draft write asks. The flat organism namespace (no ws) keeps its membership rule. True when
+   * the refusal was sent.
+   */
+  const refusedWorkspaceWrite = async (req: Request, res: Response, orgId: string, wsId: string | undefined, namespace: string, instance: string): Promise<boolean> => {
+    if (!wsId) return false;
+    const who = callerOf(req, config.nodeId, storage);
+    const refusal = await checkOrganismNamespaceAccess({ storage, config },
+      { principal: who.principal, owner: who.owner, roles: [...who.roles], scopes: who.scopes },
+      `organism.${orgId}.w.${wsId}.${namespace}.${instance}.draft`, 'write');
+    if (!refusal) return false;
+    res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message, refusal.status, refusal.details));
     return true;
   };
 
@@ -233,6 +255,9 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       return;
     }
     if (await refusedByFence(req, res, id, wsId, namespace, instance)) return;
+    // Before the publish gate files an approval: a caller who may not write the draft neither
+    // publishes it nor asks a reviewer to.
+    if (await refusedWorkspaceWrite(req, res, id, wsId, namespace, instance)) return;
     // Archived content is read-only — block publishing into an archived organism/workspace.
     const pubGuard = await isKeyArchived(storage, wsId ? `organism.${id}.w.${wsId}.` : `organism.${id}.`);
     if (pubGuard.archived) {
@@ -392,6 +417,8 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No published record at ${namespace}.${instance} to reopen`));
       return;
     }
+    // Reading is not writing: a viewer reads the record and does not write its draft.
+    if (await refusedWorkspaceWrite(req, res, id, wsId, namespace, instance)) return;
     const result = await revertToDraft(id, wsId, namespace, instance, reverter);
     if (!result.ok) {
       if (result.code === 'UNDECLARED_SPACE') {
