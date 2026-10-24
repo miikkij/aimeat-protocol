@@ -20,6 +20,8 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.27.0 — 2026-10-25 — A redirect on the bare app host is the app's own path-form address, or the host's root in
+ *     web_message mode, else 400 INVALID_REDIRECT_URI (secaudit2026oct22; Jouni, 2026-10-25).
  *   v1.26.0 — 2026-10-13 — An app's allowance from the move to 4.0 (services/app-scope-allowance.ts) counts as declared:
  *     authorize and the silent bridge ask for it, and the refresh's narrowing keeps it.
  *   v1.25.0 — 2026-10-06 — SECURITY: code at an app's draft origin (`<sub>--draft.<appHost>`) is
@@ -142,7 +144,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
-import { apexOrigin, frameRedirect } from '../services/app-frame-redirect.js';
+import { apexOrigin, frameRedirect, bareAppHostRedirectOk } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
 import { appAllowanceWords, withAllowance } from '../services/app-scope-allowance-store.js';
@@ -428,7 +430,11 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const appHostL = (config.appHost || '').toLowerCase();
     const coHostL = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
     const rdHost = new URL(redirectUri).hostname.toLowerCase();
-    if (appHostL && rdHost !== appHostL && rdHost.endsWith('.' + appHostL)) {
+    const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
+    // The bare app host: the app's own path-form address, or its root in web_message mode (services/app-frame-redirect.ts).
+    if (appHostL && rdHost === appHostL && !bareAppHostRedirectOk(redirectUri, app, responseMode)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri on the shared app host must be this app\'s own address, /<owner>/<filename>'));
+    } else if (appHostL && rdHost !== appHostL && rdHost.endsWith('.' + appHostL)) {
       const label = rdHost.slice(0, -(appHostL.length + 1));
       // The app's draft origin belongs to the app, but its code is unpublished: the consent screen is
       // shown even to the app's owner, because the request is not bound (secaudit 2026-10 follow-up, A2).
@@ -451,8 +457,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       originBound = true;
     }
 
-    const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
-    const manage = String(req.query.manage ?? '') === '1';
+    const manage =String(req.query.manage ?? '') === '1';
     // An app a package installed is not the owner's own, whoever it is registered under: the consent
     // page and authorize-consent read this, as the silent bridge does (package-approvals.ts).
     const packageApp = await isPackageApp(storage, app.slice(0, slash), app);

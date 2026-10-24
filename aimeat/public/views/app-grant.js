@@ -65,6 +65,10 @@
  *     from signIn({ register: true })); "Log in to continue" stays under it. A package-installed app
  *     (`package_app`) is not auto-approved for its owner: it was the one path that skipped the screen
  *     for somebody else's code. Asked by aimeat-commercial, measured on its store's buyer path.
+ *   v1.8.0 — 2026-10-24 — The no-screen decision moved to app-grant-auto.js. A live grant that covers the
+ *     request approves with no screen only when the request is bound to the app's own address
+ *     (origin_bound), and "Next time it signs you in without this screen" shows only then
+ *     (secaudit2026oct22).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -75,6 +79,7 @@ import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, getStoredGhii, getNodeUrl } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { scopeSentence, areaLine, boundaryLines } from '/js/consent-vocab.js';
+import { isOwnApp, autoApproves } from './app-grant-auto.js';
 import { AskPage } from '/components/AskPage.js';
 import { Action, Loud } from '/components/Action.js';
 import { Box } from '/components/Box.js';
@@ -148,22 +153,19 @@ export default function AppGrant() {
         // The owner's OWN app (server-verified: the redirect origin is bound to exactly this app):
         // same auto-approve policy as the silent bridge — their own app never needs the trust prompt.
         // The server computes `own` independently at consent time, so this is UX, not the gate.
-        const myOwner = (getStoredGhii() || '').split('@')[0];
         // A package installed the app: somebody else's code under the owner's name, so the owner
         // sees the screen like anyone else (v1.7.0; the server never marks it own either).
-        const own = !!(res.data.origin_bound && res.data.app_owner && myOwner && myOwner === res.data.app_owner && !res.data.package_app);
+        const myOwner = (getStoredGhii() || '').split('@')[0];
         // Pre-check the UNION of already-granted and now-requested scopes: an app update that added
         // a scope must surface it CHECKED — presenting it unchecked made users keep the old grant
         // without noticing (the Band Jam scope-upgrade trap).
         const granted = grant ? [...new Set([...grant.scopes, ...reqScopes])] : reqScopes;
         setExistingGrant(grant);
         setSelected(new Set(granted));
-        setOwnApp(own);
-        if (own && !res.data.manage) { setState({ status: 'autoapprove', request: res.data }); return; }
-        // Pass-through: when NOT explicitly managing (the gear) and the app already holds a grant that
-        // covers what it's asking for, just approve silently — no second prompt for an app you trust.
-        const covers = grant && reqScopes.every((s) => grant.scopes.includes(s));
-        if (grant && !res.data.manage && covers) { setState({ status: 'autoapprove', request: res.data }); return; }
+        setOwnApp(isOwnApp(res.data, myOwner));
+        // Pass-through: when NOT explicitly managing (the gear), the owner's own app, and an app whose
+        // live grant covers what it asks for, are approved with no second prompt (app-grant-auto.js).
+        if (autoApproves(res.data, myOwner, grant)) { setState({ status: 'autoapprove', request: res.data }); return; }
         if (grant) setDetails(true); // manage / add-scopes → open the exact list + checkboxes up front
         setState({ status: 'ready', request: res.data });
       })
@@ -276,7 +278,8 @@ export default function AppGrant() {
   const promises = [
     ...boundaries,
     tr('appGrant.assureKey', 'It gets its own key, never your password.'),
-    !existingGrant && tr('appGrant.assureNext', 'Next time it signs you in without this screen.'),
+    // Only a bound request skips this screen next time (app-grant-auto.js).
+    !existingGrant && req.origin_bound && tr('appGrant.assureNext', 'Next time it signs you in without this screen.'),
   ].filter(Boolean);
 
   return html`
