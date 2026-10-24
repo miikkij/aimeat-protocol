@@ -36,6 +36,10 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   v1.4.0 — 2026-10-24 — A value from the extension's shared map that has no host yet is bound only
+ *     when `sharedFirstUse()` allows it (the host is on the operator's allow_hosts, the extension
+ *     declares it, or the operator makes the call in person); otherwise nothing is sent or bound and
+ *     the refusal is 'host' with `firstUse.shared` (secaudit2026oct22; Jouni, 2026-10-24).
  *   v1.3.1 — 2026-10-21 — A first-use decision may name the other account's extension that asked
  *     (`foreign`), and secretForeignExtensionMessage words that refusal (secaudit 2026-10, v58 as
  *     amended by Jouni: the caller's vault serves any extension, toward a bound host only).
@@ -402,7 +406,7 @@ export function extensionConfigSecrets(extConfig: Record<string, unknown> | unde
  */
 export type SecretResolutionRefusal =
   | { ok: false; reason: 'unknown'; headerName: string; secretName: string }
-  | { ok: false; reason: 'host'; headerName: string; secretName: string; boundTo: string[]; host: string; firstUse?: { by: string; foreign?: ForeignExtension } };
+  | { ok: false; reason: 'host'; headerName: string; secretName: string; boundTo: string[]; host: string; firstUse?: { by: string; foreign?: ForeignExtension; shared?: true } };
 
 /** The extension another account installed, named in a refused first use (secaudit 2026-10, v58). */
 export type ForeignExtension = { extension: string; installer: string };
@@ -505,6 +509,12 @@ export async function resolveSecretForHeaders(deps: {
    * recorded with the decision's `by`.
    */
   firstUse: (secretName: string, host: string) => Promise<FirstUseDecision>;
+  /**
+   * Asked when a value from the extension's shared map has no host yet and this call would bind
+   * one: may this call choose `host` for every account (secaudit2026oct22; Jouni, 2026-10-24)?
+   * Absent means no: the value is not sent and nothing is bound.
+   */
+  sharedFirstUse?: (secretName: string, host: string) => Promise<FirstUseDecision>;
   /** The extension and the account that installed it, for the approvals the owner gave on a secret. */
   approvedFor?: { extension: string; installer: string };
   /** The extension's manifest config, secrets already decrypted by the road that built the context. */
@@ -613,6 +623,19 @@ export async function resolveSecretForHeaders(deps: {
       };
     }
     decidedBy.set(name, decision.by);
+  }
+  // THE SHARED MAP'S FIRST HOST (secaudit2026oct22; Jouni, 2026-10-24). The operator's value serves
+  // every account, so the host it is bound to is chosen for every account. Only a host the operator
+  // listed in allow_hosts, a host the extension declares, or the operator in person may choose it.
+  // Asked here, before any binding, so a refused call binds no vault secret either.
+  for (const { name } of toBindShared) {
+    const decision = deps.sharedFirstUse ? await deps.sharedFirstUse(name, host) : { allowed: false, by: deps.principal ?? '' };
+    if (!decision.allowed) {
+      return {
+        ok: false, reason: 'host', headerName: headerNaming(headers, name), secretName: name, boundTo: [], host,
+        firstUse: { by: decision.by, shared: true },
+      };
+    }
   }
   const firstUse: SecretBinding = {
     how: 'first-use', by: deps.principal ?? ownerGhii ?? '', extension: extName, at,
