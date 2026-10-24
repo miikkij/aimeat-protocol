@@ -194,6 +194,11 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + 'directly in test/unit/compliance-snapshot-dispatch.test.ts, because the two parameters here '
             + 'are mutually exclusive and one probe run cannot exercise both.',
     },
+    aimeat_compliance_agreement: Object.fromEntries(
+        ['id', 'dry_run', 'message', 'storage_key', 'kind', 'party', 'accept', 'reason', 'choice', 'note', 'version'].map(p => [p,
+            'Conditional, not dropped: each belongs to one or a few actions, and the probe holds `action` at one '
+            + 'sentinel. Every action forwards its parameters, measured per action in '
+            + 'test/unit/compliance-agreement-dispatch.test.ts.'])),
     aimeat_memory_search: {
         include_versions: 'GET /v1/memory/search does not read it; the node MCP applies that filter itself after the query.',
     },
