@@ -32,6 +32,8 @@
  *   ghii, back, link?) · registerLoginLinkSecondFactorRoute(router, config, storage)
  * @usage registerLoginLinkSecondFactorRoute(router, config, storage);
  * @version-history
+ *   2026-10-24 — The SECOND_FACTOR_EXPIRED message says to sign in again, which fits every way the step
+ *     starts (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-24 — The ticket can carry an external sign-in's provider identity (`link`), saved on the
  *     account only after a correct code (secaudit2026oct22, external-login-skips-second-factor).
  *   v1.0.2 — 2026-10-09 — The LOGIN_LINK_FAILED sentence passes the 500 text filter through
@@ -151,10 +153,12 @@ export async function startLinkSecondFactor(
 export function registerLoginLinkSecondFactorRoute(router: Router, config: AimeatConfig, storage: Storage): void {
     router.post('/v1/ghii/magic-link/second-factor', rateLimit({ max: 20, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         res.set('Cache-Control', 'no-store');
+        // One sentence for every way the code step starts: a sign-in link, or a first Google, Entra,
+        // Casdoor or SAML sign-in. Signing in again starts a new step from any of them.
+        const EXPIRED_TEXT = 'The time to enter the code has run out, or this step has already ended. Sign in again.';
         const expired = () => {
             clearTicketCookie(req, res);
-            res.status(401).json(error(config.nodeId, 'SECOND_FACTOR_EXPIRED',
-                'This sign-in step has expired or was already used. Ask for a new sign-in link.'));
+            res.status(401).json(error(config.nodeId, 'SECOND_FACTOR_EXPIRED', EXPIRED_TEXT));
         };
 
         const raw = readTicketCookie(req);
@@ -204,7 +208,7 @@ export function registerLoginLinkSecondFactorRoute(router: Router, config: Aimea
         const consumed = await storage.deleteVerificationNonce(key);
         clearTicketCookie(req, res);
         if (!consumed) {
-            res.status(401).json(error(config.nodeId, 'SECOND_FACTOR_EXPIRED', 'This sign-in has expired. Ask for a new sign-in link and open it.'));
+            res.status(401).json(error(config.nodeId, 'SECOND_FACTOR_EXPIRED', EXPIRED_TEXT));
             return;
         }
         try {

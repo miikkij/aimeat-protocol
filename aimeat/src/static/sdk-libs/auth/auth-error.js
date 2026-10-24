@@ -10,12 +10,15 @@
  *   from the address so a reload does not repeat the message.
  *
  *   A sign-in that needs one more step comes back the same way, as `?auth_step=<step>`. The one step
- *   today is `second_factor`: an emailed sign-in link on an account with two-step sign-in leaves a
- *   ticket, and the dialog opens on its code view (modal-totp.js, link mode).
+ *   today is `second_factor`: an emailed sign-in link, or a first Google, Entra, Casdoor or SAML
+ *   sign-in, on an account with two-step sign-in leaves a ticket, and the dialog opens on its code
+ *   view (modal-totp.js, link mode).
  * @structure takeParam(name) · readAuthError() · readAuthStep() · authErrorText(i, code) ·
  *   showAuthErrorIn(i, code)
  * @usage import { readAuthError, readAuthStep, showAuthErrorIn } from './auth-error.js';
  * @version-history
+ *   v1.2.0 — 2026-10-24 — The SECOND_FACTOR_EXPIRED sentence says to sign in again, which fits every
+ *     way the code step starts, not only a sign-in link (secaudit2026oct22, external-login-skips-second-factor).
  *   v1.1.0 — 2026-10-09 — readAuthStep() for `?auth_step=second_factor`, and the sentence for
  *     SECOND_FACTOR_EXPIRED (secaudit 2026-10-09, S1).
  *   v1.0.0 — 2026-09-29 — Initial.
@@ -52,7 +55,7 @@ export function authErrorText(i, code) {
   if (code === 'INVALID_TOKEN') return i.authErrorUsedLink || 'This sign-in link has already been used or is not valid. Ask for a new one below, or sign in another way.';
   if (code === 'EXPIRED') return i.authErrorExpired || 'This sign-in link has expired. Ask for a new one below.';
   if (code === 'ACCOUNT_DISABLED') return i.authErrorDisabled || 'This account has been deactivated. Contact the administrator of this service.';
-  if (code === 'SECOND_FACTOR_EXPIRED') return i.authErrorSecondFactorExpired || 'This sign-in has expired. Ask for a new sign-in link and open it.';
+  if (code === 'SECOND_FACTOR_EXPIRED') return i.authErrorSecondFactorExpired || 'The time to enter the code has run out. Sign in again.';
   return i.authErrorGeneric || 'Sign-in did not go through. Try again, or choose another way to sign in.';
 }
 

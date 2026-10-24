@@ -5,6 +5,7 @@
  *   code off the address, so a reload does not repeat it, and gives the sentence the sign-in dialog
  *   shows; a value that is not a code in our shape is shown as the general message, never echoed.
  * @version-history
+ *   2026-10-24 — SECOND_FACTOR_EXPIRED says to sign in again, for every way the code step starts (secaudit2026oct22).
  *   v1.1.0 — 2026-10-09 — readAuthStep() and SECOND_FACTOR_EXPIRED (secaudit 2026-10-09, S1).
  *   v1.0.0 — 2026-09-29 — Initial.
  */
@@ -74,8 +75,12 @@ describe('the refused sign-in on the front page', () => {
         expect(readAuthStep()).toBeNull();
     });
 
-    it('tells the person to ask for a new link when the code step has expired', async () => {
+    // The code step also starts from a first Google, Entra, Casdoor or SAML sign-in
+    // (secaudit2026oct22), so the sentence names no sign-in link: signing in again fits every way in.
+    it('tells the person to sign in again when the code step has run out', async () => {
         const { authErrorText } = await lib();
-        expect(authErrorText({}, 'SECOND_FACTOR_EXPIRED')).toMatch(/new sign-in link/);
+        const text = authErrorText({}, 'SECOND_FACTOR_EXPIRED');
+        expect(text).toMatch(/Sign in again/);
+        expect(text).not.toMatch(/sign-in link/);
     });
 });
