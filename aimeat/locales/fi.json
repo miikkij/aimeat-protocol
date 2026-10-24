@@ -3598,6 +3598,7 @@
         "unanswered": "{n} vastaamatta",
         "gapsTitle": "Mitä selosteesta puuttuu",
         "gapsNone": "Mitään ei puutu.",
+        "gapPlaces": "{name} ({n} paikassa)",
         "promptTitle": "Pyydä tekoälyäsi pitämään seloste ajan tasalla",
         "promptCopy": "Kopioi kehote",
         "promptNote": "Liitä tämä omaan tekoälykeskusteluusi. Tekoäly lukee, mitä täällä on, kysyy sinulta sen, minkä vain sinä tiedät, näyttää tuloksen ja odottaa hyväksyntääsi.",

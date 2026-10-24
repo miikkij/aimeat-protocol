@@ -3598,6 +3598,7 @@
         "unanswered": "{n} unanswered",
         "gapsTitle": "What the records leave open",
         "gapsNone": "Nothing is open.",
+        "gapPlaces": "{name} (in {n} places)",
         "promptTitle": "Ask your AI to keep the records",
         "promptCopy": "Copy the prompt",
         "promptNote": "Paste this into your own AI chat. It reads what is kept here, asks you what only you know, shows you the result and waits for your yes.",

@@ -2541,6 +2541,7 @@
         "unanswered": "{n} sin responder",
         "gapsTitle": "Lo que el registro deja pendiente",
         "gapsNone": "No hay nada pendiente.",
+        "gapPlaces": "{name} (en {n} lugares)",
         "promptTitle": "Pide a tu IA que mantenga el registro",
         "promptCopy": "Copiar el prompt",
         "promptNote": "Pega esto en tu propio chat con una IA. Lee lo que hay aquí, te pregunta lo que solo tú sabes, te muestra el resultado y espera tu sí.",
