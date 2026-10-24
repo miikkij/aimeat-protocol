@@ -44025,8 +44025,9 @@ paths:
         (`.latest`) record of the workspace's record spaces as `{ type, id, value }` rows — no share
         gating; authorization is the workspace read authz itself (an active member of the organism
         who is an organism manager, the same owner as the manifest or holds the creator's grant, or a
-        non-member holding the creator's grant; the GEAI data-area). A workspace creator who left or
-        was removed from the organism gets 404. Owner sessions bypass scopes; an app session (H-2) must hold the owner-granted
+        non-member holding the grant of a creator who is an active member; the GEAI data-area). A
+        workspace creator who left or was removed from the organism gets 404, and so does a
+        non-member holding that creator's grant. Owner sessions bypass scopes; an app session (H-2) must hold the owner-granted
         `organism:read` scope — this is how a published app renders members-only content (e.g. gated
         curriculum) for the signed-in user, with access granted/revoked per user via workspace
         membership. Agents use the MCP workspace_read surface instead. `?space=` limits to one records

@@ -5,6 +5,8 @@
  *   which creates a consent grant. Covers: discovery, denied-before-approval, request, list-requests,
  *   approve → read, and deny → revoke.
  * @version-history
+ *   2026-10-25 — 19d: a non-member holding the grant of a creator removed from the organism reads
+ *     neither the records nor the page (404). Failed before the fix with records 200.
  *   2026-10-24 — 19-19c: a workspace creator removed from the organism no longer reads the member
  *     records read or the page routes (404); the creator while a member, a granted member, a
  *     non-member with the creator's grant and the organism's creator still read (secaudit2026oct22).
@@ -423,7 +425,7 @@ await test('18. removing a member closes the question they left open', async () 
 // …/opened) decided on the manifest alone, which its creator owns. So a creator removed from the
 // organism kept reading every member's published records. They ask canReadWorkspaceRecords now: the
 // gate the workspace read answers to (an active member, then the manifest), or a non-member holding
-// the creator's grant, a use another suite asserts and the developer decides on.
+// the grant of a creator who is still an active member (ruled by the developer on 2026-10-25).
 let E: Awaited<ReturnType<typeof setupOwner>> | undefined;
 let F: Awaited<ReturnType<typeof setupOwner>> | undefined;
 let G: Awaited<ReturnType<typeof setupOwner>> | undefined;
@@ -461,8 +463,8 @@ const openedAs = (t: string) => json(`/v1/organisms/${orgId}/workspace/documents
 const frameAs = (t: string) => json(`/v1/organisms/${orgId}/workspace/documents/pages/${docE}/frame?ws=${wsE}`, { method: 'POST', headers: auth(t), body: '{}' });
 
 await test('19b. POSITIVE CONTROL: the creator, a member with the grant, a non-member with the grant and the organism\'s creator read the records', async () => {
-    // G is not a member and holds E's grant: e2e-workspace-member-records test 6 asserts that use,
-    // and whether it stays is the developer's decision, so it is kept and pinned here too.
+    // G is not a member and holds E's grant: it reads while E is an active member
+    // (e2e-workspace-member-records test 6 asserts the same use; 19d is the removal).
     for (const [who, t] of [['E', E!.token], ['F', F!.token], ['G', G!.token], ['A', A.token]] as const) {
         const r = await recordsAs(t);
         assert(r.status === 200 && (r.body.data.records as any[]).some(x => x.id === 'i1'), `${who}: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error).slice(0, 200)}`);
@@ -483,6 +485,21 @@ await test('19c. The creator removed from the organism reads neither the records
     // The organism's creator still reads the workspace E left behind.
     const a = await recordsAs(A.token);
     assert(a.status === 200 && (a.body.data.records as any[]).some(x => x.id === 'i1'), `A after the removal: ${a.status}`);
+});
+
+await test('19d. A non-member holding the removed creator\'s grant reads neither the records nor the page (404)', async () => {
+    // A grant opens these routes to a non-member only while the account that issued it is an active
+    // member of the organism (ruled by the developer on 2026-10-25). E issued G's grant and was
+    // removed in 19c; G was never a member.
+    const r = await recordsAs(G!.token);
+    assert(r.status === 404, `records: expected 404, got ${r.status} ${JSON.stringify(r.body.data ?? r.body.error).slice(0, 200)}`);
+    const o = await openedAs(G!.token);
+    assert(o.status === 404, `opened: expected 404, got ${o.status}`);
+    const f = await frameAs(G!.token);
+    assert(f.status === 404 && f.body.error?.code === 'NOT_FOUND', `frame: expected 404 NOT_FOUND, got ${f.status} ${f.body.error?.code}`);
+    // F, a member holding the same creator's grant, is decided by the workspace read gate as before.
+    const a = await recordsAs(A.token);
+    assert(a.status === 200, `A still reads: ${a.status}`);
 });
 
 await test('Cleanup A + B + C + D', async () => {
