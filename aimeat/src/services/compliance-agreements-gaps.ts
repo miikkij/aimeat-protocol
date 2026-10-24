@@ -14,7 +14,7 @@
  *   week before an announced change takes effect, a lapsed notice turned into the version in force,
  *   and the AIMEAT signing requests read, so a version signed in the signing app comes into force and
  *   is told without anyone opening the page.
- * @structure AgreementGap · agreementGaps() · sweepAgreements()
+ * @structure AgreementGap · agreementGaps() · sweepAgreements() · scheduleAgreementSweep()
  * @usage const gaps = await agreementGaps(deps);
  * @version-history
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D4).
@@ -115,4 +115,16 @@ export async function sweepAgreements(deps: Deps, now = Date.now()): Promise<{ r
     }
   }
   return res;
+}
+
+/**
+ * Run sweepAgreements hourly, the first time 150 s after boot (server-bootstrap/service-init.ts
+ * calls this once). Hourly because the shortest clock is a day.
+ */
+export function scheduleAgreementSweep(deps: Deps): void {
+  const run = () => {
+    sweepAgreements(deps).catch(err => logger.warn('agreements sweep failed', { error: String(err) }));
+  };
+  setTimeout(run, 150_000);
+  setInterval(run, 3_600_000);
 }
