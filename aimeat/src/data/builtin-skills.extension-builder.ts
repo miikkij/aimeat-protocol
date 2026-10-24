@@ -27,6 +27,7 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-24 — The ctx rules: a binary answer is read with `responseType: 'base64'` (jussil riistakartta).
  *   2026-10-21 — Section 9: code installed before the rules keeps the old first use until it is written
  *     again; through living-hooks only the operator's list binds by itself (Jouni, 2026-10-21).
  *   2026-10-21 — Section 9: a declared host without a port covers every port; `network:` hosts count as
@@ -138,7 +139,9 @@ may already do it.
   \`ctx.ai.result(job_id)\` reads it at any later time. Never make the answer public to read it.
 - An \`undefined\` or \`null\` argument to a \`ctx\` call throws, naming the method.
 - \`ctx.fetch(url, opts)\` answers \`{ status, ok, text, headers }\`. \`text\` is the body as a string:
-  \`JSON.parse(res.text)\`; there is no \`json()\`. It reads at most 4 MB of one answer.
+  \`JSON.parse(res.text)\`; there is no \`json()\`. It reads at most 4 MB of one answer. A binary
+  answer (an image, a map file) needs \`{ responseType: 'base64' }\`, which returns the bytes as
+  \`res.base64\`; read as text, every byte that is not valid UTF-8 is lost.
 - \`ctx.log\` is \`{ info, warn, error }\`, not a function. Log calls cost no API call.
 - \`ctx.memory\` is the extension's own namespace, \`ext:{name}\`. **A key is public unless the write
   passes \`{ visibility: 'private' }\`**: pass it on every write that holds personal data. Write one
