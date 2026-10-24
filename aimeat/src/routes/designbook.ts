@@ -14,6 +14,10 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.9.0 — 2026-10-24 — The preview of a grown genre INSIDE A FRAME (Sec-Fetch-Dest iframe/frame,
+ *     or ?view=frame) is the node's own script-free card of the app (grownGenreFramePage): the
+ *     redirect to the app left the gallery tile empty, since the app refuses another origin's frame.
+ *     A top-level open still goes to the app.
  *   2026-10-21 — isSignedIn asks isAnonymousPrincipal, so the minted anonymous token sees no part in
  *     proposal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.8.0 — 2026-10-17 — SECURITY: a part in proposal is not previewed for the anonymous internet.
@@ -71,7 +75,7 @@ import { loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, se
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { getAppTemplates } from '../data/app-templates.js';
-import { grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
+import { grownGenreFramePage, grownGenrePage, isGrownGenreBody } from '../services/design-book/grown-genre.js';
 import { resolveAppUrls } from './apps/helpers.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { designBookPreviewToken, designBookPreviewTokenOpens } from '../services/design-book/preview-token.js';
@@ -234,18 +238,31 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // A GENRE THAT GREW OUT OF AN APP is shown at the app's own address, never here: it is a
       // stranger's page with script in it, and this origin is the node's. It answers only while
       // the app stands (kept by its owner, open for forking, not parked or hidden).
+      // INSIDE A FRAME the app's address refuses to stand (an app answers another origin's frame
+      // with SAMEORIGIN and frame-ancestors), and the gallery's tile stayed empty. A frame
+      // (Sec-Fetch-Dest, or ?view=frame for a client that sends no fetch metadata) gets the node's
+      // own card of the app instead: its screenshot, its name, a link out, and no script at all.
+      let grownHtml: string | undefined;
       if (part && part.kind === 'genre' && isGrownGenreBody(part.body)) {
         const page = await grownGenrePage(storage, config, part.proposed_by_owner, part.body);
         const url = page ? (await resolveAppUrls(config, storage, [{ owner: page.owner, filename: page.filename }]))[`${page.owner}/${page.filename}`] : undefined;
-        if (!url) {
+        if (!page || !url) {
           return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE', `"${id}" grew out of an app that is no longer offered, so there is nothing to show.`));
         }
-        res.setHeader('Cache-Control', 'no-store');
-        return res.redirect(302, url);
+        res.setHeader('Vary', 'Sec-Fetch-Dest');
+        const dest = String(req.get('sec-fetch-dest') ?? '');
+        if (dest !== 'iframe' && dest !== 'frame' && req.query.view !== 'frame') {
+          res.setHeader('Cache-Control', 'no-store');
+          return res.redirect(302, url);
+        }
+        grownHtml = grownGenreFramePage({
+          title: part.title, summary: part.summary, appUrl: url,
+          screenshotUrl: `/v1/apps/${encodeURIComponent(page.owner)}/${encodeURIComponent(page.filename)}/screenshot`,
+        });
       }
       // ?theme=dark|light: the ground a COMPONENT is shown on. Anything else is the light page.
       const theme = req.query.theme === 'dark' ? 'dark' as const : req.query.theme === 'light' ? 'light' as const : undefined;
-      const html = part ? partPreviewHtml(part, { theme }) : served!.content;
+      const html = grownHtml ?? (part ? partPreviewHtml(part, { theme }) : served!.content);
       if (html === null) {
         return res.status(404).json(error(config.nodeId, 'NOT_RENDERABLE',
           `"${id}" points at a template this node no longer carries, so there is nothing to render.`));
@@ -267,7 +284,8 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // and it carries no script of its own (component.ts), so nothing on it needs the nonce, and
       // withholding it means a <script> that ever got past the bench is still refused by the CSP.
       // Its <style> blocks need none: style-src allows inline styles without one.
-      const nonce = part?.kind === 'component' ? undefined : res.locals.cspNonce as string | undefined;
+      // The grown genre's frame card carries no script either, so it gets none.
+      const nonce = part?.kind === 'component' || grownHtml ? undefined : res.locals.cspNonce as string | undefined;
       // A part an AI wrote is shown with its marks and the visible AI label, as a published app is
       // (services/app-serve-marks.ts); the gallery frames this page, so the label sits on it.
       const prov = part ? await loadServedProvenance(storage, config, (await partProvenanceIds(storage, config, [part.id])).get(part.id)) : undefined;
