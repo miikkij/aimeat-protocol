@@ -312,7 +312,7 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -322,7 +322,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:d5d56e4feb12045d38ef59c4"
+      "digest": "sha256:4c2331614a9e74a8e84aa391"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-23",
@@ -349,7 +349,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -359,7 +359,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:d44ff67446540a69424076cd"
+      "digest": "sha256:24883f6e1fdedf973c1b1d3e"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-23",
@@ -484,13 +484,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:48d3d10a0f51d69f2fa58433"
+      "digest": "sha256:60d243d2e2c0c15b8230ea5c"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -685,7 +685,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "ba558088830eb13c",
-      "aimeat/src/services/build-extension-prompt.ts": "1c79998a65a291d4"
+      "aimeat/src/services/build-extension-prompt.ts": "4a4714bd350426a9"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -746,8 +746,8 @@
       "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "1c79998a65a291d4",
-      "aimeat/src/services/extension-ctx-contract.ts": "a072f7eef334ecf9",
+      "aimeat/src/services/build-extension-prompt.ts": "4a4714bd350426a9",
+      "aimeat/src/services/extension-ctx-contract.ts": "6a6bc7fdec4a5c5f",
       "aimeat/src/services/extension-manifest.ts": "603b3fdef4938f90",
       "aimeat/src/routes/extensions/paywall.ts": "e93944dd10ba1fb2",
       "aimeat/src/routes/extensions/crud.ts": "5e8254712e70fae7",
@@ -786,7 +786,7 @@
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
       "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
-      "aimeat/src/services/extension-ctx-contract.ts": "a072f7eef334ecf9",
+      "aimeat/src/services/extension-ctx-contract.ts": "6a6bc7fdec4a5c5f",
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/services/workspace-rows/row-service.ts": "f85b2fe48572e93d",
       "aimeat/src/services/refinery/pipeline.ts": "5a26add0ca7f5509",

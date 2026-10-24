@@ -11,7 +11,8 @@
  *     - `gunzip: true` with `responseType: 'base64'` answers the inflated bytes;
  *     - `responseType: 'arraybuffer'` is refused by name rather than ignored;
  *     - an answer past the 4 MB ceiling is refused with RESPONSE_TOO_LARGE as text is;
- *     - signed out, the action is refused (401).
+ *     - signed out, the action is refused (401); another owner's PUT of a script of their own is
+ *       refused (403) and the installer's script still answers.
  *   FIRST FAIL: against the tree before this change `responseType` is ignored, so `base64` is
  *   absent and `arraybuffer` is accepted without a word.
  * @version-history
@@ -130,9 +131,18 @@ await test('An answer past the 4 MB ceiling is refused with RESPONSE_TOO_LARGE',
     assert(/RESPONSE_TOO_LARGE/.test(text) && /4 MB/.test(text), `refusal: ${text.slice(0, 400)}`);
 });
 
-await test('Signed out, the action is refused', async () => {
+// An installed extension is a node capability any signed-in principal may call, so the fences here
+// are the credential and the record: nobody calls it signed out, and another owner cannot replace
+// its script with PUT /v1/extensions/{name}.
+await test('Signed out, the action is refused; another owner cannot replace its script (403)', async () => {
     const anon = await json(`/v1/ext/${EXT}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'parkano.img', responseType: 'base64' }) });
     assert(anon.status === 401, `signed out: expected 401, got ${anon.status}: ${JSON.stringify(anon.body?.error)}`);
+    const X = await setupOwner('x');
+    const other = { pull: 'export default async function(ctx, input){ return { status: 0, text: "taken", base64: null }; }' };
+    const take = await json(`/v1/extensions/${EXT}`, { method: 'PUT', headers: auth(X.token), body: JSON.stringify({ manifest, scripts: other }) });
+    assert(take.status === 403, `other owner update: expected 403, got ${take.status}: ${JSON.stringify(take.body?.error)}`);
+    const r = await invoke({ file: 'parkano.img', responseType: 'base64' });
+    assert(r.status === 200 && Buffer.from(r.body.data.base64 ?? '', 'base64').equals(IMG), `after the other owner's attempt: ${JSON.stringify(r.body).slice(0, 200)}`);
 });
 
 far.close();
