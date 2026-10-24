@@ -28,9 +28,10 @@
  * @structure DocSignRecord · DocSignature · DocsignError · createRequest · getRequest ·
  *   listRequests · lookupByHash · beginPasskeySignature · signRequest · cancelRequest ·
  *   verifyRecordSignatures · publicView · walletSigner · checkWalletSignature · recordWalletSignature · signedDocument ·
- *   nextPdfToSign · deleteRequest
+ *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-24 — readRequestRecord: the stored request for the node's own work, so a data processing agreement reads its signatures (plan doc-mvmr4i2wdk0p, D3.1).
  *   2026-10-19 — addToIndex and removeFromIndex change the index on its version (updateRecord): withLock is per request and per process (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-15 — signRequest takes the credential origin: method "session" is refused for an owner-level personal access token, which is a program and not the person at the node's page (feature-list audit #37).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
@@ -289,6 +290,15 @@ async function tellParties(ctx: DocsignCtx, rec: DocSignRecord, from: string): P
       logger.warn('docsign: a party could not be notified', { request: rec.id, error: String(err) });
     }
   }
+}
+
+/**
+ * A request as stored, for the node's own work that keeps a document of its own beside a request:
+ * the data processing agreements read which parties have signed (compliance-agreements-sign.ts).
+ * Never handed to a caller as it is; the caller's own door decides what of it they see.
+ */
+export async function readRequestRecord(ctx: DocsignCtx, id: string): Promise<DocSignRecord | null> {
+  return /^ds-[0-9a-f-]{36}$/.test(id) ? readJson<DocSignRecord>(ctx.storage, reqKey(id)) : null;
 }
 
 async function load(ctx: DocsignCtx, id: string): Promise<DocSignRecord> {

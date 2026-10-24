@@ -23035,6 +23035,410 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/compliance/agreements:
+    get:
+      operationId: listComplianceAgreements
+      summary: The node's data processing agreements, short
+      tags: [Compliance]
+      description: >
+        Every data processing agreement (GDPR art. 28) the operator keeps, each with its status
+        (draft, sent, review, signed, expired, ended), the version in force, what it waits for and an
+        announced change. Operator only; something acting for the operator needs `compliance:read`.
+        A fleet manager reads the agreement status per customer from here (`external_ref`).
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createComplianceAgreement
+      summary: Make a data processing agreement from the node's own data
+      tags: [Compliance]
+      description: >
+        Version 1 as a draft: the Commission's standard contractual clauses (Decision 2021/915) word
+        for word, with the four annexes filled from the node (I the parties from the operator settings
+        and the counterparty; II the processing from a named register or the product's default; III
+        the measures the node can read about itself; IV the sub-processors from the processor list,
+        by product). The answer names `missing_measures`, the Annex III areas the operator writes.
+        `dry_run=true` returns it and stores nothing. Operator only, `compliance:write`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: dry_run, in: query, required: false, schema: { type: boolean } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [counterparty]
+              properties:
+                counterparty:
+                  type: object
+                  required: [name]
+                  properties:
+                    name: { type: string }
+                    type: { type: string, enum: [company, natural_person, public_body, other] }
+                    businessId: { type: string }
+                    address: { type: string }
+                    country: { type: string }
+                    contactName: { type: string }
+                    contactRole: { type: string }
+                    contactEmail: { type: string, format: email }
+                    signerName: { type: string }
+                    signerRole: { type: string }
+                    dpo: { type: string }
+                    account: { type: string, description: 'Their account on this node, name@node: notices land in its bell, and it may sign here.' }
+                product: { type: string, enum: [place, box, managed, custom], default: custom }
+                language: { type: string, enum: [fi, en], default: fi }
+                ourRole: { type: string, enum: [processor, controller], default: processor }
+                subject: { type: string }
+                registerId: { type: string }
+                externalRef: { type: string }
+                options:
+                  type: object
+                  properties:
+                    subprocessorAuthorisation: { type: string, enum: [general, specific], default: general }
+                    noticeDays: { type: integer, minimum: 1, maximum: 180, default: 30 }
+                    breachNoticeHours: { type: integer, minimum: 1, maximum: 72, default: 24 }
+                    deletionDays: { type: integer, minimum: 1, maximum: 180, default: 30 }
+                    dockingClause: { type: boolean, default: false }
+                annexes: { type: object, description: 'Parts of Annex II, III (measures, assistance) and IV written over the generated ones.' }
+                written_by: { type: string, enum: [human, ai] }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/compliance/agreements/mine:
+    get:
+      operationId: listMyComplianceAgreements
+      summary: The agreements where the caller is the counterparty
+      tags: [Compliance]
+      description: >
+        The data processing agreements whose counterparty is the caller's account on this node,
+        short. Something acting for the person needs `compliance:read`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/compliance/agreements/gaps:
+    get:
+      operationId: getComplianceAgreementGaps
+      summary: What the data processing agreements leave open
+      tags: [Compliance]
+      description: >
+        An agreement waiting for its counterparty over a week, a signed copy waiting for the operator,
+        a sub-processor taken into use and not announced, an open objection, a deletion past its day,
+        measures signed over a year ago, an Annex III area a draft says nothing about, and an open
+        breach whose agreed hours passed without a notice. Operator only.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/compliance/agreements/breach-notice:
+    post:
+      operationId: sendComplianceAgreementBreachNotice
+      summary: Tell the counterparties of a personal data breach
+      tags: [Compliance]
+      description: >
+        Sends each named agreement's counterparty an e-mail and a bell notice, records it in the
+        agreement's history and says whether the agreed hours had already passed. Operator only,
+        `compliance:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agreements, title, discovered_at, summary]
+              properties:
+                agreements: { type: array, items: { type: string } }
+                title: { type: string }
+                discovered_at: { type: string, format: date-time }
+                summary: { type: string }
+                breach_id: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/compliance/agreements/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, pattern: '^dpa-[a-z0-9]{6,20}$' } }
+    get:
+      operationId: getComplianceAgreement
+      summary: One data processing agreement, whole
+      tags: [Compliance]
+      description: >
+        Every version with its annexes, signatures, review and notice, the history, the status and
+        `viewer` (operator or counterparty). The operator and the agreement's counterparty read it;
+        anyone else gets 404. A version signed in the AIMEAT signing app is recorded on the read.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: patchComplianceAgreement
+      summary: Change the newest draft
+      tags: [Compliance]
+      description: >
+        The same fields as the POST, all optional. A changed counterparty, product, language or
+        register generates the annexes again before the given parts are written over them. A version
+        that has been sent never changes (409). Operator only, `compliance:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/versions:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: newComplianceAgreementVersion
+      summary: A new draft from the newest version
+      tags: [Compliance]
+      description: >
+        The next version as a draft, with the operator party, the measures the node reads about
+        itself and the sub-processors read again; what a person wrote is kept. The answer says what
+        changed against the version in force and `can_notice`, whether it may be announced instead of
+        signed again. Operator only, `compliance:write`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/send:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: sendComplianceAgreement
+      summary: Send the newest draft for signature
+      tags: [Compliance]
+      description: >
+        Fixes the version's canonical text, its SHA-256 and its PDF (stored in the caller's files),
+        makes an AIMEAT signing request for every party with an account here (passkey or the EU
+        Digital Identity Wallet), and tells the counterparty by e-mail (the PDF attached) and bell.
+        Operator only, `compliance:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { message: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/notice:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: noticeComplianceAgreement
+      summary: Announce a change of Annex III or IV
+      tags: [Compliance]
+      description: >
+        Under the general authorisation of Clause 7.7(a), a draft that changes only the measures or
+        the sub-processors is announced to the counterparty and takes effect when the agreed notice
+        period ends without an objection. Any other change is signed again (409). Operator only.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/object:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: objectComplianceAgreement
+      summary: The counterparty objects to an announced change
+      tags: [Compliance]
+      description: Inside the notice period. The operator is told by bell and e-mail, and the version does not take effect.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [reason], properties: { reason: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/signed-copy:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: signedCopyComplianceAgreement
+      summary: A signed PDF or a scanned copy came back
+      tags: [Compliance]
+      description: >
+        `kind: pdf` (signed in DocuSign or another e-signature service): the signatures are validated
+        (integrity, chain, EU trusted list, revocation), the file is tied to the version, and the
+        certificate names are compared with the signer. `kind: scan`: a model compares the copy with
+        the version, when the content's label lets one read it. Either way the version waits in
+        `review` for the operator's decision. The counterparty, or the operator on its behalf
+        (`party`), with the file in their own storage.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [storage_key, kind]
+              properties:
+                storage_key: { type: string }
+                kind: { type: string, enum: [pdf, scan] }
+                party: { type: string, enum: [controller, processor] }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/confirm:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: confirmComplianceAgreementCopy
+      summary: Accept or reject the copy that came back
+      tags: [Compliance]
+      description: >
+        Accepting records the signature with its method and level (qualified, advanced or scanned);
+        when both parties have signed, the version is in force and both receive the PDF. Rejecting
+        needs a reason, which the counterparty receives. Operator only, `compliance:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [accept], properties: { accept: { type: boolean }, reason: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/end:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: endComplianceAgreement
+      summary: End the agreement
+      tags: [Compliance]
+      description: The deletion or return clock starts (the agreed days), and the counterparty is told. Operator only.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { choice: { type: string, enum: [delete, return] }, reason: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/deletion-done:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: deletionDoneComplianceAgreement
+      summary: The data was deleted or returned
+      tags: [Compliance]
+      description: Recorded on the agreement; the counterparty receives the confirmation by e-mail. Operator only.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { note: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/compliance/agreements/{id}/document:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: version, in: query, required: false, schema: { type: integer } }
+      - { name: format, in: query, required: false, schema: { type: string, enum: [pdf, text, json], default: pdf } }
+    get:
+      operationId: getComplianceAgreementDocument
+      summary: A version's PDF or canonical text
+      tags: [Compliance]
+      description: >
+        The PDF (a sent version's stored PDF, or a draft rendered now), the canonical text its
+        SHA-256 is taken from (`format=text`), or that text inside the response envelope
+        (`format=json`). Every PDF page carries the agreement, the version and the start and end of
+        the hash. The operator and the counterparty.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The PDF, the text, or the envelope with { name, text }.
+          content:
+            application/pdf: { schema: { type: string, format: binary } }
+            text/markdown: { schema: { type: string } }
+            application/json: { schema: { type: object } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/ai-transparency/mine:
     get:
       operationId: aiTransparencyMine
