@@ -11,6 +11,9 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-24 — aimeat_extension_invoke no longer hands the session's bearer to the run: ctx.buy runs
+ *     the seller's action for the buying extension's GEAI (secaudit2026oct22,
+ *     ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-21 — aimeat_extension_get answers `uses_secrets`: which vault secrets the scripts send where.
@@ -122,8 +125,9 @@ export function registerExtensionsTools(
     /** The session's caller (services/caller-context.ts), for the ownership guard on
      *  activate/deactivate/delete and the caller an action runs as. */
     caller: () => CallerContext,
-    /** The session's current bearer, which an action's ctx.buy re-presents to the node's routes. */
-    getToken?: () => string | undefined,
+    /** The session's current bearer. Unused: ctx.buy runs the seller's action for the buying
+     *  extension's own GEAI and takes no credential of this session (secaudit2026oct22). */
+    _getToken?: () => string | undefined,
 ): void {
     const agentGaii = getAgentGaii();
     /** The caller's owner GHII, the key the app listing decides visibility by. */
@@ -282,8 +286,6 @@ export function registerExtensionsTools(
                     roles: [...session.roles], scopes: [...session.scopes], appGrantId: null,
                 },
                 paywall: { res: refusal },
-                // ctx.buy re-presents the session's own bearer to the node's routes, as REST does.
-                bearer: getToken?.() ?? '',
             });
             if (out.kind === 'paywall') {
                 return { content: [{ type: 'text' as const, text: refusal.refusal ? refusalText(refusal.refusal) : 'The call was refused.' }], isError: true };
