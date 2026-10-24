@@ -10,6 +10,9 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-24 — Phase 13 (secaudit2026oct22): a publisher's login.html gets a per-app label other
+ *     than `login` and login.<apex> does not serve it; the operator cannot map a node label to an
+ *     app, a redirect there still works, and an ordinary operator site on the apex still serves.
  *   2026-10-19 — Phases 1 and 7: the apex inline redirect, open and gated, keeps the app's own query
  *     parameters and drops mode, code, access, unlock, frame and preview; the gated one carries exactly
  *     one grant, the fresh one (wish-the-apex-app-redirect-keeps-the-query-string).
@@ -1251,6 +1254,76 @@ async function main() {
             }
             const again = await onAppOrigin('/', SUB);
             assert(again.status === 200, `the restored app is served again: ${again.status}`);
+        });
+
+        // ── Phase 13: a label the node uses for itself is not an app's page on the apex ──────
+        // The per-app label is written into the same table the operator's <sub>.<apex> sites use,
+        // and the root route served a row by label alone. A publisher's `login.html` got the label
+        // `login`, so login.<apex> showed the publisher's page under the node's sign-in name
+        // (secaudit2026oct22, subdomains.ts app-label-served-on-apex-namespace).
+        console.log('\nPhase 13: a node label (login, account, pay...) is not served as an app on the apex');
+        const publisher = `labelpub${Date.now() % 100000}`;
+        const LOGIN_HTML = '<!DOCTYPE html><html><head></head><body><h1>publisher login page</h1></body></html>';
+        let pubToken = '';
+
+        await test('a non-operator publishes an app named login.html', async () => {
+            pubToken = (await registerOwner(BASE, publisher)).token;
+            const r = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${pubToken}` },
+                body: JSON.stringify({ filename: 'login.html', content: b64(LOGIN_HTML), name: 'Login', description: 'd', category: 'utility', tags: [] }),
+            });
+            assert(r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body)}`);
+        });
+
+        await test('login.<apex> does not serve the publisher\'s page', async () => {
+            const r = await json('/', { headers: { 'X-Subdomain': 'login' } });
+            assert(!String(r.body._raw ?? '').includes('publisher login page'), `login.<apex> served the publisher's page: ${r.status}`);
+            assert(r.status === 404, `expected 404 for login.<apex>, got ${r.status}`);
+        });
+
+        await test('the app still has its own per-app origin, under another label', async () => {
+            const res = await fetch(`${BASE}/v1/apps/${publisher}/login.html?mode=inline`, { redirect: 'manual' });
+            assert(res.status === 301, `apex inline: expected 301, got ${res.status}`);
+            const loc = new URL(res.headers.get('location') ?? '');
+            assert(loc.hostname.endsWith('.' + APP_HOST), `not a per-app origin: ${loc.href}`);
+            const label = loc.hostname.slice(0, -(APP_HOST.length + 1));
+            assert(label !== 'login', 'the app was given the node label "login"');
+            const served = await onAppOrigin('/', label);
+            assert(served.status === 200 && served.body.includes('publisher login page'), `per-app origin ${label}: ${served.status}`);
+        });
+
+        await test('the operator cannot map a node label to an app, and a redirect there still works', async () => {
+            const refused = await json('/v1/admin/subdomains', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ subdomain: 'signin', kind: 'app', target: `${owner}/${filename}` }),
+            });
+            assert(refused.status === 400 && refused.body.error?.code === 'RESERVED_SUBDOMAIN',
+                `expected 400 RESERVED_SUBDOMAIN, got ${refused.status} ${JSON.stringify(refused.body)}`);
+            const redir = await json('/v1/admin/subdomains', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ subdomain: 'signin', kind: 'redirect', target: `${BASE}/login` }),
+            });
+            assert(redir.status === 201, `redirect mapping: ${redir.status} ${JSON.stringify(redir.body)}`);
+            try {
+                const r = await fetch(`${BASE}/`, { headers: { 'X-Subdomain': 'signin' }, redirect: 'manual' });
+                assert(r.status === 301 && r.headers.get('location') === `${BASE}/login`, `signin redirect: ${r.status} ${r.headers.get('location')}`);
+            } finally {
+                await json('/v1/admin/subdomains/signin', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            }
+        });
+
+        await test('an ordinary operator site on the apex still serves its app', async () => {
+            const made = await json('/v1/admin/subdomains', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ subdomain: 'labelcheck', kind: 'app', target: `${owner}/${filename}` }),
+            });
+            assert(made.status === 201, `mapping: ${made.status} ${JSON.stringify(made.body)}`);
+            try {
+                const r = await json('/', { headers: { 'X-Subdomain': 'labelcheck' } });
+                assert(r.status === 200 && String(r.body._raw ?? '').includes('app origin demo'), `labelcheck.<apex>: ${r.status}`);
+            } finally {
+                await json('/v1/admin/subdomains/labelcheck', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            }
         });
 
         console.log('\n─────────────────────────────────────');
