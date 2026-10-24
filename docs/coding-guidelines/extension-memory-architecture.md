@@ -234,6 +234,17 @@ Six rules, and each one closes a way the value could leak back:
   asks once per secret and host. An own-account extension whose code was installed before these
   rules keeps the old first use, binding to the host its script names whoever calls, until its code
   is written again (`src/services/extension-first-use-keep.ts`; Jouni, 2026-10-21).
+- **A value from the shared `secrets` field gets its first host from whoever set it.** Its first
+  host then serves every account, so the first use binds by itself only toward a host on the
+  extension's `allow_hosts`, a host the extension declares for that secret, or when the map's setter
+  makes the call: any principal of an operator's own account (the operator's session, agents and
+  unattended runs) for a node-provided extension such as living-hooks, any call of the installing
+  account for an account's own extension. A visitor from another node and an anonymous principal
+  never do. Any other first use sends nothing,
+  is refused with `SECRET_HOST`, and tells every operator (and an installing account) once per
+  secret and host; the operator approves by adding the host to `allow_hosts`
+  (`PATCH /v1/extensions/:name/config` or `aimeat_extension_config_set`), and the same use then
+  works for every account (`src/services/shared-secret-ask.ts`; secaudit2026oct22, Jouni, 2026-10-24).
 - **Every refused first use asks the owner.** It files a question on the secret, rings the bell
   with an Allow button, and names `/v1/secret-allow?secret=&extension=&host=` in the `SECRET_HOST`
   text. The owner, signed in, allows that extension (installed by that account) to send that secret
