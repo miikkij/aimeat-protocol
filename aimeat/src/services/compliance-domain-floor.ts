@@ -23,6 +23,8 @@
  * @usage const outcomes = await applyDomainFloors({ storage, config }, scope, registers);
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C2, decision 10.7).
+ *   v1.0.1 — 2026-10-24 — The label rule writes as system@<node>, as the other label rules do;
+ *     compliance@ was an owner name nobody had reserved (unit synthetic-owner-names).
  */
 import type { ContentLabelTarget } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -91,7 +93,7 @@ export async function applyDomainFloors(
         if (!floor) { push(reg.domains.join(','), 'no-label'); continue; }
         const owner = ownerOfScope(target.scope);
         const actor: LabelActor = {
-          principal: `compliance@${deps.config.nodeId}`, kind: 'rule',
+          principal: `system@${deps.config.nodeId}`, kind: 'rule',
           ownerGhii: owner ?? ownerGhiiOf(`system@${deps.config.nodeId}`), ownerName: owner ? localAccountOf(owner) : null,
         };
         const view = await readContentLabel(deps, actor, target);
