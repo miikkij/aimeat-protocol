@@ -173,6 +173,15 @@ organism's or an app's; you read every one and write only the node's. \`scope: "
 part across every place at once, each place named. To change one entry (a register reviewed, a
 request done, a breach reported), pass \`item_id\` and \`set\` instead of \`value\`.
 
+**Data processing agreements (operator).** When the operator processes a customer's personal data
+(hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:
+\`aimeat_compliance_agreement\` with \`action: "create"\` (\`input: { counterparty, product, language }\`,
+\`dry_run\` first) fills the Commission's standard clauses and their annexes from the node, and names
+the measures it cannot see (\`missing_measures\`) for the operator to write with \`action: "update"\`.
+\`send\` sends it for signature by bell and e-mail; \`list\` and \`gaps\` say what waits. Read the
+agreements before you touch a customer's data: they say what was promised (breach notice hours, the
+sub-processors). A changed sub-processor is a new version announced with \`notice\`.
+
 **Install sets (operator).** \`aimeat_admin_install_set\` sets this node up for a customer from an
 install bundle bought from a package repository: the owner user, the packages, the organisms and
 workspaces, the other users and the crew agents. Always \`plan\` first; it writes nothing and lists

@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-24 -- e2e-compliance-agreements.ts joins the list (not the guard tier): data processing agreements (plan doc-mvmr4i2wdk0p).
  *   2026-10-23 -- e2e-compliance-records.ts and e2e-classification-packs.ts join the list (not the guard tier): the records of processing and the documents beside them, and the TL and NATO label packs (plan doc-mvlftkh9zmc9).
  *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
  *   2026-10-22 -- e2e-account-events-task-keep.ts joins the list (not the guard tier): an app grant made before the update keeps a task's title and reason in the event record, on its own node on 40987 (secaudit 2026-10, v89).
@@ -975,6 +976,10 @@ const ALL_SUITES = [
     // The records of processing, data domains, requests, breaches, frameworks and processors of the
     // node, an organism and an app, over REST and MCP, and their refusals (plan doc-mvlftkh9zmc9).
     'test/e2e-compliance-records.ts',
+    // Data processing agreements: the draft from the node's data, the Commission's text word for word,
+    // signing in the AIMEAT app, a returned PDF and scan, an announced change, end and deletion, and
+    // who may do what (plan doc-mvmr4i2wdk0p).
+    'test/e2e-compliance-agreements.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',

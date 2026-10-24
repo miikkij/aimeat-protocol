@@ -31,6 +31,8 @@
  *   v1.29.0 — 2026-10-11 — Fifteen capacity rows lose their upper bound, so their `range` is a recommendation and a larger number is accepted (Jouni, 2026-10-11; the list is in docs/b-config.md). The rate-limit rows moved to config-schema-rate-limits.ts unchanged (max-file-lines).
  *   v1.28.1 — 2026-10-10 —The descriptions say the versions: realtime.turn_username and turn_credential are removed in 4.0.0; federation.audience_required is on by default from 3.27.0 and the older message format is removed in 4.0.0 (secaudit 2026-10-10 I2/I12/I13/I23, I22).
  *   v1.28.0 — 2026-10-09 — security.ws_query_token (AIMEAT_WS_QUERY_TOKEN), mutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, d3).
+ *   v1.28.0 — 2026-10-24 — The operator identity rows moved unchanged to config-schema-operator.ts, with three new rows
+ *     for data processing agreements (operator.dpo_contact, signer_name, signer_role; plan doc-mvmr4i2wdk0p).
  *   v1.27.0 — 2026-10-09 — The document signing rows (config-schema-docsign.ts), beside identity verification.
  *   v1.26.0 — 2026-10-09 — security.owner_key_login (AIMEAT_OWNER_KEY_LOGIN), immutable, default on, deprecated, removed in 4.0.0 (secrets audit 2026-10-09, S2).
  *   v1.25.0 — 2026-10-09 — security.admin_setup_open_after_first_operator (AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR), immutable, default off: test nodes only (secrets audit 2026-10-09, 1.4).
@@ -116,6 +118,7 @@ import { eudiwSettingAllowed, EUDIW_SETTING_REFUSAL } from '../config-eudiw-guar
 import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
 import { VISIBILITY_CONFIG_FIELDS } from './config-schema-visibility.js';
 import { DOCSIGN_CONFIG_FIELDS } from './config-schema-docsign.js';
+import { OPERATOR_CONFIG_FIELDS } from './config-schema-operator.js';
 import { PAGES_CONFIG_FIELDS } from './config-schema-pages.js';
 import { SYSTEM2_AI_CONFIG_FIELDS } from './config-schema-ai.js';
 import { SEO_CONFIG_FIELDS } from './config-schema-seo.js';
@@ -162,67 +165,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
     description: 'Settings whoever runs this node set and nobody here can change. Readable, not writable. Empty on a node that runs itself' },
 
   // ── Operator identity (mutable) ──
-  //
-  // WHO RUNS THIS NODE, as the privacy policy and the terms name them. Every one of these was
-  // .env-and-restart only, which is the wrong shape for the one block a new operator MUST fill in
-  // before the node can serve those pages at all: /v1/privacy answers 503 until the required
-  // fields are set, so the very first thing somebody does with an instance they bought was edit a
-  // text file over a shell. They are mutable rather than immutable for the same reason the SEO
-  // group is: correcting your own postal address or raising the policy version after an edit is
-  // ordinary operator work, and a value you cannot change without a restart is one you check less
-  // often than you should. Nothing here is a secret, so nothing is hidden — a reviewer reading the
-  // Config tab should see exactly what the public pages will say.
-  //
-  // The write lands on the live config through writeConfigField, so /v1/privacy and /v1/terms
-  // reflect it on the next request and the 503 guard clears without a restart.
-  { key: 'operator.name', dotPath: 'operator.name', envVar: 'AIMEAT_OPERATOR_NAME', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
-    description: 'Legal name of the data controller: the person or company running this node. Named in the privacy policy and the terms' },
-  { key: 'operator.type', dotPath: 'operator.type', envVar: 'AIMEAT_OPERATOR_TYPE', type: 'string',
-    ...oneOf('natural_person', 'company', 'organisation', 'association'), immutable: false,
-    description: 'What kind of party that is. Decides the words the pages use ("a company", "a natural person"), so it has to match the legal reality',
-    range: 'natural_person | company | organisation | association' },
-  { key: 'operator.businessId', dotPath: 'operator.business_id', envVar: 'AIMEAT_OPERATOR_BUSINESS_ID', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 60, immutable: false,
-    description: 'Business or registration number (Y-tunnus, VAT id, company number). Empty for a private person; setting it is what makes this a company node' },
-  { key: 'operator.address', dotPath: 'operator.address', envVar: 'AIMEAT_OPERATOR_ADDRESS', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 300, immutable: false,
-    description: 'Postal address of the controller. GDPR requires one that reaches a person' },
-  { key: 'operator.country', dotPath: 'operator.country', envVar: 'AIMEAT_OPERATOR_COUNTRY', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 100, immutable: false,
-    description: 'Country this node is operated from. Decides the governing law and the international-transfer wording' },
-  { key: 'operator.email', dotPath: 'operator.email', envVar: 'AIMEAT_OPERATOR_EMAIL', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
-    description: 'Where privacy questions and data-subject requests are sent. Printed on both public pages' },
-  { key: 'operator.securityEmail', dotPath: 'operator.security_email', envVar: 'AIMEAT_OPERATOR_SECURITY_EMAIL', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
-    description: 'Where security reports are sent. Empty falls back to the privacy address' },
-  { key: 'operator.hostingName', dotPath: 'operator.hosting_name', envVar: 'AIMEAT_OPERATOR_HOSTING_NAME', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
-    description: 'Hosting provider, listed as a sub-processor in the privacy policy' },
-  { key: 'operator.hostingLocation', dotPath: 'operator.hosting_location', envVar: 'AIMEAT_OPERATOR_HOSTING_LOCATION', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
-    description: 'Where that provider keeps the data, e.g. "France (EU/EEA)". The transfers section reads it' },
-  { key: 'operator.hostingUrl', dotPath: 'operator.hosting_url', envVar: 'AIMEAT_OPERATOR_HOSTING_URL', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 400 && ((v as string) === '' || /^https?:\/\//.test(v as string)), immutable: false,
-    description: 'Link to the hosting provider. Empty renders the name without a link' },
-  { key: 'operator.supervisoryName', dotPath: 'operator.supervisory_name', envVar: 'AIMEAT_OPERATOR_SUPERVISORY_NAME', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
-    description: 'The DATA-PROTECTION authority a person complains to. Not the AI Act market-surveillance authority, which is a separate setting' },
-  { key: 'operator.supervisoryUrl', dotPath: 'operator.supervisory_url', envVar: 'AIMEAT_OPERATOR_SUPERVISORY_URL', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length <= 400 && ((v as string) === '' || /^https?:\/\//.test(v as string)), immutable: false,
-    description: 'Link to that authority' },
-  { key: 'operator.effectiveDate', dotPath: 'operator.effective_date', envVar: 'AIMEAT_OPERATOR_EFFECTIVE_DATE', type: 'string',
-    validate: v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v as string), immutable: false,
-    description: 'The day the current privacy policy and terms TAKE EFFECT (YYYY-MM-DD). Set it ahead when you owe notice of a material change',
-    range: 'YYYY-MM-DD' },
-  { key: 'operator.policyUpdatedDate', dotPath: 'operator.policy_updated', envVar: 'AIMEAT_OPERATOR_POLICY_UPDATED', type: 'string',
-    validate: v => typeof v === 'string' && ((v as string) === '' || /^\d{4}-\d{2}-\d{2}$/.test(v as string)), immutable: false,
-    description: 'The day the text was last EDITED (YYYY-MM-DD), which is not the day it takes effect. Empty follows the effective date',
-    range: 'YYYY-MM-DD or empty' },
-  { key: 'operator.policyVersion', dotPath: 'operator.policy_version', envVar: 'AIMEAT_OPERATOR_POLICY_VERSION', type: 'string',
-    validate: v => typeof v === 'string' && (v as string).length > 0 && (v as string).length <= 20, immutable: false,
-    description: 'Version shown on the privacy policy and the terms. Raise it whenever their substance changes' },
+  // The rows are in config-schema-operator.ts (moved unchanged on 2026-10-24).
+  ...OPERATOR_CONFIG_FIELDS,
 
   ...MORSEL_CONFIG_FIELDS,
   { key: 'appAuditKeepDefault', dotPath: 'apps.audit_keep_default', envVar: 'AIMEAT_APP_AUDIT_KEEP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Entries of each app\'s audit log an owner keeps when they set no limit of their own (0 = all)', range: '0-1000000' },

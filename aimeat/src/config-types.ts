@@ -143,6 +143,14 @@ export interface OperatorConfig {
   policyUpdatedDate: string;
   /** Privacy policy version string. */
   policyVersion: string;
+  /**
+   * The data protection officer, or the person who answers data protection questions, as one line
+   * ("Name, email"). Annex I of a data processing agreement names it (compliance-agreements-generate.ts).
+   */
+  dpoContact?: string;
+  /** Who signs data processing agreements for the operator, and in which role. Annex I prints both. */
+  signerName?: string;
+  signerRole?: string;
 }
 
 // The site links (the apps, the store and the people the public pages point at) live in

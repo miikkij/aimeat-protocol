@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
+ *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
  *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
  *   v1.30.0 — 2026-10-16 — pagesDefaults(): pageHost (AIMEAT_PAGE_HOST), the host the HTML pages of workspaces are served from (config-pages.ts).
  *   v1.29.0 — 2026-10-16 — loadConfig() refuses to start on a setting the node does not accept and treats an empty number or fixed-set setting as unset (config-start-check.ts; QA audit D8-02, P6-03, D6-02); `checkSettings: false` for validate, init and config. The five settings no code read are removed: AIMEAT_CAPABILITY_PUBLISHERS, _MIN_PUBLISHER_TRUST, _PUBLISHER_ALLOWLIST, _LOG_RETENTION_DAYS and AIMEAT_PACKAGE_FEDERATION_AUTO_ACCEPT (QA audit D8-05). A config file may name a setting with no schema row by its variable name, and the load line counts what was applied and names what was skipped (QA audit D8-03). The Consul block moved to config-consul.ts (pure extraction).
@@ -130,7 +132,6 @@ import type {
   AimeatConfig,
   NodeType,
   FederationRole,
-  OperatorType,
 } from './config-types.js';
 import type { LoadConfigOptions, LoadConfigResult } from './config-load-types.js';
 
@@ -712,23 +713,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     corsAllowedOrigins: (process.env.AIMEAT_CORS_ALLOWED_ORIGINS ?? '*').split(',').map(s => s.trim()).filter(Boolean),
 
-    operator: {
-      name: process.env.AIMEAT_OPERATOR_NAME ?? '',
-      type: (process.env.AIMEAT_OPERATOR_TYPE as OperatorType) ?? 'natural_person',
-      businessId: process.env.AIMEAT_OPERATOR_BUSINESS_ID ?? '',
-      address: process.env.AIMEAT_OPERATOR_ADDRESS ?? '',
-      country: process.env.AIMEAT_OPERATOR_COUNTRY ?? '',
-      email: process.env.AIMEAT_OPERATOR_EMAIL ?? '',
-      securityEmail: process.env.AIMEAT_OPERATOR_SECURITY_EMAIL ?? '',
-      hostingName: process.env.AIMEAT_OPERATOR_HOSTING_NAME ?? '',
-      hostingUrl: process.env.AIMEAT_OPERATOR_HOSTING_URL ?? '',
-      hostingLocation: process.env.AIMEAT_OPERATOR_HOSTING_LOCATION ?? '',
-      supervisoryName: process.env.AIMEAT_OPERATOR_SUPERVISORY_NAME ?? '',
-      supervisoryUrl: process.env.AIMEAT_OPERATOR_SUPERVISORY_URL ?? '',
-      effectiveDate: process.env.AIMEAT_OPERATOR_EFFECTIVE_DATE ?? '',
-      policyUpdatedDate: process.env.AIMEAT_OPERATOR_POLICY_UPDATED ?? '',
-      policyVersion: process.env.AIMEAT_OPERATOR_POLICY_VERSION ?? '1.0',
-    },
+    operator: operatorFromEnv(process.env),
 
     // Public-page links. Empty by design: the marketing pages point at apps that belong to
     // whoever runs the node, and a fresh clone must not advertise aimeat.io's apps or Jouni's
@@ -797,3 +782,4 @@ export { applyConfigOverrides } from './config-overrides.js';
 // Pure extraction (2026-08-01, max-file-lines): the operator-identity helpers moved to
 // config-operator.ts. Re-exported here so every existing `from './config.js'` importer is unaffected.
 export { missingOperatorConfig, operatorTypeLabel } from './config-operator.js';
+import { operatorFromEnv } from './config-operator.js';

@@ -16,12 +16,38 @@
  * @usage
  *   import { missingOperatorConfig } from './config-operator.js';
  * @version-history
+ *   v1.2.0 — 2026-10-24 — operatorFromEnv(): the operator block read from the environment, moved from config.ts
+ *     unchanged (max-file-lines), with the three agreement settings (plan doc-mvmr4i2wdk0p D1.4).
  *   v1.1.0 — 2026-08-12 — operatorTypeLabel takes the shared Locale type and carries Spanish, so a
  *     Spanish privacy policy names its controller in Spanish.
  *   v1.0.0 — 2026-08-01 — Pure extraction from config.ts (max-file-lines), unchanged.
  */
 import type { OperatorConfig, OperatorType } from './config-types.js';
 import type { Locale } from './i18n.js';
+
+/** The operator block a config is built with, read from the environment (moved from config.ts unchanged). */
+export function operatorFromEnv(env: NodeJS.ProcessEnv): OperatorConfig {
+  return {
+    name: env.AIMEAT_OPERATOR_NAME ?? '',
+    type: (env.AIMEAT_OPERATOR_TYPE as OperatorType) ?? 'natural_person',
+    businessId: env.AIMEAT_OPERATOR_BUSINESS_ID ?? '',
+    address: env.AIMEAT_OPERATOR_ADDRESS ?? '',
+    country: env.AIMEAT_OPERATOR_COUNTRY ?? '',
+    email: env.AIMEAT_OPERATOR_EMAIL ?? '',
+    securityEmail: env.AIMEAT_OPERATOR_SECURITY_EMAIL ?? '',
+    hostingName: env.AIMEAT_OPERATOR_HOSTING_NAME ?? '',
+    hostingUrl: env.AIMEAT_OPERATOR_HOSTING_URL ?? '',
+    hostingLocation: env.AIMEAT_OPERATOR_HOSTING_LOCATION ?? '',
+    supervisoryName: env.AIMEAT_OPERATOR_SUPERVISORY_NAME ?? '',
+    supervisoryUrl: env.AIMEAT_OPERATOR_SUPERVISORY_URL ?? '',
+    effectiveDate: env.AIMEAT_OPERATOR_EFFECTIVE_DATE ?? '',
+    policyUpdatedDate: env.AIMEAT_OPERATOR_POLICY_UPDATED ?? '',
+    policyVersion: env.AIMEAT_OPERATOR_POLICY_VERSION ?? '1.0',
+    dpoContact: env.AIMEAT_OPERATOR_DPO_CONTACT ?? '',
+    signerName: env.AIMEAT_OPERATOR_SIGNER_NAME ?? '',
+    signerRole: env.AIMEAT_OPERATOR_SIGNER_ROLE ?? '',
+  };
+}
 
 /**
  * Required operator fields that MUST be set for the privacy page to be

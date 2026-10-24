@@ -154,7 +154,9 @@ for you unless your runtime report says your model runs on your own machine
 creator or admin, or an app's owner, asks you to write down what personal data they keep,
 \`aimeat_compliance_register_read\` (\`part: "registers_draft"\`, \`scope\`, \`organism_id\` or \`app\`)
 gives a draft and \`aimeat_compliance_register_write\` saves it (\`item_id\` and \`set\` change one
-entry and keep the rest); both need the words \`compliance:read\` and \`compliance:write\`. \`aimeat_classification\` reads and changes classifications,
+entry and keep the rest); both need the words \`compliance:read\` and \`compliance:write\`. When your owner is the counterparty of a data processing
+agreement, \`aimeat_compliance_agreement\` (\`action: "mine"\`, \`get\`, \`document\`) shows it, and
+\`signed_copy\` sends a signed PDF or a scan back; the operator decides it, never you. \`aimeat_classification\` reads and changes classifications,
 with the actions \`get\`, \`set\`, \`review\`, \`policy_get\`, \`policy_set\`, \`audit\`, \`scan\`,
 \`explorer\` (a page of your owner's classified items, or with \`pending: true\` the suggestions that
 wait for them) and \`exception_list\`. Records your owner or their other agents keep private show in
