@@ -22,6 +22,9 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.3.0 — 2026-10-24 — A node name (routes/subdomain-node-labels.ts: login, account, pay...) is
+ *     refused as kind app on create, and a change of kind to app on one is refused; a redirect there
+ *     is accepted, and an existing app row on one is kept (secaudit2026oct22).
  *   v1.2.0 — 2026-10-17 — An app that needs a sign-in may be mapped to an address: only a code or a
  *     payment refuses (appNeedsCodeOrPayment), because the address serves it against a grant.
  *   v1.1.0 — 2026-10-06 — A name ending in `--draft` is refused: it is the address of an app's draft
@@ -35,6 +38,7 @@ import {
   RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, draftBaseLabel, DRAFT_LABEL_SUFFIX,
 } from '../routes/subdomains.js';
 import { appNeedsCodeOrPayment } from './app-access.js';
+import { isNodeApexLabel } from '../routes/subdomain-node-labels.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */
 export interface SubdomainRefusal {
@@ -55,6 +59,12 @@ export interface SubdomainSiteInput {
 
 function refuse(status: SubdomainRefusal['status'], code: SubdomainRefusal['code'], message: string): SubdomainRefusal {
   return { ok: false, status, code, message };
+}
+
+/** A node name (routes/subdomain-node-labels.ts) takes a redirect, never an app. */
+function nodeLabelRefusal(subdomain: string): SubdomainRefusal {
+  return refuse(400, 'RESERVED_SUBDOMAIN',
+    `People read "${subdomain}" as this node's own page, so it can only be a redirect. Choose a different name for an app.`);
 }
 
 /** Validates a kind+target pair. Null when it holds. */
@@ -112,6 +122,7 @@ export async function createSubdomainSite(
   if (kind !== 'app' && kind !== 'redirect') {
     return refuse(400, 'INVALID_KIND', 'kind must be "app" or "redirect"');
   }
+  if (kind === 'app' && isNodeApexLabel(subdomain, config)) return nodeLabelRefusal(subdomain);
   if (!target) {
     return refuse(400, 'INVALID_TARGET', 'target is required');
   }
@@ -154,6 +165,8 @@ export async function updateSubdomainSite(
       return refuse(400, 'INVALID_KIND', 'kind must be "app" or "redirect"');
     }
     updates.kind = input.kind;
+    // An existing app row on a node name keeps working; it only cannot be made into one.
+    if (input.kind === 'app' && existing.kind !== 'app' && isNodeApexLabel(subdomain, config)) return nodeLabelRefusal(subdomain);
   }
   if (input.target !== undefined) updates.target = String(input.target).trim();
   if (input.enabled !== undefined) updates.enabled = Boolean(input.enabled);

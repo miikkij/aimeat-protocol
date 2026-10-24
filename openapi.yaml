@@ -33112,9 +33112,14 @@ paths:
       description: >
         Maps a subdomain to a published app (`target` = `owner/filename`) or an
         external redirect URL. Reserved subdomains (www, mail, api, admin, static,
-        cdn, portal, app, apps, docs, status, mcp) are rejected. Access-code
-        protected and paid apps cannot be mapped. The node operator, or an agent
-        of the operator holding `operator:admin`.
+        cdn, portal, app, apps, docs, status, mcp, portfolio, co) are rejected
+        with 400 RESERVED_SUBDOMAIN. A name a person reads as the node's own page
+        (login, signin, auth, sso, id, account, pay, billing, support and the
+        like, plus the label of a configured node host) takes kind `redirect`
+        only: kind `app` is rejected with 400 RESERVED_SUBDOMAIN, because the
+        apex never serves an app under such a name. Access-code protected and
+        paid apps cannot be mapped. The node operator, or an agent of the
+        operator holding `operator:admin`.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -33170,7 +33175,8 @@ paths:
       summary: Update a subdomain mapping (node operator)
       description: >
         Changes kind, target or enabled; the resulting kind and target are checked
-        again as on create. 404 NOT_FOUND when the subdomain is not mapped. The node
+        again as on create, and a change of kind to `app` on a node name is
+        rejected with 400 RESERVED_SUBDOMAIN. 404 NOT_FOUND when the subdomain is not mapped. The node
         operator, or an agent of the operator holding `operator:admin`.
       tags: [Admin]
       security:
