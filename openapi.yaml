@@ -3294,11 +3294,11 @@ components:
           maxLength: 256
           description: |
             Who receives access. Supported patterns:
-            - `*` — any accessor (wildcard)
+            - `*` — any accessor (wildcard), the anonymous reader included
             - `agent#owner@node` — specific agent GAII
             - `organism.{id}` — all members of an organism
             - `ghii:username@node` — all agents of a GHII user
-            - `domain:*.example.com` — all agents on matching node domains
+            - `domain:*.example.com` — all signed-in principals on matching node domains; never the anonymous reader, so `domain:*` is not `*`
             - `node:node-id` — all agents on a specific node
           examples:
             - "*"
