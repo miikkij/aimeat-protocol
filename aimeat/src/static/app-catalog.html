@@ -6992,15 +6992,27 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
     });
   }
 
+  // src/static/app-catalog/js/cortex-card.js
+  function cortexArg(str) {
+    return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r?\n/g, "\\n");
+  }
+  function cortexCardHtml(ext) {
+    var types = ext.component_types || [];
+    var libCount = types.filter(function(t2) {
+      return t2 === "lib";
+    }).length;
+    var schemaCount = types.filter(function(t2) {
+      return t2 === "schema";
+    }).length;
+    return `<div class="cortex-mini-card" onclick="showCortexPopup('` + cortexArg(encodeURIComponent(ext.name)) + `')"><div class="cortex-mini-name">&#x1F4E6; ` + escapeHtml(ext.short_name || ext.name) + '</div><div class="cortex-mini-meta">' + libCount + " lib &middot; " + schemaCount + " schema</div></div>";
+  }
+
   // src/static/app-catalog/js/cortex.js
   var cortexToken = null;
   function cortexEsc(str) {
     var div = document.createElement("div");
     div.textContent = str;
     return div.innerHTML;
-  }
-  function cortexArg(str) {
-    return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r?\n/g, "\\n");
   }
   function loadCortexExtensions() {
     var config = loadConfig();
@@ -7023,16 +7035,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       if (!exts.length) return;
       document.getElementById("cortex-bar").style.display = "block";
       var grid = document.getElementById("cortex-bar-grid");
-      grid.innerHTML = exts.map(function(ext) {
-        var types = ext.component_types || [];
-        var libCount = types.filter(function(t2) {
-          return t2 === "lib";
-        }).length;
-        var schemaCount = types.filter(function(t2) {
-          return t2 === "schema";
-        }).length;
-        return `<div class="cortex-mini-card" onclick="showCortexPopup('` + encodeURIComponent(ext.name) + `')"><div class="cortex-mini-name">&#x1F4E6; ` + cortexEsc(ext.short_name || ext.name) + '</div><div class="cortex-mini-meta">' + libCount + " lib &middot; " + schemaCount + " schema</div></div>";
-      }).join("");
+      grid.innerHTML = exts.map(cortexCardHtml).join("");
     }).catch(function(e) {
       console.warn("Cortex bar load failed:", e);
     });
@@ -7099,7 +7102,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
       } catch (e) {
       }
       if (isOwner) {
-        ownerEl.innerHTML = `<button type="button" class="poster-action" onclick="window._launcher.openCortexEditor('` + encodedName + `')">` + cortexEsc(t("cortex.edit")) + "</button>";
+        ownerEl.innerHTML = `<button type="button" class="poster-action" onclick="window._launcher.openCortexEditor('` + cortexArg(encodedName) + `')">` + cortexEsc(t("cortex.edit")) + "</button>";
       }
       el.innerHTML = html;
     }).catch(function(e) {
