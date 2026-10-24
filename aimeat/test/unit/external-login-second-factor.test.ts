@@ -13,6 +13,8 @@
  *   right code links the subject and opens the session; the next sign-in with that subject is one
  *   click. An account without TOTP is linked and signed in at the callback, as before.
  * @version-history
+ *   2026-10-25 — provisionOwner is called as a request from loopback (fromLoopback): a call with no request is
+ *     asked for the setup code of a node without an operator (secaudit2026oct22 round 2).
  *   2026-10-24 — Initial (secaudit2026oct22, external-login-skips-second-factor).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -106,7 +108,7 @@ describe('the first external sign-in onto an account with two-step sign-in', () 
 
   async function account(name: string, withTotp: boolean): Promise<{ ghii: string; email: string; secret: string }> {
     const email = `${name}@example.test`;
-    const { ghii } = await provisionOwner(storage, config, { via: 'direct', username: name, displayName: name, verifiedEmail: email });
+    const { ghii } = await provisionOwner(storage, config, { via: 'direct', fromLoopback: true, username: name, displayName: name, verifiedEmail: email });
     let secret = '';
     if (withTotp) {
       const t = await setupTotp(name, totpConfigOf(config));
