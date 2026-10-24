@@ -26,7 +26,8 @@
  *   HOW IT IS USED. `pnpm sandbox` prints the base URL and every credential, and writes the same
  *   into `.sandbox.json` beside the log, so a browser, a curl and a second command all address the
  *   same node. Run it again and it reuses the node that is up and refreshes the tokens (a JWT is
- *   good for an hour). Nothing here is a test: no assertion, no cleanup between looks. When the
+ *   good for an hour). After six hours with no request the node and its mailbox stop themselves,
+ *   and the next `pnpm sandbox` starts them again on the same data. Nothing here is a test: no assertion, no cleanup between looks. When the
  *   work is finished, `pnpm gate` is what says whether it holds.
  *
  *   SAFE BY CONSTRUCTION. Every credential that could reach a third party is pinned EMPTY, the same
@@ -48,6 +49,9 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.8.0 — 2026-10-25 — The node and the test mailbox stop themselves after 6 hours without a
+ *     request (AIMEAT_SANDBOX_IDLE_HOURS, scripts/lib/sandbox-idle.mjs). Nothing ran `--stop` when a
+ *     session ended, and 13 nodes and 14 mail servers were found running, the oldest six days old.
  *   v1.7.0 — 2026-10-16 — The page host is on, at pages.localhost: an HTML page of a workspace runs in its frame.
  *   v1.6.1 — 2026-10-14 — AIMEAT_SANDBOX_TUNNEL=false starts the node with the connector tunnel off.
  *   v1.6.0 — 2026-10-12 — Owners are registered with POST /v1/ghii and a password and signed in with
@@ -84,7 +88,8 @@ import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSyn
 import { dirname, join, resolve } from 'node:path';
 import { portIsFree } from './lib/port-free.js';
 import { SANDBOX_MAX_APPS } from './lib/sandbox-limits.js';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { idleLimitMs } from './lib/sandbox-idle.mjs';
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 
@@ -136,6 +141,9 @@ interface SandboxState {
 /** The test mailbox runs beside the node on the node's port plus this. */
 const MAIL_PORT_OFFSET = 100;
 
+/** Preloaded into the node and the mailbox: each stops itself after AIMEAT_SANDBOX_IDLE_HOURS without a request. */
+const IDLE_PRELOAD = pathToFileURL(join(HERE, 'lib', 'sandbox-idle.mjs')).href;
+
 // ── The environment the sandbox node runs with ──────────────────────────────────
 //
 // Two halves. The first makes the node usable: features that ship OFF are ON here, the ceilings are
@@ -152,6 +160,8 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         AIMEAT_SQLITE_PATH: dbPath,
         DATABASE_URL: '',
         AIMEAT_LOG_LEVEL: process.env.AIMEAT_SANDBOX_LOG_LEVEL ?? 'info',
+        // The idle stop (scripts/lib/sandbox-idle.mjs) watches this process.
+        AIMEAT_SANDBOX_IDLE_WATCH: '1',
         AIMEAT_DEV_MODE: 'true',
         AIMEAT_ANONYMOUS: 'true',
 
@@ -347,8 +357,9 @@ async function refreshOwnerToken(o: { name: string; password: string }): Promise
 function startNode(port: number, dbPath: string): number {
     mkdirSync(dirname(dbPath), { recursive: true });
     const log = openSync(LOG_FILE, 'a');
-    // Detached, so the sandbox outlives the command that started it: that is the whole point.
-    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', dbPath], {
+    // Detached, so the sandbox outlives the command that started it: that is the whole point. The
+    // idle preload is what ends it, because nothing else ever ran `--stop` (scripts/lib/sandbox-idle.mjs).
+    const child = spawn('node', ['--import', 'tsx', '--import', IDLE_PRELOAD, 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', dbPath], {
         cwd: AIMEAT,
         env: sandboxEnv(port, dbPath),
         stdio: ['ignore', log, log],
@@ -370,8 +381,9 @@ async function mailUp(mailPort: number): Promise<boolean> {
 async function ensureMailServer(mailPort: number): Promise<number> {
     if (await mailUp(mailPort)) return 0;
     const log = openSync(LOG_FILE, 'a');
-    const child = spawn('node', ['--import', 'tsx', 'scripts/lib/fake-mail-server.ts', String(mailPort)], {
+    const child = spawn('node', ['--import', 'tsx', '--import', IDLE_PRELOAD, 'scripts/lib/fake-mail-server.ts', String(mailPort)], {
         cwd: AIMEAT, stdio: ['ignore', log, log], detached: true,
+        env: { ...process.env, AIMEAT_SANDBOX_IDLE_WATCH: '1' },
     });
     child.unref();
     for (let i = 0; i < 40 && !await mailUp(mailPort); i++) await new Promise(r => setTimeout(r, 250));
@@ -539,6 +551,10 @@ function report(s: SandboxState): void {
     console.log(`  curl -s -H "Authorization: Bearer <token>" ${s.baseUrl}/v1/memory | head`);
     console.log('  pnpm sandbox --reset   throw the data away and seed again');
     console.log('  pnpm sandbox --stop    stop the node, keep the data');
+    const idle = idleLimitMs();
+    console.log(idle > 0
+        ? `  it stops itself after ${Math.round(idle / 60_000)} min without a request (AIMEAT_SANDBOX_IDLE_HOURS; 0 never); \`pnpm sandbox\` starts it again`
+        : '  it does not stop by itself (AIMEAT_SANDBOX_IDLE_HOURS=0)');
     console.log('');
     console.log('  This is not a test. When the work is finished, `pnpm gate` says whether it holds.');
     console.log('');
