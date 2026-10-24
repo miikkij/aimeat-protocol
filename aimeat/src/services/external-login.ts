@@ -15,7 +15,8 @@
  *   3. Link by verified email — only when the IdP vouches for the address AND the local account
  *      verified it too (anti-takeover), AND — when the caller restricts it — the address is in the
  *      organisation's own domains. An unverified local match becomes a `link_existing` pending so
- *      the SPA can explain instead of dead-ending at "username taken".
+ *      the SPA can explain instead of dead-ending at "username taken". A match on an account with
+ *      two-step sign-in armed becomes `second_factor`: nothing is linked until the code is given.
  *   4. Brand-new — a signed pending cookie carries the verified identity to the one-time
  *      username-choice step; finalize creates owner + GHII and establishes the session.
  * @structure PendingSignup + cookie/token helpers; maskOwnerName/emailHashOf/normalizeUsername/
@@ -23,6 +24,8 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-24 — Step 3 on an account with two-step sign-in armed answers `second_factor` and saves no
+ *     link; the code step saves it after a correct code (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-23 — finalizeExternalSignup passes whether the sign-up request came in on a loopback socket,
  *     so a loopback node's first identity-provider sign-up still needs no setup code from this machine
  *     and needs it from any other (secaudit2026oct22).
@@ -49,6 +52,7 @@ import { emitChange } from './event-bus.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
+import { twoStepArmed } from './passkeys.js';
 
 /** Name of the short-lived, signed cookie that carries a not-yet-finalized external signup. */
 export const PENDING_COOKIE = 'aimeat_pending_signup';
@@ -282,9 +286,16 @@ export async function establishForGhii(
   emitChange('ghii');
 }
 
+/** A provider identity to save on an account once its second factor is given. */
+export interface PendingExternalLink { providerId: string; sub: string }
+
 export type ExternalMapResult =
   | { outcome: 'login'; ghii: GHIIRecord }
-  | { outcome: 'pending'; pending: PendingSignup };
+  | { outcome: 'pending'; pending: PendingSignup }
+  /** Step 3 matched an account with two-step sign-in armed: nothing is linked yet. The caller starts
+   *  the code step (routes/ghii/login-link-second-factor.ts startLinkSecondFactor) with `link`, and
+   *  the code step saves the link only after a correct code. */
+  | { outcome: 'second_factor'; ghii: GHIIRecord; link: PendingExternalLink };
 
 /**
  * Map a verified external identity to a GHII — the tree in the file header. Pure decision plus the
@@ -333,6 +344,14 @@ export async function mapExternalIdentity(
     const domainAllowed = !opts.emailLinkDomains || opts.emailLinkDomains.includes(domain);
     if (domainAllowed) {
       const byEmail = await storage.getGHIIByEmailHash(emailHashOf(email));
+      if (byEmail && byEmail.emailVerifiedAt && twoStepArmed(byEmail)) {
+        // The address match is the only proof that this new subject is the account's person. On an
+        // account with two-step sign-in the password sign-in and the sign-in link also ask for the
+        // code, so the link is not saved and no session opens until the code is given
+        // (secaudit2026oct22, external-login-skips-second-factor). An identity already linked
+        // (step 1) signs in without the code, as before.
+        return { outcome: 'second_factor', ghii: byEmail, link: { providerId, sub } };
+      }
       if (byEmail && byEmail.emailVerifiedAt) {
         ghiiRecord = await storage.updateGHII(byEmail.ghii, externalIdUpdate(byEmail, providerId, sub));
       } else if (byEmail) {

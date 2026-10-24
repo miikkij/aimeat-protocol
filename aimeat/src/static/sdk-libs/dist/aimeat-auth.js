@@ -1368,7 +1368,7 @@
     if (code === "INVALID_TOKEN") return i.authErrorUsedLink || "This sign-in link has already been used or is not valid. Ask for a new one below, or sign in another way.";
     if (code === "EXPIRED") return i.authErrorExpired || "This sign-in link has expired. Ask for a new one below.";
     if (code === "ACCOUNT_DISABLED") return i.authErrorDisabled || "This account has been deactivated. Contact the administrator of this service.";
-    if (code === "SECOND_FACTOR_EXPIRED") return i.authErrorSecondFactorExpired || "This sign-in has expired. Ask for a new sign-in link and open it.";
+    if (code === "SECOND_FACTOR_EXPIRED") return i.authErrorSecondFactorExpired || "The time to enter the code has run out. Sign in again.";
     return i.authErrorGeneric || "Sign-in did not go through. Try again, or choose another way to sign in.";
   }
   function showAuthErrorIn(i, code) {
