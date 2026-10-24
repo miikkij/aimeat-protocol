@@ -33,6 +33,8 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-living-hooks and e2e-connections use to put a real counterparty on the machine.
  * @version-history
+ *   v1.3.1 — 2026-10-24 — The operator's own agent (no secrets:manage) makes the first use of a shared
+ *     value toward a new host and it goes through, by Jouni's ruling of 2026-10-24 (secaudit2026oct22).
  *   v1.3.0 — 2026-10-24 — A second owner's first use of a value from the operator's shared map is
  *     refused, sends nothing and asks the operators once; after the operator adds the host to
  *     allow_hosts, the same use goes through. The test "a second owner, holding no vault entry, still
@@ -70,6 +72,9 @@ const BOTH_CONFIG_VALUE = 'zz-from-the-config-zz';
 /** Only in the shared map, and first used by an account that is not the operator. */
 const SHARED_NEW = 'SHARED_NEW_KEY';
 const SHARED_NEW_VALUE = 'zz-operator-new-shared-zz';
+/** Only in the shared map, and first used by an agent of the operator's own account. */
+const SHARED_OPS = 'SHARED_OPS_KEY';
+const SHARED_OPS_VALUE = 'zz-operator-agent-shared-zz';
 /** The bell notice the operator gets when a shared secret's first use waits for their approval. */
 const SHARED_ASK_TYPE = 'shared_secret_host_ask';
 
@@ -477,7 +482,7 @@ console.log("\n-- The operator's shared map is second, never first --");
 
 await test("the operator stores a shared map in the extension's settings", async () => {
     const { LIVING_HOOKS } = await import('../src/data/builtin-extensions/living-hooks.js');
-    const shared = JSON.stringify({ [SHARED_NAME]: SHARED_VALUE, [BOTH_NAME]: BOTH_CONFIG_VALUE, [SHARED_NEW]: SHARED_NEW_VALUE });
+    const shared = JSON.stringify({ [SHARED_NAME]: SHARED_VALUE, [BOTH_NAME]: BOTH_CONFIG_VALUE, [SHARED_NEW]: SHARED_NEW_VALUE, [SHARED_OPS]: SHARED_OPS_VALUE });
     const withSecret = LIVING_HOOKS.manifest.replace('default: ""', `default: '${shared}'`);
     assert(withSecret !== LIVING_HOOKS.manifest, 'the manifest no longer has the secrets default this test replaces');
     const r = await json('/v1/extensions/living-hooks', {
@@ -554,6 +559,28 @@ await test("a second owner's first use of a shared value is refused, sends nothi
     assert(text.includes(`${RECEIVER_HOST}:${RECEIVER_PORT}`) && text.includes(stranger.name), `the notice does not name the host and who asked: ${text}`);
     assert(text.includes('allow_hosts'), `the notice does not name the control: ${text}`);
     assert(!text.includes(SHARED_NEW_VALUE), 'the notice carries the shared value');
+});
+
+// Jouni, 2026-10-24: a principal acting in the operator's own account (here an agent without
+// secrets:manage) acts in the operator's name, so its first use binds the host.
+await test("the operator's own agent makes the first use of a shared value toward a new host, and it goes through", async () => {
+    // living-hooks' send needs memory:write too (it keeps its pacing record); neither word manages secrets.
+    const opsAgent = await mintAgentToken(owner, 'vault-ops-agent', ['ext:invoke', 'memory:write']);
+    deliveries.length = 0;
+    const r = await hook('send', opsAgent, {
+        url: `${RECEIVER}/hook`, headers: { 'X-Api-Key': `{{secret:${SHARED_OPS}}}` }, body: { a: 83 },
+    });
+    assert(r.error === null, `refused: ${JSON.stringify(r.error ?? r.envelope?.error)}`);
+    assert(deliveries.length === 1 && deliveries[0].headers['x-api-key'] === SHARED_OPS_VALUE,
+        `the receiver got: ${String(deliveries[0]?.headers['x-api-key'])}`);
+    assert((await sharedAsks(SHARED_OPS)).length === 0, 'the operator was asked about their own agent');
+    // …and it is now bound: the second owner reaches the same host with it, and only that host.
+    deliveries.length = 0;
+    const theirs = await hook('send', stranger.token, {
+        url: `${RECEIVER}/hook`, headers: { 'X-Api-Key': `{{secret:${SHARED_OPS}}}` }, body: { a: 84 },
+    });
+    assert(theirs.error === null && deliveries[0]?.headers['x-api-key'] === SHARED_OPS_VALUE,
+        `the bound host refused the second owner: ${JSON.stringify(theirs.error)}`);
 });
 
 // Changed by Jouni's ruling of 2026-10-24: the first use of a shared value toward a host only on the
