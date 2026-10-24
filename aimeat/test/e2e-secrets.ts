@@ -33,6 +33,11 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-living-hooks and e2e-connections use to put a real counterparty on the machine.
  * @version-history
+ *   v1.3.0 — 2026-10-24 — A second owner's first use of a value from the operator's shared map is
+ *     refused, sends nothing and asks the operators once; after the operator adds the host to
+ *     allow_hosts, the same use goes through. The test "a second owner, holding no vault entry, still
+ *     gets the operator's shared value" changed to prove both, by Jouni's ruling of 2026-10-24
+ *     (secaudit2026oct22).
  *   v1.2.0 — 2026-10-09 — The owner may set a secret's host when storing it (a bad host is refused,
  *     another host is refused from the first call on), the list names the principal and extension of
  *     a first use, and the operator's shared map is bound to the host of its first use (secrets audit
@@ -62,6 +67,11 @@ const SHARED_VALUE = 'zz-operator-shared-zz';
 const BOTH_NAME = 'BOTH_WAYS';
 const BOTH_VAULT_VALUE = 'zz-from-the-vault-zz';
 const BOTH_CONFIG_VALUE = 'zz-from-the-config-zz';
+/** Only in the shared map, and first used by an account that is not the operator. */
+const SHARED_NEW = 'SHARED_NEW_KEY';
+const SHARED_NEW_VALUE = 'zz-operator-new-shared-zz';
+/** The bell notice the operator gets when a shared secret's first use waits for their approval. */
+const SHARED_ASK_TYPE = 'shared_secret_host_ask';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -467,7 +477,7 @@ console.log("\n-- The operator's shared map is second, never first --");
 
 await test("the operator stores a shared map in the extension's settings", async () => {
     const { LIVING_HOOKS } = await import('../src/data/builtin-extensions/living-hooks.js');
-    const shared = JSON.stringify({ [SHARED_NAME]: SHARED_VALUE, [BOTH_NAME]: BOTH_CONFIG_VALUE });
+    const shared = JSON.stringify({ [SHARED_NAME]: SHARED_VALUE, [BOTH_NAME]: BOTH_CONFIG_VALUE, [SHARED_NEW]: SHARED_NEW_VALUE });
     const withSecret = LIVING_HOOKS.manifest.replace('default: ""', `default: '${shared}'`);
     assert(withSecret !== LIVING_HOOKS.manifest, 'the manifest no longer has the secrets default this test replaces');
     const r = await json('/v1/extensions/living-hooks', {
@@ -507,14 +517,67 @@ await test("the owner's own vault BEATS the shared map for the same name", async
         `the shared map won: ${String(deliveries[0]?.headers['x-api-key'])}`);
 });
 
-await test("and a second owner, holding no vault entry, still gets the operator's shared value", async () => {
+/** The operator's bell notices that ask about this shared secret. */
+async function sharedAsks(secretName: string): Promise<any[]> {
+    const n = await json('/v1/notifications', { headers: auth(owner.token) });
+    return (n.body?.data?.notifications ?? [])
+        .filter((x: any) => x.type === SHARED_ASK_TYPE && String(x.title ?? '').includes(secretName));
+}
+
+/** Set living-hooks' node-wide allowlist, the operator's control (PATCH /v1/extensions/:name/config). */
+async function setOperatorAllowHosts(value: string) {
+    const r = await json('/v1/extensions/living-hooks/config', {
+        method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ config: { allow_hosts: value } }),
+    });
+    assert(r.status === 200, `allow_hosts ${r.status}: ${JSON.stringify(r.body?.error)}`);
+}
+
+// secaudit2026oct22: a shared value had no owner deciding its first host. Any account could name a
+// host on its own list and receive the operator's shared credential, and that host became the
+// value's only host. A first use by an account that is not the operator now waits for the operator.
+await test("a second owner's first use of a shared value is refused, sends nothing, and asks the operator once", async () => {
+    deliveries.length = 0;
+    const r = await hook('send', stranger.token, {
+        url: `${RECEIVER}/hook`, headers: { 'X-Api-Key': `{{secret:${SHARED_NEW}}}` }, body: { a: 81 },
+    });
+    assert(deliveries.length === 0, `the receiver got: ${String(deliveries[0]?.headers['x-api-key'])}`);
+    assert(r.error !== null && String(r.error.message).includes('SECRET_HOST'), `not refused: ${JSON.stringify(r.data)}`);
+    assert(String(r.error.message).includes('operator'), `the refusal does not say who approves: ${r.error.message}`);
+    assert(!JSON.stringify(r.envelope).includes(SHARED_NEW_VALUE), 'the refusal carries the shared value');
+    const again = await hook('send', stranger.token, {
+        url: `${RECEIVER}/hook`, headers: { 'X-Api-Key': `{{secret:${SHARED_NEW}}}` }, body: { a: 82 },
+    });
+    assert(again.error !== null && deliveries.length === 0, 'the second try went through');
+    const asks = await sharedAsks(SHARED_NEW);
+    assert(asks.length === 1, `${asks.length} notices for one secret and host`);
+    const text = JSON.stringify(asks[0]);
+    assert(text.includes(`${RECEIVER_HOST}:${RECEIVER_PORT}`) && text.includes(stranger.name), `the notice does not name the host and who asked: ${text}`);
+    assert(text.includes('allow_hosts'), `the notice does not name the control: ${text}`);
+    assert(!text.includes(SHARED_NEW_VALUE), 'the notice carries the shared value');
+});
+
+// Changed by Jouni's ruling of 2026-10-24: the first use of a shared value toward a host only on the
+// second owner's own list waits for the operator, and once the operator adds that host to allow_hosts
+// the same use goes through.
+await test("a second owner's first use of a shared value goes through once the operator allows the host", async () => {
     deliveries.length = 0;
     const r = await hook('send', stranger.token, {
         url: `${RECEIVER}/hook`, headers: { 'X-Api-Key': `{{secret:${BOTH_NAME}}}` }, body: { a: 8 },
     });
-    assert(r.error === null, `refused: ${JSON.stringify(r.error)}`);
-    assert(deliveries[0]?.headers['x-api-key'] === BOTH_CONFIG_VALUE,
-        `owner B got: ${String(deliveries[0]?.headers['x-api-key'])}`);
+    assert(r.error !== null && String(r.error.message).includes('SECRET_HOST'), `not refused: ${JSON.stringify(r.data)}`);
+    assert(deliveries.length === 0, 'the refused call reached the receiver');
+    assert((await sharedAsks(BOTH_NAME)).length === 1, 'the operator was not asked');
+    await setOperatorAllowHosts(RECEIVER_HOST);
+    try {
+        const ok = await hook('send', stranger.token, {
+            url: `${RECEIVER}/hook`, headers: { 'X-Api-Key': `{{secret:${BOTH_NAME}}}` }, body: { a: 8 },
+        });
+        assert(ok.error === null, `refused after the operator allowed the host: ${JSON.stringify(ok.error)}`);
+        assert(deliveries[0]?.headers['x-api-key'] === BOTH_CONFIG_VALUE,
+            `owner B got: ${String(deliveries[0]?.headers['x-api-key'])}`);
+    } finally {
+        await setOperatorAllowHosts('');
+    }
 });
 
 // Secrets audit 2026-10-09, item 10: the operator's shared map had no host binding at all, so any
