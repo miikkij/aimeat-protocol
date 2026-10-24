@@ -9,6 +9,9 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.6.1 — 2026-10-24 — The redeploy pre-pass hands activationRefusal the record's installedBy, so a
+ *     board-template whose board id another account holds is refused with 409 BOARD_ID_TAKEN before
+ *     the first write (secaudit2026oct22).
  *   v1.6.0 — 2026-10-18 — The create branch asks the publish gate as installCortex does: a manifest
  *     asking for `public` by an agent without publish:public creates the cortex private, and the
  *     answer carries `asked` (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4). The update
@@ -210,7 +213,7 @@ export async function upsertCortex(
   //    them back. So the same question is asked here first, counting the boards step 3 deletes
   //    before it opens the new ones (activationRefusal's `replacing`). Invariant 14, db8a5635a633.
   if (wasActive) {
-    const ceiling = await activationRefusal({ name, components: parsed.components }, config, storage, gaii, false, existing);
+    const ceiling = await activationRefusal({ name, components: parsed.components, installedBy: existing.installedBy }, config, storage, gaii, false, existing);
     if (ceiling) return upsertRefusal(ceiling.status, ceiling.code, ceiling.message);
   }
 
