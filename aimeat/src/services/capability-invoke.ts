@@ -6,6 +6,9 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.8.1 - 2026-10-24 - assertCapabilityRunnable: the three checks before any run, extracted so
+ *     ctx.buy asks them when it runs a seller's extension action in-process (secaudit2026oct22,
+ *     ext-purchase:buy-forwards-outer-caller-bearer). No behaviour change here.
  *   v1.8.0 - 2026-10-22 - The `ecosystem` case refuses another account's capability unless the
  *     caller's outside app declared the action and the account holder allowed it once with one press
  *     (ECOSYSTEM_CAPABILITY_NEEDS_APPROVAL with the address, ECOSYSTEM_CAPABILITY_NOT_YOURS,
@@ -133,6 +136,30 @@ function registrantOwnerGhii(principal: string, nodeId: string): string {
   return owner.includes('@') ? owner : `${owner}@${nodeId}`;
 }
 
+/**
+ * Throws when the capability may not be run at all: not directly callable, disabled by the
+ * operator, or withdrawn. Asked by invokeCapability and by ctx.buy, which runs a seller's extension
+ * action in-process (services/extension-purchase.ts).
+ */
+export function assertCapabilityRunnable(capability: CapabilityRecord): void {
+  if (!capability.callable) {
+    const msg = capability.source.type === 'action'
+      ? `This capability uses the async work queue. ${capability.usage}`
+      : capability.source.type === 'cortex'
+        ? `This capability is browser-only. ${capability.usage}`
+        : `This capability is not directly callable. ${capability.usage}`;
+    throw Object.assign(new Error(msg), { statusCode: 400, code: 'NOT_CALLABLE' });
+  }
+
+  if (capability.operatorOverride?.disabled) {
+    throw Object.assign(new Error('This capability has been disabled by the operator'), { statusCode: 403, code: 'CAPABILITY_DISABLED' });
+  }
+
+  if (capability.status === 'disabled') {
+    throw Object.assign(new Error('This capability is no longer available'), { statusCode: 410, code: 'CAPABILITY_GONE' });
+  }
+}
+
 export async function invokeCapability(
   config: AimeatConfig,
   storage: Storage,
@@ -157,23 +184,7 @@ export async function invokeCapability(
   authority: CallAuthority = { scopes: [] },
 ): Promise<InvokeResult> {
   const start = Date.now();
-
-  if (!capability.callable) {
-    const msg = capability.source.type === 'action'
-      ? `This capability uses the async work queue. ${capability.usage}`
-      : capability.source.type === 'cortex'
-        ? `This capability is browser-only. ${capability.usage}`
-        : `This capability is not directly callable. ${capability.usage}`;
-    throw Object.assign(new Error(msg), { statusCode: 400, code: 'NOT_CALLABLE' });
-  }
-
-  if (capability.operatorOverride?.disabled) {
-    throw Object.assign(new Error('This capability has been disabled by the operator'), { statusCode: 403, code: 'CAPABILITY_DISABLED' });
-  }
-
-  if (capability.status === 'disabled') {
-    throw Object.assign(new Error('This capability is no longer available'), { statusCode: 410, code: 'CAPABILITY_GONE' });
-  }
+  assertCapabilityRunnable(capability);
 
   let result: unknown;
 
