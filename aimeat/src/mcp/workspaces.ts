@@ -17,6 +17,8 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-24 — aimeat_workspace_revert_to_draft asks the organism rule's write test with the draft's
+ *     key, so a viewer's agent does not write a draft through a reopen (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_workspace_revert_to_draft takes a space by its name as well as its namespace
@@ -213,6 +215,7 @@ import { logger } from '../utils/logger.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { fencedSpaceRefusal } from '../services/fenced-space.js';
+import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
 import { toolError } from './tool-error.js';
 import { setWorkspaceShareOp } from '../services/workspace-share.js';
 import { shareBodyFromToolInput } from '../services/workspace-share-input.js';
@@ -492,6 +495,13 @@ export function registerWorkspaceTools(
             if (!revertOrg || !(await canReadWorkspace(storage, config, revertOrg, agentGaii, ownerName, ownerGhii, ws))) {
                 return fail(`No access to workspace ${ws} — request access with aimeat_workspace_access.`);
             }
+            // Reading is not writing: the draft write test, as on the REST route. A viewer reads the
+            // record and does not write its draft.
+            const revertCaller = opsCaller();
+            const revertWrite = await checkOrganismNamespaceAccess({ storage, config },
+                { principal: revertCaller.principal, owner: revertCaller.ownerName, roles: revertCaller.roles, scopes: revertCaller.scopes },
+                `${wsRoot(organism_id, ws)}.${namespace}.${id}.draft`, 'write');
+            if (revertWrite) return failRefusal(revertWrite);
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
             // The same revertToDraft POST /v1/organisms/:id/revert calls: copy `.latest` (or the bare
             // key) into `.draft` and refuse to clobber a draft already in progress. The reopened draft

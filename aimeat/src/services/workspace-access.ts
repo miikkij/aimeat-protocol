@@ -14,10 +14,17 @@
  * @structure
  *   - canReadWorkspace(...) -- membership + manifest-gate read decision (boolean).
  *   - decideWorkspaceRead(...) -- the same, with each gate's answer and the manifest it read.
+ *   - canReadWorkspaceRecords(...) -- canReadWorkspace, or a non-member holding the grant of an
+ *     active member who created the workspace (the member records read and the member page routes).
  * @usage
  *   import { canReadWorkspace } from '../services/workspace-access.js';
  *   const ok = await canReadWorkspace(storage, config, organism, callerSub, callerOwner, callerGaii, ws);
  * @version-history
+ *   2026-10-25 — canReadWorkspaceRecords admits a non-member's grant only while its issuer is an
+ *     active member of the organism (secaudit2026oct22, ruled by the developer on 2026-10-25).
+ *   2026-10-24 — canReadWorkspaceRecords: the gate of the member records read and the member page
+ *     routes. A workspace creator removed from the organism no longer reads through them; a
+ *     non-member's grant still does, pending the developer's decision (secaudit2026oct22).
  *   2026-09-29 — decideWorkspaceRead: the same gates with each answer, taking the manifest a loader
  *     already holds. canReadWorkspace is its boolean. The REST read and readWorkspaceOp, which each
  *     carried their own copy, decide here now (TARGET-082, one check component).
@@ -36,7 +43,7 @@
 import type { Storage, OrganismRecord, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
-import { isSameOwner, isGEAI } from '../utils/gaii.js';
+import { isSameOwner, isGEAI, localAccountName } from '../utils/gaii.js';
 import { ecoMayReadKey } from './ecosystem-access.js';
 import { readWorkspaceMetaRecord } from './workspace-meta.js';
 import { agentBarred } from './organism-agent-access.js';
@@ -148,4 +155,43 @@ export async function decideWorkspaceRead(
   // owner-selected read scope actually bites (and the tunnel record-push honours it identically).
   if (allowed && callerSub && isGEAI(callerSub)) allowed = await ecoMayReadKey(storage, callerSub, manKey);
   return { member: true, manager, canRead: allowed, manRec };
+}
+
+/**
+ * The read gate of the member records read (GET …/workspace/records) and the member page routes
+ * (…/frame, …/opened): canReadWorkspace, and in addition a caller who is not a member of the
+ * organism but holds a viewer or contributor grant from the workspace's creator.
+ *
+ * WHY THE SECOND BRANCH. These routes used to decide on the manifest alone (canReadWsManifest in
+ * routes/organisms/shared.ts), with no membership gate, so a grant opened them to a non-member, and
+ * test/e2e-workspace-member-records.ts test 6 asserts that use. The same rule also admitted the
+ * manifest's own owner, a workspace creator removed or banned from the organism, who then kept reading
+ * every member's published records (secaudit2026oct22, canReadWsManifest no-membership-gate). The
+ * creator now reads only as an active member, and a non-member's grant counts only while the
+ * account that issued it is an active member (ruled by the developer on 2026-10-25).
+ */
+export async function canReadWorkspaceRecords(
+  storage: Storage,
+  config: AimeatConfig,
+  organism: OrganismRecord,
+  callerSub: string | undefined,
+  callerOwner: string | undefined,
+  callerGaii: string,
+  ws: string,
+): Promise<boolean> {
+  if (await canReadWorkspace(storage, config, organism, callerSub, callerOwner, callerGaii, ws)) return true;
+  const manRec = await readWorkspaceMetaRecord(storage, organism.id, ws, 'meta.manifest', config.nodeId);
+  // The manifest's own owner is its creator, who reads only as an active member (above).
+  if (!manRec || manRec.ownerGaii === callerGaii || isSameOwner(manRec.ownerGaii, callerGaii)) return false;
+  // A grant opens these routes to a non-member only while the account that issued it, the owner of
+  // the manifest copy that counts, is an active member: a creator removed or banned from the
+  // organism no longer lets anyone in (ruled by the developer on 2026-10-25).
+  const issuer = await storage.getMembership(organism.id, localAccountName(manRec.ownerGaii));
+  if (!issuer || issuer.status !== 'active') return false;
+  const decision = await authorizeRead(storage, config, {
+    ownerGaii: manRec.ownerGaii, accessorGaii: callerGaii, resourceKey: manRec.key,
+    visibility: manRec.visibility, groupId: manRec.groupId, action: 'read',
+  });
+  if (!decision.allowed) return false;
+  return isGEAI(callerGaii) ? ecoMayReadKey(storage, callerGaii, manRec.key) : true;
 }

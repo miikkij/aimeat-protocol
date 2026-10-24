@@ -5,6 +5,11 @@
  *   which creates a consent grant. Covers: discovery, denied-before-approval, request, list-requests,
  *   approve → read, and deny → revoke.
  * @version-history
+ *   2026-10-25 — 19d: a non-member holding the grant of a creator removed from the organism reads
+ *     neither the records nor the page (404). Failed before the fix with records 200.
+ *   2026-10-24 — 19-19c: a workspace creator removed from the organism no longer reads the member
+ *     records read or the page routes (404); the creator while a member, a granted member, a
+ *     non-member with the creator's grant and the organism's creator still read (secaudit2026oct22).
  *   2026-09-29 — 17b: a chunked upload bound to the workspace lands bound, and init refuses a
  *     workspace file that names no workspace.
  *   v1.0.0 — 2026-06-08 — Initial: workspace access request/approve/consent flow.
@@ -414,7 +419,91 @@ await test('18. removing a member closes the question they left open', async () 
     assert(req.status === 'withdrawn', `expected withdrawn, got "${req.status}"`);
 });
 
+// ─── Phase 4: the member read and the page routes ask membership ───
+// secaudit2026oct22, routes/organisms/shared.ts canReadWsManifest no-membership-gate. The member read
+// of a workspace's published records (GET …/workspace/records) and the page routes (…/frame,
+// …/opened) decided on the manifest alone, which its creator owns. So a creator removed from the
+// organism kept reading every member's published records. They ask canReadWorkspaceRecords now: the
+// gate the workspace read answers to (an active member, then the manifest), or a non-member holding
+// the grant of a creator who is still an active member (ruled by the developer on 2026-10-25).
+let E: Awaited<ReturnType<typeof setupOwner>> | undefined;
+let F: Awaited<ReturnType<typeof setupOwner>> | undefined;
+let G: Awaited<ReturnType<typeof setupOwner>> | undefined;
+let wsE = '';
+let docE = '';
+
+await test('19 fixture: E creates a workspace in A\'s organism, publishes a record and a page, and grants F (member) and G (not a member)', async () => {
+    E = await setupOwner('e'); F = await setupOwner('f'); G = await setupOwner('g');
+    for (const m of [E, F]) {
+        const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(m.token), body: '{}' });
+        assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body.error)}`);
+    }
+    const w = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: auth(E.token), body: JSON.stringify({ name: 'Leaving', manifest: {
+        manifestVersion: '1', name: 'Leaving', kind: 'project', objectTypes: [
+            { name: 'item', namespace: 'shared.items', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:item@1' },
+            { name: 'pages', namespace: 'shared.pages', mode: 'document', backing: 'memory', writeRole: 'member', schemaRef: 'schema:page@1' },
+        ] } }) });
+    assert(w.status === 201 && typeof w.body.data?.ws === 'string', `workspace ${w.status}: ${JSON.stringify(w.body.error)}`);
+    wsE = w.body.data.ws;
+    const p = await json(`/v1/organisms/${orgId}/workspace/records/publish`, { method: 'POST', headers: auth(E.token), body: JSON.stringify({ ws: wsE, namespace: 'shared.items', records: [{ id: 'i1', value: { name: 'item one' } }] }) });
+    assert(p.status === 200 && p.body.data.published === 1, `publish ${p.status}: ${JSON.stringify(p.body.data ?? p.body.error)}`);
+    const d = await json(`/v1/organisms/${orgId}/workspace/drafts`, { method: 'POST', headers: auth(E.token), body: JSON.stringify({ ws: wsE, space: 'pages', value: { title: 'Page', markdown: '# Page' } }) });
+    assert(d.status === 200, `page draft ${d.status}: ${JSON.stringify(d.body.error)}`);
+    docE = d.body.data.id;
+    const dp = await json(`/v1/organisms/${orgId}/publish`, { method: 'POST', headers: auth(E.token), body: JSON.stringify({ ws: wsE, namespace: 'shared.pages', id: docE }) });
+    assert(dp.status === 200, `page publish ${dp.status}: ${JSON.stringify(dp.body.error)}`);
+    for (const m of [F, G]) {
+        const g = await json(`/v1/organisms/${orgId}/workspace-access/grant`, { method: 'POST', headers: auth(E.token), body: JSON.stringify({ ws: wsE, grantee: m.name, role: 'viewer' }) });
+        assert(g.status === 200, `grant ${m.name} ${g.status}: ${JSON.stringify(g.body.error)}`);
+    }
+});
+
+const recordsAs = (t: string) => json(`/v1/organisms/${orgId}/workspace/records?ws=${wsE}&space=item`, { headers: auth(t) });
+const openedAs = (t: string) => json(`/v1/organisms/${orgId}/workspace/documents/pages/${docE}/opened?ws=${wsE}`, { method: 'POST', headers: auth(t), body: '{}' });
+const frameAs = (t: string) => json(`/v1/organisms/${orgId}/workspace/documents/pages/${docE}/frame?ws=${wsE}`, { method: 'POST', headers: auth(t), body: '{}' });
+
+await test('19b. POSITIVE CONTROL: the creator, a member with the grant, a non-member with the grant and the organism\'s creator read the records', async () => {
+    // G is not a member and holds E's grant: it reads while E is an active member
+    // (e2e-workspace-member-records test 6 asserts the same use; 19d is the removal).
+    for (const [who, t] of [['E', E!.token], ['F', F!.token], ['G', G!.token], ['A', A.token]] as const) {
+        const r = await recordsAs(t);
+        assert(r.status === 200 && (r.body.data.records as any[]).some(x => x.id === 'i1'), `${who}: ${r.status} ${JSON.stringify(r.body.data ?? r.body.error).slice(0, 200)}`);
+    }
+    const o = await openedAs(F!.token);
+    assert(o.status === 200, `a member with the grant marks the page opened: ${o.status} ${JSON.stringify(o.body.error)}`);
+});
+
+await test('19c. The creator removed from the organism reads neither the records nor the page (404)', async () => {
+    const rm = await json(`/v1/organisms/${orgId}/members/${E!.name}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(rm.body.ok === true, `remove E: ${rm.status} ${JSON.stringify(rm.body.error)}`);
+    const r = await recordsAs(E!.token);
+    assert(r.status === 404, `records: expected 404, got ${r.status} ${JSON.stringify(r.body.data ?? r.body.error).slice(0, 200)}`);
+    const o = await openedAs(E!.token);
+    assert(o.status === 404, `opened: expected 404, got ${o.status}`);
+    const f = await frameAs(E!.token);
+    assert(f.status === 404 && f.body.error?.code === 'NOT_FOUND', `frame: expected 404 NOT_FOUND, got ${f.status} ${f.body.error?.code}`);
+    // The organism's creator still reads the workspace E left behind.
+    const a = await recordsAs(A.token);
+    assert(a.status === 200 && (a.body.data.records as any[]).some(x => x.id === 'i1'), `A after the removal: ${a.status}`);
+});
+
+await test('19d. A non-member holding the removed creator\'s grant reads neither the records nor the page (404)', async () => {
+    // A grant opens these routes to a non-member only while the account that issued it is an active
+    // member of the organism (ruled by the developer on 2026-10-25). E issued G's grant and was
+    // removed in 19c; G was never a member.
+    const r = await recordsAs(G!.token);
+    assert(r.status === 404, `records: expected 404, got ${r.status} ${JSON.stringify(r.body.data ?? r.body.error).slice(0, 200)}`);
+    const o = await openedAs(G!.token);
+    assert(o.status === 404, `opened: expected 404, got ${o.status}`);
+    const f = await frameAs(G!.token);
+    assert(f.status === 404 && f.body.error?.code === 'NOT_FOUND', `frame: expected 404 NOT_FOUND, got ${f.status} ${f.body.error?.code}`);
+    // F, a member holding the same creator's grant, is decided by the workspace read gate as before.
+    const a = await recordsAs(A.token);
+    assert(a.status === 200, `A still reads: ${a.status}`);
+});
+
 await test('Cleanup A + B + C + D', async () => {
+    for (const m of [E, F, G]) if (m) await json(`/v1/owners/${m.name}`, { method: 'DELETE', headers: auth(m.token) });
     await json(`/v1/owners/${A.name}`, { method: 'DELETE', headers: auth(A.token) });
     await json(`/v1/owners/${B.name}`, { method: 'DELETE', headers: auth(B.token) });
     if (C) await json(`/v1/owners/${C.name}`, { method: 'DELETE', headers: auth(C.token) });

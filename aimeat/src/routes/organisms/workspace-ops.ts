@@ -7,6 +7,10 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.24.1 -- 2026-10-24 -- GET …/workspace/records asks canReadWorkspaceRecords instead of the
+ *     manifest alone: a workspace creator removed from the organism is answered 404, an organism
+ *     manager reads, and a non-member holding the creator's grant still reads (secaudit2026oct22,
+ *     canReadWsManifest no-membership-gate).
  *   v1.24.0 -- 2026-10-19 -- GET …/workspace/participants gives each agent of this node its `avatar`
  *     (services/agent-avatar.ts), one batched read; an agent of another node gets null.
  *   v1.23.0 -- 2026-10-18 -- A renamed workspace's name meets the detection rules written for
@@ -97,7 +101,7 @@ import { isKeyArchived } from '../../services/archive.js';
 import { callerOf } from '../../middleware/caller.js';
 import { workspaceCallerOf, deleteRecordsBatchOp } from '../../services/workspace-tool-ops.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
-import { isOrgManager } from '../../services/workspace-access.js';
+import { isOrgManager, canReadWorkspaceRecords } from '../../services/workspace-access.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
 import { workspaceTarget } from '../../services/classification/containers.js';
@@ -109,7 +113,7 @@ import { logger } from '../../utils/logger.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
-    memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWs, canReadWsManifest, readWsManifests,
+    memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWsManifest, readWsManifests,
     readShareMeta, collectPublicDocs, collectPublicRecords, collectWsRecords, shareGateDenied, docsToMarkdown, redactShare, archiveHandler, readWsManifestValue,
   } = H;
 
@@ -565,7 +569,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   /* ── GET /v1/organisms/:id/workspace/records?ws=&space= — AUTHENTICATED member read of a
    * workspace's PUBLISHED (.latest) records: the members-only analogue of /workspace/public/records,
    * with the same { type, id, value } rows. No share gating — authorization IS the workspace read
-   * authz (canReadWs: same-owner, membership/consent, GEAI data-area). Owner sessions bypass scopes;
+   * authz (canReadWorkspaceRecords: membership, org manager, same-owner, consent, GEAI data-area). Owner sessions bypass scopes;
    * an app session (H-2) needs the owner-granted `organism:read` scope, which is how a published app
    * (e.g. the Experience Center's gated business levels) reads members-only curriculum for the
    * signed-in user — access is granted/revoked per user via workspace membership. Agents use the MCP
@@ -578,7 +582,10 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const organism = await storage.getOrganism(id);
     if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
-    if (!(await canReadWs(id, ws, callerGaii))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    // canReadWorkspaceRecords: the gate GET …/workspace answers to (an active member, then the
+    // manifest), or a non-member holding the creator's grant. The manifest alone admitted its own
+    // owner, a creator removed from the organism (secaudit2026oct22).
+    if (!(await canReadWorkspaceRecords(storage, config, organism, req.auth!.sub, req.auth!.owner, callerGaii, ws))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
     const records = await collectWsRecords(id, ws, readerFor({ storage, config }, req.auth), space ? { space } : undefined);
     // A record the workspace shares on an open link is public, and a member sees the label it owes there.
     const alsoPublic = shareOpenedIdsOf(await readShareMeta(id, ws), records);

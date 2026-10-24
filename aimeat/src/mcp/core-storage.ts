@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-24 — aimeat_storage_download names signing in when the shared anonymous principal asks
+ *     for another owner's members file, which resolveFileRef now refuses (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The upload-mode answer carries the shared mint's `warnings` (PUBLIC_IS_SIGNED_IN_HERE:
@@ -216,6 +218,8 @@ export function registerCoreStorageTools(
                 // bare key is the single most common mistake, and the blank answer read as data loss.
                 const hint = resolved.reason === 'not_found_in_your_namespace'
                     ? `No file "${resolved.key}" in your own namespace. If it belongs to your owner or arrived as an attachment, pass owner="<owner@node>" (or key="<owner@node>/${resolved.key}").`
+                    : resolved.reason === 'members_only'
+                        ? `${resolved.ref} is for signed-in members of this node. Sign in with your own account and read it again.`
                     : resolved.access === 'denied'
                         ? `You may not read ${resolved.ref} (${resolved.reason}). The owner can make it readable by their own agents by uploading it with visibility:'owner', or grant you consent for storage:${resolved.key}.`
                         : `No such file: ${resolved.ref}`;

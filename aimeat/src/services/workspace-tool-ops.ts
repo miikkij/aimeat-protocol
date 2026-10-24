@@ -30,6 +30,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-24 — publishWorkspaceOp, and publishRecordsBatchOp with draft ids in a workspace, ask the
+ *     organism rule's write test with the draft's key, so a viewer or a member with no grant does not
+ *     publish another member's draft (secaudit2026oct22, publish-draft-without-workspace-write-role).
  *   2026-10-18 — A draft write tells the workspace's live domain (services/event-bus.ts
  *     emitWorkspaceChange); a publish tells it through emitMemoryWritten.
  *   2026-10-18 — publishWorkspaceOp and publishRecordsBatchOp take a space by its name as well as its
@@ -526,6 +529,12 @@ export async function publishWorkspaceOp(
     // record, and this operation asks no access rule with the record's key.
     const fenced = await fencedOpRefusal(deps, caller, organismId, ws, { key: `${wsRoot(organismId, ws)}.${namespace}.${id}.latest` });
     if (fenced) return fenced;
+    // The write test a draft write asks, with the draft's key: the workspace's creator, an organism
+    // admin, or a holder of the creator's contributor grant. Publishing consumes the draft.
+    const access = await checkOrganismNamespaceAccess({ storage, config },
+        { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes, extension: caller.extension },
+        `${wsRoot(organismId, ws)}.${namespace}.${id}.draft`, 'write');
+    if (access) return refuse(access.status, access.code, access.message, access.details);
     const archived = await archivedRefusal(storage, `${wsRoot(organismId, ws)}.`);
     if (archived) return refuse(409, 'ARCHIVED', archived);
     const cfg = await readOrganismConfig(storage, organismId);
@@ -627,15 +636,19 @@ export async function publishRecordsBatchOp(
     // Direct values are a WRITE of new bytes, so they get the rule every draft write gets: an agent or
     // app token of a member who did not create the workspace needs the creator's contributor grant.
     // The route skipped this until 2026-10-06, so a token without the grant could publish a batch
-    // where it could not write one draft. A draft publish (instances) publishes what was already
-    // written under that rule, as the single publish does.
+    // where it could not write one draft. A draft publish (instances) in a workspace asks the same
+    // test with the draft's key, as the single publish does: publishing consumes another member's
+    // draft, so a viewer or a member with no grant may not (secaudit2026oct22).
     // The rule depends on the workspace and the namespace, never on the instance, so one record's key
     // decides it for the whole batch.
     const firstId = useRecords ? (list.find(r => typeof (r as { id?: unknown } | null)?.id === 'string') as { id: string } | undefined)?.id : undefined;
-    if (firstId) {
+    const firstDraft = !useRecords && ws ? list.find((x): x is string => typeof x === 'string' && !!x) : undefined;
+    const accessKey = firstId ? `${rootOf(organismId, ws)}.${namespace}.${firstId}`
+        : firstDraft ? `${rootOf(organismId, ws)}.${namespace}.${firstDraft}.draft` : undefined;
+    if (accessKey) {
         const access = await checkOrganismNamespaceAccess({ storage, config },
             { principal: caller.principal, owner: caller.ownerName, roles: caller.roles, scopes: caller.scopes, extension: caller.extension },
-            `${rootOf(organismId, ws)}.${namespace}.${firstId}`, 'write');
+            accessKey, 'write');
         if (access) return refuse(access.status, access.code, access.message, access.details);
     }
     // A record space that names extensions takes the publish of a caller that is not a person only

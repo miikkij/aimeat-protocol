@@ -236,13 +236,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-21",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:2644a91f0772f91b4c42d6f3"
+      "digest": "sha256:fea493a0cd43398dfbe793c6"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-18",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:3df4843b08d25be697c445b9"
+      "digest": "sha256:57542b77255e6389d50f3e2b"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -469,11 +469,11 @@
       "digest": "sha256:ae75bae3203e79fdc7cc2700"
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-16",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:dfa324985637104dba2918b4",
+      "digest": "sha256:120d253bbb16cd2bd7e0ff68",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -499,11 +499,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-19",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:0b6260f3762e8444a6297b6f"
+      "digest": "sha256:a3194a01834a12339ddbb06f"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -618,7 +618,7 @@
     },
     "node:aimeat-node-guide": {
       "aimeat/src/routes/agents/device-auth.ts": "7c55889f06008cad",
-      "aimeat/src/routes/ghii/register-login.ts": "c60b76bc22aaea67",
+      "aimeat/src/routes/ghii/register-login.ts": "5f61c62761b5e510",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
@@ -677,7 +677,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "cff1b3fc1029b6c2"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "f2a31562094f396c"
+      "aimeat/scripts/sandbox.ts": "8c14891b17763f05"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"
@@ -689,7 +689,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -740,8 +740,8 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/cli/connect/mcp/local-server.ts": "cebe16fc0210cc3e",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "74b5425e74aeb36d",
-      "aimeat/src/routes/organisms/workspace-access.ts": "6bee2a50409a1cf7",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15",
+      "aimeat/src/routes/organisms/workspace-access.ts": "d0ff12d37b068fd0",
       "aimeat/src/services/agent-profile-write.ts": "27b8a03e2ea5d74c",
       "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
     },
