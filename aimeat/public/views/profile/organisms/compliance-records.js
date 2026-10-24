@@ -54,26 +54,37 @@ function nameOf(ev) {
 }
 
 /**
- * The gaps grouped by kind, in reading order: { kind, n, names } each, the names the distinct
- * evidence names of its gaps.
+ * The gaps grouped by kind, in reading order: { kind, n, names, times } each, the names the
+ * distinct evidence names of its gaps and `times` how many gaps carry each name (one law left
+ * unanswered in three places is three gaps under one name).
  * @param {Array<{ kind: string, evidence?: object }>} gaps
  */
 export function recordsGaps(gaps) {
   const by = new Map();
   for (const g of gaps || []) {
-    const e = by.get(g.kind) || { kind: g.kind, n: 0, names: [] };
+    const e = by.get(g.kind) || { kind: g.kind, n: 0, names: [], times: {} };
     e.n++;
     const n = nameOf(g.evidence);
-    if (n && !e.names.includes(n)) e.names.push(n);
+    if (n) {
+      if (!e.names.includes(n)) e.names.push(n);
+      e.times[n] = (e.times[n] || 0) + 1;
+    }
     by.set(g.kind, e);
   }
   const rank = (k) => { const i = KIND_ORDER.indexOf(k); return i < 0 ? KIND_ORDER.length : i; };
   return [...by.values()].sort((a, b) => rank(a.kind) - rank(b.kind) || b.n - a.n);
 }
 
-/** A group's names as one line, every one of them: a name left out could be opened nowhere. */
+/**
+ * A group's names as one line, every one of them: a name left out could be opened nowhere. A name
+ * that more than one gap carries says in how many places (the node, an organism, an app), so the
+ * names add up to the count beside them and the number never reads as a count of questions.
+ */
 export function gapNames(group) {
-  return group.names.join(', ');
+  // The note after the name stays on one line: its spaces become non-breaking, the name's do not.
+  const placed = (n) => t('admin.compliance.records.gapPlaces', { name: '\u0000', n: String(group.times[n]) })
+    .replace(/ /g, ' ').replace('\u0000 ', n + ' ').replace('\u0000', n);
+  return group.names.map(n => ((group.times?.[n] || 1) > 1 ? placed(n) : n)).join(', ');
 }
 
 /** The readings of grouped gaps, the kind's name in the reader's language and its count. */

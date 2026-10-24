@@ -118,7 +118,8 @@ function PersonalData({ records, privacyNotice, map }) {
   const mapSaysPersonal = !!map && Array.isArray(map.held) && map.held.some((row) => row && row.personalData === 'yes');
   if (!personal.length && !mapSaysPersonal) return null;
   const basisWord = (b) => tOr(`admin.compliance.records.basis.${b}`, b);
-  const kept = (r) => r.retentionText || (typeof r.retentionMonths === 'number' ? x('dataMap.recordsMonths', { n: String(r.retentionMonths) }) : '');
+  // The number and its unit stay on one line.
+  const kept = (r) => r.retentionText || (typeof r.retentionMonths === 'number' ? x('dataMap.recordsMonths', { n: String(r.retentionMonths) }).replace(/^(\S+) /, '$1 ') : '');
   return html`
     <${Space} below="part">
       <${SubHeading} level=${3}>${x('dataMap.recordsTitle')}<//>
