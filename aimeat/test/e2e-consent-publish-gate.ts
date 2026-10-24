@@ -25,6 +25,8 @@
  *   - Phase 4 the owner's approval grants it; the owner in person is unchanged
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-consent-publish-gate
  * @version-history
+ *   2026-10-24 — Phase 3b: a 'domain:*' consent admits a signed-in owner of this node and never the
+ *     anonymous reader (secaudit2026oct22, domain-recipient-matches-anonymous-reader).
  *   2026-10-20 — Initial (secaudit 2026-10, grantConsent:wildcard-recipient-skips-publish-gate).
  */
 import * as ed from '@noble/ed25519';
@@ -100,6 +102,7 @@ let agentToken = '';
 let requestId = '';
 const AGENT_KEY = 'cpg.secret';
 const OWNER_KEY = 'cpgowner.secret';
+const DOMAIN_KEY = 'cpgdom.secret';
 
 await test('the owner and an agent holding consent:manage but not publish:public', async () => {
     const reg = await json('/v1/ghii', {
@@ -182,6 +185,37 @@ await test('the owner has a waiting request of kind "consent" naming the pattern
     assert(found.name === 'cpg.*', `name: ${found.name}`);
     assert(found.requested_by?.principal === agentGaii, `requested_by: ${short(found.requested_by)}`);
     requestId = found.id as string;
+});
+
+console.log('\nPhase 3b — a "domain:*" consent reaches signed-in principals, never the anonymous reader');
+
+await test('a "domain:*" consent on the agent\'s record admits a signed-in owner and not the anonymous reader', async () => {
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: bearer(agentToken),
+        body: JSON.stringify({ key: DOMAIN_KEY, value: { note: 'the agent\'s record for every node' }, visibility: 'private' }),
+    });
+    assert(w.status === 201, `write ${w.status}: ${short(w.body)}`);
+    const r = await json('/v1/consent', {
+        method: 'POST', headers: bearer(agentToken),
+        body: JSON.stringify({ data_pattern: 'cpgdom.*', recipient: 'domain:*', purpose: 'principals of any node' }),
+    });
+    assert(r.status === 201, `a "domain:*" consent is not a publish and needs no approval: ${r.status}: ${short(r.body)}`);
+
+    const reader = `cpgr${STAMP}`;
+    const reg = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: reader, display_name: 'Consent Reader', password: 'CpGate1234' }),
+    });
+    assert(reg.status === 201, `register the reader ${reg.status}: ${short(reg.body)}`);
+    const tok = await ownerSignIn(BASE, reader, 'CpGate1234');
+    assert(tok.status === 200 && tok.body.data?.token, `reader token ${tok.status}: ${short(tok.body)}`);
+    const path = `/v1/memory/${encodeURIComponent(agentGaii)}/${encodeURIComponent(DOMAIN_KEY)}`;
+    const signedIn = await json(path, { headers: bearer(tok.body.data.token as string) });
+    assert(signedIn.status === 200 && signedIn.body.data?.value?.note === 'the agent\'s record for every node',
+        `a signed-in owner of this node did not read through "domain:*": ${signedIn.status} ${short(signedIn.body)}`);
+
+    const anon = await json(path);
+    assert(anon.status !== 200, `"domain:*" opened the record to the anonymous reader: ${anon.status} ${short(anon.body)}`);
 });
 
 console.log('\nPhase 4 — the owner decides, and the owner in person is unchanged');

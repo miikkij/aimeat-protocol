@@ -18,6 +18,9 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   v1.8.0 — 2026-10-24 — A memory record for 'members' refuses the visitor and admits a local account;
+ *     a public record and a consent by name still admit the visitor (secaudit2026oct22,
+ *     members-tier-admits-federated-visitor).
  *   v1.7.2 — 2026-10-21 — EVERY GET DOOR treats a door that runs past its 10 s limit while the body is
  *     read as no comparison, as it already did when the headers were late: in the guard tier the abort
  *     landed in r.text(), outside the catch, and failed the whole test. A control (owner or stranger)
@@ -233,6 +236,39 @@ async function run() {
         assert(local.status === 200, `a local account reads a members skill: ${local.status}`);
         const visitor = await json(path, as(fedToken));
         assert(visitor.status === 404 || visitor.status === 403, `a visitor from another node read a members skill: ${visitor.status}`);
+    });
+
+    await test('A memory record for "members" is this node\'s accounts: the visitor gets the miss, a local account reads it', async () => {
+        // The members branch of GET /v1/memory/:gaii/:key refused only the anonymous reader, and the
+        // default visitor scopes carry memory:read, so a visitor read any members record by key
+        // (secaudit2026oct22, members-tier-admits-federated-visitor).
+        assert((claims(fedToken).scopes ?? []).includes('memory:read'),
+            `the visitor must hold memory:read for this case to mean anything: ${JSON.stringify(claims(fedToken).scopes)}`);
+        const key = `nsmembers.note${stamp}`;
+        const w = await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key, value: { note: `members-${stamp}` }, visibility: 'members' }) }));
+        assert(w.status === 201, `setup: a members record: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        const path = `/v1/memory/${encodeURIComponent(alice.ghii)}/${encodeURIComponent(key)}`;
+        const local = await json(path, as(bob.token));
+        assert(local.status === 200 && local.body.data?.value?.note === `members-${stamp}`, `a local account reads a members record: ${local.status}`);
+        const visitor = await json(path, as(fedToken));
+        assert(visitor.status === 404 || visitor.status === 403, `a visitor from another node read a members record: ${visitor.status}`);
+        assert(!JSON.stringify(visitor.body ?? '').includes(`members-${stamp}`), 'the visitor was handed the members record value');
+
+        // Kept: a public record still reads for the visitor, and a consent the owner gives the
+        // visitor by name still admits it to a members record.
+        const pubKey = `nspublic.note${stamp}`;
+        const pw = await json('/v1/memory', as(alice.token, { method: 'POST', body: JSON.stringify({ key: pubKey, value: { note: `public-${stamp}` }, visibility: 'public' }) }));
+        assert(pw.status === 201, `setup: a public record: ${pw.status}`);
+        const pub = await json(`/v1/memory/${encodeURIComponent(alice.ghii)}/${encodeURIComponent(pubKey)}`, as(fedToken));
+        assert(pub.status === 200 && pub.body.data?.value?.note === `public-${stamp}`, `a visitor reads a public record: ${pub.status}`);
+        const c = await json('/v1/consent', as(alice.token, { method: 'POST', body: JSON.stringify({ data_pattern: 'nsmembers.*', recipient: `${namesake}@${homeNodeId}`, purpose: 'the visitor by name' }) }));
+        assert(c.status === 201, `setup: a consent for the visitor: ${c.status} ${JSON.stringify(c.body?.error)}`);
+        const consented = await json(path, as(fedToken));
+        assert(consented.status === 200 && consented.body.data?.value?.note === `members-${stamp}`,
+            `a consent for the visitor by name did not admit it to the members record: ${consented.status} ${JSON.stringify(consented.body?.error ?? '').slice(0, 200)}`);
+        if (c.body?.data?.id) await json(`/v1/consent/${encodeURIComponent(c.body.data.id as string)}`, as(alice.token, { method: 'DELETE' }));
+        await json(`/v1/memory/${encodeURIComponent(key)}`, as(alice.token, { method: 'DELETE' }));
+        await json(`/v1/memory/${encodeURIComponent(pubKey)}`, as(alice.token, { method: 'DELETE' }));
     });
 
     // ── The identity itself. Everything below follows from this one answer. ──
