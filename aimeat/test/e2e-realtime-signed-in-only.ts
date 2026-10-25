@@ -80,6 +80,14 @@ await test('On the open node the anonymous session joins the room', async () => 
     assert(r.status === 101, `expected 101, got ${r.status} ${r.code}`);
 });
 
+await test('FAILURE: a second owner, who is not the operator, cannot change the content access setting', async () => {
+    const other = await registerOwner(BASE, `rtsix${Date.now().toString(36)}`);
+    const r = await json('/v1/admin/config', {
+        method: 'PUT', headers: bearer(other.token), body: JSON.stringify({ changes: [{ path: 'visibility.content_access', value: 'signed-in' }] }),
+    });
+    assert(r.status === 403, `expected 403, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+});
+
 await test('Setup: the node is set to signed-in content access', async () => {
     const r = await setAccess('signed-in');
     assert(r.status === 200, `content access: ${r.status} ${JSON.stringify(r.body?.error)}`);
