@@ -10365,6 +10365,8 @@
     "cfgDesc_morsel_policy_board_post_cost_per_kb": "Morsels de ritmo adicionales por cada KB del cuerpo.",
     "cfgDesc_boards_public_per_owner_max": "Tablones públicos que una cuenta puede mantener (los del sistema quedan al operador).",
     "cfgDesc_auth_jwt_ttl_seconds": "Vida del token JWT en segundos.",
+    "cfgDesc_auth_device_authorize_email_limit": "Cuenta por dirección de red las conexiones de agentes que nombran una cuenta por su correo electrónico, para que nadie pueda probar muchas direcciones y saber si tienen cuenta aquí. Desactivado significa sin límite. El nombre de la cuenta no se cuenta nunca.",
+    "cfgDesc_auth_device_authorize_email_max": "Cuántas conexiones de agentes que nombran una cuenta por correo puede iniciar una dirección de red en 10 minutos mientras el límite está activo.",
     "cfgDesc_auth_entra_allowed_tenants": "GUIDs de inquilinos de Microsoft Entra que pueden iniciar sesión (separados por comas). Vacío: la puerta la decide AIMEAT_ENTRA_OAUTH_TENANT por sí sola.",
     "cfgDesc_features_extended_features_enabled": "Conjunto de funciones extendidas activado.",
     "cfgDesc_work_queue_max_pending": "Máximo de trabajos pendientes por proveedor.",
@@ -10453,7 +10455,7 @@
     "cfgDesc_federation_sync_genesis_memory_cache_ttl_hours": "Vida de la caché de memoria genesis en horas.",
     "cfgDesc_personal_nodes_enabled": "Alojamiento de entornos personales activado.",
     "cfgDesc_personal_nodes_max_slots": "Máximo de plazas personales.",
-    "cfgDesc_personal_nodes_max_per_owner": "Cuántos nodos personales puede anclar aquí un mismo propietario, para que las plazas compartidas sigan abiertas a todos. 0 significa sin límite. Los nodos ya anclados se mantienen.",
+    "cfgDesc_personal_nodes_max_per_owner": "Cuántos servidores propios puede conectar aquí un mismo propietario, para que las plazas compartidas sigan abiertas a todos. 0 significa sin límite. Los servidores ya conectados se mantienen.",
     "cfgDesc_echat_anonymous": "Permitir conexiones WebSocket anónimas al chat cifrado.",
     "cfgDesc_node_base_url": "URL base pública de esta instancia.",
     "cfgDesc_node_dev_mode": "Modo de desarrollo (webhooks en localhost; restablecer credenciales conserva los datos).",
@@ -11307,6 +11309,8 @@
     "cfg_morsel_policy_board_post_base_cost": "Ritmo base de una publicación en un tablero",
     "cfg_morsel_policy_board_post_cost_per_kb": "Ritmo por KB de una publicación en un tablero",
     "cfg_auth_jwt_ttl_seconds": "TTL del JWT (segundos)",
+    "cfg_auth_device_authorize_email_limit": "Limitar conexiones de agentes por correo",
+    "cfg_auth_device_authorize_email_max": "Conexiones de agentes por correo por dirección (10 minutos)",
     "cfg_features_extended_features_enabled": "Funciones ampliadas",
     "cfg_work_queue_max_pending": "Máximo en la cola de espera",
     "cfg_work_webhook_max_retries": "Reintentos máximos del webhook",
@@ -24019,7 +24023,7 @@
         "unused_client_days": {
           "title": "Registros de clientes MCP sin uso (días)",
           "short": "Un registro de cliente MCP con el que nadie inició sesión se borra pasados estos días. 0 conserva todos los registros. El valor por defecto es 30.",
-          "what": "Una aplicación de IA, como Claude, se registra en este nodo antes de que la persona inicie sesión, y cualquiera puede hacer ese registro sin cuenta. Un registro con el que alguien inició sesión se conserva, porque ese inicio de sesión todavía remite a él. Un registro con el que nunca se inició sesión se quedaría en la base de datos para siempre, así que una limpieza cada noche a las 04:53 borra el que tenga más días que este número.",
+          "what": "Una aplicación de IA, como Claude, se registra en este servidor antes de que la persona inicie sesión, y cualquiera puede hacer ese registro sin cuenta. Un registro con el que alguien inició sesión se conserva, porque ese inicio de sesión todavía remite a él. Un registro con el que nunca se inició sesión se quedaría en la base de datos para siempre, así que una limpieza cada noche a las 04:53 borra el que tenga más días que este número.",
           "range": "Un número entero de días, 0 o más. El valor por defecto es 30. 0 conserva todos los registros.",
           "low": "Menor: los registros abandonados se van antes. Una aplicación cuyo registro se borró se registra de nuevo antes de iniciar sesión.",
           "high": "Mayor: los registros abandonados se quedan más tiempo en la base de datos.",
@@ -24028,13 +24032,13 @@
       },
       "personal_nodes": {
         "max_per_owner": {
-          "title": "Plazas de nodos personales por propietario",
-          "short": "Cuántos nodos personales puede anclar un mismo propietario a este nodo. 0 significa sin límite. El valor por defecto es 3.",
-          "what": "Este nodo tiene un número de plazas para nodos personales (Plazas máximas), y todos los propietarios las comparten. Este límite impide que un solo propietario las ocupe todas. A un propietario que llega al límite se le indica el límite y cómo liberar una plaza: quitar un nodo en la pestaña Nodos de su perfil, o llamar a DELETE /v1/personal/anchor/<id del nodo>. Los nodos ya anclados se mantienen si bajas el límite; solo decide el siguiente.",
+          "title": "Servidores propios por propietario",
+          "short": "Cuántos servidores propios puede conectar un mismo propietario a este servidor. 0 significa sin límite. El valor por defecto es 3.",
+          "what": "Este servidor tiene un número de plazas para los servidores propios de las personas (Plazas máximas), y todos los propietarios las comparten. Este límite impide que un solo propietario las ocupe todas. A un propietario que llega al límite se le indica el límite y cómo liberar una plaza: quitar un servidor en Tus propios servidores, en su perfil, o llamar a DELETE /v1/personal/anchor/<id>. Los servidores ya conectados se mantienen si bajas el límite; solo decide el siguiente.",
           "range": "Un número entero, 0 o más. El valor por defecto es 3. 0 significa sin límite.",
-          "low": "1: cada propietario ancla un nodo personal, el que usa su túnel.",
-          "high": "Mayor: un propietario puede tener varios nodos personales, y caben menos propietarios en las plazas compartidas.",
-          "tip": "El túnel de un propietario sirve a un solo nodo personal, así que un número pequeño basta a casi todos."
+          "low": "1: cada propietario conecta un servidor propio, el que usa su túnel.",
+          "high": "Mayor: un propietario puede tener aquí varios servidores propios, y caben menos propietarios en las plazas compartidas.",
+          "tip": "El túnel de un propietario sirve a un solo servidor propio, así que un número pequeño basta a casi todos."
         }
       },
       "morsel_policy": {
@@ -24194,6 +24198,25 @@
         }
       },
       "auth": {
+        "device_authorize_email_limit": {
+          "title": "Limitar conexiones de agentes por correo",
+          "short": "Activado, las conexiones de agentes que nombran una cuenta por su correo se cuentan por dirección de red. Desactivado significa sin límite. Activado por defecto.",
+          "what": "Un agente que se conecta nombra la cuenta para la que es, por el nombre de la cuenta o por su correo verificado. La respuesta a la forma con correo dice si una dirección tiene cuenta en este servidor, y la solicitud no pide iniciar sesión. Por eso el servidor cuenta la forma con correo por dirección de red, como mucho el número del ajuste siguiente en 10 minutos. Una solicitud que lo supera se rechaza con el tiempo de espera y la sugerencia de usar el nombre de la cuenta, que no se cuenta nunca.",
+          "range": "Activado (por defecto) o desactivado.",
+          "low": "Desactivado: cualquiera puede probar cuantas direcciones quiera para saber si tienen cuenta aquí; solo lo limita el límite general de solicitudes.",
+          "high": "Activado: una dirección de red solo puede probar unas pocas direcciones en 10 minutos.",
+          "tip": "Déjalo activado. Desactívalo solo en un servidor cuyas cuentas se conocen todas entre sí."
+        },
+        "device_authorize_email_max": {
+          "title": "Conexiones de agentes por correo por dirección (10 minutos)",
+          "short": "Cuántas conexiones de agentes que nombran una cuenta por correo puede iniciar una dirección de red en 10 minutos. El valor por defecto es 20.",
+          "what": "Mientras el límite de arriba está activo, este es el número de solicitudes con correo que una dirección de red puede hacer en 10 minutos. Con el valor por defecto, la solicitud 21 se rechaza con 429 y los segundos que hay que esperar. Una dirección IPv6 cuenta por su red /64. La forma con el nombre de la cuenta no se cuenta.",
+          "range": "Un número entero desde 1. El valor por defecto es 20, igual que el límite de búsquedas de contactos de una cuenta.",
+          "low": "Menor: se pueden probar menos direcciones, y un equipo detrás de la dirección de una oficina llega antes al límite.",
+          "high": "Mayor: caben más conexiones por correo, y se pueden probar más direcciones.",
+          "ex1": "20: una persona que conecta cinco agentes por correo en una hora nunca llega al límite.",
+          "tip": "Súbelo si mucha gente conecta agentes por correo desde la dirección de una misma oficina a la vez."
+        },
         "jwt_ttl_seconds": {
           "title": "TTL del JWT (segundos)",
           "short": "Cuánto tiempo vale un token de acceso, en segundos. Un valor de 60 a 86 400; el predeterminado es 3600, una hora.",

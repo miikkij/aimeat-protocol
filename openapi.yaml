@@ -12656,6 +12656,10 @@ paths:
                     `NO_ACCOUNT`; malformed email → 400 `INVALID_EMAIL`; (should-never-happen) more than
                     one match → 409 `AMBIGUOUS`. The value only SELECTS which account this request targets
                     — it is not an authentication factor (the human still approves the device code).
+                    The email form is counted per network address: past `auth.device_authorize_email_max`
+                    requests in 10 minutes (default 20) it answers 429 `RATE_LIMITED` with Retry-After;
+                    the operator turns the count off with `auth.device_authorize_email_limit`. The handle
+                    form is not counted.
                 agent_name:
                   type: string
                   description: Agent name (3-32 chars, lowercase alphanumeric + hyphens)
@@ -12983,6 +12987,11 @@ paths:
                             type: string
                           owner:
                             type: string
+                            description: >
+                              The account the request names. Present only when the caller is that
+                              account, signed in in person; an anonymous caller and any other account
+                              get no owner. The consent page checks the owner through the owner's own
+                              GET /v1/agents/device-authorize/pending.
                           status:
                             type: string
                             enum: [pending, approved, denied, expired]
