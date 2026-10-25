@@ -38,6 +38,9 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-24 — ROUTE_CEILING 468: PUT /v1/portfolio/config, PUT /v1/portfolio/upload, PATCH
+ *     /v1/knowledge/{id}/sharing and PATCH /v1/knowledge/{id}/entries/{entryKey}/visibility are refused
+ *     to the minted anonymous token by test/e2e-anonymous.ts (secaudit2026oct22).
  *   2026-10-22 — ROUTE_CEILING 474: POST /v1/agents/{name}/tasks/{id}/decline and .../fail are refused
  *     by test/e2e-account-events-readers.ts and test/e2e-account-events-task-keep.ts, GET
  *     /v1/memory/{key}/hands by test/e2e-memory-hands-readers.ts, and POST /v1/knowledge/import by
@@ -100,7 +103,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 471;
+export const ROUTE_CEILING = 467;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

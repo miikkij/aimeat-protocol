@@ -49992,6 +49992,8 @@ paths:
           $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
 
@@ -50154,6 +50156,8 @@ paths:
           $ref: '#/components/responses/PublishRequested'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/knowledge/{id}/entries/{entryKey}/visibility:
     patch:
@@ -50195,6 +50199,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '202':
           $ref: '#/components/responses/PublishRequested'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/knowledge/{id}/clone:
     post:
@@ -50212,6 +50218,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/knowledge/{id}/export:
     get:

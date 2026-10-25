@@ -6,6 +6,8 @@
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-24 — POST /v1/knowledge/import refuses the shared anonymous principal with
+ *     refuseAnonymousPrincipal (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-22 — broken-links asks whether a public record is at the target with one read by that key,
  *     where it read every owner and agent of the node on each request (check:unbounded-lists).
  *   2026-10-22 — A link row belongs to the namespace that holds its source manifest: POST /link and the
@@ -64,6 +66,7 @@ import {
   KNOWLEDGE_PACKAGE_LEVELS, KNOWLEDGE_PACKAGE_SPELLING, packageAudienceOf, manifestRecordVisibility, entryRecordVisibility,
 } from '../../services/knowledge-audience.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
@@ -95,7 +98,9 @@ export function registerPackagesCoreRoutes(
   const { resolve, findReadableManifest, findOwnerScopeMemory } = helpers;
 
   /* ── POST /v1/knowledge/import — Import a knowledge package from AI Chat output ── */
-  router.post('/v1/knowledge/import', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  // The package is stored under packages/<id>/ and may be listed in the catalogue, outside the
+  // anonymous.* namespace, so the shared anonymous principal does not import one.
+  router.post('/v1/knowledge/import', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req, res) => {
     const ownerGaii = resolve(req);
     const ghii = req.auth!.owner as string;
     const { package: pkg, overrides } = req.body;
