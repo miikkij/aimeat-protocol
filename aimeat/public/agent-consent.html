@@ -364,9 +364,9 @@
       const scopeOptions = presetKeys.map((p) => ({
         key: p, name: presetLabel(p), desc: p === 'asked' ? askedDesc : presetSummary(p, t),
       }));
-      if (info.existing_agent && selectedPreset === 'standard') selectedPreset = 'keep';
       // An existing agent that did not prove it is coming back: a new device is taking it over.
       const takeover = !!info.existing_agent && info.return_proven === false;
+      if (info.existing_agent && selectedPreset === 'standard') selectedPreset = 'keep';
       else if (askedDesc && selectedPreset === 'standard') selectedPreset = 'asked';
 
       const scopeRadiosHtml = scopeOptions.map(o => `
