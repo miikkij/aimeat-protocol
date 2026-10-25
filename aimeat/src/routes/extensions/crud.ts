@@ -6,6 +6,7 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — PATCH :name/actions/:actionId keeps emailPolicy only for an operator caller, as PUT does (secaudit2026oct22).
  *   2026-10-21 — A changed action script drops the old-code first-use mark (services/extension-first-use-keep.ts).
  *   2026-10-21 — The list and GET /v1/extensions/:name answer `uses_secrets` (services/extension-secret-uses.ts).
  *   2026-10-21 — ?full=true asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
@@ -57,7 +58,7 @@ import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
   snapshotExtensionVersion,
 } from '../../services/component-versions.js';
-import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
+import { buildExtensionRecordFromManifest, NODE_OWNED_CONFIG_KEYS } from '../../services/extension-manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
@@ -508,8 +509,13 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Changed code falls under the first-use rules: the mark old code keeps goes with it
-      // (services/extension-first-use-keep.ts).
-      const updated = await storage.updateExtension(name, { actions: updatedActions, version, config: withoutFirstUseKeep(ext.config ?? {}) });
+      // (services/extension-first-use-keep.ts). The operator's emailPolicy grant stays only for code an
+      // operator caller wrote, as PUT rebuilds it through stripNodeOwnedConfig (secaudit2026oct22).
+      const keptConfig = { ...withoutFirstUseKeep(ext.config ?? {}) };
+      if (!(await isOperatorCaller(storage, req.auth))) {
+        for (const key of NODE_OWNED_CONFIG_KEYS) delete keptConfig[key];
+      }
+      const updated = await storage.updateExtension(name, { actions: updatedActions, version, config: keptConfig });
       if (updated) {
         await snapshotExtensionVersion(storage, updated, resolveIdentity(req.auth!, config.nodeId))
           .catch(err => logger.warn('PATCH action script: version not kept', { name, version, error: String(err) }));

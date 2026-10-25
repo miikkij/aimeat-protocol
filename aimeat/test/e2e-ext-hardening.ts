@@ -26,6 +26,8 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   2026-10-25 — 7: an agent of the operator without operator:admin neither changes emailPolicy through
+ *     the config route nor keeps the grant for a script it writes; the operator in person does both (secaudit2026oct22).
  *   v1.6.0 — 2026-10-20 — 3f: the WebMCP route refuses a manifest binding its owner does not own
  *     (CAPABILITY_NOT_OWNED_BY_APP, 403) before a pass is minted, so the two arms that reached
  *     ownerA's capability through ownerB's manifest assert that refusal and that nothing was
@@ -69,6 +71,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 import { removedOn } from './helpers/node-release.js';
 import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 async function setupOwner(label: string) {
@@ -718,6 +721,62 @@ async function run() {
     assert(res.status === 201, `install ${res.status}`);
     const anon = await json(`/v1/extensions/${name}/actions/ping`);
     assert(anon.status === 401, `expected 401 without a token, got ${anon.status}`);
+  });
+
+  // ── 7. emailPolicy after the install (secaudit2026oct22) ───────────────────────────────────
+  // The operator's grant lives in the stored config. The config route and the action-script route
+  // admit any principal of the installing account holding ext:write, which a '*' agent of the
+  // operator holds without operator:admin.
+  const opAgent = await makeAgent(BASE, seed, ['*']);
+  const mailExt = `hardpolicy${Date.now()}`;
+  await test('setup: the operator in person installs an extension whose config holds emailPolicy', async () => {
+    assert(rolesOf(seed.token).includes('operator'), 'the seed owner must be the operator for this section');
+    const res = await install(seed.token, mailExt, { emailPolicy: { default: 'restricted' }, greeting: { default: 'hi' } });
+    assert(res.status === 201, `install ${res.status}: ${JSON.stringify(res.body?.error)}`);
+    const cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === 'restricted', `the operator's install keeps emailPolicy, got ${JSON.stringify(cfg.emailPolicy)}`);
+  });
+
+  await test("the operator's agent without operator:admin cannot change emailPolicy through the config route", async () => {
+    const res = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }),
+    });
+    assert(res.status === 403, `expected 403, got ${res.status} ${JSON.stringify(res.body?.error ?? res.body?.data)}`);
+    assert(String(res.body?.error?.message ?? '').includes('operator:admin'), `the refusal names operator:admin: ${res.body?.error?.message}`);
+    const cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === 'restricted', `emailPolicy changed to ${JSON.stringify(cfg.emailPolicy)}`);
+  });
+
+  await test('the same agent still sets an ordinary config field, and the operator in person still sets emailPolicy', async () => {
+    const field = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ config: { greeting: 'hello' } }),
+    });
+    assert(field.status === 200, `agent field ${field.status}: ${JSON.stringify(field.body?.error)}`);
+    const op = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }),
+    });
+    assert(op.status === 200, `operator ${op.status}: ${JSON.stringify(op.body?.error)}`);
+    const cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === 'unrestricted' && cfg.greeting === 'hello', `stored ${JSON.stringify(cfg)}`);
+  });
+
+  await test("the operator's own script change keeps the grant", async () => {
+    const res = await json(`/v1/extensions/${mailExt}/actions/ping`, {
+      method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// operator edit` }),
+    });
+    assert(res.status === 200, `operator PATCH ${res.status}: ${JSON.stringify(res.body?.error)}`);
+    const cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === 'unrestricted', `the operator's own code change dropped the grant: ${JSON.stringify(cfg.emailPolicy)}`);
+  });
+
+  await test("a script change by the operator's agent without operator:admin does not inherit the grant", async () => {
+    const res = await json(`/v1/extensions/${mailExt}/actions/ping`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// agent edit` }),
+    });
+    assert(res.status === 200, `agent PATCH ${res.status}: ${JSON.stringify(res.body?.error)}`);
+    const cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === undefined, `the agent's code inherited emailPolicy=${JSON.stringify(cfg.emailPolicy)}`);
+    assert(cfg.greeting === 'hello', 'the other config fields stay');
   });
 
   console.log(`\nExtension Hardening E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
