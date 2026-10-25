@@ -18,6 +18,8 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/connector-config-layout.test.ts
  * @version-history
+ *   v1.0.2 -- 2026-10-25 -- The old file's runner is read and held until the person confirms it
+ *     (heldCommands), instead of served at once (cli/connect/command-trust.ts; secaudit2026oct22).
  *   v1.0.1 — 2026-09-24 — The re-enrolment case stays on one node and names its receiving identity:
  *     an offer may no longer move an agent to another node (secaudit 2026-09, A9-2).
  *   v1.0.0 — 2026-09-01 — Initial, with the slimmed file and the per-owner layout.
@@ -78,7 +80,10 @@ describe('an old-layout install on first start', () => {
         expect(a.owner).toBe('alice');
         expect(a.config.node_url).toBe('http://old.example:1');
         expect(a.config.poll_interval).toBe(45);
-        expect(a.config.runner?.command).toBe('echo');
+        // The runner survives the move, and it is held until the person confirms it once, since the
+        // connector did not record writing it (cli/connect/command-trust.ts; secaudit2026oct22).
+        expect(a.config.runner).toBeUndefined();
+        expect(a.heldCommands?.runner?.command).toBe('echo');
     });
 
     it('is COPIED forward, and the old file is still there afterwards', async () => {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat connect` subcommand dispatch (agent connector: auth, serve, tui, inbox, tasks, tools, list, remove, refresh, logout). Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 -- `aimeat connect trust`: confirm, once, a runner or wake command in this folder's
+ *     settings that the connector did not write (secaudit2026oct22, lead 4763).
  *   2026-10-15 — No static import of cli/connect/config.js: it loads after `aimeat connect client`
  *     has set the connector home (feature-list audit #6).
  *   v1.2.0 — 2026-09-30 — `--scopes a,b,c` reaches the device authorization request.
@@ -54,6 +56,14 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     const { runAcp } = await import('./cli/connect/acp/index.js');
     await runAcp(connectFlags);
     shouldExitAfterConnect = false;
+  } else if (connectAction === 'trust') {
+    // Confirm, once, a runner or wake command this connector did not write (cli/connect/command-trust.ts).
+    const { loadAllAgents } = await import('./cli/connect/config.js');
+    const { confirmHeldCommands } = await import('./cli/connect/command-trust.js');
+    const loaded = await loadAllAgents();
+    if (!loaded.some(a => a.heldCommands)) console.log('Every command in this folder\'s settings is already allowed, or there is none.');
+    else if (!process.stdin.isTTY) { console.error('Run `aimeat connect trust` in a terminal: it shows each command and asks you.'); process.exitCode = 1; }
+    else console.log(`${await confirmHeldCommands(loaded, { output: process.stdout })} command(s) allowed. Restart \`aimeat connect serve\` to use them.`);
   } else if (connectAction === 'inbox') {
     const { runInbox } = await import('./cli/connect/inbox.js');
     await runInbox();
