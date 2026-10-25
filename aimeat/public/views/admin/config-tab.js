@@ -32,6 +32,10 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   v3.8.0 -- 2026-10-25 -- A secret the operator may replace (the API's `set_path`) shows whether it
+ *     is set and a hidden field for a new value (TextField `unmanaged`, the key field's look); the change
+ *     is sent on its set_path and never written out, in the list of changes or a refusal. The `usage`
+ *     section sits under Node.
  *   v3.7.0 -- 2026-10-20 -- The `content_class` section (content classes: on or off, and the ffprobe and
  *     ffmpeg programs that read a video) sits under AI after the decision model: its steps that describe,
  *     sort and pick out fields call a model, and its sorting asks the decision model. It stays out of
@@ -246,6 +250,15 @@ function refusalWords(p, e, value, reason) {
 /** One field's editor, by its type; a field the node does not let this page change says why. */
 function fieldEditor(p, e, val, editable, pending, onChange, bad) {
   const range = e.range ? html`<${Note} kind="meta" inline mono>${rangeWords(e)}<//>` : null;
+  // A secret the operator may replace (the API's `set_path`): whether it is set, and a hidden field
+  // for a new value. The value is never shown, before or after saving; an emptied field is no change.
+  if (e.set_path && editable) {
+    const state = e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`;
+    return html`${state} <${TextField} unmanaged size="medium" value=${pending[p] ?? ''} invalid=${bad}
+      ariaLabel=${tr('dashboard.cfgSecretNew', '{name}: type a new value to replace it').replace('{name}', label(p))}
+      placeholder=${tr('dashboard.cfgSecretPlaceholder', 'Type a new value to replace it')}
+      onInput=${(v) => onChange(p, v === '' ? undefined : v)} />`;
+  }
   if (!e.mutable) {
     if (typeof e.value === 'boolean') {
       return html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}${e.sealed ? html` <${Note} kind="meta" inline>${t('dashboard.cfgSealed')}<//>` : null}`;
@@ -354,15 +367,27 @@ export default function ConfigTab({ data, reload, configFind }) {
   }
 
   function onChange(path, value) {
-    setPending(prev => ({ ...prev, [path]: value }));
+    // `undefined` takes the edit back (a secret field emptied again).
+    setPending(prev => {
+      if (value !== undefined) return { ...prev, [path]: value };
+      const next = { ...prev }; delete next[path]; return next;
+    });
     setRefused(prev => { if (!(path in prev)) return prev; const next = { ...prev }; delete next[path]; return next; });
   }
+
+  /** The path a change is sent on: a secret's `set_path`, every other setting its own. */
+  const sendPath = (path) => (schema[path] && schema[path].set_path) || path;
+  /** The page's path for a path the node answers with (a secret's `set_path` back to its row). */
+  const rowOf = Object.fromEntries(Object.entries(schema).filter(([, e]) => e.set_path).map(([p, e]) => [e.set_path, p]));
+  const rowPath = (path) => rowOf[path] || path;
 
   /** The node's refusals ([{ path, reason }]) as path → words, with the value that was sent. */
   function refusalsOf(errors, sent) {
     const out = {};
     for (const er of errors || []) {
-      if (er && typeof er.path === 'string' && schema[er.path]) out[er.path] = refusalWords(er.path, schema[er.path], sent[er.path], er.reason);
+      const p = er && typeof er.path === 'string' ? rowPath(er.path) : null;
+      // A secret's refusal never repeats the value that was typed.
+      if (p && schema[p]) out[p] = schema[p].set_path ? tr('dashboard.cfgRefusedSecret', 'Not saved: the new value is not accepted.') : refusalWords(p, schema[p], sent[p], er.reason);
     }
     return out;
   }
@@ -384,8 +409,8 @@ export default function ConfigTab({ data, reload, configFind }) {
     try {
       // The node saves what it accepts and names what it refuses. A refused setting stays unsaved
       // here; it used to leave the list with the saved ones under "Changes saved".
-      const r = await saveConfig(changes);
-      const saved = new Set((r.data.applied || []).map(a => a.path));
+      const r = await saveConfig(changes.map(c => ({ path: sendPath(c.path), value: c.value })));
+      const saved = new Set((r.data.applied || []).map(a => rowPath(a.path)));
       setRefused(refusalsOf(r.data.errors, sent));
       setResult({ ok: true, msg: t('dashboard.savedChanges').replace('{count}', saved.size) });
       setPending(prev => Object.fromEntries(Object.entries(prev).filter(([p]) => !saved.has(p))));
@@ -403,9 +428,13 @@ export default function ConfigTab({ data, reload, configFind }) {
 
   async function resetConfig(path) {
     try {
-      const r = await deleteConfig(path);
+      const r = await deleteConfig(sendPath(path));
       // Removing the saved value does not change the running one: the node keeps it until a restart.
-      setResult({ ok: true, msg: tr('dashboard.cfgResetDoneRestart', 'The value saved here for {name} is removed. This server runs with {value} until it restarts. After the restart the value comes from: {source}.')
+      // A secret's message names no value.
+      const words = schema[path] && schema[path].set_path
+        ? tr('dashboard.cfgResetDoneRestartSecret', 'The value saved here for {name} is removed. This server uses the change after it restarts. After the restart the value comes from: {source}.')
+        : tr('dashboard.cfgResetDoneRestart', 'The value saved here for {name} is removed. This server runs with {value} until it restarts. After the restart the value comes from: {source}.');
+      setResult({ ok: true, msg: words
         .replace('{name}', label(path)).replace('{value}', shownIn(path, schema[path], schema[path] && schema[path].value))
         .replace('{source}', sourceWord((r.data && r.data.newSource) || 'default')) });
       reload();
@@ -438,7 +467,9 @@ export default function ConfigTab({ data, reload, configFind }) {
 
   const before = html`
     ${editable && showChanges && pendingKeys.length > 0 && html`<${ChangeList} items=${pendingKeys.map(p => ({
-      key: p, code: p, was: shownIn(p, schema[p], schema[p] && schema[p].value), now: shownIn(p, schema[p], pending[p]),
+      key: p, code: p, was: shownIn(p, schema[p], schema[p] && schema[p].value),
+      // A secret's new value is never written out, not even in the list of changes.
+      now: schema[p] && schema[p].set_path ? tr('dashboard.cfgSecretNewShown', '(a new value)') : shownIn(p, schema[p], pending[p]),
     }))} />`}
 
     ${!editable && html`
@@ -498,10 +529,12 @@ export default function ConfigTab({ data, reload, configFind }) {
                     name=${label(p)} help=${hasExplain(p) ? 'config.' + p : undefined} flag=${edited ? '●' : null} flagTitle=${tr('dashboard.cfgEdited', 'Edited, not saved')}
                     code=${p} desc=${descOf(p, e)}
                     note=${(p in refused && edited) || e.restartPending ? html`${p in refused && edited ? html`<${Note} kind="message" error>${refused[p]}<//>` : null}${e.restartPending
-                      ? html`<${Tinted} tone="warn" strong>${tr('dashboard.cfgRestartPending', 'This server runs with {value} until it restarts.').replace('{value}', shownIn(p, e, e.value))}<//>` : null}` : null}
+                      ? html`<${Tinted} tone="warn" strong>${e.set_path
+                        ? tr('dashboard.cfgRestartPendingSecret', 'This server uses the change after it restarts.')
+                        : tr('dashboard.cfgRestartPending', 'This server runs with {value} until it restarts.').replace('{value}', shownIn(p, e, e.value))}<//>` : null}` : null}
                     source=${e.source && html`<${Badge} type=${SOURCE_BADGE[e.source] || 'idle'} label=${sourceWord(e.source)} />`}
                     editor=${fieldEditor(p, e, val, editable, pending, onChange, p in refused && edited)}
-                    end=${e.canReset && editable && e.mutable ? html`<${Action} small onClick=${() => resetConfig(p)}>${t('dashboard.cfgReset')}<//>` : null} />`;
+                    end=${e.canReset && editable && (e.mutable || e.set_path) ? html`<${Action} small onClick=${() => resetConfig(p)}>${t('dashboard.cfgReset')}<//>` : null} />`;
                 })}
                 ${SectionAction && html`<${SectionAction} />`}
               <//>`;
