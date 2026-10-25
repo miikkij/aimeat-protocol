@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-25 — contentAccessGate takes the lazy storage getter the CORS middleware takes: the origin of an app opened to the internet is one keyed read.
  *   2026-10-18 — POST /v1/ai/image is parsed at the large JSON limit: it carries reference pictures.
  *   2026-10-17 — contentAccessGate after appOriginSignIn: a node set to signed-in content access
  *     refuses everyone who is not one of its accounts, outside a short open list (plan doc-mvcn6c7e4e5q V1).
@@ -281,7 +282,7 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
 
   // A node set to show its content to its own signed-in accounts only refuses everybody else here,
   // deny by default (middleware/content-access-gate.ts). After CORS, so a refused app can read why.
-  app.use(contentAccessGate(config));
+  app.use(contentAccessGate(config, () => storageForCors));
 
   // Rate limiting — global (with role multipliers)
   app.use(rateLimit(config.rateLimits.global, config.rateLimits.roleMultipliers));

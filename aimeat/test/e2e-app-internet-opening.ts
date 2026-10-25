@@ -202,6 +202,9 @@ async function main() {
             const apex = await call(`/v1/apps/${A.name}/${file}?mode=inline`, { headers: { Accept: 'text/html' } });
             const loc = apex.status >= 300 && apex.status < 400 ? (await fetch(`${BASE}/v1/apps/${A.name}/${file}?mode=inline`, { redirect: 'manual', headers: { Accept: 'text/html' } })).headers.get('location') ?? '' : '';
             assert((apex.status === 200 && apex.text.includes(APP_TEXT)) || (loc.includes(APP_HOST) && !loc.includes('app-open')), `apex ${apex.status} ${loc}`);
+            // The origin's own documents open with the page (one keyed read in the gate).
+            const llms = await origin('/llms.txt', 'text/plain');
+            assert(llms.status === 200, `origin llms.txt: ${llms.status}`);
             const desc = await call(`/v1/intake/${org}/${ws}/consent`);
             assert(desc.status === 200, `descriptor ${desc.status}`);
             const s = await strangerSubmit('consent');
@@ -249,6 +252,42 @@ async function main() {
             assert((await strangerSubmit('consent')).status === 401, 'the form stayed open');
             const again = await call(`/v1/admin/internet-openings/${A.name}/${file}/close`, { token: op.token, body: {} });
             assert(again.status === 409 && again.body.error?.code === 'NOT_OPEN', `closing twice: ${again.status}`);
+        });
+
+        await test('FAILURE: every route refuses the wrong caller: a stranger 401, another owner 403, a non-operator 403 on the operators\' routes', async () => {
+            const anonRead = await call(`/v1/apps/${A.name}/${file}/internet-opening`, { method: 'GET' });
+            assert(anonRead.status === 401, `stranger read: ${anonRead.status}`);
+            const otherOpen = await call(`/v1/apps/${A.name}/${file}/internet-opening`, { token: B.token, method: 'POST', body: { reason: 'Not my app at all' } });
+            assert(otherOpen.status === 403, `another owner opens: ${otherOpen.status}`);
+            const otherClose = await call(`/v1/apps/${A.name}/${file}/internet-opening`, { token: B.token, method: 'DELETE' });
+            assert(otherClose.status === 403, `another owner closes: ${otherClose.status}`);
+            const decide = await call(`/v1/admin/internet-openings/${A.name}/${file}/decision`, { token: A.token, method: 'POST', body: { decision: 'approve' } });
+            assert(decide.status === 403, `an owner decides: ${decide.status}`);
+            const close = await call(`/v1/admin/internet-openings/${A.name}/${file}/close`, { token: B.token, method: 'POST', body: {} });
+            assert(close.status === 403, `an owner uses the operators' close: ${close.status}`);
+            const trust = await call(`/v1/admin/internet-openers/${A.name}`, { token: A.token, method: 'PUT', body: { reason: 'I trust myself' } });
+            assert(trust.status === 403, `an owner trusts themselves: ${trust.status}`);
+            const untrust = await call(`/v1/admin/internet-openers/${B.name}`, { token: A.token, method: 'DELETE' });
+            assert(untrust.status === 403, `an owner removes a trust: ${untrust.status}`);
+        });
+
+        await test('the operator\'s agent decides and trusts over MCP; an owner\'s agent is refused both', async () => {
+            const opAgent = await makeAgent(BASE, op, ['operator:admin', 'app:write', 'memory:read']);
+            const opSession = await openSession(BASE, opAgent.token);
+            const ownAgent = await makeAgent(BASE, A, ['app:write', 'memory:read']);
+            const ownSession = await openSession(BASE, ownAgent.token);
+            const asked = await openIt(A.token, { reason: 'Asked so the operator agent can decide' });
+            assert(asked.status === 202, `ask ${asked.status} ${JSON.stringify(asked.body.error)}`);
+            const refusedDecide = await callTool(ownSession, 'aimeat_admin_internet_opening_decide', { owner: A.name, app: file, decision: 'approve' });
+            assert(refusedDecide.isError, 'an owner\'s agent decided');
+            const refusedTrust = await callTool(ownSession, 'aimeat_admin_internet_opener_set', { owner: A.name, allowed: true, reason: 'Trusting myself' });
+            assert(refusedTrust.isError, 'an owner\'s agent trusted its owner');
+            const decided = await callTool(opSession, 'aimeat_admin_internet_opening_decide', { owner: A.name, app: file, decision: 'decline', note: 'Not this week' });
+            assert(!decided.isError && decided.text.includes('"state": "declined"'), decided.text.slice(0, 300));
+            const trusted = await callTool(opSession, 'aimeat_admin_internet_opener_set', { owner: B.name, allowed: true, reason: 'Runs the partner pages' });
+            assert(!trusted.isError && trusted.text.includes(B.name), trusted.text.slice(0, 300));
+            const removed = await callTool(opSession, 'aimeat_admin_internet_opener_set', { owner: B.name, allowed: false });
+            assert(!removed.isError && !removed.text.includes(`"owner": "${B.name}"`), removed.text.slice(0, 300));
         });
 
         await test('an owner the operator trusts opens at once; once the trust is gone, the extension waits', async () => {

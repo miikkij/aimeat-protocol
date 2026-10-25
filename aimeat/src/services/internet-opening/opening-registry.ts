@@ -8,7 +8,7 @@
  *   person's data. It is reloaded at start, after every change an opening service makes, and by the
  *   hourly sweep; an entry whose end date has passed stops counting at once, before the sweep closes
  *   its record.
- * @structure refreshOpenings · isAppOpenToInternet · openingOfApp · isFormOpenToInternet · isOriginOpenToInternet ·
+ * @structure refreshOpenings · isAppOpenToInternet · openingOfApp · isFormOpenToInternet · isTargetOpenToInternet ·
  *   anyOpenings · INTAKE_ROUTE · isOpenedIntakeRoute
  * @usage if (isAppOpenToInternet(app.ownerName, app.filename)) ...
  * @version-history
@@ -24,7 +24,6 @@ const intakeFormKey = (f: IntakeFormRef) => `${f.org}/${f.ws}/${f.formId}`;
 
 let openApps = new Map<string, InternetOpening>();
 let openForms = new Map<string, string>();   // form key → the app id that opened it
-let openLabels = new Map<string, string>();  // app origin label → the app id it serves
 
 function live(o: InternetOpening | undefined, now: string): o is InternetOpening {
   return !!o && o.state === 'open' && (!o.until || o.until > now);
@@ -41,18 +40,8 @@ export async function refreshOpenings(ctx: OpeningCtx): Promise<void> {
       apps.set(o.id, o);
       for (const f of o.forms) forms.set(intakeFormKey(f), o.id);
     }
-    // The app origins of the open apps, so the gate knows an origin's app without a lookup. A label
-    // is assigned when an app is first published, before it can be opened, and every publish of an
-    // open app reloads this list.
-    const labels = new Map<string, string>();
-    if (apps.size > 0) {
-      for (const s of await ctx.storage.listSubdomainSites()) {
-        if (s.enabled && s.kind === 'app' && apps.has(s.target)) labels.set(s.subdomain, s.target);
-      }
-    }
     openApps = apps;
     openForms = forms;
-    openLabels = labels;
   } catch (err) {
     logger.warn('refreshOpenings: the openings were not reloaded; the last list stays in force', { error: String(err) });
   }
@@ -72,11 +61,9 @@ export function isFormOpenToInternet(org: string, ws: string, formId: string): b
   return !!app && live(openApps.get(app), new Date().toISOString());
 }
 
-/** True when the app origin with this label serves an app that is open to the internet. */
-export function isOriginOpenToInternet(label: string | null | undefined): boolean {
-  if (!label) return false;
-  const id = openLabels.get(label.toLowerCase());
-  return !!id && live(openApps.get(id), new Date().toISOString());
+/** True when the app `owner/filename` (a subdomain site's target) is open to the internet. */
+export function isTargetOpenToInternet(target: string | null | undefined): boolean {
+  return !!target && live(openApps.get(target), new Date().toISOString());
 }
 
 /** True when any app is open: the gate skips its lookups on a node with none. */
