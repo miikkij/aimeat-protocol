@@ -13,6 +13,7 @@
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
  *   2026-10-25 — aimeat_extension_config_set says emailPolicy "unrestricted" is asked of the operators (secaudit2026oct22).
+ *   2026-10-25 — aimeat_extension_invoke says a full run pool answers EXTENSION_RUNS_BUSY with the seconds to wait (secaudit2026oct22, lead 817).
  *   v1.8.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read when it runs with nobody present, and that only the person can change it (Jouni, 2026-10-20).
  *   v1.7.2 — 2026-10-18 — aimeat_cortex_install says it answers publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   v1.7.1 — 2026-10-09 — aimeat_extension_install says which config values an update keeps.
@@ -54,7 +55,7 @@ export const extensionsCortexTools = [
     },
     {
         name: 'aimeat_extension_invoke',
-        description: 'Run one action of an installed, active extension by extension name + action id, passing input params (optionally scoped to a specific extension instance). Executes server-side in the sandbox and returns the action\'s result. The extension and action must exist and be active. Discover actions with aimeat_extension_list / aimeat_extension_get.',
+        description: 'Run one action of an installed, active extension by extension name + action id, passing input params (optionally scoped to a specific extension instance). Executes server-side in the sandbox and returns the action\'s result. The extension and action must exist and be active. Discover actions with aimeat_extension_list / aimeat_extension_get. When the node already runs as many extension actions as its operator allows, at once or for your account, it answers EXTENSION_RUNS_BUSY with the seconds to wait; call again after them.',
         caller: 'agent',
         visibility: agentEverywhere,
         // openWorldHint: extension actions run user-provided WASM with ctx.fetch -- effects unbounded

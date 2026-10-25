@@ -6,6 +6,8 @@
  *   each call (secaudit2026oct22). Against the real ctx builder:
  *     - ctx.fetch calls started together are queued so at most EXT_FETCH_INFLIGHT_BYTES of answers
  *       are in flight (32 at the 4 MB ceiling, 4 at 32 MB), and every one of them still answers;
+ *     - the budget is the operator setting extensions.fetch_inflight_mb (8 MB at the 4 MB ceiling is
+ *       2 in flight), and 0 is no limit;
  *     - a queued call ends with the run's signal;
  *     - ctx.memory.getPublic by a bare owner name reads one record, not every record of that owner's
  *       agents under the key as a prefix (every record for an empty key), and answers as before.
@@ -13,6 +15,7 @@
  *   lists the agents' records with their values.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-host-bounds.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The budget as the setting extensions.fetch_inflight_mb (secaudit2026oct22, lead 782).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -37,9 +40,9 @@ const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js'
 const { SqliteStorage } = await import('../../src/storage/providers/sqlite/index.js');
 
 const config = { nodeId: 'node-1', encryptionKey: null, totpSecretEncryptionKey: null } as unknown as AimeatConfig;
-const ctxWith = (storage: Storage, fetchMaxBytes?: number) => buildExtensionCtx({
+const ctxWith = (storage: Storage, fetchMaxBytes?: number, settings: Partial<AimeatConfig> = {}) => buildExtensionCtx({
     capabilities: { network: true, ai: false, email: false, payments: false, declared: true, ...(fetchMaxBytes ? { fetchMaxBytes } : {}) },
-    config, storage, extMemoryOwner: 'ext:collector',
+    config: { ...config, ...settings } as AimeatConfig, storage, extMemoryOwner: 'ext:collector',
     caller: { gaii: 'alice@node-1', owner: 'alice', roles: ['owner'] }, extConfig: {}, logPrefix: '[ext:collector]',
 });
 
@@ -59,6 +62,22 @@ describe('ctx.fetch calls started together', () => {
         expect(all).toHaveLength(40);
         expect(peak).toBeLessThanOrEqual(32);
         expect(peak).toBeGreaterThan(4);
+    });
+
+    it('the operator setting extensions.fetch_inflight_mb sets the budget: 8 MB at the 4 MB ceiling is 2 in flight', async () => {
+        inFlight = 0; peak = 0;
+        const ctx = ctxWith({} as Storage, undefined, { extensionFetchInflightMb: 8 });
+        const all = await Promise.all(Array.from({ length: 10 }, (_, i) => ctx.fetch(`https://feed.example/${i}`)));
+        expect(all.every(r => r.ok && r.text === 'ok')).toBe(true);
+        expect(peak).toBe(2);
+    });
+
+    it('extensions.fetch_inflight_mb 0 is no limit: all forty are in flight together', async () => {
+        inFlight = 0; peak = 0;
+        const ctx = ctxWith({} as Storage, 32 * 1024 * 1024, { extensionFetchInflightMb: 0 });
+        const all = await Promise.all(Array.from({ length: 40 }, (_, i) => ctx.fetch(`https://feed.example/${i}`)));
+        expect(all).toHaveLength(40);
+        expect(peak).toBe(40);
     });
 
     it('a call waiting for a slot ends with the run\'s signal', async () => {

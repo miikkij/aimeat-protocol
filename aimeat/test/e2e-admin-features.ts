@@ -4,6 +4,10 @@
  *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
  *   node config doors mounted alongside them.
  * @version-history
+ *   v1.8.0 — 2026-10-25 — Every setting the node reads is on the Config list (the ones that had no row
+ *     until today among them), a secret only as whether it is set; section and q narrow it; a setting
+ *     read on every use takes effect at once, one read at start is stored and waits for the restart,
+ *     and a secret set on its set_path is never answered back.
  *   v1.7.0 — 2026-10-11 — A number above a recommended range is accepted and applied, and the schema
  *     says which ranges are recommendations and which are limits (rangeKind). A removed database
  *     override is reported as waiting for a restart (restartPending) until the setting is saved again.
@@ -677,6 +681,78 @@ await test('PUT /v1/admin/config \u2192 a saved rate limit is enforced on the ne
     await new Promise(r => setTimeout(r, 1100));
     const refusedAfter = await burst();
     assert(refusedAfter === 0, `with the old limit of ${before.value} back, 12 requests at once all pass; ${refusedAfter} were refused`);
+});
+
+await test('GET /v1/admin/config \u2192 the settings read with no row until 2026-10-25 are listed, a secret only as whether it is set, and section narrows the list', async () => {
+    const { body } = await json('/v1/admin/config', authed());
+    const schema = body.data.schema;
+    for (const p of ['usage.hot_days', 'usage.buffer_ms', 'node.log_level', 'security.trust_proxy', 'security.profile', 'auth.access_ttl_seconds',
+        'packages.max_size_mb', 'features.capability_publishing', 'storage.sqlite_path', 'storage.database_url_configured', 'setup.admin_password_configured']) {
+        assert(p in schema, `the Config list has ${p}`);
+    }
+    const secret = schema['auth.casdoor_client_secret_configured'];
+    assert(secret.type === 'boolean' && typeof secret.value === 'boolean', `a secret shows whether it is set: ${JSON.stringify(secret)}`);
+    assert(secret.set_path === 'auth.casdoor_client_secret', `a secret the operator may set names its path: ${JSON.stringify(secret)}`);
+    assert(schema['usage.buffer_ms'].appliesAt === 'restart', `a setting read at start says so: ${JSON.stringify(schema['usage.buffer_ms'])}`);
+    assert(schema['usage.hot_days'].appliesAt === undefined, `a setting read on every use does not: ${JSON.stringify(schema['usage.hot_days'])}`);
+    assert(schema['security.trust_proxy'].editable === false, 'a deployment setting is shown and not changeable here');
+
+    const usage = (await json('/v1/admin/config?section=usage', authed())).body.data.schema;
+    const keys = Object.keys(usage);
+    assert(keys.length === 7 && keys.every(k => k.startsWith('usage.')), `section=usage lists the seven usage settings: ${JSON.stringify(keys)}`);
+    const found = Object.keys((await json('/v1/admin/config?q=tally', authed())).body.data.schema);
+    assert(found.length === 1 && found[0] === 'usage.tally_buffer_ms', `q=tally finds the one setting: ${JSON.stringify(found)}`);
+});
+
+await test('PUT /v1/admin/config \u2192 a setting read on every use takes effect at once (usage.hot_days reaches the usage status)', async () => {
+    const path = 'usage.hot_days';
+    const put = (value: unknown) => json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }) }));
+    const original = (await json('/v1/admin/config', authed())).body.data.schema[path].value;
+    try {
+        const saved = await put(33);
+        assert(saved.status === 200 && saved.body.data.applied[0].applies === undefined, `saved at once: ${JSON.stringify(saved.body)}`);
+        const status = await json('/v1/admin/usage/status', authed());
+        assert(status.body.data?.hot_window_days === 33, `the usage status reads the saved window: ${JSON.stringify(status.body.data)}`);
+    } finally {
+        await put(original);
+        await json(`/v1/admin/config/${encodeURIComponent(path)}`, authed({ method: 'DELETE' }));
+    }
+});
+
+await test('PUT /v1/admin/config \u2192 a setting read at start is stored and waits for the restart; the running value stays', async () => {
+    const path = 'usage.buffer_ms';
+    const entryOf = async () => (await json('/v1/admin/config', authed())).body.data.schema[path];
+    const before = await entryOf();
+    try {
+        const saved = await json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value: before.value + 5000 }] }) }));
+        assert(saved.status === 200, `saved: ${saved.status} ${JSON.stringify(saved.body)}`);
+        assert(saved.body.data.applied[0].applies === 'restart', `the answer says it waits for a restart: ${JSON.stringify(saved.body.data.applied)}`);
+        assert(String(saved.body.data.note).includes(path) && String(saved.body.data.note).includes('next starts'), `the note names it: ${saved.body.data.note}`);
+        const after = await entryOf();
+        assert(after.value === before.value, `the node still runs with ${before.value}: ${JSON.stringify(after)}`);
+        assert(after.source === 'database' && after.restartPending === true, `stored, waiting for the restart: ${JSON.stringify(after)}`);
+        const refused = await json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value: 10 }] }) }));
+        assert(refused.status === 400, `a value under the minimum of 1000 is refused: ${refused.status}`);
+    } finally {
+        await json(`/v1/admin/config/${encodeURIComponent(path)}`, authed({ method: 'DELETE' }));
+    }
+});
+
+await test('PUT /v1/admin/config \u2192 a secret is set on its set_path, stored, and never answered back', async () => {
+    const path = 'auth.casdoor_client_secret';
+    const secret = `e2e-casdoor-secret-${Date.now()}`;
+    try {
+        const saved = await json('/v1/admin/config', authed({ method: 'PUT', body: JSON.stringify({ changes: [{ path, value: secret }] }) }));
+        assert(saved.status === 200, `saved: ${saved.status} ${JSON.stringify(saved.body)}`);
+        assert(!JSON.stringify(saved.body).includes(secret), 'the answer never carries the secret');
+        assert(saved.body.data.applied[0].secret === true && saved.body.data.applied[0].new_value?.configured === true, `answered as configured: ${JSON.stringify(saved.body.data.applied)}`);
+        const list = await json('/v1/admin/config', authed());
+        assert(!JSON.stringify(list.body).includes(secret), 'the Config list never carries the secret');
+        const entry = list.body.data.schema[`${path}_configured`];
+        assert(entry.source === 'database' && entry.restartPending === true && entry.canReset === true, `stored, from the next start: ${JSON.stringify(entry)}`);
+    } finally {
+        await json(`/v1/admin/config/${encodeURIComponent(path)}`, authed({ method: 'DELETE' }));
+    }
 });
 
 // \u2500\u2500\u2500 The front-page switch (site.front_page) \u2500\u2500\u2500

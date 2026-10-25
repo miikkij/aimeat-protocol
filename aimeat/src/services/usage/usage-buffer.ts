@@ -16,7 +16,7 @@
  *   written to `await` it inside a request path, and then a slow database would be a slow node. The
  *   signature refuses that: there is nothing to await and nothing to catch.
  * @structure
- *   - initUsageBuffer(storage)     -- wire storage + start the flush interval
+ *   - initUsageBuffer(storage, ms) -- wire storage + start the flush interval
  *   - recordUsageCall(input)       -- buffer one call (fire and forget, never throws)
  *   - pendingUsageCalls(filter)    -- the unflushed tail, so a just-made call is not invisible
  *   - flushUsageBuffer()           -- write the buffer out
@@ -25,6 +25,8 @@
  *   import { recordUsageCall } from '../services/usage/usage-buffer.js';
  *   recordUsageCall({ ownerGhii, surface: 'mcp', coordinate: toolName, outcome: 'ok', durationMs });
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The flush interval is the caller's (usage.buffer_ms from the config), not
+ *     AIMEAT_USAGE_BUFFER_MS read at import.
  *   v1.1.0 — 2026-10-08 — onUsageRecorded(): a listener told of every call as it is recorded.
  *   v1.0.0 — 2026-08-14 — Initial: the buffered ingest door for the usage call stream.
  */
@@ -32,8 +34,11 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, UsageCallRecord, UsageCallInput, UsageCallFilter } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 
-/** Flush cadence. A dashboard reading raw calls is at most this stale, plus the fold's own lag. */
-const FLUSH_INTERVAL_MS = Number(process.env.AIMEAT_USAGE_BUFFER_MS) || 15_000;
+/**
+ * Flush cadence when the caller names none. A dashboard reading raw calls is at most this stale, plus
+ * the fold's own lag. The node passes usage.buffer_ms (config.usageBufferMs) at start.
+ */
+const DEFAULT_FLUSH_INTERVAL_MS = 15_000;
 
 /**
  * Hard ceiling on the unflushed buffer. If storage is down, telemetry must degrade rather than grow
@@ -153,11 +158,11 @@ export async function flushUsageBuffer(): Promise<void> {
   }
 }
 
-/** Wire storage and start the flush interval. Idempotent. */
-export function initUsageBuffer(storage: Storage): void {
+/** Wire storage and start the flush interval. Idempotent: the interval is the first call's. */
+export function initUsageBuffer(storage: Storage, flushIntervalMs: number = DEFAULT_FLUSH_INTERVAL_MS): void {
   storageRef = storage;
   if (flushTimer) return;
-  flushTimer = setInterval(() => { void flushUsageBuffer(); }, FLUSH_INTERVAL_MS);
+  flushTimer = setInterval(() => { void flushUsageBuffer(); }, Math.max(100, flushIntervalMs));
   // Don't keep the process alive solely for the flush timer (matters for in-process tests).
   flushTimer.unref?.();
 }

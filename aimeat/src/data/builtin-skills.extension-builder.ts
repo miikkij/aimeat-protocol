@@ -40,6 +40,12 @@
  *   2026-10-21 — Section 9: declare `uses_secrets`; a first use to a declared host binds by itself for
  *     a trusted code writer; every refused first use names the owner's one-press allow page; tell users
  *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   2026-10-25 — A call past the operator's run slots answers 503 EXTENSION_RUNS_BUSY with Retry-After
+ *     (secaudit2026oct22, lead 817).
+ *   2026-10-25 — ctx.email takes one recipient per call, within the account's hourly allowance
+ *     (extensions.email_per_hour; secaudit2026oct22, lead 325).
+ *   2026-10-25 — The operator's limits on one namespace's data and on the copies of one extension
+ *     (extensions.namespace_max_mb, extensions.max_instances; secaudit2026oct22, lead 750).
  *   2026-10-21 — Section 9, v58 as Jouni amended it: `{{secret:NAME}}` reads the caller's own vault
  *     for every extension the caller runs (bring your own key), a secret with a host goes only there,
  *     and a secret with no host is never bound through another account's extension.
@@ -123,7 +129,9 @@ may already do it.
 - \`capabilities: [network, ai, email, payments]\` at the top level: what the scripts may do beyond
   their own memory. Without \`network\`, \`ctx.fetch\` throws \`CAPABILITY_NOT_DECLARED\`; without the
   others, \`ctx.ai\`, \`ctx.email\` and \`ctx.buy\` are \`undefined\`. \`network: { hosts: [api.example.com] }\`
-  limits \`ctx.fetch\` to those hosts.
+  limits \`ctx.fetch\` to those hosts. \`ctx.email(to, subject, body)\` takes one address per call
+  (several recipients: one call each), and one account's extensions send at most
+  \`extensions.email_per_hour\` (200 by default) in an hour; past it the call throws naming it.
 - \`workspace: { read: true, write: true }\` gives \`ctx.workspace\`, which acts on the caller's
   organism workspace as the caller.
 - Write it in YAML **block style**. A flow mapping with a comma inside a value breaks the value and
@@ -151,12 +159,18 @@ may already do it.
 - \`ctx.memory\` is the extension's own namespace, \`ext:{name}\`. **A key is public unless the write
   passes \`{ visibility: 'private' }\`**: pass it on every write that holds personal data. Write one
   key per period or per collection, never one per item: the namespace holds 1000 keys by default.
+  An operator may also limit the data one namespace holds (\`extensions.namespace_max_mb\`, no limit
+  by default): past it a new key is refused with a message naming the setting, and updating an
+  existing key still works, so fold new data into the keys you have.
 - \`ctx.now()\` is the run's start time, fixed for the run; \`ctx.hash(s)\` is the FNV-1a hash an app
   can compute the same way.
 - A run has 500 host calls and 5 seconds by default (\`AIMEAT_EXT_MAX_API_CALLS\`,
   \`AIMEAT_EXT_TIMEOUT_MS\`, which counts the script's own running time). The whole run, waiting on
   host calls included, ends at twelve times that limit, at least one minute, so a run that awaits
-  something that never answers fails instead of hanging. \`ctx.memory.search(prefix)\` returns values too, so do not read each key
+  something that never answers fails instead of hanging. A call to an action while the node already
+  runs as many as its operator allows (\`extensions.run_slots\`, 64; \`extensions.run_slots_per_account\`,
+  16) is answered 503 \`EXTENSION_RUNS_BUSY\` with \`Retry-After\`: an app or agent retries after it.
+  \`ctx.memory.search(prefix)\` returns values too, so do not read each key
   again. Many workspace records go through \`ctx.workspace.publishRecords\` in one call.
 - The sandbox starts fresh for each call. All state lives in memory.
 - Check the caller in the script: \`ctx.caller.roles\` (an owner in person has \`['owner']\` and no
@@ -194,6 +208,8 @@ action asks \`ext:invoke\` of an agent or an app, and reading the instances asks
 deprecated), so an app that calls an extension through its cortex declares \`ext:invoke\`. Each instance
 has its own namespace, \`ext:{name}.{instanceId}\`, and the script reads \`ctx.instance.config\`. A
 \`type: secret\` field in the instance config is encrypted per instance: bring-your-own-key per tenant.
+An operator may limit the copies one extension has (\`extensions.max_instances\`, no limit by
+default); past it the create answers 409 \`LIMIT_EXCEEDED\` naming the setting.
 
 ## 7. Schedules
 

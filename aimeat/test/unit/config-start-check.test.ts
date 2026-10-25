@@ -9,6 +9,8 @@
  *   without a new case.
  * @usage pnpm exec vitest run test/unit/config-start-check.test.ts
  * @version-history
+ *   v2.1.0 — 2026-10-25 — START_ONLY_CHOICES is gone; its three settings are schema rows, so the
+ *     table-driven case over every fixed-set row covers them.
  *   v2.0.0 — 2026-10-16 — The node starts on the default of a setting it does not accept instead of
  *     refusing (Jouni, decision 2026-10-16): the cases that asserted the refusal now assert the default,
  *     the log line and the returned setting; the refusal stays asserted for the storage type, the node
@@ -17,7 +19,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { loadConfig } from '../../src/config.js';
-import { ConfigStartError, REFUSE_ON_INVALID, START_ONLY_CHOICES, startSettingProblems } from '../../src/config-start-check.js';
+import { ConfigStartError, REFUSE_ON_INVALID, startSettingProblems } from '../../src/config-start-check.js';
 import { CONFIG_FIELDS, readConfigField } from '../../src/services/config-schema.js';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import { validateEnv } from '../../src/utils/env-validator.js';
@@ -52,7 +54,9 @@ describe('a setting the node does not accept runs its default', () => {
     const setAsideRows = fixedSetRows.filter(f => REFUSE_ON_INVALID[f.envVar] === undefined);
 
     it('covers the settings the audit named', () => {
-        const vars = new Set([...fixedSetRows.map(f => f.envVar), ...Object.keys(START_ONLY_CHOICES)]);
+        // Every one of them is a schema row since 2026-10-25 (capability publishing, webhooks and the
+        // package creation role were checked from a list of their own before they had rows).
+        const vars = new Set(fixedSetRows.map(f => f.envVar));
         for (const v of ['AIMEAT_METRICS_ACCESS', 'AIMEAT_STATS_ACCESS', 'AIMEAT_CAPABILITY_PUBLISHING', 'AIMEAT_CAPABILITY_WEBHOOKS',
             'AIMEAT_PACKAGE_CREATE_ROLE', 'AIMEAT_FEDERATION_AUTH_POLICY', 'AIMEAT_REGISTRATION_MODE']) {
             expect(vars.has(v), v).toBe(true);
@@ -73,15 +77,6 @@ describe('a setting the node does not accept runs its default', () => {
         expect(line).toContain(`"${field.choices![0]}-typo"`);
         expect(line).toContain(`takes one of ${field.choices!.join(', ')}`);
         expect(line).toContain(`the default, ${String(fallback ?? '') || 'no value'}`);
-    });
-
-    it.each(Object.entries(START_ONLY_CHOICES))('%s: a word outside its list starts on the default', (variable, choices) => {
-        const bad = loadWith(variable, `${choices[0]}x`);
-        expect(bad.error).toBeUndefined();
-        expect(bad.loaded!.settingFallbacks.map(f => f.variable)).toEqual([variable]);
-        const good = loadWith(variable, choices[0]);
-        expect(good.error).toBeUndefined();
-        expect(good.loaded!.settingFallbacks).toEqual([]);
     });
 
     it('a listed word in another case runs as that word, never as the open branch', () => {

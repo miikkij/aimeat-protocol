@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.6 — 2026-10-25 — ADDITIVE: ctx.email takes one recipient per call and draws on the operator's
+ *     hourly allowance per account, extensions.email_per_hour (secaudit2026oct22, lead 325).
  *   v1.7.5 — 2026-10-24 — ADDITIVE: `ctx.fetch(url, { responseType: 'base64' })` reads a binary answer
  *     intact (jussil riistakartta, support thread 1ac0a199).
  *   v1.7.4 — 2026-10-22 — ADDITIVE: ctx.files.write and ctx.datapackage.publish say that a public write
@@ -185,7 +187,7 @@ function sandboxSection(): string {
     '| `ctx.now()` | The run\'s ISO timestamp, FIXED for the whole run |',
     '| `ctx.hash(s)` | FNV-1a 64-bit, 16 hex chars |',
     '| `ctx.notify(message, {title, link, to})` | Notify the caller\'s owner (on an unattended run, the installer). With `to`, another owner, delivered only when they consented. Returns whether it was delivered |',
-    '| `ctx.email(to, subject, body)` | Send mail. Allowed to the owner\'s own verified address, or to anyone once that owner has granted this extension an `extension_email` consent. Returns false when it is not allowed or the node has no mail |',
+    '| `ctx.email(to, subject, body)` | Send mail. Allowed to the owner\'s own verified address, or to anyone once that owner has granted this extension an `extension_email` consent. Returns false when it is not allowed or the node has no mail. `to` is one address: for several recipients, call it once per recipient. Past the operator\'s hourly allowance per account (`extensions.email_per_hour`, 200 by default) it throws a message naming that setting |',
     '',
     'Every argument a call needs has to be there. An `undefined` or `null` one makes the call throw',
     '(`ctx.files.write: argument 1 is undefined`) instead of reaching the node as the text "undefined",',

@@ -9,6 +9,9 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   v1.3.0 — 2026-10-25 — enforceExtensionMemoryLimits() refuses a new key past the operator's total
+ *     per extension namespace (extensions.namespace_max_mb, no limit by default); an update of an
+ *     existing key is not refused (secaudit2026oct22, lead 750).
  *   v1.2.1 — 2026-09-26 — The overage check reads the balance of the account localAccountOf names, so
  *     a visitor from another node never reads the local namesake's balance (secaudit 2026-09, F-1).
  *   v1.2.0 — 2026-08-09 — enforceExtensionMemoryLimits() raises the 80%/95% quota alarm, and its
@@ -81,6 +84,16 @@ export async function enforceExtensionMemoryLimits(
             // remedy, not deletion. An extension that hits this ceiling got there by writing one key
             // per item fetched, and deleting keys only buys it until the next collection run.
             throw new Error(`QUOTA_EXCEEDED: memory key limit reached (${config.memoryMaxKeysPerAgent}). One value may hold ${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one record (e.g. one key per period holding that period's array) rather than deleting data.`);
+        }
+        // The operator's total per extension namespace (extensions.namespace_max_mb, 0 is no limit).
+        // Only a NEW key is refused: an extension already over the total keeps updating and reading
+        // what it holds (secaudit2026oct22, lead 750).
+        const maxMb = config.extensionNamespaceMaxMb ?? 0;
+        if (maxMb > 0) {
+            const held = await storage.sumMemoryBytes(ownerGaii);
+            if (held + valueSize > maxMb * 1024 * 1024) {
+                throw new Error(`QUOTA_EXCEEDED: this extension's memory holds ${(held / (1024 * 1024)).toFixed(1)} MB, and a new key would take it past the ${maxMb} MB this server allows one extension (the operator setting extensions.namespace_max_mb). Existing keys can still be updated: fold the new data into one of them, delete keys the extension no longer needs, or ask the operator to raise the setting.`);
+            }
         }
     }
 }

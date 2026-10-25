@@ -19,13 +19,15 @@
  *   - loadPublicAgentFace(storage, nodeId, ownerName, filename) — the record, or null (private = absent)
  *   - loadPublicAgentFaceRecord(…) — the same, with the face record's own provenance id
  *   - buildAgentAffordances(config, ownerName, filename) — the footer both variants carry
- *   - serveAppAgentFace(res, config, storage, app) — negotiate + send; false = caller serves bytes
+ *   - serveAppAgentFace(res, config, storage, app, opts) — negotiate + send; false = caller serves bytes
  * @usage
  *   import { serveAppAgentFace } from '../services/agent-face.js';
  *   if (req.query.format === 'md' || (req.query.format === undefined && prefersMarkdown(req))) {
- *     if (await serveAppAgentFace(res, config, storage, app)) return;
+ *     if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
  *   }
  * @version-history
+ *   v1.6.0 — 2026-10-25 — `opts.lang` (the reader's `?lang=`) reaches the app's own format-md action,
+ *     and an app that declares one is cached per language.
  *   v1.5.0 — 2026-10-08 — A stored face is served with its own record when it carries one; the app's
  *     record, which describes the app's bytes, only for the converted page, the app's extension
  *     output, or a face without one (aiprov D18).
@@ -134,16 +136,20 @@ export async function buildAppAgentFace(
   config: AimeatConfig,
   storage: Storage,
   app: AppRecord,
+  opts: { lang?: string } = {},
 ): Promise<{ markdown: string; fromFace: boolean; provenanceId?: string } | null> {
   const isHtml = /html/i.test(app.mimeType);
+  // The reader's language (formatMdLang, already shaped by the caller) only reaches the app's own
+  // action, so only an app that declares one gets a cache entry per language.
+  const lang = app.manifest?.formatMd ? opts.lang : undefined;
   return cached(
-    `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}`,
+    `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}${lang ? `:lang=${lang}` : ''}`,
     TTL.public,
     async (): Promise<{ markdown: string; fromFace: boolean; provenanceId?: string } | null> => {
       // The app's own answer comes first (services/app-format-md.ts): an action of the owner's
       // extension, declared with aimeat-format-md. Null when the app declares none or the run
       // gave nothing, and then the stored face or the converted page answers as before.
-      const rendered = await renderAppMarkdown({ storage, config }, app);
+      const rendered = await renderAppMarkdown({ storage, config }, app, { lang });
       const stored = rendered === null
         ? await loadPublicAgentFaceRecord(storage, config.nodeId, app.ownerName, app.filename) : null;
       const face = rendered ?? stored?.text ?? null;
@@ -174,8 +180,9 @@ export async function serveAppAgentFace(
   config: AimeatConfig,
   storage: Storage,
   app: AppRecord,
+  opts: { lang?: string } = {},
 ): Promise<boolean> {
-  const built = await buildAppAgentFace(config, storage, app);
+  const built = await buildAppAgentFace(config, storage, app, opts);
   if (built === null) return false;
   // The machine-readable half of the same statement: YAML frontmatter carrying the whole record, and
   // the AI-Disclosure / Link headers. Two layers on purpose — strip the frontmatter and the record

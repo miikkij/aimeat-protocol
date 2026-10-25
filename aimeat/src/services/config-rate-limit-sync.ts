@@ -16,6 +16,7 @@
  * @structure RATE_LIMIT_KEYS · syncRateLimitTiers(config)
  * @usage syncRateLimitTiers(config);   // after any write of a config field
  * @version-history
+ *   v1.1.0 — 2026-10-25 — rlRegistrationInvites and rlOpenrouter, which got Config-tab rows.
  *   v1.0.0 — 2026-10-11 — Moved from config-overrides.ts (the list and the loop) so the live write
  *     paths can call it.
  */
@@ -35,6 +36,8 @@ export const RATE_LIMIT_KEYS: ReadonlyArray<{ key: string; tier: string }> = [
   { key: 'rlFederation', tier: 'federation' },
   { key: 'rlCatalogue', tier: 'catalogue' },
   { key: 'rlAuthChallenge', tier: 'authChallenge' },
+  { key: 'rlRegistrationInvites', tier: 'registrationInvites' },
+  { key: 'rlOpenrouter', tier: 'openrouter' },
 ];
 
 /**

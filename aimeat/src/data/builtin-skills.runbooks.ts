@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-25 — aimeat-node-operations: aimeat_admin_config lists every node setting (section, q), and
+ *     aimeat_admin_config_set changes them; a setting that applies at restart is said so.
  *   2026-10-23 — manage-my-agents: content whose classification refuses an outside model reaches only
  *     an agent whose runtime report says llm "local" (plan doc-mvlftkh9zmc9 C3.4).
  *   2026-10-21 — manage-my-agents: an `owner_scope` read or list leaves out an organism's records when
@@ -108,8 +110,10 @@ show the owner what you found before acting.
 3. \`aimeat_organism_list\` + \`aimeat_organism_overview\` — the shared workspaces and what lives in them.
 4. \`aimeat_discover\` with \`mode: "map"\` — a faceted map of every content type (skills,
    knowledge, workflows, apps, documents) the caller can see.
-5. \`aimeat_admin_config\` — current node configuration. It is read-only. It also reports the
-   classification switch (\`classification_mode\`: off, owner or all). You change it with
+5. \`aimeat_admin_config\` — every node setting the admin Config page shows, narrowed by \`section\`
+   or \`q\`. \`aimeat_admin_config_set\` changes them with the owner's confirmation; a setting marked
+   \`appliesAt: "restart"\` takes effect at the next start. The classification switch
+   (\`classification.mode\`: off, owner or all) has its own tool. You change it with
    \`aimeat_classification\` action \`switch_set\` (it needs the same \`operator:admin\` permission), and
    only with the owner's confirmation: turning it
    on, or from owner to all, applies at once; turning it off, or from all to owner, is refused from

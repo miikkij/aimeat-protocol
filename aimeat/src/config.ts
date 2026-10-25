@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.33.0 — 2026-10-25 — extensionLoadDefaults() (config-extension-load.ts): the operator's limits on extension load (secaudit2026oct22).
+ *   v1.32.0 — 2026-10-25 — runtimeConfigFromEnv() and siteKvFromEnv() (config-runtime.ts): the usage meter, write tally, log level, proxy trust and key settings code read from process.env, and the site key-value pairs, which also take AIMEAT_SITE_KV as one JSON object.
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
  *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
  *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
@@ -111,6 +113,8 @@ import { themesDefaults } from './config-themes.js';
 import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
+import { runtimeConfigFromEnv, siteKvFromEnv } from './config-runtime.js';
+import { extensionLoadDefaults } from './config-extension-load.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
 import { sealedKeysFromEnv } from './services/config-sealing.js';
@@ -286,6 +290,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     coHost: (process.env.AIMEAT_CO_HOST ?? deriveCoHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     ...pagesDefaults(),
+    ...runtimeConfigFromEnv(),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party
@@ -592,11 +597,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     siteEnabled: process.env.AIMEAT_SITE_ENABLED !== 'false',
     siteMaxTemplateSizeKb: parseInt(process.env.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB ?? '512', 10),
     siteCacheTtlSeconds: parseInt(process.env.AIMEAT_SITE_CACHE_TTL_SECONDS ?? '60', 10),
-    siteKv: Object.fromEntries(
-      Object.entries(process.env)
-        .filter(([k]) => k.startsWith('AIMEAT_SITE_KV_'))
-        .map(([k, v]) => [k.replace('AIMEAT_SITE_KV_', '').toLowerCase(), v ?? ''])
-    ),
+    siteKv: siteKvFromEnv(),
     siteLbEnabled: process.env.AIMEAT_SITE_LB_ENABLED === 'true',
     siteLbOriginUrl: process.env.AIMEAT_SITE_LB_ORIGIN_URL ?? null,
     siteLbSyncIntervalMin: parseInt(process.env.AIMEAT_SITE_LB_SYNC_INTERVAL_MIN ?? '30', 10),
@@ -659,6 +660,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
+    ...extensionLoadDefaults(),
 
     // Prompt Calibrator
     calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',

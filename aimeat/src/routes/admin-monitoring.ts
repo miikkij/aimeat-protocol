@@ -17,6 +17,7 @@
  *     the classification reader and names what stayed behind in `withheld`; the operator in person gets
  *     the whole file. Each person whose entries the file holds gets one export line in their account
  *     feed (secaudit2026oct22, get-admin-backup:memory-values-without-reader-or-trail).
+ *   2026-10-25 — The federation key pair is read from the config (federation.public_key, .private_key), and a pair made here is kept there too.
  *   Trust advisory sent — 2026-10-16 — POST /v1/admin/federation/trust-advisory sends the stored
  *     advisory to the active peers at once as a signed notice (services/federation-trust-notice.ts)
  *     and answers each peer's outcome; it said the advisory would be broadcast on the next sync cycle,
@@ -181,15 +182,18 @@ export function adminMonitoringRouter(
             return;
         }
 
-        // 2. Ensure this node has a keypair
-        let publicKey = process.env.AIMEAT_PUBLIC_KEY ?? '';
-        let privateKey = process.env.AIMEAT_PRIVATE_KEY ?? '';
+        // 2. Ensure this node has a keypair. The config holds the pair the environment gave
+        // (federation.public_key, federation.private_key on the admin Config tab).
+        let publicKey = config.federationPublicKey;
+        let privateKey = config.federationPrivateKey ?? '';
         if (!publicKey || !privateKey) {
             const keys = await generateKeyPair();
             publicKey = keys.publicKey;
             privateKey = keys.privateKey;
             process.env.AIMEAT_PUBLIC_KEY = publicKey;
             process.env.AIMEAT_PRIVATE_KEY = privateKey;
+            config.federationPublicKey = publicKey;
+            config.federationPrivateKey = privateKey;
         }
 
         // 3. Sign and send introduction

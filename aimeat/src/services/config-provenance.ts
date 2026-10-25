@@ -10,15 +10,29 @@
  *   - ConfigProvenance: registry with initDefaults + markEnv/markFile/markConsul/markDatabase setters
  *   - getSource / getAll: read a field's source or the whole map
  *   - revertSource: recompute a field's source down the precedence chain after a DB override is removed
- *   - awaitsRestart: whether a removed override's value is still the running one
+ *   - markDatabaseAtRestart: a saved value that takes effect at the next start
+ *   - awaitsRestart: whether the running value differs from the one the next start uses
  *
  * @version-history
+ *   v1.2.0 — 2026-10-25 — markDatabaseAtRestart(): a value saved for a row that takes effect at the
+ *     next start is the database's, and the running value stays until a restart; markConsulAtRestart
+ *     is the same for a value the Consul watch brings while the node runs. bindConfigProvenance
+ *     / provenanceOf: the MCP tools find the registry the admin Config API uses.
  *   v1.1.0 — 2026-10-11 — awaitsRestart(): a path whose database override was removed since start
  *     keeps its running value until a restart, and the Config tab says so (Jouni, 2026-10-11).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 export type ConfigSource = 'default' | 'env' | 'file' | 'consul' | 'database';
+
+/**
+ * The registry of each running config, so a caller that holds the config and not the registry (the
+ * MCP tools aimeat_admin_config and aimeat_admin_config_set) reads and marks the same sources the
+ * admin Config API does. Keyed weakly: a config that is gone takes its registry with it.
+ */
+const registries = new WeakMap<object, ConfigProvenance>();
+export function bindConfigProvenance(config: object, provenance: ConfigProvenance): void { registries.set(config, provenance); }
+export function provenanceOf(config: object): ConfigProvenance | undefined { return registries.get(config); }
 
 export class ConfigProvenance {
   private sources = new Map<string, ConfigSource>();
@@ -55,8 +69,23 @@ export class ConfigProvenance {
   }
 
   /**
-   * True when the path's database override was removed since start and nothing has written the
-   * running value since: the node still runs with the removed value, until a restart.
+   * A value saved to the database for a row that takes effect at the next start (`applies:
+   * 'restart'`): the source is the database from then on, and the running value stays the old one
+   * until the node restarts, which awaitsRestart() reports.
+   */
+  markDatabaseAtRestart(dotPaths: string[]): void {
+    for (const p of dotPaths) { this.sources.set(p, 'database'); this.awaitingRestart.add(p); }
+  }
+
+  /** The same for a value the Consul watch brought while the node runs (it is not stored). */
+  markConsulAtRestart(dotPaths: string[]): void {
+    for (const p of dotPaths) { this.sources.set(p, 'consul'); this.awaitingRestart.add(p); }
+  }
+
+  /**
+   * True when the running value is not the one the node starts with next time: the path's database
+   * override was removed since start, or a value was saved for a row that takes effect at the next
+   * start. Nothing has written the running value since.
    */
   awaitsRestart(dotPath: string): boolean {
     return this.awaitingRestart.has(dotPath);

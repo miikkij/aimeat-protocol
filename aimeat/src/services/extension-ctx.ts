@@ -28,6 +28,7 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.20.2 — 2026-10-25 — The in-flight fetch budget is the operator setting extensions.fetch_inflight_mb (secaudit2026oct22, lead 782).
  *   v1.20.1 — 2026-10-25 — buildExtensionEmail and unavailableEmail moved to services/extension-email.ts by pure
  *     extraction (max-file-lines), re-exported here; ctx.email's tier 1 asks extensionConsentHolds
  *     there (secaudit2026oct22).
@@ -449,8 +450,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // own work; a read of somebody's public memory is made for the caller who invoked the action.
     const ownReader = systemReader({ storage, config }, extMemoryOwner);
     const callerReader = readerForCaller({ storage, config }, deps.caller);
-    // One gate per run: fetches started together are queued past the run's in-flight budget.
-    const fetchGate = createFetchGate(deps.capabilities.fetchMaxBytes);
+    // One gate per run: fetches started together are queued past the run's in-flight budget, the
+    // operator setting extensions.fetch_inflight_mb (0 is no limit).
+    const fetchGate = createFetchGate(deps.capabilities.fetchMaxBytes, config.extensionFetchInflightMb);
 
     const ctx: ExtensionCtx = {
         memory: {

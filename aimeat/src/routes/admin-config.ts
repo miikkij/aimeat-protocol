@@ -18,6 +18,11 @@
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   2026-10-25 -- GET's list and PUT's checks moved to services/config-admin-view.ts unchanged, so the
+ *     MCP tools aimeat_admin_config and aimeat_admin_config_set read and change settings through the
+ *     same code. GET serves `appliesAt: 'restart'` on a row that takes effect at the next start and
+ *     `set_path` on a secret the operator may set; PUT's note names the rows that wait for a restart.
+ *     The Consul import stores such a row and answers it in `at_restart`, leaving the running value.
  *   2026-10-18 -- classification.mode moved from off makes the default caps offer of a node that ran
  *     before, when it waits (services/classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1).
  *   2026-10-16 -- A setting changed (PUT) or a database override removed (DELETE) writes the operator
@@ -61,18 +66,15 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, readConfigField } from '../services/config-schema.js';
-import { rangeKindOf } from '../services/config-schema-validators.js';
+import { MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV } from '../services/config-schema.js';
 import { planConsulExport } from '../services/consul-export.js';
 import { sealSettingForStorage } from '../services/config-at-rest-rows.js';
-import { applyConfigChanges, type ConfigChange } from '../services/config-apply.js';
+import { buildConfigView, changeNodeSettings } from '../services/config-admin-view.js';
 import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
-import { CLASSIFICATION_MODE_PATH, recordSwitchChange, switchRefusal } from '../services/classification/switch.js';
-import { offerDefaultCapsWhenSwitchedOn } from '../services/classification/default-caps.js';
 import { logger } from '../utils/logger.js';
 import { recordOperatorNodeAct } from '../services/operator-access-audit.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
@@ -87,170 +89,26 @@ export function adminConfigRouter(
 
     // GET /v1/admin/config — full config schema with types, ranges, descriptions (§14.2)
     // Schema is built dynamically from the shared CONFIG_FIELDS definitions
-    router.get('/v1/admin/config', requireAuth(), requireOperator(storage), async (_req, res) => {
-        const editable = storage.supportsConfigPersistence();
-        type SchemaEntry = {
-            value: unknown; type: string; description: string; range?: string; rangeKind?: 'limit' | 'recommended'; choices?: readonly string[];
-            mutable: boolean; editable: boolean; path: string;
-            source?: string; canReset?: boolean; sealed?: boolean; restartPending?: boolean;
-        };
-        const schema: Record<string, SchemaEntry> = {};
-
-        for (const field of CONFIG_FIELDS) {
-            if (field.adminDisplay === 'hidden') continue;
-
-            if (field.adminDisplay === 'configured') {
-                // Secret fields — show as boolean indicating whether configured
-                const configuredPath = `${field.dotPath}_configured`;
-                const sealed = isSealed(config, field.dotPath);
-                const src = sealed ? 'sealed' : provenance?.getSource(field.dotPath);
-                schema[configuredPath] = {
-                    value: !!readConfigField(config, field),
-                    type: 'boolean',
-                    description: `Whether ${field.description.toLowerCase().replace(' (secret)', '')} is configured (read-only secret)`,
-                    mutable: false,
-                    editable: false,
-                    path: configuredPath,
-                    source: src ?? 'default',
-                    canReset: false,
-                    ...(sealed ? { sealed: true } : {}),
-                };
-                continue;
-            }
-
-            // Normal field — show actual value
-            const typeStr = field.type === 'number' ? 'integer' : field.type;
-            // A sealed path answers "where did this come from" with the seal rather than with
-            // whether the host happened to pass it as env or as file: the seal is the operative
-            // fact, and it is what the admin tab badges. The VALUE is untouched and present — the
-            // operator is entitled to see what their limits are, only not to move them.
-            const sealed = isSealed(config, field.dotPath);
-            const src = sealed ? 'sealed' : (provenance?.getSource(field.dotPath) ?? 'default');
-            // A number's range is a limit (a larger value is refused) or a recommendation (a larger
-            // value is accepted); the page words the range by it.
-            const rangeKind = rangeKindOf(field);
-            schema[field.dotPath] = {
-                value: readConfigField(config, field),
-                type: typeStr,
-                description: field.description,
-                ...(field.range ? { range: field.range } : {}),
-                ...(rangeKind ? { rangeKind } : {}),
-                ...(field.choices ? { choices: field.choices } : {}),
-                mutable: !field.immutable && !sealed,
-                editable: editable && !field.immutable && !sealed,
-                path: field.dotPath,
-                source: src,
-                canReset: src === 'database',
-                ...(sealed ? { sealed: true } : {}),
-                // The override was removed since start: `value` is still the removed one, and
-                // `source` is where the value comes from after the next restart.
-                ...(provenance?.awaitsRestart(field.dotPath) ? { restartPending: true } : {}),
-            };
-        }
-
-        // Combined virtual field: VAPID keys configured
-        schema['push.vapid_configured'] = {
-            value: !!config.vapidPublicKey && !!config.vapidPrivateKey,
-            type: 'boolean',
-            description: 'Whether VAPID keys are configured (read-only secret)',
-            mutable: false,
-            editable: false,
-            path: 'push.vapid_configured',
-            source: 'default',
-            canReset: false,
-        };
-
-        res.json(success(config.nodeId, {
-            editable,
-            storageType: config.storageProvider,
-            note: editable ? undefined : 'In-memory storage detected. Config is read-only. Use .env or aimeat.ini to configure this node.',
-            sealed: config.sealedConfigKeys,
-            sealedNote: config.sealedConfigKeys.length > 0
-                ? 'Some settings here are set by whoever runs this node. You can see them; changing them is a conversation with them.'
-                : undefined,
-            schema,
-        }));
+    // The list is built in services/config-admin-view.ts, which aimeat_admin_config reads too.
+    router.get('/v1/admin/config', requireAuth(), requireOperator(storage), async (req, res) => {
+        const section = typeof req.query.section === 'string' ? req.query.section : undefined;
+        const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+        res.json(success(config.nodeId, buildConfigView({ config, storage, provenance }, { section, q })));
     });
     // PUT /v1/admin/config — atomic config update with dot-path addressing (§14.2, Appendix B)
     // Body format: {"changes": [{"path": "morsel_policy.daily_allowance", "value": 75}, ...]}
     // Mutable field lookup comes from the shared config-schema module (single source of truth)
     router.put('/v1/admin/config', requireAuth(), requireOperator(storage), async (req, res) => {
-        // In-memory guard — config editing requires persistent storage
-        if (!storage.supportsConfigPersistence()) {
-            res.status(403).json(error(config.nodeId, 'READONLY_CONFIG',
-                'Config editing requires a persistent database (PostgreSQL or SQLite). Use .env or aimeat.ini created with "aimeat init".'));
+        // The checks and the apply loop are in services/config-admin-view.ts, which
+        // aimeat_admin_config_set calls too: sealed paths and the classification switch are refused
+        // before anything in the request is applied.
+        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, req.body?.changes);
+        if (!r.ok) {
+            res.status(r.status).json(error(config.nodeId, r.code, r.message, undefined, r.details,
+                r.sealed ? [{ description: 'Ask whoever runs this node to change it.', method: 'GET', url: '/v1/admin/config' }] : undefined));
             return;
         }
-
-        const { changes } = req.body ?? {};
-
-        if (!Array.isArray(changes) || changes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-                'Body must contain "changes" array with [{path, value}] entries'));
-            return;
-        }
-
-        // Refuse before you write. The sealed scan runs over the WHOLE batch first, so a request
-        // carrying one sealed path applies none of it — including the paths that were fine. Letting
-        // the rest through would answer a refusal with "we applied three of your four changes" and
-        // leave the operator to work out which, on the one boundary where that is least acceptable.
-        const sealedPaths = (changes as Array<{ path?: unknown }>)
-            .map(c => c?.path)
-            .filter((p): p is string => typeof p === 'string' && isSealed(config, p));
-        if (sealedPaths.length > 0) {
-            const refusal = sealRefusal(sealedPaths[0]);
-            res.status(403).json(error(config.nodeId, refusal.code,
-                sealedPaths.length === 1
-                    ? refusal.message
-                    : `${sealedPaths.join(', ')} are set by whoever runs this node and cannot be changed here. Nothing in this request was applied.`,
-                undefined, { sealed: sealedPaths },
-                [{ description: 'Ask whoever runs this node to change it.', method: 'GET', url: '/v1/admin/config' }]));
-            return;
-        }
-
-        // The classification switch gives protection away when it goes off or from all to owner, and
-        // an AI credential does not make that change (services/classification/switch.ts). Refused
-        // before any of the request is applied, as the sealed scan above.
-        const modeChange = (changes as Array<{ path?: unknown; value?: unknown }>).find(c => c?.path === CLASSIFICATION_MODE_PATH);
-        if (modeChange && typeof modeChange.value === 'string') {
-            const refusal = switchRefusal(req.auth!, config.classificationMode, modeChange.value);
-            if (refusal) {
-                res.status(refusal.status).json(error(config.nodeId, refusal.code, `${refusal.message} Nothing in this request was applied.`));
-                return;
-            }
-        }
-        const modeBefore = config.classificationMode;
-
-        // The loop that checks, persists and applies each change: services/config-apply.ts, shared with
-        // the other door that changes settings (Themes & Styles' who-chooses).
-        const { applied, errors } = await applyConfigChanges({ config, storage, provenance }, changes as ConfigChange[]);
-        if (applied.some(a => a.path === CLASSIFICATION_MODE_PATH) && config.classificationMode !== modeBefore) {
-            recordSwitchChange(config.nodeId, req.auth!, modeBefore, config.classificationMode);
-            // A node that ran before gets the default caps offered when classification comes into use (L5.1).
-            await offerDefaultCapsWhenSwitchedOn(config, storage, modeBefore, config.classificationMode);
-            emitChange('classification');
-        }
-
-        if (applied.length > 0) {
-            // Who changed which setting, and when (QA audit E2-04). The paths only: a value can be a key.
-            const actorGaii = resolveIdentity(req.auth!, config.nodeId);
-            recordOperatorNodeAct({
-                operatorGhii: ownerGhiiOf(actorGaii), actorGaii, area: 'config', action: 'set',
-                meta: { paths: applied.map(a => a.path).join(', '), count: applied.length },
-            });
-        }
-
-        if (applied.length === 0 && errors.length > 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'No valid changes applied', undefined, { errors }));
-            return;
-        }
-
-        res.json(success(config.nodeId, {
-            applied,
-            errors: errors.length > 0 ? errors : undefined,
-            note: 'Config updated and persisted to database. Changes survive restart.',
-        }));
-        emitChange('config');
+        res.json(success(config.nodeId, { applied: r.applied, errors: r.errors, note: r.note }));
     });
 
     // DELETE /v1/admin/config/:path — remove a DB override (revert to file/env/default)
@@ -360,19 +218,21 @@ export function adminConfigRouter(
         const values = await consulService.loadAll();
         // applyConsulValues drops sealed paths itself (it is also the boot loader and the watch
         // callback), so `applied` cannot contain one and nothing sealed reaches the database here.
-        const { applied, sealed } = applyConsulValues(config, values);
+        // The node is running, so a row read once at start is stored and waits for the next start.
+        const { applied, sealed, atRestart } = applyConsulValues(config, values, { running: true });
 
         // Persist to DB if available
         if (storage.supportsConfigPersistence()) {
-            for (const dotPath of applied) {
+            for (const dotPath of [...applied, ...atRestart]) {
                 // A secret row is stored encrypted, as PUT stores it (services/config-at-rest.ts).
                 await storage.setConfigValue(dotPath, sealSettingForStorage(dotPath, values[dotPath], config));
             }
-            if (provenance) provenance.markDatabase(applied);
-        }
+            if (provenance) { provenance.markDatabase(applied); provenance.markDatabaseAtRestart(atRestart); }
+        } else if (provenance) provenance.markConsulAtRestart(atRestart);
 
         res.json(success(config.nodeId, {
-            imported: applied.length, total: Object.keys(values).length,
+            imported: applied.length + atRestart.length, total: Object.keys(values).length,
+            ...(atRestart.length > 0 ? { at_restart: atRestart } : {}),
             ...(sealed.length > 0 ? { sealed } : {}),
         }));
         emitChange('config');
