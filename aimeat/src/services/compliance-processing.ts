@@ -13,6 +13,7 @@
  * @structure ProcessingSummary · PROCESSING_LIMITS · buildProcessingSummary()
  * @usage const p = await buildProcessingSummary({ storage, config });   // { summary, gaps, limits }
  * @version-history
+ *   v1.0.1 — 2026-10-25 — The limit app-scan-listed-only is gone: the scan reads every app now.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.5, C3.6, C4, C5, C6, C7).
  */
 import type { AimeatConfig } from '../config.js';
@@ -48,10 +49,6 @@ export const PROCESSING_LIMITS = [
   {
     code: 'not-accredited',
     text: 'The TL and NATO label packs mark, recognise and restrict classified content. They do not make this node an accredited system (Katakri, Traficom approval, NATO accreditation).',
-  },
-  {
-    code: 'app-scan-listed-only',
-    text: 'The apps whose data maps are read here are the ones the catalogue lists, and any app with a stored register. An app that is parked or hidden is read only when it has a register.',
   },
   {
     code: 'federation-peers-not-processors',

@@ -14,10 +14,11 @@
  *   its, so the page offers a status change only where the same call would be accepted.
  *
  *   AN APP IS NAMED BY ITS FILENAME. Its documents are keyed by the app's slug (compliance-docs.ts);
- *   a listed app gives back the filename and title, an app no longer listed keeps the slug.
+ *   an app on the node, parked or hidden too, gives back the filename and title; a deleted one keeps the slug.
  * @structure readAllPlacesOp()
  * @usage const out = await readAllPlacesOp(deps, caller, 'registers');
  * @version-history
+ *   v1.0.1 — 2026-10-25 — A parked or hidden app is named by its filename too (adminView listing).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.7).
  */
 import type { AimeatConfig } from '../config.js';
@@ -53,7 +54,7 @@ export async function readAllPlacesOp(deps: Deps, caller: OperatorCaller, rawKin
   }
   places.push(...stored);
 
-  const apps = places.some(p => p.scope.kind === 'app') ? (await storage.listApps({ limit: APP_SCAN })).apps : [];
+  const apps = places.some(p => p.scope.kind === 'app') ? (await storage.listApps({ limit: APP_SCAN, adminView: true })).apps : [];
   const appBySlug = new Map<string, { filename: string; title?: string }>();
   for (const app of apps) {
     const owner = localAccountName(app.ownerName ?? app.ownerGaii);

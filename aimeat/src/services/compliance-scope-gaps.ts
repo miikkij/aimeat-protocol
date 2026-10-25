@@ -12,13 +12,16 @@
  *
  *   WHAT IS READ, AND HOW MUCH. One scope reads its own documents, the label of each container a
  *   register with a data domain names, and for an app its data map and record. The node-wide list
- *   reads every stored document (one listing per kind) and the data map of every app (at most
- *   APP_SCAN apps; aimeat.io lists 188 on 2026-10-23).
+ *   reads every stored document (one listing per kind) and the data map of every app, parked and
+ *   hidden ones included (at most APP_SCAN apps; aimeat.io lists 188 on 2026-10-23).
  * @structure ScopeGapKind · ScopeGap · DEFAULT_REVIEW_MONTHS · scopeGaps() · nodeOnlyGaps() · nodeWideScopeGaps()
  * @usage
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The node-wide list reads every app, not only the listed ones, and an app
+ *     with no data map is a gap (app-personal-data-unstated): on innokas.aimeat.io the page named 3
+ *     apps with personal data where the maps named 15, and said nothing of 18 apps with no map.
  *   v1.0.1 — 2026-10-24 — "An access request", and one question or N questions, in the sentences; an
  *     overdue request's evidence names its subject, which the pages show instead of its id.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.5, C1.6, C2, C3.6, C4, C5, C6).
@@ -191,7 +194,9 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
   if (draft.register && !personalRegs.length) {
     out.push({ kind: 'app-personal-data-without-register', detail: `The app ${scope.app} says in its data map that it keeps personal data (${draft.register.dataCategories?.length ?? 0} key families), and it has no register.`, evidence: at });
   }
-  if (draft.unstated.length) {
+  if (!draft.hasMap) {
+    out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} has no data map, so nothing says whether it keeps personal data or where it goes.`, evidence: { ...at, families: [] } });
+  } else if (draft.unstated.length) {
     out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} does not say whether ${draft.unstated.length} of its key families hold personal data.`, evidence: { ...at, families: draft.unstated.slice(0, 20) } });
   }
   if (personalRegs.length || draft.register) {
@@ -247,7 +252,9 @@ export async function nodeWideScopeGaps(deps: Deps, opts: { now?: number } = {})
       if (kind === 'registers') for (const r of (doc as { items: ComplianceRegister[] }).items) for (const d of r.domains ?? []) domainsInUse.add(d);
     }
   }
-  const { apps } = await storage.listApps({ limit: APP_SCAN });
+  // Every app, parked, community and operator-hidden ones included: an app keeps personal data
+  // whether or not the catalogue lists it, and the report is the operator's view of the whole node.
+  const { apps } = await storage.listApps({ limit: APP_SCAN, adminView: true });
   for (const a of apps) {
     const owner = localAccountName(a.ownerName ?? a.ownerGaii);
     if (owner) scopes.set(`app:${owner}/${appSlug(a.filename)}`, { kind: 'app', ownerName: owner, app: a.filename });
