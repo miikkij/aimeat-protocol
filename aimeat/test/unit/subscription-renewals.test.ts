@@ -17,6 +17,7 @@ import { registerPaymentHandler, resetPaymentHandlers } from '../../src/commerce
 import { testMoneyPaymentHandler } from '../../src/commerce/test-money-handler.js';
 import { PLANS_KEY, runSubscriptionRenewals } from '../../src/commerce/subscriptions.js';
 import { putSplit } from '../../src/commerce/beneficiary-split.js';
+import { setPurchaseLimit, spentToday } from '../../src/commerce/agent-purchase-limit.js';
 
 const NODE = 'node';
 const BUYER = `reader@${NODE}`;
@@ -24,7 +25,7 @@ const SELLER = `studio@${NODE}`;
 const ARTIST = `artist@${NODE}`;
 const EXT = 'studiosubs';
 const DAY = 86_400_000;
-const config = { nodeId: NODE, commerceFeePercent: 0 } as unknown as AimeatConfig;
+const config = { nodeId: NODE, commerceFeePercent: 0, baseUrl: 'https://node.test' } as unknown as AimeatConfig;
 let storage: Storage;
 
 const rec = (over: Record<string, unknown> = {}) => ({
@@ -82,6 +83,24 @@ describe('runSubscriptionRenewals', () => {
     const notes1 = (await storage.listMemory(BUYER, { prefix: 'notif.' })).length;
     await runSubscriptionRenewals(storage, config);
     expect((await storage.listMemory(BUYER, { prefix: 'notif.' })).length).toBe(notes1);
+  });
+
+  it('a renewal of a plan an agent bought is held to the agent\'s daily limit (secaudit2026oct22)', async () => {
+    const AGENT = `shopper#reader@${NODE}`;
+    const until = new Date(Date.now() + DAY).toISOString();
+    // No limit set for the agent: an agent with no limit does not spend money, at renewal either.
+    await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec({ active_until: until, bought_by: AGENT }));
+    const refused = await runSubscriptionRenewals(storage, config);
+    expect(refused[0]).toMatchObject({ result: 'failed' });
+    expect(refused[0].detail).toContain('PURCHASE_LIMIT_NOT_SET');
+    expect((await subOf()).active_until).toBe(until);
+    const notes = await storage.listMemory(BUYER, { prefix: 'notif.' });
+    expect(notes.length).toBe(1);
+    expect(JSON.stringify(notes[0]!.value)).toContain('subscription_renewal_agent_limit');
+    // Within a limit of 5 EUR a 3.99 EUR period renews, and is counted against the day.
+    await setPurchaseLimit(storage, BUYER, AGENT, 'EUR', 5_000_000);
+    expect((await runSubscriptionRenewals(storage, config))[0]).toMatchObject({ result: 'renewed' });
+    expect((await spentToday(storage, BUYER))[AGENT]?.EUR).toBe(3_990_000);
   });
 
   it('does not renew a plan the extension stopped offering', async () => {
