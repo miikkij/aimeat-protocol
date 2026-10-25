@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   2026-10-25 — aiNodeKeyMaxOutputTokens (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.5.1 — 2026-10-12 — aiLegacySettingsRoutes no longer names /v1/ai/settings, which stays in 4.0.0.
  *   v1.5.0 — 2026-09-28 — modelDefaultTts, modelDefaultEmbed, ttsVoiceDefault (System 2 plan, V5).
  *   v1.4.0 — 2026-09-28 — The model catalogue (System 2 plan, V4): aiCatalogRefresh, aiPriceOverrides,
@@ -88,6 +89,13 @@ export interface AiCapabilityConfig extends DecideConfig {
   aiNodeKeyAccountDailyUsd: number;
   /** In 'limits' mode: the most all accounts' calls together may cost the node's key in one day, USD. */
   aiNodeKeyNodeDailyUsd: number;
+  /**
+   * The longest answer, in tokens, a call on the node's key may ask for; a call that names none or
+   * more gets this many (services/ai/node-key-hold.ts). The call's price is estimated with it before
+   * the call runs and held against what is left of the allowance. 0 is no limit. Calls on an owner's
+   * or an agent's own key are not affected. AIMEAT_AI_NODE_KEY_MAX_OUTPUT_TOKENS, default 32000.
+   */
+  aiNodeKeyMaxOutputTokens: number;
   /**
    * Model used when someone on the node's key has spent their allowance. Empty means refuse instead
    * of degrading. A free model is a worse answer, not a wrong one, as long as the person is told.

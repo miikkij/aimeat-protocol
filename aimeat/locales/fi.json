@@ -11799,6 +11799,7 @@
     "cfg_ai_node_key_when_spent": "Kun tekoälysaldo on käytetty",
     "cfg_ai_node_key_account_daily_usd": "Päiväraja tiliä kohden",
     "cfg_ai_node_key_node_daily_usd": "Päiväraja kaikille tileille",
+    "cfg_ai_node_key_max_output_tokens": "Pisin vastaus palvelimen avaimella (tokeneina)",
     "cfg_ai_model_free_fallback": "Malli saldon jälkeen",
     "cfg_ai_model_default_chat": "Chatin oletusmalli",
     "cfg_ai_model_default_reasoning": "Päättelyn oletusmalli",
@@ -12109,6 +12110,7 @@
     "cfgDesc_ai_node_key_when_spent": "Mitä palvelimen avain tekee, kun henkilön tekoälysaldo on käytetty: avain ei maksa enää mitään, mitä mallia kutsu pyytääkin, tai avain maksaa edelleen kahteen päivärajaan asti.",
     "cfgDesc_ai_node_key_account_daily_usd": "Kun valinta on limits: enintään näin paljon yhden tilin kutsut saavat maksaa palvelimen avaimella yhden päivän (UTC) aikana, dollareina.",
     "cfgDesc_ai_node_key_node_daily_usd": "Kun valinta on limits: enintään näin paljon kaikkien tilien kutsut yhteensä saavat maksaa palvelimen avaimella yhden päivän (UTC) aikana, dollareina.",
+    "cfgDesc_ai_node_key_max_output_tokens": "Pisin vastaus, jota palvelimen avaimella tehty kutsu voi pyytää. Jokainen kutsu hinnoitellaan sen mukaan ennen käynnistystä, ja hinta varataan jäljellä olevasta saldosta. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_ai_model_free_fallback": "Malli, jota käytetään, kun palvelimen avainta käyttävä henkilö on kuluttanut saldonsa. Jos tämä on tyhjä, vastauksia ei saldon loputtua enää anneta sen sijaan, että siirryttäisiin heikompaan malliin.",
     "cfgDesc_ai_model_default_chat": "Chatin oletusmalli, kun omistaja ei ole valinnut omaansa.",
     "cfgDesc_ai_model_default_reasoning": "Päättelyn oletusmalli, kun omistaja ei ole valinnut omaansa.",
@@ -26578,6 +26580,17 @@
           "ex2": "0: ei kutsuja sen jälkeen, kun saldo on käytetty, sama kuin refuse.",
           "ex3": "100: tilaa monelle ihmiselle, joista jokainen käyttää tilikohtaisen päivärajansa.",
           "tip": "Aseta tähän suurin summa, jonka olet valmis maksamaan yhdessä päivässä."
+        },
+        "node_key_max_output_tokens": {
+          "title": "Pisin vastaus palvelimen avaimella (tokeneina)",
+          "short": "Pisin vastaus, jota palvelimen avaimella tehty kutsu voi pyytää, tokeneina. 0 tarkoittaa, että rajaa ei ole. Oletus on 32000.",
+          "what": "Kutsu nimeää mallinsa ja vastauksensa pituuden, ja ne ratkaisevat sen hinnan. Ennen kuin palvelimen avaimella tehty kutsu käynnistyy, palvelin hinnoittelee sen kehotteen pituuden ja vastauksen pituuden perusteella malliluettelosta. Kutsun ajan palvelin varaa hinnan siitä, mitä ihmisen tekoälysaldosta (tai päivärajoista) on jäljellä. Kutsu, joka pyytää pidempää vastausta tai ei nimeä pituutta, saa tämän määrän tokeneita, ja vastaus kertoo, jos se katkesi. Kutsu, joka maksaisi enemmän kuin on jäljellä, torjutaan, ja vastaus kertoo hinnan. Tekstikutsu, joka ei nimennyt mallia, saa sen sijaan maksuttoman mallin. Tämä ei koske kutsuja, jotka tehdään ihmisen tai agentin omalla avaimella.",
+          "range": "Kokonaisluku tokeneina, vähintään 0. Oletus on 32000, mikä riittää pitkään asiakirjaan. 0 tarkoittaa, että rajaa ei ole. Silloin kutsu, joka ei nimeä pituutta, hinnoitellaan 1 024 tokenin mukaan.",
+          "low": "Pienempi: kukin kutsu hinnoitellaan halvemmaksi, joten pieneen saldoon mahtuu enemmän kutsuja, ja pitkät vastaukset katkeavat aiemmin.",
+          "high": "Suurempi: pitkät vastaukset mahtuvat, ja kukin kutsu varaa käynnin ajaksi enemmän saldoa.",
+          "ex1": "32000 mallilla, jonka vastaus maksaa 75 dollaria miljoonalta tokenilta: kutsu varaa noin 2,40 dollaria käynnin ajaksi.",
+          "ex2": "4000 samalla mallilla: kutsu varaa noin 0,30 dollaria.",
+          "tip": "Pidä luku lähellä pisintä vastausta, jota ihmiset oikeasti tarvitsevat. Joka tarvitsee enemmän, käyttää omaa avaintaan, jota tämä ei koske."
         }
       },
       "security": {

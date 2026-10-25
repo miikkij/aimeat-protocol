@@ -11801,6 +11801,7 @@
     "cfg_ai_node_key_when_spent": "When the allowance is spent",
     "cfg_ai_node_key_account_daily_usd": "Daily cap per account",
     "cfg_ai_node_key_node_daily_usd": "Daily cap for all accounts",
+    "cfg_ai_node_key_max_output_tokens": "Longest answer on the server's key (tokens)",
     "cfg_ai_model_free_fallback": "Model after the allowance",
     "cfg_ai_model_default_chat": "Default chat model",
     "cfg_ai_model_default_reasoning": "Default reasoning model",
@@ -12111,6 +12112,7 @@
     "cfgDesc_ai_node_key_when_spent": "What the server's key does when a person's AI allowance is spent: it pays nothing more, whatever model a call names, or it keeps paying up to the two daily caps.",
     "cfgDesc_ai_node_key_account_daily_usd": "With limits: the most one account's calls may cost the server's key in one day (UTC), in US dollars.",
     "cfgDesc_ai_node_key_node_daily_usd": "With limits: the most all accounts' calls together may cost the server's key in one day (UTC), in US dollars.",
+    "cfgDesc_ai_node_key_max_output_tokens": "The longest answer a call on the server's key may ask for. Each call is priced with it before it runs and held against what is left of the allowance. 0 means no limit.",
     "cfgDesc_ai_model_free_fallback": "Model used when a person on the server's key has spent their allowance. Empty refuses instead of degrading",
     "cfgDesc_ai_model_default_chat": "Default chat model when the owner has not chosen one",
     "cfgDesc_ai_model_default_reasoning": "Default reasoning model when the owner has not chosen one",
@@ -26599,6 +26601,17 @@
           "ex2": "0: no calls after an allowance is used up, the same as refuse.",
           "ex3": "100: room for many people who each use their daily cap per account.",
           "tip": "Set this to the most you are ready to pay in one day."
+        },
+        "node_key_max_output_tokens": {
+          "title": "Longest answer on the server's key (tokens)",
+          "short": "The longest answer a call on the server's key may ask for, in tokens. 0 means no limit. The default is 32000.",
+          "what": "A call names its model and the length of its answer, and both decide its price. Before a call on the server's key runs, the server prices it from the length of the prompt and the answer's length with the model list, and holds that price against what is left of the person's allowance (or of the daily caps) while the call runs. A call that asks for a longer answer, or names none, gets this many tokens; its answer says when it was cut short. A call that would cost more than is left is refused with its price, or a text call that named no model gets the free model. Calls on a person's or an agent's own key are not affected.",
+          "range": "A whole number of tokens, 0 or more. The default is 32000, enough for a long document. 0 means no limit; a call that names no length is then priced at 1,024 tokens.",
+          "low": "Lower: each call is priced lower, so more calls fit in a small allowance, and long answers are cut short sooner.",
+          "high": "Higher: long answers fit, and each call holds more of the allowance while it runs.",
+          "ex1": "32000 with a model at 75 USD per million output tokens: a call holds about 2.40 USD while it runs.",
+          "ex2": "4000 with the same model: a call holds about 0.30 USD.",
+          "tip": "Keep it near the longest answer people really need. A person who needs more uses their own key, which this does not touch."
         }
       },
       "security": {
