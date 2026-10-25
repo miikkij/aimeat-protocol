@@ -9,8 +9,9 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=component-versions
  * @version-history
- *   v1.2.0 — 2026-10-25 — Another owner reads a private cortex's versions as 404 NOT_FOUND, and a
- *     bundled cortex's versions still answer any owner (secaudit2026oct22).
+ *   v1.2.0 — 2026-10-25 — Another owner reads a private cortex's versions as 404 NOT_FOUND and is
+ *     refused a redeploy under its name (403), and a bundled cortex's versions still answer any owner
+ *     (secaudit2026oct22).
  *   v1.1.0 — 2026-09-24 — A kept version is immutable (secaudit 2026-09, A6-7): re-publishing 1.1.0
  *     with other code is refused on both kinds and the pinned address keeps its bytes; the same code
  *     again is a no-op; a PATCH of a live action becomes 1.1.1 while a call pinned to 1.1.0 runs the
@@ -235,6 +236,11 @@ await test('another owner reads a private cortex\'s versions as 404, the same an
     const list = await json(`/v1/cortex/${CORTEX}/versions`, auth(other));
     assert(list.status === 404 && list.body.error?.code === 'NOT_FOUND', `expected 404 NOT_FOUND, got ${list.status} ${JSON.stringify(list.body).slice(0, 200)}`);
     assert(!JSON.stringify(list.body).includes(owner), 'the answer names the installer');
+    // Nor may that owner deploy a version under the name: the upsert is refused, and the kept code stays.
+    const put = await json(`/v1/cortex/${CORTEX}`, auth(other, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('9.0.0'), libs: cortexLib('9.0.0') }) }));
+    assert(put.status === 403, `another owner's redeploy expected 403, got ${put.status} ${JSON.stringify(put.body).slice(0, 200)}`);
+    const bare = await raw(`/v1/cortex/${CORTEX}/libs/v.js`);
+    assert(!bare.text.includes("'9.0.0'"), `the refused redeploy changed the served lib: ${bare.text}`);
 });
 
 await test('a bundled cortex\'s versions still answer any signed-in owner', async () => {
