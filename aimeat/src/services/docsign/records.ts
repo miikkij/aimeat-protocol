@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-25 — A wallet signature from an EU reference-wallet test certificate is sealed with test: true, and the signature checks and the public lookup carry `test` (secaudit2026oct22, records.ts:test-anchor-wallet-signature-sealed-without-test-mark).
  *   2026-10-24 — refuseVisitor also refuses the shared anonymous principal by identity (isAnonymousPrincipal), so the token POST /v1/auth/anonymous mints no longer creates, signs or starts a signature on a request (secaudit2026oct22, caller-context.ts:kindOf:anonymous-by-flag-only:docsign-refuseVisitor).
  *   2026-10-24 — readRequestRecord: the stored request for the node's own work, so a data processing agreement reads its signatures (plan doc-mvmr4i2wdk0p, D3.1).
  *   2026-10-19 — addToIndex and removeFromIndex change the index on its version (updateRecord): withLock is per request and per process (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -509,6 +510,9 @@ async function sealInto(
     signer, signerName: rec.parties.find((p) => p.identity === signer)?.name ?? null,
     signedAt: new Date().toISOString(), method, assurance,
     evidence: evidenceHash(ev.passkey ?? ev.key ?? ev.wallet ?? null),
+    // A test-anchored wallet signature says so in what the node seals, so the checks and the public
+    // lookup can say it too. Every other statement has no such field.
+    ...(ev.wallet?.validation.test ? { test: true as const } : {}),
   };
   const seal = await sealStatement(statement, nodeKey);
   rec.signatures[signer] = {
@@ -667,6 +671,8 @@ export interface SignatureCheck {
   /** The signer's own evidence verifies (passkey assertion or key signature); null for session. */
   evidenceValid: boolean | null;
   valid: boolean;
+  /** A wallet signature from an EU reference-wallet test certificate: a test with no legal effect. */
+  test: boolean;
 }
 
 export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord): Promise<SignatureCheck[]> {
@@ -690,6 +696,8 @@ export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord
       signer, signerName: st.signerName, signedAt: st.signedAt, method: st.method, assurance: st.assurance,
       consistent, sealValid, sealByThisNode, evidenceValid,
       valid: consistent && sealValid && sealByThisNode && evidenceValid !== false,
+      // The sealed mark, or for a statement sealed before the mark existed, the stored wallet evidence.
+      test: st.test === true || sig.wallet?.validation.test === true,
     });
   }
   return out;
@@ -722,6 +730,8 @@ export interface PublicSignature {
   method: SignMethod;
   assurance: Assurance;
   valid: boolean;
+  /** A wallet signature from an EU reference-wallet test certificate: a test with no legal effect. */
+  test: boolean;
 }
 
 export interface PublicRequestView {
@@ -741,7 +751,7 @@ export async function publicView(ctx: DocsignCtx, rec: DocSignRecord): Promise<P
     id: rec.id, title: rec.title, state: rec.state,
     document: { sha256: rec.document.sha256, name: rec.document.name, size: rec.document.size },
     createdAt: rec.createdAt, completedAt: rec.completedAt, partiesTotal: rec.parties.length,
-    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid })),
+    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test })),
   };
 }
 

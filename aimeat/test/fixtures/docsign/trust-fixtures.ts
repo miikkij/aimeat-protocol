@@ -20,6 +20,9 @@
  *   crl · trustedList · lotl · signXml · qcStatements
  * @usage const ca = makeCertX({ ... ca: true }); const pdf = signPdfAs('adbe.pkcs7.detached', signer, key, [ca], 'text');
  * @version-history
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: buildCmsX can carry OCSP responses as an unsigned
+ *     adbe-revocationInfoArchival attribute, leave out the signer or the messageDigest attribute;
+ *     ocspResponse takes a thisUpdate; signXmlById signs one element by its Id.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03b-04).
  */
 import { createHash, createSign, type KeyObject } from 'node:crypto';
@@ -126,6 +129,22 @@ export interface CmsOpts {
   noSigningTime?: boolean;
   /** An RFC 3161 token over the signature value, added as the signature-timestamp unsigned attribute. */
   timestamp?: (signatureValue: Buffer) => Buffer;
+  /** OCSP responses carried as an unsigned adbe-revocationInfoArchival attribute. */
+  unsignedOcsp?: Buffer[];
+  /** A SignedData with an empty signerInfos SET. */
+  noSigner?: boolean;
+  /** Leave the messageDigest attribute out of the signed attributes. */
+  noMessageDigest?: boolean;
+}
+
+const ADBE_REVOCATION = '1.2.840.113583.1.1.8';
+
+/** RevocationInfoArchival { ocsp [1] EXPLICIT SEQUENCE OF OCSPResponse }. */
+function adbeRevocationValue(ocsp: Buffer[]): ArrayBuffer {
+  const responses = ocsp.map((d) => asn1js.fromBER(new Uint8Array(d).buffer).result);
+  return new asn1js.Sequence({
+    value: [new asn1js.Constructed({ idBlock: { tagClass: 3, tagNumber: 1 }, value: [new asn1js.Sequence({ value: responses })] })],
+  }).toBER();
 }
 
 /** A CMS SignedData by one RSA signer, SHA-256, with the four signed attributes a PAdES signer writes. */
@@ -137,7 +156,7 @@ export function buildCmsX(content: Buffer, signerCert: Buffer, signerKey: KeyObj
   const signedAttrs = [
     attr('1.2.840.113549.1.9.3', new asn1js.ObjectIdentifier({ value: eContentType }).toBER()),
     ...(o.noSigningTime ? [] : [attr('1.2.840.113549.1.9.5', new asn1js.UTCTime({ valueDate: new Date() }).toBER())]),
-    attr('1.2.840.113549.1.9.4', new asn1js.OctetString({ valueHex: createHash('sha256').update(content).digest() }).toBER()),
+    ...(o.noMessageDigest ? [] : [attr('1.2.840.113549.1.9.4', new asn1js.OctetString({ valueHex: createHash('sha256').update(content).digest() }).toBER())]),
     attr('1.2.840.113549.1.9.16.2.47', scv2.toBER()),
   ];
   const encoded = signedAttrs.map((a) => Buffer.from(AsnConvert.serialize(a))).sort(Buffer.compare);
@@ -150,7 +169,10 @@ export function buildCmsX(content: Buffer, signerCert: Buffer, signerKey: KeyObj
     signedAttrs: encoded.map((b) => AsnConvert.parse(b, Attribute)),
     signatureAlgorithm: new AlgorithmIdentifier({ algorithm: '1.2.840.113549.1.1.1', parameters: null }),
     signature: new OctetString(signature),
-    ...(o.timestamp ? { unsignedAttrs: [attr(SIGNATURE_TIMESTAMP, new Uint8Array(o.timestamp(signature)).buffer)] } : {}),
+    ...(o.timestamp || o.unsignedOcsp ? { unsignedAttrs: [
+      ...(o.timestamp ? [attr(SIGNATURE_TIMESTAMP, new Uint8Array(o.timestamp(signature)).buffer)] : []),
+      ...(o.unsignedOcsp ? [attr(ADBE_REVOCATION, adbeRevocationValue(o.unsignedOcsp))] : []),
+    ] } : {}),
   });
   const sd = new SignedData({
     version: o.eContentType && o.eContentType !== DATA ? CMSVersion.v3 : CMSVersion.v1,
@@ -160,7 +182,7 @@ export function buildCmsX(content: Buffer, signerCert: Buffer, signerKey: KeyObj
       ...(o.attached ? { eContent: new EncapsulatedContent({ single: new OctetString(content) }) } : {}),
     }),
     certificates: new CertificateSet([signerCert, ...chain].map((c) => new CertificateChoices({ certificate: AsnConvert.parse(c, Certificate) }))),
-    signerInfos: new SignerInfos([si]),
+    signerInfos: new SignerInfos(o.noSigner ? [] : [si]),
   });
   return Buffer.from(AsnConvert.serialize(new ContentInfo({ contentType: '1.2.840.113549.1.7.2', content: AsnConvert.serialize(sd) })));
 }
@@ -209,10 +231,10 @@ function pdfWithSubFilter(subFilter: string, slot: number, text: string) {
 
 /** A one-page PDF signed by `signerCert` with the given SubFilter, optionally with a signature timestamp. */
 export function signPdfAs(subFilter: 'ETSI.CAdES.detached' | 'adbe.pkcs7.detached', signerCert: Buffer, signerKey: KeyObject, chain: Buffer[], text: string,
-  timestamp?: (signatureValue: Buffer) => Buffer): Buffer {
+  timestamp?: (signatureValue: Buffer) => Buffer, extra: CmsOpts = {}): Buffer {
   const slot = 16384;
   const { pdf, contentsAt, byteRangeAt } = pdfWithSubFilter(subFilter, slot, text);
-  return fill(pdf, contentsAt, byteRangeAt, slot, (signed) => buildCmsX(signed, signerCert, signerKey, chain, { timestamp }));
+  return fill(pdf, contentsAt, byteRangeAt, slot, (signed) => buildCmsX(signed, signerCert, signerKey, chain, { ...extra, timestamp }));
 }
 
 /** A one-page PDF whose only signature field is a document timestamp (SubFilter ETSI.RFC3161). */
@@ -233,10 +255,10 @@ function issuerHashes(issuerCert: Buffer): { nameHash: Buffer; keyHash: Buffer }
 }
 
 /** An OCSP response about `cert`, signed by its issuing CA. */
-export function ocspResponse(cert: Buffer, issuerCert: Buffer, issuerKey: KeyObject, status: { revokedAt?: Date } = {}): Buffer {
+export function ocspResponse(cert: Buffer, issuerCert: Buffer, issuerKey: KeyObject, status: { revokedAt?: Date; thisUpdate?: Date } = {}): Buffer {
   const { nameHash, keyHash } = issuerHashes(issuerCert);
   const serial = AsnConvert.parse(cert, Certificate).tbsCertificate.serialNumber;
-  const now = new Date();
+  const now = status.thisUpdate ?? new Date();
   const data = new ResponseData({
     responderID: new ResponderID({ byKey: new OctetString(keyHash) }),
     producedAt: now,
@@ -309,6 +331,20 @@ export function signXml(xml: string, key: KeyObject, cert: Buffer): string {
     digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
     transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/2001/10/xml-exc-c14n#'],
     isEmptyUri: true,
+  });
+  sx.computeSignature(xml);
+  return sx.getSignedXml();
+}
+
+/** Sign `xml` with an enveloped XML signature whose one reference names the element carrying `Id="id"`. */
+export function signXmlById(xml: string, key: KeyObject, cert: Buffer, id: string): string {
+  const sx = new SignedXml({ privateKey: key.export({ type: 'pkcs8', format: 'pem' }).toString(), publicCert: pem(cert) });
+  sx.signatureAlgorithm = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
+  sx.canonicalizationAlgorithm = 'http://www.w3.org/2001/10/xml-exc-c14n#';
+  sx.addReference({
+    xpath: `//*[@Id='${id}']`,
+    digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
+    transforms: ['http://www.w3.org/2000/09/xmldsig#enveloped-signature', 'http://www.w3.org/2001/10/xml-exc-c14n#'],
   });
   sx.computeSignature(xml);
   return sx.getSignedXml();

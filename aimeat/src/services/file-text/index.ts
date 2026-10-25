@@ -26,8 +26,11 @@
  *   if (got) prompt.push(`Attached file: ${filename}\n\n${got.text}`);
  * @version-history
  *   v1.0.0 -- 2026-08-17 -- Initial: xlsx, docx and pdf.
+ *   v1.0.1 -- 2026-10-25 -- secaudit2026oct22: a PDF whose streams decode past 256 MB is not handed
+ *     to pdf.js (pdf-budget.ts); the person hears that it was not read.
  */
 import { extractText as extractPdfText } from 'unpdf';
+import { pdfDecodesWithin } from './pdf-budget.js';
 import { safeUnzip, ZipSecurityError, type SafeZipLimits } from '../safe-zip.js';
 import { logger } from '../../utils/logger.js';
 import { extractXlsxText } from './xlsx.js';
@@ -138,6 +141,9 @@ async function readOffice(bytes: Buffer, kind: ExtractableKind): Promise<string>
  * photographed a document needs to hear "this is a picture of text" and not silence.
  */
 async function readPdf(bytes: Buffer): Promise<string> {
+    // pdf.js inflates streams with no size limit; a PDF whose streams decode past the budget is not
+    // handed to it (pdf-budget.ts).
+    if (!(await pdfDecodesWithin(bytes))) throw new Error('the PDF\'s content decodes to more than 256 MB');
     const { text } = await extractPdfText(new Uint8Array(bytes), { mergePages: true });
     return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }

@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.6.2 — 2026-10-25 — A second channel's delegation for an app id and action another channel
+ *     holds is 409 DELEGATION_IN_USE, and the 201 reads back the caller's own row (secaudit2026oct22).
  *   v1.6.1 — 2026-10-10 — A second confirmation of a bound round answers 409 with no Set-Cookie,
  *     and the first browser still finishes the round (secaudit 2026-10-10 I6).
  *   v1.6.0 — 2026-10-09 — Phase 2d: the owner lists their agents' connections (no credential) and
@@ -1040,6 +1042,27 @@ async function main(): Promise<void> {
         body: { app_id: 'app:stopper', action: 'publish-video', storage_key: 'vid/test.mp4', caption: `after-restart-${Date.now()}` },
       });
       assert(after.status === 200, `the re-enabled delegation still refuses: ${after.status} ${after.data?.error?.code}`);
+    });
+
+    // secaudit2026oct22: the delegation is found by app id and action alone, so a second channel's
+    // delegation for the same pair must not exist, and the 201 must read back the caller's own row.
+    await test('another owner cannot take an app id and action a channel already delegates', async () => {
+      const bShared = await connect(jwtB, 'bravo-channel', 'shared');
+      const bSharedId = (bShared.connections as any[]).find(c => c.mode === 'shared').id;
+      const dup = await api(`/v1/connections/${bSharedId}/delegations`, {
+        bearer: jwtB, body: { app_id: 'app:funvids', action: 'publish-video', moderation: 'auto' },
+      });
+      assert(dup.status === 409 && dup.data?.error?.code === 'DELEGATION_IN_USE',
+        `expected 409 DELEGATION_IN_USE, got ${dup.status} ${dup.data?.error?.code ?? ''} ${JSON.stringify(dup.data?.data?.delegation?.connectionId ?? '')}`);
+      const own = await api(`/v1/connections/${bSharedId}/delegations`, {
+        bearer: jwtB, body: { app_id: 'app:bravo-own', action: 'publish-video', moderation: 'auto' },
+      });
+      assert(own.status === 201 && own.data.data.delegation.connectionId === bSharedId,
+        `B's own delegation: ${own.status}, connection ${own.data?.data?.delegation?.connectionId}`);
+      const again = await api(`/v1/connections/${sharedId}/delegations`, {
+        bearer: jwtA, body: { app_id: 'app:stopper', action: 'publish-video', moderation: 'auto' },
+      });
+      assert(again.status === 201 && again.data.data.delegation.connectionId === sharedId, `A re-saves its own delegation: ${again.status}`);
     });
 
     await test('a missing file is refused BEFORE an attempt is opened', async () => {

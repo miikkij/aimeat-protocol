@@ -35,6 +35,9 @@
  *   const result = await runAppPlaytest(storage, config, 'alice', 'runner.html');
  *   if (result.ran && !result.summary.ok) { ... }
  * @version-history
+ *   v1.2.0 — 2026-10-25 — secaudit2026oct22: at most two playtests run at once on a node and an
+ *     account starts at most thirty an hour (takePlaytestSlot, answered ran:false with the reason),
+ *     and each browser pass is closed by withHeadlessContext's deadline.
  *   v1.1.0 — 2026-10-05 — The app's requests go through the headless browser's guard
  *     (headless-network.ts): the node's own loopback for its own origin, safeFetch for a public
  *     address, nothing private. serveApp gave every other request to the browser's network
@@ -339,6 +342,50 @@ export async function runAppPlaytest(
     };
   }
 
+  const slot = takePlaytestSlot(owner);
+  if ('reason' in slot) {
+    return { ran: false, reason: slot.reason, at, checks: [], console: { errors: [], warnings: 0 }, summary: { ok: true, failed: 0 } };
+  }
+  try {
+    return await playtestPasses(config, owner, filename, html, opts, at);
+  } finally {
+    slot.release();
+  }
+}
+
+/** Playtests running at once on this node: each holds a headless browser. */
+const PLAYTESTS_AT_ONCE = 2;
+/** Playtests one account may start in an hour. */
+const PLAYTESTS_PER_OWNER_HOUR = 30;
+let playtestsRunning = 0;
+const playtestHistory = new Map<string, number[]>();
+
+/**
+ * A playtest slot for `owner`, or the sentence that says why there is none: the node is running
+ * PLAYTESTS_AT_ONCE already, or this account started PLAYTESTS_PER_OWNER_HOUR in the last hour.
+ * Exported for its unit test.
+ */
+export function takePlaytestSlot(owner: string, now = Date.now()): { release(): void } | { reason: string } {
+  const recent = (playtestHistory.get(owner) ?? []).filter((t) => now - t < 3_600_000);
+  if (recent.length >= PLAYTESTS_PER_OWNER_HOUR) {
+    const waitMin = Math.max(1, Math.ceil((3_600_000 - (now - recent[0]!)) / 60_000));
+    playtestHistory.set(owner, recent);
+    return { reason: `You have run ${PLAYTESTS_PER_OWNER_HOUR} playtests in the last hour, which is the limit. Try again in about ${waitMin} minute(s).` };
+  }
+  if (playtestsRunning >= PLAYTESTS_AT_ONCE) {
+    return { reason: 'This node is running other playtests right now. Try again in a minute.' };
+  }
+  recent.push(now);
+  playtestHistory.set(owner, recent);
+  playtestsRunning++;
+  let released = false;
+  return { release: () => { if (!released) { released = true; playtestsRunning--; } } };
+}
+
+/** The two browser passes and the checks, once a slot is held. */
+async function playtestPasses(
+  config: AimeatConfig, owner: string, filename: string, html: string, opts: AppPlaytestOptions, at: string,
+): Promise<AppPlaytestResult> {
   // Relative and root-absolute URLs in the app resolve against THIS address, so it points at the
   // node's own loopback rather than its public hostname: a server often cannot reach its own public
   // name from inside, and the playtest must not depend on that (the same lesson as the Design Book

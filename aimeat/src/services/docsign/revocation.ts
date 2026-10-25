@@ -14,6 +14,9 @@
  * @usage const r = await checkRevocation(cert, issuer, { embeddedOcsp, online: true });
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: an embedded good OCSP answer stands in for a fresh one
+ *     only when it was made at or after a proven signing time (opts.provenTime); otherwise the
+ *     responder is asked and the embedded answer is the fallback. An embedded "revoked" is used as is.
  */
 import { createHash } from 'node:crypto';
 import * as asn1js from 'asn1js';
@@ -249,16 +252,31 @@ function readCrl(der: Buffer, cert: CertInfo, issuer: CertInfo): { result: Revoc
 }
 
 export async function checkRevocation(
-  cert: CertInfo, issuer: CertInfo | null, opts: { embeddedOcsp?: Buffer[]; online: boolean; trustResponder?: ResponderTrust },
+  cert: CertInfo, issuer: CertInfo | null,
+  opts: { embeddedOcsp?: Buffer[]; online: boolean; trustResponder?: ResponderTrust; provenTime?: Date | null },
 ): Promise<RevocationResult> {
   const notes: string[] = [];
   if (!issuer) return { status: 'unchecked', source: null, revokedAt: null, producedAt: null, notes: ['the issuer certificate is missing'] };
 
+  // An embedded answer that says "revoked" is used as it is. One that says "good" speaks for its
+  // own thisUpdate only, so it stands in for a fresh answer when it was made at or after a PROVEN
+  // signing time (PAdES-LT). Otherwise the responder is asked, and the embedded answer is kept as
+  // the fallback when no fresh answer can be had.
+  let fallback: RevocationResult | null = null;
   for (const der of opts.embeddedOcsp ?? []) {
     const r = await readOcsp(der, cert, issuer, opts.trustResponder);
-    if (r.result) return { ...r.result, source: 'embedded-ocsp' };
+    if (!r.result) continue;
+    const embedded: RevocationResult = { ...r.result, source: 'embedded-ocsp' };
+    if (r.result.status !== 'good') return embedded;
+    const madeAt = r.result.producedAt ? Date.parse(r.result.producedAt) : NaN;
+    if (opts.provenTime && madeAt >= opts.provenTime.getTime()) return embedded;
+    fallback ??= embedded;
   }
-  if (!opts.online) return { status: 'unchecked', source: null, revokedAt: null, producedAt: null, notes: ['online checks are off on this node'] };
+  if (fallback) notes.push('the OCSP answer the signature carries does not cover a proven signing time, so the responder was asked');
+  if (!opts.online) {
+    return fallback ? { ...fallback, notes: [...fallback.notes, 'online checks are off on this node'] }
+      : { status: 'unchecked', source: null, revokedAt: null, producedAt: null, notes: ['online checks are off on this node'] };
+  }
 
   for (const url of cert.ocspUrls.filter((u) => /^https?:\/\//i.test(u)).slice(0, 2)) {
     try {
@@ -290,6 +308,7 @@ export async function checkRevocation(
     }
   }
   if (!cert.ocspUrls.length && !cert.crlUrls.length) notes.push('the certificate names no OCSP responder and no CRL');
+  if (fallback) return { ...fallback, notes: [...fallback.notes, ...notes] };
   return { status: 'unknown', source: null, revokedAt: null, producedAt: null, notes };
 }
 

@@ -44,6 +44,8 @@
  *     Settings, the headings a step larger than the words (Jouni's decision "Small reader").
  *   v1.8.0 -- 2026-09-26 -- `scroll`: a long document in a tab keeps a reading width (760px) and
  *     scrolls inside after 60% of the window (.md-body--scroll; was agents-detail.css .pf-agd-readme).
+ *   v1.8.1 -- 2026-10-25 -- secaudit2026oct22: sanitizeHref and sanitizeImgSrc decide the scheme on the
+ *     text the URL parser reads (tabs and newlines removed, C0 controls trimmed).
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
@@ -61,9 +63,20 @@ export function slugifyHeading(text) {
   return String(text).toLowerCase().trim().replace(/[`*_~[\]()#]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }
 
+// The text the browser's URL parser reads: it removes leading and trailing C0 controls and spaces,
+// and every ASCII tab and newline, before it looks for the scheme. String.trim() alone let
+// `java<TAB>script:` and `<U+0001>javascript:` pass as relative links.
+function parserText(url) {
+  const s = url.replace(/[\t\n\r]/g, '');
+  let a = 0, b = s.length;
+  while (a < b && s.charCodeAt(a) <= 0x20) a++;
+  while (b > a && s.charCodeAt(b - 1) <= 0x20) b--;
+  return s.slice(a, b).trim();
+}
+
 export function sanitizeHref(url) {
   if (typeof url !== 'string') return null;
-  const trimmed = url.trim();
+  const trimmed = parserText(url);
   // Relative links (no scheme) and fragment/anchor links are safe.
   if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
   return SAFE_SCHEME.test(trimmed) ? trimmed : null;
@@ -71,7 +84,7 @@ export function sanitizeHref(url) {
 
 export function sanitizeImgSrc(url) {
   if (typeof url !== 'string') return null;
-  const trimmed = url.trim();
+  const trimmed = parserText(url);
   if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;   // relative (e.g. /v1/storage/…)
   return SAFE_IMG_SCHEME.test(trimmed) ? trimmed : null;
 }

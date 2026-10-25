@@ -13,6 +13,8 @@
  *   renderToString/renderRich; rich CDN loaders; live memory embeds; attach('md', …).
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  AIMEAT.md.render(md, '#out')
  * @version-history
+ *   v1.2.1 — 2026-10-25 — secaudit2026oct22: sanitizeHref and sanitizeImgSrc decide the scheme on the
+ *     text the URL parser reads (tabs and newlines removed, C0 controls trimmed).
  *   v1.2.0 — 2026-10-25 — renderRich() loads Mermaid 12 from /lib/mermaid@12/ (ELK layout); the initialize options are unchanged and valid in 12.
  *   v1.0.1 — 2026-10-19 — A live block's public read goes through _core/public-fetch.js (signed-in-only node).
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-markdown.ts (SDK-libs migration Phase 2).
@@ -29,15 +31,25 @@ var BT = String.fromCharCode(96); // backtick
 var SAFE = /^(https?:|mailto:)/i;
 var SAFE_IMG = /^(https?:|blob:)/i;
 
+// The text the browser's URL parser reads: it removes leading and trailing C0 controls and spaces,
+// and every ASCII tab and newline, before it looks for the scheme. Deciding on String.trim() alone let
+// `java<TAB>script:` and `<U+0001>javascript:` pass as relative links.
+function parserText(url) {
+  var s = url.replace(/[\t\n\r]/g, '');
+  var a = 0, b = s.length;
+  while (a < b && s.charCodeAt(a) <= 0x20) a++;
+  while (b > a && s.charCodeAt(b - 1) <= 0x20) b--;
+  return s.slice(a, b).trim();
+}
 function sanitizeHref(url) {
   if (typeof url !== 'string') return null;
-  var t = url.trim();
+  var t = parserText(url);
   if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;       // relative / fragment links are safe
   return SAFE.test(t) ? t : null;
 }
 function sanitizeImgSrc(url) {
   if (typeof url !== 'string') return null;
-  var t = url.trim();
+  var t = parserText(url);
   if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;        // relative (e.g. /v1/pub/…)
   return SAFE_IMG.test(t) ? t : null;
 }
