@@ -39,6 +39,7 @@
  *   walletClient · parseDocumentWithSignature
  * @usage const s = await startWalletSignature(ctx, caller, id, { bytes });
  * @version-history
+ *   2026-10-25 — The seal rule is walletSealRefusal(); a certificate revoked now is refused (422 CERTIFICATE_REVOKED) whatever signing time the signature claims (secaudit2026oct22, eudi.ts:wallet-seal-accepts-indeterminate-revocation).
  *   2026-10-15 — A wallet signature is sealed only when its chain reaches a trusted root (422 SIGNER_NOT_TRUSTED) and the certificate names the account holder (422 NAME_MISMATCH) (feature-list audit 38).
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
  *   v1.1.0 — 2026-10-10 — x509_san_uri: the EU test registrar's access certificate for aimeat.io
@@ -57,7 +58,7 @@ import type { CallerContext } from '../caller-context.js';
 import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
 import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
-import { validatePdf } from './validate.js';
+import { validatePdf, type SignatureReport } from './validate.js';
 import {
   DocsignError, walletSigner, checkWalletSignature, recordWalletSignature, noteWalletAttempt, noteDocumentSource, documentHash,
   type DocsignCtx, type WalletEvidence,
@@ -359,6 +360,45 @@ export function parseDocumentWithSignature(form: Record<string, unknown>): strin
 
 const fromBase64 = (s: string) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 
+/** Why a wallet's newest signature cannot be sealed: the code, the line for the log and the request, and the answer. */
+export interface WalletSealRefusal { code: string; log: string; message: string }
+
+/**
+ * The rule a wallet's newest signature must pass before the node seals it as the person's own, or
+ * null when it passes. `fields` is how many signature fields the returned PDF holds, for the log.
+ */
+export function walletSealRefusal(newest: SignatureReport | undefined, fields: number): WalletSealRefusal | null {
+  if (!newest || !newest.integrity.contentIntact || !newest.integrity.signatureValid || newest.verdict === 'invalid' || newest.coverage?.wholeFile === false) {
+    const why = newest
+      ? `${newest.verdict}: ${newest.summary} [reasons ${newest.reasons.join(',') || 'none'}; content intact ${newest.integrity.contentIntact}; signature valid ${newest.integrity.signatureValid}; algorithm ${newest.integrity.algorithm}; whole file ${newest.coverage?.wholeFile}]`
+      : `no signature in the returned PDF (${fields} fields)`;
+    return { code: 'SIGNATURE_NOT_VALID', log: `The wallet's signature did not check out (${why}).`, message: `The returned signature did not check out: ${why}` };
+  }
+  // A wallet signature is sealed as the person's own only when its chain reaches a trusted root (the
+  // EU trusted list, an operator anchor, or an EUDI test root, decision "EU wallet signing",
+  // 2026-10-09) and the certificate names the person who signs. An unverified chain was accepted as
+  // indeterminate and the name match was only recorded (feature-list audit 38).
+  if (!newest.trust.source) {
+    return {
+      code: 'SIGNER_NOT_TRUSTED',
+      log: `The signing certificate's chain does not reach a root this node trusts (issuer ${newest.issuer?.name ?? 'unknown'}), so the signature cannot be sealed as yours.`,
+      message: 'The wallet signed with a certificate whose chain reaches no root this node trusts, so nothing was sealed. Sign with a wallet whose certificate comes from a trusted provider, or ask the operator which providers this node trusts.',
+    };
+  }
+  // A wallet signs during this session, so its certificate must not be revoked NOW. The validator's
+  // leniency for an unproven historical signing time (validate.ts, REVOKED_NO_PROOF_OF_TIME as a
+  // doubt) and its "revoked after signing" reading do not apply to a signature the node knows was
+  // made a moment ago; the claimed time inside the signature is the signer's own statement.
+  if (newest.revocation.status === 'revoked') {
+    return {
+      code: 'CERTIFICATE_REVOKED',
+      log: `The signing certificate was revoked${newest.revocation.revokedAt ? ` at ${newest.revocation.revokedAt}` : ''}, so the signature cannot be sealed as yours.`,
+      message: 'The certificate your wallet signed with has been revoked, so nothing was sealed. Renew the signing certificate in your wallet, then sign again.',
+    };
+  }
+  return null;
+}
+
 /** "Matti Meikäläinen" and "MEIKÄLÄINEN Matti" name the same person; anything else does not. */
 function sameName(a: string | null | undefined, b: string | null | undefined): boolean | null {
   const words = (s: string) => s.toLocaleLowerCase('fi').normalize('NFC').split(/[^\p{L}]+/u).filter((w) => w.length > 1).sort().join(' ');
@@ -437,22 +477,13 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   }
   const report = await validatePdf(ctx.config, signed);
   const newest = report.signatures.filter((x) => x.kind === 'signature').sort((a, b) => b.index - a.index)[0];
-  if (!newest || !newest.integrity.contentIntact || !newest.integrity.signatureValid || newest.verdict === 'invalid' || newest.coverage?.wholeFile === false) {
-    const why = newest
-      ? `${newest.verdict}: ${newest.summary} [reasons ${newest.reasons.join(',') || 'none'}; content intact ${newest.integrity.contentIntact}; signature valid ${newest.integrity.signatureValid}; algorithm ${newest.integrity.algorithm}; whole file ${newest.coverage?.wholeFile}]`
-      : `no signature in the returned PDF (${report.signatures.length} fields)`;
-    await refuse('SIGNATURE_NOT_VALID', `The wallet's signature did not check out (${why}).`, signed);
-    throw new DocsignError('SIGNATURE_NOT_VALID', 422, `The returned signature did not check out: ${why}`);
+  const refusal = walletSealRefusal(newest, report.signatures.length);
+  if (refusal) {
+    await refuse(refusal.code, refusal.log, signed);
+    throw new DocsignError(refusal.code, 422, refusal.message);
   }
-
-  // A wallet signature is sealed as the person's own only when its chain reaches a trusted root (the
-  // EU trusted list, an operator anchor, or an EUDI test root, decision "EU wallet signing",
-  // 2026-10-09) and the certificate names the person who signs. An unverified chain was accepted as
-  // indeterminate and the name match was only recorded (feature-list audit 38).
-  if (!newest.trust.source) {
-    await refuse('SIGNER_NOT_TRUSTED', `The signing certificate's chain does not reach a root this node trusts (issuer ${newest.issuer?.name ?? 'unknown'}), so the signature cannot be sealed as yours.`, signed);
-    throw new DocsignError('SIGNER_NOT_TRUSTED', 422, 'The wallet signed with a certificate whose chain reaches no root this node trusts, so nothing was sealed. Sign with a wallet whose certificate comes from a trusted provider, or ask the operator which providers this node trusts.');
-  }
+  // walletSealRefusal refuses a missing signature; this narrows the type for what follows.
+  if (!newest) throw new DocsignError('SIGNATURE_NOT_VALID', 422, 'The returned PDF holds no signature.');
   const signerGhii = await ctx.storage.getGHII(s.signer);
   if (sameName(newest.signer?.name, signerGhii?.displayName) !== true) {
     await refuse('NAME_MISMATCH', `The name in the signing certificate (${newest.signer?.name ?? 'none'}) is not the name on the account (${signerGhii?.displayName ?? 'none'}).`, signed);
