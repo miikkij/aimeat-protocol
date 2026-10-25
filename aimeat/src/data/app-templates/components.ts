@@ -11,6 +11,7 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.5.2 — 2026-10-25 — COMP_MERMAID_DIAGRAM loads Mermaid 12 from /lib/mermaid@12/.
  *   v1.5.1 — 2026-10-16 — COMP_PRIVATE_STORE, COMP_SETTINGS and COMP_PHASER_ARCADE's saveHighScore
  *     say why their "read, change, write the whole value" is safe: AIMEAT.data.get() throws on a
  *     refused read (aimeat-data v1.7.0), so the set() after it never runs, and an app built from them
@@ -215,7 +216,7 @@ AIMEAT.md.render(markdownString, '#target');   // replaces #target content with 
 // XSS-safe for LLM-authored text (no innerHTML; hrefs/imgs sanitized). Pairs well with aimeat-ai output.`;
 
 export const COMP_MERMAID_DIAGRAM = `// mermaid-diagram — render a text-defined diagram (flowchart/sequence/gantt/mindmap).
-// Load the self-hosted pack: <script src="/lib/mermaid/mermaid.min.js"></script>  (pack id: mermaid)
+// Load the self-hosted pack: <script src="/lib/mermaid@12/mermaid.min.js"></script>  (pack id: mermaid)
 var diagramSeq = 0;
 function initMermaid() {
   var dark = document.documentElement.getAttribute('data-theme') === 'dark';

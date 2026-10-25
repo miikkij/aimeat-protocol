@@ -5,7 +5,7 @@
  *   the DOM with createElement/textContent (never innerHTML for content) so LLM-authored markdown has
  *   no raw-HTML/<script> surface; hrefs + img srcs are scheme-sanitized. renderToString() serializes
  *   the safe subset. renderRich() runs the full GFM pipeline (markdown-it + task lists + footnotes +
- *   DOMPurify + highlight.js from jsDelivr; mermaid from the node's vendored /lib/mermaid), falling
+ *   DOMPurify + highlight.js from jsDelivr; mermaid 12 from the node's vendored /lib/mermaid@12), falling
  *   back to render() when any CDN dep fails. ```aimeat-memory fences become live data embeds.
  *   Componentized ESM source esbuild bundles to the IIFE served, unchanged, at /v1/libs/aimeat-markdown.js.
  *   Ported verbatim from lib-markdown.ts; NODE_URL now comes from _core/config.
@@ -13,6 +13,7 @@
  *   renderToString/renderRich; rich CDN loaders; live memory embeds; attach('md', …).
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  AIMEAT.md.render(md, '#out')
  * @version-history
+ *   v1.2.0 — 2026-10-25 — renderRich() loads Mermaid 12 from /lib/mermaid@12/ (ELK layout); the initialize options are unchanged and valid in 12.
  *   v1.0.1 — 2026-10-19 — A live block's public read goes through _core/public-fetch.js (signed-in-only node).
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-markdown.ts (SDK-libs migration Phase 2).
  *   v1.1.0 — 2026-07-25 — Added AIMEAT.md.citations(text): pulls `Source:`/`Sources:` lines, inline
@@ -303,7 +304,7 @@ function loadMermaid() {
   if (_mermaidP) return _mermaidP;
   _mermaidP = new Promise(function (resolve, reject) {
     var s = document.createElement('script');
-    s.src = NODE_URL + '/lib/mermaid/mermaid.min.js'; // vendored on the node, ~3MB — lazy
+    s.src = NODE_URL + '/lib/mermaid@12/mermaid.min.js'; // vendored on the node, ~5.5MB — lazy
     s.onload = function () {
       try {
         window.mermaid.initialize({
