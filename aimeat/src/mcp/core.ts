@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-10-25 — aimeat_discover with scope 'shared' needs organism:read, as aimeat_workspace_read
+ *     does; without it the tool answers SCOPE_DENIED naming the word (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The three work tools moved to mcp/core-work.ts (pure extraction, max-file-lines).
@@ -172,6 +174,8 @@ import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hi
 import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';
 import { organismReadableRecords } from '../services/organism-namespace-access.js';
 import { listMemoryMetaFor } from '../services/memory-query.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeDeniedText } from './scope-denied-answer.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, agentsListOutput, agentProfileOutput } from '../tool-catalog/output-schemas.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
@@ -321,6 +325,12 @@ export function registerCoreTools(
             annotations: annotationsFor('aimeat_discover'),
         },
         async ({ mode, q, type, tags, segment, scope, limit, response_format }) => {
+            // The shared scope returns organism workspace content, which aimeat_workspace_read and
+            // aimeat_organism_search read only with organism:read: the same word here
+            // (secaudit2026oct22, discover-shared-scope-skips-organism-read).
+            if (scope === 'shared' && !scopeIsCovered(sessionScopes, 'organism:read')) {
+                return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_discover', ['organism:read'], { baseUrl: config.baseUrl, agentGaii }) }], isError: true as const };
+            }
             const parsed = parseGAII(agentGaii);
             const agent = await storage.getAgent(agentGaii);
             const types = discoverCsv(type).filter((t): t is DiscoveryType => VALID_DISCOVER_TYPES.has(t as DiscoveryType));

@@ -88,7 +88,7 @@ export const memoryMethods = {
     const valueStr = JSON.stringify(record.value);
     const byteSize = Buffer.byteLength(valueStr, 'utf8');   // cached for the O(1) total-size quota sum + ?include=meta
     // What the FTS index holds for this row: the scalar values to six levels, the PostgreSQL rule.
-    const searchValues = searchValueText(record.value);
+    const searchValues = searchValueText(record.value, record.key);
     if (existing) {
       if (existing.trackable) {
         // Archive the about-to-be-overwritten version into the separate history table (append-only).
@@ -185,7 +185,7 @@ export const memoryMethods = {
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       record.trackable ? 1 : 0, Buffer.byteLength(valueStr, 'utf8'),
       record.aiProvenanceId ?? null,
-      searchValueText(record.value),
+      searchValueText(record.value, record.key),
     );
     return result.changes === 0 ? null : record;
   },

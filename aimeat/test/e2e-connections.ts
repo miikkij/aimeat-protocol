@@ -19,6 +19,8 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.6.3 — 2026-10-25 — Phase 17: a caption-only scheduled post an agent made does not fire after the agent
+ *     is deleted or loses connections:use, and fires while it holds the word (secaudit2026oct22).
  *   v1.6.2 — 2026-10-25 — A second channel's delegation for an app id and action another channel
  *     holds is 409 DELEGATION_IN_USE, and the 201 reads back the caller's own row (secaudit2026oct22).
  *   v1.6.1 — 2026-10-10 — A second confirmation of a bound round answers 409 with no Set-Cookie,
@@ -1858,6 +1860,57 @@ async function main(): Promise<void> {
         `the run does not say why: ${JSON.stringify(fired.data.data)}`);
 
       await api(`/v1/schedules/${openSched}`, { method: 'DELETE', bearer: jwtA });
+    });
+
+    // secaudit2026oct22 (scheduler:connections-publish-fires-without-maker-check). A caption-only post
+    // names no file, so the file check above asks nothing at the fire. The maker is asked at every
+    // fire as the extension and agent_task kinds ask it: a deleted agent, or one that lost
+    // connections:use, does not post; one that still holds the word does.
+    await test('a scheduled post an agent made does not fire after the agent is deleted or loses connections:use; it does while the agent holds it', async () => {
+      const makeScheduler = async (name: string) => {
+        const made = await api('/v1/agents', { bearer: jwtA, body: { name, owner: userA, capabilities: ['memory'], model: 'test' } });
+        assert(made.status === 201, `agent: ${made.status} ${made.data?.error?.message}`);
+        const scoped = await api(`/v1/agents/${name}/scopes`, { method: 'PATCH', bearer: jwtA, body: { scopes: ['task:write', 'connections:use'] } });
+        assert(scoped.status === 200, `agent scopes: ${scoped.status} ${scoped.data?.error?.message}`);
+        const gaii = made.data.data.agent.gaii as string;
+        const ts = new Date().toISOString();
+        const sig = await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(made.data.data.private_key, 'base64'));
+        const tok = await api('/v1/auth/token', { body: { gaii, timestamp: ts, signature: Buffer.from(sig).toString('base64') } });
+        assert(tok.status === 200, `agent token: ${tok.status}`);
+        const s = await api('/v1/schedules', {
+          bearer: tok.data.data.token as string,
+          body: { kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC', constraints: ONE_SHOT, display_name: `post by ${name}`, input: { connection_id: connA, caption: `agent post ${name}` } },
+        });
+        assert(s.status === 201, `the agent could not schedule a caption: ${s.status} ${s.data?.error?.code} ${s.data?.error?.message}`);
+        return (s.data.data.schedule ?? s.data.data).id as string;
+      };
+
+      const keeps = await makeScheduler(`postkeep${stamp}`);
+      const before = provider.stats.publishes;
+      const okFire = await api(`/v1/schedules/${keeps}/trigger`, { bearer: jwtA });
+      assert(okFire.status === 200 && provider.stats.publishes === before + 1,
+        `an agent that holds connections:use did not post: ${okFire.status} ${JSON.stringify(okFire.data?.data ?? okFire.data?.error).slice(0, 300)}`);
+      await api(`/v1/schedules/${keeps}`, { method: 'DELETE', bearer: jwtA });
+
+      const gone = `postgone${stamp}`;
+      const goneSched = await makeScheduler(gone);
+      const del = await api(`/v1/agents/${gone}`, { method: 'DELETE', bearer: jwtA });
+      assert(del.status === 200, `agent delete: ${del.status} ${del.data?.error?.message}`);
+      const b1 = provider.stats.publishes;
+      const f1 = await api(`/v1/schedules/${goneSched}/trigger`, { bearer: jwtA });
+      assert(provider.stats.publishes === b1, `a deleted agent's schedule posted (${provider.stats.publishes - b1}): ${JSON.stringify(f1.data?.data).slice(0, 300)}`);
+      await api(`/v1/schedules/${goneSched}`, { method: 'DELETE', bearer: jwtA });
+
+      const narrowed = `postnarrow${stamp}`;
+      const narrowSched = await makeScheduler(narrowed);
+      const less = await api(`/v1/agents/${narrowed}/scopes`, { method: 'PATCH', bearer: jwtA, body: { scopes: ['task:write'] } });
+      assert(less.status === 200, `narrow: ${less.status} ${less.data?.error?.message}`);
+      const b2 = provider.stats.publishes;
+      const f2 = await api(`/v1/schedules/${narrowSched}/trigger`, { bearer: jwtA });
+      assert(provider.stats.publishes === b2, `an agent without connections:use posted (${provider.stats.publishes - b2})`);
+      assert(/connections:use/.test(JSON.stringify(f2.data?.data)), `the run does not name the missing permission: ${JSON.stringify(f2.data?.data).slice(0, 300)}`);
+      await api(`/v1/schedules/${narrowSched}`, { method: 'DELETE', bearer: jwtA });
+      await api(`/v1/agents/${narrowed}`, { method: 'DELETE', bearer: jwtA });
     });
 
     await test('an unknown time zone is refused by the scheduler’s own validation', async () => {

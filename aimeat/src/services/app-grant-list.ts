@@ -14,11 +14,14 @@
  *   import { listActiveAppGrants } from '../services/app-grant-list.js';
  *   const { grants, total } = await listActiveAppGrants(storage, ownerName);
  * @version-history
+ *   2026-10-25 — A grant given to an app of an earlier holder of the author's name is left out
+ *     (services/app-grant-author.ts; secaudit2026oct22).
  *   v1.0.0 — 2026-09-27 — Extracted from GET /v1/app-grants (routes/app-grants-manage.ts v1.2.0),
  *     same shape, when an agent holding consent:manage was allowed to read the list.
  */
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AppGrantRecord } from '../storage/interface.js';
 import { heldOwnerAdded } from './app-grant-scopes.js';
+import { grantGivenToEarlierAuthor } from './app-grant-author.js';
 
 /** One live app grant, in the shape GET /v1/app-grants answers. */
 export interface AppGrantListEntry {
@@ -46,7 +49,14 @@ export async function listActiveAppGrants(
   storage: Storage,
   ownerName: string,
 ): Promise<{ grants: AppGrantListEntry[]; total: number }> {
-  const grants = (await storage.listAppGrantsByOwner(ownerName)).filter(g => !g.revoked);
+  // A grant given to an app of an earlier holder of the author's name holds nothing any more
+  // (services/app-grant-author.ts), so it is not listed as live, and the consent page does not
+  // approve the new holder's app on it (secaudit2026oct22).
+  const authors = new Map<string, string | null>();
+  const grants: AppGrantRecord[] = [];
+  for (const g of await storage.listAppGrantsByOwner(ownerName)) {
+    if (!g.revoked && !(await grantGivenToEarlierAuthor(storage, g, authors))) grants.push(g);
+  }
   return {
     grants: grants.map(g => ({
       grant_id: g.grantId, app: g.app, app_name: g.appName, app_origin: g.appOrigin,

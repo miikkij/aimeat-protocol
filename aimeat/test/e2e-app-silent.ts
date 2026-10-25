@@ -8,6 +8,9 @@
  *   subdomain-served app HTML and the bridge page is framable only by app origins.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
+ *   2026-10-25 — A consent to an erased author's app does not pass to the next holder of the name (the
+ *     silent bridge, the refresh and the grant list); the same author's republish keeps it
+ *     (secaudit2026oct22, app-grants:grants-to-erased-authors-apps-rebind-on-name-reuse).
  *   2026-10-25 — Phase 4: a bare app-host redirect is the app's own path-form address, or the host's root in
  *     web_message mode; another app's address and an arbitrary path answer 400 INVALID_REDIRECT_URI. The
  *     test that accepted `/apps/a/callback` now expects 400 (Jouni, 2026-10-25; secaudit2026oct22).
@@ -736,6 +739,39 @@ async function main() {
         await test('the origin\'s own app is still served inline through /v1/apps/...', async () => {
             const r = await onOrigin('aaa', `/v1/apps/${a}/app-a.html?mode=inline`);
             assert(r.status === 200, `the origin's own app: ${r.status}`);
+        });
+
+        // secaudit2026oct22 (app-grants:grants-to-erased-authors-apps-rebind-on-name-reuse). A consent
+        // covers the app of the author the person consented to. A republish by the same author keeps
+        // it; after the author is erased and another person registers the name and publishes the same
+        // file at the same origin, the earlier consent mints nothing for the new code.
+        await test('a consent to an erased author\'s app does not pass to the next holder of the name; the same author\'s republish keeps it', async () => {
+            const dn = `silentd${(Date.now() + 2) % 100000}`;
+            const D1 = await register(dn);
+            await publish(D1.token, 'app-d.html', 'memory:read');
+            await assignSub(A.token, 'ddd', `${dn}/app-d.html`);
+            const ORIGIN_D = `https://ddd.${APP_HOST}`;
+            const r0 = await authorize(`${dn}/app-d.html`, 'memory:read', `${ORIGIN_D}/callback`);
+            const granted = await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_D}/callback`, B.token);
+            await publish(D1.token, 'app-d.html', 'memory:read');
+            const kept = await silent(ORIGIN_D, 'memory:read', B.rt);
+            assert(kept.ok === true, `the same author's republish dropped the consent: ${JSON.stringify(kept)}`);
+
+            const del = await json(`/v1/owners/${dn}`, { method: 'DELETE', headers: { Authorization: `Bearer ${D1.token}` } });
+            assert(del.status === 200, `erase the author: ${del.status} ${JSON.stringify(del.body?.error)}`);
+            const D2 = await register(dn);
+            await publish(D2.token, 'app-d.html', 'memory:read');
+            const s = await silent(ORIGIN_D, 'memory:read', B.rt);
+            assert(s.ok === false && s.error === 'consent_required', `the new holder's app got a token on the earlier consent: ${JSON.stringify({ ok: s.ok, error: s.error })}`);
+            const ref = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: granted.refresh_token }) });
+            assert(ref.status === 401, `the earlier refresh token minted for the new holder's app: ${ref.status}`);
+            const list = await json('/v1/app-grants', { headers: { Authorization: `Bearer ${B.token}` } });
+            assert(!(list.body.data.grants as any[]).some(g => g.app === `${dn}/app-d.html`), `the grant to the erased author's app is still listed as live`);
+            // A new consent to the new holder's app works.
+            const r1 = await authorize(`${dn}/app-d.html`, 'memory:read', `${ORIGIN_D}/callback`);
+            await consentAndExchange(r1.requestId!, r1.verifier, `${ORIGIN_D}/callback`, B.token);
+            const again = await silent(ORIGIN_D, 'memory:read', B.rt);
+            assert(again.ok === true, `a consent to the new holder's app does not sign in: ${JSON.stringify({ ok: again.ok, error: again.error })}`);
         });
 
         await test('a subdomain ending in --draft cannot be registered', async () => {

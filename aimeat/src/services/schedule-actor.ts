@@ -23,13 +23,16 @@
  *   const actor = await scheduleActor(storage, job);
  *   if (!actor.ok) throw new Error(actor.reason);
  * @version-history
+ *   2026-10-25 — A schedule older than the account its ownerScope names does not fire: it was left by a
+ *     previous holder of the name (secaudit2026oct22, owner-erasure:agent-made-schedules-survive-and-rebind).
  *   v1.1.0 — 2026-10-21 — makerOf() is exported, for services/schedule-fire-refusal.ts and
  *     services/schedule-extension-keep.ts (secaudit 2026-10, capability-loss review).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-2 and AI-3).
  */
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { WorkflowSaver } from '../models/workflow-schemas.js';
-import { isGEAI } from '../utils/gaii.js';
+import { isGEAI, localAccountOf } from '../utils/gaii.js';
+import { madeAfter, recordIssuedAt } from '../auth/credential-age.js';
 import { saverAuthority } from './workflow/trigger-authority.js';
 import { aiCallerOfPrincipal, OWNER_CALLER, type AiCallerContext } from './ai/caller-context.js';
 
@@ -61,9 +64,19 @@ export function makerOf(job: Pick<ScheduledJobRecord, 'createdBy' | 'createdByAg
 
 /** Who `job` fires as now, or why it does not fire. */
 export async function scheduleActor(
-  storage: Storage, job: Pick<ScheduledJobRecord, 'createdBy' | 'createdByAgent' | 'createdByApp' | 'ownerScope'>,
+  storage: Storage,
+  job: Pick<ScheduledJobRecord, 'createdBy' | 'createdByAgent' | 'createdByApp' | 'ownerScope'> & { createdAt?: string },
 ): Promise<ScheduleActor> {
   const owner = job.ownerScope ?? '';
+  // A schedule older than the account that holds its name now was left by a previous holder of that
+  // name: an account name is released at erasure, and a later account under it is a new principal
+  // (the madeAfter rule auth/agent-alive.ts applies to tokens). It does not fire in the new account
+  // (secaudit2026oct22, owner-erasure:agent-made-schedules-survive-and-rebind).
+  const accountName = owner ? localAccountOf(owner) : null;
+  const account = accountName ? await storage.getOwner(accountName) : null;
+  if (account && madeAfter(account.createdAt, recordIssuedAt(job.createdAt))) {
+    return { ok: false, reason: 'This schedule was made before this account existed, by a previous holder of the account name, so it does not run. Delete this schedule.' };
+  }
   const maker = makerOf(job);
   if (maker === 'unknown-app') {
     return { ok: false, reason: 'An app made this schedule before 2026-10-05, and the node cannot tell which app, so it no longer runs with your whole authority. Open the app to make it again, or delete this schedule.' };

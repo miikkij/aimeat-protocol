@@ -25380,7 +25380,9 @@ paths:
         fans across a registry of source adapters (design doc 2026-06-23). Scopes: `own` (caller's own
         content), `public` (public content node-wide), `shared` (content in organisms the caller is a
         member of, gated per-workspace by the same `canReadWorkspace` check as the REST read — nothing
-        the caller cannot read is ever returned, and facet counts obey the identical gate). Default
+        the caller cannot read is ever returned, and facet counts obey the identical gate; every
+        caller but the owner in person needs the `organism:read` scope for it, as on
+        `GET /v1/organisms/{id}/workspace`, and is answered 403 SCOPE_DENIED without it). Default
         scope: authenticated → `own`, anonymous → `public`. For an agent caller, results span the full
         owner identity set only when the agent holds the `memory:read` scope; otherwise they are limited
         to the agent's own content, and private records of the owner or of a sibling agent need
@@ -25434,7 +25436,8 @@ paths:
           description: >
             `own` (default when authenticated) = the caller's reachable content; `public` (default when
             anonymous) = public-visibility content node-wide; `shared` = readable content across the
-            organisms the caller is a member of (per-workspace gated). `own`/`shared` require auth.
+            organisms the caller is a member of (per-workspace gated). `own`/`shared` require auth;
+            `shared` also requires `organism:read` of every caller but the owner in person.
         - name: page
           in: query
           schema: { type: integer, minimum: 1, default: 1 }
@@ -25448,6 +25451,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '401':
           $ref: '#/components/responses/AimeatError'
+        '403':
+          description: scope=shared without the organism:read scope (SCOPE_DENIED).
 
   /v1/discover/facets:
     get:
@@ -25457,7 +25462,8 @@ paths:
         The cheap "what kinds of things, segments, and tags exist here, and how many?" probe an LLM
         runs before pulling entries. Returns facet counts (types, segments, tags) over the same
         access-gated, filtered set as `/v1/discover` — counts never reveal content the caller cannot
-        read. Accepts the same filter + scope parameters as `/v1/discover`.
+        read. Accepts the same filter + scope parameters as `/v1/discover`; `scope=shared` needs
+        `organism:read` of every caller but the owner in person (403 SCOPE_DENIED without it).
       tags: [Catalogue]
       security:
         - BearerAuth: []
@@ -25494,6 +25500,8 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '401':
           $ref: '#/components/responses/AimeatError'
+        '403':
+          description: scope=shared without the organism:read scope (SCOPE_DENIED).
 
   /v1/librarian/classify:
     post:
@@ -44173,7 +44181,7 @@ paths:
       responses:
         '200': { description: Form defined; returns form_id + submit_url }
         '400': { description: Invalid input (missing fields, meta.* namespace, bad slug) }
-        '403': { description: Not the workspace creator / org admin }
+        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
         '404': { description: Organism or workspace not found }
         '422':
           description: >
@@ -44196,7 +44204,7 @@ paths:
         - { name: ws, in: query, required: true, schema: { type: string } }
       responses:
         '200': { description: The owner's forms in the workspace }
-        '403': { description: Not the workspace creator / org admin }
+        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
     delete:
       operationId: deleteIntakeForm
       summary: Delete an intake form — its public link stops working (owner)
@@ -44208,7 +44216,7 @@ paths:
         - { name: form_id, in: query, required: true, schema: { type: string } }
       responses:
         '200': { description: 'Deleted (or already absent). The conversations of a conversation form stay until their own date (`ttl_days` after the last visitor message), when the node deletes them.' }
-        '403': { description: Not the workspace creator / org admin }
+        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
   /v1/intake/{org}/{ws}/{formId}:
     get:
       operationId: getIntakeFormDescriptor

@@ -17,6 +17,7 @@
  *   2026-10-25 -- e2e-admin-backup-reader.ts joins the list (not the guard tier): the classification reader and the export trail on GET /v1/admin/backup (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-operator-trail.ts joins the list (not the guard tier): the operator trail on the identity and scheduler routes (secaudit2026oct22).
  *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 40991 (secaudit2026oct22).
+ *   2026-10-25 -- e2e-anonymous-records-incident.ts joins the list (not the guard tier): what the shared anonymous agent wrote outside its namespace is one Security page incident, once, on its own node on 40458 (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
@@ -1036,6 +1037,9 @@ const ALL_SUITES = [
     // Owns its server on 40452 and boots it three times on one database: the move to the full
     // identity runs when the store opens, and what it cannot place becomes one incident.
     'test/e2e-held-account-names.ts',
+    // Owns its server on 40458 and boots it three times on one database: what the shared anonymous
+    // agent wrote outside its namespace becomes one Security page incident, once (secaudit2026oct22).
+    'test/e2e-anonymous-records-incident.ts',
     // Owns its server on 40477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
     // worked on 3.x keep the scope words 4.0.0 started to check, once, and only those agents.
     'test/e2e-rest-scope-keep-working.ts',

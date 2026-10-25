@@ -17,6 +17,9 @@
  *     200, app gone from admin+public+download, delete-missing 404.
  *   v1.2.0 — 2026-06-26 — add assertion that a DIFFERENT authenticated owner never sees another
  *     owner's hidden app (visibility is decided purely by who is authenticated; no client flag).
+ *   2026-10-25 — A hidden app's public tools leave discover and the commerce catalog, a manifest for
+ *     a file the node does not host keeps its listing, and the restore lists them again
+ *     (secaudit2026oct22, app-tool-catalog-ignores-app-hidden-state).
  */
 
 import { registerOwner } from './helpers/owner-login.js';
@@ -146,6 +149,34 @@ await test('App is GONE from the anonymous catalogue', async () => {
     assert(!found, 'app absent for anonymous viewer');
 });
 
+// secaudit2026oct22 (app-tool-catalog-ignores-app-hidden-state). The app's public tool manifest is
+// read by one scanner that feeds discover, the commerce feeds, the .well-known card and the merchant
+// files. The hide takes its tools out of all of them; a manifest for a file the node does not host
+// keeps its listing, and the restore below brings the tools back.
+const TOOL_ID = `${victimName}/${FILENAME}#modtool`;
+const ORPHAN_ID = `${victimName}/not-hosted-${FILENAME}#orphantool`;
+const toolIds = async () => (((await json('/v1/discover?scope=public&type=tool&per_page=100')).body.data?.entries ?? []) as any[]).map(e => e.id);
+const commerceSkus = async (): Promise<string[] | null> => {
+    const r = await json('/v1/commerce/tools');
+    return r.status === 200 ? (r.body.tools ?? []).map((t: any) => t.sku) : null;
+};
+await test('A hidden app\'s tools leave discover and the commerce catalog; a manifest for a file the node does not host stays', async () => {
+    const tools = { tools: [{ name: 'modtool', description: 'A tool of a moderated app', priceMoney: { amount: 500_000, currency: 'EUR' }, action_id: 'ext:demo:modtool' }] };
+    const orphan = { tools: [{ name: 'orphantool', description: 'A tool of a file the node does not host', priceMoney: { amount: 500_000, currency: 'EUR' }, action_id: 'ext:demo:orphan' }] };
+    for (const [key, value] of [[`apps.${FILENAME}.tools`, tools], [`apps.not-hosted-${FILENAME}.tools`, orphan]] as const) {
+        const w = await json('/v1/memory', victimAuthed({ method: 'POST', body: JSON.stringify({ key, value, visibility: 'public' }) }));
+        assert(w.status === 200 || w.status === 201, `manifest ${key}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    }
+    const ids = await toolIds();
+    assert(!ids.includes(TOOL_ID), `the hidden app's tool is still in public discover: ${JSON.stringify(ids)}`);
+    assert(ids.includes(ORPHAN_ID), `a manifest for a file the node does not host lost its listing: ${JSON.stringify(ids)}`);
+    const skus = await commerceSkus();
+    if (skus) {
+        assert(!skus.some(s => s.includes(`${victimName}/${FILENAME}:`)), `the hidden app's tool is still for sale: ${JSON.stringify(skus)}`);
+        assert(skus.some(s => s.includes(`not-hosted-${FILENAME}`)), `the orphan manifest left the commerce catalog: ${JSON.stringify(skus)}`);
+    }
+});
+
 await test('Owner STILL sees the app, badged operator_hidden + reason', async () => {
     const { body } = await json('/v1/apps?limit=200', victimAuthed());
     const found = (body.data?.apps ?? []).find((a: any) => a.filename === FILENAME && a.owner === victimName);
@@ -218,6 +249,13 @@ await test('App is visible again in the anonymous catalogue, reason cleared', as
 await test('Anonymous direct download works again', async () => {
     const res = await fetch(`${BASE}/v1/apps/${victimName}/${FILENAME}`);
     assert(res.status === 200, `expected 200, got ${res.status}`);
+});
+
+await test('The restored app\'s tools are listed again in discover and the commerce catalog', async () => {
+    const ids = await toolIds();
+    assert(ids.includes(TOOL_ID), `the restored app's tool is missing from public discover: ${JSON.stringify(ids)}`);
+    const skus = await commerceSkus();
+    if (skus) assert(skus.some(s => s.includes(`${victimName}/${FILENAME}:`)), `the restored app's tool is not for sale: ${JSON.stringify(skus)}`);
 });
 
 console.log('\nPhase 5: Operator hard delete');

@@ -10,6 +10,8 @@
  *   (storage/search-text.ts) and is exercised by e2e-mcp-memory-extended on that backend.
  * @usage cd aimeat && pnpm exec vitest run test/unit/memory-search-one-rule.test.ts
  * @version-history
+ *   2026-10-25 — A workspace share record's passwordHash and icsKeyHash are not search words, and a
+ *     record indexed before is rebuilt once at start (secaudit2026oct22).
  *   2026-10-15 — Initial (feature-list audit #52).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -18,6 +20,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { MemoryRecord } from '../../src/storage/interface.js';
 import { buildSearchBlob, searchValueText } from '../../src/storage/search-text.js';
 import { backfillMemorySearchValues } from '../../src/storage/providers/sqlite/schema-memory-search.js';
+import { reindexShareSearchTextOnce } from '../../src/services/share-search-reindex.js';
 
 const OWNER = 'alice@search-rule-node';
 
@@ -78,6 +81,57 @@ describe('SQLite search follows the PostgreSQL rule', () => {
         await storage.setMemory(rec('rule.fields', { zqfieldname: 'zqreplaced' }));
         expect(await keysOf('zqvalueword')).toEqual([]);
         expect(await keysOf('zqreplaced')).toEqual(['rule.fields']);
+    });
+});
+
+// secaudit2026oct22 (search-index-prefix-oracle-on-masked-fields): the fields every read door masks on
+// a workspace share record are not search words, on either backend's text; the record stays findable.
+describe('a workspace share record', () => {
+    const SALT = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
+    const KEY_HEX = 'f'.repeat(64) + '0123456789abcdef'.repeat(4);
+    const ICS = '9e'.repeat(32);
+    const SHARE_KEY = 'organism.org1.w.ws1.meta.share';
+    const share = () => rec(SHARE_KEY, { access: 'password', passwordHash: `v2:${SALT}:${KEY_HEX}`, icsKeyHash: ICS, spaces: { page: 'zqsharedspace' } });
+
+    it('its search text leaves out passwordHash and icsKeyHash and keeps every other value', () => {
+        const blob = buildSearchBlob(share());
+        expect(blob).not.toContain(SALT);
+        expect(blob).not.toContain(ICS);
+        expect(blob).toContain('zqsharedspace');
+        expect(blob).toContain('password');
+        expect(searchValueText({ passwordHash: 'v2:x:y' }, 'notes.share')).toBe('v2:x:y');
+    });
+
+    it('a hex prefix of the hash finds nothing on SQLite; its key and values still find it', async () => {
+        const storage = new SqliteStorage(':memory:');
+        await storage.setMemory(share());
+        const keys = async (q: string) => (await storage.searchText(q, { ownerGaiis: [OWNER], keyPrefix: SHARE_KEY })).map(h => h.record.key);
+        expect(await keys(SALT.slice(0, 4))).toEqual([]);
+        expect(await keys(ICS.slice(0, 4))).toEqual([]);
+        expect(await keys('share')).toEqual([SHARE_KEY]);
+        expect(await keys('zqsharedspace')).toEqual([SHARE_KEY]);
+    });
+
+    it('a share record indexed before the change is rebuilt once at start (reindexShareSearchTextOnce)', async () => {
+        const storage = new SqliteStorage(':memory:');
+        const N = 'search-rule-node';
+        const stamp = new Date().toISOString();
+        await storage.createOrganism({
+            id: 'org1', name: 'Org', description: 'x', type: 'project', interests: [], creatorGhii: OWNER, createdBy: OWNER, owners: [OWNER],
+            admins: [OWNER], members: [OWNER], agentGaiis: [], boardId: 'b1', joinPolicy: 'invite_only', maxMembers: 10, visibility: 'private',
+            moderationConfig: { flagsEnabled: false, autoHideThreshold: 5, appealsEnabled: false }, memoryNamespace: 'organism.org1', createdAt: stamp, updatedAt: stamp,
+        } as never);
+        await storage.setMemory(rec('organism.org1.meta.workspaces', { workspaces: [{ id: 'ws1', name: 'Board', createdAt: stamp, createdBy: 'alice' }] }));
+        await storage.setMemory(share());
+        const db = (storage as unknown as { db: Database.Database }).db;
+        // The text an older node indexed: every scalar value, the hash among them.
+        db.prepare('UPDATE memory SET searchValues = ? WHERE key = ?').run(`password v2:${SALT}:${KEY_HEX} ${ICS} zqsharedspace`, SHARE_KEY);
+        const hits = async (q: string) => (await storage.searchText(q, { ownerGaiis: [OWNER], keyPrefix: SHARE_KEY })).length;
+        expect(await hits(SALT.slice(0, 4))).toBe(1);
+        expect(await reindexShareSearchTextOnce(storage, { nodeId: N })).toBe(1);
+        expect(await hits(SALT.slice(0, 4))).toBe(0);
+        expect(await hits('zqsharedspace')).toBe(1);
+        expect(await reindexShareSearchTextOnce(storage, { nodeId: N })).toBeNull();
     });
 });
 

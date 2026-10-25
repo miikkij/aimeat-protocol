@@ -17,6 +17,9 @@
  *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
  *   const byApp = await listOwnerAppToolNames(storage, ownerGhii);
  * @version-history
+ *   2026-10-25 — listPublicAppTools leaves out the tools of an app the operator hid (operatorHidden),
+ *     so discover, the commerce feed and catalog, the .well-known card and the merchant files stop
+ *     listing them; a manifest for a file the node does not host is unchanged (secaudit2026oct22).
  *   v1.5.0 — 2026-10-12 — listOwnerAppToolNames(): the names and descriptions of every tool an
  *     owner's own agent can call on the owner's apps, priced ones included, by app. The home's
  *     agent draft reads it (GET /v1/home/agents/choices?include=tools). It and
@@ -149,6 +152,11 @@ export async function listPublicAppTools(
     if (!tools) continue;
     const ownerName = localAccountName(rec.ownerGaii);
     const appRef = `${ownerName}/${appId}`;
+    // An app the operator hid is removed from every public surface, and these lists are public
+    // surfaces: discover, the commerce feed and catalog, the .well-known card and the merchant files
+    // (secaudit2026oct22, app-tool-catalog-ignores-app-hidden-state). A manifest for a file the node
+    // does not host has no app record and keeps its listing.
+    if ((await storage.getAppByOwnerName(ownerName, appId))?.operatorHidden === true) continue;
     for (const tool of tools) {
       if (out.length >= cap) break;
       // Offered = a money price (isToolPriced, the invoke route's own 402 test, which reads
