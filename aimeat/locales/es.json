@@ -10293,6 +10293,7 @@
     "cfg_ai_node_key_when_spent": "Cuando se agota el saldo de IA",
     "cfg_ai_node_key_account_daily_usd": "Límite diario por cuenta",
     "cfg_ai_node_key_node_daily_usd": "Límite diario para todas las cuentas",
+    "cfg_ai_node_key_max_output_tokens": "Respuesta más larga con la clave del servidor (tokens)",
     "cfg_ai_model_free_fallback": "Modelo tras agotar el crédito",
     "cfg_ai_model_default_chat": "Modelo de chat predeterminado",
     "cfg_ai_model_default_reasoning": "Modelo de razonamiento predeterminado",
@@ -10603,6 +10604,7 @@
     "cfgDesc_ai_node_key_when_spent": "Qué hace la clave del servidor cuando se agota el saldo de IA de una persona: ya no paga nada, pida la llamada el modelo que pida, o sigue pagando hasta los dos límites diarios.",
     "cfgDesc_ai_node_key_account_daily_usd": "Con limits: lo máximo que las llamadas de una cuenta pueden costar a la clave del servidor en un día (UTC), en dólares.",
     "cfgDesc_ai_node_key_node_daily_usd": "Con limits: lo máximo que las llamadas de todas las cuentas juntas pueden costar a la clave del servidor en un día (UTC), en dólares.",
+    "cfgDesc_ai_node_key_max_output_tokens": "La respuesta más larga que puede pedir una llamada con la clave del servidor. Cada llamada se calcula con ella antes de correr y su precio se reserva de lo que queda del saldo. 0 significa sin límite.",
     "cfgDesc_ai_model_free_fallback": "Modelo usado cuando una persona en la clave del servidor agotó su crédito. Vacío rechaza en vez de degradar.",
     "cfgDesc_ai_model_default_chat": "Modelo de chat por defecto cuando el propietario no ha elegido uno.",
     "cfgDesc_ai_model_default_reasoning": "Modelo de razonamiento por defecto cuando el propietario no ha elegido uno.",
@@ -24329,6 +24331,17 @@
           "ex2": "0: ninguna llamada después de agotar el saldo, lo mismo que refuse.",
           "ex3": "100: margen para muchas personas que agotan cada una su límite diario por cuenta.",
           "tip": "Pon aquí lo máximo que estás dispuesto a pagar en un día."
+        },
+        "node_key_max_output_tokens": {
+          "title": "Respuesta más larga con la clave del servidor (tokens)",
+          "short": "La respuesta más larga que puede pedir una llamada con la clave del servidor, en tokens. 0 significa sin límite. El valor por defecto es 32000.",
+          "what": "Una llamada nombra su modelo y el largo de su respuesta, y ambos deciden su precio. Antes de que corra una llamada con la clave del servidor, el servidor le pone precio a partir del largo de la petición y del largo de la respuesta con el catálogo de modelos, y reserva ese precio de lo que queda del saldo de IA de la persona (o de los límites diarios) mientras la llamada corre. Una llamada que pide una respuesta más larga, o no nombra ninguna, recibe este número de tokens, y su respuesta dice si se cortó. Una llamada que costaría más de lo que queda se rechaza con su precio, o una llamada de texto que no nombró modelo recibe el modelo gratuito. No afecta a las llamadas con la clave propia de una persona o de un agente.",
+          "range": "Un número entero de tokens, 0 o más. El valor por defecto es 32000, suficiente para un documento largo. 0 significa sin límite; una llamada que no nombra largo se calcula entonces con 1.024 tokens.",
+          "low": "Menor: cada llamada tiene un precio menor, así que caben más llamadas en un saldo pequeño, y las respuestas largas se cortan antes.",
+          "high": "Mayor: caben respuestas largas, y cada llamada reserva más saldo mientras corre.",
+          "ex1": "32000 con un modelo a 75 USD por millón de tokens de salida: una llamada reserva unos 2,40 USD mientras corre.",
+          "ex2": "4000 con el mismo modelo: una llamada reserva unos 0,30 USD.",
+          "tip": "Mantenlo cerca de la respuesta más larga que la gente necesita de verdad. Quien necesite más usa su propia clave, que esto no toca."
         }
       },
       "security": {

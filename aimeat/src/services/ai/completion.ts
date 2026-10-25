@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.14.0 -- 2026-10-25 -- completeForOwner holds a node-key call's estimate until it is settled, and its answer is at most ai.node_key_max_output_tokens long (ai/node-key-hold.ts; secaudit2026oct22).
  *   v3.13.1 -- 2026-10-25 -- An app grant's call is checked against the owner's allowlist and per-app cap,
  *     and recorded, under the app the grant names (opts.verifiedApp), not the body's app_id (secaudit2026oct22).
  *   v3.13.0 -- 2026-10-08 -- settleAiCall takes `media` (kind, IANA type, method, surface), so a
@@ -167,6 +168,7 @@ import type { SurfaceContext } from '../ai-disclosure.js';
 import { logger } from '../../utils/logger.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
+import { holdNodeKeyCandidates, nodeKeyOutputCap } from './node-key-hold.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
 import { agentCapRefusal } from '../agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
@@ -694,11 +696,13 @@ export async function completeForOwner(
     const pp = c.provider.capabilities[plan.capability]?.params;
     const legacy = !!c.provider.legacy || c.provider.id === NODE_OPENROUTER_ID;
     const pref = (k: string) => (legacy && typeof prefs[k] === 'number' ? prefs[k] as number : undefined);
+    const length = typeof opts.maxTokens === 'number' && opts.maxTokens > 0 ? (opts.maxTokens | 0)
+      : opts.uncapped ? undefined : (roleParams?.max_tokens ?? pp?.max_tokens ?? pref('max_tokens'));
     return {
       temperature: opts.temperature ?? roleParams?.temperature ?? pp?.temperature ?? pref('temperature'),
       topP: opts.topP ?? roleParams?.top_p ?? pp?.top_p ?? pref('top_p'),
-      maxTokens: typeof opts.maxTokens === 'number' && opts.maxTokens > 0 ? (opts.maxTokens | 0)
-        : opts.uncapped ? undefined : (roleParams?.max_tokens ?? pp?.max_tokens ?? pref('max_tokens')),
+      // On the node's key, at most the operator's limit (ai/node-key-hold.ts); `truncated` says when it cut.
+      maxTokens: c.nodeKey ? nodeKeyOutputCap(config, length) : length,
       reasoning: opts.reasoning ?? toReasoning(roleParams?.reasoning) ?? toReasoning(pp?.reasoning) ?? (legacy ? prefReasoning : undefined),
     };
   };
@@ -708,9 +712,11 @@ export async function completeForOwner(
   let result;
   let answered: AiCallPlan;
   let route: AiRoute;
+  // The estimate of a node-key call is held until it is settled or failed (ai/node-key-hold.ts).
+  const held = holdNodeKeyCandidates(gaii, plan.candidates);
   try {
     const run = await runRoute({
-      storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
+      storage, gaii, capability: plan.capability, candidates: held.candidates, chosenBy: plan.chosenBy,
       allowFallback: plan.allowFallback, rules: plan.rules, ...(opts.signal ? { signal: opts.signal } : {}),
       ...(plan.noCreditModel ? { noCreditModel: plan.noCreditModel } : {}),
     }, (c) => {
@@ -735,6 +741,7 @@ export async function completeForOwner(
     route = run.route;
     if (route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: opts.appId, source: 'ai-complete' });
   } catch (e) {
+    held.release();
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
     if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
     // The provider answered, every attempt, with nothing. Its own name so a caller can tell "the
@@ -762,7 +769,7 @@ export async function completeForOwner(
     promptTokens: promptTok, completionTokens: completionTok, totalTokens: totalTok,
     costUsd, content: result.content, appId: opts.appId, source: 'ai-complete',
     costSource: price.costSource, priceRef: price.priceRef,
-  });
+  }).finally(held.release);
   route.attempts[route.attempts.length - 1].costUsd = costUsd;
 
   return {

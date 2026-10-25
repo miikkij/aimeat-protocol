@@ -28,6 +28,10 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.4.0 — 2026-10-25 — nodeKeyStanding says how much one more call may cost (headroomUsd, and in
+ *     'limits' mode nodeHeadroomUsd), so the planner holds a call's estimate against it before the
+ *     call runs (services/ai/node-key-hold.ts; secaudit2026oct22,
+ *     node-key-allowance-precheck-unbounded-call-cost).
  *   v1.3.1 — 2026-10-25 — One account's allowance writes (starter grant, debit, grant) run one at a
  *     time, so calls that settle at the same moment lose no debit (secaudit2026oct22).
  *   v1.3.0 — 2026-10-05 — nodeKeyStanding(): one answer to "may the node's key pay" for the AI planner
@@ -79,6 +83,14 @@ export interface NodeKeyStanding {
   remainingUsd: number;
   /** The node's key may pay. With an allowance left, always; once it is spent, by the operator's mode. */
   mayPay: boolean;
+  /**
+   * What one more call may cost this account on the node's key: what is left of the allowance, or in
+   * 'limits' mode once it is spent, what is left of the account's daily limit. The planner holds a
+   * call's estimate against it (services/ai/node-key-hold.ts).
+   */
+  headroomUsd?: number;
+  /** In 'limits' mode once the allowance is spent: what is left of the node-wide daily limit. */
+  nodeHeadroomUsd?: number;
   /** Why it may not. */
   reason?: 'allowance-spent' | 'account-daily-limit' | 'node-daily-limit';
   /** The sentence the caller is told. */
@@ -209,7 +221,7 @@ function parseNodeDay(v: unknown): NodeDay {
 export async function nodeKeyStanding(storage: Storage, config: AimeatConfig, gaii: string): Promise<NodeKeyStanding> {
   const rec = await readAllowance(storage, config, gaii);
   const remaining = remainingOf(rec);
-  if (remaining > 0) return { remainingUsd: remaining, mayPay: true };
+  if (remaining > 0) return { remainingUsd: remaining, mayPay: true, headroomUsd: remaining };
   if (config.aiNodeKeyWhenSpent !== 'limits') {
     return { remainingUsd: 0, mayPay: false, reason: 'allowance-spent',
       message: 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.' };
@@ -221,11 +233,13 @@ export async function nodeKeyStanding(storage: Storage, config: AimeatConfig, ga
       message: `Your allowance on this node is used up, and your account has reached today's limit on the node's key ($${config.aiNodeKeyAccountDailyUsd.toFixed(2)}). It opens again tomorrow (UTC), or set your own key in your AI settings.` };
   }
   const node = parseNodeDay((await readSystem(storage, config.nodeId, NODE_DAY_KEY))?.value);
-  if ((node.day === today ? node.spent_usd : 0) >= config.aiNodeKeyNodeDailyUsd) {
+  const nodeToday = node.day === today ? node.spent_usd : 0;
+  if (nodeToday >= config.aiNodeKeyNodeDailyUsd) {
     return { remainingUsd: 0, mayPay: false, reason: 'node-daily-limit',
       message: 'Your allowance on this node is used up, and the node\'s shared key has reached today\'s limit. It opens again tomorrow (UTC), or set your own key in your AI settings.' };
   }
-  return { remainingUsd: 0, mayPay: true };
+  return { remainingUsd: 0, mayPay: true,
+    headroomUsd: config.aiNodeKeyAccountDailyUsd - mine, nodeHeadroomUsd: config.aiNodeKeyNodeDailyUsd - nodeToday };
 }
 
 /**

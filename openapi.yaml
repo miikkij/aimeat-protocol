@@ -19384,6 +19384,15 @@ paths:
         same holds for `/v1/llm/chat/completions` and `POST /v1/ai/jobs`.
 
 
+        THE SERVER'S KEY. A call on the server's key gets an answer of at most
+        `ai.node_key_max_output_tokens` tokens (default 32000; 0 is no limit), also when `max_tokens`
+        asks for more or is absent, and `data.truncated` says when the answer was cut. Before it runs,
+        the call is priced from the prompt's size and that length with the model catalogue and held
+        against what is left of the allowance (or the daily limits) while it runs; a call that would
+        cost more answers 402 `QUOTA_EXHAUSTED` with the price, except that a text call that named no
+        model gets the free model. A call on the owner's or an agent's own key is not affected.
+
+
         MODEL POLICY. The owner may limit which models their calls use (`GET/PUT /v1/ai/policy`), and
         an app may limit itself with `models=` in its `<meta name="aimeat-ai">`. A `model` the rules
         leave out is refused with 403 `AI_MODEL_NOT_ALLOWED`, and `error.details` names the layer that
