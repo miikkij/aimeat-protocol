@@ -11633,6 +11633,7 @@
     "cfg_auth_entra_allowed_tenants": "Allowed Entra tenants",
     "cfg_email_smtp_secure": "Implicit TLS",
     "cfg_email_smtp_reject_unauthorized": "Reject bad TLS certificates",
+    "cfg_email_company_smtp_private_hosts": "Companies' mail servers on a private network",
     "cfg_account_events_window": "Account event window",
     "cfg_proactive_guidance_enabled": "Proactive guidance",
     "cfg_commerce_fee_mode": "Fee destination",
@@ -11902,6 +11903,7 @@
     "cfgDesc_email_smtp_from": "SMTP From address",
     "cfgDesc_email_smtp_secure": "Use implicit TLS (port 465). Set false for STARTTLS (port 587).",
     "cfgDesc_email_smtp_reject_unauthorized": "Reject unauthorized TLS certificates. Set false for self-signed certs or STARTTLS.",
+    "cfgDesc_email_company_smtp_private_hosts": "Mail servers on a private network that a company may send through: names, addresses or networks such as 10.0.5.0/24, one per line. Any other private address is refused. Empty: public mail servers only.",
     "cfgDesc_consent_enabled": "Consent layer enabled",
     "cfgDesc_account_events_window": "Events kept in an account live \"what has happened\" window before the oldest are archived",
     "cfgDesc_consent_audit_retention_days": "Consent audit log retention in days",
@@ -26289,6 +26291,19 @@
       }
     },
     "config": {
+      "email": {
+        "company_smtp_private_hosts": {
+          "title": "Companies' mail servers on a private network",
+          "short": "The mail servers on a private network that a company may send through. Empty means public mail servers only. Empty by default.",
+          "what": "A company on this server can send its mail through its own mail server, and this server opens that connection. A host that is not on the public internet (a private, link-local or reserved address) could be any service inside the network this server sees, so such a host is refused when the company's settings are saved, and checked again before each send. List here the mail servers on your own network that companies may use: a host name, an address, or a network such as 10.0.5.0/24. On a server in local mode, the machine's own address (loopback) stays allowed without a list.",
+          "range": "A list, one entry per line: host names, IPv4 or IPv6 addresses, or networks in CIDR form. Empty by default.",
+          "low": "Empty: companies send through public mail servers only.",
+          "high": "More entries: companies may also send through the listed servers inside your network.",
+          "ex1": "mail.internal: a company may use the mail server named mail.internal, whatever private address it has.",
+          "ex2": "10.0.5.0/24: a company may use any mail server in that network.",
+          "tip": "List only mail servers. A failed send never shows what the server answered, so a listed address that is not a mail server tells nothing about itself."
+        }
+      },
       "mcp": {
         "unused_client_days": {
           "title": "Unused MCP client registrations (days)",

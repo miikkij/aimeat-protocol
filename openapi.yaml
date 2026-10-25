@@ -77887,7 +77887,7 @@ paths:
       operationId: setCompanySmtp
       tags: [Companies]
       summary: Store the company's own sending identity
-      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one."
+      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one. A host at an address outside the public internet (loopback, private, link-local or reserved) is refused with 400 SMTP_HOST_NOT_ALLOWED unless the operator lists the host, the address or its network in email.company_smtp_private_hosts (AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS); loopback is allowed on a node in local mode. A host name that does not resolve is accepted, and the same check runs again before each send, which connects to the checked address. A failed send reports the failure in fixed words by its code, never with the mail server's own reply text."
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:

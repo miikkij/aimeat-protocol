@@ -9,6 +9,7 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   v1.2.0 — 2026-10-25 — email.company_smtp_private_hosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — auth.device_authorize_email_limit and auth.device_authorize_email_max
  *     (secaudit2026oct22, device-authorize-email-owner-oracle).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22): mcp.unused_client_days.
@@ -28,4 +29,7 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'deviceAuthEmailMax', dotPath: 'auth.device_authorize_email_max', envVar: 'AIMEAT_DEVICE_AUTHORIZE_EMAIL_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1, immutable: false,
     description: 'Email-form agent connections one network address may start in 10 minutes while the limit is on',
     range: '1-1000' },
+  { key: 'companySmtpPrivateHosts', dotPath: 'email.company_smtp_private_hosts', envVar: 'AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS', type: 'object', list: true,
+    validate: v => Array.isArray(v) && v.every(s => typeof s === 'string' && s.trim() !== '' && !s.includes(',') && s.length <= 253), immutable: false,
+    description: 'Mail servers on a private network that a company may send through: host names, addresses or networks (10.0.5.0/24), one per line (comma separated in the environment). Any other private address is refused. Empty: public mail servers only, and loopback on a local node' },
 ];

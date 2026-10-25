@@ -10125,6 +10125,7 @@
     "cfg_auth_entra_allowed_tenants": "Inquilinos de Entra permitidos",
     "cfg_email_smtp_secure": "TLS implícito",
     "cfg_email_smtp_reject_unauthorized": "Rechazar certificados TLS no válidos",
+    "cfg_email_company_smtp_private_hosts": "Servidores de correo de empresas en una red privada",
     "cfg_account_events_window": "Ventana de eventos de la cuenta",
     "cfg_proactive_guidance_enabled": "Orientación proactiva",
     "cfg_commerce_fee_mode": "Destino de la comisión",
@@ -10394,6 +10395,7 @@
     "cfgDesc_email_smtp_from": "Dirección From del correo saliente.",
     "cfgDesc_email_smtp_secure": "TLS implícito (puerto 465). Desactivado = STARTTLS (587).",
     "cfgDesc_email_smtp_reject_unauthorized": "Rechazar certificados TLS no válidos. Desactívalo para certificados autofirmados o STARTTLS.",
+    "cfgDesc_email_company_smtp_private_hosts": "Servidores de correo en una red privada por los que una empresa puede enviar: nombres, direcciones o redes como 10.0.5.0/24, uno por línea. Cualquier otra dirección privada se rechaza. Vacío: solo servidores de correo públicos.",
     "cfgDesc_consent_enabled": "Capa de consentimiento activada.",
     "cfgDesc_account_events_window": "Eventos que guarda la ventana \"qué ha pasado\" de la cuenta antes de archivar los más viejos.",
     "cfgDesc_consent_audit_retention_days": "Retención del registro de consentimiento en días.",
@@ -24019,6 +24021,19 @@
       }
     },
     "config": {
+      "email": {
+        "company_smtp_private_hosts": {
+          "title": "Servidores de correo de empresas en una red privada",
+          "short": "Los servidores de correo en una red privada por los que una empresa puede enviar. Vacío significa solo servidores de correo públicos. Vacío por defecto.",
+          "what": "Una empresa de este servidor puede enviar su correo por su propio servidor de correo, y este servidor abre esa conexión. Un servidor que no está en internet pública (una dirección privada, de enlace local o reservada) podría ser cualquier servicio dentro de la red que ve este servidor, así que se rechaza al guardar los ajustes de la empresa y se comprueba de nuevo antes de cada envío. Pon aquí los servidores de correo de tu propia red que las empresas pueden usar: un nombre, una dirección o una red como 10.0.5.0/24. En un servidor en modo local, la dirección de la propia máquina (loopback) sigue permitida sin lista.",
+          "range": "Una lista, una entrada por línea: nombres, direcciones IPv4 o IPv6, o redes en forma CIDR. Vacía por defecto.",
+          "low": "Vacía: las empresas envían solo por servidores de correo públicos.",
+          "high": "Más entradas: las empresas también pueden enviar por los servidores de la lista dentro de tu red.",
+          "ex1": "mail.internal: una empresa puede usar el servidor de correo llamado mail.internal, tenga la dirección privada que tenga.",
+          "ex2": "10.0.5.0/24: una empresa puede usar cualquier servidor de correo de esa red.",
+          "tip": "Pon solo servidores de correo. Un envío fallido nunca muestra lo que respondió el servidor, así que una dirección de la lista que no es un servidor de correo no dice nada de sí misma."
+        }
+      },
       "mcp": {
         "unused_client_days": {
           "title": "Registros de clientes MCP sin uso (días)",

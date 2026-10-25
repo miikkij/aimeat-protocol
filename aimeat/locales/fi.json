@@ -11631,6 +11631,7 @@
     "cfg_auth_entra_allowed_tenants": "Sallitut Entra-vuokraajat",
     "cfg_email_smtp_secure": "Suora TLS",
     "cfg_email_smtp_reject_unauthorized": "Hylkää kelvottomat TLS-varmenteet",
+    "cfg_email_company_smtp_private_hosts": "Yritysten postipalvelimet sisäverkossa",
     "cfg_account_events_window": "Tilitapahtumien ikkuna",
     "cfg_proactive_guidance_enabled": "Oma-aloitteinen opastus",
     "cfg_commerce_fee_mode": "Palkkion kohde",
@@ -11900,6 +11901,7 @@
     "cfgDesc_email_smtp_from": "Lähtevän postin From-osoite.",
     "cfgDesc_email_smtp_secure": "Suora TLS (portti 465). Pois = STARTTLS (portti 587).",
     "cfgDesc_email_smtp_reject_unauthorized": "Hylkää kelvottomat TLS-varmenteet. Pois itse allekirjoitetuille varmenteille tai STARTTLS:lle.",
+    "cfgDesc_email_company_smtp_private_hosts": "Sisäverkon postipalvelimet, joiden kautta yritys voi lähettää: nimet, osoitteet tai verkot, kuten 10.0.5.0/24, yksi riviä kohden. Muut sisäverkon osoitteet torjutaan. Tyhjä: vain julkiset postipalvelimet.",
     "cfgDesc_consent_enabled": "Suostumuskerros käytössä.",
     "cfgDesc_account_events_window": "Montako tapahtumaa tilin \"mitä on tapahtunut\" -ikkuna pitää ennen vanhimpien arkistointia.",
     "cfgDesc_consent_audit_retention_days": "Suostumuslokin säilytysaika päivinä.",
@@ -26268,6 +26270,19 @@
       }
     },
     "config": {
+      "email": {
+        "company_smtp_private_hosts": {
+          "title": "Yritysten postipalvelimet sisäverkossa",
+          "short": "Sisäverkon postipalvelimet, joiden kautta yritys voi lähettää postia. Tyhjä tarkoittaa, että vain julkiset postipalvelimet käyvät. Oletuksena tyhjä.",
+          "what": "Tämän palvelimen yritys voi lähettää postinsa oman postipalvelimensa kautta, ja tämä palvelin avaa yhteyden. Palvelin, joka ei ole julkisessa internetissä (sisäverkon, paikallisen linkin tai varattu osoite), voi olla mikä tahansa palvelu siinä verkossa, jonka tämä palvelin näkee. Siksi sellainen palvelin torjutaan, kun yrityksen asetukset tallennetaan, ja se tarkistetaan uudelleen ennen jokaista lähetystä. Luettele tässä oman verkkosi postipalvelimet, joita yritykset saavat käyttää: palvelimen nimi, osoite tai verkko, kuten 10.0.5.0/24. Paikallisessa tilassa palvelimen oma osoite (loopback) on sallittu ilman luetteloa.",
+          "range": "Luettelo, yksi kohta riviä kohden: palvelinten nimiä, IPv4- tai IPv6-osoitteita tai verkkoja CIDR-muodossa. Oletuksena tyhjä.",
+          "low": "Tyhjä: yritykset lähettävät vain julkisten postipalvelinten kautta.",
+          "high": "Enemmän kohtia: yritykset voivat lähettää myös luetteloitujen sisäverkon palvelinten kautta.",
+          "ex1": "mail.internal: yritys voi käyttää postipalvelinta nimeltä mail.internal, oli sen sisäverkon osoite mikä tahansa.",
+          "ex2": "10.0.5.0/24: yritys voi käyttää mitä tahansa postipalvelinta tässä verkossa.",
+          "tip": "Luettele vain postipalvelimia. Epäonnistunut lähetys ei koskaan näytä palvelimen vastausta, joten luetteloitu osoite, joka ei ole postipalvelin, ei kerro itsestään mitään."
+        }
+      },
       "mcp": {
         "unused_client_days": {
           "title": "Käyttämättömät MCP-rekisteröinnit (päivää)",
