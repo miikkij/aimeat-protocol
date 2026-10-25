@@ -12,6 +12,9 @@
  *   (federation.ts). A node id that is only a waiting package registration is deleted as that.
  * @structure PeerRemoveResult · removePeer()
  * @version-history
+ *   v1.2.1 — 2026-10-25 — An emergency de-peering cancels a work item on its status
+ *     (storage.transitionWorkStatus) before returning its escrow, so the escrow moves once
+ *     (secaudit2026oct22, work-status-transition-without-cas).
  *   v1.2.0 — 2026-10-20 — The de-peering grace converts the peer's replicas by KEY PREFIX across every
  *     owner principal (listAllMemory, paged), not by walking the local agents table. A replica sits
  *     under the SENDING node's principal, which is in no agents table, so the walk converted none of
@@ -81,9 +84,14 @@ export async function removePeer(
             const isFromPeer = work.providerGaii.endsWith(`@${nodeId}`) || work.requesterGaii.endsWith(`@${nodeId}`);
             if (!isFromPeer) continue;
 
-            await returnEscrow(storage, work);
-            await storage.updateWork(work.trackingCode, { status: 'cancelled', updatedAt: new Date().toISOString() });
-            cancelledCount++;
+            // Cancelled on its status before the refund, so a deliver or an expiry at the same moment
+            // pays or returns the escrow once (secaudit2026oct22).
+            const cancelled = await storage.transaction(async () => {
+                if (!await storage.transitionWorkStatus(work.trackingCode, ['pending', 'accepted'], 'cancelled', new Date().toISOString())) return false;
+                await returnEscrow(storage, work);
+                return true;
+            });
+            if (cancelled) cancelledCount++;
         }
 
         // 3. Notify other peers if requested: a signed notice to each, and each answer read. Until

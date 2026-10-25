@@ -37,6 +37,9 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-25 — deliverWork() moves the status to delivered with storage.transitionWorkStatus before
+ *     settling, so concurrent delivers, or a deliver and the expiry job, pay or return the escrow once
+ *     on PostgreSQL too (secaudit2026oct22, work-status-transition-without-cas).
  *   2026-10-16 — deliverWork() settles and marks the item delivered in one transaction, after reading
  *     its status again, so a failed status write cannot leave a settled item deliverable a second
  *     time (QA audit E6-03).
@@ -223,9 +226,14 @@ export async function deliverWork(
     // transaction. Written apart, a failed status write after the credit left the item deliverable,
     // and a retry credited the provider again (QA audit E6-03). The status is read again inside the
     // transaction, so a retry after a delivery that did land settles nothing.
+    //
+    // The status moves accepted|in_progress → delivered in one conditional UPDATE before the credit,
+    // and only the call that moved it settles. A re-read inside the transaction did not stop a second
+    // settlement on PostgreSQL, where the read takes no lock: two concurrent delivers, or a deliver
+    // and the expiry job, each read the open status and each paid or returned the escrow
+    // (secaudit2026oct22, work-status-transition-without-cas).
     const settled = await storage.transaction(async () => {
-        const current = await storage.getWork(trackingCode);
-        if (!current || !['accepted', 'in_progress'].includes(current.status)) return null;
+        if (!await storage.transitionWorkStatus(trackingCode, ['accepted', 'in_progress'], 'delivered', new Date().toISOString())) return null;
         await settlePayment(storage, config, work);
         return storage.updateWork(trackingCode, {
             status: 'delivered',

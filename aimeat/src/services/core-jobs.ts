@@ -11,6 +11,10 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-25 — The work expiry and the dispute timeout move the status with one conditional UPDATE
+ *     (storage.transitionWorkStatus, transitionDisputeStatus) before any morsel moves, so a concurrent
+ *     deliver, ruling or resolution moves the escrow or the refund once; runWorkTimeoutJob is exported
+ *     for its test (secaudit2026oct22, work-status-transition-without-cas, dispute-resolution-without-cas).
  *   2026-10-25 — internet-opening-sweep: apps open to the internet on a closed node close at their end
  *     date, owners are reminded, lapsed requests settle (services/internet-opening/opening-version.ts).
  *   2026-10-22 — The 30-day dispute timeout takes back the toll delivery paid the provider
@@ -270,7 +274,7 @@ async function runDailyAllowanceJob(config: AimeatConfig, storage: Storage): Pro
   logger.info(`Daily allowance credited to ${out.people} people, ${out.credited} morsels in all`);
 }
 
-async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promise<void> {
+export async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promise<void> {
   const allWork = await storage.listAllWork();
   const now = Date.now();
   for (const work of allWork) {
@@ -280,14 +284,11 @@ async function runWorkTimeoutJob(config: AimeatConfig, storage: Storage): Promis
         // The refund and the status that stops a second refund in ONE transaction, with the status
         // read again inside it: written apart, a failing status write refunded the requester again
         // on every round of this job (QA audit E6-03).
+        // The status moves to expired in one conditional UPDATE before the refund, so a deliver or
+        // a reject at the same moment pays or returns the escrow once (secaudit2026oct22).
         const expired = await storage.transaction(async () => {
-          const current = await storage.getWork(work.trackingCode);
-          if (!current || !['pending', 'accepted', 'in_progress'].includes(current.status)) return false;
-          await returnEscrow(storage, current);
-          await storage.updateWork(work.trackingCode, {
-            status: 'expired',
-            updatedAt: new Date().toISOString(),
-          });
+          if (!await storage.transitionWorkStatus(work.trackingCode, ['pending', 'accepted', 'in_progress'], 'expired', new Date().toISOString())) return false;
+          await returnEscrow(storage, work);
           return true;
         });
         if (!expired) continue;
@@ -385,10 +386,9 @@ export async function runDisputeTimeoutJob(config: AimeatConfig, storage: Storag
     const disputeAge = now - new Date(dispute.createdAt).getTime();
 
     if ((dispute.status === 'open' || dispute.status === 'contested') && disputeAge > SEVEN_DAYS) {
-      await storage.updateDispute(dispute.id, {
-        status: 'escalated',
-        updatedAt: new Date().toISOString(),
-      });
+      // Moved on its status, so a dispute resolved since the read is never escalated again and then
+      // resolved a second time by the 30-day branch (secaudit2026oct22).
+      if (!await storage.transitionDisputeStatus(dispute.id, ['open', 'contested'], 'escalated', new Date().toISOString())) continue;
 
       const log = await storage.getDisputeAuditLog(dispute.id);
       const prevHash = log.length > 0 ? log[log.length - 1].hash : '0';
@@ -420,13 +420,16 @@ export async function runDisputeTimeoutJob(config: AimeatConfig, storage: Storag
       // the whole escrow from nowhere while the provider kept the toll (secaudit2026oct22). A provider
       // whose balance cannot cover it leaves the dispute escalated for the operator's ruling.
       const toRequester = disputedAmount(work);
-      const outcome = await storage.transaction(async (): Promise<'resolved' | 'skip' | 'short'> => {
-        const current = await storage.getDispute(dispute.id);
-        if (!current || current.status !== 'escalated') return 'skip';
-        if (!(await takeBackFromProvider(storage, work, { toRequester }))) return 'short';
+      // The dispute is claimed on its status (escalated → resolved, one conditional UPDATE) before
+      // the take-back, so an operator ruling or a party's resolution at the same moment moves the
+      // refund once (secaudit2026oct22, dispute-resolution-without-cas). A short balance throws, so
+      // the claim rolls back and the dispute stays escalated.
+      const short = new Error('provider balance short');
+      const outcome = await storage.transaction(async (): Promise<'resolved' | 'skip'> => {
+        if (!await storage.transitionDisputeStatus(dispute.id, ['escalated'], 'resolved', new Date().toISOString())) return 'skip';
+        if (!(await takeBackFromProvider(storage, work, { toRequester }))) throw short;
 
         await storage.updateDispute(dispute.id, {
-          status: 'resolved',
           ruling: {
             ruling: 'timeout',
             distribution: { toRequester, toProvider: 0, burned: 0 },
@@ -439,8 +442,8 @@ export async function runDisputeTimeoutJob(config: AimeatConfig, storage: Storag
           status: 'settled',
           updatedAt: new Date().toISOString(),
         });
-        return 'resolved';
-      });
+        return 'resolved' as const;
+      }).catch((err: unknown) => { if (err === short) return 'short' as const; throw err; });
       if (outcome === 'short') await tellOperatorsTimeoutWaits(config, storage, dispute.id, toRequester);
       if (outcome !== 'resolved') continue;
       // A timed-out dispute is a lost one (services/trust.ts LOST_DISPUTE_VERDICTS).
