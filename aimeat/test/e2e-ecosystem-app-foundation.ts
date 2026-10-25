@@ -633,6 +633,50 @@ await test('Failure mode: a recommended_agents entry MISSING `why` fails static 
   assert(schemaCheck && schemaCheck.ok === false, `manifest_schema check should be false: ${JSON.stringify(body.data.validation?.checks)}`);
 });
 
+// ─── Phase 8: a hello for an app already connected (secaudit2026oct22, rehello-repins-live-binding-key) ───
+console.log('\nPhase 8 — A reconnect of a connected app, with the same key and with a new one');
+
+/** hello → (pending row) → approve → token for `app`, signed with `publicKey`. */
+async function connectApp(app: string, publicKey: string): Promise<{ pending: any; token: string }> {
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({ owner: ownerName, app, display_name: `Desk ${app}`, public_key: publicKey, scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(hello.status === 200, `hello: ${hello.status} ${JSON.stringify(hello.body?.error)}`);
+  const list = await json('/v1/ecosystem-apps/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const pending = (list.body.data.requests as any[]).find(r => r.user_code === hello.body.data.user_code);
+  const ok = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(ok.status === 200, `approve: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+  const tok = await json('/v1/ecosystem-apps/token', { method: 'POST', body: JSON.stringify({ device_code: hello.body.data.device_code, grant_type: GRANT }) });
+  assert(typeof tok.body.access_token === 'string', `token: ${JSON.stringify(tok.body)}`);
+  return { pending, token: tok.body.access_token as string };
+}
+const memRead = (token: string) => json('/v1/memory?prefix=eco&limit=1', { headers: { Authorization: `Bearer ${token}` } });
+
+await test('A reconnect with the pinned key is marked as one, and the earlier credential keeps working (yearly re-approval)', async () => {
+  const first = await connectApp('deskapp', APP_PUBKEY);
+  assert(first.pending.reconnect === false && first.pending.key_changed === false, `a new app is no reconnect: ${JSON.stringify(first.pending)}`);
+  const again = await connectApp('deskapp', APP_PUBKEY);
+  assert(again.pending.reconnect === true && again.pending.key_changed === false, `same-key reconnect: ${JSON.stringify(again.pending)}`);
+  assert((await memRead(first.token)).status === 200, 'the earlier credential still works after a same-key reconnect');
+  assert((await memRead(again.token)).status === 200, 'the new credential works');
+});
+
+await test('A reconnect with a new key says so with both fingerprints, and approving it ends the earlier credential (key-loss recovery)', async () => {
+  const before = await connectApp('deskapp2', APP_PUBKEY);
+  const other = (await generateKeyPair()).publicKey;
+  const after = await connectApp('deskapp2', other);
+  assert(after.pending.reconnect === true && after.pending.key_changed === true, `key-change reconnect: ${JSON.stringify(after.pending)}`);
+  assert(typeof after.pending.pinned_key_fingerprint === 'string' && typeof after.pending.key_fingerprint === 'string'
+    && after.pending.pinned_key_fingerprint !== after.pending.key_fingerprint, `fingerprints: ${JSON.stringify(after.pending)}`);
+  const old = await memRead(before.token);
+  assert(old.status === 401, `the credential from before the key change must end, got ${old.status}`);
+  assert((await memRead(after.token)).status === 200, 'the credential for the new key works');
+});
+
 // ─── Summary ───
 console.log('\n' + '─'.repeat(48));
 console.log(`Ecosystem-App Foundation E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);

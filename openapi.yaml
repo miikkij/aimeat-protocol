@@ -7866,7 +7866,12 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: Pending requests for the authenticated owner.
+          description: |
+            Pending requests for the authenticated owner. Each request carries `reconnect` (true when
+            the owner already connected this app) and `key_changed` (true when the request carries
+            another key than the pinned one); a key change also carries `pinned_key_fingerprint` and
+            `key_fingerprint`, so the owner can see that approving replaces the key of a working
+            connection.
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{userCode}/approve:
@@ -7876,7 +7881,9 @@ paths:
       description: |
         The owner approves/denies a pending request, selecting the final scopes (validated against
         the node's `maxEcoScopes` ceiling) and the data-area allowlist. On approve the GEAI principal
-        is created (or re-approval rotates the pinned key) and the credential becomes issuable.
+        is created (or re-approval rotates the pinned key) and the credential becomes issuable. A
+        re-approval that changes the pinned key ends the sessions issued under the old key; one with
+        the same key keeps them.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
