@@ -71,7 +71,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 - **Speak human.** A term from the system's own vocabulary carries its meaning in the same sentence, or it does not appear. "agentAutonomy is L3 and meta.decisions is alwaysGate" says nothing; "the agent may write on its own, but decisions and gaps wait for your approval" says the same thing and can be acted on. An identifier or a config key is evidence, and the sentence still has to work without it.
 - No em-dashes. No decorative emoji (✓ ✗ → ↩ only).
 
-- **Ask before:** spending money or changing AI settings, importing data automatically, touching infrastructure (wsl/docker are off limits), building something not yet agreed.
+- **Ask before:** spending money or changing AI settings, importing data automatically, touching infrastructure (wsl/docker are off limits), building something not yet agreed. Not asked: your sandbox gets the developer's OpenRouter test key and model without a question; how, in `docs/internal/TESTING.md`, Model keys (Jouni, 2026-10-25: "I gave the key exactly for this").
 - **A locked plan gets finished**, not sliced, and not followed by "next we could".
 - **Name the exact scope of a deletion** before deleting.
 - **Evidence before assertions.** Verify with real content, not fixtures. Clean up test data fully. A test must fail first. The pass-criterion discipline is its own section below.
