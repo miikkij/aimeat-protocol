@@ -11,7 +11,8 @@
  * @version-history
  *   v1.1.0 — 2026-10-25 — aimeat_goal_set and aimeat_goal_work take the goal's and the work's fields at
  *     the top level, as the REST routes read them (GOAL_INPUT_FIELDS, WORK_INPUT_FIELDS); `input` and
- *     `work` still work.
+ *     `work` still work. The four are on the agent surface (and full); the chat surface stays at its
+ *     twenty tools and finds them with aimeat_tools_find (test/unit/mcp-surfaces.test.ts).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
@@ -44,7 +45,7 @@ export const goalTools = [
     visibility: agentEverywhere,
     annotations: { title: 'Agent goals: read', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     scope: 'task:read',
-    surfaces: ['agent', 'chat'],
+    surfaces: ['agent'],
     input: {
       goal_id: { type: 'string', description: 'One goal (g-…). Omit for the list.' },
       status: { type: 'string', enum: ['running', 'active', 'paused', 'done', 'stopped', 'expired'], description: 'For the list: which goals.' },
@@ -58,7 +59,7 @@ export const goalTools = [
     visibility: agentEverywhere,
     annotations: { title: 'Agent goals: make and steer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     scope: 'task:write',
-    surfaces: ['agent', 'chat'],
+    surfaces: ['agent'],
     input: {
       action: { type: 'string', required: true, enum: [...GOAL_SET_ACTIONS], description: 'What to do. Start with "create".' },
       goal_id: { type: 'string', description: 'The goal, for every action but create.' },
@@ -95,7 +96,7 @@ export const goalTools = [
     visibility: agentEverywhere,
     annotations: { title: 'Agent goals: works', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     scope: 'task:write',
-    surfaces: ['agent', 'chat'],
+    surfaces: ['agent'],
     input: {
       action: { type: 'string', required: true, enum: [...GOAL_WORK_ACTIONS], description: 'What to do.' },
       goal_id: { type: 'string', description: 'The goal, for every action but available.' },
@@ -123,7 +124,7 @@ export const goalTools = [
     visibility: agentEverywhere,
     annotations: { title: 'Agent goals: answer a step', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     scope: 'task:write',
-    surfaces: ['agent', 'chat'],
+    surfaces: ['agent'],
     input: {
       goal_id: { type: 'string', required: true, description: 'The goal.' },
       work_id: { type: 'string', required: true, description: 'The step.' },

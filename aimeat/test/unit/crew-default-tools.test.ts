@@ -41,9 +41,10 @@ const required = defaults.filter(name => !ifOffered.includes(name));
 
 describe("the crew daemon's default tools exist on aimeat connect serve", () => {
     it('reads both lists from daemon.py', () => {
-        expect(defaults).toHaveLength(30);
-        expect(new Set(defaults).size).toBe(30);
-        expect([...ifOffered].sort()).toEqual(['aimeat_discover', 'aimeat_invoke', 'aimeat_mcp_call', 'aimeat_mcp_list', 'aimeat_mcp_tools']);
+        // 32 since aimeat-crewai 0.38.0: aimeat_goal_get and aimeat_goal_work, loaded when offered.
+        expect(defaults).toHaveLength(32);
+        expect(new Set(defaults).size).toBe(32);
+        expect([...ifOffered].sort()).toEqual(['aimeat_discover', 'aimeat_goal_get', 'aimeat_goal_work', 'aimeat_invoke', 'aimeat_mcp_call', 'aimeat_mcp_list', 'aimeat_mcp_tools']);
         expect(ifOffered.filter(name => !defaults.includes(name))).toEqual([]);
     });
 
