@@ -30,6 +30,8 @@
  * @usage
  *   import { buildDescriptor, signAttestation, verifyAttestation } from './package-attestation.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — verifyComponentDigests also compares each arrived component's type with
+ *     its signed type, since the type decides how a part is installed (secaudit2026oct22).
  *   v1.0.0 — 2026-09-05 — Initial.
  */
 import { createHash } from 'node:crypto';
@@ -138,9 +140,9 @@ export async function verifyAttestation(publicKeyBase64: string, doc: Attestatio
  */
 export function verifyComponentDigests(
     descriptor: AttestationDescriptor,
-    components: Array<{ id: string; content?: string }>,
+    components: Array<{ id: string; type?: string; content?: string }>,
 ): { ok: true } | { ok: false; reason: string } {
-    const claimed = new Map(descriptor.component_digests.map(c => [c.id, c.sha256]));
+    const claimed = new Map(descriptor.component_digests.map(c => [c.id, c]));
 
     for (const comp of components) {
         const want = claimed.get(comp.id);
@@ -148,8 +150,12 @@ export function verifyComponentDigests(
             return { ok: false, reason: `component "${comp.id}" is not named in the signed descriptor` };
         }
         const got = sha256(comp.content ?? '');
-        if (got !== want) {
+        if (got !== want.sha256) {
             return { ok: false, reason: `component "${comp.id}" does not match its signed digest` };
+        }
+        // The type decides how a part is installed, and the manifest that carries it is not signed.
+        if (comp.type !== undefined && comp.type !== want.type) {
+            return { ok: false, reason: `component "${comp.id}" arrived as type "${comp.type}", signed as "${want.type}"` };
         }
         claimed.delete(comp.id);
     }

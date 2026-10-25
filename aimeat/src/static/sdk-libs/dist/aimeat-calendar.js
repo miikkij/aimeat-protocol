@@ -8050,6 +8050,48 @@
     new RRule2(options);
     return options;
   }
+  var TIME_LIMITS = { [RRule2.HOURLY]: ["byhour"], [RRule2.MINUTELY]: ["byhour", "byminute"], [RRule2.SECONDLY]: ["byhour", "byminute", "bysecond"] };
+  var TIME_SIZE = { byhour: 24, byminute: 60, bysecond: 60 };
+  var UTC_PART = { byhour: (d2) => d2.getUTCHours(), byminute: (d2) => d2.getUTCMinutes(), bysecond: (d2) => d2.getUTCSeconds() };
+  var DAY_FILTERS = ["bymonth", "byweekno", "byweekday", "byeaster", "bymonthday", "byyearday"];
+  var ENGINE_FACTOR = 5;
+  var PAST_END = /* @__PURE__ */ Symbol("past the range end");
+  var asList = (v2) => v2 == null ? [] : [].concat(v2);
+  var gcd = (a2, b2) => b2 ? gcd(b2, a2 % b2) : a2;
+  function timeLimits(opts, startWall) {
+    const keys = (TIME_LIMITS[opts.freq] || []).filter((k2) => asList(opts[k2]).length);
+    if (!keys.length) return { never: false, lift: [] };
+    const interval = opts.interval || 1, stepped = keys.includes(TIME_LIMITS[opts.freq].at(-1)) ? TIME_LIMITS[opts.freq].at(-1) : null;
+    const coarser = keys.filter((k2) => k2 !== stepped);
+    if (coarser.length && (interval >= 60 || DAY_FILTERS.some((k2) => asList(opts[k2]).length))) {
+      return { never: false, lift: keys.map((k2) => [k2, new Set(asList(opts[k2]))]) };
+    }
+    const start = new Date(startWall), at2 = { byhour: start.getUTCHours(), byminute: start.getUTCMinutes(), bysecond: start.getUTCSeconds() };
+    const valid = (k2) => asList(opts[k2]).filter((v2) => Number.isInteger(v2) && v2 >= 0 && v2 < TIME_SIZE[k2]);
+    const step = stepped && gcd(interval, TIME_SIZE[stepped]);
+    const never = coarser.some((k2) => !valid(k2).length) || stepped !== null && !valid(stepped).some((v2) => ((v2 - at2[stepped]) % step + step) % step === 0);
+    return { never, lift: [] };
+  }
+  function lastPeriod(freq, interval, startWall, endWall) {
+    const span = Math.max(0, endWall - startWall), a2 = new Date(startWall), b2 = new Date(endWall);
+    const months = (b2.getUTCFullYear() - a2.getUTCFullYear()) * 12 + b2.getUTCMonth() - a2.getUTCMonth();
+    if (freq === RRule2.YEARLY) return Math.floor(Math.max(0, months) / 12 / interval) + 2;
+    if (freq === RRule2.MONTHLY) return Math.floor(Math.max(0, months) / interval) + 2;
+    const unit = { [RRule2.WEEKLY]: 7 * 864e5, [RRule2.DAILY]: 864e5, [RRule2.HOURLY]: 36e5, [RRule2.MINUTELY]: 6e4, [RRule2.SECONDLY]: 1e3 }[freq];
+    return Math.floor((span + unit) / (interval * unit)) + 2;
+  }
+  function meterPeriods(rule, last, budget) {
+    const interval = rule.options.interval;
+    let reads = 0;
+    Object.defineProperty(rule.options, "interval", {
+      configurable: true,
+      get() {
+        if (++budget.used > budget.max) throw new RangeError("Recurrence iteration limit exceeded; shorten the series");
+        if (++reads - 1 >> 1 > last) throw PAST_END;
+        return interval;
+      }
+    });
+  }
   function occurrences(events, options) {
     const bounds = rangeMs(options);
     const limit = options.limit ?? 1e4, maxIterations = options.maxIterations ?? 1e5;
@@ -8057,6 +8099,7 @@
     if (!Array.isArray(events) || events.length > 1e4) throw new RangeError("At most 10000 event series per query");
     const output = [], ids = /* @__PURE__ */ new Set();
     let iterations = 0;
+    const engine = { used: 0, max: maxIterations * ENGINE_FACTOR * 2 };
     for (const source of events) {
       let add2 = function(start, patch = null) {
         start = local(start, e2.allDay);
@@ -8093,24 +8136,38 @@
         delete opts.until;
         delete opts.tzid;
         const endWall = wallMs(fromInstant(options.to, e2.timeZone));
+        const startWall = wallMs(e2.start);
         let validCount = 0;
-        const rule = new RRule2({ ...opts, dtstart: new Date(wallMs(e2.start)), until: new Date(endWall) });
-        rule.all((date) => {
-          if (++iterations > maxIterations) throw new RangeError("Recurrence iteration limit exceeded; shorten the series");
-          if (date.getTime() > endWall || count && validCount >= count) return false;
-          const start = wallString(date.getTime(), e2.allDay);
-          let ms;
+        const { never, lift: limits } = timeLimits(opts, startWall);
+        if (!never) {
+          for (const [k2] of limits) delete opts[k2];
+          const rule = new RRule2({ ...opts, dtstart: new Date(startWall), until: new Date(endWall) });
+          meterPeriods(rule, lastPeriod(opts.freq, rule.options.interval, startWall, endWall), engine);
           try {
-            ms = zoned(start, e2.timeZone).epochMilliseconds;
+            rule.all((date) => {
+              if (limits.some(([k2, s2]) => !s2.has(UTC_PART[k2](date)))) {
+                if (++engine.used > engine.max) throw new RangeError("Recurrence iteration limit exceeded; shorten the series");
+                return date.getTime() <= endWall;
+              }
+              if (++iterations > maxIterations) throw new RangeError("Recurrence iteration limit exceeded; shorten the series");
+              if (date.getTime() > endWall || count && validCount >= count) return false;
+              const start = wallString(date.getTime(), e2.allDay);
+              let ms;
+              try {
+                ms = zoned(start, e2.timeZone).epochMilliseconds;
+              } catch (error) {
+                if (error instanceof RangeError && error.message.startsWith("Local time does not exist")) return true;
+                throw error;
+              }
+              if (until && (utcUntil ? ms : date.getTime()) > until.getTime()) return false;
+              validCount++;
+              add2(start);
+              return true;
+            });
           } catch (error) {
-            if (error instanceof RangeError && error.message.startsWith("Local time does not exist")) return true;
-            throw error;
+            if (error !== PAST_END) throw error;
           }
-          if (until && (utcUntil ? ms : date.getTime()) > until.getTime()) return false;
-          validCount++;
-          add2(start);
-          return true;
-        });
+        }
       }
       for (const start of e2.rdates || []) add2(start);
     }

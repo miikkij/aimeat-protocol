@@ -24,6 +24,10 @@
  *   import { pullPackage } from './package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.7.0 — 2026-10-25 — A pull is bound to the group it was requested and verified for: the signed
+ *     name and author must be the requested group's, the manifest must name the signed package, and
+ *     each component must arrive under its signed type, or the pull is refused before any write
+ *     (secaudit2026oct22).
  *   v1.6.0 — 2026-10-05 — Every signed pull names the repository it is for (signedPackageHeaders
  *     audience; secaudit 2026-10, PKG-10).
  *   v1.5.0 — 2026-09-29 — With package federation off, the repository an install set named is still
@@ -341,7 +345,19 @@ export async function pullPackage(
         };
     }
 
-    // 8. And the bytes that arrived are the bytes it signed about.
+    // 7b. And it is the package that was asked for. The group a pull is written into is read from
+    //     manifest.yaml, which the signature does not cover, and every check in step 4 ran on the
+    //     requested group. So the signed name and author must be the requested group's, and the
+    //     manifest must name the package that was signed.
+    const [askedName, askedAuthor] = groupId.split('::');
+    if (doc.descriptor.name !== askedName || doc.descriptor.author !== askedAuthor || parsed.name !== doc.descriptor.name) {
+        return {
+            ok: false, status: 401, code: 'INVALID_SIGNATURE',
+            message: `${source.nodeId} served a package signed as "${doc.descriptor.name}::${doc.descriptor.author}" and named "${parsed.name}" in its manifest, not "${groupId}".`,
+        };
+    }
+
+    // 8. And the bytes that arrived are the bytes it signed about, each under the type it was signed as.
     const digests = verifyComponentDigests(doc.descriptor, parsed.components);
     if (!digests.ok) {
         return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: digests.reason };
