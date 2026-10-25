@@ -34,6 +34,9 @@
  * @usage const match = await findIssuingService(config, chain, signingTime);
  * @version-history
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: a list's XML signature counts only when a reference
+ *     covers the whole document (the empty URI or the document element's Id), because the readers
+ *     walk the whole original document.
  */
 import { X509Certificate, createHash, createPublicKey, verify as cryptoVerify, type KeyLike } from 'node:crypto';
 import { DOMParser, type Element as XmlElement, type Document as XmlDocument } from '@xmldom/xmldom';
@@ -165,6 +168,21 @@ const ECDSA_ALGORITHMS: Record<string, new () => SignatureAlgorithm> = {
   'http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512': ecdsaAlgorithm('http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512', 'sha512'),
 };
 
+/**
+ * Whether a verified signature covers the whole document the readers below walk. The lists are read
+ * from the original DOM (parseTerritory, parsePointers), so a reference must be the empty URI (the
+ * whole document) or name the Id of the document element itself. A reference to an element inside
+ * the document leaves everything outside it unsigned, and a list must not be read from that.
+ */
+function coversDocument(sx: SignedXml, doc: XmlDocument): boolean {
+  const root = doc.documentElement as unknown as XmlElement | null;
+  const rootId = root?.getAttribute('Id') || root?.getAttribute('ID') || root?.getAttribute('id') || '';
+  return sx.getReferences().some((r) => {
+    const uri = r.uri ?? '';
+    return uri === '' || (rootId !== '' && uri === `#${rootId}`);
+  });
+}
+
 /** The XML's enveloped signature verifies with one of `certs` (base64 DER). Returns the cert that did. */
 function verifyXmlSignature(xml: string, certs: string[]): string | null {
   const doc = new DOMParser().parseFromString(xml, 'text/xml');
@@ -175,7 +193,7 @@ function verifyXmlSignature(xml: string, certs: string[]): string | null {
       const sx = new SignedXml({ publicCert: pem(b64) });
       sx.SignatureAlgorithms = { ...sx.SignatureAlgorithms, ...ECDSA_ALGORITHMS };
       sx.loadSignature(sigNode as unknown as Parameters<SignedXml['loadSignature']>[0]);
-      if (sx.checkSignature(xml)) return b64;
+      if (sx.checkSignature(xml) && coversDocument(sx, doc)) return b64;
     // eslint-disable-next-line aimeat/no-silent-catch -- xml-crypto throws for the wrong certificate; the caller logs when none of them verifies
     } catch {
       // Wrong certificate for this signature: try the next one.
