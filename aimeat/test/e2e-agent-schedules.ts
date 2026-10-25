@@ -1097,7 +1097,13 @@ await test('47. Erasure removes the schedules the account\'s agents made, and a 
     const listed = await json('/v1/schedules', { headers: { Authorization: `Bearer ${second.token}` } });
     assert(!JSON.stringify(listed.body?.data ?? {}).includes(oldId), 'the previous holder\'s schedule is listed to the new holder');
     const leftId = await schedule(bot2, 'LEFT_BY_PREVIOUS_HOLDER');
-    await storage.updateScheduledJob(leftId, { createdAt: '2020-01-01T00:00:00.000Z' });
+    // updateScheduledJob never writes createdAt on Postgres, so the row is aged with one statement there.
+    if (provider === 'postgres-kysely') {
+        await (storage as unknown as { pool: { query(q: string, p: unknown[]): Promise<unknown> } }).pool
+            .query('UPDATE "ScheduledJob" SET "createdAt" = $1 WHERE "id" = $2', [new Date('2020-01-01T00:00:00.000Z'), leftId]);
+    } else {
+        await storage.updateScheduledJob(leftId, { createdAt: '2020-01-01T00:00:00.000Z' });
+    }
     const run = await json(`/v1/schedules/${leftId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${second.token}` } });
     assert(run.status === 200 && run.body.data.outcome !== 'created', `a schedule older than the account fired in it: ${run.status} ${run.body?.data?.outcome}`);
     // Control: the new holder's own agent schedule fires.
