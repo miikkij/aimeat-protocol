@@ -50024,7 +50024,10 @@ paths:
         without a node key). A host field (manifest `network.host_fields`) takes one hostname or IPv4
         address with an optional :port, never a scheme, path, wildcard or list, and an empty string
         clears it; its host joins the fetch allowlist from the extension's next run on, and
-        `network_hosts` in the answer lists every host it reaches now. A refused value changes nothing
+        `network_hosts` in the answer lists every host it reaches now. A host field value set by a
+        caller other than the account holder in person or a principal holding secrets:manage is
+        reached by ctx.fetch but does not count as a host the extension declares for a vault secret:
+        the first use of an unbound secret toward it asks the owner on the allow page. A refused value changes nothing
         (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. A key the node
         owns (`emailPolicy`) is set only by the operator in person or the operator's agent holding
         operator:admin; anyone else is refused 403 OPERATOR_REQUIRED and nothing is changed. MCP:
