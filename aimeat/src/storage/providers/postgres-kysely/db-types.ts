@@ -2197,6 +2197,8 @@ export interface SubdomainSite {
   enabled: Generated<boolean>;
   id: Generated<string>;
   kind: string;
+  /** 'operator' | 'publisher'; null until classified (migration 0116). */
+  origin: string | null;
   subdomain: string;
   target: string;
   updatedAt: Generated<Timestamp>;

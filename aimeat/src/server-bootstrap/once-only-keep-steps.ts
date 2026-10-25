@@ -21,6 +21,9 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.2.6 -- 2026-10-25 -- classifySubdomainSiteOriginsOnce, last: the subdomain rows from before
+ *     `origin` are classified on evidence, the rest named on the Security page (secaudit2026oct22;
+ *     services/subdomain-site-origin-keep.ts).
  *   v1.2.5 -- 2026-10-24 -- disableMalformedExtensionRefsOnce, last: a stored extension capability whose
  *     ref names no extension action gets the operator's disable switch with a note, nothing deleted
  *     (secaudit2026oct22; services/capability-extension-ref.ts).
@@ -61,6 +64,7 @@ import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
+import { classifySubdomainSiteOriginsOnce } from '../services/subdomain-site-origin-keep.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -128,4 +132,9 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // invoke meets such a ref first.
   await disableMalformedExtensionRefsOnce(storage, config)
     .catch(err => logger.error('Failed to switch off the extension capabilities whose ref names no action; the next boot tries again', { error: String(err) }));
+  // The subdomain rows from before `origin` get the origin their evidence shows; the rest are named on
+  // the Security page and served as before (services/subdomain-site-origin-keep.ts). Awaited, so the
+  // apex answers by the classified origin from the first request.
+  await classifySubdomainSiteOriginsOnce(storage, config)
+    .catch(err => logger.error('Failed to classify the older subdomain addresses; the next boot tries again', { error: String(err) }));
 }
