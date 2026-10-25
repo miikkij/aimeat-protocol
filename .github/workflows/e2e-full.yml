@@ -20,7 +20,11 @@ permissions:
 
 jobs:
   sweep:
-    runs-on: ubuntu-latest
+    # Ubuntu 24.04, not ubuntu-latest: e2e-backup-restore runs pg_dump and pg_restore against the
+    # postgres:16 service, as an operator does with the matching client. ubuntu-latest became 26.04
+    # on 2026-10-25, whose pg_dump writes `SET transaction_timeout`, which a PostgreSQL 16 server
+    # refuses, so pg_restore exits 1. Move this with the service image, never on its own.
+    runs-on: ubuntu-24.04
     # A time limit per job (QA audit P1-06); the runner also limits each suite, so a hung suite is
     # one red row and not a job that runs until GitHub's six-hour default.
     timeout-minutes: 120
