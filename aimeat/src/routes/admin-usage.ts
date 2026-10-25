@@ -28,6 +28,8 @@
  *   import { adminUsageRouter } from './routes/admin-usage.js';
  *   app.use(adminUsageRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-10-25 — The hot window and the hour-rollup window come from the config
+ *     (usage.hot_days, usage.hour_rollup_days), so the admin Config tab shows and changes them.
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2). The raw-calls audit row names the calling agent as the actor when an agent reads.
  *   v1.2.0 — 2026-10-02 — chat_agent.metered_here is true on the node route (no shared chat key).
  *   v1.1.0 — 2026-09-12 — The Usage page's own read, and the one route that asks the provider what
@@ -53,7 +55,6 @@ import { chatUsesSharedKey } from '../services/goose-env.js';
 import { logger } from '../utils/logger.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-const HOT_DAYS = Number(process.env.AIMEAT_USAGE_HOT_DAYS) || 90;
 
 export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -158,8 +159,8 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
 
       res.json(success(config.nodeId, {
         count: calls.length,
-        hot_window_days: HOT_DAYS,
-        note: `Raw calls are kept ${HOT_DAYS} days here; older ones are in the archive and are not served by this endpoint.`,
+        hot_window_days: config.usageHotDays,
+        note: `Raw calls are kept ${config.usageHotDays} days here; older ones are in the archive and are not served by this endpoint.`,
         audited: true,
         calls,
       }));
@@ -180,8 +181,8 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
           llm: llm ? { last_ts: llm.lastTs, updated_at: llm.updatedAt } : null,
           call: call ? { last_ts: call.lastTs, updated_at: call.updatedAt } : null,
         },
-        hot_window_days: HOT_DAYS,
-        hour_rollup_days: Number(process.env.AIMEAT_USAGE_HOUR_ROLLUP_DAYS) || 30,
+        hot_window_days: config.usageHotDays,
+        hour_rollup_days: config.usageHourRollupDays,
       }));
     });
 
@@ -312,6 +313,7 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
       if (!ISO_DAY.test(from)) {
         return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'from is required, as YYYY-MM-DD'));
       }
+      const HOT_DAYS = config.usageHotDays;
       const hotStart = dayNDaysAgo(HOT_DAYS);
       if (from < hotStart) {
         // Refuse before doing anything. A rebuild reaching past the hot window would DELETE rollup

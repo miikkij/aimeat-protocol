@@ -9,6 +9,7 @@
  * @structure ConfigFieldShape<K>
  * @usage import type { ConfigFieldDef } from './config-schema.js';
  * @version-history
+ *   2026-10-25 — `applies: 'restart'`: a row stored in the database that takes effect at the next start.
  *   2026-10-16 — `refusal`: the reason a row's check gives for a value it refuses on principle (QA audit D6-01).
  *   v1.2.0 — 2026-10-11 — `list`: a setting whose running value is a list of strings.
  *   v1.1.0 — 2026-09-29 — `choices`: the fixed values of a string setting, for the Config tab's pick.
@@ -33,6 +34,14 @@ export interface ConfigFieldShape<K extends string> {
   refusal?: string;
   /** true = cannot be changed after startup */
   immutable: boolean;
+  /**
+   * When a saved value takes effect, for a row that is not immutable. Absent: at once, because the
+   * code that uses the setting reads the config on every use. 'restart': the code reads it once when
+   * the node starts, so a save is stored in the database and takes effect at the next start
+   * (config-overrides.ts applies it before anything reads it). The Config tab and the admin API say
+   * so, and until then the running value is the old one (ConfigProvenance.awaitsRestart).
+   */
+  applies?: 'restart';
   /** Human-readable description */
   description: string;
   /** Valid range hint for numbers (e.g. '0-10000') */

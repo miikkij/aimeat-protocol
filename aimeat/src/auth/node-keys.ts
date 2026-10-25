@@ -13,6 +13,8 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   2026-10-25 — The key path and the passphrase are read from the config first (node.key_path,
+ *     node.key_passphrase, shown on the admin Config tab), the environment after it.
  *   v1.4.0 — 2026-10-16 — The page frame token (services/page-frame-token.ts) is signed with the node keys too.
  *   v1.3.1 — 2026-10-16 — readKeyFileClaim's silent-catch exemption states its reason after `--`,
  *     which check:silent-catch now requires of every exemption (W25). Comment only.
@@ -91,7 +93,9 @@ interface EncryptedKeyFile {
  * they are the same node and sharing a key is correct.
  */
 function getNodeKeyPath(config?: AimeatConfig): string {
-  const explicit = process.env.AIMEAT_NODE_KEY_PATH?.trim();
+  // config.nodeKeyPath is the same variable, loaded (node.key_path on the admin Config tab); the
+  // environment is read too for a caller that has no config yet.
+  const explicit = config?.nodeKeyPath || process.env.AIMEAT_NODE_KEY_PATH?.trim();
   if (explicit) return explicit;
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '.';
   if (!config?.nodeId) return join(home, '.aimeat', 'node-key.json');
@@ -344,7 +348,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     // The secrets the database copy is sealed with: the passphrase the key file uses, and the data
     // key. Set before the first read, so the providers open the row with them.
     const secrets: NodeKeySecrets = {
-      passphrase: process.env.AIMEAT_KEY_PASSPHRASE || null,
+      passphrase: config.keyPassphrase || process.env.AIMEAT_KEY_PASSPHRASE || null,
       dataKeyHex: config.encryptionKey ?? process.env.AIMEAT_ENCRYPTION_KEY ?? null,
     };
     configureNodeKeySecrets(secrets);

@@ -11,6 +11,8 @@
  * @structure ConfigChange · ConfigApplyResult · applyConfigChanges(deps, changes)
  * @usage const r = await applyConfigChanges({ config, storage, provenance }, [{ path, value }]);
  * @version-history
+ *   2026-10-25 — A row with `applies: 'restart'` is stored and not written to the running config; the
+ *     answer names it, and the Config tab says the node runs with the old value until it restarts.
  *   2026-10-16 — A refused value is answered with the row's `refusal` when it has one (eudiw.enabled; QA audit D6-01).
  *   v1.4.0 — 2026-10-11 — A list setting is normalized to a list before its check and stored as
  *     comma-separated text; it was written as the text the request sent. The rate-limit settings are
@@ -32,11 +34,12 @@ import { isSecretField } from './config-sealing.js';
 import { sealSettingForStorage } from './config-at-rest-rows.js';
 import { withinStatedRange, RANGE_ENFORCED, rangeKindOf, numericRangeOf, asList } from './config-schema-validators.js';
 import { syncRateLimitTiers } from './config-rate-limit-sync.js';
-import { logger } from '../utils/logger.js';
+import { logger, setLogLevel } from '../utils/logger.js';
 
 export interface ConfigChange { path?: unknown; value?: unknown }
 export interface ConfigApplyResult {
-    applied: { path: string; old_value: unknown; new_value: unknown; secret?: true }[];
+    /** `applies: 'restart'`: stored, and the running value stays the old one until the next start. */
+    applied: { path: string; old_value: unknown; new_value: unknown; secret?: true; applies?: 'restart' }[];
     errors: { path: string; reason: string }[];
 }
 
@@ -96,16 +99,26 @@ export async function applyConfigChanges(
             });
             continue;
         }
-        writeConfigField(config, mapping, value);
-        if (provenance) provenance.markDatabase([path]);
+        // A row whose code reads it once at start takes the stored value at the next start. Writing it
+        // to the running config now would show a value the node is not running with.
+        const atRestart = mapping.applies === 'restart';
+        if (atRestart) {
+            if (provenance) provenance.markDatabaseAtRestart([path]);
+        } else {
+            writeConfigField(config, mapping, value);
+            if (provenance) provenance.markDatabase([path]);
+        }
         // A secret is answered with whether it was and is configured, never with the value.
         // The old value can be a key the host injected through the environment, which the
         // operator may replace and must not read. Measured on aimeat.io 2026-09-16.
-        applied.push(isSecretField(mapping)
-            ? { path, old_value: { configured: !!oldValue }, new_value: { configured: !!value }, secret: true }
-            : { path, old_value: oldValue, new_value: value });
+        applied.push({
+            ...(isSecretField(mapping)
+                ? { path, old_value: { configured: !!oldValue }, new_value: { configured: !!value }, secret: true as const }
+                : { path, old_value: oldValue, new_value: value }),
+            ...(atRestart ? { applies: 'restart' as const } : {}),
+        });
     }
-    // A saved rate limit reaches the running limiters now, not at the next restart.
-    if (applied.length > 0) syncRateLimitTiers(config);
+    // A saved rate limit reaches the running limiters now, not at the next restart; so does the log level.
+    if (applied.length > 0) { syncRateLimitTiers(config); setLogLevel(config.logLevel); }
     return { applied, errors };
 }

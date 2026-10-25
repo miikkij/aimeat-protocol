@@ -14,6 +14,8 @@
  *   - load/save/clearPendingJoin: resumable pending-request state on disk
  *
  * @version-history
+ *   2026-10-25 — saveFederationState says why it reads process.env: it asks what .env already names
+ *     (check:config-coverage lists the read with that reason).
  *   v1.4.0 — 2026-10-16 — doKeyExchange returns its outcome and sends `node_public_key`, the field the
  *     key-exchange route requires (it sent `public_key` and was refused with 400 on every run). A failed
  *     exchange saves no federation state and prints no success text; runFederationJoin returns false on
@@ -505,6 +507,9 @@ async function doKeyExchange(
 
 /** Save federation role and genesis URL to .env if not already set. */
 function saveFederationState(config: AimeatConfig, targetUrl: string, role: string): void {
+  // The question is what the environment (.env) already names, which is why process.env is read here
+  // and not the config: config.federationRole is the role being joined with. A value saved on the
+  // Config page is in the database and the next start applies it over .env either way.
   if (!process.env.AIMEAT_FEDERATION_ROLE || process.env.AIMEAT_FEDERATION_ROLE === 'standalone') {
     setEnvVar('AIMEAT_FEDERATION_ROLE', role);
   }
