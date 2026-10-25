@@ -2493,10 +2493,10 @@
      "slug": "g-11-vendored-libraries",
      "cells": [
       "<strong>Vendored libraries</strong>",
-      "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, Tailwind CSS, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream.",
-      "<code>/lib/*</code>, <code>/v1/library-packs</code>, library pack <code>hls</code>"
+      "three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, Tailwind CSS, fonts, an ffmpeg core so an app can encode video in the browser, hls.js so an app can play an HLS video stream, and proj4 with Proj4Leaflet so a map can be drawn in a national projection such as Finland's ETRS-TM35FIN (EPSG:3067), the one the National Land Survey's maps use.",
+      "<code>/lib/*</code>, <code>/v1/library-packs</code>, library packs <code>hls</code>, <code>proj4leaflet</code>"
      ],
-     "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, Tailwind CSS, fonts, an ffmpeg core so an app can encode video in the browser, and hls.js so an app can play an HLS video stream. /lib/*, /v1/library-packs, library pack hls"
+     "plain": "Vendored libraries three.js, p5, PixiJS, Chart.js, D3, Mermaid, KaTeX, Leaflet, PDF.js, DuckDB-WASM, YAML, Tailwind CSS, fonts, an ffmpeg core so an app can encode video in the browser, hls.js so an app can play an HLS video stream, and proj4 with Proj4Leaflet so a map can be drawn in a national projection such as Finland's ETRS-TM35FIN (EPSG:3067), the one the National Land Survey's maps use. /lib/*, /v1/library-packs, library packs hls, proj4leaflet"
     },
     {
      "slug": "g-11-realtime-library",
