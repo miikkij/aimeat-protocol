@@ -10,6 +10,9 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-10-25 — The refresh, revoke and session routes read the refresh cookie by the node's config, so an
+ *     https node reads `__Host-aimeat_rt` and the old name only inside its window (secaudit2026oct22,
+ *     refresh-cookie-unprefixed-first-match).
  *   2026-10-25 — The JWT minted from a PAT-backed refresh cookie carries the `pat` claim, so revoking the
  *     PAT ends it at the next request (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  *   2026-10-21 — The bearer refresh asks isAnonymousPrincipal: the minted anonymous token carries no
@@ -435,14 +438,14 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/auth/refresh
-  // Two modes: (1) owner session refresh via the httpOnly aimeat_rt cookie with token
-  // rotation + reuse detection; (2) Bearer-based refresh for agents and ecosystem apps only (an
-  // owner bearer is refused, QA audit S1-01). optionalAuth() resolves a Bearer if present without
-  // rejecting cookie clients.
+  // Two modes: (1) owner session refresh via the httpOnly refresh cookie (__Host-aimeat_rt on
+  // https, aimeat_rt on http) with token rotation + reuse detection; (2) Bearer-based refresh for
+  // agents and ecosystem apps only (an owner bearer is refused, QA audit S1-01). optionalAuth()
+  // resolves a Bearer if present without rejecting cookie clients.
   router.post('/v1/auth/refresh', optionalAuth(), async (req, res) => {
     // (1) Cookie-based owner session refresh (rotation + reuse detection).
-    if (readRefreshCookie(req)) {
-      const cookieVal = readRefreshCookie(req)!;
+    const cookieVal = readRefreshCookie(req, config);
+    if (cookieVal) {
       // PAT-backed browser session: the cookie value IS the access token (set by a browser
       // PAT request) — validate it per refresh so revocation takes effect immediately.
       if (cookieVal.startsWith(PAT_PREFIX)) {
@@ -645,7 +648,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   // bearer token, then clear the refresh cookie. optionalAuth so it still works when
   // the short-lived access token has already expired.
   router.post('/v1/auth/revoke', optionalAuth(), async (req, res) => {
-    const rt = readRefreshCookie(req);
+    const rt = readRefreshCookie(req, config);
     if (rt) {
       const session = await storage.getSessionByRefreshHash(hashToken(rt));
       if (session) await storage.revokeSession(session.sessionId);
@@ -738,7 +741,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     }
     await storage.revokeSession(sessionId);
     // If the caller revoked the device they're currently on, clear its cookie too.
-    const rt = readRefreshCookie(req);
+    const rt = readRefreshCookie(req, config);
     if (rt && (hashToken(rt) === target.refreshTokenHash || hashToken(rt) === target.prevTokenHash)) {
       clearRefreshCookie(req, res);
     }

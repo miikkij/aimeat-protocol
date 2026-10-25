@@ -11631,6 +11631,7 @@
     "cfg_auth_entra_allowed_tenants": "Sallitut Entra-vuokraajat",
     "cfg_auth_casdoor_link_domains": "Casdoorin luotetut verkkotunnukset",
     "cfg_auth_entra_link_domains": "Entran luotetut verkkotunnukset",
+    "cfg_auth_refresh_cookie_legacy_until": "Vanha kirjautumiseväste luetaan asti",
     "cfg_email_smtp_secure": "Suora TLS",
     "cfg_email_smtp_reject_unauthorized": "Hylkää kelvottomat TLS-varmenteet",
     "cfg_account_events_window": "Tilitapahtumien ikkuna",
@@ -11875,6 +11876,7 @@
     "cfgDesc_auth_entra_allowed_tenants": "Microsoft Entra -vuokraajat, jotka saavat kirjautua (pilkuin eroteltuina GUID:eina). Tyhjä: portti tulee AIMEAT_ENTRA_OAUTH_TENANT-arvosta yksinään.",
     "cfgDesc_auth_casdoor_link_domains": "Verkkotunnukset, joiden Casdoor-osoitteet lasketaan vahvistetuiksi (pilkuin eroteltuina, * = kaikki). Vain tällainen osoite liittää Casdoor-kirjautumisen olemassa olevaan tiliin tai tulee uuden tilin vahvistetuksi osoitteeksi. Tyhjä: ei mikään.",
     "cfgDesc_auth_entra_link_domains": "Verkkotunnukset, joiden Microsoft Entra -osoitteet lasketaan vahvistetuiksi (pilkuin eroteltuina, * = kaikki). Tyhjä: kaikki, kun yksi vuokraaja saa kirjautua, eikä mikään, kun sallittuja vuokraajia on useampi.",
+    "cfgDesc_auth_refresh_cookie_legacy_until": "Viimeinen päivä (VVVV-KK-PP, UTC), jona https-palvelin vielä lukee vanhan kirjautumisevästeen nimen aimeat_rt ja siirtää selaimen uuteen __Host-aimeat_rt-evästeeseen. Tyhjä arvo asetetaan ensimmäisellä käynnistyksellä 30 päivän päähän. Mennyt päivä: vanhaa nimeä ei lueta enää, ja selain, jolla on vain vanha eväste, kirjautuu uudelleen.",
     "cfgDesc_features_extended_features_enabled": "Laajennettu ominaisuusjoukko käytössä.",
     "cfgDesc_work_queue_max_pending": "Odottavien työkohteiden katto tarjoajaa kohden.",
     "cfgDesc_work_webhook_max_retries": "Webhook-toimituksen uusintayritysten katto.",
@@ -26450,6 +26452,15 @@
           "ex1": "Tyhjä ja yksi vuokraaja: omat työntekijäsi pääsevät omille tileilleen jo ensimmäisellä Microsoft-kirjautumisella.",
           "ex2": "corp.example, partner.example ja kaksi sallittua vuokraajaa: näiden kahden verkkotunnuksen osoitteet liitetään olemassa oleviin tileihin, ja muun verkkotunnuksen osoite vie käyttäjätunnuksen valintaan.",
           "tip": "Kun vuokraajia on useampi, lisää listalle kunkin organisaation omat verkkotunnukset. Listalla oleva verkkotunnus antaa sen vuokraajan ylläpitäjälle pääsyn täällä oleviin tileihin, joiden osoite on siinä verkkotunnuksessa."
+        },
+        "refresh_cookie_legacy_until": {
+          "title": "Vanha kirjautumiseväste luetaan asti",
+          "short": "Viimeinen päivä, jona tämä palvelin vielä lukee selaimen vanhan kirjautumisevästeen. Sen jälkeen selain, jolla on vain vanha eväste, kirjautuu uudelleen.",
+          "what": "Selain pitää ihmisen kirjautuneena evästeen avulla. Https-palvelimella evästeen nimi on nyt __Host-aimeat_rt. Selain hyväksyy tämännimisen evästeen vain tältä palvelimelta itseltään, joten sovellus omassa osoitteessaan tämän palvelimen alla ei voi asettaa sitä selaimeen. Ennen evästeen nimi oli aimeat_rt, ja sovellus pystyi kirjoittamaan samannimisen evästeen. Palvelin lukee vanhaa nimeä vielä tämän päivän loppuun (UTC). Kun se lukee vanhan evästeen, se antaa selaimelle uuden evästeen ja poistaa vanhan, joten ajoissa palaava ihminen pysyy kirjautuneena. Tämän päivän jälkeen vanhaa nimeä ei lueta. Pelkkää http:tä käyttävä palvelin pitää vanhan nimen, koska uusi nimi vaatii https:n.",
+          "range": "Päivämäärä muodossa VVVV-KK-PP. Jos arvo on tyhjä käynnistyksessä, palvelin asettaa sen 30 päivän päähän käynnistyksestä ja säilyttää sen. Mennyt päivä lopettaa vanhan nimen lukemisen heti.",
+          "ex1": "Ensimmäisellä käynnistyksellä asetettu päivä: 30 päivän sisällä palaavat ihmiset pysyvät kirjautuneina.",
+          "ex2": "Eilinen päivä: vanha nimi lakkaa toimimasta heti, ja ihmiset, joilla oli vain vanha eväste, kirjautuvat uudelleen.",
+          "tip": "Pidä palvelimen asettama päivä. Aseta aikaisempi päivä, jos haluat lopettaa vanhan nimen lukemisen aiemmin, esimerkiksi kun jokin tämän palvelimen sovellus on voinut kirjoittaa evästeitä."
         }
       },
       "totp": {

@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.19.2 — 2026-10-25 — refreshCookieLegacyUntil: the last day an https node reads the old refresh cookie name (secaudit2026oct22).
  *   v1.19.1 — 2026-10-25 — OperatorConfig and OperatorType moved to config-types-operator.ts unchanged and re-exported (an import cycle through config-sealing.ts).
  *   v1.19.0 — 2026-10-20 — ContentClassConfig mixed in (config-content-class.ts): contentClassMode,
  *     ffprobePath, ffmpegPath.
@@ -284,6 +285,9 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   refreshIdleDays: number;      // sliding idle window for the refresh cookie
   refreshAbsoluteDays: number;  // hard cap for the refresh cookie, never extended
   refreshGraceMs: number;       // previous token honored this long after rotation (concurrency)
+  /** YYYY-MM-DD: the last day an https node reads the old refresh cookie name `aimeat_rt` (UTC).
+   *  Empty at first start = set to 30 days later and stored (services/owner-session.ts). */
+  refreshCookieLegacyUntil: string;
   welcomeBonus: number;
   dailyAllowance: number;
   dailyAllowanceCap: number;
