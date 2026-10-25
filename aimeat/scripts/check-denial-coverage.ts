@@ -38,6 +38,9 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-25 -- ROUTE_CEILING 455: GET /v1/admin/scheduler/jobs/{id} and GET
+ *     /v1/admin/scheduler/execution-log are refused to a non-operator by test/e2e-owner-deactivation.ts
+ *     (secaudit2026oct22, round 7).
  *   2026-10-25 — ROUTE_CEILING 457: the three rows below, merged.
  *   2026-10-25 — ROUTE_CEILING 460: the two rows below, merged.
  *   2026-10-25 — ROUTE_CEILING 461: PATCH /v1/extensions/{name}/actions/{actionId} and PATCH
@@ -117,7 +120,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 457;
+export const ROUTE_CEILING = 455;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

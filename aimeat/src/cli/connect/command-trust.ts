@@ -38,8 +38,13 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from '
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
-import type { AimeatPerAgentConfig, RunnerConfig } from './config.js';
 import { logger } from '../../utils/logger.js';
+
+// The parts of a per-agent config this file reads and changes. config.ts AimeatPerAgentConfig and
+// RunnerConfig have them; they are written out here so this file imports nothing from config.ts,
+// which imports it (check:deps no-circular).
+interface RunnerConfig { command: string; args?: string[]; cwd?: string; env?: Record<string, string> }
+interface AimeatPerAgentConfig { runner?: RunnerConfig; wake?: { command?: string; webhook?: string; strategy?: string } }
 
 /** The commands one agent's config would have the connector run, held back until confirmed. */
 export interface HeldCommands {
@@ -102,7 +107,7 @@ export function trustCommand(held: HeldCommands, env: NodeJS.ProcessEnv = proces
  * config with no command, or with confirmed ones, comes back unchanged and `held` is null. A wake
  * webhook is not a command and stays.
  */
-export function heldBackCommands(config: AimeatPerAgentConfig, home: string, env: NodeJS.ProcessEnv = process.env): { config: AimeatPerAgentConfig; held: HeldCommands | null } {
+export function heldBackCommands<T extends AimeatPerAgentConfig>(config: T, home: string, env: NodeJS.ProcessEnv = process.env): { config: T; held: HeldCommands | null } {
   const runner = config.runner?.command ? config.runner : undefined;
   const wakeCommand = config.wake?.command || undefined;
   if (!runner && !wakeCommand) return { config, held: null };

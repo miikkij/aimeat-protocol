@@ -111,7 +111,9 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   // and a refusal names that clearance (classification/reader.ts useForAi). The owner's own
   // schedules, an app's and an ecosystem app's read as an unattended run, as before (secaudit2026oct22,
   // scheduler-ai-job.ts:runAiJob:background-ai-input-read-as-owner-reader; developer decision 2026-10-25).
-  const reader = actor.roles.includes('agent')
+  // What kind of principal made the schedule is asked of its caller object (caller-context.ts).
+  const maker = callerFromAuth({ sub: actor.principal, owner: '', roles: actor.roles, scopes: actor.scopes }, config.nodeId, storage);
+  const reader = maker.kind === 'agent'
     ? readerForCaller({ storage, config }, { gaii: actor.principal, owner: localAccountName(owner), roles: [...actor.roles], scopes: [...actor.scopes] })
     : unattendedReader({ storage, config }, owner);
   let inputs: Awaited<ReturnType<typeof readAiRecords>>;
@@ -121,8 +123,7 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
     // On the agent's card and in the owner's bell, once while the refusal stays open, as a fire
     // refused for a missing word is (services/schedule-fire-refusal.ts).
     if (err instanceof AiInputHiddenError) {
-      const caller = callerFromAuth({ sub: actor.principal, owner: '', roles: actor.roles, scopes: actor.scopes }, config.nodeId, storage);
-      if (caller.kind === 'agent') {
+      if (maker.kind === 'agent') {
         noteAgentRefusal(agentSessionCaller(actor.principal, '', actor.scopes, config.nodeId, storage).auth, [READ_AS_OWNER_SCOPE], false, `schedule ${job.id}`);
       }
     }
