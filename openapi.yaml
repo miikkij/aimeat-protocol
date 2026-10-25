@@ -80117,7 +80117,7 @@ paths:
               required: [client_id, gaii, owner_token]
               properties:
                 client_id: { type: string }
-                client_name: { type: string, description: Falls back to the registered or published name. }
+                client_name: { type: string, description: 'Accepted and not used: the client is named by its registered name, or the name its Client ID Metadata Document publishes.' }
                 redirect_uri: { type: string, description: Must be one the client lists. Falls back to the client's first. }
                 state: { type: string }
                 gaii: { type: string, description: The agent the client will act as. }

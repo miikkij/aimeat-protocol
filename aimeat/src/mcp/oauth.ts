@@ -12,6 +12,10 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.8.2 — 2026-10-25 — authorize-consent names the client by the name the server registered or
+ *     read from the client's document, never by a posted client_name, so the token's mcp_client and
+ *     the session label cannot be chosen by a link (secaudit2026oct22,
+ *     consent-identity-from-request-not-verified-client).
  *   v1.8.1 — 2026-10-22 — authorize and authorize-consent accept a registered loopback redirect on
  *     any port (RFC 8252 §7.3, mcp/oauth-redirect.ts). Claude Code's metadata document lists
  *     `http://localhost/callback` and sends an ephemeral port, so every Claude Code sign-in was
@@ -304,7 +308,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
     // POST /v1/mcp/authorize-consent — Browser consent form submission
     // Called by the consent page after user logs in, selects an agent, and clicks "Approve"
     router.post('/v1/mcp/authorize-consent', async (req: Request, res: Response) => {
-        const { client_id, client_name: clientNameBody, redirect_uri, state, gaii, owner_token, code_challenge, code_challenge_method } = req.body ?? {};
+        const { client_id, redirect_uri, state, gaii, owner_token, code_challenge, code_challenge_method } = req.body ?? {};
         const consentResources = resourceValues(req.body?.resource);
 
         if (!client_id || !gaii || !owner_token) {
@@ -429,7 +433,10 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
 
         // Issue authorization code
         const code = randomBytes(32).toString('hex');
-        const resolvedClientName = clientNameBody || client?.clientName || viaUrl?.clientName || client_id;
+        // The name the server knows, registered or read from the client's own document. The posted
+        // client_name is what the consent page read from its query, which a link can set, so it
+        // never names the client on the token (secaudit2026oct22, consent-identity-from-request).
+        const resolvedClientName = client?.clientName || viaUrl?.clientName || client_id;
         authCodes.set(code, {
             code,
             clientId: client_id,
