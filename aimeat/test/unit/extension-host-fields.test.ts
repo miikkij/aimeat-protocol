@@ -14,6 +14,8 @@
  *   safeFetch is replaced by a recorder, the way extension-ai-provider-ctx.test.ts does it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-host-fields.test.ts
  * @version-history
+ *   2026-10-25 — A host field value set by a caller that may not choose a secret's host is marked
+ *     unvetted and does not count as declared; a redeploy carries the mark (secaudit2026oct22).
  *   v1.2.0 — 2026-10-09 — carryHostFieldValues: an in-place update keeps the held host.
  *   v1.1.0 — 2026-10-09 — An unset field beside fixed hosts is named in the refusal.
  *   v1.0.0 — 2026-10-09 — Initial (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
@@ -35,7 +37,8 @@ vi.mock('../../src/utils/url-validator.js', async (importOriginal) => {
 const { buildExtensionRecordFromManifest } = await import('../../src/services/extension-manifest.js');
 const { capabilitiesOfRecord } = await import('../../src/services/extension-capability-declaration.js');
 const { buildExtensionCtx } = await import('../../src/services/extension-ctx.js');
-const { parseHostFieldValue, carryHostFieldValues, NETWORK_HOST_FIELDS_KEY } = await import('../../src/services/extension-network-hosts.js');
+const { parseHostFieldValue, carryHostFieldValues, NETWORK_HOST_FIELDS_KEY, HOST_FIELDS_UNVETTED_KEY } = await import('../../src/services/extension-network-hosts.js');
+const { declaresHost } = await import('../../src/services/extension-secret-uses.js');
 const { setExtensionConfig } = await import('../../src/services/extension-config-set.js');
 const { questionsOf } = await import('../../src/services/packages/compose/package-config-needs.js');
 const { planPackageConfig } = await import('../../src/services/packages/compose/package-config.js');
@@ -202,6 +205,29 @@ describe('an in-place update keeps the host the install holds', () => {
         expect(carryHostFieldValues(next, undefined).X).toBe('');
         // Only host fields are carried; any other config value is the new build's.
         expect(carryHostFieldValues({ ...next, REGION: 'eu' }, { X: 'c.example', REGION: 'us' }).REGION).toBe('eu');
+    });
+});
+
+describe('who set a host field decides whether it counts as declared for a secret (secaudit2026oct22)', () => {
+    it('a value set by a caller that may not choose a secret host is reached but not declared; the owner\'s value is both', async () => {
+        const { storage, current } = storageWith(record());
+        const byAgent = await setExtensionConfig({ storage, config }, current(), { X: 'agent.example' }, { isOperator: false, mayChooseSecretHosts: false });
+        expect(byAgent.ok).toBe(true);
+        expect(current().config?.[HOST_FIELDS_UNVETTED_KEY]).toEqual(['X']);
+        expect(capabilitiesOfRecord(current()).hosts).toContain('agent.example');
+        expect(declaresHost(current().config, 'K', 'agent.example')).toBe(false);
+        expect(declaresHost(current().config, 'K', 'a.example')).toBe(true);
+
+        // A redeploy carries the value and the mark with it.
+        const next = record('network: { hosts: [a.example], host_fields: { X: optional } }', 'config:\n  X: { description: The indexer }').config;
+        const carried = carryHostFieldValues(next, current().config);
+        expect(carried.X).toBe('agent.example');
+        expect(carried[HOST_FIELDS_UNVETTED_KEY]).toEqual(['X']);
+
+        const byOwner = await setExtensionConfig({ storage, config }, current(), { X: 'agent.example' }, { isOperator: false, mayChooseSecretHosts: true });
+        expect(byOwner.ok).toBe(true);
+        expect(current().config?.[HOST_FIELDS_UNVETTED_KEY]).toBeUndefined();
+        expect(declaresHost(current().config, 'K', 'agent.example')).toBe(true);
     });
 });
 

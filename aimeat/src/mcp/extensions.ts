@@ -11,6 +11,9 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-25 — aimeat_extension_config_set tells the service whether the agent may choose a secret's host (secaudit2026oct22).
+ *   2026-10-25 — aimeat_extension_install with update: true asks the manage rule as a code write (writesCode) (secaudit2026oct22).
+ *   2026-10-25 — aimeat_extension_config_set tells the service whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
  *   2026-10-24 — aimeat_extension_invoke no longer hands the session's bearer to the run: ctx.buy runs
  *     the seller's action for the buying extension's GEAI (secaudit2026oct22,
  *     ext-purchase:buy-forwards-outer-caller-bearer).
@@ -109,7 +112,7 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
-import { setExtensionConfig } from '../services/extension-config-set.js';
+import { setExtensionConfig, mayChooseSecretHost } from '../services/extension-config-set.js';
 import { readAuthorityOf, readAuthorityPayload } from '../services/extension-read-authority.js';
 import { toolError } from './tool-error.js';
 
@@ -393,7 +396,7 @@ export function registerExtensionsTools(
                 // installedBy as permission, so an imported or legacy record could be overwritten
                 // in place by any agent holding ext:write. canManageExtensionAs compares owners
                 // directly, which refuses an empty installer to everyone but an operator.
-                if (!(await canManageExtensionAs(storage, config, caller, existingExt.installedBy, { action: 'update', subject: name }))) {
+                if (!(await canManageExtensionAs(storage, config, caller, existingExt.installedBy, { action: 'update', subject: name, writesCode: true }))) {
                     return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy || 'an unknown installer'}" — only the installing owner may update it` }], isError: true };
                 }
             }
@@ -522,10 +525,14 @@ export function registerExtensionsTools(
         },
         async ({ name, config: values }) => {
             const ext = await storage.getExtension(name);
-            if (!ext || !(await canManageExtensionAs(storage, config, resolveCaller(), ext.installedBy, { action: 'update', subject: name }))) {
+            const caller = resolveCaller();
+            if (!ext || !(await canManageExtensionAs(storage, config, caller, ext.installedBy, { action: 'update', subject: name }))) {
                 return { ...toolError('NOT_FOUND', `Extension "${name}" not found`) };
             }
-            const out = await setExtensionConfig({ storage, config }, ext, values);
+            const out = await setExtensionConfig({ storage, config }, ext, values, {
+                isOperator: await isOperatorCaller(storage, caller),
+                mayChooseSecretHosts: mayChooseSecretHost({ roles: caller.roles, scopes: caller.scopes, principal: agentGaii }),
+            });
             if (!out.ok) return { ...toolError(out.code, out.message) };
             const hosts = capabilitiesOfRecord(out.record).hosts;
             return { content: [{ type: 'text' as const, text: JSON.stringify({

@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-25 — Section 9: a host field value counts as declared only when the owner in person or a
+ *     secrets:manage principal set it (secaudit2026oct22).
  *   2026-10-24 — The ctx rules: a binary answer is read with `responseType: 'base64'` (jussil riistakartta).
  *   2026-10-21 — Section 9: code installed before the rules keeps the old first use until it is written
  *     again; through living-hooks only the operator's list binds by itself (Jouni, 2026-10-21).
@@ -258,7 +260,10 @@ Every action can carry two values, and they do different jobs:
   weather for your saved places" }]\`. It is public with the extension (GET /v1/extensions/{name},
   \`aimeat_extension_get\`), so whoever runs it sees where their key goes before it goes. A host
   without a port covers every port of that host; with a port, only that port. The hosts in your
-  \`network:\` block count as declared for every secret your scripts name.
+  \`network:\` block count as declared for every secret your scripts name. A \`host_fields\` value
+  counts only when the owner in person or a principal holding \`secrets:manage\` set it: a value
+  another agent set is still reached by \`ctx.fetch\`, and the first use of a secret with no host
+  toward it asks the owner.
 - Through the caller's own account's extension, a secret saved with no host is bound to the host of
   its first use. A first use to a host \`uses_secrets\` declares for that secret binds by itself,
   whoever calls (the owner's app, their chat agent, a schedule), when the extension's code was

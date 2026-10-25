@@ -53,6 +53,8 @@
  *   v1.5.0 — 2026-10-24 — An `extension` source ref must follow ext:<name>[@<version>][:<action>]
  *     (services/capability-extension-ref.ts), and updateCapability normalises and checks a patched
  *     source as createCapability does; both answer 400 INVALID_INPUT otherwise (secaudit2026oct22).
+ *   2026-10-25 — updateCapability applies the publishing policy to a change of visibility to public:
+ *     self_only refuses it for a non-operator, moderated sends an active capability to review (secaudit2026oct22).
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -353,6 +355,19 @@ export async function updateCapability(
         const cost = normalizeCapabilityCost(updates.cost);
         if (!cost.ok) return cost;
         updates.cost = cost.value;
+    }
+
+    // Making a capability PUBLIC is the same decision as creating a public one (secaudit2026oct22).
+    // The policy was read at create and on a request to go active, so a private active capability
+    // patched to { visibility: 'public' } was listed node-wide without the review, and self_only
+    // never refused it. Only the change to public is asked: a capability already public keeps its
+    // status when another field changes, and unpublishing never waits for anyone.
+    const becomesPublic = updates.visibility === 'public' && cap.visibility !== 'public';
+    if (becomesPublic && !caller.isOperator && config.capabilityPublishing === 'self_only') {
+        return refuse(403, 'PUBLIC_DISABLED', 'Public capabilities require operator approval. Use visibility: private');
+    }
+    if (becomesPublic && updates.status === undefined && cap.status === 'active') {
+        updates.status = moderatedStatus(config, 'public', caller.isOperator, 'active');
     }
 
     // Going ACTIVE with a public capability on a moderated node is the same decision as at create,

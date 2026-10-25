@@ -32,6 +32,8 @@
  *     mailbox and company-SMTP paths carried it. Found by test/e2e-email-delivery.ts, the first
  *     suite to run this service at all. Same commit removes sendMatchSuggestion(), which had no
  *     caller anywhere in src/.
+ *   2026-10-25 -- sendNotification() renders through textNotificationEmailHtml(): the subject and
+ *     body are escaped and line breaks kept (secaudit2026oct22).
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -41,7 +43,7 @@ import { getStats } from './stats.js';
 import {
   verificationEmailHtml,
   magicLinkEmailHtml,
-  notificationEmailHtml,
+  textNotificationEmailHtml,
   inviteEmailHtml,
   inviteEmailSubject,
   keyInviteEmailHtml,
@@ -178,7 +180,8 @@ export function createEmailService(config: AimeatConfig): EmailService {
     },
 
     async sendNotification(to: string, subject: string, body: string): Promise<boolean> {
-      const { html, text } = notificationEmailHtml(subject, body);
+      // Plain text from an extension, an agent or a workflow: escaped, line breaks kept.
+      const { html, text } = textNotificationEmailHtml(subject, body);
       return send(to, subject, html, text, 'notification');
     },
 

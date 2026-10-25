@@ -32,6 +32,8 @@
  *   THE RECEIVER runs on 127.0.0.1, which the runner admits with AIMEAT_ALLOW_PRIVATE_EGRESS=true,
  *   on E2E_SECRETS_AUTHORITY_PORT (40674 by default).
  * @version-history
+ *   2026-10-25 — 18 to 21: a host field value set by an agent without secrets:manage does not choose
+ *     the first host of the owner's unbound secret; one set by the owner or a secrets:manage agent does (secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, v58 and v59).
  *   v1.0.1 — 2026-10-21 — Test 9 also asserts the wildcard agent gets 403 when it sets the host itself.
  *   v1.1.0 — 2026-10-21 — v58 as amended: tests 2 to 5 assert bring-your-own-key through another
@@ -416,6 +418,82 @@ await test("17. once the owner sets the host, the wildcard agent's unattended co
     const out = await runUnattended(UNATT_WILD);
     assert(out.failed === null, `refused: ${out.failed}`);
     assert(arrived('/unattended-wild')[0]?.headers['x-api-key'] === 'zz-V59_U_WILD-zz', 'nothing arrived');
+});
+
+// ── A host field's value counts as declared only when a principal that may choose a secret's host
+// set it (secaudit2026oct22, extension-secret-uses.ts:declaredHostsFor:host-field-value-trusted-as-code-declaration).
+console.log("\n-- a host field set by an agent without secrets:manage --");
+const HF_EXT = `sau-hostfield-${STAMP}`;
+const hostFieldManifest = `extension: "1.0"
+metadata:
+  name: "${HF_EXT}"
+  version: "1.0.0"
+  description: "Calls the host its TARGET field names, with a header that names a vault secret."
+  author: "test"
+required_apis:
+  - memory
+config:
+  TARGET:
+    description: "The host to call"
+    default: "example.com"
+network:
+  host_fields:
+    TARGET: optional
+actions:
+  - id: probe
+    description: "Call the given URL with the given headers."
+    method: POST
+    path: "/v1/ext/${HF_EXT}/probe"
+    auth: required
+    script: "actions/probe.js"
+limits:
+  memory_mb: 16
+  timeout_ms: 5000
+  max_api_calls: 5
+`;
+const setTarget = (token: string, value: string) => json(`/v1/extensions/${HF_EXT}/config`, {
+    method: 'PATCH', headers: auth(token), body: JSON.stringify({ config: { TARGET: value } }),
+});
+
+await test('18. setup: the owner in person installs an extension with a host field', async () => {
+    const install = await json('/v1/extensions', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ manifest: hostFieldManifest, scripts: { 'actions/probe.js': PROBE_JS } }),
+    });
+    assert(install.status === 201, `install ${install.status}: ${JSON.stringify(install.body?.error)}`);
+    const activate = await json(`/v1/extensions/${HF_EXT}/activate`, { method: 'POST', headers: auth(owner.token) });
+    assert(activate.status === 200, `activate ${activate.status}`);
+    for (const name of ['HF_A', 'HF_B']) await storeSecret(owner.token, name, `zz-${name}-zz`);
+});
+
+await test("19. THE LEAK: the wildcard agent points the host field at its own host; the owner's unbound secret is not sent or bound there", async () => {
+    const set = await setTarget(wildAgent.token, RECEIVER_HOST);
+    assert(set.status === 200, `the agent may still set the field: ${set.status} ${JSON.stringify(set.body?.error)}`);
+    deliveries.length = 0;
+    const out = await probe(HF_EXT, wildAgent.token, '/hf-agent', 'HF_A');
+    assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:'), `not refused: ${JSON.stringify(out)}`);
+    assert(out.failed.includes('Access page'), `the refusal says what to do: ${out.failed}`);
+    assert(deliveries.length === 0, `${deliveries.length} request(s) reached the agent's host`);
+    const row = await rowOf(owner.token, 'HF_A');
+    assert(row.hosts.length === 0 && row.hostBinding === null, `the secret was bound: ${JSON.stringify(row)}`);
+});
+
+await test('20. the same host set by an agent holding secrets:manage counts, and the wildcard agent then binds it', async () => {
+    const set = await setTarget(managerAgent.token, RECEIVER_HOST);
+    assert(set.status === 200, `manager set ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    deliveries.length = 0;
+    const out = await probe(HF_EXT, wildAgent.token, '/hf-managed', 'HF_A');
+    assert(out.failed === null, `refused: ${out.failed}`);
+    assert(arrived('/hf-managed')[0]?.headers['x-api-key'] === 'zz-HF_A-zz', `the receiver got: ${JSON.stringify(arrived('/hf-managed'))}`);
+});
+
+await test('21. the owner in person setting the host field counts too, after the agent changed it', async () => {
+    assert((await setTarget(wildAgent.token, 'example.org')).status === 200, 'agent set');
+    assert((await setTarget(owner.token, RECEIVER_HOST)).status === 200, 'owner set');
+    deliveries.length = 0;
+    const out = await probe(HF_EXT, wildAgent.token, '/hf-owner', 'HF_B');
+    assert(out.failed === null, `refused: ${out.failed}`);
+    assert(arrived('/hf-owner')[0]?.headers['x-api-key'] === 'zz-HF_B-zz', `the receiver got: ${JSON.stringify(arrived('/hf-owner'))}`);
 });
 
 await stopReceiver();
