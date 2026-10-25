@@ -24,6 +24,11 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.5.0 — 2026-10-24 — The seller's extension action runs in-process for the buyer, the
+ *     extension's GEAI on its owner's account, and no longer over the loopback HTTP hop with the
+ *     bearer of the session the buying extension was serving (secaudit2026oct22,
+ *     ext-purchase:buy-forwards-outer-caller-bearer). `jwt` is gone; the buying run passes
+ *     `runSellerAction`, which runs services/extension-invoke.ts for the buyer.
  *   v1.4.0 — 2026-10-20 — The invoke carries no scopes: it asserted mcp:use for a buyer that is the
  *     extension's own GEAI, which caused calls on attached MCP servers for a principal the owner
  *     never gave the word to (secaudit 2026-10, capability-invoke.ts:mcp-source:server-slug-
@@ -41,7 +46,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { buildGEAI, appSlug, localAccountName } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, applyLockedInput } from '../models/app-tool-schemas.js';
 import { authoriseMeteredCall } from './metered-access.js';
@@ -55,6 +60,61 @@ import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from './members
  * carry a full GHII; either can be an agent or an ecosystem form. All four collapse to the human.
  */
 const ownerNameOf = (principal: string): string => localAccountName(principal);
+
+/**
+ * One seller extension action run, as services/extension-invoke.ts invokeExtensionAction runs it.
+ * The buying run passes this in, because that module calls this one and the two would otherwise
+ * import each other.
+ */
+export type SellerActionRunner = (run: {
+  extRef: string;
+  actionId: string;
+  input: Record<string, unknown>;
+  caller: {
+    gaii: string; metered: string; owner: string; kind: 'ecosystem';
+    roles: string[]; scopes: string[]; appGrantId: null;
+  };
+  /** Where the seller's paywall writes a refusal. */
+  res: { status(code: number): { json(body: unknown): unknown } };
+  internalPass: string;
+}) => Promise<{ kind: 'ok' | 'refused' | 'paywall'; result?: unknown; status?: number; message?: string }>;
+
+/**
+ * Run the seller's extension action for the buyer, in-process, through the same sequence the HTTP
+ * route runs: its paywall stands down on `internalPass`, and the run sees the buyer as ctx.caller.
+ * The buyer is an ecosystem-kind principal with no scopes, so the run holds nothing of any session.
+ * Throws as invokeCapability's extension case threw, so the refund below behaves the same.
+ */
+async function runSellerExtensionForBuyer(args: {
+  cap: CapabilityRecord;
+  input: Record<string, unknown>;
+  buyer: string;
+  buyerOwner: string;
+  internalPass: string;
+  runSellerAction: SellerActionRunner;
+}): Promise<{ result: unknown }> {
+  const { assertCapabilityRunnable } = await import('./capability-invoke.js');
+  assertCapabilityRunnable(args.cap);
+  const [, sellerExt, actionId] = args.cap.source.ref.split(':');
+  // The paywall writes a refusal into a responder; this keeps it to report in the thrown error.
+  let refusal: { status: number; body: unknown } | null = null;
+  const res = { status(code: number) { return { json(body: unknown) { refusal = { status: code, body }; return body; } }; } };
+  const out = await args.runSellerAction({
+    extRef: sellerExt ?? '', actionId: actionId ?? '', input: args.input,
+    caller: {
+      gaii: args.buyer, metered: args.buyer, owner: args.buyerOwner,
+      kind: 'ecosystem', roles: ['ecosystem'], scopes: [], appGrantId: null,
+    },
+    res, internalPass: args.internalPass,
+  });
+  if (out.kind === 'ok') return { result: out.result };
+  const recorded = refusal as { status: number; body: unknown } | null;
+  const message = out.kind === 'refused'
+    ? (out.message ?? 'Extension invoke failed')
+    : ((recorded?.body as { error?: { message?: string } } | undefined)?.error?.message ?? 'Extension invoke failed');
+  const statusCode = out.kind === 'refused' ? (out.status ?? 500) : (recorded?.status ?? 502);
+  throw Object.assign(new Error(message), { statusCode, code: 'EXTENSION_ERROR' });
+}
 
 /** What an extension's purchase produced — or why it could not be made. */
 export interface ExtensionPurchaseResult {
@@ -86,11 +146,12 @@ export async function buyForExtension(args: {
   appRef: string;
   tool: string;
   input: Record<string, unknown>;
-  /** The caller's bearer token — the invoke runs over the node's own authenticated surface. */
-  jwt: string;
+  /** Runs a seller's extension action in-process, passed in by the buying run. Its paywall stands
+   *  down on the internal pass this purchase mints. */
+  runSellerAction: SellerActionRunner;
   correlationId?: string | null;
 }): Promise<ExtensionPurchaseResult> {
-  const { config, storage, extName, extOwner, appRef, tool, input, jwt } = args;
+  const { config, storage, extName, extOwner, appRef, tool, input } = args;
   const slash = appRef.indexOf('/');
   if (slash < 1 || slash === appRef.length - 1) {
     return { ok: false, code: 'INVALID_APP', message: 'Buy from "ownerName/appId" — e.g. "alice/data.html"' };
@@ -166,19 +227,28 @@ export async function buyForExtension(args: {
   try {
     const { invokeCapability } = await import('./capability-invoke.js');
     const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
-    const invoked = await invokeCapability(
-      config, storage, cap, applyLockedInput(toolDef, input), buyer, jwt, 'normal',
-      // Already settled on the product's own coordinate — the raw paywall must not charge it again.
-      mintInternalPass(coordExt, tool),
-      // NOTHING, and the buyer's own token is deliberately not read here. The buyer is the
-      // extension's GEAI, not the session that happens to be served; `jwt` belongs to whoever
-      // called the extension, so reading it would hand the purchase a permission that session holds
-      // and this extension does not. Asserting `{ scopes: ['mcp:use'] }` was the same mistake in the
-      // other direction: it caused calls on attached MCP servers for a principal nobody gave the
-      // word to (secaudit 2026-10). A capability over a remote MCP tool is therefore not buyable
-      // through ctx.buy; an extension that needs one attaches the server itself.
-      { scopes: [] },
-    );
+    const lockedInput = applyLockedInput(toolDef, input);
+    // Already settled on the product's own coordinate: the seller's paywall must not charge it again.
+    const pass = mintInternalPass(coordExt, tool);
+    // The run is the BUYER's: the extension's GEAI on its owner's account, the identity the purchase
+    // settled on. No session of the person this extension happens to be serving goes with it. Their
+    // bearer used to authenticate the seller's action over the loopback HTTP hop, so the seller's
+    // code ran as that person, with their wallet, files and namespace, although they never chose the
+    // seller (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer). An extension-backed
+    // capability therefore runs in-process for the buyer; every other source takes no bearer.
+    const invoked = cap.source.type === 'extension'
+      ? await runSellerExtensionForBuyer({
+        cap, input: lockedInput, buyer, buyerOwner: extOwner, internalPass: pass,
+        runSellerAction: args.runSellerAction,
+      })
+      : await invokeCapability(
+        config, storage, cap, lockedInput, buyer, '', 'normal', pass,
+        // NOTHING. The buyer is the extension's GEAI, which holds no scope of any session.
+        // Asserting `{ scopes: ['mcp:use'] }` caused calls on attached MCP servers for a principal
+        // nobody gave the word to (secaudit 2026-10). A capability over a remote MCP tool is
+        // therefore not buyable through ctx.buy; an extension that needs one attaches the server itself.
+        { scopes: [] },
+      );
     // Delivered → book the SELLER's beneficiaries out of the seller's own cut, exactly as the REST
     // and MCP doors do. A capability buying from another capability is still a sale.
     const shared = takeDesignations(invoked.result);

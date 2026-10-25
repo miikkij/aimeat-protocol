@@ -13,6 +13,8 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   2026-10-24 — CHAIN: the supplier's action reports the reseller as its caller, not the end user
+ *     (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.4.0 — 2026-10-17 — A tool with only pacing (solo, brief, cheap) is a free product on the raw and
  *     capability routes too, as the app-tool route already served it: an uncontracted caller is served
@@ -1523,6 +1525,15 @@ await test('CHAIN · a reseller buys from a supplier on ITS OWN account, and its
     assert(!!row, `the supplier's customer is the reseller: ${JSON.stringify((cons.body.data.consumers as any[]).map(c => c.consumerGaii))}`);
     assert((row.callers ?? []).some((c: any) => String(c.gaii).startsWith('eco:')),
         `and the buying capability is named: ${JSON.stringify(row.callers)}`);
+
+    // The supplier's action runs for the BUYER, which is the reseller's extension on the reseller's
+    // account, the identity the purchase settled on. It ran as the end user, with the end user's
+    // wallet, files and namespace, although the end user never chose the supplier (secaudit
+    // 2026-10, ext-purchase:buy-forwards-outer-caller-bearer). The provider's `work` script reports
+    // ctx.caller.owner.
+    assert(r.body.data.result.upstream.caller === reseller.name,
+        `the supplier's action runs for the reseller, not for the end user: it saw ${JSON.stringify(r.body.data.result.upstream.caller)} `
+        + `(reseller ${reseller.name}, end user ${enduser.name})`);
 });
 
 await test('MERGE · a right stored under the OLD key is folded in, deleted, and never counted twice', async () => {
