@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-25 — Section 5: aimeat_schedule_list lists the agents' schedules and those that target
+ *     the caller; the app-made and outside-app-made ones need workflow:read (secaudit2026oct22).
  *   2026-10-21 — Section 5 says which older app-made schedules keep running as before (the unknown-app
  *     maker counts as the owner; kept app extension schedules fire and run now).
  *   2026-10-21 — Section 5: the `extension` kind needs `ext:invoke` on create, edit and run, and the
@@ -224,8 +226,9 @@ sees every schedule and can pause or delete any of them.
 | \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | \`ext:invoke\` |
 | \`refinery\` | \`input: { prefix }\` | \`connections:read-through\`, \`ai:use\`, \`organism:rows\`, \`memory:write\` |
 
-It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you made (\`detail: true\` adds
-each one's prompt), \`aimeat_schedule_update\` pauses (\`enabled: false\`), resumes, or changes the
+It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you and your owner's other
+agents made and the ones that target you (\`detail: true\` adds each one's prompt); with
+\`workflow:read\` it also lists the ones an app or a connected outside app made. \`aimeat_schedule_update\` pauses (\`enabled: false\`), resumes, or changes the
 cron, the timezone, the name or the prompt, \`aimeat_schedule_trigger\` runs one now, and
 \`aimeat_schedule_delete\` removes it. These three reach any schedule an agent of your owner made, a
 sibling's included, and no further: a schedule an app or a connected outside app made is that
