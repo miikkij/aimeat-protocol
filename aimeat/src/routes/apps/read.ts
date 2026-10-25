@@ -9,6 +9,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-25 — A runnable request on the bare app host is redirected to the app's own origin like one on the apex (secaudit2026oct22, read.ts:bare-app-host-runs-any-app).
  *   2026-10-25 — accessCodeUnlockPage moved unchanged to routes/apps/access-code-page.ts (max-file-lines).
  *   2026-10-25 — An app a closed node opened to the internet carries the line that says so (internetOpenMarkFor, services/internet-opening/).
  *   2026-10-24 — A draft preview token serves only on the URL of its own owner, else 403 TOKEN_INVALID (secaudit2026oct22).
@@ -578,7 +579,13 @@ export function registerReadRoutes(
         // (audit of the secaudit last items, finding 2).
         const here = runnable ? await appOfRequestOrigin(storage, req) : null;
         const foreignOrigin = !!here && (here.draft || here.target !== `${app.ownerName}/${app.filename}`);
-        if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin)) {
+        // The bare app host (apps.<apex>, no label) is shared by every app that has no label of its
+        // own, which it serves in the path form, with a restricted app's grant cookie separated only
+        // by its path. Any app run there through this route would sit beside them, so a runnable
+        // request on it moves to the app's own address too: its label, or the path form when it has
+        // none (secaudit2026oct22, read.ts:bare-app-host-runs-any-app).
+        const bareAppHost = runnable && !!req.appOrigin && !req.subdomain;
+        if (runnable && config.appOriginEnabled && config.appHost && (!req.appOrigin || foreignOrigin || bareAppHost)) {
             // The app's own parameters travel; the apex's (mode, code, grants) do not (helpers.ts).
             const target = withForwardedQuery(await appOriginUrl(config, storage, owner, filename), req.originalUrl);
             const gated = !!current.accessCode
