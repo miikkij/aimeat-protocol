@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   2026-10-25 — personalNodeMaxPerOwner (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
  *   v1.19.1 — 2026-10-25 — OperatorConfig and OperatorType moved to config-types-operator.ts unchanged and re-exported (an import cycle through config-sealing.ts).
  *   v1.19.0 — 2026-10-20 — ContentClassConfig mixed in (config-content-class.ts): contentClassMode,
  *     ffprobePath, ffmpegPath.
@@ -487,6 +488,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   // Personal Node support (operator-side)
   personalNodesEnabled: boolean;
   personalNodeMaxSlots: number;
+  /** Personal nodes one owner may anchor here (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3); 0 = no limit. */
+  personalNodeMaxPerOwner: number;
   personalNodeMailboxQuotaMb: number;
   personalNodeHeartbeatIntervalMs: number;
   personalNodeOfflineThresholdMs: number;

@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-25 — personal_nodes.max_per_owner (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, 0 = no
+ *     limit; secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
  *   2026-10-20 — content_class.mode, content_class.ffprobe_path, content_class.ffmpeg_path
  *     (config-schema-content-class.ts; wish-sis-ll-n-purku-luokittelu-ja-owl). The email rows move
  *     to config-schema-email.ts, unchanged (max-file-lines).
@@ -329,6 +331,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Personal Nodes (mutable) ──
   { key: 'personalNodesEnabled', dotPath: 'personal_nodes.enabled', envVar: 'AIMEAT_PERSONAL_NODES_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Personal node hosting enabled' },
   { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max personal node slots', range: '1-10000' },
+  { key: 'personalNodeMaxPerOwner', dotPath: 'personal_nodes.max_per_owner', envVar: 'AIMEAT_PERSONAL_NODE_MAX_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Personal nodes one owner may anchor here, so the shared slots stay open to every owner. 0 = no limit. Anchors that exist stay', range: '0-10000 (0 = no limit)' },
 
   // ── Match Notifications (Phase 1.6, mutable) ──
 
