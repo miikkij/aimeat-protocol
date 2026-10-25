@@ -25,6 +25,9 @@
  * @usage Called by `aimeat connect serve`.
  *
  * @version-history
+ *   2026-10-25 -- A runner or wake command the person has not confirmed is held back: a daemon started
+ *     in a terminal asks once with the command shown, any other start says how to confirm it
+ *     (command-trust.ts; secaudit2026oct22, lead 4763).
  *   2026-10-20 -- Stdio mode serves through serveStdio: a 2025 client keeps the initialize handshake,
  *     a 2026-07-28 client is served statelessly (MCP SDK v2 migration step 10).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -43,6 +46,7 @@
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { McpServer } from '@modelcontextprotocol/server';
 import { loadAllAgents, getConfigDir } from '../config.js';
+import { confirmHeldCommands, heldNotices } from '../command-trust.js';
 import { checkConnectorHome } from '../home-access.js';
 import { buildRegistry, type AgentRegistry } from '../agent-registry.js';
 import { registerAllTools } from './tools/index.js';
@@ -96,6 +100,11 @@ export async function runServe(flags: Record<string, string>): Promise<void> {
     console.error('No agents configured. Run: aimeat connect');
     process.exit(1);
   }
+  // A runner or wake command the person has not confirmed is held back (command-trust.ts). A daemon
+  // started in a terminal asks now; stdio mode speaks MCP on stdin, so it only says how to confirm.
+  const daemon = flags.http === 'true' || flags.daemon === 'true';
+  if (daemon && process.stdin.isTTY) await confirmHeldCommands(loaded);
+  for (const notice of heldNotices(loaded)) console.error(notice);
 
   const registry = buildRegistry(loaded);
 

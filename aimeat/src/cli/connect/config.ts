@@ -22,6 +22,9 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
+ *   2026-10-25 -- loadAllAgents takes a runner or wake command the person has not confirmed out of the
+ *     agent's config and says so in `heldCommands` (command-trust.ts), so a command that came with the
+ *     folder runs only after the person confirms it once (secaudit2026oct22, lead 4763).
  *   2026-10-25 — loadPerAgentConfig copies an old bare-name file's runner and wake only into the
  *     identity of the owner who wrote it (the file names them, or names nobody and no other owner
  *     holds the agent name); another owner's identity gets the rest (secaudit2026oct22).
@@ -58,6 +61,7 @@ import { parse, stringify } from 'yaml';
 import { listAllTokens, parseTokenFilename } from './keychain.js';
 import { listAllAgentKeys } from './agent-key.js';
 import { gaiiFromToken, isGaii } from './agent-gaii.js';
+import { heldBackCommands, type HeldCommands } from './command-trust.js';
 import { logger } from '../../utils/logger.js';
 
 // Connector home resolution (directory-scoped, home-dir.ts):
@@ -372,6 +376,18 @@ export interface LoadedAgent {
   gaii: string;
   token: string;
   config: AimeatPerAgentConfig;
+  /**
+   * The runner and wake command the config names and the person has not confirmed: taken out of
+   * `config`, so nothing runs them, until the person confirms them (command-trust.ts). Absent or
+   * null when there is none.
+   */
+  heldCommands?: HeldCommands | null;
+}
+
+/** The agent with any unconfirmed command taken out of its config (command-trust.ts). */
+function guarded(a: Omit<LoadedAgent, 'heldCommands'>): LoadedAgent {
+  const { config, held } = heldBackCommands(a.config, getConfigDir());
+  return held ? { ...a, config, heldCommands: held } : a;
 }
 
 /**
@@ -412,7 +428,7 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
       });
       continue;
     }
-    out.push({ agent: cred.agent, owner: cred.owner, gaii, token: cred.token, config: perAgent });
+    out.push(guarded({ agent: cred.agent, owner: cred.owner, gaii, token: cred.token, config: perAgent }));
   }
 
   for (const k of keyed) {
@@ -435,7 +451,7 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
       });
       continue;
     }
-    out.push({ agent: k.agent, owner: k.owner, gaii: k.key.gaii, token: '', config: perAgent });
+    out.push(guarded({ agent: k.agent, owner: k.owner, gaii: k.key.gaii, token: '', config: perAgent }));
   }
 
   return out;
