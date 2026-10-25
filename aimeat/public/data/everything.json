@@ -4165,7 +4165,7 @@
     "- The MCP tool cannot withdraw an exception. You withdraw one in the Data Wallet, and the operator on the Security page; an app uses <code>AIMEAT.labels.withdrawException()</code>.",
     "- An app's classification covers what the app keeps in its own namespace. What a hosted app saves in your own memory through its sign-in, and files it uploads there, cannot be told apart from your own content, so they keep their own classification.",
     "- A place's classification is shown and set on the place's own page: the organism's settings (Who sees), the workspace's settings, the board's rules and the app's page in the App Catalog (Manage on server). Other lists that say who can read a thing (memory, files, packages) do not show its classification yet; the What others can see page does.",
-    "- No level comes with a limit on who can see it yet: the operator, an owner or an organism sets one in the policy. Content already shown wider than a newly set limit is not changed: it is listed as a conflict on the What others can see page.",
+    "- A node that ran before the limits existed has no limit on any level until its operator applies the offered ones on the Security page; a new node starts with them (row &quot;A classification limits who can see&quot;). The operator, an owner or an organism sets or narrows a limit in the policy. Content already shown wider than a newly set limit is not changed: it is listed as a conflict on the What others can see page.",
     "- Packages, knowledge packages and data packages are not limited by a classification yet. A whole space shared from a workspace is held to the workspace's classification, not to each page's."
    ],
    "columns": [

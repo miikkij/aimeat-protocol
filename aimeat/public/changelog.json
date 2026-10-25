@@ -4,6 +4,28 @@
     {
       "date": "2026-10-25",
       "kind": "feature",
+      "id": "2026-10-25-apps-answer-in-your-language-as-markdown",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "agent"
+      ],
+      "title": {
+        "en": "Apps answer in your language as markdown",
+        "fi": "Sovellukset vastaavat markdownina sinun kielelläsi"
+      },
+      "summary": {
+        "en": "Add &lang=es or any language to ?format=md, and an app that writes its own markdown answers in it.",
+        "fi": "Lisää ?format=md-osoitteeseen &lang=es tai muu kieli, niin oman markdowninsa tekevä sovellus vastaa sillä."
+      },
+      "body": {
+        "en": "An app that writes its own markdown page now gets the reader's language: add &lang=es (or any language) to ?format=md. The Experience Center uses it: English by default, Finnish and Spanish on request.",
+        "fi": "Sovellus, joka tekee oman markdown-sivunsa, saa nyt lukijan kielen: lisää ?format=md-osoitteeseen &lang=es tai muu kieli. Experience Center käyttää tätä: englanti oletuksena, suomi ja espanja pyynnöstä."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "feature",
       "id": "2026-10-25-every-setting-on-the-config-page",
       "highlight": false,
       "audience": [
