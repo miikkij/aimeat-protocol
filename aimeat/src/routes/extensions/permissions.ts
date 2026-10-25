@@ -5,6 +5,9 @@
  * @description Extension write/manage permission helpers — role/scope gates and ownership guard.
  *   Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — installRoleRefusal: with install role operator an agent of an account that is not
+ *     the operator's writes no extension code (install, redeploy, action script); the refusal names
+ *     the setting and the operator (Jouni, 2026-10-25, secaudit2026oct22 lead 128).
  *   2026-10-25 — extInstallRole decides only the acts that write code for the account holder in
  *     person: they manage every extension in their own account whatever the setting (secaudit2026oct22).
  *   v1.3.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -23,6 +26,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { isOperatorAccount } from '../../utils/operator-account.js';
+import { listOperatorGhiis } from '../../services/operators.js';
 import { isOperatorCaller, operatorOverride, type OperatorAuth } from '../../services/operator-override.js';
 
 /** The caller as both surfaces describe it: the session fields the operator check reads, plus the
@@ -67,10 +72,29 @@ function installerMayManage(caller: ExtensionCaller, config: AimeatConfig, insta
   return scopeIsCovered(caller.scopes, 'ext:write');
 }
 
+/**
+ * The install role as a rule on the ACCOUNT. With AIMEAT_EXT_INSTALL_ROLE=operator only the
+ * operator's account writes extension code: the operator in person and the operator's agents. An
+ * agent of any other account is refused an install, a redeploy and an action script change, as the
+ * account holder in person already was (Jouni, 2026-10-25, secaudit2026oct22 lead 128). With the
+ * default 'owner' nothing is asked here. Answers the refusal in plain words, naming the setting and
+ * the operator, or null when the account may write code.
+ */
+export async function installRoleRefusal(storage: Storage, config: AimeatConfig, accountName: string): Promise<string | null> {
+  if (config.extInstallRole !== 'operator') return null;
+  if (isOperatorAccount(await storage.getOwner(accountName))) return null;
+  const operators = (await listOperatorGhiis(storage, config)).map(g => localAccountName(g));
+  const who = operators.length ? `the operator (${operators.join(', ')})` : 'the operator';
+  return 'On this node only the operator\'s account installs or changes add-on code '
+    + `(the setting AIMEAT_EXT_INSTALL_ROLE is "operator"). Ask ${who} to install it for you, `
+    + 'or to change the setting. You can write to support@operators.';
+}
+
 // Does this caller have permission to write extensions?
 // The operator (isOperatorCaller: in person, or the operator's agent holding operator:admin) passes.
 // Owner role respects the configured extInstallRole gate. Agents pass if they carry the ext:write
-// scope (granted by the owner via the profile agent settings).
+// scope (granted by the owner via the profile agent settings) and, under install role operator,
+// belong to the operator's account (installRoleRefusal).
 export async function hasExtWritePermission(req: Request, config: AimeatConfig, storage: Storage): Promise<boolean> {
   const auth = req.auth;
   if (!auth) return false;
@@ -78,7 +102,25 @@ export async function hasExtWritePermission(req: Request, config: AimeatConfig, 
   const allowOwner = config.extInstallRole === 'owner';
   if (allowOwner && isOwnerInPerson(auth)) return true;
   const scopes = (auth as { scopes?: string[] }).scopes || [];
-  return scopeIsCovered(scopes, 'ext:write');
+  if (!scopeIsCovered(scopes, 'ext:write')) return false;
+  return (await installRoleRefusal(storage, config, auth.owner)) === null;
+}
+
+/**
+ * Why an install is refused, in plain words: the install role when that is the reason, otherwise the
+ * missing permission word. The doors that answered only "would need your permission" told an agent
+ * of an ordinary account to ask its owner for a permission the owner could not give.
+ */
+export async function extWriteRefusalText(req: Request, config: AimeatConfig, storage: Storage): Promise<string> {
+  const byRole = req.auth ? await installRoleRefusal(storage, config, req.auth.owner) : null;
+  return byRole ?? 'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.';
+}
+
+/** Why a code write on an installed extension is refused: the install role when the caller's own
+ *  account is held back by it, otherwise the plain "Not authorized" the manage doors answer. */
+export async function codeWriteRefusalText(req: Request, config: AimeatConfig, storage: Storage, installedBy: string): Promise<string> {
+  const byRole = req.auth && req.auth.owner === installedBy ? await installRoleRefusal(storage, config, req.auth.owner) : null;
+  return byRole ?? 'Not authorized';
 }
 
 /**
@@ -114,6 +156,7 @@ export async function canManageExtensionAs(
   installedBy: string,
   act: ExtensionAct,
 ): Promise<boolean> {
+  if (writesCode(act) && caller.owner === installedBy && (await installRoleRefusal(storage, config, caller.owner)) !== null) return false;
   if (installerMayManage(caller, config, installedBy, act)) return true;
   if (caller.owner === installedBy) return isOperatorCaller(storage, caller);
   return operatorOverride(storage, config, caller,

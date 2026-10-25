@@ -11940,7 +11940,7 @@
     "cfgDesc_extensions_max_api_calls": "API-kutsujen katto laajennoksen suoritusta kohden.",
     "cfgDesc_extensions_max_code_size_kb": "Laajennoksen koodin kokoraja (kt).",
     "cfgDesc_extensions_max_installed": "Asennettujen laajennosten katto.",
-    "cfgDesc_extensions_install_role": "Rooli, jolla laajennoksia saa asentaa: operator tai owner.",
+    "cfgDesc_extensions_install_role": "Kuka asentaa laajennoksia ja muuttaa niiden koodia. operator: vain operaattorin tili ja sen agentit. owner: jokainen tilin haltija sekä agentti, jolle omistaja on antanut asennusluvan.",
     "cfgDesc_extensions_max_per_owner": "Laajennosten katto omistajaa kohden.",
     "cfgDesc_push_enabled": "Selaimen push-ilmoitukset käytössä.",
     "cfgDesc_eudiw_enabled": "EUDIW-henkilöllisyyden vahvistus käytössä.",

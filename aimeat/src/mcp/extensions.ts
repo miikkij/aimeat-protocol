@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-25 — aimeat_extension_install asks the install rule before it hands out an upload URL, and a refusal by the install role names the setting and the operator (secaudit2026oct22 lead 128).
  *   2026-10-25 — aimeat_extension_get answers installed_by_principal, the principal that wrote the code, as the REST detail does (secaudit2026oct22 lead 98, transparency).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the agent may choose a secret's host (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_install with update: true asks the manage rule as a code write (writesCode) (secaudit2026oct22).
@@ -99,7 +100,7 @@ import { createRefusalRecorder, refusalText } from '../routes/extensions/metered
 import { localAccountName } from '../utils/gaii.js';
 import { invokeExtensionAction } from '../services/extension-invoke.js';
 import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
-import { canManageExtensionAs, type ExtensionCaller } from '../routes/extensions/permissions.js';
+import { canManageExtensionAs, installRoleRefusal, type ExtensionCaller } from '../routes/extensions/permissions.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
@@ -325,6 +326,13 @@ export function registerExtensionsTools(
 
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifestYaml) {
+                // The upload URL is an install, so the install rule is asked before it is handed out,
+                // as the inline mode below asks it: the install role included (installRoleRefusal).
+                const minter = resolveCaller();
+                if (!(await canManageExtensionAs(storage, config, minter, minter.owner, { action: 'install', subject: '(upload)' }))) {
+                    const byRole = await installRoleRefusal(storage, config, minter.owner);
+                    return { content: [{ type: 'text' as const, text: byRole ?? 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
+                }
                 const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
                 // The caller's update/activate intent must survive into the token, or the upload
                 // silently ignores it: this meta used to be `{}`, so `update: true` was accepted
@@ -380,7 +388,8 @@ export function registerExtensionsTools(
             // executable extension code with no permission check at all. routes/extensions/crud.ts
             // checks it in the handler for the same reason.
             if (!(await canManageExtensionAs(storage, config, caller, callerOwner, { action: 'install', subject: built.record.name }))) {
-                return { content: [{ type: 'text' as const, text: 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
+                const byRole = await installRoleRefusal(storage, config, callerOwner);
+                return { content: [{ type: 'text' as const, text: byRole ?? 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
             }
 
             const record = built.record;

@@ -24,6 +24,9 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-25 — An extension ZIP asks the install role at the PUT: with install role operator an
+ *     account that is not the operator's is refused 403 INSUFFICIENT_ROLE, naming the setting and the
+ *     operator (secaudit2026oct22 lead 128).
  *   v1.28.1 — 2026-10-21 — A ZIP update of byte-identical code keeps the old-code first-use mark; a
  *     changed script drops it (services/extension-first-use-keep.ts).
  *   v1.28.0 — 2026-10-20 —The PUT asks whether the principal the token was minted for still stands
@@ -189,6 +192,7 @@ import { publishAskOf, type PublishAsk } from '../services/publish-requests/ask.
 import { uploadPrincipalRefusal } from '../services/upload-principal.js';
 import { cortexAskedFields } from '../services/cortex-visibility.js';
 import { carryFirstUseKeep } from '../services/extension-first-use-keep.js';
+import { installRoleRefusal } from './extensions/permissions.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
@@ -494,6 +498,13 @@ async function handleExtensionUpload(
             success: false, error: 'FORBIDDEN',
             message: `Extension "${record.name}" belongs to another owner`,
         });
+        return;
+    }
+    // The install role, asked again at the PUT as the mint asked it: with install role operator only
+    // the operator's account writes extension code (routes/extensions/permissions.ts).
+    const roleRefused = await installRoleRefusal(storage, config, ownerName);
+    if (roleRefused) {
+        res.status(403).json({ success: false, error: 'INSUFFICIENT_ROLE', message: roleRefused });
         return;
     }
 

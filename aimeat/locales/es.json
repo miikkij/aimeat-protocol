@@ -10434,7 +10434,7 @@
     "cfgDesc_extensions_max_api_calls": "Máximo de llamadas API por ejecución de extensión.",
     "cfgDesc_extensions_max_code_size_kb": "Tamaño máximo del código por extensión (KB).",
     "cfgDesc_extensions_max_installed": "Máximo de extensiones instaladas.",
-    "cfgDesc_extensions_install_role": "Rol requerido para instalar extensiones: operator u owner.",
+    "cfgDesc_extensions_install_role": "Quién instala extensiones y cambia su código. operator: solo la cuenta del operador, con sus agentes. owner: cada titular de cuenta, y un agente al que su propietario permitió instalar.",
     "cfgDesc_extensions_max_per_owner": "Máximo de extensiones por propietario.",
     "cfgDesc_push_enabled": "Notificaciones push del navegador activadas.",
     "cfgDesc_eudiw_enabled": "Verificación de identidad EUDIW activada.",

@@ -11942,7 +11942,7 @@
     "cfgDesc_extensions_max_api_calls": "Max API calls per extension execution",
     "cfgDesc_extensions_max_code_size_kb": "Max code size per extension (KB)",
     "cfgDesc_extensions_max_installed": "Max installed extensions",
-    "cfgDesc_extensions_install_role": "Role required to install extensions: operator or owner",
+    "cfgDesc_extensions_install_role": "Who installs extensions and changes their code. operator: only the operator's account, its agents included. owner: every account holder, and an agent its owner allowed to install.",
     "cfgDesc_extensions_max_per_owner": "Max extensions per owner",
     "cfgDesc_push_enabled": "Web push notifications enabled",
     "cfgDesc_eudiw_enabled": "EUDIW identity verification enabled",
