@@ -27,6 +27,9 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.1.3 — 2026-10-24 — Comment only: a visitor from another node is refused a `members` file by
+ *     authorizeRead itself, which now derives the visitor fact from the identity (secaudit2026oct22,
+ *     members-tier-admits-federated-visitor).
  *   v1.1.2 — 2026-10-24 — A `members` file of another owner resolves as denied for the shared
  *     anonymous principal, as GET /v1/pub answers it (secaudit2026oct22,
  *     members-tier-admits-anonymous-identity).
@@ -145,9 +148,10 @@ export async function resolveFileRef(
         };
     }
 
-    // 'members' = everyone with an account on this node. authorizeRead allows the tier for any
-    // accessor and leaves the anonymous check to its caller, as GET /v1/pub makes it: the shared
-    // anonymous principal reads another owner's members file nowhere (secaudit2026oct22).
+    // 'members' = everyone with an account on this node. authorizeRead refuses the tier to an
+    // identity of another node by itself, and leaves the anonymous check to its caller, as GET /v1/pub
+    // makes it: the shared anonymous principal reads another owner's members file nowhere
+    // (secaudit2026oct22).
     if (!own && file.visibility === 'members' && isAnonymousPrincipal({ sub: accessor.sub ?? accessor.gaii, owner: accessor.owner })) {
         return { access: 'denied', ref: canonical, ownerGaii: gaii, key, reason: 'members_only' };
     }
