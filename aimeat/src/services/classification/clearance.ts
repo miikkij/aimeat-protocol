@@ -25,6 +25,7 @@
  *   const clearance = clearanceFor(deps, who);
  *   if (await clearance.refuses(label, policy)) { … hidden, audited 'refused' … }
  * @version-history
+ *   v1.1.0 -- 2026-10-25 -- limitName(): the clearance in words, so a refusal names it (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L2.2).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -37,9 +38,15 @@ import { policyFor } from './policy.js';
 export interface ClearanceCheck {
   /** True when `label`, decided under `policy`, ranks above this reader's clearance. */
   refuses(label: ClassificationLabel, policy: ClassificationPolicy): Promise<boolean>;
+  /**
+   * The clearance in words, for a refusal: the English name of the highest label this reader may
+   * read, looked up as `refuses` looks it up; 'nothing classified' when the label is gone; null
+   * when the reader has no clearance.
+   */
+  limitName(policy: ClassificationPolicy): Promise<string | null>;
 }
 
-const NONE: ClearanceCheck = { refuses: async () => false };
+const NONE: ClearanceCheck = { refuses: async () => false, limitName: async () => null };
 
 /**
  * The clearance check of one reader. Anything but an AI reader whose principal is an agent of
@@ -65,6 +72,12 @@ export function clearanceFor(
       if (id === null) return false;
       const limit = labelById(policy, id) ?? (id ? labelById((await fallback()) ?? policy, id) : undefined);
       return !limit || label.rank > limit.rank;
+    },
+    async limitName(policy) {
+      const id = await clearance();
+      if (id === null) return null;
+      const limit = labelById(policy, id) ?? (id ? labelById((await fallback()) ?? policy, id) : undefined);
+      return limit ? limit.name.en : 'nothing classified';
     },
   };
 }
