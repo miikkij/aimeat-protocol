@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.33.0 — 2026-10-25 — extensionLoadDefaults() (config-extension-load.ts): the operator's limits on extension load (secaudit2026oct22).
  *   v1.32.0 — 2026-10-25 — runtimeConfigFromEnv() and siteKvFromEnv() (config-runtime.ts): the usage meter, write tally, log level, proxy trust and key settings code read from process.env, and the site key-value pairs, which also take AIMEAT_SITE_KV as one JSON object.
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
  *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
@@ -113,6 +114,7 @@ import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
 import { runtimeConfigFromEnv, siteKvFromEnv } from './config-runtime.js';
+import { extensionLoadDefaults } from './config-extension-load.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
 import { sealedKeysFromEnv } from './services/config-sealing.js';
@@ -658,6 +660,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
+    ...extensionLoadDefaults(),
 
     // Prompt Calibrator
     calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',
