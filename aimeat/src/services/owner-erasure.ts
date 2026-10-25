@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-10-25 — The scheduled_jobs step deletes every job whose ownerScope is the account, not only
+ *     those the person made in person: a job an agent or ecosystem app made carries the maker's
+ *     identity as createdBy and survived (secaudit2026oct22).
  *   v1.14.0 — 2026-10-23 — The compliance documents of the person's apps go (step compliance_docs),
  *     and the erasure logs itself as a done data subject request (plan doc-mvlftkh9zmc9, C4.3).
  *   v1.13.0 — 2026-10-22 — The knowledge_links step deletes the person's link rows under the bare
@@ -266,7 +269,11 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
 
     await step('scheduled_jobs', async () => {
       const jobs = await storage.listScheduledJobs({});
-      const ownerJobs = jobs.filter(j => j.createdBy === ghii || j.createdBy === name);
+      // Every job that acts in this account, whoever made it: the account's agents and ecosystem apps
+      // stamp their own identity as createdBy, and ownerScope names the account (secaudit2026oct22,
+      // owner-erasure:agent-made-schedules-survive-and-rebind).
+      const ownerJobs = jobs.filter(j => j.createdBy === ghii || j.createdBy === name
+        || j.ownerScope === ghii || j.ownerScope === name);
       for (const j of ownerJobs) await storage.deleteScheduledJob(j.id);
       return ownerJobs.length ? `scheduled_jobs:${ownerJobs.length}` : null;
     }, deletionLog, storage);
