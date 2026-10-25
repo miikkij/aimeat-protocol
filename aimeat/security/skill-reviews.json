@@ -260,12 +260,12 @@
       "digest": "sha256:d8c0ddd3f743e712f66442c1"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-23",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:9713ff20493c0aaa62d5a0f6"
+      "digest": "sha256:880dda102cbaf5de9995dc44"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -349,7 +349,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -359,10 +359,10 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:24883f6e1fdedf973c1b1d3e"
+      "digest": "sha256:9c3a5f35450ebe3858f00bd9"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-23",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -373,7 +373,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:b575c8ccf616a62a9b9744f4",
+      "digest": "sha256:0f28fb76f0425399f155d5c4",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -434,14 +434,14 @@
       "digest": "sha256:86b918b2382facc544199a46"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:5a5c90c5d8f38a009cffa03d"
+      "digest": "sha256:452a24a65acf4208035b8773"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-09-19",
@@ -629,7 +629,7 @@
       "aimeat/src/mcp/core-admin.ts": "ff184eec827653cc"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "fec5c4713440926b",
+      "aimeat/src/mcp/core.ts": "f1ffeb7752b77fcc",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "40c81e6211e92fcb"
     },
     "node:manage-my-profile-data": {
@@ -660,7 +660,7 @@
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
       "aimeat/src/mcp/agent-schedules.ts": "4b988464c1558aed",
-      "aimeat/src/services/scheduler.ts": "693d184ead6ac968",
+      "aimeat/src/services/scheduler.ts": "7fdaa8cc1343347d",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
     "node:aimeat-game-apps": {
@@ -756,11 +756,11 @@
     },
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "53b5f0bc9a912ed5",
-      "aimeat/src/routes/memory/key.ts": "ee6eb5fd530c09d5",
-      "aimeat/src/services/memory-bin.ts": "4674e2af0981fd35",
+      "aimeat/src/routes/memory/key.ts": "bf5d2f42ca23548e",
+      "aimeat/src/services/memory-bin.ts": "d9582548ed79b319",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
-      "aimeat/src/services/owner-erasure.ts": "221669a172ec7e1c",
+      "aimeat/src/services/owner-erasure.ts": "fc9fc257ed2ab91a",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },
@@ -785,7 +785,7 @@
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
-      "aimeat/src/commerce/app-tool-catalog.ts": "c6cd3abb7698d83a",
+      "aimeat/src/commerce/app-tool-catalog.ts": "dfb27bab240a9d9c",
       "aimeat/src/services/extension-ctx-contract.ts": "6a6bc7fdec4a5c5f",
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/services/workspace-rows/row-service.ts": "f85b2fe48572e93d",

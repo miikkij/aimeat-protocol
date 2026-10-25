@@ -21,11 +21,14 @@
  */
 import type { Storage, AppGrantRecord } from '../storage/interface.js';
 import { madeAfter, recordIssuedAt } from '../auth/credential-age.js';
-import { isPortfolioTarget } from './app-origin-target.js';
+
+/** A portfolio target's prefix (services/app-origin-target.ts PORTFOLIO_TARGET_PREFIX). Spelled out,
+ *  not imported: that module reaches routes/subdomains.ts, which would make an import cycle here. */
+const PORTFOLIO_PREFIX = 'portfolio:';
 
 /** The author account name an app target `<author>/<file>` names, or null for any other target. */
 export function authorAccountOf(app: string): string | null {
-  if (!app || isPortfolioTarget(app)) return null;
+  if (!app || app.startsWith(PORTFOLIO_PREFIX)) return null;
   const slash = app.indexOf('/');
   return slash > 0 ? app.slice(0, slash) : null;
 }

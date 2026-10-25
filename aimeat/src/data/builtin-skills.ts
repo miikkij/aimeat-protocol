@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-25 -- diagnose-a-workflow, step 3: a scheduled post's fire needs `connections:use` of its
+ *     maker, and a schedule older than the account does not run (secaudit2026oct22).
  *   2026-10-21 -- diagnose-a-workflow, steps 3 and 6, and set-up-content-pipeline: an `extension` fire
  *     needs `ext:invoke` and an `agent_task` fire `task:write` of the maker, and a run in flight ends
  *     `refused` with `refusal.stoppedBefore` when the principal it answers to is gone or narrowed
@@ -617,10 +619,12 @@ metadata:
    ("no longer connected", "no longer holds your permission"), it no longer holds the permission the
    kind needs (\`ai:use\` for an \`ai\` schedule, \`ext:invoke\` for an \`extension\` one, \`task:write\`
    for an \`agent_task\` one, which then puts no task in the queue, \`work:request\` for one that calls
-   a connected outside app), or the file a publishing schedule names is one its maker may no longer read. Each
+   a connected outside app, \`connections:use\` for a scheduled post), or the file a publishing schedule names is one its maker may no longer read. Each
    of these is logged as an error with that sentence, and nothing ran. The fix is the maker's
    permission or a schedule made again by someone who has it, never the cron. A schedule an app made
-   before 2026-10-05 carries no grant, so the node cannot tell which app made it and says so.
+   before 2026-10-05 carries no grant, so the node cannot tell which app made it and says so. A
+   schedule older than the account itself was left by an earlier holder of the account name, does
+   not run, and is deleted.
 4. **Check the worker:** \`aimeat_agents_list\` for the agent a step dispatches to — is it
    connected and seen recently (\`last_seen\`, \`mode\`)? \`aimeat_agent_activity\` and
    \`aimeat_task_list\` report on the CALLING agent only, so neither reads the worker's queue.
