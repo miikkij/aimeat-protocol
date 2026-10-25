@@ -21,6 +21,7 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-25 — The members-only question reads a bare tool binding as the app owner's own extension (owner namespaces wish, secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — aimeat_app_tool_invoke refuses an `action_id` whose capability the app's owner does
@@ -115,6 +116,7 @@ import { paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
 import { appToolBindingRefusal } from '../services/capability-invoke.js';
+import { findBackingCapability } from '../services/component-address.js';
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
 async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
@@ -213,7 +215,7 @@ export function registerExchangeRunTools(
             // Who the app serves, before anything is charged (services/members-only.ts); the REST twin
             // asks the same function. The settled call used to reach the paywall on this route's
             // pass, which skipped the question.
-            if (await membersOnlyRefusalForCapability(storage, toolDef.action_id, callerGaii)) {
+            if (await membersOnlyRefusalForCapability(storage, toolDef.action_id, callerGaii, ownerName)) {
                 return fail(`MEMBERS_ONLY: ${MEMBERS_ONLY_MESSAGE}`);
             }
             const outcome = await authoriseMeteredCall({
@@ -238,7 +240,8 @@ export function registerExchangeRunTools(
             const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, app, tool, pinnedVersion) : null;
             const binding = iface?.binding ?? toolDef.action_id ?? null;
             if (!binding) return fail('TOOL_NOT_INVOKABLE: this tool has no capability binding to invoke');
-            const cap = await storage.getCapability(binding);
+            // A bare binding names the app owner's own extension (services/component-address.ts).
+            const cap = await findBackingCapability(storage, binding, ownerName);
             if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
             // The manifest NAMES a capability; it does not confer one. Refused after the price is
             // decided and before the pacing is charged, as on the REST twin

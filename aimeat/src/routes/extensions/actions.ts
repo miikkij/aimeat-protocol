@@ -7,6 +7,10 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): `:extName` may be
+ *     an encoded `<owner>/<name>`; the three-segment path is the instance form or the literal
+ *     `<owner>/<name>/<action>`, read so a
+ *     bare name never reaches another account's code (owner namespaces wish, secaudit2026oct22).
  *   2026-10-24 — The run no longer receives the request's bearer: ctx.buy runs the seller's action for
  *     the buying extension's GEAI (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-21 — visitorOrSignIn asks isAnonymousPrincipal, so the minted anonymous token runs a public
@@ -74,6 +78,7 @@ import type { EmailService } from '../../services/email.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { invokeExtensionAction } from '../../services/extension-invoke.js';
 import { resolveExtensionForCall } from '../../services/component-versions.js';
+import { extensionCallTarget, addressSegment } from '../../services/component-address.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
@@ -98,11 +103,12 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
    * Run one action for this request and answer it. `:extName` may pin a version (`name@1.2.0`): the
    * call then runs that kept version's code, with the live record's status, settings and instances.
    */
-  const runAction = async (req: Request, res: Response, instanceId?: string): Promise<void> => {
+  const runAction = async (req: Request, res: Response, shape: PathShape): Promise<void> => {
     const session = callerOf(req, config.nodeId, storage);
+    const { extRef, instanceId } = await callTarget(req, shape, session.owner);
     const out = await invokeExtensionAction({
       config, storage, enforcePaywall, emailService,
-      extRef: req.params.extName as string,
+      extRef,
       instanceId,
       actionId: req.params.actionId as string,
       method: req.method,
@@ -133,8 +139,21 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       return;
     }
     res.json(success(config.nodeId, out.result, [
-      { description: 'View extension', method: 'GET', url: `/v1/extensions/${out.extName}` },
+      { description: 'View extension', method: 'GET', url: `/v1/extensions/${addressSegment(out.extName)}` },
     ]));
+  };
+
+  /**
+   * Which extension and instance a path names (services/component-address.ts). Two segments: the
+   * extension (a namespaced name arrives as one encoded segment, `alice%2Fweather`) and the action.
+   * Three: the instance form (an encoded namespaced name in the first segment) and the literal
+   * `<owner>/<name>/<action>` share it, and extensionCallTarget reads it in an order where a bare
+   * name never reaches another account's code.
+   */
+  const callTarget = async (req: Request, shape: PathShape, callerOwner: string | null): Promise<{ extRef: string; instanceId?: string }> => {
+    const p = req.params as Record<string, string>;
+    if (shape === 'three') return extensionCallTarget(storage, p.extName, p.instanceId, callerOwner);
+    return { extRef: p.extName };
   };
 
   /**
@@ -144,18 +163,19 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
    * visitor learns nothing about what exists.
    */
   const visitorLimit = rateLimit(() => ({ ...config.rateLimits.catalogue, keyBy: 'ip' }));
-  const visitorOrSignIn = (instanced: boolean) => async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const visitorOrSignIn = (shape: PathShape) => async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (req.auth && !isAnonymousPrincipal(req.auth)) { next(); return; }
-    const resolved = await resolveExtensionForCall(storage, req.params.extName as string);
+    const target = await callTarget(req, shape, null);
+    const resolved = await resolveExtensionForCall(storage, target.extRef);
     const action = resolved.ok ? resolved.ext.actions.find(a => a.id === req.params.actionId) : undefined;
     if (!action?.public) { next(); return; }
-    visitorLimit(req, res, () => { void runVisitor(req, res, instanced ? req.params.instanceId as string : undefined); });
+    visitorLimit(req, res, () => { void runVisitor(req, res, target); });
   };
-  const runVisitor = async (req: Request, res: Response, instanceId?: string): Promise<void> => {
+  const runVisitor = async (req: Request, res: Response, target: { extRef: string; instanceId?: string }): Promise<void> => {
     const nobody = `anonymous@${config.nodeId}`;
     const out = await invokeExtensionAction({
       config, storage, enforcePaywall,
-      extRef: req.params.extName as string, instanceId, actionId: req.params.actionId as string,
+      extRef: target.extRef, instanceId: target.instanceId, actionId: req.params.actionId as string,
       method: req.method, input: (req.body ?? {}) as Record<string, unknown>,
       caller: { gaii: nobody, metered: nobody, owner: '', kind: 'anonymous', roles: [], scopes: [], appGrantId: null },
       paywall: { res },
@@ -171,13 +191,17 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
   };
 
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
-  // Runs against one instance: its own config, and the namespace `ext:{name}.{instanceId}`.
-  router.post('/v1/ext/:extName/:instanceId/:actionId', visitorOrSignIn(true), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
-    await runAction(req, res, req.params.instanceId as string);
+  // Runs against one instance: its own config, and the namespace `ext:{name}.{instanceId}`. The same
+  // path is the literal form of `<owner>/<name>/<action>` (callTarget decides).
+  router.post('/v1/ext/:extName/:instanceId/:actionId', visitorOrSignIn('three'), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
+    await runAction(req, res, 'three');
   });
 
   // ── POST /v1/ext/:extName/:actionId — Dynamic action execution ──
-  router.post('/v1/ext/:extName/:actionId', visitorOrSignIn(false), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
-    await runAction(req, res);
+  router.post('/v1/ext/:extName/:actionId', visitorOrSignIn('two'), requireAuth(), requireRestScope('ext:invoke'), async (req, res) => {
+    await runAction(req, res, 'two');
   });
 }
+
+/** How many segments the action path had: the decision callTarget makes from it. */
+type PathShape = 'two' | 'three';

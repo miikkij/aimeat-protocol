@@ -15,6 +15,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=extension-calendar
  * @version-history
+ *   2026-10-25 — Owner B and a signed-out caller name the extension by its full name, as names live
+ *     in the owner's namespace (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — Rules the recurrence engine could not finish answer with no occurrence,
  *     and the node keeps answering (secaudit2026oct22).
  *   v1.0.0 — 2026-10-13 — Initial (the October agents plan, brief 11).
@@ -74,8 +76,10 @@ const manifest = JSON.stringify({
 
 let A!: Awaited<ReturnType<typeof setupOwner>>;
 let B!: Awaited<ReturnType<typeof setupOwner>>;
+// The stored name is `<installer>/<short>`: A calls it by the short name, anybody else by the full one.
+const extFull = () => `${A.name}/${EXT}`;
 const invoke = (action: string, token: string, input: Record<string, unknown> = {}) =>
-    json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify(input) });
+    json(`/v1/ext/${token === A.token ? EXT : encodeURIComponent(extFull())}/${action}`,{ method: 'POST', headers: auth(token), body: JSON.stringify(input) });
 
 const WEEKLY = { id: 'standup', title: 'Standup', start: '2026-10-12T09:00:00', end: '2026-10-12T09:30:00', timeZone: 'Europe/Helsinki', rrule: 'FREQ=WEEKLY;COUNT=4' };
 
@@ -178,9 +182,9 @@ await test('A rule the recurrence engine could not finish answers with no occurr
 await test('Another owner calling the extension gets the same computation, and no credential gets none', async () => {
     const other = await invoke('zone', B.token, { local: '2026-10-26T09:00:00', zone: 'Europe/Helsinki', other: 'UTC' });
     assert(other.status === 200 && other.body.data.instant === '2026-10-26T07:00:00Z', `owner B: ${other.status} ${JSON.stringify(other.body?.error)}`);
-    const anonymous = await json(`/v1/ext/${EXT}/zone`, { method: 'POST', body: JSON.stringify({ local: '2026-10-26T09:00:00', zone: 'Europe/Helsinki', other: 'UTC' }) });
+    const anonymous = await json(`/v1/ext/${encodeURIComponent(extFull())}/zone`,{ method: 'POST', body: JSON.stringify({ local: '2026-10-26T09:00:00', zone: 'Europe/Helsinki', other: 'UTC' }) });
     assert(anonymous.status === 401, `no credential: ${anonymous.status}`);
-    const remove = await json(`/v1/extensions/${EXT}`, { method: 'DELETE', headers: auth(B.token) });
+    const remove = await json(`/v1/extensions/${encodeURIComponent(extFull())}`, { method: 'DELETE', headers: auth(B.token) });
     assert(remove.status === 403 || remove.status === 404, `owner B cannot remove A's extension: ${remove.status}`);
 });
 

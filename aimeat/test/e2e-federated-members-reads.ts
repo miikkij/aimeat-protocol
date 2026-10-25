@@ -16,6 +16,8 @@
  *   attestation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-members-reads
  * @version-history
+ *   2026-10-25 — The local reader and the visitor invoke the extension by its full name, as names
+ *     live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22, members-tier-admits-federated-visitor).
  */
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -105,9 +107,12 @@ let alice = { ghii: '', token: '' };
 let bob = { ghii: '', token: '' };
 let fedToken = '';
 
+/** The extension's full name: every caller of peek below is another account, so it names alice's namespace. */
+const extFull = () => `fedmralice${stamp}/${EXT}`;
+
 /** Invoke the extension's peek action; `data.text` is the file's text when the read succeeded. */
 const peek = async (token: string, ref: string) => {
-    const r = await json(`/v1/ext/${EXT}/peek`, as(token, { method: 'POST', body: JSON.stringify({ ref }) }));
+    const r = await json(`/v1/ext/${encodeURIComponent(extFull())}/peek`, as(token, { method: 'POST', body: JSON.stringify({ ref }) }));
     if (r.body?.data?.b64) r.body.data.text = Buffer.from(r.body.data.b64 as string, 'base64').toString('utf8');
     return r;
 };

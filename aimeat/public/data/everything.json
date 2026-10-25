@@ -1659,6 +1659,15 @@
      "plain": "Cortex Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. /v1/cortex, aimeat_cortex_*"
     },
     {
+     "slug": "g-8-extension-and-cortex-names-carry-their-owner",
+     "cells": [
+      "<strong>Extension and cortex names carry their owner</strong>",
+      "What you install is named after your account, <code>&lt;account&gt;/&lt;name&gt;</code>, so two people can each have a <code>weather</code>, and a name you remove never goes to someone else, together with the apps that load it, the consents that name it and its kept versions. You and your AI keep calling and managing your own by the short name. Other people's apps and accounts name it in full. What the node ships keeps its short name and is also reached as <code>system/&lt;name&gt;</code>. Anything installed before keeps its short name and its address; its owner's later reinstall under that short name keeps it, and nobody else can take it. Limits: a short name in a public address (a cortex library, a visitor's call) names only what the node ships or what was installed before; new installs are addressed in full.",
+      "<code>/v1/ext/&lt;account&gt;%2F&lt;name&gt;/:action</code>, <code>/v1/cortex/&lt;account&gt;/&lt;name&gt;/libs/&lt;file&gt;</code>, <code>AIMEAT.data.action('&lt;account&gt;/&lt;name&gt;', id)</code>, memory <code>ext:&lt;account&gt;/&lt;name&gt;</code>"
+     ],
+     "plain": "Extension and cortex names carry their owner What you install is named after your account, <account>/<name>, so two people can each have a weather, and a name you remove never goes to someone else, together with the apps that load it, the consents that name it and its kept versions. You and your AI keep calling and managing your own by the short name. Other people's apps and accounts name it in full. What the node ships keeps its short name and is also reached as system/<name>. Anything installed before keeps its short name and its address; its owner's later reinstall under that short name keeps it, and nobody else can take it. Limits: a short name in a public address (a cortex library, a visitor's call) names only what the node ships or what was installed before; new installs are addressed in full. /v1/ext/<account>%2F<name>/:action, /v1/cortex/<account>/<name>/libs/<file>, AIMEAT.data.action('<account>/<name>', id), memory ext:<account>/<name>"
+    },
+    {
      "slug": "g-8-install-sets",
      "cells": [
       "<strong>Install sets</strong>",
@@ -4343,6 +4352,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 439
+  "rows": 440
  }
 }

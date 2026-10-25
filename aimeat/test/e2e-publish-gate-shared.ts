@@ -13,6 +13,8 @@
  *     - the MCP tool of the same door answers publish_request in its text, not as an error;
  *     - refusals: another owner changing A's organism (403) or A's cortex visibility (403).
  * @version-history
+ *   v1.0.1 — 2026-10-25 — Another account reads and switches A's cortex by its full name `<A>/<short>`,
+ *     as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-gate-shared
@@ -94,8 +96,10 @@ spec:
 const cortexLibs = { 'helper.js': 'export function hello() { return "hi"; }' };
 const cortexInstall = (token: string, name: string, visibility: 'public' | 'private') =>
     call('/v1/cortex', { token, method: 'POST', body: { manifest: cortexManifest(name, visibility), libs: cortexLibs } });
+/** A's cortex (installed by A or A's agent) by the full name another account must use. */
+const cortexFull = (name: string) => encodeURIComponent(`${A.name}/${name}`);
 /** A cortex as another account reads it: 200 only when it is public. */
-const otherReadsCortex = (name: string) => call(`/v1/cortex/${encodeURIComponent(name)}`, { token: B.token });
+const otherReadsCortex = (name: string) => call(`/v1/cortex/${cortexFull(name)}`, { token: B.token });
 const anonBoards = async (): Promise<string[]> => ((await call('/v1/boards')).body.data?.boards as Body[] ?? []).map(b => b.id as string);
 const anonSkill = (name: string) => call(`/v1/skills/${name}?scope=user&owner=${encodeURIComponent(A.name)}`);
 
@@ -286,7 +290,7 @@ await test('Cortex: the visibility switch keeps the level; a cortex redeployed s
     const d = await approve(pr.request_id);
     assert(d.status === 409 && d.body.error.code === 'OUTDATED', `approve: ${d.status} ${JSON.stringify(d.body.error)}`);
     assert((await otherReadsCortex(name)).status === 404, 'still private');
-    const other = await call(`/v1/cortex/${name}/visibility`, { token: B.token, method: 'POST', body: { visibility: 'public' } });
+    const other = await call(`/v1/cortex/${cortexFull(name)}/visibility`, { token: B.token, method: 'POST', body: { visibility: 'public' } });
     assert(other.status === 403, `another owner switches A's cortex: ${other.status}`);
 });
 

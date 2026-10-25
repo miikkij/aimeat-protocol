@@ -16,6 +16,9 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-10-25 — A tool's binding is read for the seller: their own extension by a bare name is still
+ *     theirs (findBackingCapability; owner namespaces wish, secaudit2026oct22). The pay token's retry
+ *     line names a stored `<owner>/<name>` as one encoded path segment.
  *   2026-10-20 — The app-tool resolver reads the manifest through publicManifestTools, so a PRIVATE
  *     apps.{appId}.tools record answers 404 APP_TOOLS_NOT_FOUND at session creation and at the
  *     completion re-resolve, as the WebMCP route does (secaudit 2026-10,
@@ -66,6 +69,7 @@ import { integerMicros, percentFee } from './money.js';
 import { readSplit } from './beneficiary-split.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { membersOnlyRefusal, membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from '../services/members-only.js';
+import { findBackingCapability, addressSegment } from '../services/component-address.js';
 
 /** Core 'pacing-pack' kind (pacing-pack.ts), re-exported so the route loader registers every core kind from one module. */
 export { pacingPackSellableResolver } from './pacing-pack.js';
@@ -230,7 +234,7 @@ export function appToolSellableResolver(): SellableResolver {
       // Who the app serves is decided before a session opens, so nothing is collected from somebody
       // the app would refuse. Without this a non-member paid here and the paywall let the call through
       // on the checkout's pass (services/members-only.ts).
-      if (await membersOnlyRefusalForCapability(storage, tool.action_id, buyerIdentityOf(buyerOwner, config))) {
+      if (await membersOnlyRefusalForCapability(storage, tool.action_id, buyerIdentityOf(buyerOwner, config), sellerOwner)) {
         throw new CommerceError('MEMBERS_ONLY', 403, MEMBERS_ONLY_MESSAGE);
       }
 
@@ -291,7 +295,8 @@ export function appToolSellableResolver(): SellableResolver {
             const { createFulfillmentTask } = await import('./fulfillment.js');
             return { taskId: await createFulfillmentTask(ctx.storage, session, item, taskAssignee) };
           }
-          const cap = await ctx.storage.getCapability(actionId);
+          // The seller's own extension by a bare name is still theirs (services/component-address.ts).
+          const cap = await findBackingCapability(ctx.storage, actionId, sellerOwner);
           if (!cap) {
             throw new CommerceError('CAPABILITY_NOT_FOUND', 404, `Backing capability not found: ${actionId}`);
           }
@@ -392,7 +397,7 @@ export function extCallSellableResolver(): SellableResolver {
             } } : {}),
           });
           return {
-            result: { pay_token: token, expiresAt, retry: `POST /v1/ext/${extName}/${actionId} with header 'x-aimeat-pay-token: ${token}'` },
+            result: { pay_token: token, expiresAt, retry: `POST /v1/ext/${addressSegment(extName)}/${actionId} with header 'x-aimeat-pay-token: ${token}'` },
             // The token is the buyer's to spend; the seller's order says one was issued, never which.
             sellerResult: { call_paid: true, expiresAt },
           };

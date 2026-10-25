@@ -6,6 +6,9 @@
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — Board and action ids take the cortex name through idStemOf, so a cortex named
+ *     `<owner>/<name>` makes `cortex-<owner>-<name>-<component>` and no id carries a slash; a bare
+ *     name gives the id it always gave (owner namespaces wish, secaudit2026oct22).
  *   2026-10-24 — activationRefusal answers 409 BOARD_ID_TAKEN when a board-template's derived board id
  *     is a board of another account, activateExtension does not record such a board, and
  *     deactivation deletes only the boards a principal of the installing account or the deactivator
@@ -47,6 +50,7 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, CortexExtensionRecord, CortexActivationArtifacts } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { idStemOf } from '../../services/component-address.js';
 import { publicBoardCeiling, type BoardWriteRefusal } from '../../services/board-write.js';
 import { cortexOntologyToSkos } from '../../services/cortex-ontology-skos.js';
 import { accountPrincipals } from '../../services/db/owner-identity.js';
@@ -105,7 +109,7 @@ export async function activationRefusal(
   let wanted = 0;
   for (const comp of ext.components) {
     if (comp.type !== 'board-template' || comp.visibility !== 'public') continue;
-    const boardId = `cortex-${ext.name}-${comp.name}`;
+    const boardId = `cortex-${idStemOf(ext.name)}-${comp.name}`;
     if (!leaving.has(boardId) && await storage.getBoard(boardId)) continue;   // already there, and staying
     wanted++;
   }
@@ -139,7 +143,7 @@ async function foreignBoardRefusal(
   let holders: Set<string> | undefined;
   for (const comp of ext.components) {
     if (comp.type !== 'board-template') continue;
-    const boardId = `cortex-${ext.name}-${comp.name}`;
+    const boardId = `cortex-${idStemOf(ext.name)}-${comp.name}`;
     const board = await storage.getBoard(boardId);
     if (!board) continue;
     holders ??= await boardHolders(storage, ext.installedBy, gaii);
@@ -313,7 +317,7 @@ export async function activateExtension(
 
       // 4. action, under the resolved identity (CortexActor says why)
       case 'action': {
-        const actionId = `cortex-${ext.name}-${comp.name}`;
+        const actionId = `cortex-${idStemOf(ext.name)}-${comp.name}`;
         try {
           await storage.createAction({
             id: actionId,
@@ -344,7 +348,7 @@ export async function activateExtension(
 
       // 5. board-template
       case 'board-template': {
-        const boardId = `cortex-${ext.name}-${comp.name}`;
+        const boardId = `cortex-${idStemOf(ext.name)}-${comp.name}`;
         const existingBoard = await storage.getBoard(boardId);
         if (!existingBoard) {
           // THE CEILING ON PUBLIC BOARDS APPLIES HERE TOO. A board-template defaults to `public`

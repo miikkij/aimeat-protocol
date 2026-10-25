@@ -30,6 +30,9 @@
  * @structure pricedAppToolsFor(storage, ownerGhii, extName, actionId) → PricedBinding[]
  * @usage const sold = await pricedAppToolsFor(storage, `${owner}@${config.nodeId}`, ext.name, action.id);
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A tool the owner bound to their own namespaced extension by its short name
+ *     (`ext:weather:run` for `alice/weather`) sells that action too, so the raw route charges as the
+ *     tool does (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-07-27 — Initial: close the free raw door onto every priced app-tool on the node.
  *   v1.1.0 — 2026-10-11 — A tool counts when it is offered (a money price or a pacing amount), not only
  *     when it has a money price: a free tool with pacing is paced on the raw route too.
@@ -43,6 +46,7 @@ import type { Storage } from '../../storage/interface.js';
 import { AppToolsDocSchema, isToolOffered, isToolPriced, toolTollMorsels } from '../../models/app-tool-schemas.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
+import { shortNameOf } from '../../services/component-address.js';
 
 /** The app-tool an extension action is sold as. */
 export interface PricedBinding {
@@ -72,6 +76,9 @@ export async function pricedAppToolsFor(
   storage: Storage, ownerGhii: string, extName: string, actionId: string,
 ): Promise<PricedBinding[]> {
   const binding = `ext:${extName}:${actionId}`;
+  // The owner's own manifests may name their own namespaced extension by its short name: that binding
+  // sells the same action (services/component-address.ts findBackingCapability reads it so).
+  const bindings = new Set([binding, `ext:${shortNameOf(extName)}:${actionId}`]);
   try {
     return await cached(`pricedbinding:${ownerGhii}:${binding}`, TTL.dashboard, async () => {
       // The manifests live in the owner's own memory namespace under `apps.{appId}.tools`, keyed by
@@ -86,7 +93,7 @@ export async function pricedAppToolsFor(
         for (const t of parsed.data.tools) {
           // Offered = a money price or a pacing amount: a free tool with pacing is still a product, so
           // its action is not free through the raw route either.
-          if (t.action_id === binding && isToolOffered(t)) {
+          if (t.action_id && bindings.has(t.action_id) && isToolOffered(t)) {
             out.push({ appId, tool: t.name, money: isToolPriced(t), tollMorsels: toolTollMorsels(t) });
           }
         }

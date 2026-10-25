@@ -11,8 +11,15 @@ mistake, so start by naming which one you are writing.
 | Kind | Runs where | Source | Reached as |
 |---|---|---|---|
 | **Served SDK lib** | the browser | `src/static/sdk-libs/<name>/` (ESM) | `/v1/libs/aimeat-<name>.js` |
-| **Cortex lib** | the browser | its own package, installed on the node | `/v1/cortex/<pack>/libs/<file>.js` |
-| **Extension** | the node, QuickJS WASM sandbox | manifest + `scripts/` | `/v1/ext/<name>/<action>` |
+| **Cortex lib** | the browser | its own package, installed on the node | `/v1/cortex/<owner>/<pack>/libs/<file>.js` (a shipped pack: `/v1/cortex/<pack>/libs/<file>.js`) |
+| **Extension** | the node, QuickJS WASM sandbox | manifest + `scripts/` | `/v1/ext/<name>/<action>` for the installer, `/v1/ext/<owner>%2F<name>/<action>` for anyone else |
+
+**Names live in the owner's namespace** (since 2026-10-25, `src/services/component-address.ts`):
+a cortex or extension installed by an account is stored as `<owner>/<name>`. The installer and its
+agents still manage and call their own by the short name; another account, a visitor and every
+app page name it in full. A shipped cortex or extension keeps its bare name, and a record installed
+before that date keeps its bare name too. The install answer carries the stored name and the lib
+addresses.
 | **Library pack** | the browser (vendored third-party) | `public/lib/` + registry entry | `/lib/<name>@<major>.js` |
 
 **Two prefixes, never mixed:** AIMEAT SDK libs load from `/v1/libs/`, vendored styling and
@@ -39,7 +46,7 @@ Browser IIFE installed on the node as a pack (manifest + `libs/`). The manifest 
 `spec.version`, a `filename`, `exports` as a list of strings and a **string** `api_surface` (a YAML
 block scalar); anything else is refused naming the field. Every lib component's `filename` needs
 its source under `libs` in the same call (`{ manifest, libs: { "x.js": "..." } }`), or the install
-is refused; it serves from the bare name.
+is refused; it serves from the stored name.
 
 - **The seeder is version-aware:** editing a bundled cortex `.js` without bumping the yaml
   `spec.version` will not refresh an installed node.

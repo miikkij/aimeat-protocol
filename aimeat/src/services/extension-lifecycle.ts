@@ -39,6 +39,9 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.11.0 — 2026-10-25 — uninstallExtension writes a bare name down with its holder, and a new
+ *     install that took a released bare name settles it (services/component-address.ts; owner
+ *     namespaces wish, secaudit2026oct22).
  *   v1.10.0 — 2026-10-21 — An update of byte-identical code keeps the old-code first-use mark; a changed
  *     script drops it (services/extension-first-use-keep.ts carryFirstUseKeep).
  *   v1.9.0 — 2026-10-20 —writeExtensionRecord stamps `installedByPrincipal` with the actor of the
@@ -84,6 +87,7 @@ import { snapshotExtensionVersion, forgetVersions, keptVersionRefusal, extension
 import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { carryHostFieldValues } from './extension-network-hosts.js';
 import { carryFirstUseKeep } from './extension-first-use-keep.js';
+import { releaseBareName, settleReclaimed } from './component-address.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -179,6 +183,8 @@ export async function writeExtensionRecord(
         record.config = prepared;
 
         const created = await storage.createExtension(record);
+        // A bare name its holder installed again is no longer released (services/component-address.ts).
+        await settleReclaimed(storage, 'extension', created.name);
         // Every version is kept: this one too, so `name@<version>` keeps serving it after an update.
         await snapshotExtensionVersion(storage, created, ctx.actor)
             .catch(err => logger.warn('writeExtensionRecord: version not kept', { name, version: created.version, error: String(err) }));
@@ -346,7 +352,11 @@ export async function uninstallExtension(
         }
     }
 
+    const holder = (await storage.getExtension(name))?.installedBy;
     const deleted = await storage.deleteExtension(name);
+    // A bare name stays its holder's: written down so only they install under it again, and an old
+    // `/v1/ext/<name>/<instance>/…` address keeps reading as this extension's (services/component-address.ts).
+    if (deleted && holder) await releaseBareName(storage, 'extension', name, holder);
     await forgetVersions(storage, 'extension', name)
         .catch(err => logger.warn('uninstallExtension: kept versions not dropped', { name, error: String(err) }));
     emitChange('extensions');

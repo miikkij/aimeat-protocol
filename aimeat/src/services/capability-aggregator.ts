@@ -5,6 +5,8 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.8.2 - 2026-10-25 - A cortex capability's usage line takes its address from cortexLibPath, the
+ *     two segments of a cortex named `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   v1.8.1 - 2026-10-24 - The cleanup step leaves a row whose operatorOverride.disabled is set as it
  *     is: it neither disables nor deletes it, so the operator's switch and the note the extension-ref
  *     boot step writes stay (secaudit2026oct22). Only a row the scan disabled itself is deleted later.
@@ -43,6 +45,7 @@ import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord, CortexLibComponent, CortexPromptComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { cortexLibPath } from './component-address.js';
 import { AppToolsDocSchema } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, normalizeOfferPacing, TOLL_MORSELS_MAX, type Offer } from '../models/offer-schemas.js';
 
@@ -300,7 +303,7 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
         if (p.content) promptContent += p.content + '\n';
       }
 
-      const usageLines = [`await loadScript('/v1/cortex/${cortex.name}/libs/${libFilename}')`];
+      const usageLines = [`await loadScript('${cortexLibPath(cortex.name, libFilename)}')`];
       if (apiSurface) usageLines.push('\nAPI:\n' + apiSurface.trim());
 
       if (!existing) {

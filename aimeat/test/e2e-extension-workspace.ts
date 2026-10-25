@@ -21,6 +21,9 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   2026-10-25 — Callers other than the installer, the public detail read, the provenance pipeline
+ *     and the extension's memory owner use the full name `<installer>/<short>`, as names live in the
+ *     owner's namespace (secaudit2026oct22).
  *   v1.7.0 — 2026-10-18 — An agent's write through the extension is marked AI output and a person's
  *     own write is not (wish-ihmisen-laajennuksen-kautta-kirjoittama-teksti-ei-ole-teko-l).
  *   v1.6.0 — 2026-10-12 — B's two agents also hold ext:invoke, the word node 4.0.0 asks on POST
@@ -156,8 +159,11 @@ let orgId = '';
 const WS = 'wsclaims';
 const root = () => `organism.${orgId}.w.${WS}`;
 
+// The stored name is `<installer>/<short>` (services/component-address.ts). A, the installer, calls
+// and manages by the short name; everybody else, and a request without a credential, by the full one.
+const full = (ext: string) => `${A.name}/${ext}`;
 const invoke = (ext: string, action: string, token: string, input: Record<string, unknown> = {}) =>
-    json(`/v1/ext/${ext}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify({ org: orgId, ws: WS, ...input }) });
+    json(`/v1/ext/${token === A.token ? ext : encodeURIComponent(full(ext))}/${action}`,{ method: 'POST', headers: auth(token), body: JSON.stringify({ org: orgId, ws: WS, ...input }) });
 
 await test('Setup: three owners, B\'s two agents (one may write, one may only read)', async () => {
     A = await setupOwner('a'); B = await setupOwner('b'); D = await setupOwner('d');
@@ -212,9 +218,9 @@ await test('Install + activate: declared, undeclared, read-only and budget-cappe
         const act = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(A.token) });
         assert(act.status === 200, `activate ${name} ${act.status}`);
     }
-    const detail = await json(`/v1/extensions/${EXT}`);
+    const detail = await json(`/v1/extensions/${encodeURIComponent(full(EXT))}`);
     assert(detail.body?.data?.extension?.workspace?.read === true && detail.body.data.extension.workspace.write === true, `detail carries the declaration: ${JSON.stringify(detail.body?.data?.extension?.workspace)}`);
-    const none = await json(`/v1/extensions/${EXT_NONE}`);
+    const none = await json(`/v1/extensions/${encodeURIComponent(full(EXT_NONE))}`);
     assert(none.body?.data?.extension?.workspace === null, `undeclared reads back null: ${JSON.stringify(none.body?.data?.extension?.workspace)}`);
 });
 
@@ -278,7 +284,7 @@ await test('Provenance: an agent\'s write through the extension is marked AI out
     assert(typeof agentPid === 'string' && agentPid.length > 0, `the agent's record carries a provenance record: ${agentPid}`);
     const prov = await json(`/v1/provenance/${agentPid}`, { headers: { ...auth(B.token), Accept: 'application/json' } });
     const p = prov.body.data.provenance ?? prov.body.data;
-    assert(p.level === 'ai-generated' && p.generator?.pipeline === `ext.${EXT}.claim`, `agent: ${p.level} ${JSON.stringify(p.generator)}`);
+    assert(p.level === 'ai-generated' && p.generator?.pipeline === `ext.${full(EXT)}.claim`, `agent: ${p.level} ${JSON.stringify(p.generator)}`);
 
     const r = await invoke(EXT, 'claim', B.token, { id: 'c-person', port: '40256', publish: true });
     assert(r.status === 200, `person claim ${r.status}: ${JSON.stringify(r.body?.error)}`);
@@ -416,7 +422,7 @@ await test('A scheduled run (nobody present) gets no ctx.workspace', async () =>
     const scheduleId = s.body.data.schedule?.id ?? s.body.data.id;
     const t = await json(`/v1/schedules/${scheduleId}/trigger`, { method: 'POST', headers: auth(A.token), body: '{}' });
     assert(t.status === 200 && t.body.data.schedule?.lastRunResult === 'success', `trigger ${t.status}: ${JSON.stringify(t.body?.data?.schedule?.lastRunError ?? t.body?.error)}`);
-    const probe = await json(`/v1/memory/${encodeURIComponent(`ext:${EXT}`)}/probe`);
+    const probe = await json(`/v1/memory/${encodeURIComponent(`ext:${full(EXT)}`)}/probe`);
     assert(probe.status === 200, `probe readback ${probe.status}`);
     // GUARD, not hole: no road offered ctx.workspace before, so the old tree held this trivially.
     // What it asserts now is that the DECLARED extension, which has it on the HTTP road (see the

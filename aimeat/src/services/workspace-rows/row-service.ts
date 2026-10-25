@@ -31,6 +31,8 @@
  *   - sweepRevisions / listRowRevisions / restoreRowRevision
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-10-25 — An extension's marker comes from extensionMarker, so a name that carries its installer
+ *     (`<owner>/<name>`) is compared as it is (owner namespaces wish, secaudit2026oct22).
  *   2026-10-22 — A replacement across writer families keeps the old content as a revision and the
  *     row's first author in createdBy, and names the new writer in updatedBy (row-revisions.ts);
  *     appendRows answers which rows it kept. listRowRevisions and restoreRowRevision give the delete
@@ -78,6 +80,7 @@ import { readWorkspaceManifest, isRowBackedSpace } from '../workspace-meta.js';
 import { emitChange, emitRowsAppended } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { rowTarget } from '../classification/labels.js';
+import { extensionMarker } from '../fenced-space.js';
 import type { ContentReader } from '../classification/reader.js';
 import {
   WorkspaceRowError, resolveRowSpace, columnsForBody, columnsForWhere, retentionOf,
@@ -240,7 +243,8 @@ async function authorizeExtension(
   // The installer is half of the name: an extension name is free again after an uninstall, and the
   // next member to take it must not inherit a space the organism opened to somebody else's code.
   const ext = (caller.extension ?? '').trim().toLowerCase();
-  const named = `${caller.owner.trim().toLowerCase()}/${ext}`;
+  // extensionMarker: a name that already carries its installer (`<owner>/<name>`) is its own marker.
+  const named = extensionMarker(caller.owner, ext);
   if (!ext || !space.extensions.includes(named)) {
     throw new WorkspaceRowError('ACCESS_DENIED', 403,
       `This space is not open to the extension ${ext ? named : '(unnamed)'}. An organism admin names the extensions a row space accepts in the manifest, as installer/name (objectTypes[].extensions).`);

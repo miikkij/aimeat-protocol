@@ -20,6 +20,10 @@
  *   await refreshAppDependencies(storage, { ownerName, filename, versionNumber, mimeType, data, manifest });
  *   const { apps, cortexes } = await dependentsOf(storage, 'extension', 'prh-api');
  * @version-history
+ *   v1.3.0 — 2026-10-25 — An extension address may be `<owner>%2F<name>`, the encoded form of a name
+ *     installed since names carry their owner, and a bare name in an owner's own app or cortex is the
+ *     edge to what the call reaches, the bare record or the owner's own (owner namespaces wish,
+ *     secaudit2026oct22).
  *   v1.2.0 — 2026-09-19 — A pack is used when the app loads the pack's OWN file. "Any include path
  *     present" counted a prerequisite as the pack: aimeat-voice lists aimeat-auth.js and
  *     aimeat-living lists the Atelier files, so on aimeat.io every app that signs people in was
@@ -36,6 +40,7 @@ import type { AppManifest } from '../storage/interface.js';
 import type { DependencyEdge, DependencyFromKind, DependencyToKind } from '../storage/types/dependencies.js';
 import { logger } from '../utils/logger.js';
 import { getLibraryPacks } from '../data/library-packs.js';
+import { findExtension, splitComponentAddress } from './component-address.js';
 
 export interface Dep { name: string; version: string | null; via: 'source' | 'manifest' }
 export interface ExtractedDependencies { cortex: Dep[]; extensions: Dep[]; packs: Dep[] }
@@ -79,10 +84,12 @@ function packNeedlesOnce(): Array<{ id: string; paths: string[] }> {
   return packNeedles;
 }
 
-// A cortex name may carry one slash ("owner/name"), an extension name never does. The version,
-// when pinned, follows an @ and runs to the next slash or quote. `%2F` is a slash a caller encoded.
+// A cortex name may carry one slash ("owner/name"). An extension name carries one since 2026-10-25,
+// and in a path it is one encoded segment (`alice%2Fweather`), because the literal form shares its
+// shape with the instance address (services/component-address.ts). The version, when pinned,
+// follows an @ and runs to the next slash or quote. `%2F` is a slash a caller encoded.
 const CORTEX_RE = /\/v1\/cortex\/((?:[A-Za-z0-9._-]+(?:%2F|\/))?[A-Za-z0-9._-]+)(?:@([0-9][A-Za-z0-9.+-]*))?\/(?:libs|prompts|ontology|export)(?:[/?"'`\s)]|$)/g;
-const EXT_RE = /\/v1\/ext\/([A-Za-z0-9._-]+)(?:@([0-9][A-Za-z0-9.+-]*))?\//g;
+const EXT_RE = /\/v1\/ext\/((?:[a-z0-9-]+%2F)?[A-Za-z0-9._-]+)(?:@([0-9][A-Za-z0-9.+-]*))?\//gi;
 
 /** Read the addresses out of one source text. Deduplicated by name; a pinned version wins over a bare mention. */
 export function extractDependencies(text: string, declaredCortex: string[] = []): ExtractedDependencies {
@@ -100,7 +107,7 @@ export function extractDependencies(text: string, declaredCortex: string[] = [])
     keep(cortex, name, m[2] ?? null, 'source');
   }
   for (const m of text.matchAll(EXT_RE)) {
-    keep(extensions, m[1], m[2] ?? null, 'source');
+    keep(extensions, m[1].replace(/%2F/gi, '/'), m[2] ?? null, 'source');
   }
   for (const name of declaredCortex) {
     if (typeof name === 'string' && /^[A-Za-z0-9._/-]+$/.test(name)) keep(cortex, name, null, 'manifest');
@@ -129,20 +136,34 @@ function edgesOf(fromKind: DependencyFromKind, fromRef: string, fromVersion: str
 
 export const appRef = (ownerName: string, filename: string): string => `${ownerName}/${filename}`;
 
+/**
+ * A bare extension name in an owner's own code means the bare record when there is one, else the
+ * owner's own `<owner>/<name>` (services/component-address.ts), so the edge names what the call reaches.
+ */
+async function withOwnNames(storage: Storage, found: ExtractedDependencies, ownerName: string | null): Promise<ExtractedDependencies> {
+  if (!ownerName) return found;
+  const extensions: Dep[] = [];
+  for (const d of found.extensions) {
+    const ext = d.name.includes('/') ? null : await findExtension(storage, d.name, ownerName);
+    extensions.push(ext && ext.name !== d.name ? { ...d, name: ext.name } : d);
+  }
+  return { ...found, extensions };
+}
+
 /** Re-read an app version's dependencies from its bytes and replace its edges. HTML and JS only. */
 export async function refreshAppDependencies(storage: Storage, app: {
   ownerName: string; filename: string; versionNumber: number; mimeType: string; data: Buffer | Uint8Array; manifest?: AppManifest;
 }): Promise<ExtractedDependencies> {
   const isText = /html|javascript|json|text/i.test(app.mimeType);
   const text = isText ? Buffer.from(app.data).toString('utf8') : '';
-  const found = extractDependencies(text, app.manifest?.usesCortex ?? []);
+  const found = await withOwnNames(storage, extractDependencies(text, app.manifest?.usesCortex ?? []), app.ownerName);
   await storage.replaceDependencyEdges('app', appRef(app.ownerName, app.filename), edgesOf('app', appRef(app.ownerName, app.filename), String(app.versionNumber), found));
   return found;
 }
 
 /** Re-read a cortex's library files for extension calls and replace its edges. */
 export async function refreshCortexDependencies(storage: Storage, name: string, version: string, libs: Record<string, string>): Promise<ExtractedDependencies> {
-  const found = extractDependencies(Object.values(libs).join('\n'));
+  const found = await withOwnNames(storage, extractDependencies(Object.values(libs).join('\n')), splitComponentAddress(name)?.owner ?? null);
   found.cortex = [];   // a cortex loading another cortex is not a thing the address form expresses
   found.packs = [];    // a library file mentioning a pack path is documentation, not a load
   await storage.replaceDependencyEdges('cortex', name, edgesOf('cortex', name, version, found));

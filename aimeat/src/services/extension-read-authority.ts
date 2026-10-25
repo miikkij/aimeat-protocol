@@ -30,12 +30,15 @@
  *   res.json(success(config.nodeId, readAuthorityPayload(name, view)));
  *   const out = await setReadAuthority({ storage }, ext, 'installer');
  * @version-history
+ *   2026-10-25 — readAuthorityOf reads the name through services/component-address.ts, the caller's own
+ *     first, as a managing read (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial: the owner's per-extension choice of the unattended read authority
  *     (Jouni, 2026-10-20, on secaudit 2026-10 extension-system-run:files-read-as-owner-ghii).
  */
 import type { Storage } from '../storage/interface.js';
 import type { ExtensionRecord } from '../storage/interface.js';
 import { isGEAI } from '../utils/gaii.js';
+import { findExtension } from './component-address.js';
 
 /** The two answers, as the API and the MCP tool take them. */
 export const READ_AUTHORITIES = ['owner', 'installer'] as const;
@@ -114,8 +117,10 @@ function summaryOf(authority: ReadAuthority, kind: ReadAuthorityView['installedB
 export async function readAuthorityOf(
   deps: { storage: Storage },
   name: string,
+  /** The caller's account: a bare name names their own extension of that name first (services/component-address.ts, 'manage'). */
+  callerOwner?: string | null,
 ): Promise<{ ext: ExtensionRecord; view: ReadAuthorityView } | null> {
-  const ext = await deps.storage.getExtension(name);
+  const ext = await findExtension(deps.storage, name, callerOwner, 'manage');
   return ext ? { ext, view: describeReadAuthority(ext) } : null;
 }
 

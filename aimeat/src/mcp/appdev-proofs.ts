@@ -16,6 +16,7 @@
  * @structure registerAppdevProofTools()
  * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes, caller);
  * @version-history
+ *   2026-10-25 — The answer names the subject the proof was stored under, a community pack's `<owner>/<name>` when the owner named it short (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -70,7 +71,7 @@ export function registerAppdevProofTools(
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        attached: true, subject_type, subject_id,
+                        attached: true, subject_type, subject_id: attached.subjectId,
                         proofs_total: attached.proofsTotal, self_reported: true,
                     }, null, 2),
                 }],

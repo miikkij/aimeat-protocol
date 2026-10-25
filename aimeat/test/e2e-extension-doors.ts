@@ -24,6 +24,9 @@
  *     test/run-e2e-ci.ts --test=extension-doors
  *
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Names live in the owner's namespace: another account and a caller with no
+ *     sign-in reach the installs by `<owner>/<name>`, the owner keeps the bare name, and an instance's
+ *     memory is `ext:<owner>/<name>.<instance>` (owner namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-09-24 — The action-script PATCH is a new version (secaudit 2026-09, A6-7): the
  *     answer names 1.0.1, and the versions list keeps 1.0.0 beside it. The list asserted 1.0.0 as
  *     current after the PATCH, which held only while a PATCH changed the code under the version.
@@ -83,6 +86,11 @@ const ownerName = `doorsowner${Date.now()}`;
 
 const strangerName = `doorsstranger${Date.now()}`;
 let strangerToken = '';
+
+// Installs are stored in the owner's namespace (services/component-address.ts). The owner keeps the
+// bare name; another account and a caller with no sign-in name the owner.
+const RC = encodeURIComponent(`${ownerName}/rest-connector`);
+const ECHO_FULL = encodeURIComponent(`${ownerName}/doors-echo`);
 
 let narrowToken = '';
 
@@ -250,7 +258,7 @@ await test('unknown extension → 404', async () => {
 });
 
 await test('a second owner cannot create an instance on another owner\'s extension → 403', async () => {
-  const { status, body } = await json('/v1/extensions/rest-connector/instances', {
+  const { status, body } = await json(`/v1/extensions/${RC}/instances`, {
     method: 'POST', headers: strangerAuth(), body: JSON.stringify({ id: 'stranger', config: { apiKey: 'x' } }),
   });
   assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
@@ -347,11 +355,12 @@ await test('GET instances — the owner sees acme', async () => {
 await test('GET instances as a second owner — FILTERED to empty, not refused', async () => {
   // The answer to "list the instances" is "the ones that are yours". Until 2026-09-04 this returned
   // everyone's, another owner's name in createdBy included.
-  const { status, body } = await json('/v1/extensions/rest-connector/instances', { headers: strangerAuth() });
+  const { status, body } = await json(`/v1/extensions/${RC}/instances`, { headers: strangerAuth() });
   assert(status === 200, `expected 200 (filtered, not refused), got ${status}`);
   assert((body.data?.instances ?? []).length === 0, `expected an empty list, got ${JSON.stringify(body.data?.instances)}`);
   assert(body.data?.total === 0, `total ${body.data?.total}`);
-  assert(JSON.stringify(body).indexOf(ownerName) === -1, 'the filtered list leaked the other owner\'s name');
+  // The extension's own name carries its owner, which the caller sent; no instance row may name them.
+  assert(JSON.stringify(body.data?.instances ?? []).indexOf(ownerName) === -1, 'the filtered list leaked the other owner\'s name');
 });
 
 await test('GET instances without auth → 401', async () => {
@@ -366,7 +375,7 @@ await test('GET detail — unknown extension, unknown instance, and another owne
   assert(noInst.status === 404, `unknown instance: expected 404, got ${noInst.status}`);
   // 404 and not 403, on purpose: the id is the caller's guess, and confirming that somebody else's
   // instance exists answers a question they did not get to ask.
-  const theirs = await json('/v1/extensions/rest-connector/instances/acme', { headers: strangerAuth() });
+  const theirs = await json(`/v1/extensions/${RC}/instances/acme`, { headers: strangerAuth() });
   assert(theirs.status === 404, `another owner's instance: expected 404, got ${theirs.status}`);
   assert(JSON.stringify(theirs.body).indexOf(SECRET) === -1, 'the refusal leaked the secret');
 });
@@ -441,7 +450,7 @@ await test('PATCH on an unknown extension and on an unknown instance → 404 eac
 });
 
 await test('PATCH as a second owner → 403, and nothing changed', async () => {
-  const { status } = await json('/v1/extensions/rest-connector/instances/acme', {
+  const { status } = await json(`/v1/extensions/${RC}/instances/acme`, {
     method: 'PATCH', headers: strangerAuth(), body: JSON.stringify({ status: 'paused' }),
   });
   assert(status === 403, `expected 403, got ${status}`);
@@ -459,7 +468,7 @@ await test('PATCH without auth → 401', async () => {
 // ─── Phase 5: DELETE, and what goes with the row ───
 console.log('Phase 5 — DELETE and the namespace cleanup');
 
-const WIPE_NS = encodeURIComponent('ext:rest-connector.wipe');
+const WIPE_NS = encodeURIComponent(`ext:${ownerName}/rest-connector.wipe`);
 
 await test('a second instance writes into its own ext: namespace', async () => {
   const inst = await json('/v1/extensions/rest-connector/instances', {
@@ -476,9 +485,9 @@ await test('a second instance writes into its own ext: namespace', async () => {
 });
 
 await test('DELETE without auth → 401, as a second owner → 403, and the instance survives both', async () => {
-  const noauth = await json('/v1/extensions/rest-connector/instances/wipe', { method: 'DELETE' });
+  const noauth = await json(`/v1/extensions/${RC}/instances/wipe`, { method: 'DELETE' });
   assert(noauth.status === 401, `expected 401, got ${noauth.status}`);
-  const theirs = await json('/v1/extensions/rest-connector/instances/wipe', {
+  const theirs = await json(`/v1/extensions/${RC}/instances/wipe`, {
     method: 'DELETE', headers: strangerAuth(),
   });
   assert(theirs.status === 403, `expected 403, got ${theirs.status}`);
@@ -516,23 +525,23 @@ await test('DELETE the instance — the ext:{name}.{id} namespace goes with it',
 console.log('Phase 6 — Public per-instance translations');
 
 await test('GET translations?locale=fi — no auth, and it carries what the PATCH stored', async () => {
-  const { status, body } = await json('/v1/extensions/rest-connector/instances/acme/translations?locale=fi');
+  const { status, body } = await json(`/v1/extensions/${RC}/instances/acme/translations?locale=fi`);
   assert(status === 200, `expected 200 unauthenticated, got ${status}`);
   assert(body.data?.locale === 'fi', `locale ${body.data?.locale}`);
   assert(body.data?.translations?.title === 'Yhteys', `fi translations: ${JSON.stringify(body.data?.translations)}`);
 });
 
 await test('GET translations with no locale falls back to en, and an unknown locale is empty', async () => {
-  const en = await json('/v1/extensions/rest-connector/instances/acme/translations');
+  const en = await json(`/v1/extensions/${RC}/instances/acme/translations`);
   assert(en.body.data?.locale === 'en', `default locale ${en.body.data?.locale}`);
   assert(en.body.data?.translations?.title === 'Connection', `en translations: ${JSON.stringify(en.body.data?.translations)}`);
-  const none = await json('/v1/extensions/rest-connector/instances/acme/translations?locale=zz');
+  const none = await json(`/v1/extensions/${RC}/instances/acme/translations?locale=zz`);
   assert(none.status === 200 && Object.keys(none.body.data?.translations ?? {}).length === 0,
     `an unknown locale is an empty map, got ${JSON.stringify(none.body.data)}`);
 });
 
 await test('GET translations for an instance that does not exist → 404', async () => {
-  const { status, body } = await json('/v1/extensions/rest-connector/instances/never-made/translations');
+  const { status, body } = await json(`/v1/extensions/${RC}/instances/never-made/translations`);
   assert(status === 404, `expected 404, got ${status}`);
   assert(body.error?.code === 'NOT_FOUND', `code ${body.error?.code}`);
 });
@@ -590,12 +599,12 @@ await test('PUT — the CREATE arm refuses a principal without ext:write (403)',
 
 await test('PUT — the UPDATE arm refuses a second owner (403), and the extension is untouched', async () => {
   // The other arm: the name exists, so the bar is canManageInstalledExt — being the installer.
-  const { status } = await json('/v1/extensions/doors-echo', {
+  const { status } = await json(`/v1/extensions/${ECHO_FULL}`, {
     method: 'PUT', headers: strangerAuth(),
     body: JSON.stringify({ manifest: echoManifest.replace('1.0.0', '9.9.9'), scripts: echoScripts }),
   });
   assert(status === 403, `expected 403, got ${status}`);
-  const chk = await json('/v1/extensions/doors-echo');
+  const chk = await json(`/v1/extensions/${ECHO_FULL}`);
   assert(chk.body.data?.extension?.version === '1.0.0', `the refused PUT changed the version to ${chk.body.data?.extension?.version}`);
 });
 
@@ -603,13 +612,13 @@ await test('GET ?full=true — unauthenticated is refused, and it is 403 rather 
   // optionalAuth injects the shared anonymous principal when anonymous mode is on, so the handler
   // decides this rather than the middleware: a bare 401 assertion would pass on one node and fail
   // on another. scriptContent is the whole implementation of somebody's extension.
-  const { status, body } = await json('/v1/extensions/doors-echo?full=true');
+  const { status, body } = await json(`/v1/extensions/${ECHO_FULL}?full=true`);
   assert(status === 403, `expected 403, got ${status}`);
   assert(JSON.stringify(body).indexOf('export default') === -1, 'the refusal carried the script');
 });
 
 await test('GET ?full=true as a second owner → 403; as the installer → the script', async () => {
-  const theirs = await json('/v1/extensions/doors-echo?full=true', { headers: strangerAuth() });
+  const theirs = await json(`/v1/extensions/${ECHO_FULL}?full=true`, { headers: strangerAuth() });
   assert(theirs.status === 403, `expected 403, got ${theirs.status}`);
   assert(JSON.stringify(theirs.body).indexOf('export default') === -1, 'the refusal carried the script');
   const mine = await json('/v1/extensions/doors-echo?full=true', { headers: ownerAuth() });
@@ -620,7 +629,7 @@ await test('GET ?full=true as a second owner → 403; as the installer → the s
 });
 
 await test('GET without ?full=true never carries scriptContent, whoever asks', async () => {
-  const { status, body } = await json('/v1/extensions/doors-echo');
+  const { status, body } = await json(`/v1/extensions/${ECHO_FULL}`);
   assert(status === 200, `status ${status}`);
   const action = (body.data?.extension?.actions ?? []).find((a: { id: string }) => a.id === 'echo');
   assert(action !== undefined, 'the action is listed');
@@ -631,7 +640,7 @@ await test('GET action script — the installer reads it, a second owner gets 40
   const mine = await json('/v1/extensions/doors-echo/actions/echo', { headers: ownerAuth() });
   assert(mine.status === 200, `installer: expected 200, got ${mine.status}`);
   assert(typeof mine.body.data?.action?.scriptContent === 'string', 'scriptContent present');
-  const theirs = await json('/v1/extensions/doors-echo/actions/echo', { headers: strangerAuth() });
+  const theirs = await json(`/v1/extensions/${ECHO_FULL}/actions/echo`, { headers: strangerAuth() });
   assert(theirs.status === 403, `second owner: expected 403, got ${theirs.status}`);
 });
 
@@ -712,13 +721,13 @@ await test('six doors on a name nobody installed, six 404s', async () => {
 });
 
 await test('DELETE as a second owner → 403; the installer removes it', async () => {
-  const theirs = await json('/v1/extensions/doors-echo', { method: 'DELETE', headers: strangerAuth() });
+  const theirs = await json(`/v1/extensions/${ECHO_FULL}`, { method: 'DELETE', headers: strangerAuth() });
   assert(theirs.status === 403, `expected 403, got ${theirs.status}`);
-  const still = await json('/v1/extensions/doors-echo');
+  const still = await json(`/v1/extensions/${ECHO_FULL}`);
   assert(still.status === 200, `the refused DELETE removed it anyway: ${still.status}`);
   const mine = await json('/v1/extensions/doors-echo', { method: 'DELETE', headers: ownerAuth() });
   assert(mine.status === 200, `installer delete: ${mine.status}`);
-  const gone = await json('/v1/extensions/doors-echo');
+  const gone = await json(`/v1/extensions/${ECHO_FULL}`);
   assert(gone.status === 404, `expected 404 after uninstall, got ${gone.status}`);
 });
 

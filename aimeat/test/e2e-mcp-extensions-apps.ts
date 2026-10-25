@@ -36,6 +36,7 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
+ *   2026-10-25 — 10: another owner's install of the same short name lands as their own <owner>/<name>, and a PUT of the author's full name is refused 403; 11, 12 read the full name; 18 calls the author's extension by its full name, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-17 — 3: the ext and app tools miss only one-press words, so a memory:read agent is listed
  *     them (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED with the
  *     allow address.
@@ -304,6 +305,8 @@ let mute: Awaited<ReturnType<typeof makeAgent>>;
 let authorSession: McpSession;
 let strangerSession: McpSession;
 let muteSession: McpSession;
+/** The author's extension by its full name, `<installer>/<name>` (services/component-address.ts). */
+const authorExt = (): string => `${author.owner}/${EXT}`;
 
 console.log('\nPhase 1 — fixtures');
 
@@ -395,11 +398,19 @@ await test('9. Installing the same name again without update:true is refused by 
 });
 
 await test('10. An update by somebody who did not install it is refused', async () => {
+    // Since names live in the owner's namespace, another owner's install of the same short name is
+    // their OWN `<stranger>/<name>`, beside the author's, and never an update of the author's.
     const r = await callTool(strangerSession, 'aimeat_extension_install', {
         manifest: manifestYaml(EXT), scripts: SCRIPTS, update: true,
     });
-    assert(r.isError, `another owner overwrote this extension in place: ${r.text}`);
-    assert(r.text.includes('only the installing owner may update it'), `wrong refusal: ${r.text}`);
+    assert(!r.isError, `another owner's install of the same short name was refused: ${r.text}`);
+    assert(r.data.name === `${stranger.owner}/${EXT}`, `the other owner's install must land in their own namespace: ${r.text.slice(0, 300)}`);
+
+    // Naming the author's extension by its full name is the update attempt, and it is refused.
+    const put = await json(`/v1/extensions/${encodeURIComponent(authorExt())}`, {
+        method: 'PUT', headers: authed(stranger.token), body: JSON.stringify({ manifest: manifestYaml(EXT), scripts: SCRIPTS }),
+    });
+    assert(put.status === 403, `another owner updated ${authorExt()} by its full name: ${put.status} ${JSON.stringify(put.body?.error)}`);
 
     // Refuse before you write: the record still belongs to its installer.
     const rest = await json(`/v1/extensions/${EXT}`, { headers: authed(author.token) });
@@ -427,7 +438,7 @@ await test('11. Omitting the manifest hands back a presigned ZIP road, and the Z
     });
     const out = await put.json() as any;
     assert(put.status === 200, `PUT of the zip ${put.status}: ${JSON.stringify(out).slice(0, 300)}`);
-    assert(out.name === ZIP_EXT, `the uploaded extension is named ${out.name}`);
+    assert(out.name === `${author.owner}/${ZIP_EXT}`, `the uploaded extension is named ${out.name}`);
     // The intent carried in the token rather than being dropped: `activate: true` was passed to the
     // mint, and this is the assertion that it survived into the upload.
     assert(out.status === 'active', `activate:true did not survive the presigned road: ${out.status}`);
@@ -438,7 +449,7 @@ console.log('\nPhase 4 — aimeat_extension_get, and the not-found arms');
 await test('12. aimeat_extension_get returns the whole record, with the secret MASKED', async () => {
     const r = await callTool(authorSession, 'aimeat_extension_get', { name: EXT });
     assert(!r.isError, `extension_get refused: ${r.text}`);
-    assert(r.data.name === EXT && r.data.version === '1.0.0', `name/version: ${r.text.slice(0, 300)}`);
+    assert(r.data.name === authorExt() && r.data.version === '1.0.0', `name/version: ${r.text.slice(0, 300)}`);
     assert(r.data.status === 'active', `status: ${r.data.status}`);
     assert(r.data.installed_by === author.owner, `installed_by: ${r.data.installed_by}`);
     const echo = (r.data.actions ?? []).find((a: any) => a.id === 'echo');
@@ -514,8 +525,10 @@ await test('18. A priced action from another owner\'s agent meets the paywall ov
     // tool used to execute the script without asking, so a priced action was free through a tool call
     // and metered over HTTP. A money price with no paid token, so the refusal is deterministic (a
     // morsel price was used until 2026-10-11; a morsel amount is pacing now and runs once paid).
+    // The stranger names the author's extension by its full name: the bare name reaches the
+    // stranger's own (inactive) copy that test 10 installed.
     const r = await callTool(strangerSession, 'aimeat_extension_invoke', {
-        extension_name: EXT, action_id: 'expensive', input: { q: 'free ride' },
+        extension_name: authorExt(), action_id: 'expensive', input: { q: 'free ride' },
     });
     assert(r.isError, `a priced action ran free through the tool door: ${r.text}`);
     assert(/^[A-Z_]+ \(\d{3}\):/.test(r.text), `a paywall refusal carries its code and status: ${r.text}`);

@@ -13,6 +13,10 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.7.2 — 2026-10-25 — An ext-action offering and a bid name the provider's own extension through
+ *     services/component-address.ts (own first) and keep its stored name (owner namespaces wish,
+ *     secaudit2026oct22). The call recipe encodes that name as one path segment and names the
+ *     invoke tool's `extension_name` field.
  *   v1.7.1 — 2026-10-13 — The offering detail and the ODPS document of an ext action state its toll
  *     through extActionDeclaredToll, so a toll-only action reads toll_morsels 10, not 20.
  *   v1.7.0 — 2026-10-12 — Listing an extension action prices it with resolveExtActionPricing, so an
@@ -63,6 +67,7 @@ import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-t
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
 import { logger } from '../utils/logger.js';
+import { findExtension, addressSegment } from '../services/component-address.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -311,11 +316,13 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     }
 
     // ── kind: ext-action (default) — the raw data-service surface ──
-    const ext = str(b.ext), action = str(b.action);
-    if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
-    const extRec = await storage.getExtension(ext);
-    if (!extRec) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${ext}" not found`));
+    const extAddress = str(b.ext), action = str(b.action);
+    if (!extAddress || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
+    // The provider's own first (services/component-address.ts); the listing keeps the stored name.
+    const extRec = await findExtension(storage, extAddress, owner, 'manage');
+    if (!extRec) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${extAddress}" not found`));
     if (extRec.installedBy !== owner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the extension owner may list it'));
+    const ext = extRec.name;
     const act = extRec.actions.find(a => a.id === action);
     if (!act) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${action}" not found on "${ext}"`));
     const priced = resolveExtActionPricing(act, null);
@@ -426,10 +433,10 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       iface: act ? { inputSchema: (act.inputSchema ?? {}) as Record<string, unknown>, outputSchema: (act.outputSchema ?? {}) as Record<string, unknown> } : null,
       callRecipe: {
         method: 'POST',
-        url: `/v1/ext/${o.ext}/${o.action}`,
+        url: `/v1/ext/${addressSegment(o.ext)}/${o.action}`,
         auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
         note: 'Each call is metered + charged to your budget at the provider price; the provider’s own upstream keys stay server-side.',
-        mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
+        mcp: `aimeat_extension_invoke { "extension_name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
       },
       stats, tollMorsels: act ? extActionDeclaredToll(act) : null,
     };
@@ -628,10 +635,11 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (!n) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such need'));
     if (n.state !== 'open') return res.status(409).json(error(config.nodeId, 'NEED_CLOSED', `Need is ${n.state}`));
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const ext = str(b.ext), action = str(b.action);
-    if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
-    const extRec = await storage.getExtension(ext);
+    const extAddress = str(b.ext), action = str(b.action);
+    if (!extAddress || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
+    const extRec = await findExtension(storage, extAddress, owner, 'manage');
     if (!extRec || extRec.installedBy !== owner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Bid only with an action your extension owns'));
+    const ext = extRec.name;
     if (!extRec.actions.find(a => a.id === action)) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${action}" not found`));
     const bid: Bid = {
       bidId: newBidId(), needId: n.needId,

@@ -14,6 +14,7 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-cortex-board-ownership
  * @version-history
+ *   2026-10-25 — The colliding board id is derived through the account names (cortex-<installer>-<name>-<component>), and the second owner names the first owner's cortex by its full name, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -50,16 +51,19 @@ async function json(path: string, opts: RequestInit = {}) {
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 const sfx = Math.random().toString(36).slice(2, 7);
-const firstName = `cbo-a-${sfx}`;
-const secondName = `cbo-b-${sfx}`;
+const firstName = `cbo${sfx}`;
+const secondName = `cbo${sfx}-kit`;
 let first = '';
 let second = '';
 
-// The two cortexes derive one board id: `cortex-` + `cbo<sfx>-board` + `-` + `general`, and
-// `cortex-` + `cbo<sfx>` + `-` + `board-general`.
-const firstCortex = `cbo${sfx}-board`;
-const secondCortex = `cbo${sfx}`;
-const boardId = `cortex-${firstCortex}-general`;
+// A cortex is stored as `<installer>/<name>` and its board id is `cortex-<installer>-<name>-<component>`
+// (the slash becomes a hyphen, services/component-address.ts idStemOf). The two cortexes derive one
+// board id through the account names: `cortex-` + `cbo<sfx>` + `-` + `kit-board` + `-general`, and
+// `cortex-` + `cbo<sfx>-kit` + `-` + `board` + `-general`.
+const firstCortex = 'kit-board';
+const secondCortex = 'board';
+const firstFull = `${firstName}/${firstCortex}`;
+const boardId = `cortex-${firstName}-${firstCortex}-general`;
 
 function manifest(name: string, component: string, version: string, title: string): string {
     return `apiVersion: cortex.aimeat.org/v1
@@ -111,14 +115,15 @@ await test('The first owner installs and activates a cortex that makes the board
 console.log('Refusal');
 
 await test('Another owner may not deactivate the first owner\'s cortex: 403, and the board stays', async () => {
-    const off = await json(`/v1/cortex/${firstCortex}/deactivate`, { method: 'POST', headers: auth(second) });
+    const off = await json(`/v1/cortex/${encodeURIComponent(firstFull)}/deactivate`, { method: 'POST', headers: auth(second) });
     assert(off.status === 403, `expected 403, got ${off.status} ${off.body.error?.code}`);
     assert(await boardOf(first), 'the first owner\'s board stays');
 });
 
 await test('Another owner\'s cortex that derives the same board id is refused with 409, and the board stays', async () => {
-    const inst = await install(second, secondCortex, 'board-general');
+    const inst = await install(second, secondCortex, 'general');
     assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body.error)}`);
+    assert(inst.body.data?.name === `${secondName}/${secondCortex}`, `the second install lands in its own namespace: ${inst.body.data?.name}`);
     const act = await json(`/v1/cortex/${secondCortex}/activate`, { method: 'POST', headers: auth(second) });
     if (act.status === 200) {
         await json(`/v1/cortex/${secondCortex}/deactivate`, { method: 'POST', headers: auth(second) });

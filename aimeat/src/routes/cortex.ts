@@ -11,6 +11,10 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): `:name` takes
+ *     `<owner>/<name>` encoded as one segment, the alias of a bare record, or a bare name (reads take the
+ *     bare record first, the managing routes the caller's own); GET /v1/cortex/:owner/:name/libs/:libFile serves a namespaced cortex's file;
+ *     lib_urls carry that address (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — GET /:name/versions asks canSeeCortex like the detail read, so another owner's private
  *     cortex answers the same 404 as a missing name (secaudit2026oct22).
  *   2026-10-18 — POST /v1/cortex, PUT /v1/cortex/:name (a new name) and POST /v1/cortex/:name/visibility
@@ -57,7 +61,7 @@
  *     live gap (libs swapped, never deleted-then-recreated), re-runs init on an active cortex,
  *     and never consumes a quota slot when updating an existing cortex.
  */
-import { Router, type Request } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
@@ -73,6 +77,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
+import { findCortex, cortexLibPath } from '../services/component-address.js';
 import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { callerOf as requestCaller } from '../middleware/caller.js';
@@ -88,10 +93,11 @@ export { upsertCortex, type CortexUpsertResult } from './cortex/upsert.js';
 /**
  * Where each lib of this cortex is served: the exact `<script src>` an app loads, keyed by filename.
  *
- * The address follows the record's NAME, encoded as one path segment, so a cortex named
- * `owner/thing` serves from `/v1/cortex/owner%2Fthing/libs/…` and one named `thing` in namespace
- * `owner` from `/v1/cortex/thing/libs/…`. No answer said which, so an author guessed, and a wrong
- * guess is a 404 inside an app that shows nothing. Absolute, because apps run on their own origins.
+ * The address follows the record's NAME: a cortex installed since 2026-10-25 is named
+ * `<owner>/<thing>` and serves from `/v1/cortex/<owner>/<thing>/libs/…`, a bare one from
+ * `/v1/cortex/<thing>/libs/…` (services/component-address.ts cortexLibPath). No answer said which, so
+ * an author guessed, and a wrong guess is a 404 inside an app that shows nothing. Absolute, because
+ * apps run on their own origins.
  */
 export function cortexLibUrls(
   baseUrl: string,
@@ -100,7 +106,7 @@ export function cortexLibUrls(
   const urls: Record<string, string> = {};
   for (const comp of cortex.components) {
     if (comp.type === 'lib') {
-      urls[comp.filename] = `${baseUrl}/v1/cortex/${encodeURIComponent(cortex.name)}/libs/${encodeURIComponent(comp.filename)}`;
+      urls[comp.filename] = `${baseUrl}${cortexLibPath(cortex.name, encodeURIComponent(comp.filename))}`;
     }
   }
   return urls;
@@ -291,7 +297,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
     res.json(success(config.nodeId, {
       uninstalled: true,
-      name,
+      name: out.value.name,
     }, [
       { description: 'List extensions', method: 'GET', url: '/v1/cortex' },
     ]));
@@ -360,8 +366,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── POST /v1/cortex/:name/visibility — toggle visibility ──
   router.post('/v1/cortex/:name/visibility', requireAuth(), requireScope('cortex:write'), async (req, res) => {
-    const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
+    const address = decodeURIComponent(req.params.name as string);
+    const ext = await findCortex(storage, address, req.auth?.owner, 'manage');
+    const name = ext?.name ?? address;
     if (!ext) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
       return;
@@ -401,8 +408,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/cortex/:name/prompts — list prompts from extension ──
   router.get('/v1/cortex/:name/prompts', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
-    const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
+    const address = decodeURIComponent(req.params.name as string);
+    const ext = await findCortex(storage, address, req.auth?.owner);
+    const name = ext?.name ?? address;
 
     if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
@@ -424,9 +432,10 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/cortex/:name/prompts/:promptName — get prompt with variable substitution ──
   router.get('/v1/cortex/:name/prompts/:promptName', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
-    const name = decodeURIComponent(req.params.name as string);
+    const address = decodeURIComponent(req.params.name as string);
     const promptName = decodeURIComponent(req.params.promptName as string);
-    const ext = await storage.getCortexExtension(name);
+    const ext = await findCortex(storage, address, req.auth?.owner);
+    const name = ext?.name ?? address;
 
     if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
@@ -455,8 +464,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/cortex/:name/ontology — get ontology data ──
   router.get('/v1/cortex/:name/ontology', requireAuth(), requireRestScope('catalogue:read'), async (req, res) => {
-    const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
+    const address = decodeURIComponent(req.params.name as string);
+    const ext = await findCortex(storage, address, req.auth?.owner);
+    const name = ext?.name ?? address;
 
     if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
@@ -504,8 +514,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // `:name` may carry a pinned version (`name@1.5.0`): then the bytes come from the kept snapshot
   // of that version, while the bare name keeps serving the latest. An app built against one version
   // keeps loading it after the cortex moves on.
-  router.get('/v1/cortex/:name/libs/:libFile', async (req, res) => {
-    const raw = decodeURIComponent(req.params.name as string);
+  // `/v1/cortex/<owner>/<name>/libs/<file>` is the same file of a cortex named `<owner>/<name>`
+  // (services/component-address.ts): four segments, which no other cortex route has.
+  const serveLib = async (req: Request, res: Response, raw: string): Promise<void> => {
     const libFile = req.params.libFile as string;
 
     const found = await resolveCortexLib(storage, raw, libFile);
@@ -522,12 +533,19 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     // PUT and must not be.
     res.setHeader('Cache-Control', found.pinned ? 'public, max-age=31536000, immutable' : 'no-cache');
     res.send(found.content);
+  };
+  router.get('/v1/cortex/:name/libs/:libFile', async (req, res) => {
+    await serveLib(req, res, decodeURIComponent(req.params.name as string));
+  });
+  router.get('/v1/cortex/:owner/:name/libs/:libFile', async (req, res) => {
+    await serveLib(req, res, `${req.params.owner as string}/${req.params.name as string}`);
   });
 
   // ── GET /v1/cortex/:name/versions — the kept versions, newest first ──
   router.get('/v1/cortex/:name/versions', requireAuth(), requireAnyScope('memory:read', 'app:write', 'cortex:write'), async (req, res) => {
-    const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
+    const address = decodeURIComponent(req.params.name as string);
+    const ext = await findCortex(storage, address, req.auth?.owner);
+    const name = ext?.name ?? address;
     // The same fence as the detail read: another owner's private cortex answers as missing.
     if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));

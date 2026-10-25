@@ -14,6 +14,7 @@
  *   name, which the provider run must refuse.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-extension-provider.ts
  * @version-history
+ *   2026-10-25 — The other owner names A's extension by its full name `<a>/<short>` to be refused 403, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-09-28 — Initial (V6 of the System 2 plan).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -210,7 +211,8 @@ function scripts(port: number): Record<string, string> {
     });
 
     await test('3. another owner\'s extension cannot be their provider: 403', async () => {
-      const r = await put(b, 'their-ext', provider);
+      // A stranger names it by its full name: the bare short name means nothing in their namespace.
+      const r = await put(b, 'their-ext', { ...provider, extension: `${a.name}/${extName}` });
       assert(r.status === 403 && r.body.error.code === 'FORBIDDEN', `cross-owner: ${r.status} ${JSON.stringify(r.body?.error)}`);
     });
 

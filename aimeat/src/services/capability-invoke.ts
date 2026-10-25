@@ -6,6 +6,10 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.9.2 - 2026-10-25 - The `extension` case reads its ref for the registrant (the bare record, else
+ *     the registrant's own of that name; services/component-address.ts) and loops back with the stored
+ *     name, so the route runs that record and never the caller's own of the same name (owner
+ *     namespaces wish, secaudit2026oct22).
  *   v1.9.1 - 2026-10-25 - The `extension` case refuses another account's capability over an extension
  *     the CALLER installed (403 EXTENSION_CAPABILITY_NOT_YOURS), the rule the `mcp` case already has
  *     (secaudit2026oct22, capability-invoke.ts:extension-source:caller-own-extension-fronted-by-another-owner).
@@ -209,7 +213,12 @@ export async function invokeCapability(
       // would not admit still runs: what makes the request safe is that both segments name what is
       // installed and are encoded into the path.
       const segments = splitExtensionRef(capability.source.ref);
-      const resolved = segments ? await resolveExtensionForCall(storage, segments.pinned) : null;
+      // The ref is the registrant's: a bare name in it is the bare record, else the registrant's own
+      // extension of that name (services/component-address.ts). The loopback below carries the stored
+      // name, so the route reads the same record and never the caller's own of that name.
+      const resolved = segments
+        ? await resolveExtensionForCall(storage, segments.pinned, localAccountName(registrantOwnerGhii(capability.ownerGhii, config.nodeId)))
+        : null;
       if (!segments || !resolved?.ok || !resolved.ext.actions.some(a => a.id === segments.action)) {
         throw Object.assign(
           new Error(`Cannot invoke "${capability.id}": its source ref "${capability.source.ref}" does not name an action of an installed extension.`),
@@ -231,7 +240,7 @@ export async function invokeCapability(
           { statusCode: 403, code: 'EXTENSION_CAPABILITY_NOT_YOURS' },
         );
       }
-      const extName = encodeURIComponent(segments.pinned);
+      const extName = encodeURIComponent(resolved.pinned ? `${resolved.name}@${resolved.pinned}` : resolved.name);
       const actionId = encodeURIComponent(segments.action);
 
       // The extension runs behind the node's own AUTHENTICATED HTTP surface, so the caller's token

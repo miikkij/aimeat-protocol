@@ -52,6 +52,9 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.10.0 -- 2026-10-25 -- The extension is found through services/component-address.ts, the owner's
+ *     own first, so a run named with the bare name of an install made since names carry the owner
+ *     reaches it (owner namespaces wish, secaudit2026oct22).
  *   v1.9.0 -- 2026-10-22 -- ctx.files and ctx.datapackage ask the node's publish gate about the
  *     principal that installed the extension (and `alsoPublishFor`, a workflow run's principal) before
  *     they make anything public; an extension an agent installed before this keeps its old behaviour
@@ -101,6 +104,7 @@ import { buildUnattendedExtensionWorkspace } from './extension-workspace-rows.js
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
 import { installerActor, type PublishActor } from './publish-actors.js';
 import { getEncryptionKey } from './encryption.js';
+import { findExtension } from './component-address.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
 
@@ -230,7 +234,10 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
     const { storage, config, emailService } = deps;
     const { extensionName, actionId, instanceId, ownerName, callerGaii, storageOwnerGhii, logLabel } = args;
 
-    const ext = await storage.getExtension(extensionName);
+    // An unattended run calls only the owner's own extension, so a bare name is the owner's own first
+    // (services/component-address.ts): a schedule or a workflow step written as `weather` reaches
+    // `<owner>/weather`, and one stored before names carried an owner reaches its bare record.
+    const ext = await findExtension(storage, extensionName, ownerName, 'manage');
     if (!ext) throw new Error(`Extension "${extensionName}" not found`);
     if (ext.status !== 'active') throw new Error(`Extension "${extensionName}" is not active`);
     // The fence. See the file header: an unattended call has no door where a price could be asked.

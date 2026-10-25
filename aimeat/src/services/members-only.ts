@@ -19,6 +19,8 @@
  *   const refused = await membersOnlyRefusalForCapability(storage, tool.action_id, buyer);
  *   if (refused) throw new CommerceError('MEMBERS_ONLY', 403, MEMBERS_ONLY_MESSAGE);
  * @version-history
+ *   v1.1.0 — 2026-10-25 — membersOnlyRefusalForCapability takes the app's owner and reads a bare binding
+ *     as their own extension, as the call does (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v1.0.1 — 2026-10-05 — The installer test is isSameAccount (utils/same-account.ts; secaudit 2026-10, C8).
  *   v1.0.0 — 2026-10-01 — Initial (wish-members-only-refuses-a-non-member-before-checkout-or-a-contr).
  *     resolveGatedApp moved here from routes/extensions/permissions.ts unchanged, so a service and the
@@ -28,6 +30,7 @@ import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { isSameAccount } from '../utils/same-account.js';
 import { getCarryPlan, getMember } from './app-members.js';
+import { findBackingCapability } from './component-address.js';
 
 /** What the caller is told, on every route. Nothing has been charged when it is said. */
 export const MEMBERS_ONLY_MESSAGE =
@@ -87,9 +90,11 @@ export async function membersOnlyRefusal(
  */
 export async function membersOnlyRefusalForCapability(
   storage: Storage, capabilityId: string | null | undefined, callerGaii: string,
+  /** The tool's app owner: a bare `ext:<name>:<action>` binding names their own extension of that name. */
+  appOwner?: string,
 ): Promise<{ appId: string } | null> {
   if (!capabilityId) return null;
-  const cap = await storage.getCapability(capabilityId);
+  const cap = appOwner ? await findBackingCapability(storage, capabilityId, appOwner) : await storage.getCapability(capabilityId);
   if (!cap || cap.source?.type !== 'extension') return null;
   const extName = String(cap.source.ref ?? '').split(':')[1];
   if (!extName) return null;

@@ -5,6 +5,8 @@
  *   mid-upsert), init re-runs so new behaviour goes live, no quota slot consumed on update,
  *   identical bytes are a 200 no-op, and create-via-PUT works.
  * @version-history
+ *   v1.4.0 — 2026-10-25 — The served libs, the polls and the stranger's attempts name the installs as
+ *     `<owner>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.3.0 — 2026-09-24 — The extension's v2 code is deployed as version 1.0.1. A kept version is
  *     immutable now (secaudit 2026-09, A6-7), so other code under 1.0.0 is refused with 409
  *     VERSION_EXISTS; the suite had redeployed v2 under v1's version, which the node no longer
@@ -68,11 +70,14 @@ const ownerName = `upsertowner${Date.now()}`;
 let agentToken = '';
 let agentGaii = '';
 
+// Installs live in the owner's namespace (services/component-address.ts): the addresses below name the
+// owner, which is how the served lib and another account reach them; the owner's bare name works too.
 const CORTEX = 'upsert-demo';
-const CORTEX_ENC = encodeURIComponent(CORTEX);
+const CORTEX_ENC = encodeURIComponent(`${ownerName}/${CORTEX}`);
 const CORTEX_NEW = 'upsert-created-via-put';
-const CORTEX_NEW_ENC = encodeURIComponent(CORTEX_NEW);
+const CORTEX_NEW_ENC = encodeURIComponent(`${ownerName}/${CORTEX_NEW}`);
 const EXT = 'upsert-ext';
+const EXT_FULL_ENC = encodeURIComponent(`${ownerName}/${EXT}`);
 const EXT_NEW = 'upsert-ext-created-via-put';
 
 const cortexManifest = (version: string, greeting: string) => `
@@ -347,7 +352,7 @@ await test('A redeploy the board ceiling refuses changes nothing: bytes, manifes
   });
   assert(put.status === 403 && put.body.error?.code === 'BOARD_QUOTA', `the redeploy is refused by the ceiling: ${put.status} ${JSON.stringify(put.body?.error)}`);
 
-  const lib = await (await fetch(`${BASE}/v1/cortex/${encodeURIComponent(cortex)}/libs/q.js`)).text();
+  const lib = await (await fetch(`${BASE}/v1/cortex/${name}/${encodeURIComponent(cortex)}/libs/q.js`)).text();
   assert(lib.includes('render-A') && !lib.includes('render-B'), `the old bytes are still the served ones: ${lib.slice(0, 80)}`);
   const detail = await json(`/v1/cortex/${encodeURIComponent(cortex)}`, { headers: hdr });
   assert(detail.body.data?.version === '1.0.0' && detail.body.data?.status === 'active', `the record is as it was: ${detail.body.data?.version} ${detail.body.data?.status}`);
@@ -395,7 +400,7 @@ await test('PUT extension v2 — endpoint never 404s, new code live, ext memory 
   let done = false;
   const poller = (async () => {
     while (!done) {
-      const r = await fetch(`${BASE}/v1/extensions/${EXT}`);
+      const r = await fetch(`${BASE}/v1/extensions/${EXT_FULL_ENC}`);
       polls++;
       if (r.status === 404) saw404 = true;
     }
@@ -473,7 +478,7 @@ await test('another owner cannot PUT over this cortex, or this extension', async
   const text = await served.text();
   assert(!text.includes('owned by the stranger'), `the stranger's bytes are being served: ${text.slice(0, 120)}`);
 
-  const putExt = await json(`/v1/extensions/${encodeURIComponent(EXT)}`, {
+  const putExt = await json(`/v1/extensions/${EXT_FULL_ENC}`, {
     method: 'PUT', headers: strangerHdr,
     body: JSON.stringify({ manifest: extManifest, scripts: { 'actions/echo.js': EXT_SCRIPT_V1 } }),
   });

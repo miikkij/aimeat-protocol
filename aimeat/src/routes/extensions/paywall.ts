@@ -15,6 +15,8 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   2026-10-25 — A bare tool binding in the owner's manifest names their own namespaced extension when
+ *     a pass is checked (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v2.2.0 — 2026-10-18 — Step 4: a spent pay token whose sale carries the seller's net (a dynamic
  *     split) answers with `accrue`, so the payees the call's result names are paid out of it; they
  *     were dropped on this path (Comicland v3 A-6).
@@ -82,6 +84,7 @@ import { resolveGatedApp } from './permissions.js';
 import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../../services/members-only.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { findBackingCapability } from '../../services/component-address.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
 
@@ -219,7 +222,8 @@ async function coveringPass(
   const namesThisAction = async (binding: string | null | undefined): Promise<boolean> => {
     if (!binding) return false;
     if (binding === target) return true;
-    return (await storage.getCapability(binding))?.source.ref === target;
+    // A bare binding in the owner's manifest names their own extension (services/component-address.ts).
+    return (await findBackingCapability(storage, binding, coordOwner))?.source.ref === target;
   };
 
   const providerGhii = `${coordOwner}@${nodeId}`;

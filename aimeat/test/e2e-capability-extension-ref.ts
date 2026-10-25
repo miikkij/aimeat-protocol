@@ -15,6 +15,9 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capability-extension-ref
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Names live in the owner's namespace: a bare name in a ref is the registrant's
+ *     own extension, and a capability over another account's extension names that account
+ *     (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — Another account's capability over the caller's own extension is 403
  *     EXTENSION_CAPABILITY_NOT_YOURS; the caller's own capability over it runs (secaudit2026oct22).
@@ -200,7 +203,9 @@ await test('The caller installs and activates an extension of its own', async ()
 await test('Another account\'s capability over the caller\'s own extension does not run for the caller: 403', async () => {
     const id = `capref-front-${suffix}`;
     const created = await json('/v1/capabilities', {
-        method: 'POST', headers: auth(registrant), body: JSON.stringify(capBody(id, `ext:${ownExt}:echo`)),
+        // The caller's extension is named with its owner (services/component-address.ts); a bare name
+        // in the registrant's ref would name the registrant's own.
+        method: 'POST', headers: auth(registrant), body: JSON.stringify(capBody(id, `ext:${callerName}/${ownExt}:echo`)),
     });
     assert(created.status === 201, `create: ${created.status} ${JSON.stringify(created.body.error)}`);
     const inv = await json(`/v1/capabilities/${id}/invoke`, {

@@ -45,6 +45,10 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): installCortex
+ *     stores `<owner>/<name>` (or the owner's released bare name), a manifest name with another
+ *     account's prefix goes into the installer's own with a warning, and removeCortex writes a bare
+ *     name down with its holder (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — installCortex keeps the first version with the acting principal (caller.gaii) as its
  *     writer, so the version list names the agent that installed it (secaudit2026oct22 lead 98).
  *   2026-10-25 — installCortex refuses a name the node ships to anyone but an operator while the name
@@ -105,6 +109,7 @@ import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
 import { accountGhii } from './publish-requests/ask.js';
 import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
 import { bundledCortexNames } from './cortex-seeder.js';
+import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from './component-address.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -326,18 +331,19 @@ export async function installCortex(
             + `Use your own namespace "${caller.ownerName}" or "community".`);
     }
 
-    // A name already held by another owner is refused BEFORE the lib write below. Install never
-    // replaces a record (createCortexExtension throws on a collision), but it does replace lib
-    // bytes, so without this the refusal arrives after the damage. No operator bypass: an operator
-    // gains nothing here except the ability to overwrite those bytes.
-    const prior = await storage.getCortexExtension(ext.name);
-    if (prior && prior.installedBy !== caller.ownerName) {
-        return refuse(403, 'FORBIDDEN', 'Not your extension');
+    // The name lives in the installer's namespace (services/component-address.ts): `<owner>/<name>`,
+    // or a bare name this owner released and takes back. A manifest name carrying another account's
+    // prefix is installed under the installer's own, with a warning: that prefix is not theirs.
+    const placed = await placeCortexInstall(storage, caller.ownerName, ext);
+    if (placed.warning) (result.warnings ??= []).push(placed.warning);
+    if (placed.takenByOther) {
+        return refuse(409, 'CONFLICT', `"${ext.name}" is held by a cortex another account installed before names carried their owner. Give yours another name.`);
     }
     // The same answer the insert below gives for a name this owner already holds, decided here so it
     // comes before the lib-content question: install never replaces, so for a duplicate the missing
-    // bytes are not the thing to fix. The insert stays the race-proof check for the name.
-    if (prior) {
+    // bytes are not the thing to fix. The insert stays the race-proof check for the name. Nobody else
+    // can hold a name in this owner's namespace, so another owner's record is never in the way.
+    if (placed.existing) {
         return refuse(409, 'CONFLICT', `Extension "${ext.name}" is already installed`);
     }
     // A name the node ships is the node's own even while it has no record (secaudit2026oct22).
@@ -380,6 +386,7 @@ export async function installCortex(
         throw e;
     }
 
+    await settleReclaimed(storage, 'cortex', record.name);
     for (const [filename, content] of Object.entries(libs)) {
         await storage.setCortexLibFile(ext.name, filename, content);
     }
@@ -410,7 +417,8 @@ export async function activateCortex(
 ): Promise<CortexOutcome<CortexActivationResult>> {
     const { storage, config } = deps;
 
-    const ext = await storage.getCortexExtension(name);
+    // `<owner>/<name>`, the alias of a bare record, or a bare name read for the caller, own first.
+    const ext = await findCortex(storage, name, caller.ownerName, 'manage');
     if (!ext) return refuse(404, 'NOT_FOUND', `Cortex extension not found: ${name}`);
     if (ext.installedBy !== caller.ownerName && !caller.isOperator) {
         return refuse(403, 'FORBIDDEN', 'Not your extension');
@@ -428,7 +436,7 @@ export async function activateCortex(
 
     const artifacts = await activateExtension(ext, config, storage, caller, caller.isOperator);
     const activatedAt = new Date().toISOString();
-    await storage.updateCortexExtension(name, {
+    await storage.updateCortexExtension(ext.name, {
         status: 'active',
         activatedAt,
         activationArtifacts: artifacts,
@@ -450,7 +458,8 @@ export async function deactivateCortex(
 ): Promise<CortexOutcome<CortexDeactivationResult>> {
     const { storage } = deps;
 
-    const ext = await storage.getCortexExtension(name);
+    // `<owner>/<name>`, the alias of a bare record, or a bare name read for the caller, own first.
+    const ext = await findCortex(storage, name, caller.ownerName, 'manage');
     if (!ext) return refuse(404, 'NOT_FOUND', `Cortex extension not found: ${name}`);
     if (ext.installedBy !== caller.ownerName && !caller.isOperator) {
         return refuse(403, 'FORBIDDEN', 'Not your extension');
@@ -463,7 +472,7 @@ export async function deactivateCortex(
 
     await deactivateExtension(ext, storage, caller);
 
-    await storage.updateCortexExtension(name, {
+    await storage.updateCortexExtension(ext.name, {
         status: 'inactive',
         activatedAt: undefined,
         activationArtifacts: {
@@ -492,7 +501,8 @@ export async function deleteCortex(
 ): Promise<CortexOutcome<{ name: string }>> {
     const { storage } = deps;
 
-    const ext = await storage.getCortexExtension(name);
+    // `<owner>/<name>`, the alias of a bare record, or a bare name read for the caller, own first.
+    const ext = await findCortex(storage, name, caller.ownerName, 'manage');
     if (!ext) return refuse(404, 'NOT_FOUND', `Cortex extension not found: ${name}`);
     if (ext.installedBy !== caller.ownerName && !caller.isOperator) {
         return refuse(403, 'FORBIDDEN', 'Not your extension');
@@ -501,8 +511,8 @@ export async function deleteCortex(
     await removeCortex(storage, ext, caller);
     // A request waiting to make it public names content that is gone, and an install again may take
     // the same version: settle it, so its approval publishes nothing written after it.
-    await settleRequestsForRemovedTarget(deps, accountGhii(ext.installedBy, deps.config.nodeId), 'cortex', { name }, `the cortex library ${name}`);
-    return { ok: true, value: { name } };
+    await settleRequestsForRemovedTarget(deps, accountGhii(ext.installedBy, deps.config.nodeId), 'cortex', { name: ext.name }, `the cortex library ${ext.name}`);
+    return { ok: true, value: { name: ext.name } };
 }
 
 /**
@@ -551,6 +561,9 @@ export async function removeCortex(
     }
 
     const removed = await storage.deleteCortexExtension(name);
+    // A bare name stays its holder's: written down so only they install under it again
+    // (services/component-address.ts). A namespaced name needs nothing.
+    if (removed) await releaseBareName(storage, 'cortex', name, ext.installedBy);
     await forgetDependencies(storage, 'cortex', name)
         .catch(err => logger.warn('removeCortex: dependency map not cleared', { name, error: String(err) }));
     await forgetVersions(storage, 'cortex', name)

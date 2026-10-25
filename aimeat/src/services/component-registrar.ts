@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.16.1 — 2026-10-25 — rewriteComponentRefs moved to component-ref-rewrite.ts, which also rewrites a name written with its owner (secaudit2026oct22).
  *   v1.16.0 — 2026-10-20 — A memory component writes no `skills.` or `organism.` key: the raw setMemory below wrote the author's key verbatim under the installer's identity, so a package planted a workspace skill in an organism its installer is not a member of, and shadowed a node built-in skill (secaudit 2026-10; package-memory-component.ts v1.4.0 says why each prefix).
  *   v1.15.1 — 2026-10-18 — The app component's publish names no publish gate (`publishGate: null`): the install is the owner's act.
  *   v1.15.0 — 2026-10-13 — An extension component's actions are capability rows when its install answers (capability-aggregator.ts aggregateExtensionNow).
@@ -94,6 +95,7 @@ import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
 import { mergeExtensionConfig } from './packages/compose/package-config.js';
 import { registerSkillComponent, deleteSkillComponent } from './packages/install/package-skill-component.js';
 import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
+import { rewriteComponentRefs } from './component-ref-rewrite.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -178,63 +180,6 @@ export interface ComponentRegistrationInput {
 /** Compute SHA-256 hash of content string */
 export function computeHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
-}
-
-// ── URL rewriting for package install ────────────────────────────────
-
-/**
- * Rewrite hardcoded short-name references in a content string so they point
- * at the per-instance registered component names. Used for both app HTML and
- * cortex lib JS at install time.
- *
- * Patterns covered:
- *   /v1/cortex/<shortName>/...   → /v1/cortex/<registeredAs>/...
- *   /v1/ext/<shortName>/...      → /v1/ext/<registeredAs>/...
- *   "ext:<shortName>" (literal)  → "ext:<registeredAs>"  (memory namespace strings)
- *   ext%3A<shortName>            → ext%3A<registeredAs>  (URL-encoded variant)
- */
-function rewriteComponentRefs(
-  content: string,
-  cortexMap: Map<string, string> | undefined,
-  extMap: Map<string, string> | undefined,
-): string {
-  if (!content) return content;
-  const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  let out = content;
-  if (cortexMap) {
-    for (const [shortName, regAs] of cortexMap) {
-      if (!shortName || shortName === regAs) continue;
-      const esc = escapeRe(shortName);
-      out = out.replace(
-        new RegExp('(\\/v1\\/cortex\\/)' + esc + '(?=[\\/?#"\\\'\\s]|$)', 'g'),
-        '$1' + regAs,
-      );
-    }
-  }
-  if (extMap) {
-    for (const [shortName, regAs] of extMap) {
-      if (!shortName || shortName === regAs) continue;
-      const esc = escapeRe(shortName);
-      // /v1/ext/<name>(/ or terminator)
-      out = out.replace(
-        new RegExp('(\\/v1\\/ext\\/)' + esc + '(?=[\\/?#"\\\'\\s]|$)', 'g'),
-        '$1' + regAs,
-      );
-      // ext:<name> in memory-namespace strings — common in cortex libs:
-      //   AIMEAT.data.getPublic('ext:comicland-v2', 'config.app')
-      // Terminator is whatever closes the string / next segment.
-      out = out.replace(
-        new RegExp('(ext:)' + esc + '(?=[/"\\\'\\s,\\]}]|$)', 'g'),
-        '$1' + regAs,
-      );
-      // URL-encoded variant for any place that already escapes the colon.
-      out = out.replace(
-        new RegExp('(ext%3A)' + esc + '(?=[%/"\\\'\\s,\\]}]|$)', 'gi'),
-        '$1' + regAs,
-      );
-    }
-  }
-  return out;
 }
 
 // ── Pre-flight validation ────────────────────────────────────────────

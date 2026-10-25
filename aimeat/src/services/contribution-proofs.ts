@@ -35,6 +35,7 @@
  *   const out = await attachContributionProof({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out.message);
  * @version-history
+ *   v1.1.0 -- 2026-10-25 -- A community pack is named by its stored `<owner>/<name>` or, by its owner, by its short name; the ledger key and the answer carry the stored name (secaudit2026oct22).
  *   v1.0.0 -- 2026-08-11 -- Initial (August 2026 audit step 8): extracted from
  *     mcp/appdev-proofs.ts, with the storage write replaced by writeMemoryRecord().
  *   v1.0.1 -- 2026-09-26 -- The caller's account comes from localAccountOf, so a visitor from another
@@ -47,6 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 import { isGEAI, localAccountOf } from '../utils/gaii.js';
+import { namespacedName } from './component-address.js';
 import { writeMemoryRecord, type MemoryWriteResult } from './memory-write.js';
 import { getTemplateProposal, templateProposalKey } from './app-template-proposals.js';
 import { CAS_ATTEMPTS } from './record-cas.js';
@@ -138,7 +140,10 @@ export async function attachContributionProof(
     if (input.subjectType === 'library_pack') {
         // Owner gate: the community pack is the caller's own ACTIVE + PUBLIC cortex with a lib.
         const all = await storage.listCortexExtensions({ status: 'active' });
-        const ext = all.find(e => e.name === input.subjectId);
+        // The owner names their own pack by its short name or its stored `<owner>/<name>`
+        // (services/component-address.ts); the ledger is keyed by the stored name, the pack's id.
+        const ext = all.find(e => e.name === input.subjectId)
+            ?? all.find(e => e.name === namespacedName(who.owner, input.subjectId));
         if (!ext || ext.visibility !== 'public' || !ext.components.some(c => c.type === 'lib')) {
             return { ok: false, status: 404, code: 'NOT_FOUND', message: `No active public community pack "${input.subjectId}"` };
         }
@@ -148,10 +153,11 @@ export async function attachContributionProof(
 
         // The ledger is written on the version that was read. A proof attached at the same moment
         // lands first; this one is then checked and appended against a fresh read.
-        const key = packProofsKey(input.subjectId);
+        const packId = ext.name;
+        const key = packProofsKey(packId);
         for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
             const existing = await storage.getMemory(who.ownerGhii, key);
-            const value = (existing?.value ?? { packId: input.subjectId, proofs: [] }) as { packId: string; proofs: ContributionProof[] };
+            const value = (existing?.value ?? { packId, proofs: [] }) as { packId: string; proofs: ContributionProof[] };
             const proofs = Array.isArray(value.proofs) ? value.proofs : [];
             if (isDuplicate(proofs)) {
                 return { ok: false, status: 409, code: 'DUPLICATE_PROOF', message: DUPLICATE_MESSAGE };
@@ -163,7 +169,7 @@ export async function attachContributionProof(
                 scopes: caller.scopes, roles: caller.roles,
             }, {
                 key,
-                value: { packId: input.subjectId, proofs },
+                value: { packId, proofs },
                 visibility: 'public',
                 tags: ['libpack-proofs'],
                 ttlHours: null,
@@ -175,7 +181,7 @@ export async function attachContributionProof(
             if (!written.ok) {
                 return { ok: false, status: written.status, code: written.code, message: written.message };
             }
-            return { ok: true, subjectType: input.subjectType, subjectId: input.subjectId, proofsTotal: proofs.length, proof };
+            return { ok: true, subjectType: input.subjectType, subjectId: packId, proofsTotal: proofs.length, proof };
         }
         return { ok: false, status: 409, code: 'VERSION_CONFLICT', message: CONFLICT_MESSAGE };
     }

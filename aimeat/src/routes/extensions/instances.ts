@@ -5,6 +5,9 @@
  * @description Extension instance REST routes — create, list, get, update (PATCH), delete, and
  *   public per-instance translations. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — `:name` is read through services/component-address.ts (`<owner>/<name>`, the alias of a
+ *     bare record, a bare name read for the caller); the translations door reads no caller's own
+ *     (owner namespaces wish, secaudit2026oct22).
  *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): ext:invoke on GET /v1/extensions/:name/instances, GET /v1/extensions/:name/instances/:instanceId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-09 — Instance secrets are encrypted bound to their extension, instance and field
  *     (SecretBinding; secrets audit 2026-10-09, 1.1).
@@ -25,6 +28,7 @@ import {
   getInstanceSecretKeys, encryptSecretFields, maskSecretFields, preserveMaskedSecrets, stripClientEncryptedValues,
 } from '../../services/extension-secrets.js';
 import { mayManageInstalledExt, canSeeExtensionInstanceAs } from './permissions.js';
+import { findExtension } from '../../services/component-address.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 
@@ -32,8 +36,8 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── POST /v1/extensions/:name/instances — Create instance ──────────
   router.post('/v1/extensions/:name/instances', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -122,8 +126,8 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── GET /v1/extensions/:name/instances — List instances ───────────
   router.get('/v1/extensions/:name/instances', requireAuth(), requireRestScope('ext:invoke', { orScope: 'ext:write' }), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -154,9 +158,9 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── GET /v1/extensions/:name/instances/:instanceId — Get instance detail ──
   router.get('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireRestScope('ext:invoke', { orScope: 'ext:write' }), async (req, res) => {
     try {
-      const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -189,9 +193,9 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── PATCH /v1/extensions/:name/instances/:instanceId — Update instance ──
   router.patch('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -271,9 +275,9 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── DELETE /v1/extensions/:name/instances/:instanceId — Delete instance ──
   router.delete('/v1/extensions/:name/instances/:instanceId', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
       const instanceId = req.params.instanceId as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -320,7 +324,8 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
   // ── GET /v1/extensions/:name/instances/:instanceId/translations — Public translations ──
   router.get('/v1/extensions/:name/instances/:instanceId/translations', async (req, res) => {
     try {
-      const name = req.params.name as string;
+      // Public: the stored name or the holder's alias, never a caller's own (services/component-address.ts).
+      const name = (await findExtension(storage, req.params.name as string))?.name ?? (req.params.name as string);
       const instanceId = req.params.instanceId as string;
       const locale = (req.query.locale as string) || 'en';
 

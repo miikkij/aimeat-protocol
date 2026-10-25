@@ -17,6 +17,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   v1.11.1 — 2026-10-25 — A tool's binding is read for the app's owner: their own extension by a bare
+ *     name is still theirs (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v1.11.0 — 2026-10-22 — The invoke asks exchange:write of an agent or an ecosystem app on both paths,
  *     before anything is metered, paced or run (routes/webmcp-invoke-gate.ts), as its MCP twin does. An
  *     agent narrowed below it spent its person's contract budget and pacing here (secaudit 2026-10, v72).
@@ -93,6 +95,7 @@ import { logger } from '../utils/logger.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { findBackingCapability } from '../services/component-address.js';
 import { buildAppAgentSurface } from '../services/app-agent-surface.js';
 import { appHiddenFromPublicSurfaces } from '../services/app-ai-use.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
@@ -273,7 +276,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       const coordExt = `apptool:${ownerName}/${filename}`;
       // Who the app serves, before anything is charged (services/members-only.ts). The settled call
       // used to reach the paywall on this route's pass, which skipped the question.
-      if (await membersOnlyRefusalForCapability(storage, tool.action_id, callerGaii)) {
+      if (await membersOnlyRefusalForCapability(storage, tool.action_id, callerGaii, ownerName)) {
         res.status(403).json(error(config.nodeId, 'MEMBERS_ONLY', MEMBERS_ONLY_MESSAGE));
         return;
       }
@@ -300,7 +303,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool is not wired to anything that can run, so there is nothing to call yet.'));
           return;
         }
-        const cap = await storage.getCapability(binding);
+        const cap = await findBackingCapability(storage, binding, ownerName);
         if (!cap) {
           res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${binding}`));
           return;
@@ -391,7 +394,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool declares no price and no capability binding; nothing to invoke'));
         return;
       }
-      const cap = await storage.getCapability(tool.action_id);
+      // The app owner's own extension by a bare name is still theirs (services/component-address.ts).
+      const cap = await findBackingCapability(storage, tool.action_id, ownerName);
       if (!cap) {
         res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${tool.action_id}`));
         return;

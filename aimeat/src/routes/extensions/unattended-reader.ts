@@ -22,6 +22,7 @@
  * @structure registerExtensionUnattendedReaderRoutes(router, config, storage)
  * @usage registerExtensionUnattendedReaderRoutes(router, config, storage) in routes/extensions.ts
  * @version-history
+ *   2026-10-25 — `:name` is read through services/component-address.ts (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (Jouni, 2026-10-20, on secaudit 2026-10
  *     extension-system-run:files-read-as-owner-ghii).
  */
@@ -33,6 +34,7 @@ import { requireOwnerPrincipal } from '../../auth/account-security.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { mayManageInstalledExt } from './permissions.js';
+import { findExtension } from '../../services/component-address.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { describeReadAuthority, readAuthorityPayload, setReadAuthority, READ_AUTHORITIES, type ReadAuthority } from '../../services/extension-read-authority.js';
 
@@ -42,8 +44,8 @@ export function registerExtensionUnattendedReaderRoutes(router: Router, config: 
   // ── GET /v1/extensions/:name/unattended-reader — what it may read with nobody present ──
   router.get('/v1/extensions/:name/unattended-reader', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       // Not found and not yours read the same, as on every other door of an installed extension.
       if (!ext || !(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'read', subject: name }))) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
@@ -61,14 +63,15 @@ export function registerExtensionUnattendedReaderRoutes(router: Router, config: 
   // ── PATCH /v1/extensions/:name/unattended-reader — the account holder sets it ──
   router.patch('/v1/extensions/:name/unattended-reader', requireAuth(), requireOwnerPrincipal(OWNER_ONLY), async (req, res) => {
     try {
-      const name = req.params.name as string;
+      const address = req.params.name as string;
       const authority = (req.body as { authority?: unknown } | undefined)?.authority;
       if (typeof authority !== 'string' || !(READ_AUTHORITIES as readonly string[]).includes(authority)) {
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
           `"authority" is one of: ${READ_AUTHORITIES.join(', ')}. "owner" lets it read your files with your own reach; "installer" narrows it to whoever wrote its code.`));
         return;
       }
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, address, req.auth?.owner, 'manage');
+      const name = ext?.name ?? address;
       if (!ext || !(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'update', subject: name }))) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;

@@ -8,6 +8,7 @@
  * @structure registerExtensionConfigRoutes(router, config, storage)
  * @usage registerExtensionConfigRoutes(router, config, storage) in routes/extensions.ts
  * @version-history
+ *   2026-10-25 — `:name` is read through services/component-address.ts (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — The service is told whether the caller may choose a secret's host, which decides whether a host field value it sets counts as declared (secaudit2026oct22).
  *   2026-10-25 — The service is told whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial: the owner points a host field (manifest network.host_fields) at a
@@ -26,13 +27,14 @@ import { mayManageInstalledExt } from './permissions.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
+import { findExtension } from '../../services/component-address.js';
 
 export function registerExtensionConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── PATCH /v1/extensions/:name/config — set config values of an installed extension ──
   router.patch('/v1/extensions/:name/config', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       // Not found and not yours read the same, as on every other door of an installed extension.
       if (!ext || !(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'update', subject: name }))) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));

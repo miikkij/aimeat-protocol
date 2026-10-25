@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-25 — An extension schedule names the caller's own extension through
+ *     services/component-address.ts (own first) and keeps its stored name (owner namespaces wish,
+ *     secaudit2026oct22).
  *   2026-10-22 — An `ai` schedule's input may name no record of the owner or a sibling agent that the
  *     caller may not read itself (services/schedule-ai-read.ts aiScheduleInputRefusal), at create and
  *     at edit: 403 SCOPE_DENIED naming memory:read-as-owner. The owner in person and an app grant read
@@ -90,6 +93,7 @@ import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constr
 import { scheduleFileDenial } from './schedule-file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
 import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
+import { findExtension } from './component-address.js';
 import { aiScheduleInputRefusal } from './schedule-ai-read.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
@@ -442,7 +446,8 @@ export async function createScheduleRecord(
         if (!extensionName || !actionId) {
             return { ok: false, status: 400, code: 'INVALID_EXTENSION_JOB', message: 'extension_name and action_id are required for extension schedules' };
         }
-        const ext = await storage.getExtension(extensionName);
+        // The caller's own first (services/component-address.ts); the job keeps the stored name.
+        const ext = await findExtension(storage, extensionName, caller.owner, 'manage');
         if (!ext) return { ok: false, status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
         // Only the extension's own owner may put its actions on a clock. The scheduler runs an action as
         // a system caller — no paywall, no contract, no meter — so a cron on someone else's extension is
@@ -452,7 +457,7 @@ export async function createScheduleRecord(
         if (ext.installedBy !== caller.owner) {
             return { ok: false, status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
         }
-        base.extensionName = extensionName;
+        base.extensionName = ext.name;
         base.actionId = actionId;
         if (typeof body.instance_id === 'string') base.instanceId = body.instance_id;
         if (body.input && typeof body.input === 'object') base.input = body.input as Record<string, unknown>;

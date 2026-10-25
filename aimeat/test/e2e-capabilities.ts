@@ -6,6 +6,9 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   v1.2.3 — 2026-10-25 — The cortex and extension capability ids carry the installer's full name
+ *     (cortex:<owner>/<short>, ext:<owner>/<short>:echo) and are URL-encoded in the path, as names
+ *     live in the owner's namespace (secaudit2026oct22).
  *   v1.2.2 — 2026-10-25 — A non-operator owner is refused POST /v1/admin/capabilities/aggregate with
  *     403, so check:denial-coverage holds the route's operator check.
  *   v1.2.1 — 2026-10-23 — The operators from POST /v1/admin/setup/register get a password and sign in
@@ -406,6 +409,9 @@ if (isOperator) {
 console.log('\nPhase 6 — Cortex & Aggregator');
 
 const testCortexName = 'e2e-test-cortex-' + Math.random().toString(36).slice(2, 8);
+// The aggregated capability names the cortex by its full name in the installer's namespace.
+const cortexCapId = `cortex:${ownerName}/${testCortexName}`;
+const cortexCapPath = encodeURIComponent(cortexCapId);
 const testCortexManifest = `apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
@@ -523,7 +529,7 @@ await test('Cortex capability now exists', async () => {
 });
 
 await test('Cortex capability has correct metadata', async () => {
-    const { status, body } = await json(`/v1/capabilities/cortex:${testCortexName}`);
+    const { status, body } = await json(`/v1/capabilities/${cortexCapPath}`);
     assert(status === 200, `status ${status}`);
     const cap = body.data;
     assert(cap.source.type === 'cortex', `source type: ${cap.source.type}`);
@@ -546,7 +552,7 @@ await test('Cortex capability has correct metadata', async () => {
 
 await test('Cortex capability visible in list', async () => {
     const { body } = await json('/v1/capabilities?source_type=cortex');
-    const found = body.data.capabilities.some((c: any) => c.id === `cortex:${testCortexName}`);
+    const found = body.data.capabilities.some((c: any) => c.id === cortexCapId);
     assert(found, 'cortex capability should appear in filtered list');
 });
 
@@ -573,7 +579,7 @@ await test('Manifest update refreshes the aggregated capability', async () => {
     assert(agg.status === 200, `aggregate status ${agg.status}`);
     assert(agg.body.data.updated >= 1, `should update >=1 capability, got: ${JSON.stringify(agg.body.data)}`);
 
-    const { status, body } = await json(`/v1/capabilities/cortex:${testCortexName}`);
+    const { status, body } = await json(`/v1/capabilities/${cortexCapPath}`);
     assert(status === 200, `capability status ${status}`);
     const cap = body.data;
     assert(cap.source.version === '1.1.0', `source version should refresh, got: ${cap.source.version}`);
@@ -594,12 +600,12 @@ await test('The app tool is a discovery entry: app-tool source, not callable, us
     const { body: list } = await json('/v1/capabilities?source_type=app-tool');
     assert(list.data.capabilities.some((c: any) => c.id === id), 'app-tool filter does not list it');
     const { body: callable } = await json('/v1/capabilities?callable=true&per_page=500');
-    assert(!callable.data.capabilities.some((c: any) => c.id === id || c.id === `cortex:${testCortexName}`), 'a discovery entry leaked into callable=true');
+    assert(!callable.data.capabilities.some((c: any) => c.id === id || c.id === cortexCapId), 'a discovery entry leaked into callable=true');
     await json(`/v1/memory/${encodeURIComponent(`apps.${CAP_APP}.tools`)}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${ownerToken}` } });
 });
 
 await test('Cortex invoke from API returns BROWSER_ONLY', async () => {
-    const { status, body } = await json(`/v1/capabilities/cortex:${testCortexName}/invoke`, {
+    const { status, body } = await json(`/v1/capabilities/${cortexCapPath}/invoke`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${ownerToken}` },
         body: JSON.stringify({ input: { test: true } }),
@@ -627,6 +633,8 @@ await test('Deactivate and delete cortex', async () => {
 console.log('\nPhase 7 — Extension Install + Invoke via Capability');
 
 const testExtName = 'e2e-cap-ext-' + Math.random().toString(36).slice(2, 8);
+// The installer manages it by the short name; its capability id carries the full name.
+const extCapPath = encodeURIComponent(`ext:${ownerName}/${testExtName}:echo`);
 const testExtManifest = `metadata:
   name: ${testExtName}
   version: 1.0.0
@@ -712,7 +720,7 @@ await test('Trigger aggregator picks up extension', async () => {
 });
 
 await test('Extension capability exists and is callable', async () => {
-    const capId = `ext:${testExtName}:echo`;
+    const capId = extCapPath;
     const { status, body } = await json(`/v1/capabilities/${capId}`);
     assert(status === 200, `cap status ${status}`);
     assert(body.data.callable === true, 'should be callable');
@@ -724,7 +732,7 @@ await test('Extension capability exists and is callable', async () => {
 // name as ownerGhii, so the owner's own PUT was refused (ownerGhii !== resolveIdentity) — 315 of
 // 322 extension rows on aimeat.io carried the bare name, and "Hide from agents" was a 403.
 await test('Extension capability is owned by the installer\'s GHII, so the owner can change its visibility', async () => {
-    const capId = `ext:${testExtName}:echo`;
+    const capId = extCapPath;
     const { body } = await json(`/v1/capabilities/${capId}`);
     assert(body.data.ownerGhii === `${ownerName}@${NODE_ID}`, `ownerGhii: ${body.data.ownerGhii}`);
     const hide = await json(`/v1/capabilities/${capId}`, {
@@ -743,7 +751,7 @@ await test('Extension capability is owned by the installer\'s GHII, so the owner
 });
 
 await test('Invoke extension via capability proxy', async () => {
-    const capId = `ext:${testExtName}:echo`;
+    const capId = extCapPath;
     const { status, body } = await json(`/v1/capabilities/${capId}/invoke`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${ownerToken}` },
@@ -754,7 +762,7 @@ await test('Invoke extension via capability proxy', async () => {
 });
 
 await test('Invoke stats recorded', async () => {
-    const capId = `ext:${testExtName}:echo`;
+    const capId = extCapPath;
     const { body } = await json(`/v1/capabilities/${capId}`);
     assert(body.data.stats.totalInvocations >= 1, `invocations: ${body.data.stats.totalInvocations}`);
     assert(body.data.stats.successCount >= 1, `success: ${body.data.stats.successCount}`);

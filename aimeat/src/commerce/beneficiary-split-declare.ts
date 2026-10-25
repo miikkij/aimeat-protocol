@@ -14,16 +14,21 @@
  *   The MCP tool validated with its own copy until 2026-10-16: it stored the owner as the author,
  *   answered EMPTY_SPLIT, EMPTY_CHAIN, ROLES_EXCEED_CUT and INVALID_GHII where REST answers
  *   INVALID_INPUT, and took a missing pool_percent as 0 where REST refuses it.
- * @structure declareSplit · splitView · describeSplit · parseRoles · parseBeneficiaries
+ * @structure declareSplit · withdrawSplit · splitView · describeSplit · parseRoles · parseBeneficiaries
  * @usage
  *   const out = await declareSplit(storage, { providerGhii, createdBy: principal }, body);
  *   if (!out.ok) refuse(400, out.code, out.message); else answer(splitView(out.split));
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A split over the provider's own extension is keyed by its stored name,
+ *     `<owner>/<name>`, whichever name the declaration used (owner namespaces wish, secaudit2026oct22).
+ *     withdrawSplit reaches it by the short name too.
  *   v1.0.0 — 2026-10-16 — Moved out of routes/commerce-beneficiaries.ts and mcp/commerce.ts; the view names created_by (QA audit D2-08).
  */
 import type { Storage } from '../storage/interface.js';
+import { findExtension, isNamespacedName, namespacedName } from '../services/component-address.js';
+import { localAccountName } from '../utils/gaii.js';
 import {
-  putSplit, BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare, type BeneficiaryRole,
+  putSplit, deleteSplit, BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare, type BeneficiaryRole,
 } from './beneficiary-split.js';
 
 /** What a split looks like on the wire. Snake-case, like every other commerce surface. */
@@ -125,6 +130,17 @@ export function parseBeneficiaries(raw: unknown): { rows: BeneficiaryShare[] } |
   return { rows };
 }
 
+/**
+ * Withdraw the provider's split on `ext`/`action`. A split is keyed by the stored name, so a
+ * provider who names its own extension by the short name reaches the split declareSplit wrote under
+ * `<owner>/<name>`. True when a split was removed.
+ */
+export async function withdrawSplit(storage: Storage, providerGhii: string, ext: string, action: string): Promise<boolean> {
+  if (await deleteSplit(storage, providerGhii, ext, action)) return true;
+  if (isNamespacedName(ext)) return false;
+  return deleteSplit(storage, providerGhii, namespacedName(localAccountName(providerGhii), ext), action);
+}
+
 export type DeclareSplitOutcome =
   | { ok: true; split: BeneficiarySplit }
   | { ok: false; code: 'INVALID_INPUT'; message: string };
@@ -139,9 +155,13 @@ export async function declareSplit(
   body: Record<string, unknown>,
 ): Promise<DeclareSplitOutcome> {
   const refuse = (message: string): DeclareSplitOutcome => ({ ok: false, code: 'INVALID_INPUT', message });
-  const ext = typeof body.ext === 'string' ? body.ext.trim() : '';
+  const named = typeof body.ext === 'string' ? body.ext.trim() : '';
   const action = typeof body.action === 'string' ? body.action.trim() : '';
-  if (!ext || !action) return refuse('Name the metered coordinate this split applies to: `ext` and `action`');
+  if (!named || !action) return refuse('Name the metered coordinate this split applies to: `ext` and `action`');
+  // An extension of the provider's own is keyed by its stored name, `<owner>/<name>`
+  // (services/component-address.ts), which is the name a settled call carries.
+  const own = await findExtension(storage, named, localAccountName(who.providerGhii), 'manage');
+  const ext = own && own.installedBy === localAccountName(who.providerGhii) ? own.name : named;
 
   const mode = body.mode === 'roles' ? 'roles' : 'pool';
   const dynamic = body.dynamic === true;

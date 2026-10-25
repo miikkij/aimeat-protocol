@@ -39,6 +39,8 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.7.2 — 2026-10-25 — A tool bound to the owner's own namespaced extension by its short name counts
+ *     as selling that action (ownBindingExt; owner namespaces wish, secaudit2026oct22).
  *   v1.7.1 — 2026-10-19 — migrateLegacyOfferings sets the exchange flag on the source record's version
  *     (updateRecord) (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.7.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
@@ -80,6 +82,13 @@ import { hasSchema, usageTermsOf, provenanceOf, moneyPricesOf, contentHash, list
 import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchange-projection-types.js';
 import { logger } from '../utils/logger.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
+import { findExtension } from './component-address.js';
+
+/** A tool binding's extension as stored: an owner's bare name for their own namespaced extension is that one. */
+async function ownBindingExt(storage: Storage, name: string, ownerName: string): Promise<string> {
+  if (name.includes('/')) return name;
+  return (await findExtension(storage, name, ownerName, 'manage'))?.name ?? name;
+}
 
 /** A stored source document as its schema reads it, or null when it is absent or does not validate. */
 const parsedOrNull = <T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }, v: unknown): T | null => {
@@ -475,7 +484,7 @@ async function listOnce(
     const m = t.kind === 'app-tool' && t.binding ? /^ext:([^:]+):(.+)$/.exec(t.binding) : null;
     if (!m) continue;
     if (t.lockedInput) { narrowing.add(labelOf(t)); continue; }
-    const k = `${m[1]}|${m[2]}`, list = sellers.get(k) ?? [];
+    const k = `${await ownBindingExt(storage, m[1]!, ownerName)}|${m[2]}`, list = sellers.get(k) ?? [];
     if (!list.includes(labelOf(t))) sellers.set(k, [...list, labelOf(t)].sort());
   }
   let actions = unique.filter(d => d.kind === 'ext-action');
@@ -548,7 +557,8 @@ async function warnAlsoListed(
     const binding = tool.binding ?? (s?.kind === 'app-tool' ? (await getLatestInterface(storage, ownerGhii, s.appId, s.tool))?.binding ?? null : null);
     const m = binding ? /^ext:([^:]+):(.+)$/.exec(binding) : null;
     if (!m) continue;
-    for (const act of actions.filter(a => a.o.ext === m[1] && a.o.action === m[2])) { warn(tool, act); warn(act, tool); }
+    const boundExt = await ownBindingExt(storage, m[1]!, localAccountName(ownerGhii));
+    for (const act of actions.filter(a => a.o.ext === boundExt && a.o.action === m[2])) { warn(tool, act); warn(act, tool); }
   }
 }
 

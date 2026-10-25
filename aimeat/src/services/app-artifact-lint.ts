@@ -41,6 +41,7 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-10-25 — A dead cortex lib path gets one sentence on the owner's namespace, where a cortex installed since then loads from (secaudit2026oct22).
  *   2026-10-17 — The two inline-js-does-not-parse messages give a node command a builder can run, not
  *     `pnpm check:js-syntax`, which exists only in this repository (pitfall-list round).
  *   2026-10-13 — undeclared-scope-words: a warning naming each word the code (and the cortex libs it loads,
@@ -584,7 +585,11 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
     `This node answers 404 for ${dead.length === 1 ? 'an asset this app loads' : 'assets this app loads'}: `
     + `${dead.join(', ')}. The app would throw before it drew anything. The SDK libraries live under `
     + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
-    + 'URLs from GET /v1/prompts/build-app rather than guessing one that looks right.')];
+    + 'URLs from GET /v1/prompts/build-app rather than guessing one that looks right.'
+    + (dead.some(p => p.startsWith('/v1/cortex/'))
+      ? ' A cortex installed since 2026-10-25 carries its owner\'s name and loads from '
+        + '/v1/cortex/<owner>/<name>/libs/<file>; the install answer lists its exact addresses.'
+      : ''))];
 }
 
 /**

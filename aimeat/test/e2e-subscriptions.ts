@@ -11,6 +11,8 @@
  *   the Stripe handlers do; without it the suite says it skipped.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=subscriptions
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The reader names the studio's extension `<studio>/<name>` in calls, checkouts
+ *     and cancels, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-5, A-4).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -73,7 +75,9 @@ const accrued = async (token: string): Promise<number> => {
   const r = await json('/v1/commerce/beneficiary/earnings', { headers: auth(token) });
   return Number(r.body?.data?.totals?.EUR?.accrued ?? 0);
 };
-const read = (token: string) => json(`/v1/ext/${EXT}/read`, { method: 'POST', headers: auth(token), body: '{}' });
+// A reader names the studio's extension in full, `<studio>/<name>` (services/component-address.ts).
+const EXT_FULL = `${studio.name}/${EXT}`;
+const read = (token: string) => json(`/v1/ext/${encodeURIComponent(EXT_FULL)}/read`, { method: 'POST', headers: auth(token), body: '{}' });
 
 await test('Setup: the studio installs the extension, publishes its plan and declares the split for its subscriptions', async () => {
   const inst = await json('/v1/extensions', { method: 'POST', headers: auth(studio.token), body: JSON.stringify({ manifest, scripts: SCRIPTS }) });
@@ -93,7 +97,7 @@ await test('Before subscribing, the extension sees no subscription for the reade
 
 await test('A plan the extension does not offer is refused at checkout', async () => {
   const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(reader.token),
-    body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT, tool: 'no-such-plan' }] }) });
+    body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT_FULL, tool: 'no-such-plan' }] }) });
   assert(open.status === 404 && open.body.error?.code === 'PLAN_NOT_FOUND', `${open.status}: ${JSON.stringify(open.body?.error)}`);
 });
 
@@ -105,7 +109,7 @@ if (!moneyRail) {
   await test('The reader subscribes: one period, the card kept for renewals, and the artist is paid out of the studio\'s net', async () => {
     const before = await accrued(artist.token);
     const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(reader.token),
-      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT, tool: 'studio-harbour', input: { auto_renew: true } }] }) });
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT_FULL, tool: 'studio-harbour', input: { auto_renew: true } }] }) });
     assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
     assert(open.body.data.session.total === 3_990_000, `the plan's price: ${open.body.data.session.total}`);
     const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
@@ -130,10 +134,10 @@ if (!moneyRail) {
   await test('The reader lists it, and a second period extends from the current end, not from today', async () => {
     const list = await json('/v1/commerce/subscriptions', { headers: auth(reader.token) });
     assert(list.status === 200, `${list.status}`);
-    const first = list.body.data.subscriptions.find((s: any) => s.ext === EXT);
+    const first = list.body.data.subscriptions.find((s: any) => s.ext === EXT_FULL);
     assert(first?.active === true && first.auto_renew === true && !('kept_payment' in first) && !JSON.stringify(first).includes('testcus_'), `the listing carries no card ids: ${JSON.stringify(first)}`);
     const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(reader.token),
-      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT, tool: 'studio-harbour', input: { auto_renew: true } }] }) });
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT_FULL, tool: 'studio-harbour', input: { auto_renew: true } }] }) });
     const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
       method: 'POST', headers: auth(reader.token), body: JSON.stringify({ payment: { handler: 'test.money', instrument: 'testpm' } }) });
     assert(done.status === 200, `second period ${done.status}: ${JSON.stringify(done.body?.error)}`);
@@ -146,19 +150,19 @@ if (!moneyRail) {
     const agent = await makeAgent(BASE, reader, ['wallet:read', 'commerce:buy']);
     const s = await openSession(BASE, agent.token, 'subs-agent');
     const list = await callTool(s, 'aimeat_subscription_list', {});
-    assert(!list.isError && list.data.subscriptions.some((x: any) => x.ext === EXT && x.active), `list: ${list.text.slice(0, 300)}`);
-    const none = await callTool(s, 'aimeat_subscription_cancel', { ext: EXT, plan: 'nothing' });
+    assert(!list.isError && list.data.subscriptions.some((x: any) => x.ext === EXT_FULL && x.active), `list: ${list.text.slice(0, 300)}`);
+    const none = await callTool(s, 'aimeat_subscription_cancel', { ext: EXT_FULL, plan: 'nothing' });
     assert(none.isError && /NOT_FOUND/.test(none.text), `cancel nothing: ${none.text.slice(0, 200)}`);
   });
 
   await test('Cancelling stops the renewal and keeps the paid period', async () => {
     const agent = await makeAgent(BASE, reader, ['commerce:buy']);
     const s = await openSession(BASE, agent.token, 'subs-cancel-agent');
-    const c = await callTool(s, 'aimeat_subscription_cancel', { ext: EXT, plan: 'studio-harbour' });
+    const c = await callTool(s, 'aimeat_subscription_cancel', { ext: EXT_FULL, plan: 'studio-harbour' });
     assert(!c.isError && c.data.subscription.auto_renew === false, `cancel: ${c.text.slice(0, 300)}`);
     const r = await read(reader.token);
     assert(r.body.data.subscribed === true, 'still subscribed until the end of the paid period');
-    const none = await json(`/v1/commerce/subscriptions/${EXT}/nothing/cancel`, { method: 'POST', headers: auth(reader.token), body: '{}' });
+    const none = await json(`/v1/commerce/subscriptions/${encodeURIComponent(EXT_FULL)}/nothing/cancel`, { method: 'POST', headers: auth(reader.token), body: '{}' });
     assert(none.status === 404, `no such subscription: ${none.status}`);
   });
 }
@@ -167,14 +171,14 @@ await test('An agent without wallet:read cannot list, and one without commerce:b
   const narrow = await makeAgent(BASE, reader, ['memory:read']);
   const list = await json('/v1/commerce/subscriptions', { headers: auth(narrow.token) });
   assert(list.status === 403, `list without wallet:read: ${list.status}`);
-  const cancel = await json(`/v1/commerce/subscriptions/${EXT}/studio-harbour/cancel`, { method: 'POST', headers: auth(narrow.token), body: '{}' });
+  const cancel = await json(`/v1/commerce/subscriptions/${encodeURIComponent(EXT_FULL)}/studio-harbour/cancel`, { method: 'POST', headers: auth(narrow.token), body: '{}' });
   assert(cancel.status === 403, `cancel without commerce:buy: ${cancel.status}`);
 });
 
 await test('Nobody writes a subscription record through the memory routes, the account holder included', async () => {
   const w = await json('/v1/memory', { method: 'POST', headers: auth(artist.token), body: JSON.stringify({
-    key: `commerce.subscription.${EXT}.studio-harbour`, visibility: 'private',
-    value: { ext: EXT, plan: 'studio-harbour', active_until: '2099-01-01T00:00:00Z' },
+    key: `commerce.subscription.${EXT_FULL}.studio-harbour`, visibility: 'private',
+    value: { ext: EXT_FULL, plan: 'studio-harbour', active_until: '2099-01-01T00:00:00Z' },
   }) });
   assert(w.status === 403 || w.status === 400, `expected a refusal, got ${w.status}: ${JSON.stringify(w.body)}`);
   const r = await read(artist.token);
@@ -184,7 +188,7 @@ await test('Nobody writes a subscription record through the memory routes, the a
 // ── The card page route (Comicland v3 A-4) ──
 await test('The card page refuses an agent, a return address that is not http(s), and a seller with no Stripe key', async () => {
   const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(reader.token),
-    body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT, tool: 'studio-harbour' }] }) });
+    body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT_FULL, tool: 'studio-harbour' }] }) });
   assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
   const id = open.body.data.session.id;
   const bad = await json(`/v1/commerce/checkout-sessions/${id}/card`, { method: 'POST', headers: auth(reader.token), body: JSON.stringify({ return_url: 'javascript:alert(1)' }) });

@@ -49848,6 +49848,11 @@ paths:
       description: |
         Install an extension from its manifest and script bundle.
         Requires operator role.
+        The installed extension is named `<owner>/<metadata.name>` in the installing account's
+        namespace (since 2026-10-25; the answer's `extension.name`), or keeps the bare name the same
+        account released by an earlier uninstall. Only that account creates names under its prefix.
+        With AIMEAT_EXT_INSTALL_ROLE=operator only the operator's account installs, its agents
+        included; another account is refused 403 INSUFFICIENT_ROLE naming the setting and the operator.
         Manifest `config:` fields declared `type: secret` are encrypted at rest (AES-256-GCM,
         node master key) and decrypted only just before the sandbox runs — never returned in
         plaintext (read responses show a mask sentinel). Installing a manifest with a secret
@@ -50251,6 +50256,11 @@ paths:
         channel requires a one-time token: settle a checkout (`kind: ext-call`) to receive an
         `x-aimeat-pay-token`, then retry this call with that header. Either one the caller cannot
         satisfy returns 402; the pacing goes back when the call is refused later or the script throws.
+
+        Names live in the owner's namespace: an extension installed since 2026-10-25 is named
+        `<owner>/<name>`, written here as one encoded segment (`alice%2Fweather`). A bare name is the
+        bare record when there is one (shipped, or installed before), else the signed-in caller's own
+        `<caller>/<name>`, so an author keeps calling an install by the name they typed.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50261,7 +50271,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Extension name
+          description: Extension name, `<owner>/<name>` encoded as one segment, or a bare name; optionally `@<version>`
         - name: actionId
           in: path
           required: true
@@ -50335,7 +50345,15 @@ paths:
       x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0' }
       operationId: executeExtensionInstanceAction
       summary: Execute extension action on specific instance
-      description: Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}.
+      description: |
+        Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}.
+
+        The same three segments are the literal form of `<owner>/<name>/<action>`, which the SDK's
+        `AIMEAT.data.action('<owner>/<name>', id)` sends. They are read in this order: an extension the
+        node knows by `extName` (installed, or a bare name its holder uninstalled) with that instance;
+        the signed-in caller's own `<caller>/<extName>` with that instance; the extension
+        `<extName>/<instanceId>`. A namespaced extension's instance is called with the name encoded as
+        one segment: `/v1/ext/alice%2Fweather/{instanceId}/{actionId}`.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -51993,7 +52011,12 @@ paths:
     get:
       operationId: getCortexLib
       summary: Get cortex library file
-      description: Serve a cortex library file (no auth required).
+      description: |
+        Serve a cortex library file (no auth required). `name` is a stored cortex name, optionally
+        pinned (`name@1.2.0`). A cortex installed since 2026-10-25 is named `<owner>/<name>`: write
+        it as one encoded segment (`alice%2Fui`) here, or use GET /v1/cortex/{owner}/{name}/libs/{libFile}.
+        A bare name serves what the node ships and cortexes installed before names carried their
+        owner; `system/<name>` serves a shipped one too.
       tags: [Cortex]
       parameters:
         - name: name
@@ -52006,6 +52029,26 @@ paths:
           required: true
           schema:
             type: string
+      responses:
+        '200':
+          description: Library file content
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/cortex/{owner}/{name}/libs/{libFile}:
+    get:
+      operationId: getOwnedCortexLib
+      summary: Get a library file of a cortex named `<owner>/<name>`
+      description: |
+        The same file as GET /v1/cortex/{name}/libs/{libFile} for the cortex named `<owner>/<name>`,
+        which is how an install is named since 2026-10-25 (the install answer's `lib_urls` give this
+        address). `name` may be pinned (`ui@1.2.0`). No auth required. Only the account `owner`
+        creates names under its namespace, so a name it removes never serves another account's code.
+      tags: [Cortex]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: libFile, in: path, required: true, schema: { type: string } }
       responses:
         '200':
           description: Library file content

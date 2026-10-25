@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.17.1 -- 2026-10-25 -- An on_done callback names the account's own extension through services/component-address.ts, own
+ *     first, and readResult reads a short name on a job as the owner's `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   v1.17.0 -- 2026-10-25 -- finish() tells the finished-job listeners (finished-listeners.ts).
  *   v1.16.0 -- 2026-10-22 -- The start and a restart hold the job's inputs to its viewer (starter.ts
  *     jobReadViewer) and keep `read_as` (secaudit 2026-10, r49, v75).
@@ -112,6 +114,7 @@ import { runJobOp, assertAudioInReach, type JobOpOutcome } from './run-op.js';
 import { fileJobPictureRequest } from './picture-request.js';
 import { takeAiCall } from '../account-limits.js';
 import { emitAiJobFinished } from './finished-listeners.js';
+import { findExtension, namespacedName } from '../component-address.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     readActiveIndex, addToActiveIndex, removeFromActiveIndex,
@@ -315,7 +318,8 @@ export class AiJobService implements AiJobStarter {
         const notFound: AiJobResultRead = { ok: false, code: 'AI_JOB_NOT_FOUND', message: `No job "${jobId}" started by this extension.` };
         if (!jobId) return notFound;
         const job = await this.getJob(ownerGhii, jobId);
-        if (!job || (job.extension !== extension && job.on_done?.extension !== extension)) return notFound;
+        const names = (n?: string) => !!n && (n === extension || namespacedName(localAccountName(job!.owner), n) === extension);
+        if (!job || (!names(job.extension) && !names(job.on_done?.extension))) return notFound;
 
         const base = { ok: true as const, job_id: job.id, state: job.state, result_key: job.result_key };
         if (job.result_version === undefined) return base;
@@ -686,7 +690,8 @@ export class AiJobService implements AiJobStarter {
                 `on_done names an extension action this account cannot call: ${extensionName}/${actionId}.`);
         };
         if (!extensionName || !actionId) refuse();
-        const ext = await this.storage.getExtension(extensionName);
+        // The account's own first (services/component-address.ts), as the unattended run reads it.
+        const ext = await findExtension(this.storage, extensionName, ownerName, 'manage');
         if (!ext) refuse();
         if (ext!.installedBy !== ownerName) refuse();
         if (!ext!.actions.some(a => a.id === actionId)) refuse();

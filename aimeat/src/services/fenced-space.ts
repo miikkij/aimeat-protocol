@@ -103,6 +103,8 @@
  *   if (fenced) return res.status(fenced.status).json(error(config.nodeId, fenced.code, fenced.message, fenced.status, fenced.details));
  *   const changed = fenceChangeRefusal(manifestBefore, manifestAfter, { principal, roles, scopes });
  * @version-history
+ *   v1.1.2 — 2026-10-25 — extensionMarker leaves a name that already carries its installer as it is,
+ *     so `alice/x` stays `alice/x` and not `alice/alice/x` (owner namespaces wish, secaudit2026oct22).
  *   v1.1.1 — 2026-10-15 — fencesMet trims a subtree's trailing dots with a scan, not a regular
  *     expression (CodeQL js/polynomial-redos).
  *   v1.1.0 — 2026-10-13 — The permission `organism:direct`: a session that covers it writes a
@@ -214,7 +216,10 @@ const ENTRY = /^[^/\s]+\/[^/\s]+$/;
 /** `installer/name`, lower-cased: the marker the capability puts on its caller, and the form a
  *  manifest entry is compared in. */
 export function extensionMarker(installer: string, name: string): string {
-    return `${installer.trim().toLowerCase()}/${name.trim().toLowerCase()}`;
+    const who = installer.trim().toLowerCase(), what = name.trim().toLowerCase();
+    // A name installed since 2026-10-25 already carries its installer (`<owner>/<name>`,
+    // services/component-address.ts), and is itself the marker; a bare one is prefixed as before.
+    return what.startsWith(`${who}/`) ? what : `${who}/${what}`;
 }
 
 /**

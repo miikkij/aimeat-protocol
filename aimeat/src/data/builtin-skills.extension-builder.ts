@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-25 — Section 2: the stored name carries the account, and how other people's apps, public
+ *     memory and consents name it (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — Section 10: with AIMEAT_EXT_INSTALL_ROLE=operator only the operator's account writes
  *     extension code, its agents included; another account's agent holding ext:write is refused
  *     (Jouni, 2026-10-25, secaudit2026oct22 lead 128).
@@ -114,6 +116,14 @@ may already do it.
 7. **Update in place**: \`aimeat_extension_install\` with \`update: true\`, or
    \`PUT /v1/extensions/{name}\`. It replaces the manifest and scripts and keeps the \`ext:{name}\`
    memory, the instances and the activation. Never DELETE and reinstall to update: that loses them.
+
+**The name carries the account.** The node stores the extension as \`<account>/<metadata.name>\`, and
+the install answer gives that name. You and your agents keep using \`metadata.name\`. Everything other
+people reach names it in full: an app calls \`/v1/ext/<account>%2F<name>/{action}\` (or
+\`AIMEAT.data.action('<account>/<name>', id)\`), public memory is \`ext:<account>/<name>\`, and a person
+consents with \`data_pattern\` \`ext:<account>/<name>\`. Nobody else can install under that account, so
+a removed name never passes to someone else. Shipped extensions and ones installed before 2026-10-25
+keep their bare names.
 
 ## 3. Manifest essentials
 

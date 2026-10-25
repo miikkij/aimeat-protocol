@@ -1028,6 +1028,8 @@ const ALL_SUITES = [
     'test/e2e-appdev-overview.ts',
     'test/e2e-dependency-map.ts',
     'test/e2e-component-versions.ts',
+    // Extension and cortex names live in the owner's namespace (secaudit2026oct22 leads 589, 2827).
+    'test/e2e-component-namespaces.ts',
     'test/e2e-appdev-flow.ts',
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',

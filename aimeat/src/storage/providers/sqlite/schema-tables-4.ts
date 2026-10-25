@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.15.0 — 2026-10-25 — released_component_names: a bare extension or cortex name released by
+ *     uninstall, and its holder (owner namespaces wish, secaudit2026oct22). Mirrors Postgres 0118.
  *   v1.14.0 — 2026-10-22 — Ends with applyWorkspaceRowRevisionSchema: workspace_rows.updatedBy and
  *     workspace_row_revisions (secaudit 2026-10, v80). Mirrors Postgres 0113.
  *   v1.13.0 — 2026-10-09 — secrets.hostBinding: who bound a vault secret to its host. Mirrors Postgres 0099.
@@ -599,6 +601,16 @@ export function applySchemaTables4(db: Database.Database): void {
       createdAt TEXT NOT NULL,
       createdBy TEXT NOT NULL,
       PRIMARY KEY (kind, name, version)
+    );
+
+    -- A bare extension or cortex name released by uninstall, and the account that held it
+    -- (services/component-address.ts). Mirrors Postgres 0118.
+    CREATE TABLE IF NOT EXISTS released_component_names (
+      kind       TEXT NOT NULL,
+      name       TEXT NOT NULL,
+      holder     TEXT NOT NULL,
+      releasedAt TEXT NOT NULL,
+      PRIMARY KEY (kind, name)
     );
 
     -- ── Passkeys (types/passkeys.ts; mirrors Postgres 0068) ──

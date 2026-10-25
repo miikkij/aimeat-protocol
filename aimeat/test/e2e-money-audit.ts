@@ -13,6 +13,8 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   2026-10-25 — Every caller reaches the provider's extension by its full name `<provider>/<EXT>` on the raw route,
+ *     the capability id and the schedule, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-24 — CHAIN: the supplier's action reports the reseller as its caller, not the end user
  *     (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -199,8 +201,16 @@ let offeringPaced = '';
  *  toll_morsels only and no `unit` / `basePrice` / `price_per_call` mirror. */
 const mirrorsGone = () => removedOn(BASE, MORSEL_PRICE_FIELDS_REMOVED_IN);
 
+/** The extension's stored name: the installing account's namespace, then the manifest's name. The
+ *  provider's own manifest may keep the bare `ext:<EXT>:<action>` binding; every other caller names it in full. */
+const extFull = () => `${provider.name}/${EXT}`;
+/** The raw route for an action, addressed by the full name so it works for every caller. */
+const extUrl = (action: string) => `/v1/ext/${encodeURIComponent(extFull())}/${action}`;
+/** The capability id the node registers for one of the extension's actions. */
+const capId = (action: string) => `ext:${extFull()}:${action}`;
+
 const rawInvoke = (token: string | null, action = 'work') =>
-    json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: token ? auth(token) : {}, body: JSON.stringify({ q: 'hi' }) });
+    json(extUrl(action), { method: 'POST', headers: token ? auth(token) : {}, body: JSON.stringify({ q: 'hi' }) });
 const toolInvoke = (token: string | null, tool = 'brief') =>
     json(`/v1/apps/${encodeURIComponent(provider.name)}/${encodeURIComponent(APP)}/webmcp/tools/${tool}`,
         { method: 'POST', headers: token ? auth(token) : {}, body: JSON.stringify({ input: { q: 'hi' } }) });
@@ -369,7 +379,7 @@ await test('RAW · ambiguity settles the CHEAPEST right the caller holds, not th
     assert(bb - await balance(both.token) === 3, `charged the cheaper 3, moved ${bb - await balance(both.token)}`);
     // And naming the dearer one is honoured — the caller may still say what they meant.
     const nb = await balance(both.token);
-    const named = await json(`/v1/ext/${EXT}/work`, {
+    const named = await json(extUrl('work'), {
         method: 'POST', headers: { ...auth(both.token), 'x-aimeat-app-tool': `${APP}/brief` }, body: JSON.stringify({ q: 'hi' }),
     });
     assert(named.status === 200, `naming a held product works, got ${named.status}: ${JSON.stringify(named.body?.error)}`);
@@ -383,7 +393,7 @@ await test('RAW · a name is a request, not an instruction — no talking onto a
     assert((await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(one.token), body: JSON.stringify({ offering_id: cheapOff.offeringId, cap_units: 60 }) })).status === 201, 'holds only `cheap`');
     const bb = await balance(one.token);
     // Naming `brief`, which they never contracted: they are neither served it nor billed for it.
-    const r = await json(`/v1/ext/${EXT}/work`, {
+    const r = await json(extUrl('work'), {
         method: 'POST', headers: { ...auth(one.token), 'x-aimeat-app-tool': `${APP}/brief` }, body: JSON.stringify({ q: 'hi' }),
     });
     assert(r.status === 402, `an uncontracted name owes 402, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
@@ -504,7 +514,7 @@ await test('CAPABILITY · invoking the backing capability directly is charged li
     const cExt = `apptool:${provider.name}/${APP}`;
     const cb = await balance(consumer.token);
     const before = await contract(consumer.token, cExt, 'solo');
-    const r = await json(`/v1/capabilities/${encodeURIComponent(SOLO)}/invoke`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ input: { q: 'hi' } }) });
+    const r = await json(`/v1/capabilities/${encodeURIComponent(capId('solo'))}/invoke`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ input: { q: 'hi' } }) });
     assert(r.status === 200, `capability invoke ${r.status}: ${JSON.stringify(r.body?.error)}`);
     const after = await contract(consumer.token, cExt, 'solo');
     assert(after.budget.spent_units === before.budget.spent_units + 8, `spent +8, got +${after.budget.spent_units - before.budget.spent_units}`);
@@ -517,7 +527,7 @@ await test('CAPABILITY · invoking the backing capability directly is charged li
 await test('CAPABILITY · an uncontracted caller of a free paced product is served and pays its pacing', async () => {
     const stranger = await setupOwner('capx');
     const sb = await balance(stranger.token);
-    const r = await json(`/v1/capabilities/${encodeURIComponent(SOLO)}/invoke`, { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ input: { q: 'hi' } }) });
+    const r = await json(`/v1/capabilities/${encodeURIComponent(capId('solo'))}/invoke`, { method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ input: { q: 'hi' } }) });
     assert(r.status === 200, `expected the free product to run, got ${r.status}: ${JSON.stringify(r.body).slice(0, 250)}`);
     assert(await balance(stranger.token) === sb - 8, `the caller pays the 8 morsels of pacing, moved ${sb - await balance(stranger.token)}`);
 });
@@ -527,7 +537,7 @@ await test('CAPABILITY · an uncontracted caller of a free paced product is serv
 await test("SCHEDULER · a stranger cannot put another owner's priced action on a recurring schedule", async () => {
     const r = await json('/v1/schedules', {
         method: 'POST', headers: auth(consumer.token),
-        body: JSON.stringify({ kind: 'extension', name: 'free-forever', extension_name: EXT, action_id: 'work', cron: '*/5 * * * *', input: { q: 'cron' } }),
+        body: JSON.stringify({ kind: 'extension', name: 'free-forever', extension_name: extFull(), action_id: 'work', cron: '*/5 * * * *', input: { q: 'cron' } }),
     });
     assert(r.status === 403 || r.status === 404, `expected refusal, got ${r.status}: ${JSON.stringify(r.body?.data ?? r.body?.error).slice(0, 250)}`);
 });
@@ -575,7 +585,7 @@ await test('APP GRANT · an app the consumer connected cannot spend a contract i
 
     const before = await contract(consumer.token, cExt, 'solo');
     const cb = await balance(consumer.token);
-    const r = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    const r = await json(extUrl('solo'), { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
     const after = await contract(consumer.token, cExt, 'solo');
     const moved = cb - await balance(consumer.token);
     assert(r.status !== 200 || moved === 0,
@@ -620,13 +630,13 @@ await test('APP GRANT · without the money permission, a FREE action still answe
     assert(!!appToken, `grant token issued: ${JSON.stringify(tok.body?.error)}`);
 
     const cb = await balance(consumer.token);
-    const free = await json(`/v1/ext/${EXT}/freebie`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    const free = await json(extUrl('freebie'), { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
     assert(free.status === 200,
         `a free action must serve an app that holds no spend permission: ${free.status} ${JSON.stringify(free.body?.error)}`);
     assert(cb - await balance(consumer.token) === 0, 'and nothing may be charged for it');
 
     // The other half stays true: the PRICED action is still refused for exactly this app.
-    const priced = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    const priced = await json(extUrl('solo'), { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
     assert(priced.status !== 200,
         `the same app must still be refused the priced capability: ${priced.status} ${JSON.stringify(priced.body?.data ?? priced.body?.error)}`);
 });
@@ -667,7 +677,7 @@ await test('APP GRANT · with the permission, it spends — and the app is NAMED
     assert(!!appToken, `grant token issued: ${JSON.stringify(tok.body?.error)}`);
 
     const cb = await balance(consumer.token);
-    const r = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    const r = await json(extUrl('solo'), { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
     assert(r.status === 200, `with contract:spend the app is served: ${r.status} ${JSON.stringify(r.body?.error)}`);
     assert(cb - await balance(consumer.token) === 8, `and the HUMAN pays, moved ${cb - await balance(consumer.token)}`);
 
@@ -925,7 +935,7 @@ await test('GRANT · it works through every door a paid contract works through',
     const viaMcp = parse(await captureTools(member.gaii, member.token)['aimeat_app_tool_invoke']({ owner: provider.name, app: APP, tool: 'solo', input: { q: 'hi' } }));
     assert(!viaMcp.error, `MCP door: ${viaMcp.error}`);
 
-    const viaCap = await json(`/v1/capabilities/${encodeURIComponent(SOLO)}/invoke`, { method: 'POST', headers: auth(member.token), body: JSON.stringify({ input: { q: 'hi' } }) });
+    const viaCap = await json(`/v1/capabilities/${encodeURIComponent(capId('solo'))}/invoke`, { method: 'POST', headers: auth(member.token), body: JSON.stringify({ input: { q: 'hi' } }) });
     assert(viaCap.status === 200, `capability door: ${viaCap.status} ${JSON.stringify(viaCap.body?.error)}`);
 
     const create = await json('/v1/commerce/checkout-sessions', {
@@ -1351,7 +1361,7 @@ await test('APP CAP · a ceiling on what an app may spend of your money holds, a
     assert(row?.spend_cap_morsels === 8, `and what its ceiling is: ${JSON.stringify(row?.spend_cap_morsels)}`);
     assert(typeof row?.spent_morsels === 'number', `and how much of it is gone: ${JSON.stringify(row?.spent_morsels)}`);
 
-    const call = () => json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    const call = () => json(extUrl('solo'), { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
     assert((await call()).status === 200, 'the call the ceiling allows');
     const cb = await balance(consumer.token);
     const blocked = await call();
@@ -1736,7 +1746,7 @@ await test('APP GRANT · exchange:grant is ENFORCED on the door, not only offere
 
     // And the grant is real: the beneficiary calls the provider's product without paying for it.
     const before = await balance(beneficiary.token);
-    const call = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(beneficiary.token), body: JSON.stringify({ q: 'hi' }) });
+    const call = await json(extUrl('solo'), { method: 'POST', headers: auth(beneficiary.token), body: JSON.stringify({ q: 'hi' }) });
     assert(call.status === 200, `the granted call is served: ${call.status} ${JSON.stringify(call.body?.error)}`);
     assert(await balance(beneficiary.token) === before, 'and a granted call costs the beneficiary nothing');
 });

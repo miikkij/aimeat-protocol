@@ -15,6 +15,9 @@
  * @structure ExtensionConsentPurpose · extensionConsentHolds()
  * @usage if (await extensionConsentHolds(storage, ownerGhii, 'extension_notify', extName)) { ... }
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A consent may name a bare-named extension through its holder's namespace,
+ *     `ext:<holder>/<name>` (services/component-address.ts). New installs are named `<owner>/<name>`,
+ *     so a consent to one names its owner (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-10-25 — Initial: the one check ctx.notify's cross-owner delivery and ctx.email's
  *     tier 1 ask (secaudit2026oct22).
  */
@@ -39,8 +42,12 @@ export async function extensionConsentHolds(
   if (!ext) return false;
   const installedAt = Date.parse(ext.installedAt);
   const consents = await storage.listConsents(ownerGhii, { status: 'active' });
+  // The consent names the extension by its stored name, or a bare one through its holder's
+  // namespace (`ext:<holder>/<name>`, the alias services/component-address.ts reads).
+  const patterns = new Set([`ext:${extName}`]);
+  if (!extName.includes('/') && ext.installedBy) patterns.add(`ext:${ext.installedBy}/${extName}`);
   return consents.some(c => c.purpose === purpose
-    && c.dataPattern === `ext:${extName}`
+    && patterns.has(c.dataPattern)
     && (c.expires === null || !(Date.parse(c.expires) <= now.getTime()))
     && !(Date.parse(c.grantedAt) < installedAt));
 }

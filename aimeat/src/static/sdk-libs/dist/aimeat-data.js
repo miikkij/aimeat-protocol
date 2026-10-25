@@ -452,7 +452,8 @@
      * `public: true` answers (any other throws with code UNAUTHORIZED). A visitor's run reads and never
      * writes, so a reader page can list a catalogue or open a free episode for anyone. A refusal throws
      * with the node's `code` (EXTENSION_ERROR, EXTENSION_INACTIVE, RATE_LIMITED, …).
-     * @param {string} ext The extension's name, or `name/instanceId` for one copy of it.
+     * @param {string} ext The extension's name as the node gave it (`owner/name` for one installed since
+     *   2026-10-25, a bare `name` for a shipped or older one), with `/instanceId` for one copy of it.
      * @param {string} actionId
      * @param {object} [input]
      * @returns {Promise<any>}
@@ -472,7 +473,9 @@
       return res.data;
     },
     async action(ext, actionId, input) {
-      const path = "/v1/ext/" + String(ext).split("/").map(encodeURIComponent).join("/") + "/" + encodeURIComponent(actionId);
+      const parts = String(ext).split("/");
+      const segments = parts.length === 3 ? [parts[0] + "/" + parts[1], parts[2]] : parts;
+      const path = "/v1/ext/" + segments.map(encodeURIComponent).join("/") + "/" + encodeURIComponent(actionId);
       const opts = { method: "POST", body: JSON.stringify(input || {}) };
       const auth = window.AIMEAT && window.AIMEAT.auth;
       const signedIn = !!(auth && auth.getSession && auth.getSession());

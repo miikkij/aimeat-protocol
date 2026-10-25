@@ -5,6 +5,7 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — EXT_ADDRESS_PATTERN: the name, or `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — NODE_OWNED_CONFIG_KEYS is exported: the config route and the action-script route ask it too (secaudit2026oct22).
  *   v1.15.0 — 2026-10-21 — `uses_secrets: [{ name, hosts, why }]`, stored as `config.__usesSecrets`.
  *   v1.14.0 — 2026-10-18 —An action may say `public: true`: it answers a caller without an account.
@@ -469,6 +470,13 @@ export const NODE_OWNED_CONFIG_KEYS: readonly string[] = ['emailPolicy'];
  * All 63 extensions on aimeat.io satisfy this, so nothing in production has to be renamed.
  */
 export const EXT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
+
+/**
+ * An extension's address: the name, or `<owner>/<name>`, which is how an install is stored since
+ * names live in the owner's namespace (services/component-address.ts). The slash is the one
+ * separator the address adds; `.` and `:` stay out, so the memory namespace keeps its meaning.
+ */
+export const EXT_ADDRESS_PATTERN = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 
 /** Strip the keys an installer must not set. Operator installs keep `emailPolicy`, which is what
  *  "operator-granted" meant; everything `__`-prefixed goes regardless of who is installing. */

@@ -18,6 +18,8 @@
  *   attestation. The runner pins AIMEAT_FEDERATION_AUTH_POLICY=all_peers and private egress.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-namesake
  * @version-history
+ *   2026-10-25 — The cortex lists hold the namesake's full cortex name, and the visitor tries the full
+ *     and the bare name, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.8.0 — 2026-10-24 — A memory record for 'members' refuses the visitor and admits a local account;
  *     a public record and a consent by name still admit the visitor (secaudit2026oct22,
  *     members-tier-admits-federated-visitor).
@@ -684,9 +686,11 @@ spec:
         }));
         assert(install.status === 201, `install: ${install.status} ${JSON.stringify(install.body?.error)}`);
 
+        // The cortex lives in the local account's namespace, so every list holds its full name.
+        const cortexFull = `${namesake}/${cortexName}`;
         // The namesake sees it, so an empty answer below is a fence and not a missing record.
         const mine = await json('/v1/cortex', as(alice.token));
-        assert((mine.body.data.extensions as any[]).some(e => e.name === cortexName),
+        assert((mine.body.data.extensions as any[]).some(e => e.name === cortexFull),
             `the namesake lost their own cortex: ${JSON.stringify((mine.body.data.extensions as any[]).map(e => e.name))}`);
 
         // The same point as the work door above: what a visitor may reach is this node's decision,
@@ -701,19 +705,22 @@ spec:
         assert(relogin.status === 200, `federated re-login: ${relogin.status}`);
         const cortexToken = relogin.body.data.token as string;
 
-        const enc = encodeURIComponent(cortexName);
         const listed = await json('/v1/cortex', as(cortexToken));
         assert(listed.status === 200, `the visitor's list: ${listed.status}`);
-        assert(!(listed.body.data.extensions as any[]).some(e => e.name === cortexName),
+        assert(!(listed.body.data.extensions as any[]).some(e => e.name === cortexFull || e.name === cortexName),
             "the visitor was shown the local namesake's private cortex");
 
-        const detail = await json(`/v1/cortex/${enc}`, as(cortexToken));
-        assert(detail.status !== 200, `the visitor opened it: ${detail.status} ${JSON.stringify(detail.body?.data ?? null).slice(0, 200)}`);
+        // The visitor tries both addresses: the full name, and the bare name a namesake might be
+        // resolved into the local account's namespace with.
+        for (const enc of [encodeURIComponent(cortexFull), encodeURIComponent(cortexName)]) {
+            const detail = await json(`/v1/cortex/${enc}`, as(cortexToken));
+            assert(detail.status !== 200, `the visitor opened ${enc}: ${detail.status} ${JSON.stringify(detail.body?.data ?? null).slice(0, 200)}`);
 
-        const gone = await json(`/v1/cortex/${enc}`, as(cortexToken, { method: 'DELETE' }));
-        assert(gone.status !== 200 && gone.status !== 204, `the visitor deleted it: ${gone.status}`);
+            const gone = await json(`/v1/cortex/${enc}`, as(cortexToken, { method: 'DELETE' }));
+            assert(gone.status !== 200 && gone.status !== 204, `the visitor deleted ${enc}: ${gone.status}`);
+        }
         const after = await json('/v1/cortex', as(alice.token));
-        assert((after.body.data.extensions as any[]).some(e => e.name === cortexName),
+        assert((after.body.data.extensions as any[]).some(e => e.name === cortexFull),
             "the visitor's DELETE removed the namesake's cortex");
     });
 

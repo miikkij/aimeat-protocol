@@ -16,6 +16,8 @@
  *   with the running version switched per test: a 4.0.0 run and a 3.26.1 run of the same code.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-token-on-rest.test.ts
  * @version-history
+ *   2026-10-25 — The capability id carries the seller, `ext:<seller>/<name>:echo`, as names live in the
+ *     owner's namespace (secaudit2026oct22).
  *   2026-10-16 — A call by name to aimeat_app_tool_invoke without ext:invoke answers SCOPE_DENIED naming
  *     the permission, no longer "not found": the test asserted the answer QA audit E5-04 replaced.
  *   v1.0.1 — 2026-10-13 — aimeat_app_tool_invoke is not offered to a caller without ext:invoke, which the
@@ -57,7 +59,8 @@ const SELLER = 'restseller';
 const BUYER = 'restbuyer';
 const EXT = `tokenecho${randomBytes(3).toString('hex')}`;
 const APP_FILE = 'token-echo.html';
-const CAPABILITY = `ext:${EXT}:echo`;
+// The capability is keyed by the stored name, `<seller>/<name>` (services/component-address.ts).
+const CAPABILITY = `ext:${SELLER}/${EXT}:echo`;
 
 /** Every word the three tools and their loopback routes ask for. */
 const FULL_SCOPES = ['memory:read', 'memory:write', 'work:request', 'exchange:write', 'ext:invoke', 'social:read'];
