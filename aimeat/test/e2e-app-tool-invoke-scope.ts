@@ -11,6 +11,8 @@
  *   origin); refusals with the balance and the budget unchanged; the uses that keep working; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-invoke-scope
  * @version-history
+ *   v1.0.2 — 2026-10-25 — The app-origin twin addresses `<SUB>.<apex>` with a real Host (helpers/host-request.ts):
+ *     X-Subdomain counts only on its own Host (secaudit2026oct22, subdomain-label-from-client-headers).
  *   v1.0.1 — 2026-10-22 — A case that reads the narrowed agent's refusal as a 403 on both addresses
  *     (check:denial-coverage).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v72).
@@ -18,6 +20,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { hostRequest } from './helpers/host-request.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = randomBytes(4).toString('hex');
@@ -150,8 +153,14 @@ try {
 
   const call = (token: string, tool: string, q = 'hello', headers: Record<string, string> = {}) =>
     json('/v1/apps/' + seller!.name + '/' + FILE + '/webmcp/tools/' + tool, { method: 'POST', headers: { ...auth(token), ...headers }, body: JSON.stringify({ input: { q } }) });
-  const onOrigin = (token: string, tool: string) =>
-    json('/webmcp/tools/' + tool, { method: 'POST', headers: { ...auth(token), 'X-Subdomain': SUB, Host: SUB + '.aimeat.io' }, body: JSON.stringify({ input: { q: 'origin' } }) });
+  // The app origin the way nginx delivers it: Host <SUB>.<apex> and X-Subdomain naming the same label,
+  // over node:http because fetch drops Host (X-Subdomain counts only on its own Host since 2026-10-25).
+  const onOrigin = async (token: string, tool: string) => {
+    const r = await hostRequest(BASE, '/webmcp/tools/' + tool, SUB + '.' + new URL(BASE).hostname + ':' + new URL(BASE).port, {
+      method: 'POST', headers: { ...auth(token), 'X-Subdomain': SUB, 'Content-Type': 'application/json' }, body: JSON.stringify({ input: { q: 'origin' } }) });
+    let body: any; try { body = JSON.parse(r.body); } catch { body = { text: r.body }; }
+    return { status: r.status, body };
+  };
   const refusedForWord = (r: { status: number; body: any }) => r.status === 403 && r.body.error?.code === 'SCOPE_DENIED'
     && String(r.body.error?.message ?? '').includes('exchange:write') && !r.body.data?.result;
 
