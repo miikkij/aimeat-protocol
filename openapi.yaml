@@ -32370,6 +32370,19 @@ paths:
         /v1/admin/config/{path}) since the node started: `value` is still the removed value, which
         the node runs with until a restart, and `source` names where the value comes from after it.
 
+        A field carries `appliesAt: "restart"` when the code that uses it reads it once when the node
+        starts. PUT stores such a value and it takes effect at the next start; until then `value` is
+        the running value and the field carries `restartPending: true`.
+
+        Every AIMEAT_* setting the node reads has a field here (the check `check:config-coverage`
+        holds that). A secret shows only whether it is set, as `<path>_configured`; when the operator
+        may set it, the entry carries `set_path`, the path PUT takes for it. The value is never sent
+        back, by GET or by PUT.
+
+        The list is over four hundred fields. `section` narrows it to the fields whose path starts
+        with that first part (`ai`, `auth`, `packages`), `q` to the fields whose path or description
+        contains the text. The MCP tool aimeat_admin_config answers the same list.
+
         SEALED FIELDS. On a node one party runs on behalf of another, the party that STARTED the
         node may nominate paths as read-only (`AIMEAT_SEALED_CONFIG_KEYS`). Such a field carries
         `sealed: true`, `mutable: false`, `editable: false` and `source: "sealed"`, and its VALUE is
@@ -32380,6 +32393,17 @@ paths:
       tags: [Admin]
       security:
         - BearerAuth: []
+      parameters:
+        - name: section
+          in: query
+          required: false
+          description: Only the fields whose dot-path starts with this section, such as ai, auth, packages.
+          schema: { type: string }
+        - name: q
+          in: query
+          required: false
+          description: Only the fields whose dot-path or description contains this text.
+          schema: { type: string }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -32393,7 +32417,11 @@ paths:
         tune the node via this endpoint.
 
         Each change is checked, stored in the node's database and then applied to the running node;
-        it takes effect on the next request, the rate limits included. The request is NOT atomic
+        it takes effect on the next request, the rate limits and the log level included. A field
+        GET marks `appliesAt: "restart"` is stored and takes effect at the next start: its entry in
+        `applied` carries `applies: "restart"`, and `note` names it. A secret is set on the
+        `set_path` GET names, and is answered as `{ configured }`. The MCP tool
+        aimeat_admin_config_set calls the same function. The request is NOT atomic
         across changes: a change that passes is applied even when another one in the same request is
         refused. The answer carries `applied` (path, old_value, new_value; a secret as
         `{ configured }`) and `errors` (path and reason) for the refused ones. When nothing passed

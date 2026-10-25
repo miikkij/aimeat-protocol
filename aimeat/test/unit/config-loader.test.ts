@@ -3,6 +3,8 @@
  * @description The config system: config-schema, config-loader and config-provenance.
  * @usage pnpm test -- config-loader
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The old paths of storage.database_url, storage.sqlite_path and
+ *     setup.admin_password (LEGACY_DOT_PATHS) name their rows in both maps.
  *   v1.1.0 — 2026-08-10 — Moved from test/ to test/unit/ and put on vitest. It was named
  *     `.test.ts` and carried its own hand-rolled harness, but vitest's include covers
  *     test/unit/** and nothing else, so 30 assertions about how this node reads its own
@@ -28,6 +30,7 @@ import {
   isImmutable,
   parseConfigValue,
   serializeConfigValue,
+  LEGACY_DOT_PATHS,
 } from '../../src/services/config-schema.js';
 
 test('MUTABLE_CONFIG_MAP only contains non-immutable fields', () => {
@@ -36,19 +39,24 @@ test('MUTABLE_CONFIG_MAP only contains non-immutable fields', () => {
   }
 });
 
-test('ALL_CONFIG_MAP contains all fields', () => {
-  assert.equal(Object.keys(ALL_CONFIG_MAP).length, CONFIG_FIELDS.length);
+test('ALL_CONFIG_MAP contains all fields, and each old path names its row', () => {
+  // The paths rows had before they moved into a Config-tab section (2026-10-25) stay as aliases.
+  assert.equal(Object.keys(ALL_CONFIG_MAP).length, CONFIG_FIELDS.length + Object.keys(LEGACY_DOT_PATHS).length);
   for (const field of CONFIG_FIELDS) {
     assert.ok(ALL_CONFIG_MAP[field.dotPath], `Missing: ${field.dotPath}`);
   }
+  for (const [old, now] of Object.entries(LEGACY_DOT_PATHS)) {
+    assert.equal(ALL_CONFIG_MAP[old], ALL_CONFIG_MAP[now], `${old} should name the row of ${now}`);
+  }
 });
 
-test('ENV_TO_DOT_PATH and DOT_PATH_TO_ENV are inverse mappings', () => {
+test('ENV_TO_DOT_PATH and DOT_PATH_TO_ENV are inverse mappings, old paths aside', () => {
   for (const [envVar, dotPath] of Object.entries(ENV_TO_DOT_PATH)) {
     assert.equal(DOT_PATH_TO_ENV[dotPath], envVar, `Inverse mismatch: ${envVar} <-> ${dotPath}`);
   }
   for (const [dotPath, envVar] of Object.entries(DOT_PATH_TO_ENV)) {
-    assert.equal(ENV_TO_DOT_PATH[envVar], dotPath, `Inverse mismatch: ${dotPath} <-> ${envVar}`);
+    const expected = LEGACY_DOT_PATHS[dotPath] ?? dotPath;
+    assert.equal(ENV_TO_DOT_PATH[envVar], expected, `Inverse mismatch: ${dotPath} <-> ${envVar}`);
   }
 });
 
