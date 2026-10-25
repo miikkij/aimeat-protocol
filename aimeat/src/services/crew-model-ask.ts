@@ -73,6 +73,11 @@ export async function askOwnerForCrewModel(
         why: `The crew sends your provider key (${keyEnv}) to that address when it thinks. An app set it, so you confirm the address first; until then the crew keeps the model it has.`,
         // An agent of the owner sets any choice at once, so one holding memory:write may approve it.
         approve_scope: 'memory:write',
+        // The answered notice says where the model is changed later: the agent's Crew tab.
+        change: {
+          link: args.agentName ? `/v1/profile?tab=agents&agent=${encodeURIComponent(args.agentName)}` : '/v1/profile?tab=agents',
+          key: 'approval_change.crew',
+        },
         i18n: {
           key: args.agentName ? 'approval_crew_model' : 'approval_crew_model_default',
           vars: { agent: args.agentName ?? '', host: hosts.join(', '), key: keyEnv },

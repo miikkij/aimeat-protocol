@@ -26,12 +26,16 @@
  *   answer on the row the answer governs (the secret, the outside app) and call tellAsker when the
  *   owner answers. services/shared-secret-ask.ts tells the operators through approverGhiis.
  *   services/permission-ask-notice.ts asks for a permission, which the agent's page answers.
- * @structure Approver · AskerKind · askerKind · approverGhiis · ApprovalOutcome · AskerAnswer ·
+ *     5. Once decided, the question's notices show the answer (who, what, when, where to change it)
+ *        and no buttons (closeQuestion; the developer, 2026-10-25).
+ * @structure Approver · AskerKind · askerKind · approverGhiis · closeQuestion · ApprovalOutcome · AskerAnswer ·
  *   APPROVAL_ANSWER_TYPE · tellAsker
  * @usage
  *   const to = await approverGhiis({ storage, config }, accountGhii, 'operators');
  *   await tellAsker({ storage, config }, { accountGhii, asker, outcome: 'declined', sentence, decidedBy, contextId, what });
  * @version-history
+ *   v1.1.0 — 2026-10-25 — closeQuestion(): a decided question's notices show the answer and lose their
+ *     buttons, whoever decided and wherever (the developer's review of the sandbox).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, the developer's approval standard).
  */
 import type { AimeatConfig } from '../config.js';
@@ -40,6 +44,7 @@ import { notify } from './notify.js';
 import { listOperatorGhiis } from './operators.js';
 import { sendAgentV2Message } from './agent-v2-messaging.js';
 import { emitChange } from './event-bus.js';
+import { answerNotifications, type AnswerOutcome } from './notification-answers.js';
 import { isGEAI, localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -48,6 +53,23 @@ export type Approver = 'owner' | 'operators';
 
 /** What kind of principal asked: an agent, an app (an app grant or an ecosystem app), or a person. */
 export type AskerKind = 'agent' | 'app' | 'person';
+
+/**
+ * The question is decided: every notice that asked it (written with `ref`) shows the answer, who gave
+ * it and when, and where to change it later, and offers no button again (services/notification-
+ * answers.ts). `recipients` are the ones the question went to. Never throws.
+ */
+export async function closeQuestion(
+  deps: { storage: Storage },
+  q: { recipients: readonly string[]; ref: string; outcome: AnswerOutcome; decidedBy: string | null; change?: { link: string; key: string } },
+): Promise<void> {
+  const at = new Date().toISOString();
+  for (const to of new Set(q.recipients)) {
+    await answerNotifications(deps.storage, to, { ref: q.ref }, {
+      outcome: q.outcome, by: q.decidedBy, at, ...(q.change ? { change: q.change } : {}),
+    });
+  }
+}
 
 /** The kind of a principal as it is stored: `eco:` is an app, a `#` an agent, anything else a person. */
 export function askerKind(principal: string): AskerKind {

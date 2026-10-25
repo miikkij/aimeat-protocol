@@ -14520,7 +14520,9 @@ paths:
       description: >-
         The allow page (/v1/allow?agent=&need=) reads this. For each permission in `need`: whether the
         agent holds it already (`held`) and whether one press may give it (`one_press`: "Full access"
-        carries it and the node does not call it powerful). A permission that is not one press is
+        carries it and the node does not call it powerful), and when the person said no to it on an
+        open refusal (`declined_at`, null otherwise), so the page shows that answer instead of the
+        buttons. A permission that is not one press is
         given on the agent's own page, `agent_page`. The owner in person only: anything acting in
         their name is refused with 403. An agent that lacks a permission is handed this page's address
         in its SCOPE_DENIED answer (`details.allow_url` on REST, the text on MCP).
@@ -46040,6 +46042,39 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not an owner session }
         '503': { description: "SETTINGS_UNAVAILABLE: the owner's settings could not be read, so the decision per sender cannot be shown truthfully." }
+
+  /v1/notifications/{id}/answered:
+    post:
+      operationId: markNotificationAnswered
+      summary: A notification's button ran and answered; the notice shows the answer and no buttons
+      description: |
+        The bell and the Notifications page call this after an `api` button's own call answered, so the
+        notification keeps `answered: { outcome, by, at, change? }` (outcome allowed, declined, done, or
+        answered when the call said the question was decided before, with `already: true`) and its
+        `actions` are emptied, for every kind of notification. A question decided anywhere else (an
+        allow page, an agent, the Access page) marks its notices the same way on the server. GET
+        /v1/notifications answers `answered.by_you`. Only a button the notification carries may be
+        named, on the caller's own account. Requires memory:write.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, description: "The id of the button that ran, e.g. allow or deny." }
+                already: { type: boolean, description: "The button's call answered that the question was decided before." }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/notifications/read:
     post:

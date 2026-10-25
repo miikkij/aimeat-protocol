@@ -10,6 +10,8 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.19.0 -- 2026-10-25 -- An access request answered no or taken back shows that answer, not Approve
+ *     and Deny again, and an open request inbox reads again on the live `organisms` event (the developer's review).
  *   v1.18.0 -- 2026-10-16 -- A failed read of the list shows the could-not-load note with Retry instead
  *     of "No workspaces yet", and does not report 0 to the tab badge; the order prefs are saved only
  *     after they loaded (QA audit F6-04, F6-05).
@@ -246,7 +248,12 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   // Re-load on organism changes, but DEBOUNCE: on a busy node dozens of agents emit 'organisms'
   // events ~1/sec; a trailing debounce collapses a burst into one reload (the load is now a single
   // cheap request). `onLiveUpdate` reads the Set-typed domains correctly — never via e.detail directly.
-  const liveRef = useRef(load); liveRef.current = load;
+  // The open access-request inbox reads again too, so a request decided elsewhere shows its answer.
+  const liveRef = useRef(load);
+  liveRef.current = async () => {
+    await load();
+    if (openReqWs) setReqInbox(await orgService.listWorkspaceRequests(orgId, openReqWs));
+  };
   useEffect(() => {
     let timer = null;
     const off = onLiveUpdate(['organisms'], () => { clearTimeout(timer); timer = setTimeout(() => liveRef.current(), 1500); });
@@ -352,7 +359,13 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
           <${Name} desc=${r.message ? '— ' + r.message : undefined}>${(r.requester)}<//>
           <${Doors}>${r.status === 'approved'
             ? html`<${Mark} kind="status" tone="fine">✓ ${t('organisms.approved') || 'approved'}<//><${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.revoke') || 'Revoke'}<//>`
-            : html`<${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}<//><${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`}<//>
+            // A decided request shows its answer, never the two answer buttons again: a "no" keeps one
+            // way to change it, a request its sender took back keeps none (the developer, 2026-10-25).
+            : r.status === 'denied'
+              ? html`<${Mark} kind="status" tone="off">✗ ${t('organisms.denied')}<//><${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.allowAfterAll')}<//>`
+              : r.status === 'withdrawn'
+                ? html`<${Mark} kind="status" tone="off">${t('organisms.withdrawn')}<//>`
+                : html`<${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'approve')}>${t('organisms.approve') || 'Approve'}<//><${Action} small disabled=${busy} onClick=${() => decide(w, r.requester, 'deny')}>${t('organisms.deny') || 'Deny'}<//>`}<//>
         <//>`)}
     <//>`;
 
