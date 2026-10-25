@@ -6,9 +6,19 @@
  * 20 connections, and HTTP/1.1 caps at 6/domain), a single "leader" tab holds the EventSource
  * and relays each event to follower tabs over a BroadcastChannel. Leadership is elected with the
  * Web Locks API: whoever holds the 'aimeat-live-leader' lock is the leader; when the leader tab
- * closes (or crashes) the browser auto-releases the lock and a waiting tab takes over — no
- * heartbeat, no polling. Browsers without BroadcastChannel/Web Locks fall back to a per-tab
- * connection (today's behaviour, no regression).
+ * closes (or crashes) the browser auto-releases the lock and a waiting tab takes over. Browsers
+ * without BroadcastChannel/Web Locks fall back to a per-tab connection (today's behaviour, no
+ * regression).
+ *
+ * A leader that stops delivering (2026-10-25). Closing is not the only way a leader fails: a
+ * background tab whose session expired stops its stream (the dead-session stop below) and waits to be
+ * shown again, still holding the lock, and every other tab then hears nothing. On production Jouni's
+ * Messages tab had no stream of its own, nine tabs waited for the lock, and a message his agent sent
+ * appeared only when he clicked the thread. The node now writes its 15 s keepalive as `event: alive`;
+ * the leader relays it with whether its stream is signed, and a VISIBLE follower that has heard
+ * nothing for 45 s, or hears a visitor stream while it has a session itself, takes the lock with
+ * `steal`. The tab it was taken from closes its stream and waits in line. The follower's watchdog is
+ * a timer that sends nothing: every byte still arrives on the one stream, never by polling.
  *
  * Selective refetch: the server sends `data: {"domains":[...]}` (which domains changed in the
  * last ~1s window). We accumulate domains across a 1000ms debounce (matching the server
@@ -75,6 +85,16 @@ let bc = null;                        // BroadcastChannel | null
 let leaderRelease = null;            // resolves the Web Lock promise → releases leadership
 let leaderAbort = null;             // aborts a still-queued (follower) lock request on disconnect
 
+// Leader liveness (2026-10-25). The node writes `event: alive` every 15 s (routes/sse.ts); the leader
+// relays it, and a visible follower that has heard nothing for three of them takes the lock.
+const STALE_MS = 45000;
+let lastAliveAt = 0;
+let leaderSigned = true;            // the leader's last word on whether its stream carries a session
+let watchdogTimer = null;
+let staleWhileHidden = false;       // the leader went silent while this tab was hidden
+let leaderRequest = 0;              // the id of this tab's newest lock request
+let heldRequest = 0;                // the id of the request that holds the lock, while it does
+
 export async function connect(getJwt) {
   refCount++;
   jwtGetter = getJwt;
@@ -119,25 +139,102 @@ function startShared() {
 
   bc = new BroadcastChannel('aimeat-live');
   bc.onmessage = (ev) => {
-    if (ev.data && ev.data.type === 'domains') ingestDomains(ev.data.domains);
+    if (ev.data && ev.data.type === 'domains') { heardLeader(); ingestDomains(ev.data.domains); }
     if (ev.data && ev.data.type === 'hello') checkBuild(ev.data.build);
+    if (ev.data && ev.data.type === 'alive') heardLeader(ev.data.signed !== false);
   };
-  // Hold the lock for as long as this tab is connected; whoever holds it is the leader. The
-  // request callback resolves only when we release (on disconnect), at which point the next
-  // waiting tab becomes leader. If the leader tab closes/crashes the browser auto-releases.
-  // The AbortController cancels a still-QUEUED request (a follower that disconnects before ever
-  // acquiring the lock) so it can't later become a phantom leader with no active views.
-  leaderAbort = new AbortController();
-  navigator.locks.request('aimeat-live-leader', { mode: 'exclusive', signal: leaderAbort.signal }, () => new Promise((release) => {
+  lastAliveAt = Date.now();   // the leader gets the same grace a new one does
+  requestLeadership(false);
+  armWatchdog();
+}
+
+/**
+ * Ask for the 'aimeat-live-leader' lock. Holding it makes this tab the leader; the callback's promise
+ * resolves only when we release (on disconnect), and the browser releases it when the tab closes.
+ * A plain request waits in line, and its AbortController cancels it while still QUEUED (a follower
+ * that disconnects before ever acquiring the lock) so it can't later become a phantom leader with no
+ * active views. `steal` takes the lock from a leader that has gone silent (takeOver): the browser
+ * rejects that leader's request, and its catch below hands the stream back (lostLeadership).
+ * Web Locks refuse `signal` together with `steal`, so a stealing request carries none.
+ */
+function requestLeadership(steal) {
+  const mine = ++leaderRequest;
+  /** @type {LockOptions} */
+  const opts = steal
+    ? { mode: 'exclusive', steal: true }
+    : { mode: 'exclusive', signal: (leaderAbort = new AbortController()).signal };
+  navigator.locks.request('aimeat-live-leader', opts, () => new Promise((release) => {
+    heldRequest = mine;
     leaderRelease = release;
     becomeLeader();
-  })).catch(() => { /* aborted while queued — fine */ });
+  })).catch(() => {
+    // Aborted while queued (disconnect, or this tab stealing past its own queued request): nothing
+    // held, nothing to do. Stolen while held: another tab leads now.
+    if (mine === heldRequest && isLeader && started) lostLeadership();
+  });
 }
 
 function becomeLeader() {
   if (isLeader) return;
   isLeader = true;
+  clearTimeout(watchdogTimer);
+  staleWhileHidden = false;
   _open();
+}
+
+/** Another tab took the lock: close this tab's stream and listen to the new leader instead. */
+function lostLeadership() {
+  isLeader = false;
+  leaderRelease = null;
+  if (es) { es.close(); es = null; }
+  clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  lastAliveAt = Date.now();
+  requestLeadership(false);
+  armWatchdog();
+}
+
+/** The leader's stream is alive: tell the followers, and whether it carries a signed session. */
+function beat() {
+  if (bc && isLeader) { try { bc.postMessage({ type: 'alive', signed: streamSigned }); } catch { /* channel closed */ } }
+}
+
+/** A follower heard the leader (a relayed keepalive or a change). */
+function heardLeader(signed) {
+  lastAliveAt = Date.now();
+  if (signed !== undefined) leaderSigned = signed;
+  armWatchdog();
+}
+
+/**
+ * A follower's watchdog: a timer that sends nothing and asks the node nothing. It fires when the
+ * leader has relayed nothing for STALE_MS. A few seconds of jitter keep several followers from all
+ * stealing at once.
+ */
+function armWatchdog() {
+  clearTimeout(watchdogTimer);
+  if (!bc || isLeader || refCount === 0) return;
+  watchdogTimer = setTimeout(checkLeader, STALE_MS + Math.floor(Math.random() * 5000));
+}
+
+/** Silent past STALE_MS, or holding a visitor stream while this tab has a session. */
+function leaderFailing() {
+  return Date.now() - lastAliveAt > STALE_MS || (!leaderSigned && !!jwtGetter?.());
+}
+
+function checkLeader() {
+  if (!bc || isLeader || refCount === 0) return;
+  if (!leaderFailing()) { armWatchdog(); return; }
+  // A hidden tab does not take the stream; it does so when the person comes back to it.
+  if (typeof document !== 'undefined' && document.hidden) { staleWhileHidden = true; return; }
+  takeOver();
+}
+
+function takeOver() {
+  staleWhileHidden = false;
+  if (leaderAbort) { try { leaderAbort.abort(); } catch { /* already settled */ } leaderAbort = null; }
+  everOpened = true;   // the stream opens after a gap: its onopen reconciles every domain in every tab
+  requestLeadership(true);
 }
 
 /** Relay an event to follower tabs (no-op when not sharing). */
@@ -178,8 +275,13 @@ async function _open() {
     }
     const body = await resp.json();
     const ticket = body.data.ticket;
+    // Another tab took the lock while the ticket was on its way: the stream is that tab's to open.
+    if (!isLeader) return;
 
     es = new EventSource(`/v1/events?ticket=${encodeURIComponent(ticket)}`);
+
+    // The node's 15 s keepalive, relayed so the followers know this stream is alive.
+    es.addEventListener('alive', beat);
 
     // Which build answers: a restart on new code reloads the page (watchBuild).
     es.addEventListener('hello', (event) => {
@@ -197,6 +299,7 @@ async function _open() {
       // reconcile (locally + relayed). Skip on the very first open (views load on mount).
       if (everOpened) { ingestDomains(null); relay(null); }
       everOpened = true;
+      beat();
     };
 
     es.onmessage = (event) => {
@@ -258,6 +361,11 @@ if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     // A new build arrived while the tab was hidden: the reload happens when the person comes back.
     if (!document.hidden && buildReloadPending) { location.reload(); return; }
+    // The leader went silent while this tab was hidden: take the stream now if it still is.
+    if (!document.hidden && staleWhileHidden) {
+      staleWhileHidden = false;
+      if (bc && !isLeader && refCount > 0 && leaderFailing()) takeOver(); else armWatchdog();
+    }
     if (!document.hidden && hadHiddenUpdate) {
       hadHiddenUpdate = false;
       pendingDomains = null;   // one catch-up reconcile across all domains
@@ -293,6 +401,10 @@ export function disconnect() {
     if (bc) { try { bc.close(); } catch { /* already closed */ } bc = null; }
     clearTimeout(debounceTimer);
     clearTimeout(reconnectTimer);
+    clearTimeout(watchdogTimer);
+    staleWhileHidden = false;
+    leaderSigned = true;
+    heldRequest = 0;
     reconnectDelay = INITIAL_RECONNECT_DELAY;
     authRetried = false;
     authDead = false;

@@ -11,6 +11,8 @@
  *     3. An app-grant stream does NOT mark the owner present. Only a real owner session may.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sse.ts
  * @version-history
+ *   v1.4.0 — 2026-10-25 — Phase 1: the 15 s keepalive is `event: alive`, which the shared-stream
+ *     failover in public/lib/live-updates.js listens for.
  *   v1.3.0 — 2026-10-18 — Phase 7: a change in one workspace is that workspace's own domain, told to
  *     the organism's members and to nobody else.
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -183,6 +185,15 @@ async function main() {
             const at = await owner.waitFor(t => t.includes(':open'), 3_000, 'the :open comment');
             assert(at < 3_000, `first bytes took ${at}ms`);
             assert(owner.text().includes('retry:'), 'a retry hint must be sent so the browser knows the backoff');
+        });
+
+        // The tab holding a browser's shared stream relays this keepalive to the other tabs, and a tab
+        // that stops hearing it takes the stream over (public/lib/live-updates.js). A comment line is
+        // invisible to the page, so it has to be a named event.
+        await test('the 15 s keepalive is an "alive" event the page can see', async () => {
+            assert(!!owner, 'owner stream open');
+            await owner!.waitFor(t => t.includes('event: alive\ndata: {}\n\n'), 18_000, 'the alive event');
+            assert(!owner!.text().includes(':keepalive'), 'the keepalive is no longer a comment line');
         });
 
         console.log('\nPhase 2: The owner sees their own changes');
