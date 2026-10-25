@@ -216,7 +216,8 @@
           { "id": "ex-conflicts", "num": "01", "labelKey": "exposure.cls.conflictsTitle" },
           { "id": "ex-items", "num": "02", "labelKey": "exposure.itemsTitle" },
           { "id": "ex-notes", "num": "03", "labelKey": "exposure.notesTitle" }
-        ] }
+        ] },
+        { "id": "agreements", "labelKey": "profile.tabs.agreements" }
       ] },
       { "titleKey": "profile.landing.menuInfra", "operator": true, "items": [
         { "id": "federation", "labelKey": "profile.tabs.federation" },
