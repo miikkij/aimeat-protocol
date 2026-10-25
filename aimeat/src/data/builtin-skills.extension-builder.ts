@@ -37,6 +37,8 @@
  *   2026-10-21 — Section 9: declare `uses_secrets`; a first use to a declared host binds by itself for
  *     a trusted code writer; every refused first use names the owner's one-press allow page; tell users
  *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   2026-10-25 — ctx.email takes one recipient per call, within the account's hourly allowance
+ *     (extensions.email_per_hour; secaudit2026oct22, lead 325).
  *   2026-10-25 — The operator's limits on one namespace's data and on the copies of one extension
  *     (extensions.namespace_max_mb, extensions.max_instances; secaudit2026oct22, lead 750).
  *   2026-10-21 — Section 9, v58 as Jouni amended it: `{{secret:NAME}}` reads the caller's own vault
@@ -122,7 +124,9 @@ may already do it.
 - \`capabilities: [network, ai, email, payments]\` at the top level: what the scripts may do beyond
   their own memory. Without \`network\`, \`ctx.fetch\` throws \`CAPABILITY_NOT_DECLARED\`; without the
   others, \`ctx.ai\`, \`ctx.email\` and \`ctx.buy\` are \`undefined\`. \`network: { hosts: [api.example.com] }\`
-  limits \`ctx.fetch\` to those hosts.
+  limits \`ctx.fetch\` to those hosts. \`ctx.email(to, subject, body)\` takes one address per call
+  (several recipients: one call each), and one account's extensions send at most
+  \`extensions.email_per_hour\` (200 by default) in an hour; past it the call throws naming it.
 - \`workspace: { read: true, write: true }\` gives \`ctx.workspace\`, which acts on the caller's
   organism workspace as the caller.
 - Write it in YAML **block style**. A flow mapping with a comma inside a value breaks the value and

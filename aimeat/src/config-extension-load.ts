@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description The operator's settings for how much load extensions may put on this node: the answer
  *   bytes one run's ctx.fetch calls may hold in flight together, the bytes one extension namespace
- *   may hold, and the number of instances one extension may have. Each is a row on the admin Config
+ *   may hold, the number of instances one extension may have, and the ctx.email messages one
+ *   account's extensions may send in an hour. Each is a row on the admin Config
  *   tab (services/config-schema-extension-load.ts), read on every use, so a saved value applies to
  *   the next run. 0 is "no limit" on every one of them.
  *
@@ -15,6 +16,7 @@
  *   import { extensionLoadDefaults } from './config-extension-load.js';
  *   const config = { ...extensionLoadDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-10-25 — extensionEmailPerHour (AIMEAT_EXT_EMAIL_PER_HOUR), 200 by default (secaudit2026oct22, lead 325).
  *   v1.1.0 — 2026-10-25 — extensionNamespaceMaxMb (AIMEAT_EXT_NAMESPACE_MAX_MB) and extensionMaxInstances
  *     (AIMEAT_EXT_MAX_INSTANCES), both no limit by default (secaudit2026oct22, lead 750).
  *   v1.0.0 — 2026-10-25 — Initial: extensionFetchInflightMb (AIMEAT_EXT_FETCH_INFLIGHT_MB), the
@@ -38,7 +40,15 @@ export interface ExtensionLoadConfig {
   extensionNamespaceMaxMb: number;
   /** The most instances one extension may have; POST /v1/extensions/:name/instances refuses past it. 0: no limit (the default). */
   extensionMaxInstances: number;
+  /**
+   * The ctx.email messages one account's extension runs may send in an hour, counted per account
+   * whichever extension sends (services/extension-email.ts). 0: no limit. Default 200.
+   */
+  extensionEmailPerHour: number;
 }
+
+/** The ctx.email allowance per account and hour when nothing sets it. */
+export const EXT_EMAIL_PER_HOUR_DEFAULT = 200;
 
 /** A whole number from 0 up from its raw env string; `fallback` when absent, not a number or negative. */
 export function wholeFromEnv(raw: string | undefined, fallback: number): number {
@@ -51,5 +61,6 @@ export function extensionLoadDefaults(): ExtensionLoadConfig {
     extensionFetchInflightMb: wholeFromEnv(process.env.AIMEAT_EXT_FETCH_INFLIGHT_MB, EXT_FETCH_INFLIGHT_MB_DEFAULT),
     extensionNamespaceMaxMb: wholeFromEnv(process.env.AIMEAT_EXT_NAMESPACE_MAX_MB, 0),
     extensionMaxInstances: wholeFromEnv(process.env.AIMEAT_EXT_MAX_INSTANCES, 0),
+    extensionEmailPerHour: wholeFromEnv(process.env.AIMEAT_EXT_EMAIL_PER_HOUR, EXT_EMAIL_PER_HOUR_DEFAULT),
   };
 }

@@ -13857,6 +13857,8 @@
     "cfgDesc_extensions_namespace_max_mb": "Kuinka paljon dataa laajennuksen muistissa saa olla. Laajennuksen jokainen kopio lasketaan erikseen. Rajan jälkeen uusi avain hylätään, mutta olemassa olevaa avainta voi yhä päivittää. Ihmisten omat muistirajat ovat tästä erillään (oletus 0 = ei rajaa).",
     "cfg_extensions_max_instances": "Kopioita laajennusta kohden",
     "cfgDesc_extensions_max_instances": "Kuinka monta kopiota laajennuksesta saa olla. Rajan jälkeen uusi kopio hylätään (oletus 0 = ei rajaa).",
+    "cfg_extensions_email_per_hour": "Laajennusten sähköpostit tiliä kohden tunnissa",
+    "cfgDesc_extensions_email_per_hour": "Kuinka monta sähköpostia yhden tilin laajennukset saavat lähettää tunnissa yhteensä. Rajan jälkeen lähetys hylätään, kunnes tunti vaihtuu (oletus 200, 0 = ei rajaa).",
     "cfg_features_capability_publishing": "Kuka lisää kyvykkyyksiä",
     "cfgDesc_features_capability_publishing": "Kuka saa lisätä kyvykkyyden rekisteriin.",
     "cfgOpt_features_capability_publishing_disabled": "Vain operaattori",
@@ -26712,6 +26714,17 @@
           "ex1": "0 (oletus): laajennuksella voi olla kuinka monta kopiota tahansa.",
           "ex2": "20: omistaja voi liittää 20 tiliä yhden laajennuksen kautta.",
           "tip": "Aseta tämä yhdessä laajennuskohtaisen muistin kanssa: jokaisella kopiolla on oma muistinsa, joten nämä kaksi yhdessä rajaavat, paljonko yksi laajennus voi tallentaa."
+        },
+        "email_per_hour": {
+          "title": "Laajennusten sähköpostit tiliä kohden tunnissa",
+          "short": "Kuinka monta sähköpostia yhden tilin laajennukset saavat lähettää ctx.email-kutsulla tunnissa yhteensä. Rajan jälkeen seuraava lähetys hylätään, kunnes tunti vaihtuu. Oletus on 200, ja 0 tarkoittaa, ettei rajaa ole.",
+          "what": "Laajennus voi lähettää sähköpostia palvelimen omalla lähettäjällä: omistajan omaan vahvistettuun osoitteeseen, kenelle tahansa, jolle omistaja on antanut luvan, tai kenelle tahansa, jos operaattori on sallinut sen tälle laajennukselle. Kaikki viestit lähtevät palvelimen osoitteesta, joten lähettäjän maine on kaikkien tilien yhteinen, myös niiden koodien ja kirjautumislinkkien, joita ihmiset tarvitsevat. Tämä raja laskee jokaisen tilin lähetykset tunnin jaksoissa. Rajan jälkeen laajennuksen lähetys hylätään viestillä, joka nimeää tämän asetuksen ja kertoo, milloin voi yrittää uudelleen. Jokaisessa viestissä on yksi vastaanottaja, joten vastaanottajaluettelo on yksi lähetys kutakin vastaanottajaa kohden.",
+          "range": "Kokonaisluku nollasta ylöspäin. Oletus on 200. Arvolla 0 rajaa ei ole.",
+          "low": "Pienempi: laajennus, joka lähettää vahingossa postia silmukassa, pysähtyy aiemmin, ja palvelimen osoite on paremmin suojassa roskapostimerkinnältä.",
+          "high": "Suurempi: tapahtuma, joka lähettää osallistujilleen postia (messut, näyttely, kurssi), voi lähettää enemmän tunnissa.",
+          "ex1": "200 (oletus): tilin laajennukset lähettävät enintään 200 sähköpostia tunnissa.",
+          "ex2": "5000 messuviikon ajaksi, ja sen jälkeen takaisin 200:aan.",
+          "tip": "Nosta rajaa tai aseta 0 tapahtumaa varten, joka lähettää postia monelle kerralla, ja tarkista, että sähköpostipalvelusi hyväksyy sen määrän."
         }
       },
       "morsel_policy": {
