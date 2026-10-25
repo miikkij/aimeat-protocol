@@ -16,6 +16,8 @@
  * @structure registerDecideTools(mcp, storage, config, getAgentGaii, sessionCaller)
  * @usage registerDecideTools(mcp, storage, config, () => agentGaii, caller);
  * @version-history
+ *   2026-10-25 — aimeat_decide_run reads the owner's records as the session's agent (readerAs), so its
+ *     clearance applies (secaudit2026oct22).
  *   2026-10-22 — aimeat_decide_run asks the session caller whether it reads as the owner
  *     (readsAsOwner): without memory:read-as-owner its keys and prefix read only what the memory route
  *     shows it, and it lists, reads, resumes and stops only the runs it started (secaudit 2026-10,
@@ -88,7 +90,9 @@ export function registerDecideTools(
   // removes takes effect at once (secaudit 2026-10, v83, v84).
   const runCaller = (appId?: string): DecideCaller => {
     const session = sessionCaller?.();
-    return { ...caller(appId), readsAll: session ? readsAsOwner(session) : false };
+    // The session is this agent's: its run reads the owner's records as the agent, so its clearance
+    // applies (secaudit2026oct22). Without a session caller it holds no scopes.
+    return { ...caller(appId), readsAll: session ? readsAsOwner(session) : false, readerAs: { roles: ['agent'], scopes: session?.scopes ?? [] } };
   };
 
   // ── aimeat_decide ──
