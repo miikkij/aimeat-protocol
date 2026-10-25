@@ -135,7 +135,8 @@ await test('FAILURE: with extensions.max_instances 1, a second copy is refused 4
   const b = await call('POST', `/v1/extensions/${EXT}/instances`, op.token, { id: 'copy-two' });
   assert(b.status === 409, `expected 409, got ${b.status}: ${JSON.stringify(b.body)}`);
   assert(b.body?.error?.code === 'LIMIT_EXCEEDED', `code ${b.body?.error?.code}`);
-  assert(String(b.body?.error?.message ?? '').includes('extensions.max_instances'), `names the setting: ${b.body?.error?.message}`);
+  assert(String(b.body?.error?.message ?? '').includes('Copies per extension'), `names the setting: ${b.body?.error?.message}`);
+  assert(b.body?.error?.details?.setting === 'extensions.max_instances', `details name the path: ${JSON.stringify(b.body?.error?.details)}`);
   const run = await put('copy.key', 1, 'copy-one');
   assert(run.status === 200, `the existing copy still runs: ${run.status} ${JSON.stringify(run.body?.error)}`);
 });
@@ -201,6 +202,13 @@ await test('extensions.run_slots 0 is no limit: two runs at once both answer', a
   assert(s.status === 200, `PUT ${s.status}: ${JSON.stringify(s.body?.error)}`);
   const [a, b] = await Promise.all([waitRun(op.token), waitRun(other.token)]);
   assert(a.status === 200 && b.status === 200, `both run: ${a.status} ${b.status}`);
+});
+
+await test('FAILURE: another account changes none of these settings and makes no copy of the operator\'s extension', async () => {
+  const put = await call('PUT', '/v1/admin/config', other.token, { changes: [{ path: 'extensions.run_slots', value: 1 }] });
+  assert(put.status === 403, `a non-operator PUT /v1/admin/config: expected 403, got ${put.status}`);
+  const inst = await call('POST', `/v1/extensions/${EXT}/instances`, other.token, { id: 'not-theirs' });
+  assert(inst.status === 403, `another account's copy: expected 403, got ${inst.status} ${JSON.stringify(inst.body?.error)}`);
 });
 
 await test('Cleanup: the settings go back to their defaults and the extension is removed', async () => {
