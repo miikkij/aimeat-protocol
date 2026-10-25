@@ -6,6 +6,7 @@
  *   reads as an array and `allowed.includes(origin)` became a substring test.
  * @usage pnpm test -- config-list-settings
  * @version-history
+ *   v1.1.1 — 2026-10-25 — email.company_smtp_private_hosts, the list row W2b added (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — The list rows that came with the rest of the settings' rows, and the one
  *     immutable list row (ai.provider_allowlist).
  *   v1.0.0 — 2026-10-11 — Initial.
@@ -22,6 +23,8 @@ const LIST_PATHS = [
     'push.notify_types', 'realtime.stun_servers', 'federation.default_scopes',
     // Rows since 2026-10-25, when every setting the node reads got one (check:config-coverage).
     'scopes.default_eco_scopes', 'scopes.max_eco_scopes', 'ai.cop_sections', 'features.capability_webhook_domain_allowlist',
+    // The private mail hosts companies may send through (config-schema-node-limits.ts, secaudit2026oct22).
+    'email.company_smtp_private_hosts',
 ];
 /** List rows that are set in the environment only: a stored key is sent only to these hosts. */
 const IMMUTABLE_LIST_PATHS = ['ai.provider_allowlist'];

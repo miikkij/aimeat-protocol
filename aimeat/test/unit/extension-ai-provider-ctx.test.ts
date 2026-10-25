@@ -15,6 +15,7 @@
  *   safeFetch is replaced by a recorder, the way outbound-read-cap.test.ts does it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-ai-provider-ctx.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-25 — The storage stub answers getOwner: the run checks the account is not deactivated (secaudit2026oct22).
  *   v1.1.0 — 2026-10-10 — A provider call refused for plain http binds no secret to its host:port
  *     (secaudit 2026-10-10 I16).
  *   v1.0.0 — 2026-09-28 — System 2 plan, V6: initial.
@@ -235,6 +236,8 @@ describe('runExtensionActionAsSystem as a provider', () => {
             name: 'example-ai', status: 'active', installedBy, config: {}, limits,
             actions: [{ id: 'ai.text', scriptContent: SCRIPT }],
         }),
+        // An active account: the run asks whether its owner was deactivated (services/account-deactivated.ts).
+        getOwner: async () => ({ disabledAt: null }),
     }) as unknown as Storage;
     const args = (url: string, extra: Record<string, unknown> = {}) => ({
         extensionName: 'example-ai', actionId: 'ai.text', callerGaii: 'alice@node-1', ownerName: 'alice',
