@@ -887,6 +887,42 @@ await test('41. An agent is refused an app-made schedule, and a sibling agent st
     assert(ownerDelete.status === 200, `the owner cannot delete the app's schedule: ${ownerDelete.status}`);
 });
 
+// secaudit2026oct22, aimeat_schedule_list:createdByAgent-filter-without-word. The MCP list kept every
+// schedule with createdByAgent set, which an app grant and an ecosystem app also set, so an agent
+// without workflow:read read their prompts while GET /v1/schedules refused it.
+await test('41b. aimeat_schedule_list shows an agent its own and its siblings\' schedules, and the app-made ones only with workflow:read', async () => {
+    const appToken = await appGrantToken(o1.ownerToken, o1.ownerName, 'sched-list-grant.html', 'task:write workflow:write memory:write');
+    const ecoToken = await ecosystemToken(o1.ownerToken, o1.ownerName, 'schedlisteco', ECO_SCOPES);
+    const sibToken = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedlistsib', MANAGE_SCOPES);
+    const narrowToken = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedlistnarrow', ['task:write']);
+    const wideToken = await scopedAgent(o1.ownerName, o1.ownerToken, 'schedlistwide', ['task:write', 'workflow:read']);
+    const as = (t: string) => ({ Authorization: `Bearer ${t}` });
+    const task = (title: string) => ({ kind: 'agent_task', cron: '0 2 * * *', target_agent: o1.agentName, display_name: title, task_template: { title, description: `${title} prompt` } });
+    const made = async (t: string, title: string) => {
+        const r = await json('/v1/schedules', { method: 'POST', headers: as(t), body: JSON.stringify(task(title)) });
+        assert(r.status === 201, `create ${title}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        return r.body.data.schedule.id as string;
+    };
+    const appMade = await made(appToken, 'LIST_APP');
+    const ecoMade = await made(ecoToken, 'LIST_ECO');
+    const sibMade = await made(sibToken, 'LIST_SIB');
+
+    const rest = await json('/v1/schedules?detail=true', { headers: as(narrowToken) });
+    assert(rest.status === 403, `REST twin without workflow:read: ${rest.status}`);
+    const narrow = await (await mcpSession(narrowToken))('aimeat_schedule_list', { detail: true });
+    assert(!narrow.isError, `narrow list: ${narrow.text}`);
+    const narrowIds = (narrow.data?.schedules ?? []).map((s: any) => s.id);
+    assert(!narrowIds.includes(appMade), 'an agent without workflow:read listed an app-made schedule');
+    assert(!narrowIds.includes(ecoMade), 'an agent without workflow:read listed an ecosystem-app-made schedule');
+    assert(narrowIds.includes(sibMade), 'a sibling agent\'s schedule is no longer listed');
+
+    const wide = await (await mcpSession(wideToken))('aimeat_schedule_list', { detail: true });
+    const wideIds = (wide.data?.schedules ?? []).map((s: any) => s.id);
+    assert(wideIds.includes(appMade) && wideIds.includes(ecoMade) && wideIds.includes(sibMade), `with workflow:read the owner-wide list: ${JSON.stringify(wideIds)}`);
+
+    for (const id of [appMade, ecoMade, sibMade]) await json(`/v1/schedules/${id}`, { method: 'DELETE', headers: auth1 });
+});
+
 // secaudit 2026-10, runAiJob:raw-setMemory-unvalidated-outputVisibility. The create door stored any
 // string as outputVisibility and the edit door replaced the input wholesale, so a schedule carried
 // `organism:<id>` for an organism the owner is not a member of and the fire wrote the model's answer
