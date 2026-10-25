@@ -21,6 +21,8 @@
  * @structure meta · ActionsSection({ d })
  * @usage loaded by the detail view: import('./sections/actions.js')
  * @version-history
+ *   v1.2.1 — 2026-10-25 — The app handed to the AI prompt names its owner and whether it is the
+ *     viewer's own, so a connected AI changes the app on the node (or copies somebody else's first).
  *   v1.2.0 — 2026-10-18 — Improve with AI, Publish and the two screenshot doors are the owner's only: a visitor saw
  *     "Publish as v4" on somebody else's app (Jouni, 2026-10-18). Share as prompt stays, and View source
  *     opens read-only for anybody but the owner, with no save, try or publish.
@@ -79,13 +81,16 @@ export default function ActionsSection({ d }) {
   const shotPath = () => '/v1/apps/' + encodeURIComponent(d.owner) + '/' + encodeURIComponent(d.filename) + '/screenshot';
   const adopt = (data) => { if (data && data.version_number) setVersion(data.version_number); bumpVersions(); };
 
+  // The app as the AI prompt names it: on the node only when it is published.
+  const forPrompt = (text) => ({ name, filename: d.filename, owner: published ? d.owner : undefined, own: !!d.isOwn, track: manifest.track, html: text });
+
   const viewSource = async () => {
     const text = await sourceText();
     // Somebody else's app is shown, never edited: no save, no try, no publish (Jouni, 2026-10-18).
     if (!d.isOwn) {
       open('source', {
         name, text, readOnly: true, title: x('ctx.viewSourceOnly') + ': ' + name,
-        app: { name, filename: d.filename, track: manifest.track, html: text },
+        app: forPrompt(text),
       });
       return;
     }
@@ -93,13 +98,13 @@ export default function ActionsSection({ d }) {
       name, text, owner: d.owner, filename: d.filename, published,
       onSave: (next) => saveWork(textToB64(next)),
       onPublished: adopt,
-      app: { name, filename: d.filename, track: manifest.track, html: text },
+      app: forPrompt(text),
     });
   };
 
   const improve = async () => {
     const text = await sourceText();
-    open('generate', { app: { name, filename: d.filename, track: manifest.track, html: text } });
+    open('generate', { app: forPrompt(text) });
   };
 
   const share = async () => {
