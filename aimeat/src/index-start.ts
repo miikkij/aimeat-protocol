@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — secaudit2026oct22: on a signed-in-only node the realtime upgrade refuses a verified
+ *     credential that is not a node account (isNodeAccount) with 401 SIGN_IN_REQUIRED, as the REST
+ *     content-access gate does; node accounts join by header and by ticket as before.
  *   2026-10-23 — The setup code is issued on every node without an operator, loopback included: a
  *     request from outside the machine is asked for it there too, and the line says so (secaudit2026oct22).
  *   2026-10-17 — A node set to signed-in content access refuses an anonymous realtime or echat
@@ -284,6 +287,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     const { WebSocketServer } = await import('ws');
     const { authenticateUpgrade, refuseUpgrade, upgradeDeprecationHeaderLines } = await import('./auth/ws-upgrade.js');
     const { isAnonymousMode, isOwnerPrincipal } = await import('./auth/middleware.js');
+    const { isNodeAccount } = await import('./services/audience.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
@@ -461,6 +465,14 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           if (auth.outcome === 'refused') { refuseUpgrade(socket, auth.status, auth.code, auth.message); return; }
           if (auth.outcome === 'none' && (!isAnonymousMode() || signedInOnly(config))) {
             refuseUpgrade(socket, 401, 'AUTH_REQUIRED', 'Authentication required');
+            return;
+          }
+          // The REST content-access gate's rule on this path, where no Express middleware runs: a
+          // signed-in-only node admits its own accounts, not an anonymous session minted while it
+          // was open and not a visitor from another node (secaudit2026oct22).
+          if (auth.outcome === 'verified' && signedInOnly(config) && !isNodeAccount(auth.payload)) {
+            refuseUpgrade(socket, 401, 'SIGN_IN_REQUIRED',
+              'This node shows its content to its own signed-in accounts only. Sign in to an account of this node, and connect again.');
             return;
           }
 
