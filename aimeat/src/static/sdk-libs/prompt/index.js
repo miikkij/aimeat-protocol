@@ -26,6 +26,8 @@
  *     onResult: (plan) => showPlan(plan),
  *   });
  * @version-history
+ *   v1.0.1 — 2026-10-25 — Finnish strings use the decided words: "kehote" for a prompt and "tekoälysi" for
+ *     the person's AI, never "prompti" or "AI:ta" (language context, skill aimeat-writing).
  *   v1.0.0 — 2026-09-18 — Initial. Item 10 of the instruction review: the portal's PromptCard is a
  *     Preact component an app cannot load, so apps get the same shape as a served library.
  */
@@ -61,14 +63,14 @@ const TEXT = {
     building: 'Preparing the prompt…',
   },
   fi: {
-    copy: 'Kopioi prompti', copied: 'Kopioitu', show: 'Näytä prompti', hide: 'Piilota prompti',
-    hint: 'Kopioi prompti, aja se omassa AI-chatissasi ja liitä koko vastaus alle.',
-    hintCopyOnly: 'Kopioi prompti ja aja se omassa AI-chatissasi.',
+    copy: 'Kopioi kehote', copied: 'Kopioitu', show: 'Näytä kehote', hide: 'Piilota kehote',
+    hint: 'Kopioi kehote, anna se omalle tekoälyllesi ja liitä koko vastaus alle.',
+    hintCopyOnly: 'Kopioi kehote ja anna se omalle tekoälyllesi.',
     answer: 'Liitä vastaus tähän', use: 'Käytä tätä vastausta',
-    copyFailed: 'Kopiointi ei onnistunut. Valitse promptin teksti ja kopioi se käsin.',
+    copyFailed: 'Kopiointi ei onnistunut. Valitse kehotteen teksti ja kopioi se käsin.',
     empty: 'Liitä ensin vastaus.',
-    notJson: 'Vastauksesta ei löytynyt JSONia. Pyydä AI:ta vastaamaan pelkällä JSONilla ja liitä uudelleen.',
-    building: 'Valmistellaan promptia…',
+    notJson: 'Vastauksesta ei löytynyt JSONia. Pyydä tekoälyäsi vastaamaan pelkällä JSONilla ja liitä vastaus uudelleen.',
+    building: 'Kehotetta valmistellaan…',
   },
   es: {
     copy: 'Copiar el prompt', copied: 'Copiado', show: 'Mostrar el prompt', hide: 'Ocultar el prompt',

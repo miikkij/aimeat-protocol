@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.36.0 — 2026-10-25 — `?format=md&lang=<tag>` passes the reader's language to the app's own format-md
+ *     action (formatMdLang, services/app-format-md.ts).
  *   v1.35.1 — 2026-10-25 — injectAppScript and relaxAppCspMeta moved unchanged to routes/subdomain-app-html.ts (max-file-lines).
  *   v1.35.0 — 2026-10-25 — serveApp gives an app a closed node opened to the internet the line that says
  *     so (internetOpenMarkFor, services/internet-opening/).
@@ -183,6 +185,7 @@ import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services
 import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent-face.js';
+import { formatMdLang } from '../services/app-format-md.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
 import { localAccountName, resolveIdentity } from '../utils/gaii.js';
@@ -681,7 +684,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // app's markdown read-surface (public agentface record, else converted HTML) instead of the
     // runnable page. Browsers (Accept: text/html) keep the exact HTML behavior below.
     if (req.query.format === 'md' || (req.query.format === undefined && prefersMarkdown(req))) {
-      if (await serveAppAgentFace(res, config, storage, app)) return;
+      if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
     }
 
     const discover = {

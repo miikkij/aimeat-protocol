@@ -10,6 +10,7 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-25 — aimeat_admin_config forwards section and q; aimeat_admin_config_set proxies PUT /v1/admin/config.
  *   2026-10-23 — The four compliance tools moved unchanged to tool-call-defs-compliance.ts (max-file-lines).
  *   2026-10-18 — The aimeat_admin_incident_resolve comment names the offered default audience caps too
  *     (plan doc-mvdipuyqraas, L5.1); the handler is unchanged.
@@ -319,7 +320,13 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_config',
-        handler: ({ client }) => client.get('/v1/admin/config'),
+        handler: ({ client }, input) => client.get(`/v1/admin/config${query({
+            section: optionalString(input, 'section'), q: optionalString(input, 'q'),
+        })}`),
+    },
+    {
+        name: 'aimeat_admin_config_set',
+        handler: ({ client }, input) => client.put('/v1/admin/config', { changes: requiredValue(input, 'changes') }),
     },
     // ── Arranging this node's pages. The third door: a fleet daemon calls this dispatch, not the
     // MCP surfaces above it, and a parameter that exists on those two and not here is dropped in

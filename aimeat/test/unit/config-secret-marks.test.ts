@@ -19,6 +19,8 @@
  *   NOT_SECRET is the explicit list of secret-named rows that are public on purpose (a public key, a
  *   key id), each with its reason. A row goes there only with that reason written down.
  * @version-history
+ *   v1.0.3 — 2026-10-25 — AIMEAT_VAPID_PUBLIC_KEY, AIMEAT_PUBLIC_KEY and AIMEAT_ALLOW_PRIVATE_EGRESS join
+ *     NOT_SECRET: two public keys and a switch, shown on the Config page since every setting got a row.
  *   v1.0.2 — 2026-10-10 — AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL joins NOT_SECRET: a file path, not the key.
  *   v1.0.1 — 2026-10-10 — AIMEAT_WS_QUERY_TOKEN joins NOT_SECRET: a switch named after what it switches.
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, S2).
@@ -33,6 +35,9 @@ const SECRET_LAST_WORDS = new Set(['SECRET', 'PASSWORD', 'PASSPHRASE', 'PASS', '
 const NOT_SECRET: Readonly<Record<string, string>> = {
   AIMEAT_WS_QUERY_TOKEN: 'a true/false switch for whether a socket upgrade still accepts ?token=, not a token (auth/ws-upgrade.ts)',
   AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL: 'the path of the PEM file that holds the wallet access key, not the key; the Config page shows where the file is (config-schema-docsign.ts)',
+  AIMEAT_VAPID_PUBLIC_KEY: 'the public half of the push key pair; every browser that subscribes receives it (config-schema.ts)',
+  AIMEAT_PUBLIC_KEY: 'the public half of the federation key pair; peers receive it when this node joins (config-schema-runtime.ts)',
+  AIMEAT_ALLOW_PRIVATE_EGRESS: 'a true/false switch for calls into private networks, named after the networks it opens (config-schema-runtime.ts)',
 };
 
 function secretNamed(envVar: string): boolean {

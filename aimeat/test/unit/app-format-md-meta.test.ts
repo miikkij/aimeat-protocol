@@ -6,10 +6,27 @@
  *   unclosed comment, so it read the meta that a browser hides behind one.
  * @usage cd aimeat && pnpm exec vitest run test/unit/app-format-md-meta.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — formatMdLang(): which ?lang= values reach the action.
  *   v1.0.0 — 2026-10-03 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { parseFormatMdMeta } from '../../src/services/app-format-md.js';
+import { parseFormatMdMeta, formatMdLang } from '../../src/services/app-format-md.js';
+
+describe('formatMdLang', () => {
+    it('takes a language tag with at most one subtag, primary subtag lowercased', () => {
+        expect(formatMdLang('en')).toBe('en');
+        expect(formatMdLang('ES')).toBe('es');
+        expect(formatMdLang('pt-BR')).toBe('pt-BR');
+        expect(formatMdLang('zh-Hant')).toBe('zh-Hant');
+        expect(formatMdLang(' fi ')).toBe('fi');
+    });
+
+    it('drops anything else', () => {
+        for (const bad of [undefined, '', 'e', 'english', '../x', 'en-US-x-long', '<b>', ['en']]) {
+            expect(formatMdLang(bad)).toBeUndefined();
+        }
+    });
+});
 
 const META = '<meta name="aimeat-format-md" content="/v1/ext/my-ext/render">';
 
