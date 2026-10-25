@@ -9,6 +9,9 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.6.2 — 2026-10-25 — The create branch inserts the record before it writes a lib byte and
+ *     answers 409 CONFLICT on a collision with nothing written, as installCortex does
+ *     (secaudit2026oct22).
  *   v1.6.1 — 2026-10-24 — The redeploy pre-pass hands activationRefusal the record's installedBy, so a
  *     board-template whose board id another account holds is refused with 409 BOARD_ID_TAKEN before
  *     the first write (secaudit2026oct22).
@@ -158,10 +161,21 @@ export async function upsertCortex(
     const ask = cortexPublishAsk(deps, input.publishGate, undefined, parsed.visibility);
     if (ask?.kind === 'refused') return upsertRefusal(ask.status, ask.code, ask.message);
     if (ask) parsed.visibility = 'private';
+    // Claim the name FIRST, then write the bytes, as installCortex does. The lib table is keyed on
+    // (name, file) with no owner, so a lib written before the insert replaced the bytes of whoever
+    // took the name between the read above and the insert (the boot seeder or another install).
+    let record: CortexExtensionRecord;
+    try {
+      record = await storage.createCortexExtension(parsed);
+    } catch (e: unknown) {
+      if ((e as Error).message?.includes('already exists')) {
+        return upsertRefusal(409, 'CONFLICT', `Extension "${name}" is already installed`);
+      }
+      throw e;
+    }
     for (const [filename, content] of Object.entries(newLibs)) {
       await storage.setCortexLibFile(name, filename, content);
     }
-    const record = await storage.createCortexExtension(parsed);
     // Kept like every install, so `name@version` answers for what this created (A6-7).
     await snapshotCortexVersion(storage, record, newLibs, ownerName)
       .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
