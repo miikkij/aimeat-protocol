@@ -11,6 +11,8 @@
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   2026-10-25 — secaudit2026oct22: a full store evicts the oldest finished entry, 'unavailable' as
+ *     well as 'complete', so finished requests whose body was not kept no longer hold every slot.
  *   2026-10-15 — The 400, 409 and 503 refusals are built with the shared error() envelope, so they
  *     carry the node, the request id and the next steps; the malformed-key sentence is plain and
  *     names the header in `details` (feature-list audit #186).
@@ -142,12 +144,16 @@ export function idempotency(nodeId: string) {
             return;
         }
 
-        // SECURITY: Evict oldest entry if cache is full (prevent unbounded memory growth)
+        // SECURITY: Evict oldest entry if cache is full (prevent unbounded memory growth). Only a
+        // finished request gives its slot: 'complete', or 'unavailable' (finished, body not kept). A
+        // 'pending' one is work in progress and keeps it. 'unavailable' was kept like 'pending' until
+        // 2026-10-25, so 10,000 credential answers, which a caller with no account can collect from
+        // POST /v1/mcp/register, made every keyed POST and PUT answer 503 for a day (secaudit2026oct22).
         if (cache.size >= MAX_CACHE_SIZE) {
             let oldestKey: string | null = null;
             let oldestTime = Infinity;
             for (const [key, entry] of cache) {
-                if (entry.state === 'complete' && entry.storedAt < oldestTime) {
+                if (entry.state !== 'pending' && entry.storedAt < oldestTime) {
                     oldestTime = entry.storedAt;
                     oldestKey = key;
                 }

@@ -14734,6 +14734,7 @@
       "operatorSearchedEntries": "Operaattorin haussa näkyi otteita {count} merkinnästäsi.",
       "operatorDeletedEntry": "Operaattori poisti merkintäsi {key}.",
       "operatorRestoredEntry": "Operaattori palautti merkintäsi {key}.",
+      "operatorExportedEntries": "Operaattori otti tästä asennuksesta varmuuskopion. Siinä on {count} merkintääsi.",
       "operatorInstalledSet": "Operaattori asensi tiliisi asennuspaketin {set}: {packages} pakettia, ja {apps} sovellusta sai oikeuksia. Näet ja muutat sovellustesi oikeudet asetuksistasi.",
       "operatorActed": "Operaattori teki muutoksen tiliisi ({area}: {action}).",
       "operatorAdminGrantedOne": "{name} sai oikeuden ylläpitää tätä asennusta, koska sillä oli täysi pääsy. Voit poistaa oikeuden agentin asetuksista.",

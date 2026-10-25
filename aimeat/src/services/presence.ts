@@ -39,6 +39,8 @@
  *     they never open a tunnel or refresh lastSeen, so presence now reads their configured state.
  *   v1.3.0 — 2026-10-05 — Requests to peer nodes go through peerFetch (utils/peer-fetch.ts): no redirect, a time limit, and the answer read under a ceiling (secaudit 2026-10, C6).
  *   v1.4.0 — 2026-10-06 — A presence push names the peer it is for (audienceProof; secaudit 2026-10 follow-up, A7).
+ *   v1.5.0 — 2026-10-25 — secaudit2026oct22: applyRemoteUpdates keeps an update only for a person homed
+ *     on the pushing peer and only with a defined status; the others are ignored and logged once.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -82,6 +84,8 @@ export const DEFAULT_PRESENCE_CONFIG: PresenceConfig = {
 const MODES = new Set<PresenceMode>(['auto', 'manual']);
 const MANUAL_STATUSES = new Set<ManualStatus>(['available', 'busy', 'away', 'invisible']);
 const VISIBILITIES = new Set<Visibility>(['everyone', 'contacts', 'nobody']);
+/** The statuses a peer's push may carry: the four raw ones, and 'unknown' to withdraw an entry. */
+const REMOTE_STATUSES = new Set<VisibleStatus>(['available', 'busy', 'away', 'offline', 'unknown']);
 
 const CONFIG_CACHE_TTL_MS = 30_000;
 const FLUSH_INTERVAL_MS = 60_000; // "at most once a minute" per the federation design
@@ -330,17 +334,24 @@ export class PresenceTracker {
   applyRemoteUpdates(fromNode: string, updates: PresenceUpdate[]): void {
     if (!Array.isArray(updates)) return;
     let changed = false;
+    let dropped = 0;
     for (const u of updates) {
       if (!u || typeof u.ghii !== 'string') continue;
       // Never accept a remote claim about a local owner.
       if (this.isLocalGhii(u.ghii)) continue;
+      // A peer reports its own people only, with one of the defined statuses (secaudit2026oct22).
+      // getSnapshot and buildDelta on the sending node push only that node's owners, so an update
+      // naming a person of a third node, or another status word, is not from an honest peer.
+      if (parseGaiiLoose(u.ghii).node !== fromNode || !REMOTE_STATUSES.has(u.status)) { dropped += 1; continue; }
       if (u.status === 'unknown') {
         if (this.remote.delete(u.ghii)) changed = true;
       } else {
-        this.remote.set(u.ghii, { status: u.status, since: u.since ?? null, node: fromNode, receivedAt: Date.now() });
+        const since = typeof u.since === 'string' ? u.since : null;
+        this.remote.set(u.ghii, { status: u.status, since, node: fromNode, receivedAt: Date.now() });
         changed = true;
       }
     }
+    if (dropped > 0) logger.warn('Presence push: updates for people of another node, or with an undefined status, were ignored', { fromNode, dropped });
     if (changed) emitChange('presence');
   }
 
