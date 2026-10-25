@@ -10,12 +10,13 @@
  * @structure SignatureCheck · verifyRecordSignatures(ctx, rec)
  * @usage const checks = await verifyRecordSignatures(ctx, rec);
  * @version-history
+ *   v1.1.0 -- 2026-10-25 -- A check carries the caveats sealed into the statement (secaudit2026oct22, lead 3895).
  *   v1.0.0 -- 2026-10-25 -- Moved from records.ts (max-file-lines), bodies verbatim.
  */
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import type { AimeatConfig } from '../../config.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
-import { intentChallenge, keyMessage, evidenceHash, verifySeal, type SignMethod, type Assurance } from './statement.js';
+import { intentChallenge, keyMessage, evidenceHash, verifySeal, type SignMethod, type Assurance, type StatementCaveat } from './statement.js';
 import type { DocsignCtx, DocSignRecord, PasskeyEvidence } from './records.js';
 
 export interface SignatureCheck {
@@ -34,6 +35,8 @@ export interface SignatureCheck {
   valid: boolean;
   /** A wallet signature from an EU reference-wallet test certificate: a test with no legal effect. */
   test: boolean;
+  /** What the node could not establish when it sealed the signature, as sealed; empty when nothing. */
+  caveats: StatementCaveat[];
 }
 
 export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord): Promise<SignatureCheck[]> {
@@ -59,6 +62,8 @@ export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord
       valid: consistent && sealValid && sealByThisNode && evidenceValid !== false,
       // The sealed mark, or for a statement sealed before the mark existed, the stored wallet evidence.
       test: st.test === true || sig.wallet?.validation.test === true,
+      // Read from the sealed statement, so a caveat is shown only as the seal covers it.
+      caveats: st.caveats ?? [],
     });
   }
   return out;

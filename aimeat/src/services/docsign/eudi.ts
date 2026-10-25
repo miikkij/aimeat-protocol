@@ -39,6 +39,7 @@
  *   walletClient · parseDocumentWithSignature
  * @usage const s = await startWalletSignature(ctx, caller, id, { bytes });
  * @version-history
+ *   2026-10-25 -- A wallet signature whose certificate's revocation status could not be established is sealed with the caveat REVOCATION_UNKNOWN, which the statement and the public lookup carry (walletCaveats; secaudit2026oct22, lead 3895).
  *   2026-10-25 — The seal rule is walletSealRefusal(); a certificate revoked now is refused (422 CERTIFICATE_REVOKED) whatever signing time the signature claims (secaudit2026oct22, eudi.ts:wallet-seal-accepts-indeterminate-revocation).
  *   2026-10-15 — A wallet signature is sealed only when its chain reaches a trusted root (422 SIGNER_NOT_TRUSTED) and the certificate names the account holder (422 NAME_MISMATCH) (feature-list audit 38).
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
@@ -59,6 +60,7 @@ import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
 import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
 import { validatePdf, type SignatureReport } from './validate.js';
+import { caveat, type StatementCaveat } from './statement.js';
 import {
   DocsignError, walletSigner, checkWalletSignature, recordWalletSignature, noteWalletAttempt, noteDocumentSource, documentHash,
   type DocsignCtx, type WalletEvidence,
@@ -399,6 +401,17 @@ export function walletSealRefusal(newest: SignatureReport | undefined, fields: n
   return null;
 }
 
+/**
+ * What the node cannot establish about a wallet signature that passed walletSealRefusal, sealed with
+ * it as caveats (statement.ts). A certificate whose revocation status is not known (the responder did
+ * not answer, the node checks offline, or the responder does not know it) is still sealed, because
+ * the person signed in their own wallet a moment ago, and the statement says it could not be checked
+ * (secaudit2026oct22, lead 3895; developer decision 2026-10-25). A revoked one is refused above.
+ */
+export function walletCaveats(newest: SignatureReport): StatementCaveat[] {
+  return newest.revocation.status === 'good' ? [] : [caveat('REVOCATION_UNKNOWN')];
+}
+
 /** "Matti Meikäläinen" and "MEIKÄLÄINEN Matti" name the same person; anything else does not. */
 function sameName(a: string | null | undefined, b: string | null | undefined): boolean | null {
   const words = (s: string) => s.toLocaleLowerCase('fi').normalize('NFC').split(/[^\p{L}]+/u).filter((w) => w.length > 1).sort().join(' ');
@@ -521,6 +534,7 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
       test: newest.trust.source === 'eudi-test-anchor',
     },
     nameMatches: sameName(newest.signer?.name, ghii?.displayName),
+    ...(walletCaveats(newest).length ? { caveats: walletCaveats(newest) } : {}),
   };
   try {
     await recordWalletSignature(ctx, s.requestId, s.signer, s.sha256, wallet, `${base}-signed.pdf`);
