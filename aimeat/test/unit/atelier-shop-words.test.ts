@@ -8,11 +8,13 @@
  *   refusal line, which is an alert.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-shop-words.test.ts
  * @version-history
+ *   v1.1.1 - 2026-10-25 - The clock is fixed at a midday, so "24 hours ago" is Yesterday on the
+ *     autumn clock-change day too.
  *   v1.1.0 - 2026-10-01 - crew's live count, the palette, compare and the tour take their words
  *     from the kit dictionary too (atelier 0.62.2).
  *   v1.0.0 - 2026-10-01 - Initial (atelier 0.62.1, the shop parts in three languages).
  */
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { installGlobals } from './phaser-stub.mjs';
 
 let restore: any;
@@ -27,6 +29,10 @@ let parts: any;
 let partsUi: any;
 
 beforeAll(async () => {
+  // The fixtures date a message "now" and "24 hours ago", which the shop draws as Today and
+  // Yesterday. On a day with 25 hours (the autumn clock change) 24 hours ago can fall on the same
+  // calendar day, so the clock is fixed at a midday with no clock change near it.
+  vi.useFakeTimers({ now: new Date('2026-10-14T12:00:00Z'), toFake: ['Date'] });
   restore = installGlobals({ motion: 'less' });
   doc = restore.document;
   fmt = await import('../../src/static/sdk-libs/_core/format.js');
@@ -39,7 +45,7 @@ beforeAll(async () => {
   partsUi = await import('../../src/static/sdk-libs/atelier/parts-ui.js');
 });
 afterEach(() => { doc.body.innerHTML = ''; kit.i18n.setLang('en'); });
-afterAll(() => restore());
+afterAll(() => { restore(); vi.useRealTimers(); });
 
 function host(): any {
   const node = doc.createElement('div');
