@@ -444,12 +444,12 @@
       "digest": "sha256:5a5c90c5d8f38a009cffa03d"
     },
     "node:aimeat-game-apps": {
-      "reviewedOn": "2026-09-19",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/data/library-packs/vendored-creative.ts",
         "aimeat/src/static/sdk-libs/phaser/index.js"
       ],
-      "digest": "sha256:e85afc8e3cb9f610c0140d11"
+      "digest": "sha256:28c44ab5d5b30609821c175c"
     },
     "project:aimeat-app-building": {
       "reviewedOn": "2026-10-18",
@@ -664,7 +664,7 @@
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
     "node:aimeat-game-apps": {
-      "aimeat/src/data/library-packs/vendored-creative.ts": "d4c59f171eb2fb20",
+      "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
       "aimeat/src/static/sdk-libs/phaser/index.js": "036eac5aa666d96a"
     },
     "project:aimeat-app-building": {
