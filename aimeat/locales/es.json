@@ -15006,6 +15006,10 @@
   "oauthConsent": {
     "title": "Conecta {client} a AIMEAT",
     "titleNoName": "Conecta tu IA a AIMEAT",
+    "codeGoesTo": "Cuando lo apruebas, el código de inicio de sesión va a",
+    "redirectUnchecked": "Este servidor no pudo comprobar a dónde iría el código de inicio de sesión. Aprueba solo una IA que hayas conectado tú.",
+    "identityHost": "La aplicación se identifica por su dirección",
+    "nameSelfDeclared": "\"{client}\" es el nombre que la aplicación se dio a sí misma. Este servidor no lo ha comprobado, así que fíjate en la dirección de arriba.",
     "yourAi": "Tu IA",
     "yourAiInline": "tu IA",
     "lead": "{client} recibe en AIMEAT su propio nombre y sus propios permisos. A esto se le llama agente. Todo lo que haga aquí queda registrado con el nombre del agente, y tú decides qué puede hacer.",

@@ -12,6 +12,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.8.5 — 2026-10-25 — GET /v1/mcp/consent-info (mcp/oauth-consent-info.ts): the consent page's
+ *     client name, whether it is self-declared, the client_id host and the checked redirect
+ *     (secaudit2026oct22, mcp-oauth:consent-identity-from-request-not-verified-client).
  *   v1.8.4 — 2026-10-25 — The refresh_token grant refuses a refresh token made before the agent's key
  *     rotation (agent.credentialsValidAfter; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.8.3 — 2026-10-25 — secaudit2026oct22: POST /v1/mcp/register refuses a client_name that is not
@@ -70,6 +73,7 @@ import { buildAgentAuthMetadata } from '../services/auth-md.js';
 import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
 import { redirectUriRegistered } from './oauth-redirect.js';
+import { registerOAuthConsentInfo } from './oauth-consent-info.js';
 import {
     hasUnknownResource, mcpOAuthLaxLive, mcpResourceOf, noteLaxUse, pkceRefusal, resourceRefusal, resourceValues,
 } from './oauth-binding.js';
@@ -164,6 +168,9 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             grant_types: ['authorization_code', 'refresh_token'],
         });
     });
+
+    // GET /v1/mcp/consent-info — what the consent page shows, checked here (mcp/oauth-consent-info.ts).
+    registerOAuthConsentInfo(router, storage);
 
     // GET /v1/mcp/authorize — Authorization endpoint (dual-path: signature or browser consent)
     router.get('/v1/mcp/authorize', async (req: Request, res: Response) => {
