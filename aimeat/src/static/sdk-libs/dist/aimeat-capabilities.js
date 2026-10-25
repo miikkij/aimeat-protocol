@@ -33,6 +33,24 @@
     return ns;
   }
 
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    if (typeof self !== "undefined" && typeof self.origin === "string" && self.origin.indexOf("http") === 0) {
+      return self.origin;
+    }
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
   // src/static/sdk-libs/capabilities/index.js
   var { getSession: getSession2, authFetch: authFetch2 } = makeSession("aimeat-capabilities.js");
   var _loadedCortex = {};
@@ -50,6 +68,20 @@
       };
       document.head.appendChild(s);
     });
+  }
+  function nodeCortexLibUrl(raw, ref) {
+    var name = String(ref || "").replace(/^cortex:/, "");
+    if (!name || /[/\\?#]/.test(name)) return null;
+    var base = NODE_URL || location.href;
+    if (!URL.canParse(base) || !URL.canParse(String(raw), base)) return null;
+    var u = new URL(String(raw), base);
+    var nodeOrigin = new URL(base).origin;
+    if (u.origin !== nodeOrigin && u.origin !== location.origin) return null;
+    var prefix = "/v1/cortex/" + encodeURIComponent(name) + "/libs/";
+    if (u.pathname.indexOf(prefix) !== 0) return null;
+    var file = u.pathname.slice(prefix.length);
+    if (!/^[A-Za-z0-9._-]+\.m?js$/.test(file) || file.indexOf("..") !== -1) return null;
+    return u.origin + u.pathname;
   }
   var capabilities = {
     // ── Discovery ──
@@ -86,7 +118,11 @@
         var usage = cap.usage || "";
         var libMatch = usage.match(/loadScript\(['"]([^'"]+)['"]/);
         if (libMatch) {
-          await loadCortexLib(libMatch[1]);
+          var libUrl = nodeCortexLibUrl(libMatch[1], cap.source.ref);
+          if (!libUrl) {
+            throw new Error(`This cortex capability names a library outside this node's cortex route for "` + String(cap.source.ref || "") + '", so it was not loaded. Load the library yourself with loadScript() if you trust it.');
+          }
+          await loadCortexLib(libUrl);
         }
         if (cap.exports && cap.exports.length > 0) {
           var parts = id.split(":");
