@@ -59,15 +59,22 @@
   var BT = String.fromCharCode(96);
   var SAFE = /^(https?:|mailto:)/i;
   var SAFE_IMG = /^(https?:|blob:)/i;
+  function parserText(url) {
+    var s = url.replace(/[\t\n\r]/g, "");
+    var a = 0, b = s.length;
+    while (a < b && s.charCodeAt(a) <= 32) a++;
+    while (b > a && s.charCodeAt(b - 1) <= 32) b--;
+    return s.slice(a, b).trim();
+  }
   function sanitizeHref(url) {
     if (typeof url !== "string") return null;
-    var t = url.trim();
+    var t = parserText(url);
     if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
     return SAFE.test(t) ? t : null;
   }
   function sanitizeImgSrc(url) {
     if (typeof url !== "string") return null;
-    var t = url.trim();
+    var t = parserText(url);
     if (!/^[a-z][a-z0-9+.-]*:/i.test(t)) return t;
     return SAFE_IMG.test(t) ? t : null;
   }
