@@ -51,6 +51,9 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.5.1 — 2026-10-25 — The `<html>` tag is found with findDocumentElement
+ *     (utils/html-document-element.ts), the same scan markDocumentElement uses, so a `<html>` in a
+ *     comment is not taken for it.
  *   v1.5.0 — 2026-10-25 — The internet-open line (utils/app-internet-open-badge.ts) is taken out like the app-info mark.
  *   v1.4.1 — 2026-10-19 — Strip the nonblocking cookie banner's single marked script as well as
  *     both older asset-and-script forms directly after the owner's tags.
@@ -76,6 +79,7 @@ import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
 import { REVIEWED_MARK } from './app-serve-marks.js';
 import { FRAME_SUPPORT_MARK } from '../utils/app-frame-assets.js';
 import { BEHAVIOUR_MARK } from './visibility/behaviour-script.js';
+import { findDocumentElement } from '../utils/html-document-element.js';
 
 /** Which of the node's marks a removal was. One word per block the serve pass writes. */
 export type ServedMarkKind =
@@ -158,9 +162,6 @@ const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string
   { mark: 'owner-tags', marker: 'data-aimeat-tags', words: 'the owner\'s own analytics tags and the cookie banner they bring' },
   { mark: 'behaviour', marker: BEHAVIOUR_MARK, words: 'the on-page behaviour script' },
 ];
-
-/** Where markDocumentElement looks for the `<html>` tag, in the document it marks. */
-const DOCUMENT_ELEMENT_WINDOW = 512;
 
 /** A served copy re-served by an older node can carry two generations; more than this is not a copy. */
 const MAX_PASSES = 4;
@@ -409,24 +410,20 @@ function endsWithTag(text: string, before: number, open: string, shape: RegExp):
 /**
  * The ` ai-disclosure="…"` markDocumentElement appended to the `<html>` tag, when its value is one
  * the node's own meta carried in this same document. It is written as the tag's last attribute, on
- * the first `<html>` tag in the first 512 characters, so that is the only place it is looked for.
- * An author who wrote the attribute themselves with no node block beside it keeps it.
+ * the tag findDocumentElement finds, so that is the only place it is looked for. A `<html>` inside a
+ * comment is not that tag. An author who wrote the attribute themselves with no node block beside it
+ * keeps it.
  *
  * One rewrite here is not undone: markDocumentElement writes the tag name in lower case, so an app
  * that wrote `<HTML …>` gets back `<html …>`.
  */
 function documentElementDisclosure(text: string, values: ReadonlySet<string>): { start: number; end: number } | null {
-  const lower = text.slice(0, DOCUMENT_ELEMENT_WINDOW).toLowerCase();
-  for (let at = lower.indexOf('<html'); at !== -1; at = lower.indexOf('<html', at + 5)) {
-    const after = lower[at + 5];
-    if (after !== '>' && !(after !== undefined && /\s/.test(after))) continue;
-    const gt = text.indexOf('>', at);
-    if (gt < 0) return null;
-    for (const value of values) {
-      const suffix = ` ai-disclosure="${value}"`;
-      if (text.startsWith(suffix, gt - suffix.length)) return { start: gt - suffix.length, end: gt };
-    }
-    return null;
+  const el = findDocumentElement(text);
+  if (!el) return null;
+  const gt = el.end - 1;
+  for (const value of values) {
+    const suffix = ` ai-disclosure="${value}"`;
+    if (text.startsWith(suffix, gt - suffix.length)) return { start: gt - suffix.length, end: gt };
   }
   return null;
 }
