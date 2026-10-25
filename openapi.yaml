@@ -65487,6 +65487,10 @@ paths:
           description: >
             No such connection, or no such stored file. A connection belonging to someone else is
             this same 404.
+        '409':
+          description: >
+            DELEGATION_AMBIGUOUS - more than one channel has given this app_id the action, so the
+            delegated publish does not choose one.
         '502':
           description: >
             The provider refused. `REJECTED` is permanent and must not be retried; `PUBLISH_FAILED`
@@ -66425,6 +66429,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: No such connection.
+        '409':
+          description: DELEGATION_IN_USE - another channel already gives this app_id the same action; choose a different app_id.
     get:
       operationId: listConnectionDelegations
       summary: What has been delegated over a channel
