@@ -1270,7 +1270,8 @@
           "headless_browser": "The server's own browser does not start",
           "scope_words_kept": "Permissions the update gave to existing agents and apps",
           "config_setting": "A setting the server did not accept, so it runs the default",
-          "classification_default_caps": "Limits on who may see classified content"
+          "classification_default_caps": "Limits on who may see classified content",
+          "anonymous_principal_records": "What the shared anonymous agent wrote"
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1296,7 +1297,28 @@
             "erittain-luottamuksellinen": "Highly confidential"
           }
         },
+        "entries": {
+          "lead": {
+            "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision."
+          },
+          "rowResolved": "Every record is decided.",
+          "clear": "Clear",
+          "delete": "Delete",
+          "keep": "Keep as it is",
+          "done": "done",
+          "kept": "kept",
+          "confirmClear": "Remove this from the shared anonymous agent? {line}",
+          "confirmDelete": "Delete this for good? {line}",
+          "kind": {
+            "agent_webhook": "A webhook to {url}. It receives the messages sent to the shared agent.",
+            "agent_tags": "Tags on the shared agent: {tags}",
+            "agent_capabilities": "On the shared agent's public card: {technical} technical and {domain} other capabilities, {languages} languages",
+            "skill": "The skill {name}, with its files",
+            "datapackage": "The data package {name}, with its files"
+          }
+        },
         "source": {
+          "boot": "server start",
           "start": "server start",
           "switch": "classification switched on",
           "workspace_import": "workspace import",

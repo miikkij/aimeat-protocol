@@ -369,7 +369,8 @@
           "headless_browser": "El navegador propio del servidor no arranca",
           "scope_words_kept": "Permisos que la actualización dio a los agentes y las apps existentes",
           "config_setting": "Un ajuste que el servidor no aceptó, así que usa el valor predeterminado",
-          "classification_default_caps": "Límites de quién puede ver el contenido clasificado"
+          "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
+          "anonymous_principal_records": "Lo que escribió el agente anónimo compartido"
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -395,7 +396,28 @@
             "erittain-luottamuksellinen": "Altamente confidencial"
           }
         },
+        "entries": {
+          "lead": {
+            "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión."
+          },
+          "rowResolved": "Todos los registros están decididos.",
+          "clear": "Vaciar",
+          "delete": "Eliminar",
+          "keep": "Dejar como está",
+          "done": "hecho",
+          "kept": "sin cambio",
+          "confirmClear": "¿Quitar esto del agente anónimo compartido? {line}",
+          "confirmDelete": "¿Eliminar esto para siempre? {line}",
+          "kind": {
+            "agent_webhook": "Un webhook a {url}. Recibe los mensajes enviados al agente compartido.",
+            "agent_tags": "Etiquetas del agente compartido: {tags}",
+            "agent_capabilities": "En la ficha pública del agente compartido: {technical} capacidades técnicas y {domain} de otro tipo, {languages} idiomas",
+            "skill": "La habilidad {name}, con sus archivos",
+            "datapackage": "El paquete de datos {name}, con sus archivos"
+          }
+        },
         "source": {
+          "boot": "arranque del servidor",
           "start": "arranque del servidor",
           "switch": "se activó la clasificación",
           "workspace_import": "importación de espacio de trabajo",
