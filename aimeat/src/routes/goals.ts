@@ -47,9 +47,12 @@ export function goalsRouter(config: AimeatConfig, storage: Storage): Router {
   const who = (req: Request) => callerOf(req, config.nodeId, storage);
   const p = (req: Request, name: string) => req.params[name] as string;
   const body = (req: Request) => (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
-  const run = (fn: (req: Request) => Promise<unknown>, status = 200) => async (req: Request, res: Response) => {
+  // Each route hands its own (req, res) handler to the registration, so the field-reach measurement
+  // (scripts/inventory/field-reach.ts) can follow what a route reads from req.body to the route; a
+  // handler built by a wrapper function hides the request from it. `send` only answers.
+  const send = async (res: Response, work: () => Promise<unknown>, status = 200) => {
     try {
-      res.status(status).json(success(config.nodeId, await fn(req)));
+      res.status(status).json(success(config.nodeId, await work()));
     } catch (err) {
       if (!(err instanceof GoalError)) throw err;
       res.status(err.status).json(error(config.nodeId, err.code, err.message));
@@ -58,30 +61,55 @@ export function goalsRouter(config: AimeatConfig, storage: Storage): Router {
   const read = [requireAuth(), requireScope('task:read')];
   const write = [requireAuth(), requireScope('task:write')];
 
-  router.get('/v1/goals', ...read, run(req => listOp(deps, who(req), { status: typeof req.query.status === 'string' ? req.query.status : undefined })));
-  router.post('/v1/goals', ...write, run(req => createOp(deps, who(req), req.body), 201));
-  router.get('/v1/goals/waiting', ...read, run(req => waitingOp(deps, who(req))));
-  router.get('/v1/goals/available', ...read, run(req => workOp(deps, who(req), 'available', {})));
-  router.get('/v1/goals/:id', ...read, run(req => getOp(deps, who(req), p(req, 'id'))));
-  router.patch('/v1/goals/:id', ...write, run(req => patchOp(deps, who(req), p(req, 'id'), req.body)));
-  router.delete('/v1/goals/:id', ...write, run(req => goalActionOp(deps, who(req), p(req, 'id'), 'delete', body(req))));
-  router.post('/v1/goals/:id/actions/:action', ...write, run(req => {
+  router.get('/v1/goals', ...read, async (req: Request, res: Response) => {
+    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    await send(res, () => listOp(deps, who(req), { status }));
+  });
+  router.post('/v1/goals', ...write, async (req: Request, res: Response) => {
+    await send(res, () => createOp(deps, who(req), req.body), 201);
+  });
+  router.get('/v1/goals/waiting', ...read, async (req: Request, res: Response) => {
+    await send(res, () => waitingOp(deps, who(req)));
+  });
+  router.get('/v1/goals/available', ...read, async (req: Request, res: Response) => {
+    await send(res, () => workOp(deps, who(req), 'available', {}));
+  });
+  router.get('/v1/goals/:id', ...read, async (req: Request, res: Response) => {
+    await send(res, () => getOp(deps, who(req), p(req, 'id')));
+  });
+  router.patch('/v1/goals/:id', ...write, async (req: Request, res: Response) => {
+    await send(res, () => patchOp(deps, who(req), p(req, 'id'), req.body));
+  });
+  router.delete('/v1/goals/:id', ...write, async (req: Request, res: Response) => {
+    await send(res, () => goalActionOp(deps, who(req), p(req, 'id'), 'delete', body(req)));
+  });
+  router.post('/v1/goals/:id/actions/:action', ...write, async (req: Request, res: Response) => {
     const action = p(req, 'action');
-    if (!GOAL_ACTIONS.has(action)) throw new GoalError(404, 'NOT_FOUND', 'action is one of pause, resume, stop, done, renew, start_round.');
-    return goalActionOp(deps, who(req), p(req, 'id'), action, body(req));
-  }));
-  router.post('/v1/goals/:id/material', ...write, run(req => attachOp(deps, who(req), p(req, 'id'), body(req))));
-  router.post('/v1/goals/:id/works', ...write, run(req => {
-    const b = body(req);
+    await send(res, async () => {
+      if (!GOAL_ACTIONS.has(action)) throw new GoalError(404, 'NOT_FOUND', 'action is one of pause, resume, stop, done, renew, start_round.');
+      return goalActionOp(deps, who(req), p(req, 'id'), action, body(req));
+    });
+  });
+  router.post('/v1/goals/:id/material', ...write, async (req: Request, res: Response) => {
+    await send(res, () => attachOp(deps, who(req), p(req, 'id'), body(req)));
+  });
+  router.post('/v1/goals/:id/works', ...write, async (req: Request, res: Response) => {
+    // Read in place, not through body(): the field-reach measurement follows a shared helper's
+    // return into every route that calls it, and then credits this route's `action` to the others.
+    const b = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
     const action = b.action === 'leave' ? 'leave' : 'add';
-    return workOp(deps, who(req), action, { ...b, goal_id: p(req, 'id') });
-  }, 201));
-  router.post('/v1/goals/:id/works/:workId/actions/:action', ...write, run(req => {
+    await send(res, () => workOp(deps, who(req), action, { ...b, goal_id: p(req, 'id') }), 201);
+  });
+  router.post('/v1/goals/:id/works/:workId/actions/:action', ...write, async (req: Request, res: Response) => {
     const action = p(req, 'action');
-    if (!WORK_ACTIONS.has(action)) throw new GoalError(404, 'NOT_FOUND', 'action is one of claim, release, reroute, reject.');
-    return workOp(deps, who(req), action, { ...body(req), goal_id: p(req, 'id'), work_id: p(req, 'workId') });
-  }));
-  router.post('/v1/goals/:id/works/:workId/answer', ...write, run(req => answerOp(deps, who(req), p(req, 'id'), p(req, 'workId'), body(req))));
+    await send(res, async () => {
+      if (!WORK_ACTIONS.has(action)) throw new GoalError(404, 'NOT_FOUND', 'action is one of claim, release, reroute, reject.');
+      return workOp(deps, who(req), action, { ...body(req), goal_id: p(req, 'id'), work_id: p(req, 'workId') });
+    });
+  });
+  router.post('/v1/goals/:id/works/:workId/answer', ...write, async (req: Request, res: Response) => {
+    await send(res, () => answerOp(deps, who(req), p(req, 'id'), p(req, 'workId'), body(req)));
+  });
 
   return router;
 }

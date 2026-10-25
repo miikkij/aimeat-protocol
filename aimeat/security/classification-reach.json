@@ -1733,6 +1733,26 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Subscribed public memory passes leaveToPeer; the cache prune and the subscription record are the node's own."
     },
+    "src/services/goals/goals-ops.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-25 (agent goals), the node's own read: when material names a memory record, the record is looked up under the caller and then under the owner only to refuse a name that does not exist; its value is not read on, stored or shown. The goal keeps the name."
+    },
+    "src/services/goals/goals-store.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-25 (agent goals), the node's own read: the owner's goal records (agent-goals.*, a reserved prefix only services/goals writes), read to answer the owner and the owner's agents and to update the record on its version. No content anybody classified."
+    },
+    "src/services/goals/goals-sweep.ts": {
+      "reads": {
+        "listAllMemoryMeta": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-25 (agent goals), the node's own read: the minute sweep lists the goal records (agent-goals.*, reserved, written only by services/goals) to return stuck work, end expired goals and start clock rounds. Shown to nobody here."
+    },
     "src/services/home-feed.ts": {
       "reads": {
         "listMemoryForOwners": 1

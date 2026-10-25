@@ -9,6 +9,7 @@
  * @structure registerGoalTools(mcp, storage, config, caller)
  * @usage registerGoalTools(mcp, storage, config, caller);   // mcp/register-all.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — aimeat_goal_set reads the goal's fields at the top level as well as in `input`.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -21,6 +22,7 @@ import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { toolError } from './tool-error.js';
 import { withCaughtError } from './tool-fault.js';
 import { GoalError } from '../services/goals/goals-store.js';
+import { GOAL_INPUT_FIELDS, WORK_INPUT_FIELDS } from '../tool-catalog/definitions/goals.js';
 import {
   answerOp, attachOp, createOp, getOp, goalActionOp, listOp, patchOp, waitingOp, workOp,
 } from '../services/goals/goals-ops.js';
@@ -57,7 +59,9 @@ export function registerGoalTools(mcp: McpServer, storage: Storage, config: Aime
     const a = args as Record<string, unknown>;
     const action = str(a.action);
     const id = str(a.goal_id);
-    const input = a.input && typeof a.input === 'object' ? { ...(a.input as Record<string, unknown>) } : {};
+    // The goal's fields at the top level, as REST takes them; `input` from an earlier client wins.
+    const top = Object.fromEntries(GOAL_INPUT_FIELDS.filter(k => a[k] !== undefined).map(k => [k, a[k]]));
+    const input: Record<string, unknown> = { ...top, ...(a.input && typeof a.input === 'object' ? a.input as Record<string, unknown> : {}) };
     const reason = str(a.reason);
     if (reason && !input.reason) input.reason = reason;
     switch (action) {
@@ -77,7 +81,10 @@ export function registerGoalTools(mcp: McpServer, storage: Storage, config: Aime
     annotations: annotationsFor('aimeat_goal_work'),
   }, async (args) => guard(async () => {
     const a = args as Record<string, unknown>;
-    return workOp(deps, caller(), str(a.action), a);
+    // A `work` object from an earlier client is merged over the same fields given at the top level.
+    if (!a.work || typeof a.work !== 'object') return workOp(deps, caller(), str(a.action), a);
+    const top = Object.fromEntries([...WORK_INPUT_FIELDS, 'agent', 'wants'].filter(k => a[k] !== undefined).map(k => [k, a[k]]));
+    return workOp(deps, caller(), str(a.action), { ...a, work: { ...top, ...(a.work as Record<string, unknown>) } });
   }));
 
   mcp.registerTool('aimeat_goal_answer', {

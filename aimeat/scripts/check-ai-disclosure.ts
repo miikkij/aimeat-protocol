@@ -314,6 +314,12 @@ const AI_PROVENANCE_REQUIRED = [
  * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
+  // DECIDED, 2026-10-25 (the session that built agent goals; the developer reviews it with the
+  // build). The free text is the owner's answer to a step of their own goal: a choice, an approval
+  // with its reason, a short answer or a fact. It is an instruction to the owner's agents inside the
+  // goal record, never published, and the goal's log already says whether the owner answered in
+  // person or through their AI (services/goals/goals-ops.ts answerOp), which is the provenance it needs.
+  'aimeat_goal_answer',
   // DECIDED, 2026-10-09 (the session that built document signing; the developer reviews it with the
   // build). The free text is a signing request's title and a short note to its parties: a label for
   // the document, which the request names by its hash and never stores. The provenance a signature

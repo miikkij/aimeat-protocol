@@ -7,8 +7,10 @@
  *   refused to an agent that is not the person's own AI, an agent leaving the next work and the chain
  *   limit turning it into an approve step, a rejected result asked again with its reason, pause refusing
  *   a take, and the refusals: another owner, another owner's agent, no token, and a memory route writing
- *   the service-owned key.
+ *   the service-owned key; an agent without task:write on every write route and without task:read on
+ *   the reads; and the four MCP tools driven by the owner's AI, with another owner's agent refused.
  * @version-history
+ *   v1.1.0 — 2026-10-25 — Tests 18 and 19: the scope refusal on every route, and the MCP tools.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=goals
@@ -16,6 +18,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent as scopedAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -90,6 +93,7 @@ const ownerA = `goalowner${Date.now()}`;
 const ownerB = `goalother${Date.now()}`;
 let tokenA = '';
 let tokenB = '';
+let ownerAObj: { name: string; token: string };
 let grok1: Agent; let grok2: Agent; let writer: Agent; let chat: Agent; let otherAgent: Agent;
 let goalId = '';
 let w1 = ''; let w2 = ''; let w3 = '';
@@ -97,6 +101,7 @@ let task1 = ''; let task2 = ''; let task3 = '';
 
 await test('setup: two owners, three working agents, the owner\'s own AI, and another owner\'s agent', async () => {
   tokenA = (await registerOwner(BASE, ownerA)).token;
+  ownerAObj = { name: ownerA, token: tokenA };
   tokenB = (await registerOwner(BASE, ownerB)).token;
   grok1 = await makeAgent(tokenA, ownerA, 'grok1', ['tutkimus']);
   grok2 = await makeAgent(tokenA, ownerA, 'grok2', ['tutkimus']);
@@ -312,6 +317,74 @@ await test('17. no token is refused, and no memory route writes a goal record', 
   assert(w.status === 403, `memory write of the goal: ${w.status} ${JSON.stringify(w.body.error)}`);
   const still = await readGoal(tokenA, goalId);
   assert(still.status === 'done', 'the goal is unchanged');
+});
+
+await test('18. an agent of the owner without task:write is refused by every write route, and one without task:read by the reads', async () => {
+  const readOnly = await scopedAgent(BASE, ownerAObj, ['task:read']);
+  const noTask = await scopedAgent(BASE, ownerAObj, ['memory:read']);
+  const h = auth(readOnly.token);
+  const create = await json('/v1/goals', { method: 'POST', headers: h, body: JSON.stringify({ statement: 'Not allowed' }) });
+  assert(create.status === 403, `create without task:write: ${create.status}`);
+  const patch = await json(`/v1/goals/${goalId}`, { method: 'PATCH', headers: h, body: JSON.stringify({ title: 'Not allowed' }) });
+  assert(patch.status === 403, `update without task:write: ${patch.status}`);
+  const del = await json(`/v1/goals/${goalId}`, { method: 'DELETE', headers: h });
+  assert(del.status === 403, `delete without task:write: ${del.status}`);
+  const pause = await json(`/v1/goals/${goalId}/actions/pause`, { method: 'POST', headers: h, body: '{}' });
+  assert(pause.status === 403, `pause without task:write: ${pause.status}`);
+  const material = await json(`/v1/goals/${goalId}/material`, { method: 'POST', headers: h, body: JSON.stringify({ kind: 'text', ref: 'x' }) });
+  assert(material.status === 403, `material without task:write: ${material.status}`);
+  const leave = await json(`/v1/goals/${goalId}/works`, { method: 'POST', headers: h, body: JSON.stringify({ action: 'leave', title: 'x' }) });
+  assert(leave.status === 403, `leave work without task:write: ${leave.status}`);
+  const waiting = await json('/v1/goals/waiting', { headers: auth(noTask.token) });
+  assert(waiting.status === 403, `waiting without task:read: ${waiting.status}`);
+  const available = await json('/v1/goals/available', { headers: auth(noTask.token) });
+  assert(available.status === 403, `available without task:read: ${available.status}`);
+  const still = await readGoal(tokenA, goalId);
+  assert(still.status === 'done' && still.title !== 'Not allowed', 'nothing changed');
+});
+
+await test('19. the four MCP tools: the owner\'s AI makes, reads, moves and answers a goal; another owner\'s agent is refused', async () => {
+  // The owner's own AI in a conversation: a workstation agent. It writes the person's question when it
+  // makes the goal, and answers it when the person tells it.
+  const ai = await scopedAgent(BASE, ownerAObj, ['task:read', 'task:write']);
+  const ws = await json(`/v1/agents/${ai.name}/mode`, { method: 'PATCH', headers: auth(tokenA), body: JSON.stringify({ mode: 'workstation' }) });
+  assert(ws.status === 200, `workstation mode: ${ws.status} ${JSON.stringify(ws.body.error)}`);
+  const s = await openSession(BASE, ai.token, 'e2e-goals');
+  const made = await callTool(s, 'aimeat_goal_set', { action: 'create', reason: 'MCP test', input: {
+    statement: 'Tell the owner which day suits a meeting.',
+    works: [{ title: 'Which day?', kind: 'human', human_kind: 'choose', options: [{ id: 'mon', label: 'Monday' }, { id: 'tue', label: 'Tuesday' }] }, { title: 'Book it', wants: ['tutkimus'] }],
+  } });
+  assert(!made.isError, `aimeat_goal_set create: ${made.text}`);
+  const id = made.data.goal?.id ?? made.data.data?.goal?.id;
+  assert(typeof id === 'string', `a goal id: ${made.text.slice(0, 300)}`);
+  const got = await callTool(s, 'aimeat_goal_get', { goal_id: id });
+  assert(!got.isError && JSON.stringify(got.data).includes('Which day?'), `aimeat_goal_get: ${got.text.slice(0, 300)}`);
+  const goal = got.data.goal ?? got.data.data?.goal;
+  const step = goal.works.find((w: any) => w.kind === 'human');
+  const open = goal.works.find((w: any) => w.kind === 'agent');
+  const avail = await callTool(s, 'aimeat_goal_work', { action: 'available' });
+  assert(!avail.isError, `aimeat_goal_work available: ${avail.text.slice(0, 300)}`);
+  const answered = await callTool(s, 'aimeat_goal_answer', { goal_id: id, work_id: step.id, option: 'tue' });
+  assert(!answered.isError, `aimeat_goal_answer: ${answered.text.slice(0, 300)}`);
+  const after = await readGoal(tokenA, id);
+  assert(after.works.find((w: any) => w.id === step.id).status === 'done', 'the step is answered');
+  const other = await openSession(BASE, otherAgent.token, 'e2e-goals-other');
+  const refused = await callTool(other, 'aimeat_goal_work', { action: 'claim', goal_id: id, work_id: open.id });
+  assert(refused.isError, `another owner's agent may not take the work: ${refused.text.slice(0, 200)}`);
+  const still = await readGoal(tokenA, id);
+  assert(still.works.find((w: any) => w.id === open.id).status !== 'claimed', 'the work was not taken');
+  // Once the same AI works in a goal, a question it leaves while working is the person's to answer.
+  // The goal's fields at the top level, as REST takes them (the first goal above sent them in `input`).
+  const g2 = await callTool(s, 'aimeat_goal_set', { action: 'create', reason: 'MCP test', statement: 'Work done by the AI itself.', works: [{ title: 'Do it', agent: ai.name }] });
+  assert(!g2.isError, `aimeat_goal_set with top-level fields: ${g2.text.slice(0, 200)}`);
+  const id2 = g2.data.goal?.id ?? g2.data.data?.goal?.id;
+  const w0 = (await readGoal(tokenA, id2)).works[0];
+  assert(w0.status === 'claimed' && w0.claimed_by === ai.name, `a work named for the AI is given to it: ${JSON.stringify(w0).slice(0, 200)}`);
+  const left = await callTool(s, 'aimeat_goal_work', { action: 'leave', goal_id: id2, title: 'Is this right?', kind: 'human', human_kind: 'answer' });
+  assert(!left.isError, `the AI leaves a question: ${left.text.slice(0, 200)}`);
+  const q = (await readGoal(tokenA, id2)).works.find((w: any) => w.kind === 'human');
+  const self = await callTool(s, 'aimeat_goal_answer', { goal_id: id2, work_id: q.id, text: 'Yes' });
+  assert(self.isError && /FORBIDDEN/.test(self.text), `an agent working in the goal may not answer its own question: ${self.text.slice(0, 200)}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

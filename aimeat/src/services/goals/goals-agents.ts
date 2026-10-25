@@ -14,6 +14,7 @@
 import type { AgentRecord } from '../../storage/interface.js';
 import { buildGAII, parseGAII } from '../../utils/gaii.js';
 import { getTodayUsage } from '../ai-usage-record.js';
+import { loadOwnerAgents } from '../db/owner-identity.js';
 import { LIVE_TASK_STATUSES } from '../../storage/types/agents-messaging.js';
 import { logger } from '../../utils/logger.js';
 import type { GoalDeps } from './goals-store.js';
@@ -27,9 +28,8 @@ export function agentGaiiOf(deps: GoalDeps, name: string, ownerName: string): st
 
 /** Every agent of one owner, as the goal reads it. */
 export async function ownerAgents(deps: GoalDeps, ownerName: string): Promise<GoalAgent[]> {
-  const all = await deps.storage.listAgents();
-  return all
-    .filter((a: AgentRecord) => a.owner === ownerName)
+  const own = await loadOwnerAgents(deps.storage, ownerName);
+  return own
     .map((a: AgentRecord) => ({
       name: parseGAII(a.gaii)?.agent ?? a.gaii,
       gaii: a.gaii,
