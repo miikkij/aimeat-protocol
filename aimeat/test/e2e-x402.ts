@@ -22,6 +22,9 @@
  *   e2e-x402-testnet.ts, opted into by setting AIMEAT_X402_TEST_FACILITATOR=false.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.5.0 -- 2026-10-25 -- 5d: a settlement the payment service does not answer is 502
+ *     X402_SETTLE_UNKNOWN, the buyer is told not to pay again, and the seller has a possible-payment
+ *     record and a notice (secaudit2026oct22, lead 4432).
  *   v1.4.0 — 2026-10-18 — An agent of the seller is refused PUT and DELETE /v1/commerce/payout/x402
  *     with 403 ACCESS_DENIED and the address stays as it was; red with requireRole('owner') removed
  *     from either route (wish-kolme-puuttuvaa-kieltotesti-maksuosoite-ty-nkulun-ajo-ja-kyv).
@@ -284,6 +287,34 @@ await test('5c. A checkout session belongs to its buyer, and the seller is not t
     const mine = await json(`/v1/commerce/checkout-sessions/${theirs}`, { headers: auth(buyer.token) });
     assert(mine.status === 200 && mine.body.data.session.status === 'open',
         `the stranger's attempt moved it: ${mine.status} ${mine.body.data?.session?.status}`);
+});
+
+// The payment service settled the transfer and its answer never came back (a timeout): the outcome is
+// unknown, so the node keeps a possible payment for the seller and the operator and tells the buyer
+// not to pay again yet. Before 2026-10-25 the session opened again and nothing was kept
+// (secaudit2026oct22, lead 4432). The double settles a nonce with this prefix and then throws.
+await test('5d. A settlement the payment service does not answer is kept as a possible payment: the buyer is told not to pay again, the seller has the record and a notice', async () => {
+    const open = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ currency: 'USD', items: [{ agent: seller.vendorGaii, offer_id: 'usd-service' }] }),
+    });
+    assert(open.status === 201, `create ${open.status}: ${JSON.stringify(open.body.error)}`);
+    const sid = open.body.data.session.id as string;
+    const nonce = `0xdead5e771e${randomBytes(27).toString('hex')}`;
+    const r = await json(`/v1/commerce/checkout-sessions/${sid}/complete`, {
+        method: 'POST', headers: { ...auth(buyer.token), 'X-PAYMENT': buildXPayment(requirements, BUYER_WALLET, nonce) }, body: JSON.stringify({}),
+    });
+    assert(r.status === 502 && r.body.error?.code === 'X402_SETTLE_UNKNOWN', `unknown outcome: ${r.status} ${JSON.stringify(r.body.error)}`);
+    assert(/not known/.test(r.body.error.message) && /Do not pay again/.test(r.body.error.message) && r.body.error.message.includes(sid),
+        `the buyer's message: ${r.body.error.message}`);
+    const rec = await json(`/v1/memory/${encodeURIComponent(`commerce.possible.${sid}`)}`, { headers: auth(seller.token) });
+    assert(rec.status === 200, `the seller's record: ${rec.status} ${JSON.stringify(rec.body.error)}`);
+    const v = rec.body.data.value ?? rec.body.data.memory?.value;
+    assert(v?.nonce === nonce && v?.payer === BUYER_WALLET && v?.status === 'unconfirmed' && v?.amount === PRICE_MICROS,
+        `the record names the nonce, the payer and the amount: ${JSON.stringify(v)}`);
+    const notes = await json('/v1/notifications', { headers: auth(seller.token) });
+    const list = (notes.body.data?.notifications ?? notes.body.data?.items ?? []) as any[];
+    assert(list.some(n => n.type === 'payment_possible'), `the seller's notice: ${JSON.stringify(list.map(n => n.type))}`);
 });
 
 await test('6. A seller with no USDC address → 422 SELLER_NO_X402_ADDRESS (payTo gate)', async () => {
