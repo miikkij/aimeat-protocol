@@ -38,6 +38,8 @@
  *   cd aimeat && pnpm check:denial-coverage:report     # report
  *   cd aimeat && pnpm check:denial-coverage:seed       # rewrite `exempt` from today's state (a decision)
  * @version-history
+ *   2026-10-25 — ROUTE_CEILING 461: GET and DELETE /v1/intake/forms and GET /v1/organisms/waiting are
+ *     refused to an agent the organism does not admit, by test/e2e-organism-agent-access.ts (secaudit2026oct22).
  *   2026-10-25 — ROUTE_CEILING 464: the two rows below, merged.
  *   2026-10-24 — ROUTE_CEILING 465: PUT /v1/companies/{id}/portfolio and DELETE /v1/companies/{id} are
  *     refused to the minted anonymous token by test/e2e-anonymous.ts Phase 3e (secaudit2026oct22).
@@ -108,7 +110,7 @@ const OPENAPI = join(ROOT, '..', 'openapi.yaml');
  * How many entries security/route-refusal-exemptions.json may hold. Lower it in the change that
  * deletes entries; raising it is the developer's decision.
  */
-export const ROUTE_CEILING = 464;
+export const ROUTE_CEILING = 461;
 
 interface Exemption {
     /** Why this suite has no denial case. Seeded entries say they are unreviewed, and mean it. */

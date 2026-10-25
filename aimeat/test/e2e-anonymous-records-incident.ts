@@ -30,7 +30,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { createStorage } from '../src/storage/storage-factory.js';
-import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
+import { ownerSignIn, registerOwner, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { ANONYMOUS_PRINCIPAL_RECORDS_KEY } from '../src/services/anonymous-principal-records.js';
 
 const PORT = process.env.E2E_ANON_RECORDS_PORT ?? '40458';
@@ -175,6 +175,12 @@ async function stepIncidents(token: string): Promise<any[]> {
             assert(detail.includes(part), `the incident does not name ${part}: ${detail.slice(0, 400)}`);
         }
         assert(/^5 record/.test(detail) && detail.includes('5. '), `one entry per record: ${detail.slice(0, 200)}`);
+    });
+    await test('2c. a person who is not an operator is refused the Security page, and reads no incident', async () => {
+        const person = await registerOwner(BASE, `anrx${stamp}`);
+        const r = await json('/v1/admin/security/incidents', { headers: { Authorization: `Bearer ${person.token}` } });
+        assert(r.status === 403, `a non-operator read the incidents: ${r.status}`);
+        assert(!JSON.stringify(r.body).includes('hooks.example.test'), 'the refusal carries the incident');
     });
     await stopServer(server);
 
