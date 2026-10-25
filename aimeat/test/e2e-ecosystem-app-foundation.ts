@@ -7,6 +7,8 @@
  *   poll-before-approval). Also unit-asserts the gaii.ts GEAI/GAII discrimination. Additive: the
  *   agent path is unaffected (regression covered by e2e-agent-onboarding).
  * @version-history
+ *   2026-10-25 — Phase 9: the Outside apps row's approval sends the data areas left ticked, and an
+ *     unticked organisms-wide area is not granted (secaudit2026oct22, lead 2378, the portal part).
  *   2026-10-25 — owner_scope on PUT and restore stays inside the ecosystem app's own namespace, and a
  *     sibling agent keeps the reach (secaudit2026oct22, memory-key-route:owner-scope-ecosystem-not-excluded).
  *   v1.5.0 — 2026-10-09 — The app pins a real Ed25519 key, and a refresh needs a fresh signature by
@@ -82,6 +84,8 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 }
 
 import { registerOwner } from './helpers/owner-login.js';
+// The Outside apps row's own body builder (pure, no imports), so this asserts what the page sends.
+import { chosenAreas } from '../public/views/profile/ecosystem-tab.helpers.js';
 import { makeAgent } from './helpers/mcp-session.js';
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
@@ -721,6 +725,35 @@ await test('A reconnect with a new key says so with both fingerprints, and appro
   const old = await memRead(before.token);
   assert(old.status === 401, `the credential from before the key change must end, got ${old.status}`);
   assert((await memRead(after.token)).status === 200, 'the credential for the new key works');
+});
+
+// ─── Phase 9: the portal's approval sends the data areas the owner left ticked (secaudit2026oct22, lead 2378) ───
+console.log('\nPhase 9 — The Outside apps row lists the data areas, and its approval sends the ticked ones');
+
+await test('An organisms-wide area the owner unticks on the row is not granted; the ticked one is', async () => {
+  const asked = [
+    { area: 'organisms', pattern: '*', rights: ['read'] },
+    { area: 'memory', pattern: 'service.areadesk.*', rights: ['read', 'write'] },
+  ];
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({ owner: ownerName, app: 'areadesk', display_name: 'Areadesk', public_key: APP_PUBKEY, scopes: ['memory:read', 'organism:read'], data_areas: asked }),
+  });
+  assert(hello.status === 200, `hello ${hello.status}`);
+  const list = await json('/v1/ecosystem-apps/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const row = (list.body.data.requests as any[]).find(r => r.user_code === hello.body.data.user_code);
+  assert(JSON.stringify(row?.requested_data_areas) === JSON.stringify(asked), `the row has the areas to show: ${JSON.stringify(row?.requested_data_areas)}`);
+  // Exactly the body the Outside apps row sends: the Read only preset and the areas left ticked.
+  const ok = await json(`/v1/ecosystem-apps/${row.user_code}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'organism:read'], data_areas: chosenAreas(row, [false, true]) }),
+  });
+  assert(ok.status === 200, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+  const apps = (await json('/v1/ecosystem-apps', { headers: { Authorization: `Bearer ${ownerToken}` } })).body.data.ecosystem_apps as any[];
+  const rec = apps.find(a => String(a.geai).startsWith('eco:areadesk#'));
+  const areas = (rec?.data_areas ?? []) as Array<{ area: string }>;
+  assert(!areas.some(a => a.area === 'organisms'), `the unticked organisms area was granted: ${JSON.stringify(areas)}`);
+  assert(areas.some(a => a.area === 'memory'), `the ticked memory area is missing: ${JSON.stringify(areas)}`);
 });
 
 // ─── Summary ───
