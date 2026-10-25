@@ -8,6 +8,12 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.9.0 — 2026-10-25 — The page reads what the server checked about the app (GET
+        /v1/mcp/consent-info) and shows it before the sign-in and the approval: the host the code goes
+        to, the client_id host of a metadata-document client, and a name the app gave itself at
+        registration marked as not checked. The title uses that checked name instead of the query's.
+        Deny goes back only to a redirect the server checked; otherwise the page says what was not
+        granted (secaudit2026oct22, mcp-oauth:consent-identity-from-request-not-verified-client).
     v1.8.0 — 2026-10-22 — With no stored theme the page follows the OS preference, as the SPA does,
         instead of opening light. The ☀|☾ switch stays and its choice wins.
     v1.7.0 — 2026-10-19 — The agent picker lists the agents in alphabetical order of their shown name.
@@ -118,6 +124,9 @@
     .subtitle { color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
     .lead { font-size:.92rem; line-height:1.5; margin-bottom:.6rem; }
     .operator-line { color:var(--muted); font-size:.8rem; line-height:1.45; margin-bottom:.9rem; }
+    .identity-box { background:var(--surface); border:1px solid var(--accent-soft-border); border-radius:.5rem;
+      padding:.5rem .75rem; margin-bottom:.75rem; font-size:.85rem; line-height:1.45; overflow-wrap:anywhere; }
+    .identity-box p + p { margin-top:.35rem; }
     .operator-line a { color:var(--accent); }
     .agent-explainer { background:var(--surface); border-radius:.5rem; padding:.5rem .75rem;
       margin-bottom:1.25rem; font-size:.85rem; }
@@ -234,9 +243,23 @@
     const clientId = params.get('client_id') || '';
     // The name the connecting service registered with (client_name is required at registration,
     // src/mcp/oauth.ts). Self-declared: it says what the service calls itself, not who verified it.
-    const declaredName = (params.get('client_name') || '').trim();
-    const clientName = declaredName || clientId;
+    // The query's name is replaced by the one this server checked (GET /v1/mcp/consent-info, read at
+    // boot), so a link cannot open this page under a name of its own choosing.
+    let declaredName = (params.get('client_name') || '').trim();
+    let clientName = declaredName || clientId;
     const redirectUri = params.get('redirect_uri') || '';
+    // What the server checked about the app: its registered or published name, whether the name is
+    // self-declared, the client_id host of a metadata-document client, and the redirect's host when
+    // the redirect is one the client registered. null until read, {} when the server does not know it.
+    let verified = null;
+    async function fetchClientInfo() {
+      try {
+        const q = new URLSearchParams({ client_id: clientId, ...(redirectUri ? { redirect_uri: redirectUri } : {}) });
+        const r = await fetch('/v1/mcp/consent-info?' + q.toString(), { headers: { Accept: 'application/json' } });
+        return r.ok ? await r.json() : {};
+      } catch {}
+      return {};
+    }
     const state = params.get('state') || '';
     const codeChallenge = params.get('code_challenge') || '';
     const codeChallengeMethod = params.get('code_challenge_method') || '';
@@ -273,14 +296,46 @@
     // What the page calls the connecting service: its registered name, or "your AI" when it gave
     // none. `aiLabel` opens a sentence, `aiInline` sits inside one; the title has its own key for the
     // no-name case.
-    const aiLabel = declaredName || t('yourAi');
-    const aiInline = declaredName || t('yourAiInline');
+    let aiLabel = declaredName || t('yourAi');
+    let aiInline = declaredName || t('yourAiInline');
     const titleText = () => declaredName ? t('title', { client: declaredName }) : t('titleNoName');
+    /** Take the checked name over the query's, once the server has answered. */
+    function applyVerified(v) {
+      verified = v || {};
+      if (typeof verified.client_name === 'string' && verified.client_name.trim()) {
+        declaredName = verified.client_name.trim();
+        clientName = declaredName;
+        aiLabel = declaredName;
+        aiInline = declaredName;
+      }
+    }
+
+    /**
+     * Where the code goes and how the app is identified, from what the server checked: the redirect's
+     * host, the client_id host of a metadata-document client, and a name the app gave itself marked
+     * as not checked. Shown before the sign-in and the approval alike.
+     */
+    function identityHtml() {
+      if (!verified) return '';
+      const lines = [];
+      if (verified.redirect_ok && verified.redirect_host) {
+        lines.push(`${escHtml(t('codeGoesTo'))} <strong>${escHtml(verified.redirect_host)}</strong>`);
+      } else {
+        lines.push(escHtml(t('redirectUnchecked')));
+      }
+      if (verified.client_id_host) {
+        lines.push(`${escHtml(t('identityHost'))} <strong>${escHtml(verified.client_id_host)}</strong>`);
+      } else if (verified.self_declared && declaredName) {
+        lines.push(escHtml(t('nameSelfDeclared', { client: declaredName })));
+      }
+      return `<div class="identity-box">${lines.map((l) => `<p>${l}</p>`).join('')}</div>`;
+    }
 
     /** The lead and the expandable "What is an agent?", shared by the sign-in and approval views. */
     const introHtml = () => `
       <h1>${escHtml(titleText())}</h1>
       <p class="lead">${escHtml(t('lead', { client: aiLabel }))}</p>
+      ${identityHtml()}
       ${operatorHtml()}
       <details class="agent-explainer">
         <summary>${escHtml(t('whatIsAgent'))}</summary>
@@ -483,8 +538,11 @@
     }
 
     function deny() {
-      if (redirectUri) {
-        const url = new URL(redirectUri);
+      // Only to a redirect the server checked is one the client registered (GET /v1/mcp/consent-info);
+      // any other is not followed, so a link cannot turn Deny into a jump to an address of its choice.
+      const checked = verified && verified.redirect_ok && typeof verified.redirect_uri === 'string' ? verified.redirect_uri : '';
+      if (checked) {
+        const url = new URL(checked);
         url.searchParams.set('error', 'access_denied');
         url.searchParams.set('error_description', 'User denied the request');
         if (state) url.searchParams.set('state', state);
@@ -852,7 +910,9 @@
 
     // Boot. The operator statement is public and small, so it is read beside the session restore and
     // is in place before the first view renders.
-    [session, operator] = await Promise.all([checkSession(), fetchOperator()]);
+    let clientInfo;
+    [session, operator, clientInfo] = await Promise.all([checkSession(), fetchOperator(), fetchClientInfo()]);
+    applyVerified(clientInfo);
     if (session) {
       const jwt = session.jwt || session.token;
       loadPacing(jwt);

@@ -30,6 +30,8 @@
  *   - Phase 3: app-grant PKCE and redirect_uri refusals at authorize and token
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-oauth-consent-refusals
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Phase 4: GET /v1/mcp/consent-info, what the consent page shows as the server
+ *     checked it, and no redirect for Deny that the client did not register (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — The token names the client by its registered name, not a posted client_name (secaudit2026oct22).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F01a-01, F21a-01, F21a-02).
  */
@@ -318,6 +320,30 @@ await test('token with the right verifier but another redirect_uri: 400 INVALID_
     const r = await exchange(code, { code_verifier: p.verifier, redirect_uri: 'http://localhost:9911/other' });
     assert(r.status === 400 && r.body.error?.code === 'INVALID_GRANT' && /redirect_uri/i.test(r.body.error?.message ?? ''), `redirect mismatch: ${r.status} ${short(r.body)}`);
     assert(!r.body.data?.access_token, `a token was issued: ${short(r.body)}`);
+});
+
+// ─── Phase 4: what the consent page shows, as the server checked it (secaudit2026oct22, lead 2483) ───
+console.log('\nPhase 4 — the consent page reads the checked name, the redirect host and the self-declared mark');
+
+await test('a registered client: its own name, marked self-declared, and the host of a redirect it registered', async () => {
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `Claude ${stamp}`, redirect_uris: [MCP_REDIRECT] }) });
+    assert(reg.status === 201, `register ${reg.status}`);
+    const id = reg.body.client_id as string;
+    const ok = await json(`/v1/mcp/consent-info?client_id=${encodeURIComponent(id)}&redirect_uri=${encodeURIComponent(MCP_REDIRECT)}`);
+    assert(ok.status === 200 && ok.body.client_name === `Claude ${stamp}` && ok.body.self_declared === true, `info: ${short(ok.body)}`);
+    assert(ok.body.redirect_ok === true && ok.body.redirect_host === 'client.example.test' && ok.body.redirect_uri === MCP_REDIRECT, `redirect: ${short(ok.body)}`);
+    // No redirect named: the first registered one, as the authorize step uses.
+    const first = await json(`/v1/mcp/consent-info?client_id=${encodeURIComponent(id)}`);
+    assert(first.body.redirect_ok === true && first.body.redirect_host === 'client.example.test', `first: ${short(first.body)}`);
+});
+
+await test('a redirect the client did not register is not offered to Deny, and an unknown client is 404', async () => {
+    const reg = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: `Desk ${stamp}`, redirect_uris: [MCP_REDIRECT] }) });
+    const id = reg.body.client_id as string;
+    const off = await json(`/v1/mcp/consent-info?client_id=${encodeURIComponent(id)}&redirect_uri=${encodeURIComponent('https://elsewhere.example.test/x')}`);
+    assert(off.status === 200 && off.body.redirect_ok === false && !('redirect_uri' in off.body) && !('redirect_host' in off.body), `unregistered: ${short(off.body)}`);
+    const none = await json('/v1/mcp/consent-info?client_id=mcp-client-nobody');
+    assert(none.status === 404 && none.body.error === 'invalid_client', `unknown: ${none.status} ${short(none.body)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

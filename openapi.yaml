@@ -80507,6 +80507,41 @@ paths:
                           code: { example: BACKFILL_FAILED }
 
   # ── MCP OAuth consent ─────────────────────────────────────────
+  /v1/mcp/consent-info:
+    get:
+      operationId: getMcpConsentInfo
+      summary: What the consent page shows about the app that asks, as this server checked it
+      description: >-
+        The consent page (GET /v1/oauth/consent) reads this before anyone signs in and shows it in
+        place of what its own address says: the name the client registered (dynamic registration,
+        which the client chose itself, so `self_declared` is true) or the name its Client ID
+        Metadata Document gives, the host of a metadata-document client's client_id URL, and
+        whether the redirect is one the client registered, with its host. Deny goes back only to a
+        redirect this route answered `redirect_ok` for. No credential; it says nothing the caller of
+        the authorize step was not already told.
+      tags: [Auth]
+      parameters:
+        - { in: query, name: client_id, required: true, schema: { type: string } }
+        - { in: query, name: redirect_uri, required: false, schema: { type: string }, description: The redirect the request names; the client's first registered one when absent, as the authorize step does. }
+      responses:
+        '200':
+          description: The checked facts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  client_id: { type: string }
+                  client_name: { type: string }
+                  self_declared: { type: boolean, description: 'True for a dynamically registered client: the name is the one the client gave itself.' }
+                  client_id_host: { type: string, description: The host of a metadata-document client's client_id URL. }
+                  redirect_ok: { type: boolean }
+                  redirect_uri: { type: string, description: Present when redirect_ok. }
+                  redirect_host: { type: string, description: Present when redirect_ok. }
+        '400':
+          description: client_id missing.
+        '404':
+          description: The server does not know this client_id.
   /v1/mcp/authorize-consent:
     post:
       operationId: submitMcpAuthorizeConsent

@@ -16756,6 +16756,10 @@
   "oauthConsent": {
     "title": "Connect {client} to AIMEAT",
     "titleNoName": "Connect your AI to AIMEAT",
+    "codeGoesTo": "When you approve, the sign-in code goes to",
+    "redirectUnchecked": "This server could not check where the sign-in code would go. Approve only an AI you connected yourself.",
+    "identityHost": "The app is identified by its address",
+    "nameSelfDeclared": "\"{client}\" is the name the app gave itself. This server has not checked it, so check the address above.",
     "yourAi": "Your AI",
     "yourAiInline": "your AI",
     "lead": "{client} gets its own name and its own permissions in AIMEAT. This is called an agent. Everything it does here is recorded under the agent's name, and you decide what it may do.",
