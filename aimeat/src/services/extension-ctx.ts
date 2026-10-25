@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.20.0 — 2026-10-25 — ctx.fetch calls of one run are queued past its in-flight answer budget,
+ *     and getPublic by a bare owner name reads one record (extension-host-bounds.ts; secaudit2026oct22).
  *   v1.19.1 — 2026-10-24 — ctx.fetch asks decideSharedFirstUse before a value from the extension's
  *     shared secret map is bound to its first host (secaudit2026oct22; Jouni, 2026-10-24).
  *   v1.19.0 — 2026-10-24 — ctx.fetch takes `responseType: 'base64'`: the bytes come back intact as
@@ -150,6 +152,7 @@ import { readerForCaller, systemReader } from './classification/reader.js';
 import { shareCarriesKey } from './group-shares-classification.js';
 import { capabilityNotDeclared, type ExtensionCapabilitySet } from './extension-capability-declaration.js';
 import { buildExtensionCalendar } from './extension-calendar.js';
+import { createFetchGate, withFetchGate, agentRecordByKey } from './extension-host-bounds.js';
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -492,6 +495,8 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // own work; a read of somebody's public memory is made for the caller who invoked the action.
     const ownReader = systemReader({ storage, config }, extMemoryOwner);
     const callerReader = readerForCaller({ storage, config }, deps.caller);
+    // One gate per run: fetches started together are queued past the run's in-flight budget.
+    const fetchGate = createFetchGate(deps.capabilities.fetchMaxBytes);
 
     const ctx: ExtensionCtx = {
         memory: {
@@ -608,17 +613,10 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 const ownDoor = ownDoorRefusal(namespace, key, config.nodeId);
                 if (ownDoor) throw new Error(`${ownDoor.code}: ${ownDoor.message}`);
                 let record = await storage.getMemory(namespace, key);
-                // A bare owner name resolves through that owner's agents. One IN query rather than
-                // one lookup per agent: the per-agent loop was the older shape and it is still in
-                // the scheduler copy this builder replaces.
+                // A bare owner name resolves through that owner's agents, reading one record
+                // (extension-host-bounds.ts; secaudit2026oct22).
                 if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
-                    const agents = await storage.getAgentsByOwner(namespace);
-                    const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
-                    const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
-                    for (const agent of agents) {
-                        const r = byGaii.get(agent.gaii);
-                        if (r) { record = r; break; }
-                    }
+                    record = await agentRecordByKey(storage, namespace, key);
                 }
                 // An ext: namespace is world-readable by design, so only 'public' leaves it, and it
                 // leaves through the one presentation of a memory value, for the caller.
@@ -657,7 +655,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         //
         // GUARD (2026-10-08): a manifest that names `network: { hosts }` reaches only those hosts.
         // Checked here before any secret is resolved, and again on every redirect hop by safeFetch.
-        fetch: async (url, opts, host) => {
+        // GUARD (2026-10-25): at most the run's in-flight budget of answers is buffered at once;
+        // a call past it waits for a slot (extension-host-bounds.ts; secaudit2026oct22).
+        fetch: withFetchGate<ExtensionCtx['fetch']>(fetchGate, async (url, opts, host) => {
             if (deps.providerCall) assertProviderHost(deps.providerCall, url);
             const inject = deps.providerCall?.inject;
             // The owner's key never travels in clear text: over https only, or http to localhost on
@@ -727,7 +727,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             const forms = scrubFormsOf([...outbound.inserted, ...(inject ? [inject.value, inject.value.replace(/^Bearer\s+/i, '')] : [])]);
             if (bytes) return { status: resp.status, ok: resp.ok, ...scrubResponse('', headers, forms), base64: scrubBytes(bytes, forms).toString('base64') };
             return { status: resp.status, ok: resp.ok, ...scrubResponse(text, headers, forms) };
-        },
+        }),
 
         caller: deps.caller,
         // Server-derived, so an owner-only action can exist at all. Absent on a road that does not
