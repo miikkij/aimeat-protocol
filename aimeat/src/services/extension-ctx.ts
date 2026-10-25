@@ -28,6 +28,9 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   2026-10-25 — buildExtensionEmail and unavailableEmail moved to services/extension-email.ts by pure
+ *     extraction (max-file-lines), re-exported here; ctx.email's tier 1 asks extensionConsentHolds
+ *     there (secaudit2026oct22).
  *   v1.19.1 — 2026-10-24 — ctx.fetch asks decideSharedFirstUse before a value from the extension's
  *     shared secret map is bound to its first host (secaudit2026oct22; Jouni, 2026-10-24).
  *   v1.19.0 — 2026-10-24 — ctx.fetch takes `responseType: 'base64'`: the bytes come back intact as
@@ -131,7 +134,6 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
-import type { EmailService } from './email.js';
 import { enforceExtensionMemoryLimits } from './quota.js';
 import { isServerWrittenKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
 import { ownDoorRefusal } from '../utils/own-door-keys.js';
@@ -330,57 +332,9 @@ export function buildExtensionNotify(deps: {
     };
 }
 
-/**
- * The tiered email capability, which is the one place a sandboxed script can reach a stranger.
- * Three ways to be allowed, checked in this order:
- *   Tier 2 — the operator set `emailPolicy: 'unrestricted'` on this extension's config. Only the
- *            operator can write that, and manifest config strips `__` keys, so a guest cannot.
- *   Tier 0 — the recipient IS the owner's own verified notification address.
- *   Tier 1 — the owner granted an `extension_email` consent naming this extension.
- * Anything else is refused and logged. Written once here because it was written three times before,
- * and a rule about who may be emailed is not a thing to keep re-deriving.
- */
-export function buildExtensionEmail(deps: {
-    storage: Storage;
-    config: AimeatConfig;
-    extName: string;
-    extConfig: Record<string, unknown> | undefined;
-    /** Bare owner name whose consents and verified address decide the answer. */
-    ownerName: string;
-    emailService: EmailService | undefined;
-}): NonNullable<ExtensionCtx['email']> {
-    const { storage, config, extName, extConfig, ownerName, emailService } = deps;
-    return async (to, subject, body) => {
-        if (!emailService?.enabled) {
-            logger.warn(`[ext:${extName}] Email not available (SMTP not configured)`);
-            return false;
-        }
-        if (extConfig?.emailPolicy === 'unrestricted') {
-            return emailService.sendNotification(to, subject, body);
-        }
-        const ownerGhii = ownerName.includes('@') ? ownerName : `${ownerName}@${config.nodeId}`;
-        const ghiiRec = await storage.getGHII(ownerGhii);
-        if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
-            return emailService.sendNotification(to, subject, body);
-        }
-        const consents = await storage.listConsents(ownerGhii, { status: 'active' });
-        if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${extName}`)) {
-            return emailService.sendNotification(to, subject, body);
-        }
-        logger.warn(`[ext:${extName}] Email blocked: no authorization for recipient`);
-        return false;
-    };
-}
-
-/** An email capability for a road that genuinely cannot send one. Returns false rather than being
- *  absent, so a script that calls `ctx.email(…)` gets the answer it always got instead of a
- *  TypeError. MCP uses this. */
-export function unavailableEmail(extName: string, reason: string): NonNullable<ExtensionCtx['email']> {
-    return async () => {
-        logger.warn(`[ext:${extName}] Email not available (${reason})`);
-        return false;
-    };
-}
+// buildExtensionEmail and unavailableEmail live in services/extension-email.ts (moved 2026-10-25,
+// max-file-lines) and are re-exported here, so every importer resolves unchanged.
+export { buildExtensionEmail, unavailableEmail } from './extension-email.js';
 
 /**
  * How much memory, time and outbound calls one action may have. The declared numbers are a request,
