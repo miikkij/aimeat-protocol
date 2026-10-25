@@ -27,6 +27,8 @@
  *   verifySeal · evidenceHash · canonicalJson
  * @usage const challenge = intentChallenge(intent);
  * @version-history
+ *   v1.3.0 -- 2026-10-25 -- SealedStatement.certificate (a wallet signature's certificate subject and
+ *     issuer) and the caveat NAME_NOT_VERIFIED (secaudit2026oct22, lead 3924).
  *   v1.2.0 -- 2026-10-25 -- SealedStatement.caveats: what the node could not establish when it sealed a
  *     wallet signature, first REVOCATION_UNKNOWN (secaudit2026oct22, lead 3895).
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: SealedStatement.test, set only for a wallet signature
@@ -91,16 +93,23 @@ export interface SealedStatement {
    * none, so a statement sealed before the field existed keeps its canonical JSON and its seal.
    */
   caveats?: StatementCaveat[];
+  /**
+   * The certificate a wallet signature was made with: its subject and its issuer, so whoever checks
+   * the seal sees whose certificate the node matched with the signer (a wallet signature only).
+   * Absent on every other statement and on a wallet statement sealed before 2026-10-25.
+   */
+  certificate?: { subject: string; issuer: string | null };
 }
 
 /** One recorded caveat of a sealed statement. */
 export interface StatementCaveat { code: StatementCaveatCode; text: string }
 
-export type StatementCaveatCode = 'REVOCATION_UNKNOWN';
+export type StatementCaveatCode = 'REVOCATION_UNKNOWN' | 'NAME_NOT_VERIFIED';
 
 /** The sentence each caveat is sealed with, in English, as the statement is. */
 export const STATEMENT_CAVEATS: Record<StatementCaveatCode, string> = {
   REVOCATION_UNKNOWN: 'Whether the signing certificate had been revoked could not be established when this signature was sealed.',
+  NAME_NOT_VERIFIED: 'The name in the signing certificate was compared with the name the account holder gave on this node, which no identity verification has confirmed.',
 };
 
 /** A caveat with its sentence. */

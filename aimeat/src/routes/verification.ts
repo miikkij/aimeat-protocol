@@ -5,6 +5,7 @@
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history
+ *   2026-10-25 -- A verification keeps the given and family name it proved (services/verified-name.ts), which a wallet signature's seal compares with instead of the display name (secaudit2026oct22, lead 3924).
  *   2026-10-18 — An EUDI wallet or a bank identification that shows 18 or older records the account
  *     holder as a verified adult (services/adult-assurance.ts); the birth date is not kept (Comicland v3 A-3).
  *   2026-10-15 — GET /v1/consent/:id/receipt gives the receipt the consenting person's language
@@ -51,6 +52,7 @@ import { requireAuth, requireOwnerPrincipal, requireOperator, requireScope } fro
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { isAdultByClaims, recordAdult } from '../services/adult-assurance.js';
+import { verifiedNameOfClaims, recordVerifiedName } from '../services/verified-name.js';
 import { operatorOverride } from '../services/operator-override.js';
 
 export function verificationRouter(
@@ -163,6 +165,9 @@ export function verificationRouter(
       });
       // Adult or not, from the attested claims of this request; the birth date is not kept.
       if (isAdultByClaims(result.attributes)) await recordAdult(storage, ghii.ghii, 'eudiw');
+      // The name the credential proved, which a wallet signature's seal compares with (services/verified-name.ts).
+      const eudiwName = verifiedNameOfClaims(result.attributes);
+      if (eudiwName) await recordVerifiedName(storage, ghii.ghii, eudiwName, 'eudiw');
 
       res.json(success(config.nodeId, {
         ghii: ghii.ghii,
@@ -248,6 +253,9 @@ export function verificationRouter(
       });
       // Adult or not, from the attested claims of this request; the birth date is not kept.
       if (isAdultByClaims(result.attributes)) await recordAdult(storage, ghii.ghii, 'eudiw');
+      // The name the credential proved, which a wallet signature's seal compares with (services/verified-name.ts).
+      const eudiwName = verifiedNameOfClaims(result.attributes);
+      if (eudiwName) await recordVerifiedName(storage, ghii.ghii, eudiwName, 'eudiw');
 
       res.json(success(config.nodeId, {
         ghii: ghii.ghii,
@@ -362,6 +370,9 @@ export function verificationRouter(
       });
       // Adult or not, from the bank's birth date or the identity code it carries; neither is kept.
       if (isAdultByClaims({ ...tokenResult.claims, pid: pidValue })) await recordAdult(storage, ghii.ghii, 'ftn');
+      // The name the bank proved, which a wallet signature's seal compares with (services/verified-name.ts).
+      const ftnName = verifiedNameOfClaims(tokenResult.claims);
+      if (ftnName) await recordVerifiedName(storage, ghii.ghii, ftnName, 'ftn');
 
       if (req.accepts('html')) {
         res.redirect(`${config.baseUrl}/v1/profile`);
