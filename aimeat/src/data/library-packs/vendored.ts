@@ -10,6 +10,8 @@
  * @structure VENDORED_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   2026-10-25 — NEW proj4leaflet pack (proj4 2.22.0 + Proj4Leaflet 1.0.2), in ./vendored-maps.ts
+ *     (800-line rule): a Leaflet map in EPSG:3067 for MML's maps (jussil riistakartta).
  *   2026-10-22 — realtime aiDoc: frames over the relay limit go in parts and arrive whole (realtime.js
  *     1.5.0), pace(n), and SharedClock's measure(rt), adopt(payload, from) and schedule(cb, opts).
  *   2026-10-17 — realtime aiDoc: createRoom needs social:write, an empty room is removed after an
@@ -46,6 +48,7 @@ import type { LibraryPack } from '../library-packs.js';
 import { CREATIVE_PACKS } from './vendored-creative.js';
 import { MOTION_PACKS } from './vendored-motion.js';
 import { MEDIA_PACKS } from './vendored-media.js';
+import { MAP_PACKS } from './vendored-maps.js';
 
 export const VENDORED_PACKS: LibraryPack[] = [
   {
@@ -746,4 +749,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     status: 'preview',
     modelTier: 'any',
   },
+  // proj4leaflet (a Leaflet map in EPSG:3067 and other projections) lives in ./vendored-maps.ts
+  // for the same reason, after the leaflet pack it requires.
+  ...MAP_PACKS,
 ];
