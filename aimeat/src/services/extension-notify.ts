@@ -12,6 +12,9 @@
  * @structure safeNotificationLink, extensionCrossNotify
  * @usage if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
  * @version-history
+ *   2026-10-25 — The consent counts only when granted at or after the current extension's install and
+ *     not expired (services/extension-consent.ts): a new install of a freed name inherits no earlier
+ *     consent (secaudit2026oct22).
  *   v1.3.1 — 2026-09-26 — The target's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.3.0 — 2026-09-24 — A relative link is kept only when safeRedirectPath says it is a path of
  *     this node, so `/\host` (which a browser reads as `//host`) falls back like any other address.
@@ -27,6 +30,7 @@ import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 import { localAccountName } from '../utils/gaii.js';
+import { extensionConsentHolds } from './extension-consent.js';
 
 /**
  * Where an extension's notification may lead. A notification is a message the node delivers in its
@@ -75,8 +79,9 @@ export async function extensionCrossNotify(
     logger.warn(`[ext:${extName}] cross-notify blocked: no such owner ${targetOwner}`);
     return false;
   }
-  const consents = await storage.listConsents(targetGhii, { status: 'active' });
-  const allowed = consents.some((c) => c.purpose === 'extension_notify' && c.dataPattern === `ext:${extName}`);
+  // The consent must name the extension installed under this name now, not an earlier one
+  // (services/extension-consent.ts; secaudit2026oct22).
+  const allowed = await extensionConsentHolds(storage, targetGhii, 'extension_notify', extName);
   if (!allowed) {
     logger.warn(`[ext:${extName}] cross-notify blocked: ${targetOwner} has no extension_notify consent for ext:${extName}`);
     return false;
