@@ -14,6 +14,10 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-10-25 -- secaudit2026oct22: the ticket keeps the bearer it was minted with
+ *     (auth/stream-credential.ts), and the stream asks again whether the node honours it: before a
+ *     change frame when the last answer is over 5 s old, and every 60 s while idle. A revoked
+ *     credential gets `event: revoked` and the stream ends, presence included.
  *   2026-10-21 -- The ticket's audience asks isAnonymousPrincipal, so the minted anonymous token gets no
  *     member-audience events (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.8.0 -- 2026-10-18 -- A workspace's own domain, `workspace:<organismId>/<ws>`
@@ -75,6 +79,7 @@ import { resolveIdentity, localAccountName, runAsNode } from '../utils/gaii.js';
 import { presence } from '../services/presence.js';
 import { allowedDomains, filterDomains, isOwnerPrincipal } from '../auth/sse-domain-scopes.js';
 import { isOrganismMember, type AudienceAuth } from '../services/audience.js';
+import { streamCredentialOf, streamCredentialRevoked, type StreamCredential } from '../auth/stream-credential.js';
 import { logger } from '../utils/logger.js';
 
 interface Ticket {
@@ -104,7 +109,17 @@ interface Ticket {
    * streams of that organism's members. Frozen at mint time with the rest, from `req.auth`.
    */
   audience?: AudienceAuth;
+  /**
+   * The bearer the ticket was minted with, asked again while the stream runs (auth/stream-credential.ts):
+   * the stream ends when the node stops honouring it. Absent for a visitor's ticket.
+   */
+  credential?: StreamCredential;
 }
+
+/** A change frame waits for a fresh answer to "is the credential still honoured" when the last is this old. */
+const RECHECK_BEFORE_FRAME_MS = 5_000;
+/** An idle stream asks the same question this often, so a revoked stream also ends with no change to send. */
+const RECHECK_IDLE_MS = 60_000;
 
 const tickets = createSingleUseTicketStore<Ticket>();
 
@@ -142,7 +157,10 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
       }
       app = topic;
     }
+    const header = req.headers.authorization;
+    const credential = await streamCredentialOf(typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : null);
     const ticket = tickets.mint({
+      ...(credential ? { credential } : {}),
       sub: req.auth!.sub,
       presenceGhii: resolveIdentity(req.auth!, config.nodeId),
       allow: owner ? null : allowedDomains(req.auth!.scopes),
@@ -283,14 +301,49 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     let lastSent = 0;
     let trailingTimer: ReturnType<typeof setTimeout> | null = null;
     const pending = new Set<string>();
+
+    // 4. STILL HONOURED — the credential was verified once, at ticket mint. The stream asks again
+    //    before a change frame when its last answer is older than RECHECK_BEFORE_FRAME_MS, and every
+    //    RECHECK_IDLE_MS while idle; when the node no longer honours it (signed out, agent or app grant
+    //    removed, account deactivated) the stream sends `event: revoked` and ends, and an owner's
+    //    presence goes with it (secaudit2026oct22).
+    const credential = t.credential;
+    let lastChecked = Date.now();
+    let ended = false;
+    const revoked = async (): Promise<boolean> => {
+      if (!credential) return false;
+      lastChecked = Date.now();
+      return streamCredentialRevoked(storage, credential).catch((err: unknown) => {
+        logger.warn('sse: credential check failed, the stream stays open until the next check', { error: String(err) });
+        return false;
+      });
+    };
+    const endRevoked = (): void => {
+      if (ended) return;
+      res.write('event: revoked\ndata: {}\n\n');
+      flush();
+      cleanup();
+      res.end();
+    };
     const flushChange = (): void => {
       lastSent = Date.now();
       const domains = [...pending];
       pending.clear();
       if (!domains.length) return; // everything in this window was filtered out
-      res.write(`data: ${JSON.stringify({ domains })}\n\n`);
-      flush();
+      const send = (): void => {
+        if (ended) return;
+        res.write(`data: ${JSON.stringify({ domains })}\n\n`);
+        flush();
+      };
+      if (credential && Date.now() - lastChecked >= RECHECK_BEFORE_FRAME_MS) {
+        void revoked().then(gone => runAsNode(config.nodeId, () => { if (gone) endRevoked(); else send(); }));
+        return;
+      }
+      send();
     };
+    const idleCheck = credential
+      ? setInterval(() => { void revoked().then(gone => { if (gone) runAsNode(config.nodeId, endRevoked); }); }, RECHECK_IDLE_MS)
+      : null;
     // The bus calls this as whoever emitted the event, which in a process that serves more than one
     // node can be another node. So it runs as THIS node, and matches the owner for the node that
     // opened the stream. A production process serves one node, so nothing there changes.
@@ -355,9 +408,12 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     };
     if (topic) onAppChangeEvent(appHandler);
 
-    // Cleanup on disconnect
-    req.on('close', () => {
+    // Cleanup on disconnect, or when the stream ends itself on a revoked credential. Once only.
+    const cleanup = (): void => {
+      if (ended) return;
+      ended = true;
       clearInterval(keepalive);
+      if (idleCheck) clearInterval(idleCheck);
       if (trailingTimer) clearTimeout(trailingTimer);
       if (draftTimer) clearTimeout(draftTimer);
       if (domainFrames) offChangeEvent(handler);
@@ -368,7 +424,8 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
         const left = (visitorStreamsByIp.get(visitorIp) ?? 1) - 1;
         if (left > 0) visitorStreamsByIp.set(visitorIp, left); else visitorStreamsByIp.delete(visitorIp);
       }
-    });
+    };
+    req.on('close', cleanup);
   });
 
   return router;

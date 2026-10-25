@@ -73923,6 +73923,10 @@ paths:
         stream opened for one app emits `event: app` with
         `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. `:keepalive`
         comments every 15s. Response is `text/event-stream`; 503 when the visitor streams are at their cap.
+        A signed-in stream ends with `event: revoked` when the node stops honouring the credential
+        its ticket was minted with (signed out, agent or app grant removed, account deactivated),
+        checked before a change frame and every 60 seconds; mint a new ticket with a live credential
+        to reconnect.
       parameters:
         - name: ticket
           in: query
