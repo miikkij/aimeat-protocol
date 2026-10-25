@@ -33298,6 +33298,13 @@ paths:
         payment provider settings, decide keys) or a workspace share password. `data.omitted`
         lists the same in the response, so a restore knows what to set again. `data.version` is
         `1.3`.
+
+        The operator in person gets every other memory record. The operator's agent holding
+        `operator:admin` gets the records the classification reader lets it read, as on
+        GET /v1/admin/memory/{owner}/{key}: a record its clearance or the record's label keeps from
+        it stays out, and `data.withheld` lists each one as `{ owner, key }` (empty for the operator
+        in person). Each person whose entries the file holds reads an export line, with the count,
+        in their account feed (since 2026-10-25).
       tags: [Admin]
       security:
         - BearerAuth: []

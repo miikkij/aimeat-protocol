@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-25: memory_accessed_by_operator with action export: an operator's backup holds this many of
+ *     your entries (secaudit2026oct22).
  *   2026-10-16: password_changed (reset, changed or set) under access, session_token_reused under trouble,
  *     and operator_acted sentences for an account turned off or on and the operator role given or taken
  *     (QA audit E2-03, S1-02, E2-04).
@@ -148,6 +150,7 @@ export function line(item) {
       }
       if (d.action === 'delete') return tr('home.feed.operatorDeletedEntry', 'An operator deleted your entry {key}.').replace('{key}', d.key || '');
       if (d.action === 'restore') return tr('home.feed.operatorRestoredEntry', 'An operator restored your entry {key}.').replace('{key}', d.key || '');
+      if (d.action === 'export') return tr('home.feed.operatorExportedEntries', 'An operator took a backup of this installation. It holds {count} of your entries.').replace('{count}', d.count || '');
       return tr('home.feed.operatorOpenedEntry', 'An operator opened your entry {key}.').replace('{key}', d.key || '');
     case 'operator_acted':
       if (d.area === 'install-set') {

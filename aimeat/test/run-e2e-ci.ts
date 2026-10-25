@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-25 -- e2e-admin-backup-reader.ts joins the list (not the guard tier): the classification reader and the export trail on GET /v1/admin/backup (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-operator-trail.ts joins the list (not the guard tier): the operator trail on the identity and scheduler routes (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
@@ -867,6 +868,8 @@ const ALL_SUITES = [
     'test/e2e-operator-override.ts',
     // The operator trail on the identity and scheduler routes (secaudit2026oct22).
     'test/e2e-admin-operator-trail.ts',
+    // GET /v1/admin/backup: the classification reader for the operator's agent, and the export trail.
+    'test/e2e-admin-backup-reader.ts',
     'test/e2e-app-format-md.ts',
     // The account's own record, and the mount-order collision that made its window unreadable.
     'test/e2e-account-events.ts',
