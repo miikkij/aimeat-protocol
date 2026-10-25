@@ -18,6 +18,7 @@
  * @usage pnpm exec vitest run test/unit/capability-write.test.ts
  * @version-history
  *   v1.0.0 — 2026-08-11 — Written with the extraction into services/capability-record.ts.
+ *   2026-10-25 — A visibility change to public meets the moderated and self_only policy (secaudit2026oct22).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -223,6 +224,51 @@ describe('updateCapability — the review a PUT used to walk past', () => {
         const out = await updateCapability({ storage, config: configWith('open') }, { gaii: STRANGER, isOperator: true }, cap.id, { summary: 'moderated' });
         expect(out.ok).toBe(true);
         if (out.ok) expect(out.value.summary).toBe('moderated');
+    });
+});
+
+describe('updateCapability — a change of visibility to public meets the same policy as create (secaudit2026oct22)', () => {
+    it('sends an ACTIVE private capability made public to review on a moderated node', async () => {
+        const cap = await seed({ visibility: 'private', status: 'active' });
+        const out = await updateCapability({ storage, config: configWith('moderated') }, owner, cap.id, { visibility: 'public' });
+        expect(out.ok).toBe(true);
+        if (out.ok) {
+            expect(out.value.visibility).toBe('public');
+            expect(out.value.status).toBe('pending_review');
+        }
+    });
+
+    it('refuses a non-operator making a capability public under self_only, with or without status active', async () => {
+        const cap = await seed({ visibility: 'private', status: 'active' });
+        for (const patch of [{ visibility: 'public' }, { visibility: 'public', status: 'active' }]) {
+            const out = await updateCapability({ storage, config: configWith('self_only') }, owner, cap.id, patch);
+            expect(out.ok).toBe(false);
+            if (!out.ok) { expect(out.status).toBe(403); expect(out.code).toBe('PUBLIC_DISABLED'); }
+        }
+        expect((await storage.getCapability(cap.id))?.visibility).toBe('private');
+    });
+
+    it('keeps the uses: the operator, an open node, and an unpublish never wait for anyone', async () => {
+        const forOperator = await seed({ visibility: 'private', status: 'active' });
+        const op = await updateCapability({ storage, config: configWith('self_only') }, operator, forOperator.id, { visibility: 'public' });
+        expect(op.ok).toBe(true);
+        if (op.ok) expect(op.value.status).toBe('active');
+
+        const onOpen = await seed({ visibility: 'private', status: 'active' });
+        const open = await updateCapability({ storage, config: configWith('open') }, owner, onOpen.id, { visibility: 'public' });
+        expect(open.ok).toBe(true);
+        if (open.ok) { expect(open.value.visibility).toBe('public'); expect(open.value.status).toBe('active'); }
+
+        const published = await seed({ visibility: 'public', status: 'active' });
+        const unpublish = await updateCapability({ storage, config: configWith('moderated') }, owner, published.id, { visibility: 'private' });
+        expect(unpublish.ok).toBe(true);
+        if (unpublish.ok) { expect(unpublish.value.visibility).toBe('private'); expect(unpublish.value.status).toBe('active'); }
+
+        // A capability that is already public keeps its status when another field changes.
+        const already = await seed({ visibility: 'public', status: 'active' });
+        const edit = await updateCapability({ storage, config: configWith('moderated') }, owner, already.id, { summary: 'edited' });
+        expect(edit.ok).toBe(true);
+        if (edit.ok) expect(edit.value.status).toBe('active');
     });
 });
 
