@@ -24,6 +24,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { PostgresKyselyStorage } from '../../src/storage/providers/postgres-kysely/index.js';
 import { parseZonelessAsUtc } from '../../src/storage/providers/postgres-kysely/utc-timestamps.js';
+import { parseRecordedTime } from '../../src/utils/recorded-time.js';
 
 requirePostgresWhenAsked('pg-timestamp-zone');
 
@@ -59,6 +60,15 @@ describe('parseZonelessAsUtc', () => {
   });
   it('hands a value that is not a plain date and time to the driver', () => {
     expect(parseZonelessAsUtc('infinity') as unknown).toBe(Infinity);
+  });
+});
+
+describe('parseRecordedTime', () => {
+  it('reads a zoneless wall-clock time from a record as UTC, and an ISO string with a zone as written', () => {
+    expect(parseRecordedTime('2026-10-25T08:00:00.000')).toBe(Date.parse('2026-10-25T08:00:00.000Z'));
+    expect(parseRecordedTime('2026-10-25T08:00:00.000Z')).toBe(Date.parse('2026-10-25T08:00:00.000Z'));
+    expect(parseRecordedTime('2026-10-25T10:00:00.000+02:00')).toBe(Date.parse('2026-10-25T08:00:00.000Z'));
+    expect(Number.isNaN(parseRecordedTime('not a time'))).toBe(true);
   });
 });
 

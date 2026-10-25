@@ -14,6 +14,8 @@
  *   settleCredentialsOfDeletedAccounts · resolveHeldAccountName
  * @usage Object.assign(PostgresKyselyStorage.prototype, heldNameMethods) in providers/postgres-kysely/index.ts
  * @version-history
+ *   2026-10-25 — namingBefore, a zoneless wall-clock time from the record, is read as UTC
+ *     (utils/recorded-time.ts; secaudit2026oct22, the DST fold hour).
  *   v1.2.0 — 2026-09-26 — settleCredentialsOfDeletedAccounts, the start step for the app grants,
  *     personal access tokens and session rows of deleted accounts, with its own record; a 'previous'
  *     decision deletes the grants and tokens older than the account that holds the name (`credentials`).
@@ -33,6 +35,7 @@ import {
 } from '../../../types/held-names.js';
 import { erasedPartyPseudonym, erasedAccountParty, leavingAppsParty } from '../../../erased-party.js';
 import { validateOwnerName } from '../../../../utils/gaii.js';
+import { parseRecordedTime } from '../../../../utils/recorded-time.js';
 import { settleLeavingPartyWorkDb, pseudonymiseLedgerPartyDb } from './work-ledger-erasure.js';
 import { deleteEcosystemAppsDb, deleteInstalledCortexesDb, deleteAccountCredentialsDb } from './identity-erasure.js';
 
@@ -239,7 +242,7 @@ export const heldNameMethods = {
 
       // A previous holder's: one new pseudonym for the rows this decision settles.
       const pseudonym = erasedPartyPseudonym();
-      const before = new Date(input.namingBefore);
+      const before = new Date(parseRecordedTime(input.namingBefore));
       // The lines in other people's ledgers name the account by the bare name, its GHII or an agent or
       // app of it on this node, and only the ones older than the account that holds the name now were held.
       const forms = await ghiiForms(db, name, input.nodeId);

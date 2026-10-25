@@ -44,6 +44,8 @@
  *   await settleCredentialsAtStart(storage);
  *   await openHeldNamesIncident(config, storage);
  * @version-history
+ *   2026-10-25 — The record's holder_since is read with parseRecordedTime: a zoneless PostgreSQL
+ *     wall-clock time is UTC (utils/recorded-time.ts; secaudit2026oct22, the DST fold hour).
  *   v1.2.0 — 2026-09-26 — settleCredentialsAtStart, the start step for the app grants, personal access
  *     tokens and session rows of deleted accounts. Its record joins the same incident; a decision covers
  *     the grants and tokens its entry holds.
@@ -69,6 +71,7 @@ import {
 } from './security-incident.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { parseRecordedTime } from '../utils/recorded-time.js';
 
 /** The incident's type, code and source, which the Security page words in the reader's language. */
 export const HELD_NAMES_INCIDENT_TYPE = 'held_account_names';
@@ -342,7 +345,7 @@ export async function resolveHeldName(
     if (!owner) {
       return { ok: false, code: 'CONFLICT', message: `No account holds "${name}" now, so its rows can only be settled as a previous holder's.` };
     }
-    if (Date.parse(owner.createdAt) !== Date.parse(entry.holder_since)) {
+    if (Date.parse(owner.createdAt) !== parseRecordedTime(entry.holder_since)) {
       return { ok: false, code: 'CONFLICT', message: `The account that holds "${name}" now is not the one this incident recorded; the rows cannot be given to it.` };
     }
     holderGhii = (await storage.getGHIIByOwner(name))?.ghii ?? null;
