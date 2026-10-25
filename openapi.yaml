@@ -72687,7 +72687,7 @@ paths:
       operationId: postAdminConsulImport
       tags: [Federation, Admin]
       summary: Pull config from Consul KV and apply
-      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported.
+      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported. A setting GET /v1/admin/config marks `appliesAt "restart"` is stored and takes effect at the next start; the answer names those in `at_restart`, and the running value stays until then.
       security:
         - BearerAuth: []
       responses:

@@ -22,6 +22,7 @@
  *     MCP tools aimeat_admin_config and aimeat_admin_config_set read and change settings through the
  *     same code. GET serves `appliesAt: 'restart'` on a row that takes effect at the next start and
  *     `set_path` on a secret the operator may set; PUT's note names the rows that wait for a restart.
+ *     The Consul import stores such a row and answers it in `at_restart`, leaving the running value.
  *   2026-10-18 -- classification.mode moved from off makes the default caps offer of a node that ran
  *     before, when it waits (services/classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1).
  *   2026-10-16 -- A setting changed (PUT) or a database override removed (DELETE) writes the operator
@@ -217,19 +218,21 @@ export function adminConfigRouter(
         const values = await consulService.loadAll();
         // applyConsulValues drops sealed paths itself (it is also the boot loader and the watch
         // callback), so `applied` cannot contain one and nothing sealed reaches the database here.
-        const { applied, sealed } = applyConsulValues(config, values);
+        // The node is running, so a row read once at start is stored and waits for the next start.
+        const { applied, sealed, atRestart } = applyConsulValues(config, values, { running: true });
 
         // Persist to DB if available
         if (storage.supportsConfigPersistence()) {
-            for (const dotPath of applied) {
+            for (const dotPath of [...applied, ...atRestart]) {
                 // A secret row is stored encrypted, as PUT stores it (services/config-at-rest.ts).
                 await storage.setConfigValue(dotPath, sealSettingForStorage(dotPath, values[dotPath], config));
             }
-            if (provenance) provenance.markDatabase(applied);
-        }
+            if (provenance) { provenance.markDatabase(applied); provenance.markDatabaseAtRestart(atRestart); }
+        } else if (provenance) provenance.markConsulAtRestart(atRestart);
 
         res.json(success(config.nodeId, {
-            imported: applied.length, total: Object.keys(values).length,
+            imported: applied.length + atRestart.length, total: Object.keys(values).length,
+            ...(atRestart.length > 0 ? { at_restart: atRestart } : {}),
             ...(sealed.length > 0 ? { sealed } : {}),
         }));
         emitChange('config');

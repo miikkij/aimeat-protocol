@@ -13,7 +13,8 @@
  *
  * @version-history
  *   v1.11.0 — 2026-10-25 — The provenance registry is bound to the config (bindConfigProvenance), so
- *     the MCP admin config tools read and mark the same sources the admin Config API does.
+ *     the MCP admin config tools read and mark the same sources the admin Config API does. The Consul
+ *     watch leaves a row that applies at the next start out of the running config and marks it waiting.
  *   v1.10.0 — 2026-10-18 — The default audience caps are settled once per node at start: a new node
  *     takes them, a node that ran before gets them offered on the Security page
  *     (services/classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1).
@@ -135,8 +136,10 @@ export async function initializeConfig(
       // Start watching for live changes (Consul priority: below DB, above file)
       consulService.startWatching((changes) => {
         logger.info(`[consul] Config update detected: ${Object.keys(changes).length} keys`);
-        const { applied } = applyConsulValues(config, changes);
+        // The node is running: a row read once at start waits for the next start.
+        const { applied, atRestart } = applyConsulValues(config, changes, { running: true });
         provenance.markConsul(applied);
+        provenance.markConsulAtRestart(atRestart);
       });
     } catch (err) {
       logger.warn(`Consul config load failed: ${(err as Error).message}`);
