@@ -11,6 +11,8 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-10-25 — GET /:name/versions asks canSeeCortex like the detail read, so another owner's private
+ *     cortex answers the same 404 as a missing name (secaudit2026oct22).
  *   2026-10-18 — POST /v1/cortex, PUT /v1/cortex/:name (a new name) and POST /v1/cortex/:name/visibility
  *     ask the publish gate: a cortex made public by an agent without publish:public stays private and
  *     the answer is 202 with `publish_request` (services/cortex-visibility.ts; plan doc-mvcn6c7e4e5q, V4).
@@ -526,7 +528,8 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/cortex/:name/versions', requireAuth(), requireAnyScope('memory:read', 'app:write', 'cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const ext = await storage.getCortexExtension(name);
-    if (!ext) {
+    // The same fence as the detail read: another owner's private cortex answers as missing.
+    if (!ext || !canSeeCortex(await callerOf(req), ext, config.nodeId)) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
       return;
     }
