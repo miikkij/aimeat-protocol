@@ -49720,9 +49720,7 @@ paths:
         limits and required APIs). An address that pins a version, `/v1/ext/<name>@<version>/<action>`,
         runs that snapshot's code with the live record's status, settings and instances; the bare
         address runs the latest. An app built against one version keeps running it after the
-        extension moves on; the dependency map records which version each app pinned. `created_by`,
-        the principal that wrote the version (an agent's name included), is answered only to the
-        installing account's own principals and the operator; every other caller gets the rest.
+        extension moves on; the dependency map records which version each app pinned.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -49730,7 +49728,7 @@ paths:
         - { name: name, in: path, required: true, schema: { type: string } }
       responses:
         '200':
-          description: data.name, data.current, data.versions[] (version, created_at, created_by for the installing account and the operator, bytes, call_url), data.total
+          description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, call_url), data.total
         '404':
           description: No such extension
 

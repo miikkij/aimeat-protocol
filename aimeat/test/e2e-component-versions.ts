@@ -9,8 +9,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=component-versions
  * @version-history
- *   v1.3.0 — 2026-10-25 — GET /v1/extensions/:name/versions names the writing agent only to the installer's
- *     own principals; every caller keeps version, created_at, bytes and call_url (secaudit2026oct22).
+ *   v1.3.0 — 2026-10-25 — GET /v1/extensions/:name/versions names the writing agent to every caller,
+ *     which is public provenance (Jouni, 2026-10-25), and another account cannot write a version.
  *   v1.2.0 — 2026-10-25 — Another owner reads a private cortex's versions as 404 NOT_FOUND and is
  *     refused a redeploy under its name (403), and a bundled cortex's versions still answer any owner
  *     (secaudit2026oct22).
@@ -228,7 +228,7 @@ await test('a PATCH naming a version already kept with other code is refused, an
     assert(says(old).includes('"1.0.0"') && !says(old).includes('again'), `1.0.0 still runs its own code: ${says(old).slice(0, 200)}`);
 });
 
-await test("the version list names the owner's agent only to the owner's own principals (secaudit2026oct22)", async () => {
+await test("the version list names the agent that wrote a version to every caller, and only the installer writes", async () => {
     const agent = await makeAgent(BASE, { name: owner, token }, ['*']);
     const patch = await json(`/v1/extensions/${EXT}/actions/hello`, auth(agent.token, { method: 'PATCH', body: JSON.stringify({ scriptContent: `export default async function(ctx, input) { return { version: 'by-agent' }; }` }) }));
     assert(patch.status === 200, `agent patch ${patch.status}: ${says(patch).slice(0, 200)}`);
@@ -244,7 +244,7 @@ await test("the version list names the owner's agent only to the owner's own pri
     const theirs = await json(`/v1/extensions/${EXT}/versions`, auth(stranger));
     assert(theirs.status === 200, `another account still lists the versions: ${theirs.status}`);
     const top = theirs.body.data.versions[0];
-    assert(!JSON.stringify(theirs.body.data).includes(agent.gaii), `another account must not see the agent: ${JSON.stringify(top)}`);
+    assert(top.created_by === agent.gaii, `another account sees which agent wrote the version: ${JSON.stringify(top)}`);
     assert(top.version === mine.body.data.versions[0].version && typeof top.created_at === 'string' && typeof top.call_url === 'string' && typeof top.bytes === 'number',
         `version, created_at, bytes and call_url stay for every caller: ${JSON.stringify(top)}`);
 });
