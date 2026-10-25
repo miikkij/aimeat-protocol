@@ -9,6 +9,9 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.6.4 — 2026-10-25 — A kept version records the acting principal (caller.gaii, an agent's GAII
+ *     when an agent wrote it) as its writer, as an extension version does: who wrote a version is
+ *     public provenance (Jouni, 2026-10-25, secaudit2026oct22 lead 98).
  *   v1.6.3 — 2026-10-25 — The create branch refuses a name the node ships to anyone but an operator,
  *     409 NAME_RESERVED (reservedNameRefusal; secaudit2026oct22).
  *   v1.6.2 — 2026-10-25 — The create branch inserts the record before it writes a lib byte and
@@ -181,7 +184,7 @@ export async function upsertCortex(
       await storage.setCortexLibFile(name, filename, content);
     }
     // Kept like every install, so `name@version` answers for what this created (A6-7).
-    await snapshotCortexVersion(storage, record, newLibs, ownerName)
+    await snapshotCortexVersion(storage, record, newLibs, caller.gaii)
       .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
     emitChange('cortex');
     const asked = await fileCortexAsk(deps, input.publishGate, ask, record);
@@ -315,7 +318,7 @@ export async function upsertCortex(
   // 6) The version just deployed joins the kept ones; apps pinned to the previous one keep loading it.
   const nowStored = await storage.getCortexExtension(name);
   if (nowStored) {
-    await snapshotCortexVersion(storage, nowStored, servedLibs, ownerName)
+    await snapshotCortexVersion(storage, nowStored, servedLibs, caller.gaii)
       .catch(err => logger.warn('PUT /v1/cortex/:name: version not kept', { name, version: parsed.version, error: String(err) }));
   }
 

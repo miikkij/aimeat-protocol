@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-25 — aimeat_extension_get answers installed_by_principal, the principal that wrote the code, as the REST detail does (secaudit2026oct22 lead 98, transparency).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the agent may choose a secret's host (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_install with update: true asks the manage rule as a code write (writesCode) (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
@@ -704,6 +705,9 @@ export function registerExtensionsTools(
                         federation: ext.federation,
                         instances: ext.instances,
                         installed_by: ext.installedBy,
+                        // Which principal wrote the code (the person, or which of their agents): public
+                        // provenance, as GET /v1/extensions/:name answers it (Jouni, 2026-10-25).
+                        installed_by_principal: ext.installedByPrincipal ?? null,
                         // Which vault secrets the scripts send where, and why (services/extension-secret-uses.ts).
                         uses_secrets: usesSecretsOf(ext.config),
                         installed_at: ext.installedAt,

@@ -6,6 +6,9 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — GET :name answers installedByPrincipal again, the same writer GET :name/versions
+ *     names: who wrote the code, including which agent, is public provenance (Jouni, 2026-10-25,
+ *     secaudit2026oct22 lead 98). This undoes the v1.10.0 hiding.
  *   2026-10-25 — GET :name/versions answers created_by to every caller again: who wrote a version is
  *     public provenance (Jouni, 2026-10-25, transparency).
  *   2026-10-25 — PUT on an installed extension asks the manage rule as a code write (writesCode), so the install role still decides it (secaudit2026oct22).
@@ -344,13 +347,11 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       res.json(success(config.nodeId, {
         extension: {
           ...ext,
-          // The installing PRINCIPAL stays inside the node. This door is optionalAuth, and while
-          // the installing ACCOUNT name is already public here, the names of that person's agents
-          // are not (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii). The read
-          // authority goes with it: on its own it says only whether this owner narrowed something,
-          // which is their business, and it is served with its meaning on
+          // installedByPrincipal stays in the answer: which principal (the person or which of their
+          // agents) wrote the code is public provenance, the same writer GET :name/versions names
+          // (Jouni, 2026-10-25). The read authority says only whether this owner narrowed
+          // something, which is their business, and it is served with its meaning on
           // GET /v1/extensions/:name/unattended-reader behind requireOwnerPrincipal.
-          installedByPrincipal: undefined,
           unattendedReadAuthority: undefined,
           // What the manifest declared under `workspace:`, so an app author can see whether the
           // extension may act on the caller's organism workspace without reading its config.

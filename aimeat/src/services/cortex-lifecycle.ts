@@ -45,6 +45,8 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-25 — installCortex keeps the first version with the acting principal (caller.gaii) as its
+ *     writer, so the version list names the agent that installed it (secaudit2026oct22 lead 98).
  *   2026-10-25 — installCortex refuses a name the node ships to anyone but an operator while the name
  *     has no record, 409 NAME_RESERVED (reservedNameRefusal; secaudit2026oct22).
  *   2026-10-22 — deleteCortex settles the cortex's waiting publish requests `outdated` after the
@@ -383,7 +385,7 @@ export async function installCortex(
     }
 
     // Every version is kept, this first one too, so `name@<version>` keeps serving it after an update.
-    await snapshotCortexVersion(storage, record, libs, caller.ownerName)
+    await snapshotCortexVersion(storage, record, libs, caller.gaii)
         .catch(err => logger.warn('installCortex: version not kept', { name: ext.name, version: ext.version, error: String(err) }));
     // What the libraries call (extensions) goes into the dependency map from the bytes just stored.
     await refreshCortexDependencies(storage, ext.name, ext.version, libs)
