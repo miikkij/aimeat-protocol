@@ -22,6 +22,9 @@
  *   - R1-R3: the routing endpoint, the MCP tools and the deprecated routes
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-providers.ts
  * @version-history
+ *   v1.3.0 -- 2026-10-25 -- R1b: the routing shows the free model as the last resort (free_model) and the
+ *     owner's own word on it, freeModelLastResort, set, refused when malformed, and set back to the
+ *     node's default (secaudit2026oct22 follow-up).
  *   v1.2.0 -- 2026-10-12 -- 8 and R3 are about the settings routes from before providers, which node
  *     4.0.0 removes, so they ask the node its release (the 4.0.0 sweep): on 3.x the same assertions,
  *     on 4.0.0 410 GONE with Deprecation, the successor Link and X-AIMEAT-Removed-In, and in 8 the
@@ -552,6 +555,21 @@ const toolText = (r: any) => String(r?.result?.content?.[0]?.text ?? '');
       assert(rules.status === 200 && rules.body.data.routing.owner.rules.maxAttempts === 2, `rules: ${JSON.stringify(rules.body.data?.routing?.owner?.rules)}`);
       const read = await json('/v1/ai/routing', { headers: auth(d.token) });
       assert(JSON.stringify(read.body.data.routing.defaults.text) === JSON.stringify(['p-one', 'p-two']), `defaults kept: ${JSON.stringify(read.body.data.routing.defaults)}`);
+    });
+
+    await test('R1b. the free model as the last resort: the routing shows the node default, the owner turns it off and back to the default', async () => {
+      const before = await json('/v1/ai/routing', { headers: auth(d.token) });
+      const fm = before.body.data.free_model;
+      assert(fm?.available === true && fm.node_default === true && fm.in_effect === true && fm.model === 'openrouter/free', `free_model: ${JSON.stringify(fm)}`);
+      assert(before.body.data.routing.rules.freeModelLastResort === null, `no own word yet: ${JSON.stringify(before.body.data.routing.rules)}`);
+      const off = await routing(d, { rules: { freeModelLastResort: false } });
+      assert(off.status === 200 && off.body.data.routing.owner.rules.freeModelLastResort === false, `off: ${off.status} ${JSON.stringify(off.body.data?.routing?.owner?.rules)}`);
+      const read = await json('/v1/ai/routing', { headers: auth(d.token) });
+      assert(read.body.data.free_model.in_effect === false && read.body.data.free_model.node_default === true, `in effect off: ${JSON.stringify(read.body.data.free_model)}`);
+      const bad = await routing(d, { rules: { freeModelLastResort: 'yes' } });
+      assert(bad.status === 400 && /freeModelLastResort/.test(bad.body.error?.message ?? ''), `a bad value: ${bad.status} ${bad.body.error?.message}`);
+      const back = await routing(d, { rules: { freeModelLastResort: null } });
+      assert(back.status === 200 && back.body.data.routing.owner.rules.freeModelLastResort === null, `back to the default: ${JSON.stringify(back.body.data?.routing?.owner?.rules)}`);
     });
 
     await test('R2. over MCP an agent lists providers without a key, tests one, and proposes a routing change it must confirm', async () => {

@@ -29,6 +29,9 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.3.0 — 2026-10-25 — aiProvidersView carries free_model: whether the node's key has a free model,
+ *     the operator's default for it as the last resort, and what applies to this account
+ *     (secaudit2026oct22 follow-up).
  *   v1.2.3 — 2026-10-18 — deleteOwnerAiProvider's reset of the legacy address and persistHealth write
  *     onto the record as stored, on its version (updatePrivateRecord)
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -454,6 +457,7 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   providers: Record<string, unknown>[];
   routing: { defaults: RoutingDefaults; rules: RoutingRules; agent_defaults?: RoutingDefaults };
   limits: { max_owner_providers: number };
+  free_model: { available: boolean; model: string | null; node_default: boolean; in_effect: boolean };
 }> {
   const [{ node, owner }, routing] = await Promise.all([
     providersForOwner(storage, config, ownerGhii), readRouting(storage, ownerGhii, agent),
@@ -487,6 +491,14 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
     providers: views,
     routing: { defaults: routing.owner.defaults, rules: routing.owner.rules, ...(routing.agent ? { agent_defaults: routing.agent } : {}) },
     limits: { max_owner_providers: MAX_OWNER_PROVIDERS },
+    // The free model as the last resort on the node's key (route-plan.ts): whether this node has a
+    // key and a free model for it, the operator's default, and what applies to this account now.
+    free_model: {
+      available: !!(config.openrouterInstanceKey ?? '').trim() && !!config.modelFreeFallback,
+      model: config.modelFreeFallback || null,
+      node_default: config.aiFreeModelLastResort !== false,
+      in_effect: routing.owner.rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false),
+    },
   };
 }
 

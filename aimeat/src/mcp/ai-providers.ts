@@ -17,6 +17,7 @@
  *   change to the roles or a binding of an app's role is a proposal the owner confirms, as the routing is.
  * @structure registerAiProviderTools(mcp, storage, config, getAgentGaii)
  * @version-history
+ *   2026-10-25 — aimeat_ai_routing_set's read carries free_model, as GET /v1/ai/routing does (secaudit2026oct22 follow-up).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -88,7 +89,7 @@ export function registerAiProviderTools(
       try {
         if (!routing) {
           const v = await aiProvidersView(storage, config, payer, agent);
-          return text({ mode: 'current', routing: v.routing, providers: v.providers.map(p => ({ id: p.id, type: p.type, capabilities: p.capabilities })) });
+          return text({ mode: 'current', routing: v.routing, free_model: v.free_model, providers: v.providers.map(p => ({ id: p.id, type: p.type, capabilities: p.capabilities })) });
         }
         return text(await setRouting(storage, payer, routing, await knownProviderIds(storage, config, payer), {
           kind: 'agent', principal, ...(confirm_token ? { confirmToken: confirm_token } : {}),

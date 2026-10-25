@@ -20,6 +20,8 @@
  *   ROUTING_KEY · agentRoutingKey · RoutingRules · DEFAULT_RULES · RoutingRecord · readRouting ·
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting
  * @version-history
+ *   v1.1.0 — 2026-10-25 — rules.freeModelLastResort: the account's own word on the free model as the
+ *     last resort on the node's key; null keeps the node's default (secaudit2026oct22 follow-up).
  *   v1.0.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  *   v1.0.1 — 2026-09-28 — Comments: what the model catalogue (V4) now prices and orders.
@@ -59,6 +61,12 @@ export interface RoutingRules {
   speechVoiceMayChange: boolean;
   /** A ceiling per call; a dearer candidate is skipped. Null: none. Priced from the catalogue (V4). */
   maxCostPerCallUsd: number | null;
+  /**
+   * On the node's key: whether a text call that named no model gets the free model when what is left
+   * of the allowance cannot pay for the normal model and no other candidate can answer. Null: the
+   * node's default (ai.free_model_last_resort). Jouni, 2026-10-25.
+   */
+  freeModelLastResort: boolean | null;
 }
 
 /** Jouni's J9 defaults, approved 2026-09-28. */
@@ -72,6 +80,7 @@ export const DEFAULT_RULES: Readonly<RoutingRules> = Object.freeze({
   fallbackMayLeaveMachine: false,
   speechVoiceMayChange: false,
   maxCostPerCallUsd: null,
+  freeModelLastResort: null,
 });
 
 export type RoutingDefaults = Partial<Record<AiCapability, string[]>>;
@@ -113,6 +122,7 @@ function readRules(v: unknown): RoutingRules {
     fallbackMayLeaveMachine: bool('fallbackMayLeaveMachine'),
     speechVoiceMayChange: bool('speechVoiceMayChange'),
     maxCostPerCallUsd: typeof r.maxCostPerCallUsd === 'number' && r.maxCostPerCallUsd >= 0 ? r.maxCostPerCallUsd : null,
+    freeModelLastResort: typeof r.freeModelLastResort === 'boolean' ? r.freeModelLastResort : null,
   };
 }
 
@@ -201,6 +211,11 @@ export function normaliseRoutingInput(input: unknown, knownIds: ReadonlySet<stri
         if (r.maxCostPerCallUsd !== null && (typeof r.maxCostPerCallUsd !== 'number' || !(r.maxCostPerCallUsd >= 0 && r.maxCostPerCallUsd <= 100))) {
           problems.push('rules.maxCostPerCallUsd: a number of US dollars from 0 to 100, or null for no ceiling.');
         } else rules.maxCostPerCallUsd = r.maxCostPerCallUsd as number | null;
+      }
+      if (r.freeModelLastResort !== undefined) {
+        if (r.freeModelLastResort !== null && typeof r.freeModelLastResort !== 'boolean') {
+          problems.push('rules.freeModelLastResort: true, false, or null for the node\'s default.');
+        } else rules.freeModelLastResort = r.freeModelLastResort as boolean | null;
       }
       out.rules = rules;
     }

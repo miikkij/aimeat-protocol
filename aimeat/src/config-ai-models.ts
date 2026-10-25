@@ -15,6 +15,8 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   2026-10-25 — aiFreeModelLastResort (AIMEAT_AI_FREE_MODEL_LAST_RESORT, default true; secaudit2026oct22
+ *     follow-up, the developer's ruling on the free model).
  *   2026-10-25 — aiNodeKeyMaxOutputTokens (AIMEAT_AI_NODE_KEY_MAX_OUTPUT_TOKENS, default 32000, 0 = no
  *     limit; secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.6.1 — 2026-10-12 — /v1/ai/settings is not among the removed routes: it holds the budget.
@@ -52,7 +54,7 @@ export function aiLegacySettingsRoutesAllowed(
 }
 
 type AiModelSettings = Pick<AiCapabilityConfig,
-  'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback'
+  'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback' | 'aiFreeModelLastResort'
   | 'aiNodeKeyWhenSpent' | 'aiNodeKeyAccountDailyUsd' | 'aiNodeKeyNodeDailyUsd' | 'aiNodeKeyMaxOutputTokens'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
@@ -73,6 +75,7 @@ export function aiModelDefaults(): AiModelSettings {
     openrouterInstanceKey: process.env.AIMEAT_OPENROUTER_INSTANCE_KEY ?? '',
     chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
     modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',
+    aiFreeModelLastResort: process.env.AIMEAT_AI_FREE_MODEL_LAST_RESORT !== 'false',
     aiNodeKeyWhenSpent: process.env.AIMEAT_AI_NODE_KEY_WHEN_SPENT === 'limits' ? 'limits' : 'refuse',
     aiNodeKeyAccountDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, 1),
     aiNodeKeyNodeDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_NODE_DAILY_USD, 10),
