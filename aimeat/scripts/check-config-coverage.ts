@@ -67,11 +67,13 @@ const isSchemaFile = (rel: string): boolean => /^src\/services\/config-(schema|f
 /** The config loader: reading process.env is its job, before the database layer is applied. */
 const isLoader = (rel: string): boolean => /^src\/config[^/]*\.ts$/.test(rel);
 /**
- * A changeable setting read from process.env before any config exists, with the reason. An answer,
- * not a backlog: each one is set from the config as soon as there is one.
+ * A changeable setting read from process.env on purpose, with the reason: before any config exists,
+ * or because the question is what the environment itself holds. An answer, not a backlog.
  */
 const BOOTSTRAP_READS: Record<string, string> = {
   'src/utils/logger.ts AIMEAT_LOG_LEVEL': 'the logger exists before the config; setLogLevel() applies node.log_level once the config is built and after every save',
+  'src/cli/federation-join.ts AIMEAT_FEDERATION_ROLE': '`aimeat join` writes .env and asks whether .env already names a role; config.federationRole is the role being joined with',
+  'src/cli/federation-join.ts AIMEAT_GENESIS_URL': '`aimeat join` writes .env and asks whether .env already names a genesis URL',
 };
 
 function sourceFiles(dir: string, out: string[] = []): string[] {
