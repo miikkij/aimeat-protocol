@@ -34,6 +34,9 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   v1.2.0 -- 2026-10-25 -- A settlement whose outcome is unknown is kept as a possible payment for the
+ *     provider and the operator, and the answer asks the caller not to pay again yet
+ *     (commerce/possible-payment.ts; secaudit2026oct22, lead 4432).
  *   v1.1.0 — 2026-09-01 — The platform fee is a real number at the same rate as every other sale,
  *     booked on the SELLER's side through `bookSessionlessSale`. v1.0.0 passed `fee: 0` and named
  *     it a gap; leaving it would have made "have no account here" the cheapest way to buy.
@@ -59,6 +62,7 @@ import type { ForeignPeer } from './a2a-foreign.js';
 import { newWorkId, putWork, getWork, type AgentWork } from './exchange-work.js';
 import { getPaymentHandler } from '../commerce/payment-handlers.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
+import { PossiblePaymentError, recordPossiblePayment } from '../commerce/possible-payment.js';
 import { decodeXPayment } from '../commerce/x402-facilitator.js';
 import { bookSessionlessSale } from '../commerce/session-service.js';
 import { commerceFeePercent } from './marketplace-fee.js';
@@ -373,7 +377,16 @@ export class ForeignA2AHandler implements A2ARequestHandler {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.warn('a2a: a foreign payment did not settle', { workId: work.workId, peer: this.peer.gaii, error: message });
-      // Still quoted, still unpaid, still nothing done. The caller may pay again.
+      // The payment service did not answer, so the money may have moved: the provider and the
+      // operator are told and the message says not to pay again yet (commerce/possible-payment.ts).
+      if (err instanceof PossiblePaymentError) {
+        await recordPossiblePayment({ storage: this.storage, config: this.config }, {
+          reference: `a2a:${work.workId}`, sellerGhii: work.providerGhii, buyer: this.peer.gaii,
+          amount: priced.price.amount, currency: priced.price.currency, rail: X402_HANDLER_ID, possible: err.possible,
+        });
+      }
+      // Still quoted, still unpaid, still nothing done. The caller may pay again, except after a
+      // possible payment, whose message asks it to wait.
       return workAsTask(work, {
         x402Version: 1,
         accepts: [priced.price.requirements],

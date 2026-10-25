@@ -1,5 +1,7 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Frontend modules import each other by ABSOLUTE path ('/views/…', '/js/…', '/components/…',
 // '/lib/…') because the browser resolves them against the site root. Node resolves them against the
@@ -82,6 +84,9 @@ export default defineConfig({
                     environment: 'node',
                     include: ['test/unit/**/*.test.ts', 'test/integration/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
                     exclude: MUTATES_THE_TREE,
+                    // The connector's record of trusted commands lives in the user's home
+                    // (cli/connect/command-trust.ts); a unit run keeps its own, in the temp folder.
+                    env: { AIMEAT_COMMAND_TRUST_FILE: join(tmpdir(), `aimeat-unit-trusted-commands-${process.pid}.json`) },
                 },
             },
             {

@@ -62,6 +62,8 @@
  *   const shown = await reader.show(records, r => memoryTarget(r.ownerGaii, r.key));
  *   res.json(success(nodeId, { answer, ...warningsNote(reader) }));
  * @version-history
+ *   v2.8.1 -- 2026-10-25 -- A useForAi() refusal by an agent's clearance names the clearance in words and
+ *     the agent's page where the owner raises it (secaudit2026oct22, lead 494).
  *   v2.8.0 — 2026-10-23 — A label that refuses an outside model (externalAi, plan doc-mvlftkh9zmc9
  *     C3.4): show() hides it from an AI reader that did not report a local model, useForAi() refuses
  *     it for any model that is not `local:`, and leave() keeps it behind from such an AI reader. No
@@ -358,10 +360,14 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       const app = who.kind === 'human' && !!who.auth?.roles.includes('app');
       const appActs = new Map<string, { d: Decided; n: number }>();
       let toOutsideModel = false;
+      // The items refused only because they rank above the agent's clearance, so the refusal can
+      // name the clearance and where the owner changes it (secaudit2026oct22, lead 494).
+      const aboveClearance: Decided[] = [];
       for (const d of decided) {
         if (!d) continue;
         const outside = who.kind !== 'system' && !(await inside(d.label.audience, d.target.scope));
-        if (outside || await clearance.refuses(d.label, d.policy)) { refused.push(d); continue; }
+        if (outside) { refused.push(d); continue; }
+        if (await clearance.refuses(d.label, d.policy)) { refused.push(d); aboveClearance.push(d); continue; }
         // Where the model runs decides, whoever asked, and an app does not open it (external-ai.ts).
         if (modelRefuses(d.label, use.model)) { refused.push(d); toOutsideModel = true; continue; }
         if (d.label.aiVisibility === 'hidden') {
@@ -376,9 +382,18 @@ function makeReader(deps: ReaderDeps, who: Pick<ContentReader, 'kind' | 'identit
       if (refused.length) {
         for (const d of refused) audit(d, 'refused', purpose);
         const names = [...new Set(refused.map(d => d.label.name.en))].join(', ');
+        const limit = aboveClearance.length ? await clearance.limitName(aboveClearance[0].policy) : null;
+        const agentName = who.principal.includes('#') ? who.principal.slice(0, who.principal.indexOf('#')) : who.principal;
+        const keys = `${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}`;
+        const raise = `the owner can raise that limit on the agent's page at /profile?tab=agents&agent=${encodeURIComponent(agentName)}`;
+        // Refused by the clearance alone: say so, and what the clearance is, in plain words.
+        const head = limit && aboveClearance.length === refused.length
+          ? `${refused.length} of the items for this AI call are classified ${names}, which is more than the agent ${agentName} may read: ${keys}. `
+            + `The agent may read content classified at most ${limit}, the limit its owner set for it. Leave these items out, or ${raise}.`
+          : `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${keys}. Leave them out, or ask the person who owns them.`
+            + (limit ? ` The agent ${agentName} may read content classified at most ${limit}, the limit its owner set for it; ${raise}.` : '');
         throw new ClassificationError('CLASSIFIED', 403,
-          `${refused.length} of the items for this AI call are classified ${names}, which no AI may read here: ${refused.slice(0, 5).map(d => d.target.key).join(', ')}${refused.length > 5 ? ', …' : ''}. Leave them out, or ask the person who owns them.`
-          + (toOutsideModel ? ' Content whose label refuses an outside model reaches only a model on this machine (a local: model).' : ''));
+          head + (toOutsideModel ? ' Content whose label refuses an outside model reaches only a model on this machine (a local: model).' : ''));
       }
       // Recorded only once the call is accepted: a refused call sends nothing to the AI, so it has
       // no automatic exception to record (secaudit 2026-10-10 I10).

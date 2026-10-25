@@ -1,0 +1,124 @@
+/**
+ * @file test/unit/connect-command-trust.test.ts
+ * @description Which runner and wake commands in a connector home the connector runs
+ *   (secaudit2026oct22, home-dir.ts:resolveConnectorHome:cwd-home-executable-settings; developer
+ *   decision 2026-10-25: "jos käyttäjä yhdistää tuon niin se on silloin myös hyväksynyt sen").
+ *
+ *   1. A command the connector's own connect flow wrote is trusted by that act: connecting in a folder
+ *      is the approval of what the folder's settings name.
+ *   2. Every command an install already had at the first start after this update is adopted once, so
+ *      an existing fleet and an unattended daemon keep running, with no question.
+ *   3. A command in a folder nobody connected through the connector, which came with the folder after
+ *      the update (a cloned project), does not run; one plain line names it and says that
+ *      `aimeat connect` in that folder connects it.
+ *
+ *   Each case has its own record file outside the folder (AIMEAT_COMMAND_TRUST_FILE). "The update
+ *   was earlier" is a record whose firstRunAt lies before the folder's files were written.
+ * @version-history
+ *   v2.0.0 -- 2026-10-25 -- No question and no `aimeat connect trust`: connecting is the approval,
+ *     existing commands are adopted once, a folder nobody connected is named in one line (developer
+ *     decision 2026-10-25).
+ *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, lead 4763).
+ */
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { stringify } from 'yaml';
+import { loadAllAgents, loadPerAgentConfig, saveConnectedAgentConfig } from '../../src/cli/connect/config.js';
+import { heldNotices } from '../../src/cli/connect/command-trust.js';
+import { isRunner } from '../../src/cli/connect/task-runner.js';
+import { buildRegistry } from '../../src/cli/connect/agent-registry.js';
+
+let sandbox: string;
+let home: string;
+let trustFile: string;
+const saved: Record<string, string | undefined> = {};
+const setEnv = (k: string, v: string) => { saved[k] = process.env[k]; process.env[k] = v; };
+
+const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const fakeToken = (sub: string) => `${b64({ alg: 'none' })}.${b64({ sub })}.x`;
+const RUNNER = { command: 'node', args: ['./marker.js'] };
+
+/** A folder whose `.aimeat` names a runner and a wake command under the bare-name legacy path. */
+function folderWithCommands(dir: string): void {
+  mkdirSync(join(dir, 'agents', 'assistant'), { recursive: true });
+  writeFileSync(join(dir, 'agents', 'assistant', 'config.yaml'), stringify({ node_url: 'https://aimeat.io', runner: RUNNER, wake: { command: 'node ./wake.js', strategy: 'command_only' } }));
+  mkdirSync(join(dir, 'tokens'), { recursive: true });
+  writeFileSync(join(dir, 'tokens', 'assistant@me.token'), fakeToken('assistant#me@aimeat-test'));
+}
+
+/** The update ran on this machine before now: the record's first run is in the past. */
+const updateRanEarlier = () => {
+  mkdirSync(join(sandbox, 'trust'), { recursive: true });
+  writeFileSync(trustFile, JSON.stringify({ firstRunAt: '2020-01-01T00:00:00.000Z', hashes: {} }));
+};
+
+beforeEach(() => {
+  sandbox = mkdtempSync(join(tmpdir(), 'aimeat-cmdtrust-'));
+  home = join(sandbox, 'project', '.aimeat');
+  trustFile = join(sandbox, 'trust', 'trusted-commands.json');
+  setEnv('AIMEAT_HOME', home);
+  setEnv('AIMEAT_COMMAND_TRUST_FILE', trustFile);
+});
+
+afterEach(() => {
+  for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  rmSync(sandbox, { recursive: true, force: true });
+});
+
+describe('3. a folder nobody connected through the connector, which came after the update', () => {
+  it('does not run its commands, and one plain line names them and says how to connect', async () => {
+    updateRanEarlier();
+    folderWithCommands(home);
+    const [a] = await loadAllAgents();
+    expect(isRunner(a!)).toBe(false);
+    expect(a!.config.wake?.command).toBeUndefined();
+    const lines = heldNotices([a!]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).not.toContain('\n');
+    expect(lines[0]).toContain('node ./marker.js');
+    expect(lines[0]).toContain('node ./wake.js');
+    expect(lines[0]).toContain('aimeat connect');
+  });
+});
+
+describe('1. a command the connector\'s own connect flow wrote', () => {
+  it('runs: connecting in the folder is the approval, and the next start needs nothing', async () => {
+    updateRanEarlier();
+    folderWithCommands(home);
+    // What `aimeat connect` does (auth.ts): keep the runner and wake the folder's config names.
+    const existing = loadPerAgentConfig('assistant', 'me');
+    saveConnectedAgentConfig('assistant', 'me', { node_url: 'https://aimeat.io', wake: existing?.wake, runner: existing?.runner });
+    const [a] = await loadAllAgents();
+    expect(a!.heldCommands).toBeFalsy();
+    expect(isRunner(a!)).toBe(true);
+    expect(a!.config.wake?.command).toBe('node ./wake.js');
+    expect(heldNotices([a!])).toEqual([]);
+  });
+});
+
+describe('2. an install that already had a runner at the first start after this update', () => {
+  it('keeps running unattended: the daemon\'s registry holds the runner, nobody is asked, and the record keeps it', async () => {
+    folderWithCommands(home);
+    // No record yet: this start is the first one after the update.
+    const registry = buildRegistry(await loadAllAgents());
+    const entry = registry.list()[0]!;
+    expect(isRunner(entry)).toBe(true);
+    expect(entry.config.wake?.command).toBe('node ./wake.js');
+    expect(Object.keys((JSON.parse(readFileSync(trustFile, 'utf-8')) as { hashes: object }).hashes)).toHaveLength(1);
+    // The next start reads the same answer from the record.
+    expect(isRunner((await loadAllAgents())[0]!)).toBe(true);
+  });
+
+  it('a folder that arrives after that first start is not adopted', async () => {
+    await loadAllAgents();   // the first start after the update, with nothing in this home yet
+    await new Promise(r => setTimeout(r, 30));
+    folderWithCommands(home);
+    // Written after the first run: a file whose time is later than the record's firstRunAt.
+    const later = (await loadAllAgents())[0]!;
+    const record = JSON.parse(readFileSync(trustFile, 'utf-8')) as { firstRunAt: string };
+    expect(Date.parse(record.firstRunAt)).toBeLessThanOrEqual(Date.now());
+    expect(isRunner(later)).toBe(false);
+  });
+});

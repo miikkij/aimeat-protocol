@@ -15,10 +15,15 @@
  *      the next start meets the database as a deploy does.
  *   2. The start that carries the step: ONE incident, with one entry per record (five), and every
  *      record is where it was, unchanged.
- *   3. The next start: still one incident.
+ *   3. The next start: still one incident. The operator then acts on it: the incident lists one entry
+ *      per record with its action; a person who is not an operator is refused; the operator clears
+ *      the webhook, the tags and the capabilities, deletes the data package and keeps the skill, and
+ *      the last decision resolves the incident; a second decision is refused.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-anonymous-records-incident
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-anonymous-records-incident
  * @version-history
+ *   v1.1.0 -- 2026-10-25 -- Phase 3 decides the entries: clear, delete, keep, the refusals, and the
+ *     incident resolving with its last entry (secaudit2026oct22, developer decision 2026-10-25).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22; developer ruling 2026-10-25).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -200,7 +205,61 @@ async function stepIncidents(token: string): Promise<any[]> {
         const n = (await stepIncidents(token)).length;
         assert(n === 1, `expected the one incident after a second start, found ${n}`);
     });
+
+    // The operator acts on each record from the incident (services/incident-entries.ts).
+    const decide = (id: string, name: string, resolution: string, bearer = token) => json(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`, {
+        method: 'POST', headers: { Authorization: `Bearer ${bearer}` }, body: JSON.stringify({ name, resolution }),
+    });
+    const skillEntry = `skill:anr${stamp}`;
+    const pkgEntry = `datapackage:anr${stamp}`;
+    let incidentId = '';
+    await test('3b. the incident lists one open entry per record, each with its action', async () => {
+        const [inc] = await stepIncidents(token);
+        incidentId = inc.id;
+        const byId = new Map<string, any>((inc.entries ?? []).map((e: any) => [e.id, e]));
+        assert(byId.size === 5, `entries: ${JSON.stringify(inc.entries)}`);
+        for (const [id, action] of [['agent_webhook', 'clear'], ['agent_tags', 'clear'], ['agent_capabilities', 'clear'], [skillEntry, 'delete'], [pkgEntry, 'delete']]) {
+            assert(byId.get(id)?.action === action && byId.get(id)?.status === 'open', `entry ${id}: ${JSON.stringify(byId.get(id))}`);
+        }
+        assert(byId.get('agent_webhook').params?.url === 'https://hooks.example.test/anon', `the webhook entry carries its address: ${JSON.stringify(byId.get('agent_webhook'))}`);
+    });
+    await test('3c. a person who is not an operator cannot clear an entry: 403, nothing changes', async () => {
+        const person = await registerOwner(BASE, `anry${stamp}`);
+        const r = await decide(incidentId, 'agent_webhook', 'clear', person.token);
+        assert(r.status === 403, `a non-operator decided an entry: ${r.status}`);
+    });
+    await test('3d. an action the entry does not offer is refused: 400 INVALID_INPUT', async () => {
+        const r = await decide(incidentId, 'agent_webhook', 'delete');
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+    await test('3e. the operator clears the webhook, the tags and the capabilities, deletes the package and keeps the skill; the last decision resolves the incident', async () => {
+        for (const [name, resolution] of [['agent_webhook', 'clear'], ['agent_tags', 'clear'], ['agent_capabilities', 'clear'], [pkgEntry, 'delete']]) {
+            const r = await decide(incidentId, name, resolution);
+            assert(r.status === 200 && typeof r.body.data.entry_done === 'string' && r.body.data.incident_status === 'open', `${name}: ${r.status} ${JSON.stringify(r.body)}`);
+        }
+        const last = await decide(incidentId, skillEntry, 'keep');
+        assert(last.status === 200 && last.body.data.incident_status === 'resolved', `the last decision: ${last.status} ${JSON.stringify(last.body)}`);
+        const [inc] = await stepIncidents(token);
+        assert(inc.status === 'resolved', `the incident is ${inc.status}`);
+        const statuses = Object.fromEntries((inc.entries as any[]).map(e => [e.id, e.status]));
+        assert(statuses[skillEntry] === 'kept' && statuses.agent_webhook === 'done' && statuses[pkgEntry] === 'done', `entry statuses: ${JSON.stringify(statuses)}`);
+    });
+    await test('3f. an entry decided once is not decided again: 409', async () => {
+        const r = await decide(incidentId, 'agent_webhook', 'clear');
+        assert(r.status === 409 && r.body.error?.code === 'CONFLICT', `${r.status} ${JSON.stringify(r.body.error)}`);
+    });
     await stopServer(server);
+
+    await test('3g. the cleared and deleted records are gone, and the kept skill is where it was', async () => {
+        await withStorage(async (s) => {
+            const agent = await s.getAgent(ANON_GAII);
+            assert(!agent?.webhookUrl && agent?.webhookEnabled === false, `the webhook stays: ${JSON.stringify({ w: agent?.webhookUrl, e: agent?.webhookEnabled })}`);
+            assert((agent?.tags ?? []).length === 0, `the tags stay: ${JSON.stringify(agent?.tags)}`);
+            assert((agent?.technicalCapabilities ?? []).length === 0 && (agent?.domainCapabilities ?? []).length === 0, 'the capabilities stay');
+            assert(!(await s.getStorageFile(ANON_GHII, PKG_KEY)), 'the data package pointer stays');
+            assert(!!(await s.getMemory(ANON_GHII, SKILL_KEY)), 'the kept skill manifest is gone');
+        });
+    });
     try { rmSync(dbDir, { recursive: true, force: true }); } catch { /* the OS will collect it */ }
 
     console.log(`\n${passed} passed, ${failed} failed\n`);

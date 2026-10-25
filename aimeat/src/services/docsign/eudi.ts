@@ -39,6 +39,8 @@
  *   walletClient · parseDocumentWithSignature
  * @usage const s = await startWalletSignature(ctx, caller, id, { bytes });
  * @version-history
+ *   2026-10-25 -- The certificate's holder name is compared with the name the account's identity verification recorded, when there is one, not with the editable display name (walletNameBinding); an account without one seals on its display name with the caveat NAME_NOT_VERIFIED (secaudit2026oct22, lead 3924).
+ *   2026-10-25 -- A wallet signature whose certificate's revocation status could not be established is sealed with the caveat REVOCATION_UNKNOWN, which the statement and the public lookup carry (walletCaveats; secaudit2026oct22, lead 3895).
  *   2026-10-25 — The seal rule is walletSealRefusal(); a certificate revoked now is refused (422 CERTIFICATE_REVOKED) whatever signing time the signature claims (secaudit2026oct22, eudi.ts:wallet-seal-accepts-indeterminate-revocation).
  *   2026-10-15 — A wallet signature is sealed only when its chain reaches a trusted root (422 SIGNER_NOT_TRUSTED) and the certificate names the account holder (422 NAME_MISMATCH) (feature-list audit 38).
  *   v1.0.0 — 2026-10-10 — Initial (wish-allekirjoitus-eudi-lompakolla).
@@ -59,6 +61,8 @@ import { writeStorageFile, removeStorageFile } from '../storage-file-write.js';
 import { logger } from '../../utils/logger.js';
 import { docsignMaxBytes } from '../../config-docsign.js';
 import { validatePdf, type SignatureReport } from './validate.js';
+import { caveat, type StatementCaveat } from './statement.js';
+import { readVerifiedName } from '../verified-name.js';
 import {
   DocsignError, walletSigner, checkWalletSignature, recordWalletSignature, noteWalletAttempt, noteDocumentSource, documentHash,
   type DocsignCtx, type WalletEvidence,
@@ -399,6 +403,36 @@ export function walletSealRefusal(newest: SignatureReport | undefined, fields: n
   return null;
 }
 
+/**
+ * What the node cannot establish about a wallet signature that passed walletSealRefusal, sealed with
+ * it as caveats (statement.ts). A certificate whose revocation status is not known (the responder did
+ * not answer, the node checks offline, or the responder does not know it) is still sealed, because
+ * the person signed in their own wallet a moment ago, and the statement says it could not be checked
+ * (secaudit2026oct22, lead 3895; developer decision 2026-10-25). A revoked one is refused above.
+ */
+export function walletCaveats(newest: SignatureReport, nameBasis: WalletNameBasis = 'verified'): StatementCaveat[] {
+  return [
+    ...(newest.revocation.status === 'good' ? [] : [caveat('REVOCATION_UNKNOWN')]),
+    ...(nameBasis === 'display-name' ? [caveat('NAME_NOT_VERIFIED')] : []),
+  ];
+}
+
+/** Which of the account's names the certificate's holder name was compared with. */
+export type WalletNameBasis = 'verified' | 'display-name';
+
+/**
+ * Does the certificate name the person behind the account. With a name an identity verification
+ * proved (services/verified-name.ts) the certificate is compared with that name, and the editable
+ * display name does not count; without one it is compared with the display name, and the seal then
+ * carries the caveat NAME_NOT_VERIFIED (secaudit2026oct22, lead 3924; developer decision 2026-10-25).
+ */
+export function walletNameBinding(
+  certificateName: string | null | undefined, verifiedName: string | null | undefined, displayName: string | null | undefined,
+): { matches: boolean; basis: WalletNameBasis } {
+  if (verifiedName) return { matches: sameName(certificateName, verifiedName) === true, basis: 'verified' };
+  return { matches: sameName(certificateName, displayName) === true, basis: 'display-name' };
+}
+
 /** "Matti Meikäläinen" and "MEIKÄLÄINEN Matti" name the same person; anything else does not. */
 function sameName(a: string | null | undefined, b: string | null | undefined): boolean | null {
   const words = (s: string) => s.toLocaleLowerCase('fi').normalize('NFC').split(/[^\p{L}]+/u).filter((w) => w.length > 1).sort().join(' ');
@@ -485,7 +519,13 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   // walletSealRefusal refuses a missing signature; this narrows the type for what follows.
   if (!newest) throw new DocsignError('SIGNATURE_NOT_VALID', 422, 'The returned PDF holds no signature.');
   const signerGhii = await ctx.storage.getGHII(s.signer);
-  if (sameName(newest.signer?.name, signerGhii?.displayName) !== true) {
+  const verifiedName = (await readVerifiedName(ctx.storage, s.signer))?.name ?? null;
+  const binding = walletNameBinding(newest.signer?.name, verifiedName, signerGhii?.displayName);
+  if (!binding.matches && binding.basis === 'verified') {
+    await refuse('NAME_MISMATCH', `The name in the signing certificate (${newest.signer?.name ?? 'none'}) is not the name the account's identity verification recorded (${verifiedName}).`, signed);
+    throw new DocsignError('NAME_MISMATCH', 422, 'The name in the wallet\'s certificate is not the name your identity verification recorded for this account, so nothing was sealed. Sign in your own wallet.');
+  }
+  if (!binding.matches) {
     await refuse('NAME_MISMATCH', `The name in the signing certificate (${newest.signer?.name ?? 'none'}) is not the name on the account (${signerGhii?.displayName ?? 'none'}).`, signed);
     throw new DocsignError('NAME_MISMATCH', 422, 'The name in the wallet\'s certificate is not the name on your account, so nothing was sealed. Set your display name to the name on your identity document, then sign again.');
   }
@@ -521,6 +561,8 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
       test: newest.trust.source === 'eudi-test-anchor',
     },
     nameMatches: sameName(newest.signer?.name, ghii?.displayName),
+    nameBasis: binding.basis,
+    ...(walletCaveats(newest, binding.basis).length ? { caveats: walletCaveats(newest, binding.basis) } : {}),
   };
   try {
     await recordWalletSignature(ctx, s.requestId, s.signer, s.sha256, wallet, `${base}-signed.pdf`);
