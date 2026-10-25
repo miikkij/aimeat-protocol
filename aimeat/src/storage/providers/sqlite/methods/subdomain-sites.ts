@@ -9,7 +9,7 @@
  * @usage Object.assign(SqliteStorage.prototype, subdomainSiteMethods) in ../index.ts
  * @version-history
  *   v1.1.0 — 2026-10-25 — The `origin` column is written on create and update and read back (null when
- *     unset), mirroring Postgres 0116 (secaudit2026oct22).
+ *     unset), mirroring Postgres 0116; listSubdomainSitesPage reads a keyset page (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
  *     deleteSubdomainSite, deserializeSubdomainSite moved here from apps.ts so the file mirrors
  *     postgres-kysely/methods/subdomain-sites.ts (secaudit 2026-10, M8).
@@ -44,7 +44,16 @@ export const subdomainSiteMethods = {
     return rows.map(r => this.deserializeSubdomainSite(r));
   },
 
-  async updateSubdomainSite(this: SqliteStorage, 
+  async listSubdomainSitesPage(this: SqliteStorage, query: { after?: string; limit: number }): Promise<SubdomainSiteRecord[]> {
+    const limit = Math.min(Math.max(Math.floor(query.limit) || 1, 1), 500);
+    // TEXT compares by bytes here, the order the Postgres twin asks for with COLLATE "C".
+    const rows = (query.after
+      ? this.db.prepare('SELECT * FROM subdomain_sites WHERE subdomain > ? ORDER BY subdomain LIMIT ?').all(query.after, limit)
+      : this.db.prepare('SELECT * FROM subdomain_sites ORDER BY subdomain LIMIT ?').all(limit)) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeSubdomainSite(r));
+  },
+
+  async updateSubdomainSite(this: SqliteStorage,
     subdomain: string,
     updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin'>>,
   ): Promise<SubdomainSiteRecord | null> {
