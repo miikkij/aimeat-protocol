@@ -13859,6 +13859,10 @@
     "cfgDesc_extensions_max_instances": "Kuinka monta kopiota laajennuksesta saa olla. Rajan jälkeen uusi kopio hylätään (oletus 0 = ei rajaa).",
     "cfg_extensions_email_per_hour": "Laajennusten sähköpostit tiliä kohden tunnissa",
     "cfgDesc_extensions_email_per_hour": "Kuinka monta sähköpostia yhden tilin laajennukset saavat lähettää tunnissa yhteensä. Rajan jälkeen lähetys hylätään, kunnes tunti vaihtuu (oletus 200, 0 = ei rajaa).",
+    "cfg_extensions_run_slots": "Laajennusajoja yhtä aikaa",
+    "cfgDesc_extensions_run_slots": "Kuinka monta kutsun, agentin tai vierailijan käynnistämää laajennuksen ajoa palvelimella saa olla käynnissä yhtä aikaa. Rajan ylittävä ajo saa vastauksen \"varattu, yritä uudelleen\" (oletus 64, 0 = ei rajaa).",
+    "cfg_extensions_run_slots_per_account": "Laajennusajoja yhtä aikaa tiliä kohden",
+    "cfgDesc_extensions_run_slots_per_account": "Kuinka monta näistä ajoista yhdellä tilillä agentteineen ja sovelluksineen saa olla käynnissä yhtä aikaa. Vierailijat ilman tiliä lasketaan osoitteen mukaan (oletus 16, 0 = ei rajaa).",
     "cfg_features_capability_publishing": "Kuka lisää kyvykkyyksiä",
     "cfgDesc_features_capability_publishing": "Kuka saa lisätä kyvykkyyden rekisteriin.",
     "cfgOpt_features_capability_publishing_disabled": "Vain operaattori",
@@ -26725,6 +26729,28 @@
           "ex1": "200 (oletus): tilin laajennukset lähettävät enintään 200 sähköpostia tunnissa.",
           "ex2": "5000 messuviikon ajaksi, ja sen jälkeen takaisin 200:aan.",
           "tip": "Nosta rajaa tai aseta 0 tapahtumaa varten, joka lähettää postia monelle kerralla, ja tarkista, että sähköpostipalvelusi hyväksyy sen määrän."
+        },
+        "run_slots": {
+          "title": "Laajennusajoja yhtä aikaa",
+          "short": "Kuinka monta kutsun, agentin tai vierailijan käynnistämää laajennuksen ajoa palvelimella saa olla käynnissä yhtä aikaa. Rajan ylittävä ajo saa vastauksen \"varattu, yritä uudelleen muutaman sekunnin päästä\". Oletus on 64, ja 0 tarkoittaa, ettei rajaa ole.",
+          "what": "Laajennuksen toiminto ajetaan palvelimen omassa prosessissa. Ajo varaa muistia koko ajan, myös silloin, kun se odottaa ulkopuolisen palvelun vastausta, ja laskeva ajo varaa myös palvelimen suorittimen. Ilman rajaa monta ajoa yhtä aikaa voi hidastaa koko palvelinta kaikilta. Tämä raja laskee ajot, jotka kutsut, agentit ja vierailijat käynnistävät. Ajastetuilla ajoilla on oma pieni rajansa. Rajan ylittävää ajoa ei aloiteta: kutsuja saa vastauksen 503, jossa Retry-After on muutama sekunti, ja viestin, joka nimeää tämän asetuksen. Mitään ei veloiteta.",
+          "range": "Kokonaisluku nollasta ylöspäin. Oletus on 64. Arvolla 0 rajaa ei ole.",
+          "low": "Pienempi: palvelin vastaa nopeasti myös kuormassa, ja kutsujia pyydetään yrittämään uudelleen aiemmin.",
+          "high": "Suurempi: yhtä aikaa mahtuu enemmän ajoja, ja kiireinen palvelin käyttää enemmän muistia.",
+          "ex1": "64 (oletus): koko palvelimella enintään 64 ajoa yhtä aikaa.",
+          "ex2": "200 palvelimella, jolla on paljon muistia ja joka palvelee julkista tapahtumaa.",
+          "tip": "Aseta tämä yhdessä tilikohtaisen rajan kanssa, jotta yksi tili ei voi varata kaikkia ajoja."
+        },
+        "run_slots_per_account": {
+          "title": "Laajennusajoja yhtä aikaa tiliä kohden",
+          "short": "Kuinka monta palvelimen laajennusajoista yhdellä tilillä agentteineen ja sovelluksineen saa olla käynnissä yhtä aikaa. Vierailijat ilman tiliä lasketaan osoitteen mukaan. Oletus on 16, ja 0 tarkoittaa, ettei rajaa ole.",
+          "what": "Tämä on yhden tilin osuus laajennusajoista. Omistaja sekä agentit ja sovellukset, jotka toimivat hänen puolestaan, jakavat saman laskurin. Vierailijalla, joka ei ole kirjautunut, ei ole tiliä, joten vierailijat lasketaan verkko-osoitteen mukaan. Osuuden ylittävä ajo saa vastauksen \"varattu, yritä uudelleen muutaman sekunnin päästä\" (503 ja Retry-After) ja viestin, joka nimeää tämän asetuksen. Muut tilit saavat ajonsa silti.",
+          "range": "Kokonaisluku nollasta ylöspäin. Oletus on 16. Arvolla 0 rajaa ei ole.",
+          "low": "Pienempi: yksi kiireinen tili tai silmukassa pyörivä agentti varaa pienemmän osan palvelimesta.",
+          "high": "Suurempi: sovellus, jolla on samalla tilillä monta käyttäjää yhtä aikaa, voi ajaa useampia toimintoja kerralla.",
+          "ex1": "16 (oletus): tili ajaa enintään 16 toimintoa yhtä aikaa, ja 17. pyydetään yrittämään uudelleen.",
+          "ex2": "0 palvelimella, jota käyttää vain yksi organisaatio.",
+          "tip": "Pidä tämä selvästi pienempänä kuin koko palvelimen raja, jotta yksi tili ei koskaan täytä koko palvelinta."
         }
       },
       "morsel_policy": {

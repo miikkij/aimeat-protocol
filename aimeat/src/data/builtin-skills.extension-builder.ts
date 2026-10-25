@@ -37,6 +37,8 @@
  *   2026-10-21 — Section 9: declare `uses_secrets`; a first use to a declared host binds by itself for
  *     a trusted code writer; every refused first use names the owner's one-press allow page; tell users
  *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   2026-10-25 — A call past the operator's run slots answers 503 EXTENSION_RUNS_BUSY with Retry-After
+ *     (secaudit2026oct22, lead 817).
  *   2026-10-25 — ctx.email takes one recipient per call, within the account's hourly allowance
  *     (extensions.email_per_hour; secaudit2026oct22, lead 325).
  *   2026-10-25 — The operator's limits on one namespace's data and on the copies of one extension
@@ -162,7 +164,10 @@ may already do it.
 - A run has 500 host calls and 5 seconds by default (\`AIMEAT_EXT_MAX_API_CALLS\`,
   \`AIMEAT_EXT_TIMEOUT_MS\`, which counts the script's own running time). The whole run, waiting on
   host calls included, ends at twelve times that limit, at least one minute, so a run that awaits
-  something that never answers fails instead of hanging. \`ctx.memory.search(prefix)\` returns values too, so do not read each key
+  something that never answers fails instead of hanging. A call to an action while the node already
+  runs as many as its operator allows (\`extensions.run_slots\`, 64; \`extensions.run_slots_per_account\`,
+  16) is answered 503 \`EXTENSION_RUNS_BUSY\` with \`Retry-After\`: an app or agent retries after it.
+  \`ctx.memory.search(prefix)\` returns values too, so do not read each key
   again. Many workspace records go through \`ctx.workspace.publishRecords\` in one call.
 - The sandbox starts fresh for each call. All state lives in memory.
 - Check the caller in the script: \`ctx.caller.roles\` (an owner in person has \`['owner']\` and no
