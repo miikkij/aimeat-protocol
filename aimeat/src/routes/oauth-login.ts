@@ -17,6 +17,10 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-10-25 — A round finishes only in the browser that started it: authorize sets the round's
+ *     cookie and stores its hash, and the callback answers ?auth_error=<ID>_OTHER_BROWSER to a request
+ *     without it, before the code is exchanged (middleware/login-round-binding.ts; secaudit2026oct22,
+ *     oidc-saml-login-round-not-browser-bound). A node on plain http binds nothing.
  *   2026-10-24 — The callback sends a first sign-in that matches an account with two-step sign-in by
  *     address to the code step (startLinkSecondFactor); it had linked and opened the session on the
  *     address alone (secaudit2026oct22, external-login-skips-second-factor).
@@ -49,6 +53,7 @@ import {
   normalizeUsername,
 } from '../services/external-login.js';
 import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
+import { bindLoginRound, endLoginRound, loginRoundHeldBy } from '../middleware/login-round-binding.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
@@ -66,6 +71,7 @@ export function oauthLoginRouter(
   // Register the authorize/callback/finalize trio for one provider.
   function registerProvider(p: OidcProvider): void {
     const PREFIX = p.id.toUpperCase();
+    const callbackPath = `/v1/ghii/login/${p.id}/callback`;
 
     // GET /v1/ghii/login/<id> — Begin sign-in (redirect to the IdP's consent screen)
     router.get(`/v1/ghii/login/${p.id}`, async (req, res) => {
@@ -77,6 +83,9 @@ export function oauthLoginRouter(
 
         const authRequest = p.client!.createAuthRequest();
         const nonceTtl = config.nonceTtlSeconds * 1000;
+        // The round finishes only in this browser (middleware/login-round-binding.ts; secaudit2026oct22,
+        // oidc-saml-login-round-not-browser-bound): its cookie is set here, its hash goes in the row.
+        const binding = bindLoginRound(req, res, config, authRequest.state, callbackPath, nonceTtl, 'lax');
         await storage.createVerificationNonce({
           id: randomUUID(),
           owner: '',                       // login flow — no authenticated owner yet
@@ -84,6 +93,7 @@ export function oauthLoginRouter(
           state: authRequest.state,
           nonce: authRequest.nonce,
           redirectUri: safeRedirectPath(req.query.redirect),  // where to send the user after login
+          payload: binding,
           createdAt: new Date().toISOString(),
           expiresAt: new Date(Date.now() + nonceTtl).toISOString(),
         });
@@ -115,6 +125,14 @@ export function oauthLoginRouter(
           fail(`${PREFIX}_STATE_EXPIRED`);
           return;
         }
+        // Started in another browser: refused before the code is exchanged, and the round stays for
+        // the browser that holds it (middleware/login-round-binding.ts).
+        if (!loginRoundHeldBy(req, state, nonceRecord.payload)) {
+          logger.warn(`${p.id} sign-in callback refused: the round was started in another browser`);
+          fail(`${PREFIX}_OTHER_BROWSER`);
+          return;
+        }
+        endLoginRound(req, res, config, state, callbackPath, 'lax');
 
         const tokenResult = await p.client!.exchangeCode(code, state, nonceRecord.nonce);
         const postLoginPath = safeRedirectPath(nonceRecord.redirectUri);
