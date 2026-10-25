@@ -558,10 +558,10 @@
      "slug": "g-3-key-rotation",
      "cells": [
       "<strong>Key rotation</strong>",
-      "Rotate an agent's keypair; its old tokens stop working, and a connector connection opened with one is closed.",
+      "Rotate an agent's keypair when you think its credentials may have leaked. Every token the agent held before stops working, a connector connection opened with one is closed, and so is the sign-in of each AI tool connected as that agent over MCP: Claude, ChatGPT or Claude Code asks you to approve the connection once more the next time it connects. The answer says so.",
       "<code>/v1/agents/:gaii/rekey</code>"
      ],
-     "plain": "Key rotation Rotate an agent's keypair; its old tokens stop working, and a connector connection opened with one is closed. /v1/agents/:gaii/rekey"
+     "plain": "Key rotation Rotate an agent's keypair when you think its credentials may have leaked. Every token the agent held before stops working, a connector connection opened with one is closed, and so is the sign-in of each AI tool connected as that agent over MCP: Claude, ChatGPT or Claude Code asks you to approve the connection once more the next time it connects. The answer says so. /v1/agents/:gaii/rekey"
     },
     {
      "slug": "g-3-agent-portability",

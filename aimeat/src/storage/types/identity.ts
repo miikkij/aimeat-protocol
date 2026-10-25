@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-25 — AgentRecord.credentialsValidAfter: a key rotation ends every credential issued
+ *     before it (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.13.0 — 2026-10-23 — AgentRuntimeSource.llm takes 'local': the model runs on the crew's own
  *     machine (plan doc-mvlftkh9zmc9, C3.4).
  *   v1.12.0 — 2026-10-23 — AgentRecord.taskStartFloor: the floor permissions the owner in person
@@ -313,6 +315,12 @@ export interface AgentRecord {
    * absent = none accepted, which is every agent until its owner says otherwise.
    */
   taskStartFloor?: string[] | null;
+  /**
+   * ISO time. An agent credential issued before it is refused on every request (auth/agent-alive.ts),
+   * whatever kind it is; POST /v1/agents/:gaii/rekey sets it. Absent = the agent's key was never
+   * rotated (migration 0117).
+   */
+  credentialsValidAfter?: string | null;
 }
 
 /**
