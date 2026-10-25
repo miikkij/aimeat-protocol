@@ -11,6 +11,7 @@
  * @structure AiCallPlan · targetOf · planFor
  * @usage import { prepareAiCall, planFor, type AiCallPlan } from './completion.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — AiCallPlan.appId: the app a call is attributed to (secaudit2026oct22).
  *   v1.0.0 — 2026-10-02 — Extracted from ai/completion.ts, verbatim.
  */
 import type { AiAdapterType, AiCapability, AiOp, AiTarget } from './types.js';
@@ -72,6 +73,12 @@ export interface AiCallPlan {
   noCreditModel?: string;
   /** The role the call ran as: the owner's role, the app's binding, and the app's fine-tuning for it. */
   role?: { id: string; binding?: string; params?: AppAiRoleParams };
+  /**
+   * The app an app grant names, when the call came with one: the owner's allowlist and per-app cap
+   * were checked against it, and the settle step records the spend under it, whatever app_id the
+   * body named (secaudit2026oct22). Absent for every other caller.
+   */
+  appId?: string;
 }
 
 /** Where the gateway sends a planned call: the adapter, the address and the key that pays. */
