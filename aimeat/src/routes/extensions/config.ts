@@ -25,6 +25,7 @@ import { capabilitiesOfRecord } from '../../services/extension-capability-declar
 import { mayManageInstalledExt } from './permissions.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { callerOf } from '../../middleware/caller.js';
 
 export function registerExtensionConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── PATCH /v1/extensions/:name/config — set config values of an installed extension ──
@@ -40,9 +41,7 @@ export function registerExtensionConfigRoutes(router: Router, config: AimeatConf
       const out = await setExtensionConfig({ storage, config }, ext, (req.body as { config?: unknown } | undefined)?.config,
         {
           isOperator: await isOperatorCaller(storage, req.auth),
-          mayChooseSecretHosts: mayChooseSecretHost({
-            roles: req.auth!.roles, scopes: (req.auth as { scopes?: string[] }).scopes, principal: resolveIdentity(req.auth!, config.nodeId),
-          }),
+          mayChooseSecretHosts: mayChooseSecretHost(callerOf(req, config.nodeId, storage).principalView),
         });
       if (!out.ok) {
         res.status(out.status).json(error(config.nodeId, out.code, out.message));
