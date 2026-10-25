@@ -31,6 +31,11 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.8.0 — 2026-10-25 — A node-key candidate is priced before it runs from the prompt's size and the
+ *     answer's length, at most ai.node_key_max_output_tokens, and a call that costs more than is left
+ *     for the account (less its calls in flight) is a spent allowance: the free model for a text call
+ *     that named none, else 402 with the price. The candidate carries `nodeKey` (estimate and length)
+ *     to the call (ai/node-key-hold.ts; secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.7.0 — 2026-10-05 — The node's key asks nodeKeyStanding (ai-allowance.ts): once it may not pay,
  *     a call that names its model is refused like any other, instead of running on the node's key
  *     with no limit but the caller's own budget (secaudit 2026-10, AI-1).
@@ -69,6 +74,7 @@ import { catalogModel } from './catalog/store.js';
 import { textPricePerMtok } from './catalog/price.js';
 import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
 import { extensionRunner } from './extension-provider.js';
+import { nodeKeyOutputCap, nodeKeyRoomUsd, tooCostlyMessage, type NodeKeyHold } from './node-key-hold.js';
 
 export type ChosenBy = 'call-model' | 'call-provider' | 'role' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
 
@@ -83,6 +89,8 @@ export interface AiCandidate {
   allowanceRemainingUsd?: number;
   /** The allowance was spent and the free model answers instead of a refusal. */
   degradedToFree?: boolean;
+  /** Node key only: the call's estimate, held while it runs, and the answer's length (ai/node-key-hold.ts). */
+  nodeKey?: NodeKeyHold;
 }
 
 /** What ai-allowance.ts nodeKeyStanding answers: may the node's key pay one more call, and if not, why. */
@@ -91,6 +99,9 @@ export interface NodeKeyAnswer {
   mayPay: boolean;
   reason?: string;
   message?: string;
+  /** What one more call may cost this account (ai-allowance.ts NodeKeyStanding). */
+  headroomUsd?: number;
+  nodeHeadroomUsd?: number;
 }
 
 export type RejectReason =
@@ -385,6 +396,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     let keyScope: AiCandidate['keyScope'] = 'own';
     let allowanceRemainingUsd: number | undefined;
     let degradedToFree = false;
+    let nodeKey: NodeKeyHold | undefined;
     let model = chosen.model;
     const agentKey = input.agent ? await readAgentProviderKey(storage, config, gaii, input.agent, p) : null;
     if (agentKey) { key = agentKey; keyScope = 'agent'; }
@@ -399,19 +411,28 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       // runs, and every other call is refused, the ones that name their model included. Until
       // 2026-10-05 a text call that named its model ran as named and kept spending the node's key
       // (secaudit 2026-10, AI-1); not re-choosing a model a caller named is kept, by refusing instead.
-      if (!allowance.mayPay) {
+      // A call that would cost more than is left for this account is the same case: it is priced
+      // here from the prompt's size and the answer's length (at most the operator's limit), less what
+      // the account's calls in flight hold (ai/node-key-hold.ts; secaudit2026oct22).
+      const maxTokens = nodeKeyOutputCap(config, input.estimate?.maxTokens);
+      const est = allowance.mayPay ? estimateCallUsd(p.type, model, capability, { ...input.estimate, ...(maxTokens ? { maxTokens } : {}) }) : undefined;
+      const room = allowance.mayPay ? nodeKeyRoomUsd(gaii, allowance) : 0;
+      const tooCostly = est !== undefined && est > room;
+      if (!allowance.mayPay || tooCostly) {
         const free = config.modelFreeFallback;
         const freeAllowed = input.op === 'text' && !!free && freeModelAllowed(input.policy, free, p.type);
         if (freeAllowed && !input.requested) {
           model = free; degradedToFree = true;
         } else if (!(freeAllowed && model === free)) {
+          const spent = tooCostly ? tooCostlyMessage(est!, room) : allowance.message;
           const message = input.op === 'text' && free && !input.requested && !freeAllowed
-            ? `${allowance.message ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
-            : (allowance.message ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.');
+            ? `${spent ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
+            : (spent ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.');
           reject(p, 'allowance-spent', message, { error: new AiCompletionError('QUOTA_EXHAUSTED', 402, message) });
           continue;
         }
       }
+      nodeKey = { estimateUsd: degradedToFree || est === undefined ? 0 : est, ...(maxTokens ? { maxTokens } : {}), room: allowance };
     } else if (p.auth.type === 'env') {
       key = (process.env[p.auth.env ?? ''] ?? '').trim() || undefined;
       if (!key && !p.auth.optional) { reject(p, 'no-key', `The operator named ${p.auth.env} as the key for '${p.id}', and it is not set.`); continue; }
@@ -458,6 +479,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       policyChoseModel: chosen.policyChoseModel && !degradedToFree,
       ...(allowanceRemainingUsd !== undefined ? { allowanceRemainingUsd } : {}),
       ...(degradedToFree ? { degradedToFree } : {}),
+      ...(nodeKey ? { nodeKey } : {}),
     };
     // A call that names the provider (the owner's own test among them) reaches it whatever its health:
     // the caller asked for that one, and a test is how a refused key is found fixed. Otherwise a

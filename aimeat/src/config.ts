@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.34.0 — 2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, and nodeLimitsDefaults() (config-node-limits.ts) (secaudit2026oct22).
  *   v1.33.1 — 2026-10-25 — casdoorLinkDomains, entraLinkDomains and refreshCookieLegacyUntil read from the environment (secaudit2026oct22).
  *   v1.33.0 — 2026-10-25 — extensionLoadDefaults() (config-extension-load.ts): the operator's limits on extension load (secaudit2026oct22).
  *   v1.32.0 — 2026-10-25 — runtimeConfigFromEnv() and siteKvFromEnv() (config-runtime.ts): the usage meter, write tally, log level, proxy trust and key settings code read from process.env, and the site key-value pairs, which also take AIMEAT_SITE_KV as one JSON object.
@@ -104,6 +105,7 @@ import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
 import { pagesDefaults } from './config-pages.js';
+import { nodeLimitsDefaults } from './config-node-limits.js';
 import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
@@ -292,6 +294,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     ...pagesDefaults(),
     ...runtimeConfigFromEnv(),
+    ...nodeLimitsDefaults(),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party
@@ -441,6 +444,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     testMoneyHandler: process.env.AIMEAT_TEST_MONEY_HANDLER === 'true',
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
+    personalNodeMaxPerOwner: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_PER_OWNER ?? '3', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),
     personalNodeHeartbeatIntervalMs: parseInt(process.env.AIMEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
     personalNodeOfflineThresholdMs: parseInt(process.env.AIMEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),

@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.36.1 — 2026-10-25 — ensureAppSubdomain clears the held mark of its own target's label: the owner
+ *     published the removed app again (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.36.0 — 2026-10-25 — `?format=md&lang=<tag>` passes the reader's language to the app's own format-md
  *     action (formatMdLang, services/app-format-md.ts).
  *   v1.35.1 — 2026-10-25 — injectAppScript and relaxAppCspMeta moved unchanged to routes/subdomain-app-html.ts (max-file-lines).
@@ -245,6 +247,9 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
   // A disabled mapping now means this app has no address of its own, and the callers fall back
   // to the shared path form, which serves the same app.
   const forTarget = sites.filter(s => s.kind === 'app' && s.target === target);
+  // A label held since its app went away (services/held-app-labels.ts) is this target's own: the
+  // owner published the same app again, so it is no longer held.
+  for (const s of forTarget) if (s.heldSince) await storage.updateSubdomainSite(s.subdomain, { heldSince: null });
   const live = forTarget.find(s => s.enabled);
   if (live) return live.subdomain;
   if (forTarget.length > 0) return null;

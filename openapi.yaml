@@ -4456,6 +4456,17 @@ components:
             `<label>--draft.<apex>` answer 302 there (404 when the node has no app origin). Null: a
             mapping from before this field that the node could not classify at start, served as
             before until the operator sets it (the Security page names each one).
+        heldSince:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            When the app this label served went away (a package removal or an app deletion). The
+            label is then held for that app's owner: no other owner's app gets it, and the owner gets
+            it back by publishing the same app again. The daily core job held-label-release releases it
+            after `apps.held_label_days` (default 90; 0 holds it until released), and an owner keeps at
+            most `apps.held_labels_per_owner` held labels (default 20; the one held longest goes
+            first). DELETE on the mapping releases it at once. Null while the app is there.
 
     CrewDef:
       type: object
@@ -12664,6 +12675,10 @@ paths:
                     `NO_ACCOUNT`; malformed email → 400 `INVALID_EMAIL`; (should-never-happen) more than
                     one match → 409 `AMBIGUOUS`. The value only SELECTS which account this request targets
                     — it is not an authentication factor (the human still approves the device code).
+                    The email form is counted per network address: past `auth.device_authorize_email_max`
+                    requests in 10 minutes (default 20) it answers 429 `RATE_LIMITED` with Retry-After;
+                    the operator turns the count off with `auth.device_authorize_email_limit`. The handle
+                    form is not counted.
                 agent_name:
                   type: string
                   description: Agent name (3-32 chars, lowercase alphanumeric + hyphens)
@@ -12991,6 +13006,11 @@ paths:
                             type: string
                           owner:
                             type: string
+                            description: >
+                              The account the request names. Present only when the caller is that
+                              account, signed in in person; an anonymous caller and any other account
+                              get no owner. The consent page checks the owner through the owner's own
+                              GET /v1/agents/device-authorize/pending.
                           status:
                             type: string
                             enum: [pending, approved, denied, expired]
@@ -19387,6 +19407,15 @@ paths:
         agent's own key (`/v1/agents/{name}/ai-keys`), the owner's own key, the server's key. The
         agent's daily cap, when the owner set one, refuses with 402 `AGENT_QUOTA_EXHAUSTED`. The
         same holds for `/v1/llm/chat/completions` and `POST /v1/ai/jobs`.
+
+
+        THE SERVER'S KEY. A call on the server's key gets an answer of at most
+        `ai.node_key_max_output_tokens` tokens (default 32000; 0 is no limit), also when `max_tokens`
+        asks for more or is absent, and `data.truncated` says when the answer was cut. Before it runs,
+        the call is priced from the prompt's size and that length with the model catalogue and held
+        against what is left of the allowance (or the daily limits) while it runs; a call that would
+        cost more answers 402 `QUOTA_EXHAUSTED` with the price, except that a text call that named no
+        model gets the free model. A call on the owner's or an agent's own key is not affected.
 
 
         MODEL POLICY. The owner may limit which models their calls use (`GET/PUT /v1/ai/policy`), and
@@ -70077,7 +70106,11 @@ paths:
         Registers a personal node against this operator node. Owner session; requires the
         `tunnel:connect` scope. The `owner_name` in the body must match the authenticated owner.
         Returns 503 when personal-node support is disabled, 409 if the node id is already anchored,
-        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. Work sent to an
+        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. One owner anchors at
+        most `personal_nodes.max_per_owner` nodes (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3,
+        0 = no limit); the next one is refused with 409 `PERSONAL_NODE_LIMIT`, whose `details`
+        carry the `limit`, the owner's node ids and the call that frees a slot
+        (DELETE /v1/personal/anchor/{nodeId}). Work sent to an
         identity in `agent_gaiis` is queued for this node, so each entry must be the owner's own
         agent on it, `name#<owner_name>` or `name#<owner_name>@<node_id>`; any other entry is
         refused with 400 `AGENT_GAII_NOT_YOURS`.
@@ -78109,7 +78142,7 @@ paths:
       operationId: setCompanySmtp
       tags: [Companies]
       summary: Store the company's own sending identity
-      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one."
+      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one. A host at an address outside the public internet (loopback, private, link-local or reserved) is refused with 400 SMTP_HOST_NOT_ALLOWED unless the operator lists the host, the address or its network in email.company_smtp_private_hosts (AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS); loopback is allowed on a node in local mode. A host name that does not resolve is accepted, and the same check runs again before each send, which connects to the checked address. A failed send reports the failure in fixed words by its code, never with the mail server's own reply text."
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:

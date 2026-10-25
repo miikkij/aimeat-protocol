@@ -8,6 +8,8 @@
  * @structure SubdomainSiteRepository — CRUD keyed by lowercase subdomain label.
  * @usage import type { SubdomainSiteRepository } from './repositories/subdomain-site.repository.js';
  * @version-history
+ *   v1.2.0 — 2026-10-25 — createSubdomainSite and updateSubdomainSite also write `heldSince` (null
+ *     clears it): the label of a removed app is held (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.1.0 — 2026-10-25 — updateSubdomainSite also writes `origin`, and listSubdomainSitesPage reads the
  *     table a bounded page at a time (secaudit2026oct22).
  *   v1.0.0 — 2026-06-12 — Initial: subdomain routing (operator-only management)
@@ -25,7 +27,7 @@ export interface SubdomainSiteRepository {
   listSubdomainSitesPage(query: { after?: string; limit: number }): Promise<SubdomainSiteRecord[]>;
   updateSubdomainSite(
     subdomain: string,
-    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin'>>,
+    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin' | 'heldSince'>>,
   ): Promise<SubdomainSiteRecord | null>;
   deleteSubdomainSite(subdomain: string): Promise<boolean>;
 }
