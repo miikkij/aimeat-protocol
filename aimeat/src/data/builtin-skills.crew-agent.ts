@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-10-25 -- Section 2: a runtime reconnecting an existing agent sends `proof`, signed with the
+ *     agent's key; without it the owner sees a takeover (secaudit2026oct22, lead 2150).
  *   2026-10-25 -- Section 2: an agent made by another agent gets no looser a clearance than that
  *     agent's, and strangers' waiting requests do not block the call (secaudit2026oct22).
  *   2026-10-20 -- Section 2: when one of the owner's agents starts device authorization, the node
@@ -270,7 +272,9 @@ agent side starts device authorization (RFC 8628): \`POST /v1/agents/device-auth
 runtime or the connect CLI does, and it shows a code. The runtime names the scopes it needs in that
 call; one that names none gets the node's default set, which cannot take work. The owner approves in
 profile → Agents and chooses the scopes, and the agent's card keeps what was asked for beside what
-was granted.
+was granted. A runtime reconnecting an agent that already exists signs the call with the key its
+last approval gave it (\`proof\`, which the connect CLI sends); without it the owner is shown a new
+device taking the agent over, and may sign the agent out everywhere else when approving.
 
 **When another agent of the owner starts that call.** A device-authorize call made with the token of
 an agent of the same owner that holds \`agent:write\` is approved at once, and the agent is created

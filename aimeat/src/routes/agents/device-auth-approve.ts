@@ -11,6 +11,10 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   v1.2.0 — 2026-10-25 — `opts`: an existing agent approved without proof that it is coming back is a
+ *     takeover and records the account event agent_device_takeover; `endOtherSessions` signs the
+ *     agent's other sessions out first, as a key rotation does (secaudit2026oct22,
+ *     unbound-reapproval-of-existing-agent).
  *   v1.1.0 — 2026-10-25 — An agent approver passes on no looser a clearance than its own: a new agent
  *     gets the stricter of the node default and the approver's clearance, and a re-approved agent is
  *     lowered to the approver's when it held more (secaudit2026oct22,
@@ -36,6 +40,8 @@ import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD, exceedsCeiling } from '../../u
 import { recordAgentScopeRequest } from '../../services/agent-refusals.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance, clearanceBoundByApprover } from '../../services/agent-clearance.js';
+import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
+import { logger } from '../../utils/logger.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 export function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -75,7 +81,14 @@ export async function approveDeviceAuth(
    * theirs to keep.
    */
   approverAgentScopes?: readonly string[],
-): Promise<{ ok: true; gaii: string; existing: boolean } | { ok: false; status: number; code: string; message: string }> {
+  /**
+   * An existing agent only. `takeover`: the request did not prove it is the agent coming back
+   * (services/device-return-proof.ts), so the approval records an account event. `endOtherSessions`:
+   * the owner chose to sign the agent's other sessions out, as a key rotation does, before the new
+   * credential is issued.
+   */
+  opts: { takeover?: boolean; endOtherSessions?: boolean } = {},
+): Promise<{ ok: true; gaii: string; existing: boolean; otherSessionsEnded: boolean } | { ok: false; status: number; code: string; message: string }> {
   // Pre-registration hook
   const hookResult = await executeHooks(config, storage, 'pre_agent_registration', {
     name: request.agentName,
@@ -152,7 +165,17 @@ export async function approveDeviceAuth(
       defaultScopes: grantedScopes,
       lastSeen: now,
       ...(clearance !== heldClearance ? { clearance } : {}),
+      // Every credential issued before now stops, the new one below is issued after (auth/agent-alive.ts).
+      ...(opts.endOtherSessions ? { credentialsValidAfter: now } : {}),
     });
+    if (opts.endOtherSessions) {
+      // As a key rotation does (routes/agents/rekey.ts): the sessions, the MCP OAuth refresh tokens,
+      // the open tunnel and the open MCP sessions of the agent end before the new credential exists.
+      await storage.revokeSessionsByGaii(gaii);
+      await storage.deleteOAuthRefreshTokensByGaii(gaii);
+      try { getActiveConnectTunnelManager()?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('device approve: tunnel close failed', { gaii, error: String(err) }); }
+      closeMcpSessionsForGaii(gaii);
+    }
     // Re-approval is the other door that changes what an agent may do, and an agent being
     // re-approved is exactly the one likely to have a session open — an open MCP session AND an
     // open tunnel, whose credential the node pinned at attach and will keep honouring until told.
@@ -286,7 +309,17 @@ export async function approveDeviceAuth(
       link: '/v1/profile?tab=agents',
       data: { name: request.agentName },
     }, config);
+  } else if (opts.takeover) {
+    // A new device took the agent over (no proof that it is the agent coming back): that is news.
+    void recordAccountEvent(storage, {
+      ownerGhii: `${request.ownerName}@${config.nodeId}`,
+      kind: 'agent_device_takeover',
+      actorGaii: approvedBy,
+      subject: gaii,
+      link: '/v1/profile?tab=agents',
+      data: { name: request.agentName, other_sessions_ended: opts.endOtherSessions ? 'yes' : 'no' },
+    }, config);
   }
 
-  return { ok: true, gaii, existing: !!existing };
+  return { ok: true, gaii, existing: !!existing, otherSessionsEnded: !!existing && !!opts.endOtherSessions };
 }

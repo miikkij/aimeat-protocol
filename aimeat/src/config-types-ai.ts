@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   2026-10-25 — aiFreeModelLastResort (secaudit2026oct22 follow-up, the developer's ruling on the free model).
  *   2026-10-25 — aiNodeKeyMaxOutputTokens (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.5.1 — 2026-10-12 — aiLegacySettingsRoutes no longer names /v1/ai/settings, which stays in 4.0.0.
  *   v1.5.0 — 2026-09-28 — modelDefaultTts, modelDefaultEmbed, ttsVoiceDefault (System 2 plan, V5).
@@ -101,6 +102,14 @@ export interface AiCapabilityConfig extends DecideConfig {
    * of degrading. A free model is a worse answer, not a wrong one, as long as the person is told.
    */
   modelFreeFallback: string;
+  /**
+   * The node's default for the free model as the last resort on the node's key: a text call that
+   * named no model gets modelFreeFallback when what is left of the person's allowance cannot pay for
+   * the normal model, and no other candidate can answer. False: such a call is refused with 402 and
+   * the price. Each account can override it in its AI routing rules (freeModelLastResort; Jouni,
+   * 2026-10-25). AIMEAT_AI_FREE_MODEL_LAST_RESORT, default true.
+   */
+  aiFreeModelLastResort: boolean;
   /**
    * Instance-level model defaults, one per role. Read only when the OWNER has not chosen a model of
    * their own: owner setting, then this, then a refusal that names what to set. Empty (the default)

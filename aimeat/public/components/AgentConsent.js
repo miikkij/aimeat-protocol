@@ -21,6 +21,11 @@
  *   import { AgentConsent } from '/components/AgentConsent.js';
  *   html`<${AgentConsent} requests=${pending} onApprove=${fn} onDeny=${fn} />`
  * @version-history
+ *   v1.5.0 — 2026-10-25 — A request for an existing agent that did not prove it is the agent coming back
+ *     (`return_proven: false`) says plainly that a new device is taking the agent over, before the
+ *     first press, and the approval offers to sign the agent's other sessions out (on by default;
+ *     onApprove's third argument `{ endOtherSessions }`). A proven return keeps "keep its current
+ *     access" as before (secaudit2026oct22, unbound-reapproval-of-existing-agent).
  *   v1.4.2 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so an
  *     agent name, display name or boundary line with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.4.1 — 2026-09-27 — Draws only its own class names, its look in
@@ -73,7 +78,7 @@ function countdown(seconds) {
 
 /**
  * One pending request, with its scope choice.
- * @param {{ req: any, onApprove: (code: string, scopes: string[]) => void,
+ * @param {{ req: any, onApprove: (code: string, scopes: string[]|undefined, opts?: { endOtherSessions: boolean }) => void,
  *   onDeny: (code: string) => void, busy: boolean, variant: string }} props
  */
 function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
@@ -84,6 +89,11 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
   // 'keep' approves with NO scopes field, which is exactly how the server reads "nothing was
   // chosen" (approveDeviceAuth, scopesRequested=false).
   const returning = !!req.existing_agent;
+  // An existing agent's request that did not prove it is the agent coming back (a signature by its
+  // current key): a new device is taking the agent over. The owner is told so plainly, before the
+  // first press, and may sign the agent's other sessions out with the approval (on by default here).
+  const takeover = returning && req.return_proven === false;
+  const [endOthers, setEndOthers] = useState(true);
   // What the agent asked for in its device-authorize call. Offered as the FIRST choice and
   // preselected for a first approval, because an agent that names its own scopes has said exactly
   // what it needs, and granting the 'standard' template instead is how an agent arrives able to do
@@ -120,6 +130,11 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
         <div class="agent-consent-code">${req.user_code}</div>
       </div>
 
+      ${takeover && html`
+        <p class="agent-consent-takeover" role="note">
+          ${t('profile.agents.pendingRequests.takeover', { name: req.agent_name })}
+        </p>`}
+
       ${variant === 'step' && html`
         <p class="agent-consent-caption agent-consent-explain">
           ${tr('agentConsent.explain', 'Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time.')}
@@ -154,13 +169,19 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
           <ul class="agent-consent-caption agent-consent-boundary">
             ${boundaryLines(t).map(line => html`<li key=${line}>${line}</li>`)}
           </ul>
+          ${takeover && html`
+            <label class="agent-consent-endothers">
+              <input type="checkbox" checked=${endOthers} onChange=${(e) => setEndOthers(e.currentTarget.checked)} />
+              <span>${t('profile.agents.pendingRequests.endOtherSessions', { name: req.agent_name })}</span>
+            </label>`}
         </div>
         <div class="agent-consent-actions">
           <button type="button" class="btn-success" disabled=${busy}
             onClick=${() => onApprove(req.user_code,
               preset === 'keep' ? undefined
                 : preset === 'asked' ? asked
-                : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard))}>
+                : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard),
+              { endOtherSessions: takeover && endOthers })}>
             ${t('profile.agents.pendingRequests.confirmApprove')}
           </button>
           <button type="button" class="btn-outline" onClick=${() => setExpanded(false)}>

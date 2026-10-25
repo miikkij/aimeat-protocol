@@ -69,6 +69,10 @@
  *     request approves with no screen only when the request is bound to the app's own address
  *     (origin_bound), and "Next time it signs you in without this screen" shows only then
  *     (secaudit2026oct22).
+ *   v1.9.0 — 2026-10-25 — The owner's own app shows the screen for the scopes its grant lacks when another
+ *     account published the live version (it names who) or the owner narrowed the grant by hand, with
+ *     one line that says which (secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing).
+ *     Its exact permissions open with the screen, and with no live grant each is marked new.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -79,7 +83,7 @@ import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, getStoredGhii, getNodeUrl } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { scopeSentence, areaLine, boundaryLines } from '/js/consent-vocab.js';
-import { isOwnApp, autoApproves } from './app-grant-auto.js';
+import { isOwnApp, autoApproves, ownAppAsks } from './app-grant-auto.js';
 import { AskPage } from '/components/AskPage.js';
 import { Action, Loud } from '/components/Action.js';
 import { Box } from '/components/Box.js';
@@ -166,7 +170,9 @@ export default function AppGrant() {
         // Pass-through: when NOT explicitly managing (the gear), the owner's own app, and an app whose
         // live grant covers what it asks for, are approved with no second prompt (app-grant-auto.js).
         if (autoApproves(res.data, myOwner, grant)) { setState({ status: 'autoapprove', request: res.data }); return; }
-        if (grant) setDetails(true); // manage / add-scopes → open the exact list + checkboxes up front
+        // manage / add-scopes, or the owner's own app asking after all → the exact list + checkboxes up
+        // front, so the scopes the notice calls "marked new below" are in view.
+        if (grant || (isOwnApp(res.data, myOwner) && ownAppAsks(res.data, grant))) setDetails(true);
         setState({ status: 'ready', request: res.data });
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
@@ -269,6 +275,8 @@ export default function AppGrant() {
   const addedScopes = existingGrant
     ? reqScopeNames.filter((s) => !existingGrant.scopes.includes(s))
     : [];
+  // The owner's own app asks its owner after all (app-grant-auto.js ownAppAsks): say why.
+  const ownAsks = ownApp && ownAppAsks(req, existingGrant);
   const icon = String(req.app_icon || '').trim();
   const iconIsUrl = /^(https?:\/\/|\/)/.test(icon);
   const monogram = (Array.from(String(req.app_name || '?').trim())[0] || '?').toUpperCase();
@@ -303,10 +311,14 @@ export default function AppGrant() {
           ${submitting ? tr('appGrant.approving', 'Allowing…') : (existingGrant ? tr('appGrant.saveCta', 'Save changes') : tr('appGrant.connectCta', 'Connect'))}
         <//>`}>
       ${!existingGrant && html`<${Note} kind="lead">${tr('consent.priming.appGrant', '{app} is asking to use part of your AIMEAT account.', { app: req.app_name })}<//>`}
-      ${addedScopes.length > 0 && html`<${Box} tone="edge"><${Note} kind="lead">${tr(
-        'appGrant.updatedNotice',
-        'This app has been updated and now asks for something new. Approve it again to keep using it.',
-      )}<//><//>`}
+      ${ownAsks
+        ? html`<${Box} tone="edge"><${Note} kind="lead">${req.published_by_other
+          ? tr('appGrant.publisherNotice', 'This version of your app was published by {who}, who may publish it for you. It asks for permissions you have not given it, marked new below. Nothing changes until you allow them.', { who: req.published_by_other })
+          : tr('appGrant.narrowedNotice', 'You took permissions away from this app by hand. It asks for them again, marked new below. Nothing changes until you allow them.')}<//><//>`
+        : addedScopes.length > 0 && html`<${Box} tone="edge"><${Note} kind="lead">${tr(
+          'appGrant.updatedNotice',
+          'This app has been updated and now asks for something new. Approve it again to keep using it.',
+        )}<//><//>`}
       ${req.app_description && html`<${Note} kind="lead">${req.app_description}<//>`}
 
       <${Box} tone="dim"><b>${tr('appGrant.worksWith', 'Works with:')}</b> ${summaryLine}<//>
@@ -323,7 +335,7 @@ export default function AppGrant() {
               <${Check} checked=${selected.has(s.scope)} onChange=${() => toggle(s.scope)} ariaLabel=${s.scope}
                 hint=${html`<${Code}>${s.scope}<//>`}>
                 ${scopeSentence(s.scope, t, s.description)}
-                ${existingGrant && !existingGrant.scopes.includes(s.scope) && html` <${Mark} tone="coral">${tr('appGrant.newScope', 'new')}<//>`}
+                ${(existingGrant ? !existingGrant.scopes.includes(s.scope) : ownAsks) && html` <${Mark} tone="coral">${tr('appGrant.newScope', 'new')}<//>`}
               <//>
             <//>`)}
         <//>

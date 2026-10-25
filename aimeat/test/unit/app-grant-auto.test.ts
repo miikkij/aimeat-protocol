@@ -7,6 +7,7 @@
  *   request with a covering grant, and the owner's own bound app, still approve with no screen.
  * @usage pnpm exec vitest run test/unit/app-grant-auto.test.ts
  * @version-history
+ *   2026-10-25 — The owner's own app asks for words its grant lacks after a delegate's publish or a hand narrowing.
  *   2026-10-24 — Initial (secaudit2026oct22).
  */
 import { describe, expect, it } from 'vitest';
@@ -38,6 +39,16 @@ describe('the consent page approves with no screen', () => {
     expect(isOwnApp({ ...own, origin_bound: false }, 'alice')).toBe(false);
     expect(autoApproves({ ...own, origin_bound: false }, 'alice', null)).toBe(false);
     expect(autoApproves({ ...own, package_app: true }, 'alice', null)).toBe(false);
+  });
+
+  it('the owner\'s own app shows the screen for a word its grant lacks when a delegate published it or the owner narrowed the grant', () => {
+    const own = { app: 'alice/x.html', app_owner: 'alice', origin_bound: true, manage: false, scopes: scopes('memory:read', 'ai:use') };
+    expect(autoApproves({ ...own, published_by_other: 'bob@n' }, 'alice', grant)).toBe(false);
+    expect(autoApproves({ ...own, published_by_other: 'bob@n' }, 'alice', null)).toBe(false);
+    expect(autoApproves(own, 'alice', { ...grant, scopes_fixed_at: '2026-10-25T00:00:00Z' })).toBe(false);
+    // What the grant holds still approves with no screen, and so does the owner's own version.
+    expect(autoApproves({ ...own, scopes: scopes('memory:read'), published_by_other: 'bob@n' }, 'alice', grant)).toBe(true);
+    expect(autoApproves(own, 'alice', grant)).toBe(true);
   });
 
   it('manage mode always shows the screen', () => {

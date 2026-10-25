@@ -33,6 +33,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-10-25 — aimeat-paying-for-the-ai: the free model is the last resort, on or off by the
+ *     operator's default and the person's own routing rule (secaudit2026oct22 follow-up).
  *   2026-10-18 — aimeat-welcome-pages: `access` says who may open the person's page or the company's
  *     front page (anyone, signed-in, organism:<id>); ask the person, and `html` may be left out to
  *     change only that (plan doc-mvcn6c7e4e5q, V3.10).
@@ -506,7 +508,12 @@ not you:
    provider of their own for what the call asks for. A person whose own provider cannot answer is
    told why; the node's key does not quietly step in.
 3. **A free model** once the allowance is spent — \`openrouter/free\` by default — for a text call
-   that names no model. The answer still comes; it comes from a weaker model. Unless the owner's
+   that names no model. The answer still comes; it comes from a weaker model. It is the last resort:
+   it answers only when no other provider of the person's can answer with the normal model, and only
+   while the free model as the last resort is on. The operator sets that for everyone, and each
+   person can turn it on or off for themselves in their AI routing rules (\`freeModelLastResort\`;
+   \`free_model\` on \`GET /v1/ai/routing\` says what applies now). Off, the call is refused
+   (\`QUOTA_EXHAUSTED\`) with its price and where to turn it on. Unless the owner's
    model policy leaves the free model out: then the call is refused (\`QUOTA_EXHAUSTED\`, saying so),
    because the owner ruled weaker models out. A call that names its own model is refused
    (\`QUOTA_EXHAUSTED\`) once the allowance is spent: the node never swaps the model a caller named,

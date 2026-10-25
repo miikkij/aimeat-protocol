@@ -8,6 +8,8 @@
  *   over an in-memory storage with the model catalogue's seed; no provider is called.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-node-key-hold.test.ts
  * @version-history
+ *   2026-10-25 — The free model as the last resort: the node default, the account's rule, and the
+ *     order behind the account's own provider (secaudit2026oct22 follow-up).
  *   2026-10-25 — Initial.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -17,6 +19,9 @@ import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { loadCatalog } from '../../src/services/ai/catalog/store.js';
 import { prepareAiCall } from '../../src/services/ai/completion.js';
 import { nodeKeyOutputCap, holdNodeKeyCandidates } from '../../src/services/ai/node-key-hold.js';
+import { setRouting } from '../../src/services/ai/routing.js';
+import { putOwnerAiProvider, setOwnerProviderKey } from '../../src/services/ai/provider-store.js';
+import { NODE_OPENROUTER_ID } from '../../src/services/ai/providers.js';
 
 const NODE = 'node-hold';
 const EXPENSIVE = 'anthropic/claude-opus-4.1';   // $15 in, $75 out per million tokens in the seed
@@ -80,6 +85,55 @@ describe('a node-key call is priced before it runs', () => {
     const { storage, gaii } = await owner(config);
     const plan = await prepareAiCall(storage, config, gaii, { caller: 'owner', model: EXPENSIVE, estimate: { promptTokens: 100 } });
     expect(plan.candidates[0].model).toBe(EXPENSIVE);
+  });
+});
+
+describe('the free model is the last resort, and the operator and the account decide whether it is used', () => {
+  const unnamedLong = { caller: 'owner' as const, estimate: { promptTokens: 1000 } };
+  const rule = (storage: Storage, gaii: string, freeModelLastResort: boolean | null, ids: string[] = []) =>
+    setRouting(storage, gaii, { rules: { freeModelLastResort } }, new Set(ids), { kind: 'owner' });
+
+  it('with the node default off, an unnamed call that costs more than is left is refused with the price and where to turn it on', async () => {
+    const config = { ...base, modelDefaultChat: EXPENSIVE, aiFreeModelLastResort: false } as AimeatConfig;
+    const { storage, gaii } = await owner(config);
+    const out = prepareAiCall(storage, config, gaii, unnamedLong);
+    await expect(out).rejects.toMatchObject({ code: 'QUOTA_EXHAUSTED', status: 402 });
+    await expect(out).rejects.toThrow(/could cost up to about \$.*last resort is off for you/);
+  });
+
+  it('the account turns it on for itself when the node default is off, and off when the node default is on', async () => {
+    const off = { ...base, modelDefaultChat: EXPENSIVE, aiFreeModelLastResort: false } as AimeatConfig;
+    const a = await owner(off);
+    await rule(a.storage, a.gaii, true);
+    expect((await prepareAiCall(a.storage, off, a.gaii, unnamedLong)).candidates[0].model).toBe('openrouter/free');
+
+    const on = { ...base, modelDefaultChat: EXPENSIVE } as AimeatConfig;
+    const b = await owner(on);
+    await rule(b.storage, b.gaii, false);
+    await expect(prepareAiCall(b.storage, on, b.gaii, unnamedLong)).rejects.toMatchObject({ code: 'QUOTA_EXHAUSTED' });
+    await rule(b.storage, b.gaii, null);
+    expect((await prepareAiCall(b.storage, on, b.gaii, unnamedLong)).candidates[0].model).toBe('openrouter/free');
+  });
+
+  it('a provider of the account\'s own that answers with the normal model comes before the free model', async () => {
+    const config = { ...base, modelDefaultChat: EXPENSIVE, encryptionKey: 'ab'.repeat(32) } as AimeatConfig;
+    const { storage, gaii } = await owner(config);
+    await putOwnerAiProvider(storage, config, gaii, 'mine', {
+      title: 'Mine', type: 'openrouter', auth: { type: 'key' }, capabilities: { text: { enabled: true, pool: false, model: EXPENSIVE } },
+    });
+    await setOwnerProviderKey(storage, config, gaii, 'mine', 'sk-mine-never-sent');
+    await setRouting(storage, gaii, { defaults: { text: [NODE_OPENROUTER_ID, 'mine'] }, rules: { onlyTested: false } },
+      new Set([NODE_OPENROUTER_ID, 'mine']), { kind: 'owner' });
+    const plan = await prepareAiCall(storage, config, gaii, unnamedLong);
+    expect(plan.candidates.map((c) => [c.provider.id, c.model])).toEqual([['mine', EXPENSIVE], [NODE_OPENROUTER_ID, 'openrouter/free']]);
+  });
+
+  it('designed use: a call that fits what is left runs on the normal model whatever the setting', async () => {
+    const config = { ...base, aiFreeModelLastResort: false, chatFreeAllowanceUsd: 1 } as AimeatConfig;
+    const { storage, gaii } = await owner(config);
+    const plan = await prepareAiCall(storage, config, gaii, { caller: 'owner', model: EXPENSIVE, estimate: { promptTokens: 100, maxTokens: 50 } });
+    expect(plan.candidates[0].model).toBe(EXPENSIVE);
+    expect(plan.candidates[0].degradedToFree).toBeFalsy();
   });
 });
 

@@ -8,6 +8,9 @@
  * @structure One file per agent. `listAllTokens()` scans the directory and parses
  *   filenames so the multi-agent serve loop can load every credential at once.
  * @version-history
+ *   v1.4.0 -- 2026-10-25 -- storeAgentKey / getAgentKey: the agent's private key from its last approval,
+ *     `{agent}@{owner}.key` at 0600, for the proof that a reconnect is the agent coming back; deleteToken
+ *     removes it too (secaudit2026oct22, unbound-reapproval-of-existing-agent).
  *   v1.3.0 -- 2026-10-09 -- storeToken leaves the file at 0600 and the home and tokens/ at 0700 on
  *     every write, not only when it creates them, and the home holds a .gitignore of `*` (secrets
  *     audit 2026-10-09, S4).
@@ -53,7 +56,30 @@ export async function getToken(agent: string, owner: string): Promise<string | n
   return readFileSync(p, 'utf-8').trim();
 }
 
+function keyPath(agent: string, owner: string): string {
+  return join(tokensDir(), `${agent}@${owner}.key`);
+}
+
+/**
+ * The agent's private key from its last approval, kept beside its token at 0600, so a reconnect can
+ * prove it is the agent coming back (services/device-return-proof.ts). Not a `.token`, so
+ * listAllTokens never reads it as a credential.
+ */
+export async function storeAgentKey(agent: string, owner: string, privateKey: string): Promise<void> {
+  prepareConnectorHome(getConfigDir());
+  ensurePrivateDir(tokensDir());
+  writePrivateFile(keyPath(agent, owner), privateKey);
+}
+
+export async function getAgentKey(agent: string, owner: string): Promise<string | null> {
+  const p = keyPath(agent, owner);
+  if (!existsSync(p)) return null;
+  return readFileSync(p, 'utf-8').trim() || null;
+}
+
 export async function deleteToken(agent: string, owner: string): Promise<boolean> {
+  // The agent's key goes with its token: a forgotten agent proves nothing on this machine any more.
+  if (existsSync(keyPath(agent, owner))) unlinkSync(keyPath(agent, owner));
   const p = tokenPath(agent, owner);
   if (!existsSync(p)) return false;
   unlinkSync(p);

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-25 — The pending listing says of an existing agent's request whether it proved it is
+ *     coming back (`return_proven`; services/device-return-proof.ts; secaudit2026oct22).
  *   v1.9.0 — 2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.8.0 — 2026-10-18 — A registered agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.7.0 — 2026-10-14 — POST /v1/agents/connect is removed with the connectivity-key mint that fed
@@ -50,6 +52,7 @@ import { detectPlatform } from '../../services/platform-detector.js';
 import { exceedsCeiling } from '../../utils/scope-coverage.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
+import { returnProven } from '../../services/device-return-proof.js';
 
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
@@ -229,6 +232,11 @@ export function registerRegistrationRoutes(
     // shows them), so this authenticated listing carries them and the card can offer to keep them.
     const existing = await Promise.all(pending.map(r =>
       storage.getAgent(buildGAII(r.agentName, req.auth!.owner, config.nodeId))));
+    // An existing agent's request: proved it is coming back, or a new device is taking it over
+    // (services/device-return-proof.ts). The card warns about a takeover and offers the sign-out.
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const proven = await Promise.all(pending.map((r, i) =>
+      existing[i] ? returnProven(storage, ownerGhii, r.userCode, existing[i]!.gaii) : Promise.resolve(false)));
     res.json(success(config.nodeId, {
       requests: pending.map((r, i) => ({
         user_code: r.userCode,
@@ -237,6 +245,7 @@ export function registerRegistrationRoutes(
         description: r.description,
         status: r.status,
         existing_agent: !!existing[i],
+        ...(existing[i] ? { return_proven: proven[i] } : {}),
         current_scopes: existing[i]?.defaultScopes ?? null,
         // What the agent ASKED FOR, which is not what it currently holds. Null when it named
         // nothing. The request was thrown away at authorize time until 2026-08-29, so the card

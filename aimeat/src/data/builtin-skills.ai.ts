@@ -9,6 +9,8 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-10-25 — configure-routing: the rule freeModelLastResort and `free_model` on the read
+ *     (secaudit2026oct22 follow-up, the free model as the last resort).
  *   v1.4.2 — 2026-10-08 — ai-transparency: `media_kind`, `media_type` and `resembles_real` in the
  *     declaration.
  *   v1.4.1 — 2026-10-05 — ai-transparency: a declaration needs provenance:write in the session as well
@@ -183,7 +185,10 @@ Three separate "routing" layers — identify which one the owner means:
    one picture, so ask first, and each test counts as one call against the account's limit of AI
    calls a minute) and propose the routing (\`aimeat_ai_routing_set\`, propose-then-
    confirm): the ordered providers per capability, and the rules (fallback on or off, at most how
-   many attempts, only tested providers, never away from this machine when the first was local).
+   many attempts, only tested providers, never away from this machine when the first was local, and
+   \`freeModelLastResort\`: whether a call on the node's key that named no model gets the free model
+   when the allowance cannot pay, true, false, or null for the operator's default; \`free_model\` on
+   the read says what applies now).
    Every answer carries \`route\`: who chose, who answered, each attempt. Spend history is
    \`GET /v1/ai/usage/history\`, where each failed attempt before a fallback is a line of its own.
    The operator's side: \`AIMEAT_AI_PROVIDERS\`, \`AIMEAT_AI_BUILTIN_PROVIDERS\`,

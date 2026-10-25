@@ -7,6 +7,9 @@
     scope model and the shared consent vocabulary, so its presets and sentences can never diverge
     from the SPA's AgentConsent panel again.
   @version-history
+    2026-10-25 — A request for an existing agent that did not prove it is coming back
+        (`return_proven: false` on /verify/info) says plainly that a new device is taking the agent
+        over, and offers to sign its other sessions out (checked; end_other_sessions) (secaudit2026oct22).
     2026-10-25 — The owner check reads the signed-in owner's own pending list: /verify/info names
         the owner only to that owner (secaudit2026oct22, device-authorize-email-owner-oracle). A
         request missing from the list shows the owner-mismatch error, as before.
@@ -121,6 +124,10 @@
     .btn-deny { background:transparent; border:1px solid var(--danger); color:var(--danger); }
     .btn:disabled { opacity:.4; cursor:not-allowed; }
     .error-msg { color:var(--danger); font-size:.85rem; margin-top:.5rem; min-height:1.2em; }
+    .takeover-msg { border:1px solid var(--danger); color:var(--text); background:var(--surface);
+      border-radius:.5rem; padding:.6rem .75rem; margin:.75rem 0; font-size:.85rem; line-height:1.45; }
+    .endothers { display:flex; align-items:flex-start; gap:.5rem; font-size:.85rem; color:var(--text); margin:.75rem 0 0; }
+    .endothers input[type="checkbox"] { width:auto; margin:.15rem 0 0; accent-color:var(--accent); }
     .success-msg { text-align:center; padding:1.5rem 0; }
     .success-msg h2 { color:var(--success); margin-bottom:.5rem; }
     .success-msg .gaii { font-family:monospace; font-size:.85rem; color:var(--accent);
@@ -357,6 +364,8 @@
       const scopeOptions = presetKeys.map((p) => ({
         key: p, name: presetLabel(p), desc: p === 'asked' ? askedDesc : presetSummary(p, t),
       }));
+      // An existing agent that did not prove it is coming back: a new device is taking it over.
+      const takeover = !!info.existing_agent && info.return_proven === false;
       if (info.existing_agent && selectedPreset === 'standard') selectedPreset = 'keep';
       else if (askedDesc && selectedPreset === 'standard') selectedPreset = 'asked';
 
@@ -403,6 +412,7 @@
             <span class="agent-info-value">${escHtml(info.description)}</span>
           </div>` : ''}
         </div>
+        ${takeover ? `<p class="takeover-msg" role="note">${escHtml(t('profile.agents.pendingRequests.takeover', { name: info.agent_name }))}</p>` : ''}
         <div class="scope-section">
           <div class="scope-section-title">${escHtml(t('scopeLabel'))}</div>
           ${scopeRadiosHtml}
@@ -411,6 +421,8 @@
           </div>
         </div>
         ${boundaryHtml()}
+        ${takeover ? `<label class="endothers"><input type="checkbox" id="endOthers" checked />
+          <span>${escHtml(t('profile.agents.pendingRequests.endOtherSessions', { name: info.agent_name }))}</span></label>` : ''}
         <div id="consentError" class="error-msg"></div>
         <div class="btn-row">
           <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
@@ -478,7 +490,8 @@
             // `scopes` omitted entirely when keeping the current access — the server treats a
             // missing field as "nothing was chosen" and leaves an existing agent untouched.
             body: JSON.stringify({ user_code: code, action: 'approve', owner_token: jwt,
-              ...(scopes ? { scopes } : {}) }),
+              ...(scopes ? { scopes } : {}),
+              ...(document.getElementById('endOthers')?.checked ? { end_other_sessions: true } : {}) }),
           });
           const d = await r.json();
           if (d.ok) {

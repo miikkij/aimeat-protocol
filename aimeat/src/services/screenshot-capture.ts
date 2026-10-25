@@ -21,6 +21,9 @@
  *   log line; runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its
  *   own per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.8.2 — 2026-10-25 — secaudit2026oct22: withHeadlessContext starts its deadline before the
+ *     launch, closes a browser that arrives after the deadline, and waits for a close at most until
+ *     the deadline plus HEADLESS_CLOSE_GRACE_MS. opts.launch replaces the launcher in tests.
  *   v1.8.1 — 2026-10-25 — secaudit2026oct22: withHeadlessContext closes the browser after a deadline
  *     (HEADLESS_DEADLINE_MS, 120 s, or opts.deadlineMs) and rejects with HeadlessDeadlineError.
  *   v1.8.0 — 2026-10-12 — ensureHeadlessBrowser(): a node with auto-capture on checks its browser at
@@ -118,7 +121,7 @@ export function browserLaunchEnv(env: NodeJS.ProcessEnv): Record<string, string>
   return out;
 }
 
-interface HeadlessBrowser { close(): Promise<void>; newContext(o: unknown): Promise<unknown> }
+export interface HeadlessBrowser { close(): Promise<void>; newContext(o: unknown): Promise<unknown> }
 
 /** What one pass over the launch ladder gave: a browser, or the last error. No error and no browser: no playwright-core. */
 export interface LaunchOutcome { browser: HeadlessBrowser | null; error?: unknown }
@@ -306,18 +309,35 @@ export async function withHeadlessContext<T>(
   config: AimeatConfig,
   viewport: { width: number; height: number },
   fn: (ctx: { newPage(): Promise<unknown> }) => Promise<T>,
-  opts: { deadlineMs?: number } = {},
+  opts: { deadlineMs?: number; launch?: () => Promise<HeadlessBrowser | null> } = {},
 ): Promise<T | null> {
-  const browser = await launchBrowser();
-  if (!browser) return null;
-  // The browser is closed by the deadline whatever the page does: an evaluate against a renderer
-  // whose main thread never yields has no timeout of its own, and closing the browser is what makes
-  // it reject. The callback's own promise is then settled by that rejection and is ignored here.
+  // The deadline starts before the launch: a launch or its page probe can stall under machine load,
+  // and the caller's wait is the whole of it. The browser is closed by the deadline whatever the
+  // page does: an evaluate against a renderer whose main thread never yields has no timeout of its
+  // own, and closing the browser is what makes it reject. The callback's own promise is then settled
+  // by that rejection and is ignored here.
   const ms = Math.max(1, opts.deadlineMs ?? HEADLESS_DEADLINE_MS);
+  const endsAt = Date.now() + ms;
   let timer: NodeJS.Timeout | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new HeadlessDeadlineError(ms)), ms);
   });
+  // The races below read the deadline's rejection; this keeps one nobody races any more from being unhandled.
+  deadline.catch((err: unknown) => { logger.debug('headless: deadline passed', { error: String(err) }); });
+  const launching = (opts.launch ?? launchBrowser)();
+  let browser: HeadlessBrowser | null;
+  try {
+    browser = await Promise.race([launching, deadline]);
+  } catch (err) {
+    clearTimeout(timer);
+    // The launch outlived the deadline: the browser it brings later is closed when it arrives.
+    void launching.then(
+      (late) => (late ? closeWithin(late, HEADLESS_CLOSE_GRACE_MS) : undefined),
+      (lateErr: unknown) => { logger.debug('headless: launch failed after its deadline', { error: String(lateErr) }); },
+    );
+    throw err;
+  }
+  if (!browser) { clearTimeout(timer); return null; }
   try {
     const work = guardedContext<{ newPage(): Promise<unknown> }>(browser, config, viewport).then(fn);
     // The work's own rejection, which follows the deadline's close; the race below has already answered.
@@ -325,12 +345,33 @@ export async function withHeadlessContext<T>(
     return await Promise.race([work, deadline]);
   } finally {
     clearTimeout(timer);
-    await browser.close();
+    // The close is waited for until the deadline, and for a short grace after it at most.
+    await closeWithin(browser, Math.max(HEADLESS_CLOSE_GRACE_MS, endsAt - Date.now()));
   }
 }
 
-/** How long one lent browser may stay open: page loads, settle waits and measurements included. */
+/**
+ * Close a browser, waiting at most `ms`. A close that hangs (a renderer that does not answer) is left
+ * to finish on its own; the caller has its answer either way.
+ */
+async function closeWithin(browser: HeadlessBrowser, ms: number): Promise<void> {
+  let t: NodeJS.Timeout | undefined;
+  const closing = browser.close().catch((err: unknown) => {
+    logger.debug('headless: the browser close failed', { error: String(err) });
+  });
+  const waited = new Promise<void>((resolve) => { t = setTimeout(resolve, ms); });
+  try {
+    await Promise.race([closing, waited]);
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** How long one lent browser may stay open: the launch, page loads, settle waits and measurements included. */
 export const HEADLESS_DEADLINE_MS = 120_000;
+
+/** How long a close is waited for once the deadline has passed. */
+export const HEADLESS_CLOSE_GRACE_MS = 1_000;
 
 /** The browser was closed because the work in it did not finish within the deadline. */
 export class HeadlessDeadlineError extends Error {

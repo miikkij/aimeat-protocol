@@ -21,7 +21,8 @@
  *
  *   RENEWAL is the node's job, not the payment provider's (the rule package renewals follow):
  *   runSubscriptionRenewals() charges the kept card three days before the end, once per period, and
- *   books the plan's beneficiaries. A failed charge tells the buyer once per period and is tried again
+ *   books the plan's beneficiaries. A plan whose price went up since the buyer agreed is charged only
+ *   after the buyer allows the new price with one press. A failed charge tells the buyer once per period and is tried again
  *   each day; the subscription ends at its date by itself. Cancelling stops renewal and keeps the
  *   period that was paid for.
  *
@@ -30,6 +31,10 @@
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   v1.2.0 — 2026-10-25 — A renewal whose plan price went up since the buyer agreed (or whose currency
+ *     changed) is not charged: the buyer is asked with one press (subscription-price-ask.ts), and
+ *     allowRaisedPrice() makes the new price the agreed one and renews at once. The same or a lower
+ *     price renews as before (secaudit2026oct22, renewal-skips-agent-limit, the price part).
  *   v1.1.0 — 2026-10-25 — A renewal of a plan an agent bought (bought_by) is reserved against the
  *     agent's daily limit right before the charge and released when the charge fails; a refusal tells
  *     the owner once per period (secaudit2026oct22).
@@ -51,6 +56,7 @@ import { notify } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../services/record-cas.js';
+import { priceRose, askBuyerForPrice, type SubscriptionPriceQuestion } from './subscription-price-ask.js';
 
 /** Where an extension keeps its plans, in its own namespace. */
 export const PLANS_KEY = 'subscription.plans';
@@ -89,6 +95,8 @@ export interface SubscriptionRecord {
   kept_payment?: { handler: string } & SavedPayment;
   last_order?: string;
   last_failure?: { at: string; reason: string };
+  /** The buyer was asked about a raised price for this period (commerce/subscription-price-ask.ts). */
+  price_question?: SubscriptionPriceQuestion;
   updated_at: string;
 }
 
@@ -208,6 +216,8 @@ export async function listSubscriptions(storage: Storage, ownerGhii: string, now
     ext: v.ext, plan: v.plan, title: v.title, amount: v.amount, currency: v.currency, period_days: v.period_days,
     started_at: v.started_at, active_until: v.active_until, active: Date.parse(v.active_until) > now,
     auto_renew: v.auto_renew, ...(v.last_failure ? { last_failure: v.last_failure } : {}),
+    // A raised price this period's renewal asked the buyer about (subscription-price-ask.ts).
+    ...(v.price_question && v.price_question.period === v.active_until ? { price_question: v.price_question } : {}),
   }));
 }
 
@@ -232,7 +242,7 @@ export async function runSubscriptionRenewals(storage: Storage, config: AimeatCo
     const until = Date.parse(sub.active_until);
     if (!Number.isFinite(until) || until <= now || until - now > RENEW_DAYS_BEFORE * DAY_MS) continue;
     const base = { buyer: sub.buyer_ghii, ext: sub.ext, plan: sub.plan };
-    const reference = `subrenew:${sub.buyer_ghii}:${sub.ext}:${sub.plan}:${sub.active_until}`;
+    const reference = renewalReference(sub);
     if (sub.last_order === reference) { out.push({ ...base, result: 'skipped', detail: 'already renewed for this period' }); continue; }
     try {
       out.push({ ...base, ...await renewOne(storage, config, sub, reference) });
@@ -244,15 +254,44 @@ export async function runSubscriptionRenewals(storage: Storage, config: AimeatCo
   return out;
 }
 
+const renewalReference = (sub: SubscriptionRecord) => `subrenew:${sub.buyer_ghii}:${sub.ext}:${sub.plan}:${sub.active_until}`;
+
+/**
+ * The buyer allowed the raised price they were asked about (publish-requests/apply-subscription-
+ * price.ts): it becomes the amount they agreed to, and the period renews now rather than at the next
+ * daily run. Refused when the subscription, its period or the plan's price is no longer what was asked.
+ */
+export async function allowRaisedPrice(
+  storage: Storage, config: AimeatConfig, buyerGhii: string, asked: { ext: string; plan: string; period: string; amount: number; currency: string },
+): Promise<{ ok: true; result: SubscriptionRenewalOutcome['result']; detail?: string } | { ok: false; reason: string }> {
+  const sub = await readRecord(storage, buyerGhii, asked.ext, asked.plan);
+  if (!sub || !sub.auto_renew) return { ok: false, reason: 'the subscription no longer renews' };
+  if (sub.active_until !== asked.period) return { ok: false, reason: 'the subscription is in another period now' };
+  const plan = await readPlan(storage, asked.ext, asked.plan);
+  if (!plan || plan.amount !== asked.amount || plan.currency !== asked.currency) return { ok: false, reason: 'the plan\'s price changed again since you were asked' };
+  const agreed = await updateRecord(storage, buyerGhii, subKey(asked.ext, asked.plan), parseRecord,
+    cur => (cur ? { ...cur, amount: plan.amount, currency: plan.currency, updated_at: new Date().toISOString() } : UNCHANGED), { tag: SUBSCRIPTION_ACTION });
+  if (!agreed) return { ok: false, reason: 'the subscription no longer renews' };
+  if (Date.parse(agreed.active_until) <= Date.now() || agreed.last_order === renewalReference(agreed)) return { ok: true, result: 'skipped' };
+  const out = await renewOne(storage, config, agreed, renewalReference(agreed));
+  return { ok: true, ...out };
+}
+
 async function renewOne(storage: Storage, config: AimeatConfig, sub: SubscriptionRecord, reference: string): Promise<Pick<SubscriptionRenewalOutcome, 'result' | 'detail'>> {
-  // The plan as the extension offers it now: a price it changed applies from the next period, and a
-  // plan it removed is not renewed.
+  // The plan as the extension offers it now: a price it lowered applies from the next period, a price
+  // it raised waits for the buyer's yes (subscription-price-ask.ts), and a plan it removed is not renewed.
   const plan = await readPlan(storage, sub.ext, sub.plan);
   const ext = await storage.getExtension(sub.ext);
   if (!plan || !ext || ext.status !== 'active') return { result: 'skipped', detail: 'the plan is no longer offered' };
   const handler = getPaymentHandler(sub.kept_payment!.handler);
   if (!handler?.chargeSaved) return { result: 'skipped', detail: `handler ${sub.kept_payment!.handler} cannot charge a kept card` };
   const sellerGhii = `${ext.installedBy}@${config.nodeId}`;
+  if (priceRose(sub, plan)) {
+    return askBuyerForPrice({ storage, config }, sub, plan, sellerGhii, async (q) => {
+      await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord,
+        cur => ({ ...(cur ?? sub), price_question: q, updated_at: new Date().toISOString() }), { tag: SUBSCRIPTION_ACTION });
+    });
+  }
   const seller = { ghii: sellerGhii, owner: ext.installedBy, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
   // A plan an agent bought renews as that agent's purchase, held to the daily limit its owner set,
   // checked and counted in one step right before the charge and given back when the charge fails, as
