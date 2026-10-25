@@ -10299,6 +10299,8 @@
   "notiftext.approval_crew_model.body": "Kun agenttisi miehistö kysyy mallilta, se lähettää palveluntarjoajan avaimesi ({key}) tähän osoitteeseen. Osoitteen asetti sovellus, joten vahvistat sen ensin. Jos sallit, miehistö käyttää osoitetta seuraavasta ajosta alkaen. Jos et salli, miehistö pitää nykyisen mallinsa. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_crew_model_default.title": "{who} pyytää, että kaikki agenttisi käyttävät mallin osoitetta {host}",
   "notiftext.approval_crew_model_default.body": "Kun agenttiesi miehistöt kysyvät mallilta, ne lähettävät palveluntarjoajan avaimesi ({key}) tähän osoitteeseen. Osoitteen asetti sovellus, joten vahvistat sen ensin. Jos sallit, miehistöt käyttävät osoitetta seuraavasta ajosta alkaen. Jos et salli, ne pitävät nykyisen mallinsa. {who} saa vastauksen kummassakin tapauksessa.",
+  "notiftext.approval_subscription_price.title": "{who} pyytää uusimaan tilauksesi {name} uudella hinnalla {to}",
+  "notiftext.approval_subscription_price.body": "Hyväksyit hinnan {from}. Hinta on noussut sen jälkeen, joten korttiasi veloitetaan vain, jos sallit sen. Jos sallit, tilaus uusitaan nyt hintaan {to}. Jos et salli, korttiasi ei veloiteta, ja tilaus päättyy {date}. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.agent_permission_ask_page.title": "{agent} tarvitsee oikeuden, jonka annat sen sivulla",
   "notiftext.agent_permission_ask_page.body": "{agent} yritti tehdä puolestasi jotain, mitä et ole sallinut. Tämän oikeuden annat agentin sivulla, jos haluat. Avaa sivu, niin näet, mistä on kyse.",
   "notiftext.agent_permission_ask_page.open": "Avaa agentin sivu",

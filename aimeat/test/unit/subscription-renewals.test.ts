@@ -7,6 +7,8 @@
  *   period, the plan's payees are booked, a period further away or cancelled is left alone, and a
  *   declined card tells the buyer once and keeps the end date.
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A raised plan price waits for the buyer's one-press answer; the same or a
+ *     lower price renews as before (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-5).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -18,6 +20,8 @@ import { testMoneyPaymentHandler } from '../../src/commerce/test-money-handler.j
 import { PLANS_KEY, runSubscriptionRenewals } from '../../src/commerce/subscriptions.js';
 import { putSplit } from '../../src/commerce/beneficiary-split.js';
 import { setPurchaseLimit, spentToday } from '../../src/commerce/agent-purchase-limit.js';
+import { decidePublishRequest } from '../../src/services/publish-requests/decide.js';
+import { callerFromAuth } from '../../src/services/caller-context.js';
 
 const NODE = 'node';
 const BUYER = `reader@${NODE}`;
@@ -101,6 +105,68 @@ describe('runSubscriptionRenewals', () => {
     await setPurchaseLimit(storage, BUYER, AGENT, 'EUR', 5_000_000);
     expect((await runSubscriptionRenewals(storage, config))[0]).toMatchObject({ result: 'renewed' });
     expect((await spentToday(storage, BUYER))[AGENT]?.EUR).toBe(3_990_000);
+  });
+
+  describe('a raised plan price waits for the buyer (secaudit2026oct22)', () => {
+    const raise = (amount: number) => write(`ext:${EXT}`, PLANS_KEY, { plans: [{ id: 'monthly', title: 'Monthly', amount, currency: 'EUR', period_days: 30 }] });
+    const asks = async () => (await storage.listMemory(BUYER, { prefix: 'notif.' })).filter(n => JSON.stringify(n.value).includes('approval_subscription_price'));
+    const buyer = () => callerFromAuth({ sub: BUYER, owner: 'reader', roles: ['owner'], scopes: ['*'] }, NODE, storage);
+    const ctx = () => ({ storage, config });
+
+    it('a higher price is not charged: the buyer is asked once, and the period keeps its end', async () => {
+      const until = new Date(Date.now() + DAY).toISOString();
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec({ active_until: until }));
+      await raise(4_990_000);
+      const r = await runSubscriptionRenewals(storage, config);
+      expect(r[0]).toMatchObject({ result: 'skipped' });
+      expect(r[0].detail).toContain('3.99 EUR to 4.99 EUR');
+      const sub = await subOf();
+      expect(sub.active_until).toBe(until);
+      expect(sub.amount).toBe(3_990_000);
+      expect(sub.price_question).toMatchObject({ amount: 4_990_000, currency: 'EUR', period: until });
+      expect((await asks()).length).toBe(1);
+      // The next daily run neither charges nor asks again.
+      expect((await runSubscriptionRenewals(storage, config))[0].detail).toContain('waiting for the buyer');
+      expect((await asks()).length).toBe(1);
+    });
+
+    it('the buyer allows it with one press: the new price is the agreed one and the period renews at once', async () => {
+      const until = new Date(Date.now() + DAY).toISOString();
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec({ active_until: until }));
+      await raise(4_990_000);
+      await runSubscriptionRenewals(storage, config);
+      const id = (await subOf()).price_question.request_id as string;
+      const out = await decidePublishRequest(ctx(), { caller: buyer() }, id, 'approve');
+      expect(out).toMatchObject({ ok: true });
+      const sub = await subOf();
+      expect(sub.amount).toBe(4_990_000);
+      expect(Date.parse(sub.active_until) - Date.parse(until)).toBe(30 * DAY);
+      // The seller, for whom the renewal ran, hears the answer.
+      const told = await storage.listMemory(SELLER, { prefix: 'notif.' });
+      expect(JSON.stringify(told.map(n => n.value))).toContain('approval_answer_allowed');
+    });
+
+    it('the buyer does not allow it: nothing is charged, nobody asks again this period, and the seller hears it', async () => {
+      const until = new Date(Date.now() + DAY).toISOString();
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec({ active_until: until }));
+      await raise(4_990_000);
+      await runSubscriptionRenewals(storage, config);
+      const id = (await subOf()).price_question.request_id as string;
+      expect(await decidePublishRequest(ctx(), { caller: buyer() }, id, 'decline')).toMatchObject({ ok: true });
+      const again = await runSubscriptionRenewals(storage, config);
+      expect(again[0].detail).toContain('did not allow');
+      expect((await subOf()).active_until).toBe(until);
+      expect((await asks()).length).toBe(1);
+      expect(JSON.stringify((await storage.listMemory(SELLER, { prefix: 'notif.' })).map(n => n.value))).toContain('approval_answer_declined');
+    });
+
+    it('designed use: the same or a lower price renews as before, at the plan\'s price', async () => {
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec());
+      await raise(2_990_000);
+      expect((await runSubscriptionRenewals(storage, config))[0]).toMatchObject({ result: 'renewed' });
+      expect((await subOf()).amount).toBe(2_990_000);
+      expect((await asks()).length).toBe(0);
+    });
   });
 
   it('does not renew a plan the extension stopped offering', async () => {
