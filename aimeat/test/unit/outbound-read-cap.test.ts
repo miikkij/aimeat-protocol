@@ -22,6 +22,7 @@
  *   - readResource: exactly the same ceiling is read, one byte past it is TOO_LARGE
  * @usage cd aimeat && pnpm exec vitest run test/unit/outbound-read-cap.test.ts
  * @version-history
+ *   v1.2.1 — 2026-10-25 — The scheduled road's storage stub answers getOwner: the run checks the account is not deactivated (secaudit2026oct22).
  *   v1.2.0 — 2026-09-26 — ctx.fetch's RESPONSE_TOO_LARGE names the host it called, and never the
  *     userinfo, the path, the query or the fragment (secaudit 2026-09, N3).
  *   v1.1.0 — 2026-09-26 — living-hooks answers one code, TOO_LARGE, for an answer that is too large
@@ -178,6 +179,8 @@ describe("an extension's ctx.fetch", () => {
                 name: 'probe', status: 'active', installedBy: 'alice', config: {}, limits,
                 actions: [{ id: 'pull', scriptContent: SCRIPT_LETS_IT_THROUGH }],
             }),
+            // An active account: the run asks whether its owner was deactivated (services/account-deactivated.ts).
+            getOwner: async () => ({ disabledAt: null }),
         } as unknown as Storage;
         await expect(runExtensionActionAsSystem({ storage, config }, {
             extensionName: 'probe', actionId: 'pull', callerGaii: 'scheduler@node-1', ownerName: 'alice',
