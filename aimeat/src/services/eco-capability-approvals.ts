@@ -33,6 +33,8 @@
  *   const refusal = await ecosystemCallRefusal({ storage, config }, { capability, app, action, callerGhii, input });
  *   if (refusal) throw Object.assign(new Error(refusal.message), refusal);
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Allow and Don't allow tell the one whose call asked (approval-standard.ts
+ *     tellAsker) (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-22 — The bell notice carries Don't allow beside Allow (the developer: a question
  *     with only Allow cannot be answered no).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, capability-invoke.ts ecosystem source, r45).
@@ -41,6 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord, EcosystemAppRecord, EcoCapabilityApproval } from '../storage/interface.js';
 import { notify, type NotifyInput } from './notify.js';
 import { emitChange } from './event-bus.js';
+import { tellAsker } from './approval-standard.js';
 import { localAccountName, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -251,8 +254,29 @@ export type EcoApprovalAnswer =
  * ask this app for the same action under the same registrant: a capability changed since it asked is
  * a different question, and the old page must not answer it.
  */
+/** Tell the one whose call asked how the account holder answered (services/approval-standard.ts). */
+async function tellEcoAsker(
+  config: AimeatConfig | undefined, storage: Storage, ownerName: string, app: string,
+  entry: EcoCapabilityApproval | null, outcome: 'allowed' | 'declined', decidedBy: string,
+): Promise<void> {
+  if (!config || !entry?.requestedBy) return;
+  const name = entry.name ?? entry.capability;
+  await tellAsker({ storage, config }, {
+    accountGhii: ownerOf(ownerName, config.nodeId), asker: entry.requestedBy, outcome, decidedBy,
+    what: `${name} on ${app}`,
+    contextId: `eco-capability-approval:${app}:${entry.capability}`,
+    sentence: outcome === 'allowed'
+      ? `The account holder allowed "${name}" to ask their outside app ${app} to run ${entry.action}. Call it again; it runs now.`
+      : `The account holder did not allow "${name}" to ask their outside app ${app} to run ${entry.action}. Nothing was sent. A later call asks again.`,
+    data: { app, capability: entry.capability, action: entry.action },
+    messageKind: 'eco-capability-approval',
+  });
+}
+
 export async function approveEcoCapabilityUse(
   storage: Storage, nodeId: string, ownerName: string, app: string, capability: string, approvedBy: string,
+  /** With the node's config, the one whose call asked is told (services/approval-standard.ts). */
+  config?: AimeatConfig,
 ): Promise<EcoApprovalAnswer> {
   const gone = `This question is no longer waiting, so nothing was allowed. The outside app ${app} was removed, `
     + `the question was already answered, or the capability changed since it asked. If it still needs your app, its next call asks you again.`;
@@ -275,19 +299,29 @@ export async function approveEcoCapabilityUse(
     return list.map((a, j) => (j === i ? approved! : a));
   });
   if (!out || !approved) return { ok: false, status: 404, code: 'APPROVAL_NOT_FOUND', message: gone };
-  if (out.changed) emitChange('ecosystem-apps', ownerOf(ownerName, nodeId));
+  if (out.changed) {
+    emitChange('ecosystem-apps', ownerOf(ownerName, nodeId));
+    await tellEcoAsker(config, storage, ownerName, app, approved, 'allowed', approvedBy);
+  }
   return { ok: true, approval: approved };
 }
 
-/** The owner says no: the waiting requests of `capability` are removed, and its next call asks again. */
+/** The owner says no: the waiting requests of `capability` are removed, the one who asked is told, and its next call asks again. */
 export async function declineEcoCapabilityUse(
   storage: Storage, nodeId: string, ownerName: string, app: string, capability: string,
+  /** With the node's config and who pressed, the one whose call asked is told. */
+  tell?: { config: AimeatConfig; by: string },
 ): Promise<boolean> {
+  let dropped: EcoCapabilityApproval | null = null;
   const out = await updateApprovals(storage, ownerName, app, (list) => {
+    dropped = list.filter(a => a.capability === capability && !a.approvedAt).pop() ?? null;
     const next = list.filter(a => !(a.capability === capability && !a.approvedAt));
     return next.length === list.length ? null : next;
   });
-  if (out?.changed) emitChange('ecosystem-apps', ownerOf(ownerName, nodeId));
+  if (out?.changed) {
+    emitChange('ecosystem-apps', ownerOf(ownerName, nodeId));
+    await tellEcoAsker(tell?.config, storage, ownerName, app, dropped, 'declined', tell?.by ?? ownerOf(ownerName, nodeId));
+  }
   return !!out?.changed;
 }
 

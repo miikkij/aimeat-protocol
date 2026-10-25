@@ -27,9 +27,12 @@
  *   EMAIL. Only to a verified notification address, only while the switch `email.agentAsks` on the
  *   Email page is on (it is unless switched off), and logged in the mail log as `agent_ask`.
  * @structure PERMISSION_ASK_TYPE · permissionAskNotice(agent, words, baseUrl) ·
- *   permissionPageNotice(agent, words, baseUrl) · sendPermissionAsk(deps, ownerGhii, agent, words)
+ *   permissionPageNotice(agent, words, baseUrl) · tellPermissionAnswer(deps, agent, words, outcome, by) ·
+ *   sendPermissionAsk(deps, ownerGhii, agent, words)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The one-press notice carries Don't allow beside Allow, and
+ *     tellPermissionAnswer() tells the agent either answer (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-18 — A refusal that one press cannot answer reaches the bell and the email too,
  *     with no Allow button and the agent's page; the operator's words are left out on an account that
  *     does not run the node.
@@ -48,6 +51,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
 import { logger } from '../utils/logger.js';
+import { tellAsker } from './approval-standard.js';
 
 export const PERMISSION_ASK_TYPE = 'agent_permission_ask';
 /** The i18n key of the notice whose permission is given on the agent's page, not with one press. */
@@ -74,7 +78,17 @@ export function permissionAskNotice(agent: AgentRecord, words: readonly string[]
     body: `${name} tried to do this for you and could not, because you have not allowed it yet: ${what}`,
     link: path,
     i18n: { key: PERMISSION_ASK_TYPE, vars: { agent: name, what } },
+    // Both answers on the notice (services/approval-standard.ts): a question with only Allow cannot be answered no.
     actions: [{
+      id: 'deny',
+      label: 'Don\'t allow',
+      kind: 'api',
+      method: 'POST',
+      endpoint: `/v1/agents/${encodeURIComponent(agent.name)}/refusals/decline`,
+      body: { needed: [...words] },
+      style: 'default',
+      i18n: { key: `${PERMISSION_ASK_TYPE}.deny` },
+    }, {
       id: 'allow',
       label: 'Allow',
       kind: 'api',
@@ -130,6 +144,30 @@ async function wordsToTell(storage: Storage, ownerGhii: string, words: readonly 
   if (!words.some((w) => OPERATOR_WORDS.includes(w))) return [...words];
   const operator = isOperatorAccount(await storage.getOwner(localAccountName(ownerGhii)));
   return operator ? [...words] : words.filter((w) => !OPERATOR_WORDS.includes(w));
+}
+
+/**
+ * Tell the agent how its person answered what it asked for (services/approval-standard.ts): Allow on
+ * the allow page or the bell, Don't allow on the bell or the agent's page. Never throws.
+ */
+export async function tellPermissionAnswer(
+  deps: { storage: Storage; config: AimeatConfig },
+  agent: Pick<AgentRecord, 'gaii' | 'name' | 'owner'>,
+  words: readonly string[], outcome: 'allowed' | 'declined', decidedBy: string,
+): Promise<void> {
+  const what = words.length
+    ? words.map((w) => (plainPermission(w) ?? w).replace(/\.$/, '')).join('; ')
+    : 'the permissions you were refused';
+  await tellAsker(deps, {
+    accountGhii: agent.owner.includes('@') ? agent.owner : `${agent.owner}@${deps.config.nodeId}`,
+    asker: agent.gaii, outcome, decidedBy, what,
+    contextId: `permission-ask:${agent.name}`,
+    sentence: outcome === 'allowed'
+      ? `Your person allowed it: ${what}. Call the tool again; it works now.`
+      : `Your person did not allow it: ${what}. Do not ask again for this; do the work without it or tell them what it would need.`,
+    data: { scopes: [...words] },
+    messageKind: 'permission-ask',
+  });
 }
 
 /** Tell the person, in the bell and by email. Never throws: the refusal already stands. */

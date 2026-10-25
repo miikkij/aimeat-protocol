@@ -19,6 +19,9 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.3.0 — 2026-10-25 — A request that makes nothing public is answered under
+ *     approvalDecisionRefusal, and an operator reads and answers the operators' question of another
+ *     account by naming it (`account`) (secaudit2026oct22, the developer's approval standard).
  *   v1.2.0 — 2026-10-21 — Approving a request also applies its waiting parts (parts.ts), each checked
  *     as its own request; declining it declines them (store.ts). A part decided on its own decides only
  *     itself, and a request without parts is unchanged (the developer's one-press decision).
@@ -34,7 +37,7 @@ import {
   effectiveState, inPublishQueue, requesterName,
   type PublishRequest, type PublishRequestFail, type PublishStoreCtx,
 } from './store.js';
-import { publishDecisionRefusal, publishRequestExpired } from './policy.js';
+import { publishDecisionRefusal, approvalDecisionRefusal, publishRequestExpired } from './policy.js';
 import { PUBLISH_APPLIERS } from './appliers.js';
 import { accountGhii } from './ask.js';
 import { requestCapRefusal } from './cap-recheck.js';
@@ -69,25 +72,52 @@ export async function listPublishRequestsFor(ctx: PublishStoreCtx, viewer: Publi
   };
 }
 
-export async function readPublishRequestFor(ctx: PublishStoreCtx, viewer: PublishViewer, id: string) {
+/**
+ * The account a request is read in. The caller's own, unless `account` names another one and the
+ * caller is an operator caller: an operator answers the operators' questions of every account from
+ * their own session (services/approval-standard.ts). Null when the caller may not look there.
+ */
+async function accountFor(ctx: PublishStoreCtx, viewer: PublishViewer, account: unknown): Promise<{ ghii: string; foreign: boolean } | null> {
+  const own = accountGhii(viewer.caller.owner, ctx.config.nodeId);
+  if (typeof account !== 'string' || !account.trim()) return { ghii: own, foreign: false };
+  const named = accountGhii(account.trim(), ctx.config.nodeId);
+  if (named === own) return { ghii: own, foreign: false };
+  return (await viewer.caller.operator()) ? { ghii: named, foreign: true } : null;
+}
+
+/** A request in another account is visible to an operator only when the operators answer it. */
+const operatorsQuestion = (r: PublishRequest) => r.approval?.approver === 'operators';
+
+export async function readPublishRequestFor(ctx: PublishStoreCtx, viewer: PublishViewer, id: string, account?: unknown) {
   if (outside(viewer)) return fail(403, 'ACCESS_DENIED', NO_REQUESTS_HERE);
-  const r = await readPublishRequest(ctx.storage, accountGhii(viewer.caller.owner, ctx.config.nodeId), id);
-  if (!r || !visibleTo(ctx, viewer, r)) return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  const where = await accountFor(ctx, viewer, account);
+  if (!where) return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  const r = await readPublishRequest(ctx.storage, where.ghii, id);
+  if (!r || (where.foreign ? !operatorsQuestion(r) : !visibleTo(ctx, viewer, r))) return fail(404, 'NOT_FOUND', 'No such request on this account.');
   return { ok: true as const, request: summarizePublishRequest(r) };
 }
 
 /**
  * Approve or decline one request. An approval makes the target public as the owner, through the
- * applier of its kind; a target that changed since the request settles it `outdated` instead.
+ * applier of its kind; a target that changed since the request settles it `outdated` instead. A
+ * request that makes nothing public (`approval`) is answered under approvalDecisionRefusal, in the
+ * account `account` names when an operator answers another account's question.
  */
-export async function decidePublishRequest(ctx: PublishStoreCtx, decider: PublishViewer, id: string, decision: unknown) {
+export async function decidePublishRequest(ctx: PublishStoreCtx, decider: PublishViewer, id: string, decision: unknown, account?: unknown) {
   if (decision !== 'approve' && decision !== 'decline') return fail(400, 'INVALID_INPUT', 'decision is "approve" or "decline".');
   if (outside(decider)) return fail(403, 'ACCESS_DENIED', NO_REQUESTS_HERE);
-  const ownerGhii = accountGhii(decider.caller.owner, ctx.config.nodeId);
+  const where = await accountFor(ctx, decider, account);
+  if (!where) return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  const ownerGhii = where.ghii;
   return inPublishQueue(ownerGhii, async () => {
     const request = await readPublishRequest(ctx.storage, ownerGhii, id);
-    if (!request || !visibleTo(ctx, decider, request)) return fail(404, 'NOT_FOUND', 'No such request on this account.');
-    const refusal = publishDecisionRefusal(decider.caller, request, decision);
+    if (!request || (where.foreign ? !operatorsQuestion(request) : !visibleTo(ctx, decider, request))) {
+      return fail(404, 'NOT_FOUND', 'No such request on this account.');
+    }
+    const refusal = request.approval
+      ? approvalDecisionRefusal(decider.caller, { ...request, approval: request.approval }, decision,
+        request.approval.approver === 'operators' && await decider.caller.operator())
+      : publishDecisionRefusal(decider.caller, request, decision);
     if (refusal) return { ok: false as const, ...refusal };
     if (request.state !== 'awaiting_owner') {
       return fail(409, 'ALREADY_DECIDED', `This request is already ${request.state}. Nothing changed.`);
@@ -96,7 +126,8 @@ export async function decidePublishRequest(ctx: PublishStoreCtx, decider: Publis
       await settlePublishRequest(ctx, ownerGhii, request, 'expired', { by: null });
       return fail(410, 'EXPIRED', 'This request expired before anyone decided it. Nothing was made public. The one who asked can ask again.');
     }
-    const by = decider.caller.inPerson ? ownerGhii : decider.caller.principal;
+    // The person who pressed, by their own account: an operator answering another account is not that account.
+    const by = decider.caller.inPerson ? decider.caller.ownerGhii : decider.caller.principal;
     if (decision === 'decline') {
       // A declined parent declines its waiting parts too (store.ts settlePublishRequest).
       const settled = await settlePublishRequest(ctx, ownerGhii, request, 'declined', { by });

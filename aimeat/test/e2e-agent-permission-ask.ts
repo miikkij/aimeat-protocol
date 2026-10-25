@@ -24,6 +24,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-permission-ask
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Phase 3: the notice carries Don't allow, and the agent is told the Allow on
+ *     its inbox (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-18 — Phase 5: a refusal one press cannot answer reaches the bell too.
  *   v1.0.0 — 2026-10-17 — Initial, with the feature.
  */
@@ -206,6 +208,9 @@ await test('The owner\'s bell holds one notice with an Allow button', async () =
     // Two refusals (MCP and REST) of the same permission open one question, not two.
     assert(ask.length === 1, `expected one notice, got ${ask.length}`);
     assert(ask[0].actions?.some((a: any) => a.kind === 'api' && a.endpoint === `/v1/agents/${AGENT}/allow`), 'no Allow button');
+    // The approval standard (secaudit2026oct22): a question with only Allow cannot be answered no.
+    assert(ask[0].actions?.some((a: any) => a.id === 'deny' && a.kind === 'api' && a.endpoint === `/v1/agents/${AGENT}/refusals/decline`
+        && JSON.stringify(a.body?.needed) === '["messages:send"]'), `no Don't allow: ${JSON.stringify(ask[0].actions)}`);
 });
 
 await test('The page reads the request; Allow adds exactly the permission', async () => {
@@ -219,6 +224,11 @@ await test('The page reads the request; Allow adds exactly the permission', asyn
     assert([...OLD_DEFAULT, 'messages:send'].every(s => held.includes(s)) && held.length === OLD_DEFAULT.length + 1, `held ${JSON.stringify(held)}`);
     const again = await json(`/v1/agents/${AGENT}/allow`, auth(ownerToken, { method: 'POST', body: JSON.stringify({ scopes: ['messages:send'] }) }));
     assert(again.status === 200 && again.body.data.added.length === 0, 'a second press added something');
+    // The agent hears the answer on its inbox, once (secaudit2026oct22, the approval standard).
+    const inbox = await json(`/v1/agents/v2/messages?context_id=${encodeURIComponent(`permission-ask:${AGENT}`)}`, auth(ownerToken));
+    const told = (inbox.body?.data?.messages ?? []).filter((m: any) => m.metadata?.kind === 'permission-ask');
+    assert(told.length === 1 && told[0].parts?.[1]?.data?.outcome === 'allowed' && String(told[0].to).startsWith(`${AGENT}#`),
+        `the agent was not told once: ${JSON.stringify(told)}`);
 });
 
 console.log('\nPhase 4: the same conversation goes on');

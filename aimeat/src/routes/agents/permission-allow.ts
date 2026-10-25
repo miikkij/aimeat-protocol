@@ -28,6 +28,7 @@
  * @structure registerPermissionAllowRoutes(router, config, storage)
  * @usage registerPermissionAllowRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The agent is told what was allowed (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-19 — The `agent` object carries the agent's `avatar` (services/agent-avatar.ts), null when it has none.
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
@@ -42,6 +43,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { isOneClickWord, agentPageUrl } from '../../services/permission-ask.js';
 import { announceScopes } from './announce-scopes.js';
+import { tellPermissionAnswer } from '../../services/permission-ask-notice.js';
 import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
 import { logger } from '../../utils/logger.js';
 
@@ -130,6 +132,8 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     }
     announceScopes(updated.gaii);
     emitChange('agents');
+    // The agent hears the answer, not only its token (services/approval-standard.ts).
+    await tellPermissionAnswer({ storage, config }, updated, added, 'allowed', callerOf(req, config.nodeId, storage).ownerGhii);
     res.json(success(config.nodeId, { ...(await view(updated, words)), added }));
   });
 }
