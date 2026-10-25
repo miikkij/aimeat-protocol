@@ -12,6 +12,10 @@
  *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
  *
  * @version-history
+ *   2026-10-25 — DELETE /v1/ghii/totp and POST /v1/ghii/totp/backup-codes check the code with the
+ *     sign-in's TOTP lock (services/password-check.ts checkTotpManagementCode): a wrong code counts
+ *     toward it and the lock answers 429 TOTP_LOCKED. They checked it with no count, so a held session
+ *     could guess codes without limit (secaudit2026oct22, totp-code-check-without-lock-or-replay).
  *   v1.4.0 — 2026-10-09 — POST /v1/ghii/totp/setup answers 503 ENCRYPTION_NOT_CONFIGURED, storing
  *     nothing, on a node with no key to encrypt the secret with; it stored it in plain text (secrets
  *     audit 2026-10-09, S4).
@@ -42,8 +46,9 @@ import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { eraseTotp } from '../services/totp-recovery.js';
 import {
-  setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes, totpConfigOf, TotpEncryptionUnavailableError,
+  setupTotp, validateTotpCode, generateBackupCodes, totpConfigOf, TotpEncryptionUnavailableError,
 } from '../services/totp.js';
+import { checkTotpManagementCode } from '../services/password-check.js';
 import type { TotpConfig } from '../services/totp.js';
 
 export function totpRouter(config: AimeatConfig, storage: Storage): Router {
@@ -167,22 +172,12 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
 
     const { code, backup_code } = req.body ?? {};
 
-    let verified = false;
-
-    // Try TOTP code first
-    if (code && typeof code === 'string' && ghiiRecord.totpSecret) {
-      const totpResult = validateTotpCode(ghiiRecord.totpSecret, code, totpConfig);
-      if (totpResult.valid) verified = true;
-    }
-
-    // Try backup code if TOTP code was not provided or invalid
-    if (!verified && backup_code && typeof backup_code === 'string' && ghiiRecord.totpBackupCodes) {
-      const backupResult = validateBackupCode(backup_code, ghiiRecord.totpBackupCodes);
-      if (backupResult.valid) verified = true;
-    }
-
-    if (!verified) {
-      res.status(401).json(error(config.nodeId, 'INVALID_TOTP', 'A valid TOTP code or backup code is required to disable TOTP.'));
+    // A code from the app or one backup code, with the sign-in's TOTP lock: a wrong one counts
+    // toward it (services/password-check.ts; secaudit2026oct22, totp-code-check-without-lock-or-replay).
+    const proof = await checkTotpManagementCode(storage, config, ghiiRecord, { code, backup_code },
+      'A valid TOTP code or backup code is required to disable TOTP.');
+    if (!proof.ok) {
+      res.status(proof.status).json(error(config.nodeId, proof.code, proof.message));
       return;
     }
 
@@ -231,9 +226,9 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    const totpResult = validateTotpCode(ghiiRecord.totpSecret, code, totpConfig);
-    if (!totpResult.valid) {
-      res.status(401).json(error(config.nodeId, 'INVALID_TOTP', 'Invalid TOTP code. Please try again.'));
+    const proof = await checkTotpManagementCode(storage, config, ghiiRecord, { code }, 'Invalid TOTP code. Please try again.');
+    if (!proof.ok) {
+      res.status(proof.status).json(error(config.nodeId, proof.code, proof.message));
       return;
     }
 

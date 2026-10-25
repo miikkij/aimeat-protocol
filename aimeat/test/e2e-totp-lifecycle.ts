@@ -17,6 +17,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=totp-lifecycle
  * @version-history
+ *   2026-10-25 — Wrong codes on DELETE /v1/ghii/totp and POST /v1/ghii/totp/backup-codes count toward
+ *     the TOTP lock, and a correct code is refused while it holds (secaudit2026oct22,
+ *     totp-code-check-without-lock-or-replay).
  *   v1.1.0 — 2026-09-04 — The operator's reset (DELETE /v1/admin/owners/:name/totp) and its four
  *     refusals, plus the account-event row that tells the person it happened. That door is the one
  *     removal that asks for no code, so who may open it is most of what is asserted here.
@@ -327,7 +330,40 @@ async function main() {
         assert(rows.some(e => e.kind === 'two_factor_removed'), 'their own removal was recorded too');
     });
 
+    // secaudit2026oct22 (totp-code-check-without-lock-or-replay): removing the factor and replacing
+    // the backup codes checked the code with no failed-attempt count, so a held session could guess
+    // codes without limit. Wrong codes on both routes now count toward the sign-in's TOTP lock.
+    const locker = `totplock${stamp}`;
+    let lockerToken = '';
+    await test('wrong codes on removal and on new backup codes count toward the TOTP lock', async () => {
+        if (!armed) return;
+        lockerToken = await registerOwner(locker);
+        const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: auth(lockerToken), body: '{}' });
+        assert(setup.status === 200, `setup: ${setup.status}`);
+        const lockSecret = setup.body.data.totp_secret as string;
+        const armedNow = await json('/v1/ghii/totp/verify', { method: 'POST', headers: auth(lockerToken), body: JSON.stringify({ code: codeNow(lockSecret) }) });
+        assert(armedNow.status === 200, `verify: ${armedNow.status}`);
+        const wrong = codeNow(lockSecret, -10);
+        let locked = false;
+        for (let i = 0; i < 10 && !locked; i++) {
+            const r = i % 2 === 0
+                ? await json('/v1/ghii/totp/backup-codes', { method: 'POST', headers: auth(lockerToken), body: JSON.stringify({ code: wrong }) })
+                : await json('/v1/ghii/totp', { method: 'DELETE', headers: auth(lockerToken), body: JSON.stringify({ code: wrong }) });
+            if (r.status === 429 && r.body.error?.code === 'TOTP_LOCKED') locked = true;
+            else assert(r.status === 401 && r.body.error?.code === 'INVALID_TOTP', `wrong code ${i + 1}: ${r.status} ${JSON.stringify(r.body.error)}`);
+        }
+        assert(locked, 'SECURITY: ten wrong codes on the removal and backup-code routes never locked the factor');
+        const during = await json('/v1/ghii/totp', { method: 'DELETE', headers: auth(lockerToken), body: JSON.stringify({ code: codeNow(lockSecret) }) });
+        assert(during.status === 429 && during.body.error?.code === 'TOTP_LOCKED', `a correct code during the lock is refused: ${during.status} ${JSON.stringify(during.body.error)}`);
+        const ov = await json('/v1/security/overview', { headers: auth(lockerToken) });
+        assert(ov.body.data.two_factor.enabled === true, 'the factor is still on');
+    });
+
     await test('the accounts are erased (cleanup)', async () => {
+        if (lockerToken) {
+            const l = await json(`/v1/owners/${locker}`, { method: 'DELETE', headers: auth(lockerToken) });
+            assert(l.status === 200, `cleanup locker: ${l.status} ${JSON.stringify(l.body)}`);
+        }
         const r = await json(`/v1/owners/${owner}`, { method: 'DELETE', headers: auth(ownerToken) });
         assert(r.status === 200, `cleanup target: ${r.status} ${JSON.stringify(r.body)}`);
         const b = await json(`/v1/owners/${bystanderName}`, { method: 'DELETE', headers: auth(bystanderToken) });
