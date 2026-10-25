@@ -1270,7 +1270,8 @@
           "scope_words_kept": "Oikeudet, jotka päivitys antoi olemassa oleville agenteille ja sovelluksille",
           "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa",
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
-          "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti"
+          "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
+          "erasure_leftover_schedules": "Poistettujen tilien jäljelle jääneet ajastukset"
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1298,7 +1299,8 @@
         },
         "entries": {
           "lead": {
-            "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen."
+            "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
+            "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Poisto poisti vain ajastukset, jotka ihminen teki itse. Hänen agenttiensa ja sovellustensa tekemät ajastukset jäivät. Tällainen ajastus näkyy sille, joka rekisteröi käyttäjätunnuksen seuraavaksi, ja se voi toimia hänen samannimisenä agenttinaan. Mikään ei muutu ennen kuin päätät. Poista jokainen, jota et tarvitse. Tapahtuma on hoidettu, kun teet viimeisen päätöksen."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -1313,7 +1315,8 @@
             "agent_tags": "Jaetun agentin tunnisteet: {tags}",
             "agent_capabilities": "Jaetun agentin julkisella kortilla: {technical} teknistä ja {domain} muuta kyvykkyyttä, {languages} kieltä",
             "skill": "Taito {name} tiedostoineen",
-            "datapackage": "Datapaketti {name} tiedostoineen"
+            "datapackage": "Datapaketti {name} tiedostoineen",
+            "schedule": "Ajastus \"{label}\", jonka {maker} teki tilille {owner} ({cron})"
           }
         },
         "source": {

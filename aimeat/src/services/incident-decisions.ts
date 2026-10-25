@@ -6,11 +6,14 @@
  *   it is: a held account name (held-account-names.ts resolveHeldName, "holder" or "previous") or an
  *   offered default audience cap (classification/default-caps.ts decideDefaultCap, "apply" or
  *   "keep"), or a record an incident names to act on (incident-entries.ts: "clear" or "delete" as the
- *   entry offers, or "keep"; the shared anonymous agent's records). The route POST /v1/admin/security/incidents/:id/resolve, the MCP tool
+ *   entry offers, or "keep"; the shared anonymous agent's records, and the schedules older account
+ *   erasures left). The route POST /v1/admin/security/incidents/:id/resolve, the MCP tool
  *   aimeat_admin_incident_resolve and its CLI twin all call decideIncidentCase(), so they decide alike.
  * @structure IncidentCaseResult · decideIncidentCase()
  * @usage const r = await decideIncidentCase(config, storage, { incidentId, name, resolution, by });
  * @version-history
+ *   v1.2.0 -- 2026-10-25 -- And of the incident that names the schedules older erasures left
+ *     (services/erasure-leftover-schedules.ts; secaudit2026oct22).
  *   v1.1.0 -- 2026-10-25 -- The entries of the anonymous-records incident are decided here too
  *     (services/incident-entries.ts; secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial: the dispatch moved out of the route and the MCP tool when the
@@ -23,6 +26,8 @@ import { resolveHeldName } from './held-account-names.js';
 import { DEFAULT_CAPS_INCIDENT_TYPE, decideDefaultCap } from './classification/default-caps.js';
 import { decideIncidentEntry } from './incident-entries.js';
 import { ANONYMOUS_RECORDS_INCIDENT_TYPE, clearAnonymousRecord } from './anonymous-principal-records.js';
+import { ERASURE_LEFTOVER_INCIDENT_TYPE, deleteLeftoverSchedule } from './erasure-leftover-schedules.js';
+
 export type IncidentCaseResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; code: 'NOT_FOUND' | 'INVALID_INPUT' | 'CONFLICT'; message: string };
@@ -35,7 +40,8 @@ export async function decideIncidentCase(
   const rec = await findSecurityIncident(storage, config, input.incidentId);
   const type = (rec?.value as { type?: unknown } | undefined)?.type;
   // An incident that names records to act on: the kind supplies what its action does.
-  const actor = type === ANONYMOUS_RECORDS_INCIDENT_TYPE ? clearAnonymousRecord : null;
+  const actor = type === ANONYMOUS_RECORDS_INCIDENT_TYPE ? clearAnonymousRecord
+    : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule : null;
   if (actor) return decideIncidentEntry(config, storage, input, actor);
   if (type === DEFAULT_CAPS_INCIDENT_TYPE) {
     const r = await decideDefaultCap(config, storage, input);
