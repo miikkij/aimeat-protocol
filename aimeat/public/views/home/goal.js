@@ -48,6 +48,9 @@ import { HelpTip } from '/components/HelpTip.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { FormActions } from '/components/Field.js';
 import { getGoal, goalAction, deleteGoal } from '/js/services/goals.js';
+import { getDeliverableValue } from '/js/services/offers.js';
+import { swallowed } from '/js/swallowed.js';
+import { apiGet } from '/js/api.js';
 import { StepCard, NobodyCard, goalPrompt } from './goal-steps.js';
 import { keepLineBreaks } from './line-breaks.js';
 
@@ -126,6 +129,10 @@ export default function GoalView({ navigate }) {
   const [showLog, setShowLog] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
+  // What an agent's work delivered, read from its record: the work's own summary is often only a
+  // pointer ("deliverable published to memory at …"), which says nothing to the person.
+  const [outputs, setOutputs] = useState({});
+  const [wholeOutput, setWholeOutput] = useState({});
 
   const load = useCallback(async () => {
     try {
@@ -148,6 +155,27 @@ export default function GoalView({ navigate }) {
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [session, id]);
+
+  // The delivered records of the finished agent works, once each (the material names who wrote it).
+  useEffect(() => {
+    if (!goal) return;
+    for (const w of goal.works) {
+      const key = w.result?.deliverableKey;
+      if (w.status !== 'done' || !key || outputs[w.id] !== undefined) continue;
+      setOutputs((o) => ({ ...o, [w.id]: null }));
+      if (w.claimed_by === 'model') {
+        // The model's whole answer is in the goal's one results record (services/goals/goals-model.ts).
+        apiGet(`/v1/memory/${encodeURIComponent(key)}`)
+          .then((r) => setOutputs((o) => ({ ...o, [w.id]: (r?.data?.value?.results ?? []).find((x) => x.work === w.id)?.answer ?? '' })))
+          .catch((err) => { swallowed('goal: the model answer', err); setOutputs((o) => ({ ...o, [w.id]: '' })); });
+        continue;
+      }
+      const agentGaii = (goal.material ?? []).find((m) => m.ref === key)?.by;
+      getDeliverableValue({ agentGaii, deliverableKey: key, taskId: w.task_id })
+        .then((value) => setOutputs((o) => ({ ...o, [w.id]: value == null ? '' : typeof value === 'string' ? value : JSON.stringify(value, null, 2) })))
+        .catch((err) => { swallowed('goal: a delivered result', err); setOutputs((o) => ({ ...o, [w.id]: '' })); });
+    }
+  }, [goal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const AGENTS = '/v1/home?agents=1';
   const goBack = useCallback((e) => { e?.preventDefault?.(); navigate(AGENTS); }, [navigate]);
@@ -226,11 +254,16 @@ export default function GoalView({ navigate }) {
 
       ${results.length > 0 && html`
         <${PageSection} group ends title=${g('gotTitle', 'What came out')}>
-          ${results.map((w) => html`
+          ${results.map((w) => {
+            const text = outputs[w.id] || w.result.summary;
+            const whole = !!wholeOutput[w.id];
+            return html`
             <div key=${w.id}>
               <${Note} kind="message"><b>${w.title}</b> · ${takerName(w.claimed_by ?? w.result?.by)}<//>
-              <${Markdown} text=${keepLineBreaks(w.result.summary.slice(0, 1500))} small />
-            </div>`)}
+              <${Markdown} text=${keepLineBreaks(whole ? text : text.slice(0, 1500))} small />
+              ${text.length > 1500 && html`<${FoldButton} expanded=${whole} onClick=${() => setWholeOutput((o) => ({ ...o, [w.id]: !whole }))}>${whole ? g('less', 'Show less') : g('wholeResult', 'Show all of it')}<//>`}
+            </div>`;
+          })}
         <//>`}
 
       <${PageSection} group ends title=${titled(g('planTitle', 'The work'), 'concept.open_work')}>
