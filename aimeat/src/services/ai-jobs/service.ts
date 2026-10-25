@@ -22,6 +22,7 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.17.0 -- 2026-10-25 -- finish() tells the finished-job listeners (finished-listeners.ts).
  *   v1.16.0 -- 2026-10-22 -- The start and a restart hold the job's inputs to its viewer (starter.ts
  *     jobReadViewer) and keep `read_as` (secaudit 2026-10, r49, v75).
  *   v1.15.0 — 2026-10-21 — A gated image job's private picture gets its publish request after the
@@ -110,6 +111,7 @@ import { aiOpOf, aiOpRefusal } from './op.js';
 import { runJobOp, assertAudioInReach, type JobOpOutcome } from './run-op.js';
 import { fileJobPictureRequest } from './picture-request.js';
 import { takeAiCall } from '../account-limits.js';
+import { emitAiJobFinished } from './finished-listeners.js';
 import {
     readJob, writeJob, foldIntoLog, findInLogs, listLiveJobs, listLogged, pruneLogs,
     readActiveIndex, addToActiveIndex, removeFromActiveIndex,
@@ -601,6 +603,9 @@ export class AiJobService implements AiJobStarter {
         }
 
         logger.info(`[ai-jobs] ${jobId} ${finishedJob.state} owner=${finishedJob.owner} app=${finishedJob.app_id ?? '_unknown'} cost=$${(finishedJob.cost_usd ?? 0).toFixed(4)}`);
+        // A feature that started the job hears it finish (finished-listeners.ts): agent goals settle
+        // the work the node's model did. After the log, so a listener reads the job as stored.
+        await emitAiJobFinished(finishedJob);
     }
 
     // ── gates ─────────────────────────────────────────────────────────────────

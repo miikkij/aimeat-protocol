@@ -8,8 +8,11 @@
  *   limit turning it into an approve step, a rejected result asked again with its reason, pause refusing
  *   a take, and the refusals: another owner, another owner's agent, no token, and a memory route writing
  *   the service-owned key; an agent without task:write on every write route and without task:read on
- *   the reads; and the four MCP tools driven by the owner's AI, with another owner's agent refused.
+ *   the reads; and the four MCP tools driven by the owner's AI, with another owner's agent refused; a
+ *   work the node's model does (against a local OpenAI-compatible stand-in), the spending limit
+ *   holding it, and a goal the owner's AI proposes, which only the person approves.
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Tests 20 to 22: the node's model as a worker, its limit, and a proposal.
  *   v1.1.0 — 2026-10-25 — Tests 18 and 19: the scope refusal on every route, and the MCP tools.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
@@ -18,7 +21,8 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
-import { makeAgent as scopedAgent, openSession, callTool } from './helpers/mcp-session.js';
+import { makeAgent as scopedAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
+import { startFakeAiProvider, chatJson } from './helpers/fake-ai-provider.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
@@ -94,6 +98,8 @@ const ownerB = `goalother${Date.now()}`;
 let tokenA = '';
 let tokenB = '';
 let ownerAObj: { name: string; token: string };
+let aiSession: McpSession;
+let ownAiToken = '';
 let grok1: Agent; let grok2: Agent; let writer: Agent; let chat: Agent; let otherAgent: Agent;
 let goalId = '';
 let w1 = ''; let w2 = ''; let w3 = '';
@@ -350,6 +356,8 @@ await test('19. the four MCP tools: the owner\'s AI makes, reads, moves and answ
   const ws = await json(`/v1/agents/${ai.name}/mode`, { method: 'PATCH', headers: auth(tokenA), body: JSON.stringify({ mode: 'workstation' }) });
   assert(ws.status === 200, `workstation mode: ${ws.status} ${JSON.stringify(ws.body.error)}`);
   const s = await openSession(BASE, ai.token, 'e2e-goals');
+  aiSession = s;
+  ownAiToken = ai.token;
   const made = await callTool(s, 'aimeat_goal_set', { action: 'create', reason: 'MCP test', input: {
     statement: 'Tell the owner which day suits a meeting.',
     works: [{ title: 'Which day?', kind: 'human', human_kind: 'choose', options: [{ id: 'mon', label: 'Monday' }, { id: 'tue', label: 'Tuesday' }] }, { title: 'Book it', wants: ['tutkimus'] }],
@@ -386,6 +394,68 @@ await test('19. the four MCP tools: the owner\'s AI makes, reads, moves and answ
   const self = await callTool(s, 'aimeat_goal_answer', { goal_id: id2, work_id: q.id, text: 'Yes' });
   assert(self.isError && /FORBIDDEN/.test(self.text), `an agent working in the goal may not answer its own question: ${self.text.slice(0, 200)}`);
 });
+
+console.log('\nThe node\'s model, and a proposal');
+
+// The owner's model calls go to a local OpenAI-compatible stand-in; nothing inside the node is mocked.
+const provider = await startFakeAiProvider(0);
+provider.setDefault('chat', chatJson('Kilpailija A on halvin, B nopein ja C laajin.'));
+
+await test('20. a work for the node\'s model runs with the owner\'s key, and its answer and cost land in the goal', async () => {
+  const s = await json('/v1/memory', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: provider.baseUrl, model: 'stub/test-model', daily_budget_usd: 5 } }) });
+  assert(s.status === 200 || s.status === 201, `settings: ${s.status} ${JSON.stringify(s.body.error)}`);
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Vertaa kolmea kilpailijaa hinnan mukaan.', limits: { usd: 5 }, works: [{ title: 'Kirjoita vertailu', runner: 'model' }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id; const wid = c.body.data.goal.works[0].id;
+  const done = await waitFor('the model work to finish', async () => {
+    const g = await readGoal(tokenA, id);
+    const w = g.works.find((x: any) => x.id === wid);
+    return w.status === 'done' || w.status === 'failed' ? g : null;
+  }, 30_000);
+  const w = done.works.find((x: any) => x.id === wid);
+  assert(w.status === 'done' && w.claimed_by === 'model' && /halvin/.test(w.result?.summary ?? ''), `the work: ${JSON.stringify({ status: w.status, by: w.claimed_by, result: w.result, reason: w.reason })}`);
+  const sent = provider.lastRequest('chat');
+  assert(JSON.stringify(sent?.json ?? {}).includes('Vertaa kolmea kilpailijaa'), 'the model was told the goal');
+  assert(done.status === 'done', `a goal whose only work is done is done: ${done.status}`);
+  const kept = await json(`/v1/memory/goal-results.${id}`, { headers: auth(tokenA) });
+  assert(kept.status === 200 && JSON.stringify(kept.body.data).includes('halvin'), `the whole answer is kept: ${kept.status}`);
+  const temp = await json(`/v1/memory/goal-runs.${id}.${wid}`, { headers: auth(tokenA) });
+  assert(temp.status === 404, `the job's temporary record is gone: ${temp.status}`);
+});
+
+await test('21. at the spending limit a model work waits for the owner and the model is not called', async () => {
+  provider.reset();
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Kirjoita tiivistelmä ilman rahaa.', limits: { usd: 0 }, works: [{ title: 'Tiivistä', runner: 'model' }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const g = await readGoal(tokenA, c.body.data.goal.id);
+  assert(g.works[0].status === 'open' && g.log.some((e: any) => e.kind === 'limit'), `it waits at the limit: ${JSON.stringify({ status: g.works[0].status, log: g.log.map((e: any) => e.kind) })}`);
+  await sleep(500);
+  assert(provider.requestsFor('chat').length === 0, 'the model was not called');
+  const bad = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'x', works: [{ title: 'y', runner: 'model', agent: 'grok1' }] }) });
+  assert(bad.status === 400, `a model work naming an agent is refused: ${bad.status}`);
+});
+
+await test('22. the owner\'s AI proposes a goal; it waits, only the person approves it, and the AI may decline its own', async () => {
+  const p = await callTool(aiSession, 'aimeat_goal_set', { action: 'propose', reason: 'Asked in chat', statement: 'Seuraa päivän MCP-uutisia.', works: [{ title: 'Kerää uutiset', runner: 'model' }] });
+  assert(!p.isError, `propose: ${p.text.slice(0, 200)}`);
+  const id = p.data.goal?.id ?? p.data.data?.goal?.id;
+  const g = await readGoal(tokenA, id);
+  assert(g.status === 'proposed' && g.works[0].status === 'open' && !g.works[0].claimed_by, `nothing moves in a proposal: ${JSON.stringify({ status: g.status, work: g.works[0].status })}`);
+  const waiting = await json('/v1/goals/waiting', { headers: auth(tokenA) });
+  assert(waiting.body.data.waiting.some((x: any) => x.kind === 'proposal' && x.goal_id === id), 'the proposal waits for the person');
+  const self = await json(`/v1/goals/${id}/actions/approve`, { method: 'POST', headers: auth(ownAiToken), body: '{}' });
+  assert(self.status === 403, `the AI may not approve its own proposal: ${self.status}`);
+  const yes = await json(`/v1/goals/${id}/actions/approve`, { method: 'POST', headers: auth(tokenA), body: '{}' });
+  assert(yes.status === 200 && yes.body.data.goal.status === 'active', `the person approves: ${yes.status} ${JSON.stringify(yes.body.error)}`);
+  const p2 = await callTool(aiSession, 'aimeat_goal_set', { action: 'propose', statement: 'Toinen ehdotus.' });
+  const id2 = p2.data.goal?.id ?? p2.data.data?.goal?.id;
+  const no = await callTool(aiSession, 'aimeat_goal_set', { action: 'decline', goal_id: id2, reason: 'The person said no' });
+  assert(!no.isError, `the AI declines its own proposal: ${no.text.slice(0, 200)}`);
+  const gone = await json(`/v1/goals/${id2}`, { headers: auth(tokenA) });
+  assert(gone.status === 404, `a declined proposal is gone: ${gone.status}`);
+});
+
+await provider.close();
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);

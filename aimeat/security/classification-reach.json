@@ -1733,6 +1733,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Subscribed public memory passes leaveToPeer; the cache prune and the subscription record are the node's own."
     },
+    "src/services/goals/goals-model.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-25 (agent goals, the node's model as a worker), the node's own read: the answer a goal's own background AI job wrote to its temporary record (goal-runs.<goal>.<work>), read once to move it into the goal's results record for the same owner and then deleted. The job and the record are the goal's; nobody else's content is read."
+    },
     "src/services/goals/goals-ops.ts": {
       "reads": {
         "getMemory": 2

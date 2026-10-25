@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.45.0 -- 2026-10-25 -- Goals: propose first (the person approves), and runner "model" when no agent fits.
  *   v1.44.0 -- 2026-10-25 -- Goals: aimeat_goal_get, _set, _work, _answer (session cc-jouni-goals).
  *   v1.43.0 -- 2026-10-25 -- One app open to the internet on a closed node: aimeat_app_internet_open, _get, _close.
  *   v1.42.1 -- 2026-10-24 -- The register write changes one entry with item_id and set (C7.7).
@@ -194,8 +195,13 @@ declined, which the owner reads as your answer, not as a failure.
 
 **Goals — what the owner wants done, carried by their agents together.** \`aimeat_goal_get\` ·
 \`aimeat_goal_set\` · \`aimeat_goal_work\` · \`aimeat_goal_answer\`. When the person asks for an outcome
-("find out our competitors and write a comparison"), give it as a goal: \`aimeat_goal_set\` action
-\`create\`. For a capable agent give the whole goal as ONE open work and let agents hand the next work on
+("find out our competitors and write a comparison"), plan it and give it as a goal: \`aimeat_goal_set\`
+action \`propose\`, which waits on the person's home for their one-press yes (\`create\` only when they
+said yes in this conversation). Plan with what they have (\`aimeat_agents_list\`): a work to an agent that
+fits, open work for a skill, or, when no agent or computer fits, \`runner: "model"\`: the node's own model
+does it with the person's key inside the goal's spending limit (writing, summaries, research from what
+the model knows; no tools). Tell them which agent they lack, and why. For a capable agent give the whole
+goal as ONE open work and let agents hand the next work on
 (action \`leave\`); fixed steps are for narrow tool agents. Anything only the person can do is a step of
 kind \`human\` (choose, approve, answer, do with ready links and texts, provide): nothing is a dead end.
 As an agent: \`aimeat_goal_work\` action \`available\` lists open work your tags let you take, \`claim\`

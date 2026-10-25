@@ -43,6 +43,8 @@ export const WorkSpecSchema = z.object({
   prompt: z.string().max(20_000).optional(),
   agent: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i).optional(),
   wants: z.array(z.string().trim().min(1).max(64)).max(10).optional(),
+  runner: z.enum(['model']).optional(),
+  model: z.string().trim().min(1).max(200).optional(),
   after: z.array(z.string().max(64)).max(30).optional(),
   wait_until: z.string().datetime().optional(),
   final: z.boolean().optional(),
@@ -59,10 +61,12 @@ export function parseWorkSpec(input: unknown): WorkSpec {
   if (kind === 'human' && !w.human_kind) throw new GoalError(400, 'INVALID_INPUT', 'A person\'s step names human_kind: choose, approve, answer, do or provide.');
   if (kind === 'human' && w.human_kind === 'choose' && !(w.options?.length)) throw new GoalError(400, 'INVALID_INPUT', 'A choose step lists its options.');
   if (kind === 'agent' && w.human_kind) throw new GoalError(400, 'INVALID_INPUT', 'human_kind belongs to a person\'s step (kind "human").');
+  if (w.runner && (kind !== 'agent' || w.agent || w.wants?.length)) throw new GoalError(400, 'INVALID_INPUT', 'A work the node\'s model does (runner "model") names no agent and no skills, and is not a person\'s step.');
+  if (w.model && !w.runner) throw new GoalError(400, 'INVALID_INPUT', 'model belongs to a work the node\'s model does (runner "model").');
   return {
     title: w.title, description: w.description, kind, humanKind: w.human_kind, options: w.options, multiple: w.multiple,
-    links: w.links, texts: w.texts, prompt: w.prompt, agent: w.agent, wants: w.wants, after: w.after,
-    waitUntil: w.wait_until, final: w.final,
+    links: w.links, texts: w.texts, prompt: w.prompt, agent: w.agent, wants: w.wants, runner: w.runner, model: w.model,
+    after: w.after, waitUntil: w.wait_until, final: w.final,
   };
 }
 
@@ -87,6 +91,8 @@ export function makeWork(goal: GoalRecord, spec: WorkSpec, who: string, extra: P
     ...(spec.prompt ? { prompt: spec.prompt } : {}),
     ...(spec.agent ? { agent: spec.agent } : {}),
     ...(spec.wants?.length ? { wants: spec.wants } : {}),
+    ...(spec.runner ? { runner: spec.runner } : {}),
+    ...(spec.model ? { model: spec.model } : {}),
     ...(spec.after?.length ? { after: spec.after } : {}),
     ...(spec.waitUntil ? { waitUntil: spec.waitUntil } : {}),
     ...(spec.final ? { final: true } : {}),
@@ -112,8 +118,11 @@ export function appendWorks(goal: GoalRecord, works: GoalWork[]): GoalRecord {
   return { ...goal, works: all };
 }
 
-/** What the agent is told in its task: the goal, the work, the material and the results it builds on. */
-export function taskBody(goal: GoalRecord, work: GoalWork): { title: string; description: string; memoryKeys: string[] } {
+/**
+ * What the agent is told in its task: the goal, the work, the material and the results it builds on.
+ * `forModel`: the same for the node's model, which has no tools, so it is not told to call any.
+ */
+export function taskBody(goal: GoalRecord, work: GoalWork, forModel = false): { title: string; description: string; memoryKeys: string[] } {
   const parts: string[] = [];
   parts.push(`Goal: ${goal.statement}`);
   if (goal.doneWhen.text) parts.push(`Done when: ${goal.doneWhen.text}`);
@@ -124,7 +133,9 @@ export function taskBody(goal: GoalRecord, work: GoalWork): { title: string; des
   if (work.reason) parts.push(`Why this is asked again: ${work.reason}`);
   const material = goal.material.slice(-20);
   if (material.length) parts.push(`Material: ${material.map(m => `${m.title} (${m.kind}: ${m.ref})`).join('; ')}`);
-  parts.push(`When you are done, complete the task with what you produced. To hand the next step to another agent, call aimeat_goal_work with action "leave" and goal_id ${goal.id}. Read the whole goal with aimeat_goal_get.`);
+  parts.push(forModel
+    ? 'Answer with the result itself, written for the person whose goal this is, in the language of the goal. You have no tools and cannot open links: work from what is written here and what you know, and say plainly what you could not check.'
+    : `When you are done, complete the task with what you produced. To hand the next step to another agent, call aimeat_goal_work with action "leave" and goal_id ${goal.id}. Read the whole goal with aimeat_goal_get.`);
   const memoryKeys = [
     ...goal.material.filter(m => m.kind === 'memory' || m.kind === 'result').map(m => m.ref),
     ...before.map(b => b.result?.deliverableKey).filter((k): k is string => !!k),
@@ -135,7 +146,7 @@ export function taskBody(goal: GoalRecord, work: GoalWork): { title: string; des
 const DAY = 86_400_000;
 
 /** Refuse a take that would pass a limit; answers the goal with the day's counter moved. */
-function countTake(goal: GoalRecord): GoalRecord {
+export function countTake(goal: GoalRecord): GoalRecord {
   const today = new Date().toISOString().slice(0, 10);
   const dayTasks = goal.spent.day === today ? goal.spent.dayTasks : 0;
   if (dayTasks >= goal.limits.tasksPerDay) throw new GoalError(409, 'LIMIT', `This goal has started ${dayTasks} works today, its limit.`);
@@ -159,6 +170,7 @@ export async function claimWork(
   const taken = await updateGoal(deps, ownerGhii, goalId, cur => {
     if (goalSettled(cur.status)) throw new GoalError(409, 'CONFLICT', `The goal is ${cur.status}.`);
     if (cur.status === 'paused') throw new GoalError(409, 'CONFLICT', 'The goal is paused; its owner resumes it.');
+    if (cur.status === 'proposed') throw new GoalError(409, 'CONFLICT', 'The goal is a proposal; its owner approves it first.');
     const work = cur.works.find(w => w.id === workId);
     if (!work) throw new GoalError(404, 'NOT_FOUND', `No work ${workId} in this goal.`);
     if (work.status !== 'open') throw new GoalError(409, 'CONFLICT', work.status === 'claimed' ? `${work.claimedBy ?? 'Another agent'} took this work already.` : `The work is ${work.status}.`);

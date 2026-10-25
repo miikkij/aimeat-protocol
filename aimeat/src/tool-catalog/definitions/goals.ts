@@ -17,7 +17,7 @@
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
-export const GOAL_SET_ACTIONS = ['create', 'update', 'preview', 'pause', 'resume', 'stop', 'done', 'renew', 'start_round', 'attach', 'delete'] as const;
+export const GOAL_SET_ACTIONS = ['propose', 'create', 'update', 'preview', 'pause', 'resume', 'stop', 'done', 'renew', 'start_round', 'attach', 'decline', 'delete'] as const;
 export const GOAL_WORK_ACTIONS = ['available', 'claim', 'release', 'add', 'leave', 'reroute', 'reject'] as const;
 
 /**
@@ -34,7 +34,7 @@ export const GOAL_INPUT_FIELDS = [
 
 /** A work's fields aimeat_goal_work takes at the top level for add and leave, as POST /v1/goals/{id}/works reads them; `work` wins on a clash. */
 export const WORK_INPUT_FIELDS = [
-  'title', 'description', 'kind', 'human_kind', 'options', 'links', 'texts', 'prompt', 'after', 'final',
+  'title', 'description', 'kind', 'human_kind', 'options', 'links', 'texts', 'prompt', 'runner', 'model', 'after', 'final',
 ] as const;
 
 export const goalTools = [
@@ -54,14 +54,14 @@ export const goalTools = [
   },
   {
     name: 'aimeat_goal_set',
-    description: 'Give the person\'s agents a goal and steer it. action="create" with the goal\'s fields at the top level (an `input` object holding them works too) { statement (what the person wants, their words), title?, done_when? (a sentence), done_kind? human|check|all-done, mode? single (one agent takes the whole goal; the default), coordinator (an agent carries it: plans, hands out work, makes subgoals, asks the person) or plan (fixed steps), coordinator? (agent name; any of the person\'s agents: their Claude chat, an outside Grok bot, a crewaimeat concierge, an agent on any OpenRouter model), substitute? node|wait|{agent}, agents? [names], skills? [tags an agent needs], any_agent?, limits? { usd, hops (default 5), tasks_per_day (50), fix_rounds (4), claim_minutes (30) }, ends_at? (default 30 days), workplace? { organism_id, workspace_id }, works? [ { title, description?, kind? agent|human, human_kind? choose|approve|answer|do|provide, options? [{id,label}], links?, texts?, prompt?, agent?, wants? [skills], after? [work ids or "#1" for the first work given] } ], reactions? [ { when: { works? [ids] | wants? skill }, then: { title, agent?, wants?, kind?, human_kind?, final? } } ], rounds? { trigger manual|clock|condition, cron?, timezone?, condition?, works? }, parent_goal_id? (a subgoal; spends from its parent), reason? }. Default for a capable agent: give the whole goal as ONE open work (do not cut it into small steps); agents leave the next work for each other with aimeat_goal_work action "leave". Use fixed steps (mode plan, works with after) only for narrow tool agents. Give the person\'s choices, approvals and things they do themselves as works of kind "human": a "do" step carries links and ready texts (for example X threads to post in), so nothing is a dead end. action="update" with goal_id and the fields to change (the same fields; this_round_only for one round of a round goal) changes it; action="preview" answers what an update would end and what that cost, before you change it: SAY IT TO THE PERSON FIRST. action="pause" (agents save where they are), "resume", "stop" (running work finishes, nothing new starts), "done", "renew" (a round goal runs 90 more days), "start_round", "attach" with { kind file|memory|link|text, ref, title } adds material every agent in the goal reads, "delete" removes a finished goal. Give the reason field with every change: it is shown to the person.',
+    description: 'Give the person\'s agents a goal and steer it. PROPOSE FIRST: action="propose" takes the same fields as create and makes the goal wait on the person\'s home as a proposal they approve with one press; nothing moves before that. Use create only when the person said yes in this conversation; "decline" removes a proposal you made. Plan for what the person has: read their agents (aimeat_agents_list) and give a work to an agent that fits, as open work for a skill, or, when no agent or computer fits, to the node\'s own model with runner "model" (the person\'s key, inside the goal\'s spending limit; no tools). action="create" with the goal\'s fields at the top level (an `input` object holding them works too) { statement (what the person wants, their words), title?, done_when? (a sentence), done_kind? human|check|all-done, mode? single (one agent takes the whole goal; the default), coordinator (an agent carries it: plans, hands out work, makes subgoals, asks the person) or plan (fixed steps), coordinator? (agent name; any of the person\'s agents: their Claude chat, an outside Grok bot, a crewaimeat concierge, an agent on any OpenRouter model), substitute? node|wait|{agent}, agents? [names], skills? [tags an agent needs], any_agent?, limits? { usd, hops (default 5), tasks_per_day (50), fix_rounds (4), claim_minutes (30) }, ends_at? (default 30 days), workplace? { organism_id, workspace_id }, works? [ { title, description?, kind? agent|human, human_kind? choose|approve|answer|do|provide, options? [{id,label}], links?, texts?, prompt?, agent?, wants? [skills], after? [work ids or "#1" for the first work given] } ], reactions? [ { when: { works? [ids] | wants? skill }, then: { title, agent?, wants?, kind?, human_kind?, final? } } ], rounds? { trigger manual|clock|condition, cron?, timezone?, condition?, works? }, parent_goal_id? (a subgoal; spends from its parent), reason? }. Default for a capable agent: give the whole goal as ONE open work (do not cut it into small steps); agents leave the next work for each other with aimeat_goal_work action "leave". Use fixed steps (mode plan, works with after) only for narrow tool agents. Give the person\'s choices, approvals and things they do themselves as works of kind "human": a "do" step carries links and ready texts (for example X threads to post in), so nothing is a dead end. action="update" with goal_id and the fields to change (the same fields; this_round_only for one round of a round goal) changes it; action="preview" answers what an update would end and what that cost, before you change it: SAY IT TO THE PERSON FIRST. action="pause" (agents save where they are), "resume", "stop" (running work finishes, nothing new starts), "done", "renew" (a round goal runs 90 more days), "start_round", "attach" with { kind file|memory|link|text, ref, title } adds material every agent in the goal reads, "delete" removes a finished goal. Give the reason field with every change: it is shown to the person.',
     caller: 'agent',
     visibility: agentEverywhere,
     annotations: { title: 'Agent goals: make and steer', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     scope: 'task:write',
     surfaces: ['agent'],
     input: {
-      action: { type: 'string', required: true, enum: [...GOAL_SET_ACTIONS], description: 'What to do. Start with "create".' },
+      action: { type: 'string', required: true, enum: [...GOAL_SET_ACTIONS], description: 'What to do. Start with "propose".' },
       goal_id: { type: 'string', description: 'The goal, for every action but create.' },
       reason: { type: 'string', description: 'Why, in a sentence: shown to the person in the goal\'s log.' },
       statement: { type: 'string', description: 'For create and update: what the person wants done, in their words.' },
@@ -109,6 +109,8 @@ export const goalTools = [
       links: { type: 'array', description: 'For a do step: [{ url, title }] the person opens.' },
       texts: { type: 'array', description: 'For a do step: ready texts the person copies.' },
       prompt: { type: 'string', description: 'For a do step: a prompt the person gives their own AI.' },
+      runner: { type: 'string', enum: ['model'], description: 'For add and leave: "model" lets the node\'s own model do the work with the person\'s key, inside the goal\'s spending limit (no agent, no tools: writing, a summary, research from what the model knows).' },
+      model: { type: 'string', description: 'For a model work: the model to use; omit it and the person\'s own default model is used.' },
       after: { type: 'array', description: 'For add: the work ids this work waits for.' },
       final: { type: 'boolean', description: 'For add and leave: when this work is done, the goal is done.' },
       agent: { type: 'string', description: 'For add, leave and reroute: the agent the work is for.' },
