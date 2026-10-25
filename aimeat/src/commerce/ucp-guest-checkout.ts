@@ -33,6 +33,8 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   v1.2.1 — 2026-10-25 — The per-seller limit of 500 counts open checkouts that have not run out of
+ *     time; every kept record counts toward a bound of 2000 (openCheckoutsOf; secaudit2026oct22).
  *   v1.2.0 — 2026-10-25 — A line's total is its exact amount rounded once to cents, the checkout's
  *     total is their sum, and completion charges exactly that sum (ucpTotalCents, ucpChargeMicros):
  *     the platform was shown per-unit rounded totals and charged the exact total (secaudit2026oct22).
@@ -77,11 +79,14 @@ const OPEN_MS = 6 * 3_600_000;
 /** How long a checkout record is kept: open, then two days for idempotent replays. */
 const KEEP_HOURS = 54;
 const MAX_OPEN_PER_SELLER = 500;
+/** The most checkout records, open or closed, one seller keeps at a time: bounds what they can grow to. */
+const MAX_KEPT_PER_SELLER = 2_000;
 const MAX_LINES = 20;
 /** Webhook retries: a delivery that fails waits this long before the next try. Then it gives up. */
 const BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 3_600_000, 6 * 3_600_000, 12 * 3_600_000, 24 * 3_600_000];
 
-const sessionKey = (id: string): string => `commerce.ucp.session.${id}`;
+const SESSION_PREFIX = 'commerce.ucp.session.';
+const sessionKey = (id: string): string => `${SESSION_PREFIX}${id}`;
 const orderKey = (id: string): string => `commerce.order.${id}`;
 const pendingKey = (orderId: string): string => `commerce.ucp.pending.${orderId}`;
 
@@ -257,6 +262,24 @@ export async function sellerOfLines(storage: Storage, config: AimeatConfig, line
   }
 }
 
+/**
+ * How many of the seller's checkouts count toward MAX_OPEN_PER_SELLER: the open ones that have not
+ * run out of time. Canceled, completed and overdue checkouts are kept KEEP_HOURS for replays and
+ * counted as open until 2026-10-25, so closed checkouts alone stopped the seller's guest checkout
+ * (secaudit2026oct22). Every kept record still counts toward MAX_KEPT_PER_SELLER, which bounds what
+ * one seller's records can grow to. The values are read only once the kept records reach the open limit.
+ */
+async function openCheckoutsOf(storage: Storage, sellerGhii: string): Promise<number> {
+  const kept = await storage.countMemory([sellerGhii], { prefix: SESSION_PREFIX });
+  if (kept >= MAX_KEPT_PER_SELLER) return MAX_OPEN_PER_SELLER;
+  if (kept < MAX_OPEN_PER_SELLER) return kept;
+  const rows = await storage.listMemory(sellerGhii, { prefix: SESSION_PREFIX });
+  return rows.filter((r) => {
+    const s = r.value as unknown as UcpGuestSession;
+    return (s.status === 'incomplete' || s.status === 'ready_for_complete' || s.status === 'requires_escalation' || s.status === 'complete_in_progress') && !overdue(s);
+  }).length;
+}
+
 // ── The lifecycle ─────────────────────────────────────────────────────────────────────────────
 
 export async function createGuestCheckout(
@@ -264,10 +287,7 @@ export async function createGuestCheckout(
   args: { profileUrl: string; lineItems: UcpLineInput[]; buyer?: unknown },
 ): Promise<UcpGuestSession> {
   const { lines, sellerGhii, sellerOwner } = await priceLines(storage, config, args.lineItems);
-  const open = storage.listMemoryKeysByPrefix
-    ? (await storage.listMemoryKeysByPrefix('commerce.ucp.session.')).filter((r) => r.ownerGaii === sellerGhii).length
-    : 0;
-  if (open >= MAX_OPEN_PER_SELLER) throw new UcpError(429, 'rate_limited', 'This seller has too many open checkouts. Try again later.');
+  if (await openCheckoutsOf(storage, sellerGhii) >= MAX_OPEN_PER_SELLER) throw new UcpError(429, 'rate_limited', 'This seller has too many open checkouts. Try again later.');
   const now = nowIso();
   const buyer = cleanBuyer(args.buyer);
   const session: UcpGuestSession = {
