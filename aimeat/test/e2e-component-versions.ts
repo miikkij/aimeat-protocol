@@ -236,6 +236,8 @@ await test("the version list names the owner's agent only to the owner's own pri
     assert(viaAgent.status === 200 && viaAgent.body.data.versions[0].created_by === agent.gaii, `the owner's agent sees it too: ${JSON.stringify(viaAgent.body.data.versions[0])}`);
 
     const stranger = await makeOwner(`verownb${stamp}`);
+    const refused = await json(`/v1/extensions/${EXT}/actions/hello`, auth(stranger, { method: 'PATCH', body: JSON.stringify({ scriptContent: `export default async function(ctx, input) { return { version: 'theirs' }; }` }) }));
+    assert(refused.status === 403, `another account cannot write a version: ${refused.status}`);
     const theirs = await json(`/v1/extensions/${EXT}/versions`, auth(stranger));
     assert(theirs.status === 200, `another account still lists the versions: ${theirs.status}`);
     const top = theirs.body.data.versions[0];

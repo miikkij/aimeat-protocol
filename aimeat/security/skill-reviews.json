@@ -312,7 +312,7 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -322,7 +322,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:4c2331614a9e74a8e84aa391"
+      "digest": "sha256:afb80f048152ab26325585c9"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-24",
@@ -748,9 +748,9 @@
     "node:aimeat-extension-builder": {
       "aimeat/src/services/build-extension-prompt.ts": "4a4714bd350426a9",
       "aimeat/src/services/extension-ctx-contract.ts": "6a6bc7fdec4a5c5f",
-      "aimeat/src/services/extension-manifest.ts": "603b3fdef4938f90",
+      "aimeat/src/services/extension-manifest.ts": "f08721337c9beaa8",
       "aimeat/src/routes/extensions/paywall.ts": "e93944dd10ba1fb2",
-      "aimeat/src/routes/extensions/crud.ts": "5e8254712e70fae7",
+      "aimeat/src/routes/extensions/crud.ts": "3b4cf159b5ce2e00",
       "aimeat/src/routes/extensions/instances.ts": "ecb41d8b085d0966",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },
