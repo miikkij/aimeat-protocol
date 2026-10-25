@@ -175,6 +175,35 @@ for (const [label, body] of ONE_TIME_BODIES) {
     });
 }
 
+// secaudit2026oct22 (unavailable-state-not-evictable): a finished request whose body was not kept
+// held its slot for 24 hours, so 10,000 of them, from a caller with no account, made every keyed
+// POST and PUT on the node answer 503.
+it('finished requests whose body was not kept give their slots to new requests', async () => {
+    const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
+    const next = vi.fn();
+    const firstKey = randomUUID();
+    const first = response();
+    middleware(request(firstKey, 'anon', 'POST', '/v1/mcp/register'), first, next);
+    first.status(201).json({ client_id: 'c-0', client_secret: 'CANARYsecret' });
+    for (let n = 1; n < 10_000; n++) {
+        const res = response();
+        middleware(request(randomUUID(), 'anon', 'POST', '/v1/mcp/register'), res, next);
+        res.status(201).json({ client_id: `c-${n}`, client_secret: 'CANARYsecret' });
+    }
+    const other = response();
+    middleware(request(randomUUID(), 'owner-b'), other, next);
+    expect(other.statusCode).toBe(200);
+    expect(next).toHaveBeenCalledTimes(10_001);
+    // The oldest finished entry gave its slot; the newer ones still answer as a lost response.
+    const kept = response();
+    const keptReq = request(randomUUID(), 'anon', 'POST', '/v1/mcp/register');
+    middleware(keptReq, kept, next);
+    kept.status(201).json({ client_id: 'c-last', client_secret: 'CANARYsecret' });
+    const replay = response();
+    middleware(keptReq, replay, next);
+    expect(replay.body).toMatchObject({ ok: false, error: { code: 'IDEMPOTENCY_RESULT_UNAVAILABLE' } });
+});
+
 it('a response marked Cache-Control: no-store is not kept for a replay', async () => {
     const middleware = (await import('../../src/middleware/idempotency.js')).idempotency(NODE);
     const req = request(), first = response(), next = vi.fn();
