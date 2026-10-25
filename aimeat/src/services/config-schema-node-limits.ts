@@ -25,7 +25,7 @@ const wholeOrOff = (v: unknown): boolean => typeof v === 'number' && Number.isIn
 export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>[] = [
   { key: 'mcpUnusedClientDays', dotPath: 'mcp.unused_client_days', envVar: 'AIMEAT_MCP_UNUSED_CLIENT_DAYS', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'Days after which an MCP client registration that no sign-in finished (no refresh token, no remembered approval) is deleted by the daily cleanup. A client that is in use is never deleted. 0 keeps every registration',
-    range: '0-3650 (0 = keep all)' },
+    range: '0-3650' },
   { key: 'deviceAuthEmailLimit', dotPath: 'auth.device_authorize_email_limit', envVar: 'AIMEAT_DEVICE_AUTHORIZE_EMAIL_LIMIT', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false,
     description: 'Count the email form of an agent connection (an account named by its email address) per network address, so nobody can test many addresses for an account here. Off is no limit. The account-name form is never counted' },
   { key: 'deviceAuthEmailMax', dotPath: 'auth.device_authorize_email_max', envVar: 'AIMEAT_DEVICE_AUTHORIZE_EMAIL_MAX', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1, immutable: false,
@@ -36,8 +36,8 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
     description: 'Mail servers on a private network that a company may send through: host names, addresses or networks (10.0.5.0/24), one per line (comma separated in the environment). Any other private address is refused. Empty: public mail servers only, and loopback on a local node' },
   { key: 'appHeldLabelDays', dotPath: 'apps.held_label_days', envVar: 'AIMEAT_APP_HELD_LABEL_DAYS', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'Days a removed app\'s own address stays held for its owner, so no other owner\'s app is served where its visitors\' browser data is. Then the daily job releases it. 0 holds it until you release it on the Subdomains page',
-    range: '0-3650 (0 = until released)' },
+    range: '0-3650' },
   { key: 'appHeldLabelsPerOwner', dotPath: 'apps.held_labels_per_owner', envVar: 'AIMEAT_APP_HELD_LABELS_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'The most held addresses of removed apps one owner keeps; past it the one held longest is released first. 0 = no limit',
-    range: '0-10000 (0 = no limit)' },
+    range: '0-10000' },
 ];
