@@ -15,6 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.11.0 — 2026-10-25 — agent_device_takeover: an existing agent approved for a device that did not
+ *     prove it is the agent coming back (secaudit2026oct22).
  *   v1.10.0 — 2026-10-13 — app_scope_words_kept: the owner's published apps that kept permissions on the
  *     first start as 4.0.x (services/app-scope-allowance.ts).
  *   v1.9.0 — 2026-10-13 — scope_words_kept: the node's first start as 4.0.x gave the owner's existing
@@ -62,6 +64,9 @@ export type AccountEventKind =
   | 'room_entered'
   // Agents
   | 'agent_connected'
+  /** An existing agent was approved for a new device that did not prove it is the agent coming back
+   *  (services/device-return-proof.ts). `data.name`, `data.other_sessions_ended` ('yes' or 'no'). */
+  | 'agent_device_takeover'
   | 'agent_removed'
   | 'agent_task_done'
   | 'agent_task_failed'

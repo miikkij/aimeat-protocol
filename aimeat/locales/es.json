@@ -13407,6 +13407,8 @@
       "packageInstalled": "El paquete {name} quedó instalado. Lo pidió {who}.",
       "packageUpdated": "El paquete {name} quedó actualizado. Lo pidió {who}.",
       "agentRemoved": "{name} ya no está conectado.",
+      "agentTakeover": "Dejaste que un dispositivo nuevo tomara el agente {name}. Sus otras sesiones siguen funcionando.",
+      "agentTakeoverEnded": "Dejaste que un dispositivo nuevo tomara el agente {name}, y se cerraron sus otras sesiones.",
       "taskDone": "{agent} terminó una tarea.",
       "taskDoneTitled": "{agent} terminó: {title}",
       "taskFailed": "{agent} no pudo terminar una tarea.",
@@ -16860,7 +16862,9 @@
         "keepCurrent": "Dejarle el acceso que ya tiene",
         "asRequested": "Lo que pidió",
         "requestedNote": "Este agente pidió: {scopes}",
-        "returningAgent": "Este agente ya está configurado. Si lo apruebas sin tocar nada, sus permisos se quedan exactamente igual."
+        "returningAgent": "Este agente ya está configurado. Si lo apruebas sin tocar nada, sus permisos se quedan exactamente igual.",
+        "takeover": "Un dispositivo nuevo quiere tomar tu agente {name}. No demostró que sea {name} que vuelve, así que puede ser otra persona. Apruébalo solo si el código de arriba es el que muestra tu propia IA. Si lo apruebas, el dispositivo nuevo recibe {name} y su acceso.",
+        "endOtherSessions": "Cerrar la sesión de {name} en todos los demás lugares. Sus otros dispositivos y conexiones tendrán que conectarse de nuevo."
       },
       "mode": {
         "autonomous": "Autónomo",

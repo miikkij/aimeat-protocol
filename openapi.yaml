@@ -12716,6 +12716,21 @@ paths:
 
                     A list exceeding the node maximum (AIMEAT_MAX_AGENT_SCOPES) is refused with 400
                     INVALID_SCOPES before anything is stored.
+                proof:
+                  type: object
+                  description: |
+                    An EXISTING agent coming back proves it with the private key its last approval
+                    gave it: `signature` is base64 Ed25519 over the text
+                    `aimeat-device-return:v1\n<owner as sent>\n<agent_name>\n<signed_at>`, and
+                    `signed_at` is an ISO time within five minutes. A verified proof shows the owner
+                    a return with "keep its current access"; without one (or with one that does not
+                    verify) the owner is told that a new device is taking the agent over, the
+                    approval records an account event, and the owner may sign the agent's other
+                    sessions out. Nothing is refused either way. `aimeat connect add` sends it from
+                    the key it keeps beside the token.
+                  properties:
+                    signed_at: { type: string, format: date-time }
+                    signature: { type: string }
       responses:
         '200':
           description: Device authorization initiated
@@ -12755,6 +12770,10 @@ paths:
                             description: approved = same-owner auto-approval fired; poll device-token once for credentials
                           auto_approved:
                             type: boolean
+                          return_proof:
+                            type: string
+                            enum: [verified, not_verified]
+                            description: An existing agent's request that carried `proof`, whether it verified. Absent when none was sent.
                           user_instructions:
                             type: string
                             description: What the agent tells its owner, and how it polls for the token, in one sentence an agent can repeat.
@@ -13033,6 +13052,12 @@ paths:
                               The consent screen preselects "keep its current access" and approves
                               with no `scopes` field, which leaves the grant untouched. A boolean
                               only: this endpoint is unauthenticated, so it never discloses scopes.
+                          return_proven:
+                            type: boolean
+                            description: >
+                              Present for an existing agent: true when the request proved it is that
+                              agent coming back (`proof` on device-authorize), false when a new device
+                              is taking the agent over, which the consent page says plainly.
                           expires_in:
                             type: integer
         '404':
@@ -13068,6 +13093,13 @@ paths:
                   items:
                     type: string
                   description: Agent scopes (defaults to node default scopes)
+                end_other_sessions:
+                  type: boolean
+                  description: >
+                    An existing agent only: sign its other sessions out before the new credential is
+                    issued, as a key rotation does (sessions, MCP OAuth refresh tokens, the open tunnel
+                    and MCP sessions). The consent surfaces offer it, checked, when a new device is
+                    taking the agent over.
       responses:
         '200':
           description: Authorization decision recorded
@@ -13088,6 +13120,11 @@ paths:
                             $ref: '#/components/schemas/GAII'
                           agent_name:
                             type: string
+                          takeover:
+                            type: boolean
+                            description: An existing agent approved without proof that it is coming back; the account event agent_device_takeover was recorded.
+                          other_sessions_ended:
+                            type: boolean
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -71545,6 +71582,12 @@ paths:
                                     a RETURN (expired token, reinstall), not a first approval. The
                                     consent card then preselects "keep its current access" and
                                     approves with no `scopes` field, leaving the grant untouched.
+                                return_proven:
+                                  type: boolean
+                                  description: >
+                                    Present for an existing agent: whether the request proved it is
+                                    that agent coming back (`proof` on device-authorize). False: a new
+                                    device is taking the agent over, and the card says so.
                                 current_scopes:
                                   type: array
                                   nullable: true

@@ -15085,6 +15085,8 @@
       "packageInstalled": "The package {name} is installed. {who} asked for it.",
       "packageUpdated": "The package {name} is updated. {who} asked for it.",
       "agentRemoved": "{name} is no longer connected.",
+      "agentTakeover": "You let a new device take over {name}. Its other sessions still work.",
+      "agentTakeoverEnded": "You let a new device take over {name}, and its other sessions were signed out.",
       "taskDone": "{agent} finished a task.",
       "taskDoneTitled": "{agent} finished: {title}",
       "taskFailed": "{agent} could not finish a task.",
@@ -18615,7 +18617,9 @@
         "keepCurrent": "Keep its current access",
         "asRequested": "What it asked for",
         "requestedNote": "This agent asked for: {scopes}",
-        "returningAgent": "This agent is already set up. Approving without changing anything leaves its permissions exactly as they are."
+        "returningAgent": "This agent is already set up. Approving without changing anything leaves its permissions exactly as they are.",
+        "takeover": "A new device is taking over your agent {name}. It did not prove that it is {name} coming back, so it may be someone else. Approve only if the code above is the one your own AI shows you. If you approve, the new device gets {name} and its access.",
+        "endOtherSessions": "Sign out {name} everywhere else. Its other devices and connections must connect again."
       },
       "mode": {
         "autonomous": "Autonomous",

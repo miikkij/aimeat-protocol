@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.23.0 -- 2026-10-25 -- An approval of a new device taking over an existing agent sends the owner's
+ *     choice to sign its other sessions out (end_other_sessions; secaudit2026oct22).
  *   v4.22.0 -- 2026-10-25 -- A connection request's Approve and Deny wait while an answer is on its way
  *     (AgentConsent busyCode), so it cannot be answered twice.
  *   v4.21.0 -- 2026-10-16 -- The menu find opens one agent here, also while the page is already open
@@ -489,7 +491,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
   // Scopes come from the shared consent panel, which owns the preset choice — this stays the
   // approve action so the tab keeps its own toast, list update and reload.
-  async function handleApprove(userCode, scopes) {
+  async function handleApprove(userCode, scopes, opts) {
     // One answer at a time per request: the card's buttons wait (AgentConsent busyCode).
     if (consentBusy) return;
     setConsentBusy(userCode);
@@ -498,6 +500,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
         user_code: userCode,
         action: 'approve',
         scopes,
+        // A new device taking over an existing agent: the owner chose whether its other sessions end.
+        ...(opts?.endOtherSessions ? { end_other_sessions: true } : {}),
         owner_token: session.jwt,
       });
       if (resp?.ok !== false) {
