@@ -23,14 +23,18 @@
  *
  *   AN OPERATOR'S OWN FILE IS LEFT ALONE. The node writes config.yaml when it is missing or when it
  *   carries the node's marker line. A file without the marker is the operator's, kept as it is, with
- *   one warning, because an operator who wrote their own goose config for the chat meant it.
+ *   one warning, because an operator who wrote their own goose config for the chat meant it. The
+ *   node's default root is used only when it is this account's own directory (privateDefaultRoot),
+ *   so a file in it was written by this account.
  * @structure CHAT_GOOSE_EXTENSIONS · chatGooseRoot · chatWorkDir · chatGooseConfigYaml · ensureChatGooseConfig
  * @usage
  *   const { root, cwd } = ensureChatGooseConfig(config);   // before `goose acp` starts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The default root under the temp directory is created 0700 and used only when
+ *     this account owns it; otherwise a private directory beside it is used (secaudit2026oct22).
  *   v1.0.0 — 2026-10-04 — Initial.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AimeatConfig } from '../config.js';
@@ -63,7 +67,39 @@ type RootConfig = Pick<AimeatConfig, 'goosePathRoot' | 'nodeId'>;
 
 /** The chat agent's goose root: the operator's AIMEAT_GOOSE_PATH_ROOT, or one of the node's own. */
 export function chatGooseRoot(config: RootConfig): string {
-  return config.goosePathRoot || join(tmpdir(), `aimeat-goose-${config.nodeId.replace(/[^a-zA-Z0-9-]/g, '_')}`);
+  if (config.goosePathRoot) return config.goosePathRoot;
+  return privateDefaultRoot(join(tmpdir(), `aimeat-goose-${config.nodeId.replace(/[^a-zA-Z0-9-]/g, '_')}`));
+}
+
+/** The default roots already checked in this process, and the directory each one resolved to. */
+const checkedRoots = new Map<string, string>();
+
+/**
+ * The node's default goose root, made sure to be this account's own (secaudit2026oct22). The name is
+ * predictable and on Linux the temp directory is shared by every local account, so another account
+ * could create it first and put a config.yaml in it that the node then took as the operator's. On a
+ * system with user ids the directory is created 0700; one that exists is used only when it is a plain
+ * directory this account owns, and its mode is narrowed to 0700. Anything else (another owner, a
+ * symbolic link) is left alone and a new private directory beside it is used for this process, with a
+ * warning. Windows and macOS give each account its own temp directory, and Windows has no user ids.
+ */
+function privateDefaultRoot(path: string): string {
+  const known = checkedRoots.get(path);
+  if (known) return known;
+  const uid = typeof process.getuid === 'function' ? process.getuid() : undefined;
+  let resolved = path;
+  if (uid !== undefined) {
+    try { mkdirSync(path, { mode: 0o700 }); } catch (err) { if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err; }
+    const st = lstatSync(path);
+    if (st.isDirectory() && !st.isSymbolicLink() && st.uid === uid) {
+      if ((st.mode & 0o077) !== 0) chmodSync(path, 0o700);
+    } else {
+      resolved = mkdtempSync(`${path}-`);
+      logger.warn(`[goose] ${path} is not a directory of this account; the chat uses ${resolved} instead`);
+    }
+  }
+  checkedRoots.set(path, resolved);
+  return resolved;
 }
 
 /** The empty directory the chat's goose sessions run in, so goose finds no project files. */
