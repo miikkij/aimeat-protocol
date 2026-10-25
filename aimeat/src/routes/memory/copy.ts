@@ -8,6 +8,9 @@
  * @structure registerCopyRoute(router, ctx)
  * @usage registerCopyRoute(router, ctx)   // from registerBulkRoutes, at the position the route had
  * @version-history
+ *   v1.3.1 — 2026-10-24 — The shared anonymous agent copies only anonymous.* keys (403 FORBIDDEN, the
+ *     answer POST /v1/memory gives), so a copy no longer writes its public or members records outside
+ *     that namespace (secaudit2026oct22).
  *   v1.3.0 — 2026-10-18 — A copy that would be readable wider than its source's label or its own
  *     place allows is refused with 409 LABEL_CAPS_AUDIENCE before anything is written (plan
  *     doc-mvdipuyqraas, L3.2).
@@ -49,7 +52,7 @@ import { keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from '../
 import { callerOf } from '../../middleware/caller.js';
 import { organismWriteRefusalFor, routePublishAsk } from './batch-guards.js';
 import { closedNodeLevel, closedNodeWarnings } from '../../services/closed-node-level.js';
-import { type MemoryRouteCtx } from './shared.js';
+import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
 
 export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, resolve } = ctx;
@@ -64,6 +67,12 @@ export function registerCopyRoute(router: Router, ctx: MemoryRouteCtx): void {
 
     if (!source_gaii || !key) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_gaii and key are required'));
+      return;
+    }
+    // Anonymous namespace enforcement, as POST /v1/memory (crud.ts): the copy lands under the caller's
+    // own name with the source's key, so the shared anonymous agent copies only anonymous.* keys.
+    if (isAnonymousGaii(callerGaii) && !key.startsWith('anonymous.')) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only write to keys prefixed with "anonymous."'));
       return;
     }
     // ONE CAPABILITY, ONE DOOR: a copy would hand a Design Book part over as the caller's own, past the

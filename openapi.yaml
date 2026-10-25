@@ -61719,6 +61719,8 @@ paths:
                             description: Consecutive delivery failure count
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -61810,6 +61812,8 @@ paths:
                           removed:
                             type: boolean
                             example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -61860,6 +61864,8 @@ paths:
                             description: Error message if delivery failed
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
