@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.44.0 -- 2026-10-25 -- Goals: aimeat_goal_get, _set, _work, _answer (session cc-jouni-goals).
  *   v1.43.0 -- 2026-10-25 -- One app open to the internet on a closed node: aimeat_app_internet_open, _get, _close.
  *   v1.42.1 -- 2026-10-24 -- The register write changes one entry with item_id and set (C7.7).
  *   v1.42.0 -- 2026-10-23 -- Content that refuses an outside model, and the records of processing (plan doc-mvlftkh9zmc9).
@@ -190,6 +191,17 @@ the node narrows it at once and tells your owner.
 appending events + flipping TODO status → complete (with a summary) or fail (with a reason). A request
 you should not take (off your topic, against your rules): decline it with the reason. It ends as
 declined, which the owner reads as your answer, not as a failure.
+
+**Goals — what the owner wants done, carried by their agents together.** \`aimeat_goal_get\` ·
+\`aimeat_goal_set\` · \`aimeat_goal_work\` · \`aimeat_goal_answer\`. When the person asks for an outcome
+("find out our competitors and write a comparison"), give it as a goal: \`aimeat_goal_set\` action
+\`create\`. For a capable agent give the whole goal as ONE open work and let agents hand the next work on
+(action \`leave\`); fixed steps are for narrow tool agents. Anything only the person can do is a step of
+kind \`human\` (choose, approve, answer, do with ready links and texts, provide): nothing is a dead end.
+As an agent: \`aimeat_goal_work\` action \`available\` lists open work your tags let you take, \`claim\`
+takes one and gives you a task (complete it as usual), \`leave\` hands the next work to another agent
+(never to yourself). A goal's coordinator is woken by a task when something happens; read the goal,
+decide, and say why in \`reason\`. Ask before a change that \`preview\` says ends running work.
 
 **Messages — the owner conversation.** \`aimeat_message_inbox\` (pending inbound) ·
 \`aimeat_message_send\` (markdown; can carry a proposed_task or a single-select prompt for the owner)
