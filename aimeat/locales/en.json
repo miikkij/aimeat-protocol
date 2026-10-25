@@ -10127,6 +10127,8 @@
   "notiftext.approval_crew_model.body": "When your agent's crew thinks, it sends your provider key ({key}) to that address. An app set the address, so you confirm it first. If you allow it, the crew uses it from its next run. If you do not, the crew keeps the model it has. {who} hears the answer either way.",
   "notiftext.approval_crew_model_default.title": "{who} asks to point all your agents at the model address {host}",
   "notiftext.approval_crew_model_default.body": "When your agents' crews think, they send your provider key ({key}) to that address. An app set the address, so you confirm it first. If you allow it, the crews use it from their next run. If you do not, they keep the model they have. {who} hears the answer either way.",
+  "notiftext.approval_subscription_price.title": "{who} asks to renew your subscription {name} at the new price {to}",
+  "notiftext.approval_subscription_price.body": "You agreed to {from}. The price went up since then, so your card is charged only if you allow it. If you allow it, the subscription renews now at {to}. If you do not, your card is not charged and the subscription ends on {date}. {who} hears the answer either way.",
   "notiftext.agent_permission_ask_page.title": "{agent} needs a permission you give on its page",
   "notiftext.agent_permission_ask_page.body": "{agent} tried to do something for you that you have not allowed. You give this permission on the agent's page, if you want to. Open it to see what it is.",
   "notiftext.agent_permission_ask_page.open": "Open the agent's page",

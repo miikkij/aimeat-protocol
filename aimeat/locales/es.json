@@ -9016,6 +9016,8 @@
   "notiftext.approval_crew_model.body": "Cuando el equipo de tu agente llama a su modelo, envía tu clave del proveedor ({key}) a esa dirección. La dirección la puso una app, así que la confirmas tú primero. Si lo permites, el equipo la usa desde su próxima ejecución. Si no, el equipo sigue con el modelo que tiene. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_crew_model_default.title": "{who} pide que todos tus agentes usen la dirección de modelo {host}",
   "notiftext.approval_crew_model_default.body": "Cuando los equipos de tus agentes llaman a su modelo, envían tu clave del proveedor ({key}) a esa dirección. La dirección la puso una app, así que la confirmas tú primero. Si lo permites, los equipos la usan desde su próxima ejecución. Si no, siguen con el modelo que tienen. {who} recibe la respuesta en ambos casos.",
+  "notiftext.approval_subscription_price.title": "{who} pide renovar tu suscripción {name} con el nuevo precio {to}",
+  "notiftext.approval_subscription_price.body": "Aceptaste {from}. El precio subió desde entonces, así que solo se cobra a tu tarjeta si lo permites. Si lo permites, la suscripción se renueva ahora por {to}. Si no, no se cobra nada a tu tarjeta y la suscripción termina el {date}. {who} recibe la respuesta en ambos casos.",
   "notiftext.agent_permission_ask_page.title": "{agent} necesita un permiso que das en su página",
   "notiftext.agent_permission_ask_page.body": "{agent} intentó hacer por ti algo que no has permitido. Este permiso lo das en la página del agente, si quieres. Ábrela para ver de qué se trata.",
   "notiftext.agent_permission_ask_page.open": "Abrir la página del agente",

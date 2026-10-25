@@ -31001,7 +31001,10 @@ paths:
       description: |
         Every subscription the account bought (checkout line `{ kind: 'subscription', app: <extension>,
         tool: <plan id> }`), running and ended, without the kept card's ids. A running one renews on
-        the kept card three days before `active_until` unless `auto_renew` is false.
+        the kept card three days before `active_until` unless `auto_renew` is false. `amount` is the
+        price the buyer agreed to: a plan whose price went up (or changed currency) is not charged
+        until the buyer allows the new price with one press, a request of kind `subscription-price`
+        (GET /v1/publish-requests/{id}); `price_question` names that request for the current period.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -31034,6 +31037,14 @@ paths:
                                 active: { type: boolean }
                                 auto_renew: { type: boolean }
                                 last_failure: { type: object, additionalProperties: true }
+                                price_question:
+                                  type: object
+                                  description: The raised price this period's renewal asked the buyer about.
+                                  properties:
+                                    request_id: { type: string }
+                                    amount: { type: integer }
+                                    currency: { type: string }
+                                    period: { type: string, format: date-time }
         '401':
           description: Unauthorized
   /v1/commerce/subscriptions/{ext}/{plan}/cancel:
