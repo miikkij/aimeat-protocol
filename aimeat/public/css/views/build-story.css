@@ -8,6 +8,8 @@
  *   (.ld-sh-h2, .ld-sh-text, .ld-sh-box, .ld-sh-btn, .ld-sh-sticker, .ld-sh-door), which is the
  *   point: the story and the front page are one voice.
  * @version-history
+ *   v1.2.1 -- 2026-10-25 -- The rail is the ink ground (--ink-ground, --on-ink-ground): dark in both
+ *     modes, so its sun label and numbers read in dark mode, where --text made it a light slab (Jouni).
  *   v1.2.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v1.1.0 — 2026-08-29 — The connect story (views/connect-story.js) on the same shapes: the tool chips,
  *     the three-step strip and the door, cs- prefix.
@@ -25,12 +27,12 @@
 /* The rail: a dark slab in the head, and it sticks near the top once the head has scrolled by. */
 .bs-rail {
   position: sticky; top: 1rem; display: flex; flex-direction: column; gap: .55rem;
-  padding: 1.25rem 1.5rem; background: var(--text); color: var(--bg); border: 3px solid var(--text); box-shadow: 8px 8px 0 var(--sun);
+  padding: 1.25rem 1.5rem; background: var(--ink-ground); color: var(--on-ink-ground); border: 3px solid var(--ink-ground); box-shadow: 8px 8px 0 var(--sun);
 }
 .bs-rail-label { font-family: var(--font-showroom); text-transform: uppercase; font-size: .72rem; color: var(--sun); margin-bottom: .2rem; }
-.bs-rail-item { display: flex; align-items: center; gap: .6rem; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 800; color: var(--bg); text-decoration: none; opacity: .55; }
+.bs-rail-item { display: flex; align-items: center; gap: .6rem; font-family: var(--font-showroom-body); font-size: 1rem; font-weight: 800; color: var(--on-ink-ground); text-decoration: none; opacity: .55; }
 .bs-rail-item:hover, .bs-rail-item.is-on { opacity: 1; }
-.bs-rail-item.is-on .bs-rail-num { background: var(--sun); color: #1A1A2E; }
+.bs-rail-item.is-on .bs-rail-num { background: var(--sun); color: var(--on-sun); }
 .bs-rail-num { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; font-family: var(--font-showroom); font-size: .8rem; border: 2px solid var(--sun); color: var(--sun); }
 
 /* A beat: copy on one side, the picture on the other, flipped every other time. */

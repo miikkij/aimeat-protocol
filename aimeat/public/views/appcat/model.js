@@ -15,6 +15,7 @@
  *   fmtKb(bytes) · fmtDate(iso) · fmtNum(n) · host()
  * @usage import { filterRows, sortRows } from '/views/appcat/model.js';
  * @version-history
+ *   v1.4.0 — 2026-10-25 — openToSentenceKey says an app opened to the internet on a closed node is open to anyone (`open_to_internet`).
  *   v1.3.0 — 2026-10-18 — Who may open an app: OPEN_TO, openToOf, openToPlace and openToSentenceKey
  *     read the row's `open_to` (plan doc-mvcn6c7e4e5q, V2.5).
  *   v1.2.0 — 2026-10-18 — The search finds an app by its file name too (?q=hello.html found nothing).
@@ -62,6 +63,8 @@ export function openToPlace(sa) {
  */
 export function openToSentenceKey(sa, nodeSignedIn) {
   const level = openToOf(sa);
+  // An app the node opened to the internet is the exception (services/internet-opening/).
+  if (level === 'anyone' && nodeSignedIn && sa && sa.open_to_internet) return 'openTo.internet';
   if (level === 'anyone' && nodeSignedIn) return 'openTo.nodeSignedIn';
   return level ? 'openTo.' + level : '';
 }

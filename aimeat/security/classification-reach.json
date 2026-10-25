@@ -1803,6 +1803,13 @@
       },
       "why": "Reviewed 2026-10-15 (feature-list audit #64), the node's own read: the registry of conversation forms in the system namespace, each conversation form's config records found once on the first run, and the thread records of a form (keys, form_id and the last visitor turn's time) to find the conversations past the form's keeping time and delete them with every version. Nothing read here is returned to any caller; the scheduled job and the visitor's forget route only delete."
     },
+    "src/services/internet-opening/opening-store.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-25, the node's own read: the opening records of apps opened to the internet on a closed node and the list of trusted openers, both under system@<node> (the scan keeps only that owner's rows). They hold app names, reasons and dates, read to decide what the content-access gate passes and to list it for the operators. No content of anyone's is shown from here."
+    },
     "src/services/invitations.ts": {
       "reads": {
         "listAllMemory": 3

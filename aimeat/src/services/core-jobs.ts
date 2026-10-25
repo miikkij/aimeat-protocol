@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-25 — internet-opening-sweep: apps open to the internet on a closed node close at their end
+ *     date, owners are reminded, lapsed requests settle (services/internet-opening/opening-version.ts).
  *   2026-10-22 — The 30-day dispute timeout takes back the toll delivery paid the provider
  *     (takeBackFromProvider, disputedAmount), as every interactive resolution does, and leaves the
  *     dispute escalated when the provider cannot cover it; it had refunded the whole escrow from
@@ -119,6 +121,12 @@ export function registerCoreHandlers(
   }
   // The classification audit log and the exceptions list age on every node, consent on or off.
   scheduler.registerCoreHandler('classification-audit-prune', () => runClassificationAuditPruneJob(config, storage));
+  // Apps open to the internet on a closed node: end dates, reminders, lapsed requests.
+  scheduler.registerCoreHandler('internet-opening-sweep', async () => {
+    const { sweepOpenings } = await import('./internet-opening/opening-version.js');
+    const out = await sweepOpenings({ storage, config });
+    if (out.closed || out.reminded || out.lapsed) logger.info('Internet opening sweep', out);
+  });
   if (config.personalNodesEnabled) {
     scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
   }

@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-25 -- definitions/internet-opening.ts: an app opened to the internet on a closed node (six tools).
  *   v1.x -- 2026-10-24 -- definitions/compliance-agreements.ts: aimeat_compliance_agreement (plan doc-mvmr4i2wdk0p).
  *   v1.x -- 2026-10-20 -- definitions/content.ts: aimeat_content_facts, _inspect, _scan, _classes and _settings
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -94,6 +95,7 @@ import { visibilityTools } from './definitions/visibility.js';
 import { docsignTools } from './definitions/docsign.js';
 import { complianceAgreementTools } from './definitions/compliance-agreements.js';
 import { exposureTools } from './definitions/exposure.js';
+import { internetOpeningTools } from './definitions/internet-opening.js';
 import { dmGroupTools } from './definitions/dm-groups.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
@@ -137,6 +139,7 @@ const CATALOG = [
     ...docsignTools,
     ...complianceAgreementTools,
     ...exposureTools,
+    ...internetOpeningTools,
     ...dmGroupTools,
     ...publishRequestTools,
     ...accountRightsTools,

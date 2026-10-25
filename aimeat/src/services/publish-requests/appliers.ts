@@ -13,6 +13,7 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.6.0 — 2026-10-25 — An app opened to the internet on a closed node (apply-internet-opening.ts).
  *   v1.5.0 — 2026-10-20 — A consent to everyone (apply-consent.ts; secaudit 2026-10,
  *     grantConsent:wildcard-recipient-skips-publish-gate).
  *   v1.4.0 — 2026-10-18 — Apps, the personal welcome page and a company's front page (apply-app.ts,
@@ -37,6 +38,7 @@ import { applyAppPublish } from './apply-app.js';
 import { applyPortfolioPublish } from './apply-portfolio.js';
 import { applyCompanyPublish } from './apply-company.js';
 import { applyConsentPublish } from './apply-consent.js';
+import { applyInternetOpening } from './apply-internet-opening.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -54,4 +56,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   portfolio: applyPortfolioPublish,
   company: applyCompanyPublish,
   consent: applyConsentPublish,
+  'internet-opening': applyInternetOpening,
 };

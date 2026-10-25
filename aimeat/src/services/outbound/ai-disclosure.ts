@@ -23,12 +23,14 @@
  *   THE NAME IS BORROWED, NOT INVENTED. The header NAME comes from the IETF's AI-Disclosure draft
  *   (draft-abaris-aicdh), whose own `mode` vocabulary is none | ai-modified | ai-originated |
  *   machine-generated (services/ai-provenance-adapters.ts toIetfHeader). The four VALUES used here —
- *   none | ai-assisted | ai-generated | autonomous — are the W3C Community Group's `ai-disclosure`
- *   vocabulary (the same adapter's toW3cHtml), which reads better to a person inspecting a header.
- *   Neither has formal standing and neither is about mail, but borrowing documented words beats
- *   coining private ones. The `X-` prefix is here because Microsoft Graph accepts a custom
- *   header only in that form, and one header that works on both providers beats two that each work
- *   on one.
+ *   none | ai-assisted | ai-generated | autonomous — are the W3C Community Group's DRAFT
+ *   `ai-disclosure` list, which reads better to a person inspecting a header. The final report
+ *   (2026-10-09) settled on human-only | ai-assisted | ai-autonomous for HTML, which toW3cHtml now
+ *   serves; this header keeps the draft list, because callers send these words as `ai_disclosure`
+ *   and the final report says nothing about headers or mail. Neither source is about mail, but
+ *   borrowing documented words beats coining private ones. The `X-` prefix is here because
+ *   Microsoft Graph accepts a custom header only in that form, and one header that works on both
+ *   providers beats two that each work on one.
  *
  *   WHAT CAN AND CANNOT BE PROMISED ABOUT REMOVING IT, in the order that matters:
  *     - An APP OR AGENT CANNOT SUPPRESS IT. The node builds the message; a caller that declares AI
@@ -42,13 +44,15 @@
  * @structure AiDisclosureLevel · AiDisclosure · disclosureHeaders
  * @usage const headers = disclosureHeaders(input.aiDisclosure, config);
  * @version-history
+ *   v1.0.2 — 2026-10-25 — Comment only: the values are the W3C draft list, kept as this header's own
+ *     after the final report changed the HTML values. Behaviour unchanged.
  *   v1.0.1 — 2026-10-08 — The header comment names the vocabularies right: the values are the W3C
  *     list, the header name is the IETF draft's, whose own values differ.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import type { AimeatConfig } from '../../config.js';
 
-/** The IETF draft's vocabulary, unchanged. 'none' exists so a caller can say so explicitly. */
+/** The W3C draft list (see the file comment). 'none' exists so a caller can say so explicitly. */
 export type AiDisclosureLevel = 'none' | 'ai-assisted' | 'ai-generated' | 'autonomous';
 
 export const AI_DISCLOSURE_LEVELS: readonly AiDisclosureLevel[] =

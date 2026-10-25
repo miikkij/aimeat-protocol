@@ -4,10 +4,11 @@
  *   Locks the prod failure mode: app HTML stored as a Uint8Array (MongoDB/Prisma Bytes) must be
  *   decoded as UTF-8, not stringified to "60,33,68,..." byte values.
  * @version-history
+ *   v1.0.1 — 2026-10-25 — Imports from routes/subdomain-app-html.ts, where the two functions moved unchanged.
  *   v1.0.0 — 2026-06-20 — Initial (guards the H-2 SSO shim byte-handling bug).
  */
 import { describe, it, expect } from 'vitest';
-import { injectAppScript, relaxAppCspMeta } from '../../src/routes/subdomains.js';
+import { injectAppScript, relaxAppCspMeta } from '../../src/routes/subdomain-app-html.js';
 
 const APEX = 'https://aimeat.io';
 

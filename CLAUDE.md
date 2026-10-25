@@ -117,7 +117,7 @@ are not hard-wrapped. →
 
 ## Ask the developer first
 
-Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing roadmap items or rulings, not dev notes. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
+Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing roadmap items or rulings, not dev notes. Entries in `aimeat/public/changelog.json` (platform work only): ask at the end of EVERY feature, with the proposed entry; the feature list always gets its row (→ `feature-documentation.md`).
 
 **What Jouni wants built next lives on the node, not in this repo or in any one session.** Organism **AIMEAT CODING CENTRAL** (`da438a5f-609b-41e5-ad9f-8dd2cc76cbe1`), workspace **wish bucket** (`ws-mtemu9rieuk`): one `wish` record per thing he asked for, in his words, and a `brief` document when it needs more than a paragraph. A wish is born in a **shared goal** and gets its **project** when someone takes it to build; until then it sits in the goal's "no project yet" column on the Tavoitteet door of Lifecycle Central, which is the question "who builds?". When he says "teeppä X" and X is not on the screen, read the bucket before building; when he asks for something new, write it there first (the `wish_add` tool, with `goals`) and give him the id. Skill `aimeat-wish-bucket` (on the node, `aimeat_skill_get`) carries the flows and the record's fields; the workspace readme is the process.
 

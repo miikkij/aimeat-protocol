@@ -51,6 +51,7 @@
  *   const { data, removed } = stripServedMarks(upload);
  *   res.json({ ...fields, ...servedMarksResponse(out) });
  * @version-history
+ *   v1.5.0 — 2026-10-25 — The internet-open line (utils/app-internet-open-badge.ts) is taken out like the app-info mark.
  *   v1.4.1 — 2026-10-19 — Strip the nonblocking cookie banner's single marked script as well as
  *     both older asset-and-script forms directly after the owner's tags.
  *   v1.4.0 — 2026-10-18 — The app-info mark (utils/app-info-badge.ts), `app-info`.
@@ -68,6 +69,7 @@
 import { BADGE_MARK } from '../utils/app-badge.js';
 import { AI_USE_MARK } from '../utils/app-ai-use-badge.js';
 import { APP_INFO_MARK } from '../utils/app-info-badge.js';
+import { INTERNET_OPEN_MARK } from '../utils/app-internet-open-badge.js';
 import { RESERVE_MARK } from '../utils/app-chrome-reserve.js';
 import { APP_REF_MARK, DISCOVERY_MARK } from '../utils/app-agent-discovery.js';
 import { PROVENANCE_HTML_MARK } from './ai-provenance-marks.js';
@@ -77,7 +79,7 @@ import { BEHAVIOUR_MARK } from './visibility/behaviour-script.js';
 
 /** Which of the node's marks a removal was. One word per block the serve pass writes. */
 export type ServedMarkKind =
-  | 'chrome-reserve' | 'badge' | 'ai-use' | 'app-info' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
+  | 'chrome-reserve' | 'badge' | 'ai-use' | 'app-info' | 'internet-open' | 'ai-disclosure' | 'ai-label' | 'agent-discovery' | 'app-ref' | 'reviewed-by'
   | 'frame-support' | 'owner-tags' | 'behaviour';
 
 /** One kind of mark taken out of an upload, with everything of that kind summed. */
@@ -107,6 +109,7 @@ const BADGE_OPEN = `<div ${BADGE_MARK}>`;
 const BADGE_V1_OPEN = `<a ${BADGE_MARK} href="https://aimeat.io/" target="_blank" rel="noopener noreferrer" aria-label="`;
 const AI_USE_OPEN = `<div ${AI_USE_MARK}>`;
 const APP_INFO_OPEN = `<div ${APP_INFO_MARK}>`;
+const INTERNET_OPEN_OPEN = `<div ${INTERNET_OPEN_MARK}>`;
 const PROVENANCE_OPEN = `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>`;
 const PROVENANCE_LINK_OPEN = '<link rel="ai-provenance" href="';
 const DISCLOSURE_META_OPEN = '<meta name="ai-disclosure" content="';
@@ -145,6 +148,7 @@ const ORDER: ReadonlyArray<{ mark: ServedMarkKind; marker: string; words: string
   { mark: 'chrome-reserve', marker: RESERVE_MARK, words: 'the declaration of the bottom strip the node\'s chrome takes' },
   { mark: 'ai-use', marker: AI_USE_MARK, words: 'the "Use with your AI" mark' },
   { mark: 'app-info', marker: APP_INFO_MARK, words: 'the app-info mark' },
+  { mark: 'internet-open', marker: INTERNET_OPEN_MARK, words: 'the line saying the app is open to the internet' },
   { mark: 'ai-disclosure', marker: PROVENANCE_HTML_MARK, words: 'the AI-disclosure marks (meta, record link, JSON-LD and the attribute on <html>)' },
   { mark: 'ai-label', marker: 'id="aimeat-ai-label"', words: 'the visible AI label' },
   { mark: 'agent-discovery', marker: DISCOVERY_MARK, words: 'the agent-discovery block' },
@@ -269,6 +273,12 @@ function findCuts(text: string): Cut[] {
   for (const at of anchors(APP_INFO_OPEN)) {
     const end = endOf(at + APP_INFO_OPEN.length, '</div>');
     if (end > 0) cut('app-info', at, end);
+  }
+
+  // The internet-open line: one `<div>` whose style is raw text and which holds no `<div>`.
+  for (const at of anchors(INTERNET_OPEN_OPEN)) {
+    const end = endOf(at + INTERNET_OPEN_OPEN.length, '</div>');
+    if (end > 0) cut('internet-open', at, end);
   }
 
   // The AI-disclosure marks: the JSON-LD carries the id, and the record link and the meta sit

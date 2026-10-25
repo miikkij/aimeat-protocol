@@ -44,6 +44,10 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.11.0 — 2026-10-25 — aiDisclosureParts takes the author's document: when its head declares its
+ *     own `ai-disclosure` meta, the node adds no meta and no `<html>` attribute, and a value that
+ *     differs from the record is logged once (services/ai-disclosure-author.ts). The values are the
+ *     final W3C report's (toW3cHtml).
  *   v1.10.0 — 2026-10-16 — The loaders take `alsoPublic`: records a route knows an open workspace
  *     share serves to anyone, which the SQL predicate cannot see. A shared page was decided as private
  *     and owed no label on the share, while GET /v1/provenance/:id counted it public.
@@ -100,6 +104,7 @@ import { toIetfHeader, toW3cHtml, toIptc, toEuIcon } from './ai-provenance-adapt
 import { projectForDetail, buildDisclosure, publiclyResolvable } from './ai-provenance.js';
 import type { SurfaceContext } from './ai-disclosure.js';
 import { servedContext, type ServedSurface } from './ai-disclosure-served.js';
+import { authorDisclosure, traceAuthorDisclosure } from './ai-disclosure-author.js';
 
 export type { ServedSurface };
 import { createT, type Locale } from '../i18n.js';
@@ -562,12 +567,21 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
  * HTML face while the chip belongs only where a person is looking at a rendered app. The raw
  * (attachment) download gets neither — it stays byte-for-byte, which is what keeps the content hash
  * in the record verifiable.
+ *
+ * `doc` is the document as the author wrote it. When its head already carries a
+ * `<meta name="ai-disclosure">`, the node adds no meta and returns no `w3c`, so the document element
+ * gets no attribute either: under the W3C report the first meta is the page default, and a valid
+ * value on `<html>` would override it (services/ai-disclosure-author.ts).
  */
 export function aiDisclosureParts(
   p: ServedProvenance,
   visible?: { config: AimeatConfig; locale: Locale; reviewedBy?: string; publiclyReadable?: boolean },
+  doc?: string,
 ): { block: string; w3c: string | undefined } {
-  const w3c = toW3cHtml(p.record);
+  const own = doc === undefined ? null : authorDisclosure(doc);
+  const recordValue = toW3cHtml(p.record);
+  if (own) traceAuthorDisclosure(p.recordUrl, recordValue, own);
+  const w3c = own?.meta != null ? undefined : recordValue;
   // The machine-readable marks come from the record AS MINTED. Only the chip a person sees is
   // re-decided when a reviewer has been declared — see reviewedForLabel().
   const forLabel = visible?.reviewedBy
