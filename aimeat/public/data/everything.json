@@ -3432,10 +3432,10 @@
      "slug": "g-18-personal-nodes",
      "cells": [
       "<strong>Personal nodes</strong>",
-      "A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away.",
-      "<code>/v1/personal/*</code>"
+      "A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away. The operator's slots are shared by every owner, so one owner anchors at most three personal nodes there by default; the refusal names the limit and how to free a slot (remove one on the Nodes tab of your profile). The operator changes the limit, or turns it off with 0, from the Config tab or through chat; anchors that already exist stay.",
+      "<code>/v1/personal/*</code>, <code>personal_nodes.max_per_owner</code>"
      ],
-     "plain": "Personal nodes A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away. /v1/personal/*"
+     "plain": "Personal nodes A lightweight node that anchors to an operator node through a tunnel, with an offline mailbox and web push while it is away. The operator's slots are shared by every owner, so one owner anchors at most three personal nodes there by default; the refusal names the limit and how to free a slot (remove one on the Nodes tab of your profile). The operator changes the limit, or turns it off with 0, from the Config tab or through chat; anchors that already exist stay. /v1/personal/*, personal_nodes.max_per_owner"
     },
     {
      "slug": "g-18-connector-tunnel",

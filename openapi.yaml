@@ -69856,7 +69856,11 @@ paths:
         Registers a personal node against this operator node. Owner session; requires the
         `tunnel:connect` scope. The `owner_name` in the body must match the authenticated owner.
         Returns 503 when personal-node support is disabled, 409 if the node id is already anchored,
-        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. Work sent to an
+        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. One owner anchors at
+        most `personal_nodes.max_per_owner` nodes (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3,
+        0 = no limit); the next one is refused with 409 `PERSONAL_NODE_LIMIT`, whose `details`
+        carry the `limit`, the owner's node ids and the call that frees a slot
+        (DELETE /v1/personal/anchor/{nodeId}). Work sent to an
         identity in `agent_gaiis` is queued for this node, so each entry must be the owner's own
         agent on it, `name#<owner_name>` or `name#<owner_name>@<node_id>`; any other entry is
         refused with 400 `AGENT_GAII_NOT_YOURS`.

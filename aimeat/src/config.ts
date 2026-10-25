@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3 (secaudit2026oct22).
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
  *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
  *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
@@ -434,6 +435,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     testMoneyHandler: process.env.AIMEAT_TEST_MONEY_HANDLER === 'true',
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
+    personalNodeMaxPerOwner: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_PER_OWNER ?? '3', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),
     personalNodeHeartbeatIntervalMs: parseInt(process.env.AIMEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
     personalNodeOfflineThresholdMs: parseInt(process.env.AIMEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),
