@@ -228,6 +228,29 @@ async function main() {
     assert(direct.status === 401, `revoked token used directly should be 401, got ${direct.status}`);
   });
 
+  // secaudit2026oct22 (exchanged-pat-jwt-outlives-revoke): the JWT exchanged from a PAT named no PAT
+  // row, so it kept working for its whole lifetime after the PAT was revoked, and an owner-level one
+  // could mint a fresh PAT that outlived the revoke. Core AUTH-07: a revocation takes effect at once.
+  await test('a JWT exchanged from a PAT stops working when the PAT is revoked; an unrevoked one keeps working', async () => {
+    for (const [label, body] of [['x-owner', { grant_owner: true }], ['x-scoped', { scopes: ['memory:read'] }]] as const) {
+      const c = await api('/v1/access/tokens', { bearer: jwtB, body: { label, ...body } });
+      assert(c.status === 201, `create ${label}: ${c.status}`);
+      const x = await api('/v1/auth/token/exchange', { bearer: c.data.data.token });
+      assert(x.status === 200, `exchange ${label}: ${x.status}`);
+      const exchanged = x.data.data.access_token;
+      const before = await api('/v1/memory', { method: 'GET', bearer: exchanged });
+      assert(before.status === 200, `${label}: the exchanged JWT works while the PAT stands, got ${before.status}`);
+      const del = await api(`/v1/access/tokens/${c.data.data.id}`, { method: 'DELETE', bearer: jwtB });
+      assert(del.status === 200, `revoke ${label}: ${del.status}`);
+      const after = await api('/v1/memory', { method: 'GET', bearer: exchanged });
+      assert(after.status === 401, `SECURITY: ${label}: the exchanged JWT still works after the revoke, got ${after.status}`);
+      if (label === 'x-owner') {
+        const mint = await api('/v1/access/tokens', { bearer: exchanged, body: { label: 'after-revoke', grant_owner: true } });
+        assert(mint.status === 401, `SECURITY: the exchanged JWT minted a PAT after the revoke, got ${mint.status}`);
+      }
+    }
+  });
+
   await test('owner A CANNOT revoke owner B\'s token (revocation is owner-scoped)', async () => {
     // The `AND owner = ?` lives inside storage.revokePat — exactly where a refactor drops it.
     const c = await api('/v1/access/tokens', { bearer: jwtB, body: { label: 'victim', scopes: ['memory:read'] } });
