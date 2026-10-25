@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-fork
  * @version-history
+ *   2026-10-25 — An outsider's fork carries neither the source owner's named reviewer, its log nor
+ *     the legal pages; the owner's own fork keeps them (secaudit2026oct22).
  *   2026-10-12 — The two paid apps (Phase 3 and the MCP fork phase) are published with toll_morsels
  *     instead of price_morsels, which node 4.0.0 refuses with MORSEL_PRICE_REMOVED; the paywall tests
  *     after each had failed only because the paid app never existed.
@@ -313,6 +315,43 @@ await test('The seller (owner) can still fork their OWN paid app → 201', async
 // By now SRC_FILE has 3 direct forks from earlier phases: a-own-fork.html (owner),
 // agent-fork.html (owner's agent), b-fork.html (owner B).
 console.log('\nPhase 4: fork statistics + lineage');
+
+// ── The source owner's own statements (secaudit2026oct22) ──
+const DECL_FILE = 'fork-declared.html';
+await test('Owner A publishes a forkable app with a named reviewer and a terms page', async () => {
+    const pub = await json('/v1/apps', aAuthed({
+        method: 'POST', body: JSON.stringify({ filename: DECL_FILE, content: b64(SRC_HTML), name: 'Declared', description: 'd', category: 'utility', tags: [] }),
+    }));
+    assert(pub.status === 201, `publish ${pub.status}`);
+    const patch = await json(`/v1/apps/${DECL_FILE}`, aAuthed({
+        method: 'PATCH', body: JSON.stringify({ forkable: true, author: 'Maija Meikäläinen', legal: { terms: { format: 'markdown', content: '# Terms\n\nOwner A\'s own terms.' } } }),
+    }));
+    assert(patch.status === 200, `patch ${patch.status}: ${JSON.stringify(patch.body.error)}`);
+});
+
+await test('An outsider\'s fork carries neither the reviewer, its log nor the legal pages', async () => {
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${DECL_FILE}/fork`, bAuthed({
+        method: 'POST', body: JSON.stringify({ new_filename: 'b-fork-declared.html' }),
+    }));
+    assert(status === 201, `fork ${status}: ${JSON.stringify(body)}`);
+    const m = body.data?.manifest ?? {};
+    assert(m.authorship === undefined, `the reviewer travelled: ${JSON.stringify(m.authorship)}`);
+    assert(m.authorshipLog === undefined, `the reviewer log travelled: ${JSON.stringify(m.authorshipLog)}`);
+    assert(m.legal === undefined, `the legal pages travelled: ${JSON.stringify(Object.keys(m.legal ?? {}))}`);
+    const terms = await fetch(`${BASE}/v1/apps/${ownerBName}/b-fork-declared.html/legal/terms`);
+    assert(terms.status === 404, `the fork serves owner A's terms page: ${terms.status}`);
+    const served = await fetch(`${BASE}/v1/apps/${ownerBName}/b-fork-declared.html`);
+    assert(served.status === 200 && (await served.text()) === SRC_HTML, 'the fork still carries the source bytes');
+});
+
+await test('Owner A\'s own fork keeps A\'s reviewer and legal pages', async () => {
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${DECL_FILE}/fork`, aAuthed({
+        method: 'POST', body: JSON.stringify({ new_filename: 'a-fork-declared.html' }),
+    }));
+    assert(status === 201, `fork ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.manifest?.authorship?.name === 'Maija Meikäläinen', `own fork reviewer: ${JSON.stringify(body.data?.manifest?.authorship)}`);
+    assert(!!body.data?.manifest?.legal?.terms, 'own fork keeps the terms page');
+});
 
 await test('Listing carries a forks count for the source app (>= 3)', async () => {
     const { body } = await json('/v1/apps?limit=200');
