@@ -9,6 +9,9 @@
  *   cookie + access overview.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-access-tokens
  * @version-history
+ *   2026-10-25 — Phase 5: an owner token on a request another origin composed authenticates it and
+ *     sets no apex session cookie; the apex's own request and a navigation still get it
+ *     (secaudit2026oct22, maybeSetPatBrowserSession-cross-origin-cookie-set).
  *   2026-10-16 — Phase 6's last case follows the owner-bearer refusal (QA audit S1-01): an owner access
  *     token, operator or not, gets 403 OWNER_REFRESH_USES_COOKIE and no token.
  *   2026-10-16 — Phase 6: a Bearer refresh of an owner PAT without grant_operator on an operator account, or of its exchanged JWT, never gains operator and is sent to the exchange; a revoked PAT's JWT cannot be renewed; an operator session still refreshes to operator (QA audit P3-03).
@@ -55,10 +58,11 @@ async function registerAndLogin(username: string, password: string): Promise<str
 }
 
 // A browser-like request (Mozilla UA) that captures the aimeat_rt Set-Cookie and can resend it.
-async function browserCall(path: string, opts: { method?: string; bearer?: string; cookie?: string; csrf?: boolean; body?: any } = {}): Promise<{ status: number; data: any; setRt: string | null }> {
+async function browserCall(path: string, opts: { method?: string; bearer?: string; cookie?: string; csrf?: boolean; body?: any; headers?: Record<string, string> } = {}): Promise<{ status: number; data: any; setRt: string | null }> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    ...(opts.headers ?? {}),
   };
   if (opts.bearer) headers.Authorization = 'Bearer ' + opts.bearer;
   if (opts.cookie) headers.Cookie = 'aimeat_rt=' + encodeURIComponent(opts.cookie);
@@ -289,6 +293,31 @@ async function main() {
     await api(`/v1/access/tokens/${id}`, { method: 'DELETE', bearer: jwtB });
     const after = await browserCall('/v1/auth/refresh', { method: 'POST', cookie: ownerPat, csrf: true });
     assert(after.status === 401, `revoked PAT cookie refresh should be 401, got ${after.status}`);
+  });
+
+  // secaudit2026oct22 (maybeSetPatBrowserSession-cross-origin-cookie-set): a page on another origin
+  // (an app on a same-site app host) could send its author's owner token with credentials and have
+  // the apex session cookie replaced with it. Only a request the apex itself made, or a navigation,
+  // gets the cookie; the token still authenticates the request either way.
+  await test('an owner token on a request another origin composed does NOT set the session cookie', async () => {
+    const c = await api('/v1/access/tokens', { bearer: jwtB, body: { label: 'cross-origin', grant_owner: true } });
+    const ownerPat = c.data.data.token;
+    const cases: Array<[string, Record<string, string>]> = [
+      ['a same-site app origin', { Origin: 'https://someapp.apps.node.test', 'Sec-Fetch-Site': 'same-site' }],
+      ['a cross-site origin', { Origin: 'https://elsewhere.test', 'Sec-Fetch-Site': 'cross-site' }],
+      ['an app origin without Sec-Fetch-Site', { Origin: 'https://someapp.apps.node.test' }],
+      ['same-site with no Origin header', { 'Sec-Fetch-Site': 'same-site' }],
+    ];
+    for (const [what, headers] of cases) {
+      const r = await browserCall('/v1/memory', { method: 'GET', bearer: ownerPat, headers });
+      assert(r.status === 200, `${what}: the token still authenticates the request, got ${r.status}`);
+      assert(!r.setRt, `SECURITY: ${what} set the apex session cookie`);
+    }
+    // The apex's own page (same-origin) and a navigation (none) still get it.
+    const own = await browserCall('/v1/memory', { method: 'GET', bearer: ownerPat, headers: { Origin: new URL(BASE).origin, 'Sec-Fetch-Site': 'same-origin' } });
+    assert(own.setRt === ownerPat, 'a same-origin request from the apex should set the cookie');
+    const nav = await browserCall('/v1/memory', { method: 'GET', bearer: ownerPat, headers: { 'Sec-Fetch-Site': 'none' } });
+    assert(nav.setRt === ownerPat, 'a navigation (Sec-Fetch-Site: none) should set the cookie');
   });
 
   await test('a scoped token on a browser request does NOT set a session cookie', async () => {
