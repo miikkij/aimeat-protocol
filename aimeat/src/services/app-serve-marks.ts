@@ -46,6 +46,8 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.8.1 — 2026-10-25 — aiDisclosureParts reads the author's document, so an app that declares its
+ *     own `ai-disclosure` meta gets no second meta and no `<html>` attribute from the node.
  *   v1.8.0 — 2026-10-25 — `internetOpen`: the line at the end of an app a closed node opened to the
  *     internet (utils/app-internet-open-badge.ts), in the same one splice as the other body marks.
  *   v1.7.0 — 2026-10-18 — `info`: the app-info mark (utils/app-info-badge.ts), after the "Use with your
@@ -297,7 +299,7 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     if (spec.internetOpen && !text.includes(INTERNET_OPEN_MARK)) parts.push(internetOpenSnippet(spec.internetOpen));
     if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
       const { block, w3c } = aiDisclosureParts(spec.provenance,
-        spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined);
+        spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined, text);
       parts.push(block);
       // Before the head pass — see the file comment; this is what keeps a head-less document's
       // generated `<html>` element unmarked, as it has always been.
