@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-25 -- reindexShareSearchTextOnce, last: the stored workspace share records get a search text
+ *     without the password hash (secaudit2026oct22; services/share-search-reindex.ts).
  *   v1.2.6 -- 2026-10-25 -- classifySubdomainSiteOriginsOnce, last: the subdomain rows from before
  *     `origin` are classified on evidence, the rest named on the Security page (secaudit2026oct22;
  *     services/subdomain-site-origin-keep.ts).
@@ -65,6 +67,7 @@ import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-k
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
 import { classifySubdomainSiteOriginsOnce } from '../services/subdomain-site-origin-keep.js';
+import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -137,4 +140,9 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // apex answers by the classified origin from the first request.
   await classifySubdomainSiteOriginsOnce(storage, config)
     .catch(err => logger.error('Failed to classify the older subdomain addresses; the next boot tries again', { error: String(err) }));
+  // The workspace share records stored before the search text left out the password hash are stored
+  // again, so the index holds no word of it (services/share-search-reindex.ts). Awaited, so no search
+  // meets the old index first.
+  await reindexShareSearchTextOnce(storage, config)
+    .catch(err => logger.error('Failed to rebuild the search text of the workspace share records; the next boot tries again', { error: String(err) }));
 }

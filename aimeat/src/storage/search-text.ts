@@ -15,11 +15,14 @@
  *   `tok*`): a query token matches a word in the text that begins with it.
  * @structure
  *   - SEARCH_VALUE_DEPTH — how deep the value walk goes
- *   - searchValueText(value) — the scalar values, space-joined
+ *   - searchableValue(key, value) — the value without the fields the read doors mask
+ *   - searchValueText(value, key?) — the scalar values, space-joined
  *   - buildSearchBlob(record) — key, key segments, tags and the values (the PostgreSQL column)
  * @usage
  *   import { buildSearchBlob, searchValueText } from '../../search-text.js';
  * @version-history
+ *   2026-10-25 — searchableValue(): the passwordHash and icsKeyHash of a workspace share record are left
+ *     out of the search text on both backends, as every read door masks them (secaudit2026oct22).
  *   2026-10-15 — Initial: buildSearchBlob moved here from providers/postgres-kysely/helpers.ts so the
  *     SQLite provider indexes the same text (feature-list audit #52).
  */
@@ -28,8 +31,32 @@ import type { MemoryRecord } from './interface.js';
 /** The value walk stops below this depth: the top-level value is depth 0. */
 export const SEARCH_VALUE_DEPTH = 6;
 
-/** The scalar values inside a memory value (strings, numbers, booleans), depth ≤ 6, space-joined. */
-export function searchValueText(value: unknown): string {
+/** A workspace's public-share record, the same pattern services/secret-records.ts masks on read. */
+const WORKSPACE_SHARE_KEY_RE = /^organism\.[^.]+\.w\.[^.]+\.meta\.share$/;
+
+/** The fields of a share record that no read door shows (services/secret-records.ts shownMemoryValue). */
+const SHARE_SECRET_FIELDS = ['passwordHash', 'icsKeyHash'] as const;
+
+/**
+ * The value as the search text may read it. A field that every read door masks is left out: search
+ * matches a word at its start, so a hit or a miss on a chosen prefix of an indexed hash recovers the
+ * hash a character at a time, and a masked field is then readable through the index (secaudit2026oct22,
+ * search-index-prefix-oracle-on-masked-fields). The record stays findable by its key and its other
+ * values. Every other key's value is returned unchanged.
+ */
+export function searchableValue(key: string | undefined, value: unknown): unknown {
+  if (!key || !WORKSPACE_SHARE_KEY_RE.test(key) || !value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const rest: Record<string, unknown> = { ...(value as Record<string, unknown>) };
+  for (const field of SHARE_SECRET_FIELDS) delete rest[field];
+  return rest;
+}
+
+/**
+ * The scalar values inside a memory value (strings, numbers, booleans), depth ≤ 6, space-joined.
+ * With `key`, a field the read doors mask for that key is left out (searchableValue).
+ */
+export function searchValueText(value: unknown, key?: string): string {
+  value = searchableValue(key, value);
   const parts: string[] = [];
   const walk = (v: unknown, depth: number): void => {
     if (depth > SEARCH_VALUE_DEPTH || v == null) return;
@@ -48,7 +75,7 @@ export function buildSearchBlob(record: MemoryRecord): string {
   // by `findme`: the Postgres tsvector keeps `search.findme` as one token, whereas SQLite FTS5 splits
   // on punctuation; emitting the segments matches its recall.
   const parts: string[] = [record.key, ...record.key.split(/[._:/\-\s]+/).filter(Boolean), ...(record.tags ?? [])];
-  const values = searchValueText(record.value);
+  const values = searchValueText(record.value, record.key);
   if (values) parts.push(values);
   return parts.join(' ');
 }
