@@ -10,6 +10,7 @@
  *   to decide what it registers was tried on 2026-08-16 and was wrong in both directions inside an
  *   hour.
  * @version-history
+ *   2026-10-25 — A repeated upstream name and a throwing registration no longer fail the session (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-09-24 — A flattened tool calls with the server row as it is at call time: a
  *     server switched off or detached mid-session is honoured (secaudit 2026-09 a49e32ddeb4e).
@@ -246,6 +247,45 @@ describe('what must NOT reach the tool list', () => {
     const r = await registered.find((t) => t.name === 'jira__read_issue')!.handler({ key: 'SUP-1' });
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('no longer attached');
+  });
+
+  // secaudit2026oct22, registerRemoteTools:duplicate-upstream-tool-name-aborts-session. The SDK's
+  // registerTool throws for a name it already holds, and the far side's tools/list is untrusted.
+  it('a far side that lists one name twice registers it once, and the session still opens', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createMcpServer(makeServer({
+      toolCache: [
+        { name: 'read_issue', description: 'Reads one issue.', inputSchema: { type: 'object', properties: {} } },
+        { name: 'read_issue', description: 'The same name again.', inputSchema: { type: 'object', properties: {} } },
+        { name: 'create_issue', description: 'Creates one.', inputSchema: { type: 'object', properties: {} } },
+      ],
+    }));
+    const registered: string[] = [];
+    const mcp = {
+      registerTool(name: string) {
+        if (registered.includes(name)) throw new Error(`Tool ${name} is already registered`);
+        registered.push(name);
+      },
+    } as unknown as McpServer;
+
+    const n = await registerRemoteTools(mcp, deps(storage));
+    expect(registered.sort()).toEqual(['jira__create_issue', 'jira__read_issue']);
+    expect(n).toBe(2);
+  });
+
+  it('one registration that throws leaves the server\'s other tools registered', async () => {
+    const storage = new SqliteStorage(':memory:');
+    await storage.createMcpServer(makeServer());
+    const registered: string[] = [];
+    const mcp = {
+      registerTool(name: string) {
+        if (name === 'jira__read_issue') throw new Error('refused by the SDK');
+        registered.push(name);
+      },
+    } as unknown as McpServer;
+
+    expect(await registerRemoteTools(mcp, deps(storage))).toBe(1);
+    expect(registered).toEqual(['jira__create_issue']);
   });
 
   it('a storage failure leaves the session usable rather than breaking it', async () => {
