@@ -4696,7 +4696,9 @@ components:
           description: >-
             The app's manifest. Among its fields, `formatMd` ({ extension, action }) names the action
             of the owner's own extension that answers `?format=md`, read from
-            `<meta name="aimeat-format-md">` at publish.
+            `<meta name="aimeat-format-md">` at publish. The action receives `{ format, app, lang? }`:
+            `lang` is the reader's `?lang=` when it reads as a language tag (two or three letters,
+            at most one subtag), so the app can answer in that language.
         size: { type: integer }
         mime_type: { type: string }
         protected: { type: boolean, description: True when an access code gates downloads }

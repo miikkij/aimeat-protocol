@@ -9,6 +9,7 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-25 — `?format=md&lang=<tag>` passes the reader's language to the app's own format-md action (formatMdLang).
  *   2026-10-25 — accessCodeUnlockPage moved unchanged to routes/apps/access-code-page.ts (max-file-lines).
  *   2026-10-25 — An app a closed node opened to the internet carries the line that says so (internetOpenMarkFor, services/internet-opening/).
  *   2026-10-24 — A draft preview token serves only on the URL of its own owner, else 403 TOKEN_INVALID (secaudit2026oct22).
@@ -134,6 +135,7 @@ import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js
 import { currentAppRow } from '../../services/app-served-protection.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
+import { formatMdLang } from '../../services/app-format-md.js';
 import { appOriginUrl, appTargetOr, withForwardedQuery, type AppTargetFor, type CanonicalOwner } from './helpers.js';
 import { runnableAnswer, sendFrameHost, sandboxedCsp, withFrameShim, type RunnableAnswer } from './inline-frame.js';
 import { logger } from '../../utils/logger.js';
@@ -545,7 +547,7 @@ export function registerReadRoutes(
         // footer. Runs AFTER the hidden/access-code/paid gates so a restricted app stays exactly
         // as restricted in markdown as in HTML. Browsers (Accept: text/html) are unaffected.
         if (req.query.format === 'md' || (req.query.format === undefined && prefersMarkdown(req))) {
-            if (await serveAppAgentFace(res, config, storage, app)) return;
+            if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
         }
 
         const mode = req.query.mode as string | undefined;
