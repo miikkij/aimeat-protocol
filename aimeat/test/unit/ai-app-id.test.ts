@@ -4,6 +4,7 @@
  *   doors actually recorded on aimeat.io: `paatospaja`, `paatospaja.html` and
  *   `happydude500001/puhe.html`.
  * @version-history
+ *   2026-10-25 — A cap or allowlist entry under an app's own bare name holds for its signed reference (secaudit2026oct22).
  *   2026-10-19 — namesSignedApp (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
  *   v1.0.0 — 2026-09-19 — Initial.
  */
@@ -62,5 +63,18 @@ describe('namesSignedApp: a body app_id against the app token\'s own app', () =>
     expect(namesSignedApp('happydude500001/other.html', SIGNED)).toBe(false);
     expect(namesSignedApp('someoneelse/puhe.html', SIGNED)).toBe(false);
     expect(namesSignedApp('', SIGNED)).toBe(false);
+  });
+});
+
+describe('an app grant\'s call, attributed to its signed app (secaudit2026oct22)', () => {
+  // Another author's app this owner uses: the owner saved its cap under the name it called itself.
+  const SIGNED = 'someoneelse/puhe.html';
+  it('a cap and an allowlist entry saved under the app\'s own bare name hold for its signed reference', () => {
+    expect(appQuotaFor({ puhe: { daily_usd: 1 } }, SIGNED, OWNER, 5)).toBe(1);
+    expect(appAllowlisted(['puhe.html'], SIGNED, OWNER)).toBe(true);
+  });
+  it('an entry of another app does not', () => {
+    expect(appQuotaFor({ other: { daily_usd: 1 } }, SIGNED, OWNER, 5)).toBe(5);
+    expect(appAllowlisted(['other'], SIGNED, OWNER)).toBe(false);
   });
 });

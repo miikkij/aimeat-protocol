@@ -19419,7 +19419,7 @@ paths:
                   type: integer
                 app_id:
                   type: string
-                  description: App/source attribution — enables the per-app allowlist + quota.
+                  description: App/source attribution — enables the per-app allowlist + quota. For an app grant the call is checked and recorded under the app the grant names, whatever this field says.
                 images:
                   type: array
                   description: >
@@ -20342,7 +20342,7 @@ paths:
                   description: Picture size, op image only.
                 app_id:
                   type: string
-                  description: App attribution — enables the per-app allowlist and the per-app quota.
+                  description: App attribution — enables the per-app allowlist and the per-app quota. For an app grant the job is checked and recorded under the app the grant names, whatever this field says.
                 on_done:
                   type: object
                   required: [extension, action]

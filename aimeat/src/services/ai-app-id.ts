@@ -25,6 +25,8 @@
  * @usage
  *   const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
  * @version-history
+ *   2026-10-25 — A cap or allowlist entry under the name an app called itself also holds for the
+ *     signed app reference an app grant's call is now attributed to (entryNamesApp; secaudit2026oct22).
  *   2026-10-19 — namesSignedApp: does a body app_id name the app token's own app, under any of its
  *     names (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
  *   v1.0.0 — 2026-09-19 — Initial.
@@ -82,22 +84,31 @@ export function appSpentToday(perApp: PerApp | undefined, appId: string, ownerGh
   return spent;
 }
 
+/**
+ * True when an owner's setting entry (a cap's or an allowlist's key) names this app. A signed app
+ * reference (`author/file.html`, from an app grant) also matches an entry under the name the app
+ * called itself in the body (`file`), the name the owner saw on the AI page before the call was
+ * attributed to the signed app (secaudit2026oct22).
+ */
+function entryNamesApp(entry: unknown, appId: string, ownerGhii?: string): boolean {
+  if (canonicalAiAppId(entry, ownerGhii) === canonicalAiAppId(appId, ownerGhii)) return true;
+  return appId.includes('/') && typeof entry === 'string' && namesSignedApp(entry, appId);
+}
+
 /** The owner's daily cap for this app, whichever name they saved it under, or `fallback`. */
 export function appQuotaFor(
   quotas: Record<string, { daily_usd?: number } | undefined> | undefined,
   appId: string, ownerGhii: string | undefined, fallback: number,
 ): number {
-  const want = canonicalAiAppId(appId, ownerGhii);
   for (const [k, v] of Object.entries(quotas ?? {})) {
-    if (canonicalAiAppId(k, ownerGhii) === want && typeof v?.daily_usd === 'number') return v.daily_usd;
+    if (entryNamesApp(k, appId, ownerGhii) && typeof v?.daily_usd === 'number') return v.daily_usd;
   }
   return fallback;
 }
 
 /** True when the owner's allowlist names this app under any of its names. */
 export function appAllowlisted(allowlist: unknown[], appId: string, ownerGhii?: string): boolean {
-  const want = canonicalAiAppId(appId, ownerGhii);
-  return allowlist.some(e => canonicalAiAppId(e, ownerGhii) === want);
+  return allowlist.some(e => entryNamesApp(e, appId, ownerGhii));
 }
 
 /** A per-app map with every name folded into its canonical one, sums added. For readers of history. */
