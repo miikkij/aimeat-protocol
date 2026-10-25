@@ -8,6 +8,8 @@
  *   consent access (403 paths), and GENERICITY — a second `kind:'research-study'` manifest
  *   with different object types reads through the SAME engine.
  * @version-history
+ *   2026-10-25 -- The publish gate follows the newest meta.config copy of a current creator or admin;
+ *     an admin whose id sorts first, and a removed admin, decide nothing (secaudit2026oct22).
  *   v1.1.0 -- 2026-10-02 -- Workspace autonomy: a workspace at L5 auto-runs what the organism's L3
  *     gates, one at L1 gates what L3 auto-runs, the organism's always-gate floor holds in an L5
  *     workspace that empties its own list, a workspace with no level follows the organism, and a
@@ -434,6 +436,35 @@ await test('Approver approves → draft is published', async () => {
   assert((w.body.data.objects?.goal ?? []).some((x: any) => x.id === 'gv2'), 'gv2 published after approval');
 });
 
+// secaudit2026oct22 (readOrganismConfig:first-copy-any-owner). Each creator or admin who sets the gate
+// holds their own copy of meta.config. The copy that decides is the newest one of a CURRENT creator or
+// admin, never the copy whose owner id sorts first: an admin's name here sorts before the creator's.
+let gateAdmin: Awaited<ReturnType<typeof registerOwnerAndAgent>> | undefined;
+await test('The publish gate follows the newest copy of a current creator or admin, not the copy that sorts first', async () => {
+  gateAdmin = await registerOwnerAndAgent('aaagateadmin');
+  const join = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: bearer(gateAdmin.ownerToken), body: JSON.stringify({}) });
+  assert(join.status === 201, `admin join ${join.status}: ${JSON.stringify(join.body?.error)}`);
+  const promote = await json(`/v1/organisms/${orgId}/admins`, { method: 'POST', headers: bearer(u1.ownerToken), body: JSON.stringify({ target_ghii: gateAdmin.ownerName }) });
+  assert(promote.status === 200, `promote ${promote.status}: ${JSON.stringify(promote.body?.error)}`);
+  const cfgKey = `organism.${orgId}.meta.config`;
+  const off = await writeMemory(gateAdmin.ownerToken, cfgKey, { gates: { publish: { enabled: false } } });
+  assert(off.status === 200 || off.status === 201, `admin config ${off.status}: ${JSON.stringify(off.body?.error)}`);
+  const on = await writeMemory(u1.ownerToken, cfgKey, { gates: { publish: { enabled: true, approverRole: 'owner' } } });
+  assert(on.status === 200 || on.status === 201, `creator config ${on.status}: ${JSON.stringify(on.body?.error)}`);
+  await writeMemory(u1.ownerToken, `organism.${orgId}.meta.goals.gv3.draft`, { id: 'gv3', title: 'Gate copy goal', status: 'open' });
+  const p1 = await publish(u1.ownerToken, 'meta.goals', 'gv3');
+  assert(p1.status === 202, `the creator's newer copy did not decide the gate: ${p1.status} ${JSON.stringify(p1.body?.data ?? p1.body?.error)}`);
+
+  // The admin turns it off again, and is then removed: a removed admin's copy decides nothing.
+  const off2 = await writeMemory(gateAdmin.ownerToken, cfgKey, { gates: { publish: { enabled: false } } });
+  assert(off2.status === 200 || off2.status === 201, `admin config again ${off2.status}`);
+  const rm = await json(`/v1/organisms/${orgId}/members/${encodeURIComponent(gateAdmin.ownerName)}`, { method: 'DELETE', headers: bearer(u1.ownerToken) });
+  assert(rm.status === 200, `remove admin ${rm.status}: ${JSON.stringify(rm.body?.error)}`);
+  await writeMemory(u1.ownerToken, `organism.${orgId}.meta.goals.gv4.draft`, { id: 'gv4', title: 'Gate copy goal 2', status: 'open' });
+  const p2 = await publish(u1.ownerToken, 'meta.goals', 'gv4');
+  assert(p2.status === 202, `a removed admin's copy decided the gate: ${p2.status} ${JSON.stringify(p2.body?.data ?? p2.body?.error)}`);
+});
+
 // ─── Generic gate primitive (auto vs gate, via autonomy + alwaysGate floor) ───
 console.log('\nGeneric approvals (autonomy + always-gate floor)');
 
@@ -569,6 +600,11 @@ await test('Delete creator (cascade)', async () => {
 await test('Delete member (cascade)', async () => {
   const { status } = await json(`/v1/owners/${u2.ownerName}`, { method: 'DELETE', headers: bearer(u2.ownerToken) });
   assert(status === 200, `delete u2 ${status}`);
+});
+await test('Delete the gate admin (cascade)', async () => {
+  if (!gateAdmin) return;
+  const { status } = await json(`/v1/owners/${gateAdmin.ownerName}`, { method: 'DELETE', headers: bearer(gateAdmin.ownerToken) });
+  assert(status === 200, `delete gate admin ${status}`);
 });
 await test('Delete third member (cascade)', async () => {
   if (!u3) return;
