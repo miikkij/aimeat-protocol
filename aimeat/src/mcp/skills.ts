@@ -14,6 +14,8 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-24 — aimeat_skill_publish (inline and upload) and aimeat_skill_update refuse the shared
+ *     anonymous principal with AUTH_REQUIRED, as POST and PATCH /v1/skills do (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, aimeat_skill_publish and
@@ -70,6 +72,7 @@ import { agentSessionCaller, type CallerContext } from '../services/caller-conte
 import type { PublishGateInput } from '../services/publish-requests/door.js';
 import { skillPublishAsk, userSkillState, fileSkillAsk, closedSkillLevel } from '../services/skill-publish-gate.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
+import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 
 export function registerSkillsTools(
     mcp: McpServer,
@@ -86,6 +89,10 @@ export function registerSkillsTools(
     const agentGaii = getAgentGaii();
     const parsed = parseGAII(agentGaii);
     const ownerName = parsed ? localAccountName(agentGaii) : null;
+    // The shared anonymous principal publishes no skill and changes no skill's audience, as POST and
+    // PATCH /v1/skills refuse it (routes/skills.ts accessorOf): a members or public skill is read and
+    // linked by other people.
+    const refusesAnonymous = isAnonymousPrincipal({ sub: agentGaii });
     /** The publish gate's caller: the session's, or one built from this session's facts. */
     const publishGate = (): PublishGateInput => ({
         caller: caller ? caller() : agentSessionCaller(agentGaii, ownerName ?? '', scopes, config.nodeId, storage),
@@ -116,6 +123,7 @@ export function registerSkillsTools(
         },
         async ({ skill_md, files, scope, visibility, organism_id, workspace_id, ai_provenance, ai_provenance_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
+            if (refusesAnonymous) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             const acc = await accessor();
             const targetScope: SkillScope = scope === 'node' ? 'node' : scope === 'workspace' ? 'workspace' : 'user';
             if (targetScope === 'node' && !acc.isOperator) {
@@ -317,6 +325,7 @@ export function registerSkillsTools(
         },
         async ({ name, visibility, scope }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
+            if (refusesAnonymous) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             const acc = await accessor();
             const targetScope = scope === 'node' ? 'node' : 'user';
             if (targetScope === 'node' && !acc.isOperator) {

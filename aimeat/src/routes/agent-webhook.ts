@@ -12,6 +12,9 @@
  *   - GET    /v1/agents/:name/webhook/log   -- Get delivery log
  *   - GET    /v1/agents/:name/integration/overview -- Integration subtab composite (webhook + delivery log + onboarding checklist)
  * @version-history
+ *   2026-10-24 — PUT, DELETE and POST .../test refuse the shared anonymous principal with 401
+ *     AUTH_REQUIRED (refuseAnonymousPrincipal): every holder of that token is the same agent, so a
+ *     webhook one holder set received the events of the others (secaudit2026oct22).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.1.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.1.0 -- 2026-07-16 -- Add GET /integration/overview composite folding the Integration subtab's
@@ -27,6 +30,7 @@ import type { Storage, AgentRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
@@ -79,7 +83,9 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   /* ── PUT /v1/agents/:name/webhook -- Register or update webhook ── */
-  router.put('/v1/agents/:name/webhook', requireAuth(), async (req, res) => {
+  // The shared anonymous agent sets, removes and tests no webhook: every holder of the minted token
+  // is that one agent, so a webhook one holder set would receive the events of the others.
+  router.put('/v1/agents/:name/webhook', requireAuth(), refuseAnonymousPrincipal(), async (req, res) => {
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
@@ -167,7 +173,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   /* ── DELETE /v1/agents/:name/webhook -- Remove webhook ── */
-  router.delete('/v1/agents/:name/webhook', requireAuth(), async (req, res) => {
+  router.delete('/v1/agents/:name/webhook', requireAuth(), refuseAnonymousPrincipal(), async (req, res) => {
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
@@ -200,7 +206,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   /* ── POST /v1/agents/:name/webhook/test -- Send test event ── */
-  router.post('/v1/agents/:name/webhook/test', requireAuth(), async (req, res) => {
+  router.post('/v1/agents/:name/webhook/test', requireAuth(), refuseAnonymousPrincipal(), async (req, res) => {
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {

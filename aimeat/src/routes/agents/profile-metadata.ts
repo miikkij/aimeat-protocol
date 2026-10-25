@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-24 — PATCH /v1/agents/:name/tags refuses the shared anonymous principal with 401
+ *     AUTH_REQUIRED: its tags are on its public card and decide its catalogue listing (secaudit2026oct22).
  *   2026-10-23 — PATCH /v1/agents/:name/task-start-floor (owner in person), and
  *     `task_start_floor_accepted` on the agent list.
  *   2026-10-19 — `avatar` on GET /v1/agents and GET /v1/agents/:gaii (services/agent-avatar.ts), and
@@ -70,6 +72,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { requireScopeUnlessSelf } from '../../auth/self-or-scope.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
@@ -381,7 +384,8 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // An agent's OWN tags need no agent:write (auth/self-or-scope.ts, ruled 2026-10-02): a crew
   // runtime sets them on every start, and an agent without the word finished no task. A sibling's
   // tags still need it.
-  router.patch('/v1/agents/:name/tags', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
+  // The shared anonymous agent sets no tags: every holder of the minted token is that one agent.
+  router.patch('/v1/agents/:name/tags', requireAuth(), refuseAnonymousPrincipal(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const identifier = (req.params.name as string);
     // Ownership, normalisation and the write are services/agent-profile-write.ts, shared with
     // aimeat_agent_tags_set.

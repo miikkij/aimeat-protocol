@@ -487,6 +487,145 @@ await test('The anonymous token still writes its own memory after the Phase 3d r
     await json(`/v1/memory/${encodeURIComponent(key)}`, anonAuth({ method: 'DELETE' }));
 });
 
+// ─── Phase 3e: More writes outside the anonymous namespace ───
+// secaudit2026oct22, round 5. Data packages, a memory copy, the shared agent's webhook, tags and
+// capabilities (its public card), and a skill over MCP persisted outside anonymous.* for the minted
+// token. Each refuses it now; a signed-in owner and their agent keep every one of these writes. The
+// page open and the company page were already refused (requireRole('owner'), the company:write scope),
+// and are asserted here so they stay refused.
+console.log('\nPhase 3e — More writes outside anonymous.* refuse the minted token');
+
+const s3e = `${s3c}e`;
+const ownerAgent = await (async () => {
+    if (!dirOwner) return null;
+    try { return await makeAgent(BASE, dirOwner, ['memory:read', 'memory:write', 'storage:read', 'storage:write']); }
+    catch (err) { console.error(`  fixture: ${(err as Error).message}`); return null; }
+})();
+const agentAuth = (opts: RequestInit = {}): RequestInit =>
+    ({ ...opts, headers: { ...((opts.headers ?? {}) as Record<string, string>), Authorization: `Bearer ${ownerAgent?.token ?? ''}` } });
+const anonMcp = await openSession(BASE, anonToken, 'e2e-anonymous-3e');
+const agentMcp = ownerAgent ? await openSession(BASE, ownerAgent.token, 'e2e-anonymous-3e-member') : null;
+const isAuthRequired = (r: { status: number; body: any }) => r.status === 401 && r.body.error?.code === 'AUTH_REQUIRED';
+const shown = (r: { status: number; body: any }) => `${r.status} ${JSON.stringify(r.body.error ?? r.body.data).slice(0, 200)}`;
+
+await test('POST /v1/portfolio/:username/open: the minted token is refused, a signed-in person opens a signed-in page', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const cfg = await json('/v1/portfolio/config', ownerAuth({ method: 'PUT', body: JSON.stringify({ enabled: true, access: 'signed-in' }) }));
+    assert(cfg.status === 200, `owner config: ${shown(cfg)}`);
+    const path = `/v1/portfolio/${encodeURIComponent(dirOwner!.name)}/open`;
+    const anon = await json(path, anonAuth({ method: 'POST', body: '{}' }));
+    assert(anon.status === 403 && !anon.body.data?.url, `minted token open: ${shown(anon)}`);
+    const visitor = await registerOwner(BASE, `anonopen${s3e}`);
+    const open = await json(path, { method: 'POST', body: '{}', headers: { Authorization: `Bearer ${visitor.token}` } });
+    assert(open.status === 200 && typeof open.body.data?.url === 'string', `signed-in open: ${shown(open)}`);
+});
+
+await test('Company page: the minted token is refused on REST and MCP, the owner publishes one', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const anon = await json('/v1/companies', anonAuth({ method: 'POST', body: JSON.stringify({ name: `Anon Co ${s3e}` }) }));
+    assert(anon.status === 403, `minted token company create: ${shown(anon)}`);
+    const r = await callTool(anonMcp, 'aimeat_company_portfolio_publish', { company_id: 'x', html: '<p>x</p>' });
+    assert(r.isError, `minted token over MCP: ${r.text.slice(0, 200)}`);
+    const made = await json('/v1/companies', ownerAuth({ method: 'POST', body: JSON.stringify({ name: `Owner Co ${s3e}` }) }));
+    assert(made.status === 201, `owner company create: ${shown(made)}`);
+    const id = made.body.data.company.id;
+    const anonPage = await json(`/v1/companies/${id}/portfolio`, anonAuth({ method: 'PUT', body: JSON.stringify({ html: '<p>x</p>' }) }));
+    const anonDelete = await json(`/v1/companies/${id}`, anonAuth({ method: 'DELETE' }));
+    assert(anonPage.status === 403 && anonDelete.status === 403, `minted token company page ${shown(anonPage)}; delete ${shown(anonDelete)}`);
+    const page = await json(`/v1/companies/${id}/portfolio`, ownerAuth({ method: 'PUT', body: JSON.stringify({ html: '<!doctype html><title>x</title><p>x</p>' }) }));
+    assert(page.status === 200 || page.status === 202, `owner company page: ${shown(page)}`);
+    await json(`/v1/companies/${id}`, ownerAuth({ method: 'DELETE' }));
+});
+
+const pkgBody = (name: string) => ({ name, changes: 'First version.', visibility: 'members', resources: [{ name: 'rows', rows: [{ n: 1 }, { n: 2 }] }] });
+
+await test('POST /v1/datapackages: the minted token is 401, the owner and their agent publish', async () => {
+    assert(ownerAgent !== null, 'agent fixture failed');
+    const anon = await json('/v1/datapackages', anonAuth({ method: 'POST', body: JSON.stringify(pkgBody(`anon-pkg-${s3e}`)) }));
+    assert(isAuthRequired(anon), `minted token publish: ${shown(anon)}`);
+    const own = await json('/v1/datapackages', ownerAuth({ method: 'POST', body: JSON.stringify(pkgBody(`own-pkg-${s3e}`)) }));
+    assert(own.status === 201, `owner publish: ${shown(own)}`);
+    const agent = await json('/v1/datapackages', agentAuth({ method: 'POST', body: JSON.stringify(pkgBody(`agent-pkg-${s3e}`)) }));
+    assert(agent.status === 201, `agent publish: ${shown(agent)}`);
+});
+
+await test('MCP aimeat_datapackage_publish: the minted token is AUTH_REQUIRED, an agent of the owner publishes', async () => {
+    assert(agentMcp !== null, 'agent fixture failed');
+    const anon = await callTool(anonMcp, 'aimeat_datapackage_publish', pkgBody(`anon-mcp-pkg-${s3e}`));
+    assert(anon.offered && anon.isError && /AUTH_REQUIRED/.test(anon.text), `minted token over MCP: ${anon.text.slice(0, 200)}`);
+    const own = await callTool(agentMcp!, 'aimeat_datapackage_publish', pkgBody(`agent-mcp-pkg-${s3e}`));
+    assert(!own.isError && typeof own.data?.package_id === 'string', `agent over MCP: ${own.text.slice(0, 200)}`);
+});
+
+await test('POST /v1/memory/copy: the minted token copies only into anonymous.*, an agent of the owner copies any public record', async () => {
+    assert(dirOwner !== null && ownerAgent !== null, 'fixtures failed');
+    const plainKey = `anon-copy-src-${s3e}`;
+    const anonKey = `anonymous.copy-src-${s3e}`;
+    for (const key of [plainKey, anonKey]) {
+        const w = await json('/v1/memory', ownerAuth({ method: 'POST', body: JSON.stringify({ key, value: { text: 'public' }, visibility: 'public' }) }));
+        assert(w.status === 201 || w.status === 200, `owner write ${key}: ${shown(w)}`);
+    }
+    // The copy keeps its default level (private): the fence is what is asked here, not the publish gate.
+    const copy = (key: string) => JSON.stringify({ source_gaii: dirOwner!.ghii, key });
+    const outside = await json('/v1/memory/copy', anonAuth({ method: 'POST', body: copy(plainKey) }));
+    assert(outside.status === 403, `minted token copy outside anonymous.*: ${shown(outside)}`);
+    const inside = await json('/v1/memory/copy', anonAuth({ method: 'POST', body: copy(anonKey) }));
+    assert(inside.status === 200 || inside.status === 202, `minted token copy into anonymous.*: ${shown(inside)}`);
+    await json(`/v1/memory/${encodeURIComponent(anonKey)}`, anonAuth({ method: 'DELETE' }));
+    const agent = await json('/v1/memory/copy', agentAuth({ method: 'POST', body: copy(plainKey) }));
+    assert(agent.status === 200 || agent.status === 202, `agent copy: ${shown(agent)}`);
+});
+
+const hook = JSON.stringify({ url: 'http://127.0.0.1:9/anon-hook' });
+await test('The shared agent\'s webhook: the minted token is 401 on set, test and delete; an agent sets its own', async () => {
+    assert(ownerAgent !== null, 'agent fixture failed');
+    const set = await json('/v1/agents/shared/webhook', anonAuth({ method: 'PUT', body: hook }));
+    const probe = await json('/v1/agents/shared/webhook/test', anonAuth({ method: 'POST', body: '{}' }));
+    const del = await json('/v1/agents/shared/webhook', anonAuth({ method: 'DELETE' }));
+    assert(isAuthRequired(set) && isAuthRequired(probe) && isAuthRequired(del), `minted token webhook: set ${shown(set)}; test ${shown(probe)}; delete ${shown(del)}`);
+    const own = await json(`/v1/agents/${ownerAgent!.name}/webhook`, agentAuth({ method: 'PUT', body: hook }));
+    assert(own.status === 200, `agent own webhook: ${shown(own)}`);
+    await json(`/v1/agents/${ownerAgent!.name}/webhook`, agentAuth({ method: 'DELETE' }));
+});
+
+await test('The shared agent\'s public card: the minted token is refused on tags and capabilities (REST and MCP), an agent sets its own', async () => {
+    assert(ownerAgent !== null && agentMcp !== null, 'agent fixture failed');
+    const caps = JSON.stringify({ technical: [{ type: 'tool', name: 'anon-guard' }], domain: ['anon-guard'] });
+    const tags = JSON.stringify({ tags: [`anon-guard-${s3e}`] });
+    const restCaps = await json('/v1/agents/shared/capabilities', anonAuth({ method: 'PUT', body: caps }));
+    const restTags = await json('/v1/agents/shared/tags', anonAuth({ method: 'PATCH', body: tags }));
+    assert(isAuthRequired(restCaps) && isAuthRequired(restTags), `minted token REST: capabilities ${shown(restCaps)}; tags ${shown(restTags)}`);
+    const mcpTags = await callTool(anonMcp, 'aimeat_agent_tags_set', { target_agent_name: 'shared', tags: [`anon-guard-${s3e}`] });
+    const mcpCaps = await callTool(anonMcp, 'aimeat_agent_capabilities_report', { domain: ['anon-guard'] });
+    assert(mcpTags.isError && /AUTH_REQUIRED/.test(mcpTags.text) && mcpCaps.isError && /AUTH_REQUIRED/.test(mcpCaps.text),
+        `minted token MCP: tags ${mcpTags.text.slice(0, 160)}; capabilities ${mcpCaps.text.slice(0, 160)}`);
+    const ownCaps = await json(`/v1/agents/${ownerAgent!.name}/capabilities`, agentAuth({ method: 'PUT', body: caps }));
+    const ownTags = await json(`/v1/agents/${ownerAgent!.name}/tags`, agentAuth({ method: 'PATCH', body: tags }));
+    assert(ownCaps.status === 200 && ownTags.status === 200, `agent own: capabilities ${shown(ownCaps)}; tags ${shown(ownTags)}`);
+    const mcpOwn = await callTool(agentMcp!, 'aimeat_agent_tags_set', { target_agent_name: ownerAgent!.name, tags: [`anon-guard-${s3e}`] });
+    assert(!mcpOwn.isError, `agent own tags over MCP: ${mcpOwn.text.slice(0, 200)}`);
+});
+
+const skillMd = (name: string) => `---\nname: ${name}\ndescription: A guard skill for the anonymous suite. Use when testing.\n---\n\n# Guard\n\nNothing to do.\n`;
+await test('MCP aimeat_skill_publish and aimeat_skill_update: the minted token is AUTH_REQUIRED, an agent of the owner publishes', async () => {
+    assert(agentMcp !== null, 'agent fixture failed');
+    const name = `anon-guard-${s3e}`;
+    const anon = await callTool(anonMcp, 'aimeat_skill_publish', { skill_md: skillMd(name), visibility: 'members' });
+    assert(anon.isError && /AUTH_REQUIRED/.test(anon.text), `minted token publish: ${anon.text.slice(0, 200)}`);
+    const upd = await callTool(anonMcp, 'aimeat_skill_update', { name, visibility: 'members' });
+    assert(upd.isError && /AUTH_REQUIRED/.test(upd.text), `minted token update: ${upd.text.slice(0, 200)}`);
+    const own = await callTool(agentMcp!, 'aimeat_skill_publish', { skill_md: skillMd(`own-${name}`), visibility: 'members' });
+    assert(!own.isError, `agent publish: ${own.text.slice(0, 200)}`);
+    await json(`/v1/skills/own-${name}`, ownerAuth({ method: 'DELETE' }));
+});
+
+await test('The anonymous token still writes its own memory after the Phase 3e refusals', async () => {
+    const key = `anonymous.after-3e-${s3e}`;
+    const { status, body } = await json('/v1/memory', anonAuth({ method: 'POST', body: JSON.stringify({ key, value: { ok: true } }) }));
+    assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    await json(`/v1/memory/${encodeURIComponent(key)}`, anonAuth({ method: 'DELETE' }));
+});
+
 // ─── Phase 4: Anonymous Prompts ───
 console.log('\nPhase 4 — Anonymous Prompts');
 
