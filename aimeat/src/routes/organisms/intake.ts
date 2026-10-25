@@ -19,6 +19,9 @@
  *   GET    /v1/intake/:org/:ws/:formId   (PUBLIC)                 — public descriptor (title+fields), for any renderer
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
+ *   2026-10-25 — POST, GET and DELETE /v1/intake/forms refuse an agent that an organism with
+ *     agentAccess 'listed' does not admit, 403 AGENT_NOT_ADMITTED, as every /v1/organisms/:id route
+ *     does (secaudit2026oct22, intake.ts:requireWsOwner:listed-agent-gate-missing).
  *   2026-10-15 — The published submit reads the record's own write result before it answers: a
  *     record the batch did not store is 422 INTAKE_NOT_STORED instead of `ok: true`, and a
  *     submission that is not stored gives its daily slot back (feature-list audit #63). Defining and
@@ -80,6 +83,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import type { OrganismHelpers } from './shared.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { agentBarred, agentBarredMessage } from '../../services/organism-agent-access.js';
 
 /** Server-trusted intake-form config, stored at organism.{org}.w.{ws}.meta.intake.{formId}. */
 interface IntakeFormConfig {
@@ -139,6 +143,12 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
   async function requireWsOwner(req: Request, res: Response, org: string, ws: string): Promise<string | null> {
     const organism = await storage.getOrganism(org);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
+    // These routes are not under /v1/organisms/:id, so the listed-agent refusal registered there does
+    // not run for them: it is asked here, before the owner's role is (secaudit2026oct22).
+    const principal = resolveIdentity(req.auth!, config.nodeId);
+    if (agentBarred(organism, principal)) {
+      res.status(403).json(error(config.nodeId, 'AGENT_NOT_ADMITTED', agentBarredMessage(organism, principal))); return null;
+    }
     const role = await memberRole(req, organism, org);
     if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return null; }
     const entry = await findWsEntry(org, ws);
