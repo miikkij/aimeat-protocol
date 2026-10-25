@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.22.0 — 2026-10-25 — SubdomainSiteRecord gains `heldSince`: the label of a removed app is held.
+ *     Postgres 0117, SQLite safeAddColumn (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.21.0 — 2026-10-25 — SubdomainSiteRecord gains `origin` (SubdomainSiteOrigin): who chose the
  *     label, the operator or a publish. Postgres 0116, SQLite safeAddColumn (secaudit2026oct22).
  *   v1.20.0 — 2026-10-25 — AppManifest gains `intake`: the public forms a version submits to, read
@@ -553,6 +555,12 @@ export interface SubdomainSiteRecord {
    * start step could not classify (services/subdomain-site-origin-keep.ts), served as before.
    */
   origin?: SubdomainSiteOrigin | null;
+  /**
+   * When the app this label served went away (ISO time), so the label is held for that app's owner
+   * and no other owner's code is served at the origin its visitors' browser storage belongs to
+   * (services/held-app-labels.ts). Null or absent: the app is there, or the row was not swept yet.
+   */
+  heldSince?: string | null;
 }
 
 /** Who chose a subdomain label (SubdomainSiteRecord.origin). */

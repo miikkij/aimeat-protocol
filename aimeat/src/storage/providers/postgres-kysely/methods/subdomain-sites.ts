@@ -5,6 +5,8 @@
  * @description Subdomain-site mapping domain for the Postgres+Kysely backend (SubdomainSite table, keyed
  *   by unique `subdomain`). Maps a subdomain to an app or redirect target. Translated 1:1 from Prisma.
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The `heldSince` column (migration 0117) is written on create and update (null
+ *     clears it) and read back (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.1.0 — 2026-10-25 — The `origin` column (migration 0116) is written on create and update and read
  *     back, null when unset; listSubdomainSitesPage reads a keyset page in byte order (secaudit2026oct22).
  *   v1.0.0 — 2026-07-15 — Phase 5: subdomain sites on Postgres+Kysely.
@@ -17,15 +19,18 @@ import type { PostgresKyselyStorage } from '../index.js';
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
 function toSite(r: Selectable<SubdomainSite>): SubdomainSiteRecord {
-  return { subdomain: r.subdomain, kind: r.kind as SubdomainSiteRecord['kind'], target: r.target, enabled: r.enabled, createdBy: r.createdBy, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt), origin: (r.origin as SubdomainSiteRecord['origin']) ?? null };
+  return { subdomain: r.subdomain, kind: r.kind as SubdomainSiteRecord['kind'], target: r.target, enabled: r.enabled, createdBy: r.createdBy, createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt), origin: (r.origin as SubdomainSiteRecord['origin']) ?? null, heldSince: r.heldSince ?? null };
 }
+
+/** heldSince as stored: ISO text, or null. */
+const heldText = (v: string | null | undefined): string | null => (v ? new Date(v).toISOString() : null);
 
 export const subdomainSiteMethods = {
   async createSubdomainSite(this: PostgresKyselyStorage, site: SubdomainSiteRecord): Promise<SubdomainSiteRecord> {
     const [row] = await this.db.insertInto('SubdomainSite').values({
       subdomain: site.subdomain, kind: site.kind, target: site.target, enabled: site.enabled,
       createdBy: site.createdBy, createdAt: new Date(site.createdAt), updatedAt: new Date(site.updatedAt),
-      origin: site.origin ?? null,
+      origin: site.origin ?? null, heldSince: heldText(site.heldSince),
     }).returningAll().execute();
     return toSite(row);
   },
@@ -44,8 +49,9 @@ export const subdomainSiteMethods = {
     if (query.after) q = q.where(sql<boolean>`"subdomain" COLLATE "C" > ${query.after}`);
     return (await q.orderBy(sql`"subdomain" COLLATE "C"`).limit(limit).execute()).map(toSite);
   },
-  async updateSubdomainSite(this: PostgresKyselyStorage, subdomain: string, updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin'>>): Promise<SubdomainSiteRecord | null> {
+  async updateSubdomainSite(this: PostgresKyselyStorage, subdomain: string, updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin' | 'heldSince'>>): Promise<SubdomainSiteRecord | null> {
     const data: Record<string, unknown> = { updatedAt: updates.updatedAt ? new Date(updates.updatedAt) : new Date() };
+    if (updates.heldSince !== undefined) data.heldSince = heldText(updates.heldSince);
     if (updates.kind !== undefined) data.kind = updates.kind;
     if (updates.target !== undefined) data.target = updates.target;
     if (updates.enabled !== undefined) data.enabled = updates.enabled;

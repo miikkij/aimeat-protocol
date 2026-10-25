@@ -3,7 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description How rows that nobody uses any more go away, on both providers: an MCP client
- *   registration that no sign-in finished (secaudit2026oct22, dcr-unbounded-client-records). Each case
+ *   registration that no sign-in finished (secaudit2026oct22, dcr-unbounded-client-records), and the
+ *   held address of a removed app (app-label-recycled-after-delete). Each case
  *   runs on every configured provider and, where both run, requires the same answer.
  *
  *   A run without DATABASE_URL checks SQLite only, and a configured Postgres that does not connect
@@ -11,6 +12,9 @@
  * @structure provs · onEach / same · cases
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-conformance-lifecycle.test.ts
  * @version-history
+ *   2026-10-25 — The held address of a removed app: a package removal keeps the row, another owner
+ *     gets another label, the owner gets it back, and the daily sweep releases by age and by the
+ *     per-owner cap (secaudit2026oct22, app-label-recycled-after-delete).
  *   2026-10-25 — Initial (secaudit2026oct22): deleteUnusedOAuthClients and the daily MCP client cleanup.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -20,6 +24,9 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { runMcpClientCleanup } from '../../src/services/mcp-client-cleanup.js';
+import { deleteComponent } from '../../src/services/component-registrar.js';
+import { ensureAppSubdomain } from '../../src/routes/subdomains.js';
+import { sweepHeldAppLabels } from '../../src/services/held-app-labels.js';
 
 const SQLITE_PATH = `./test/.conformance-lifecycle-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
@@ -93,5 +100,56 @@ describe('MCP client registrations nobody uses (secaudit2026oct22, dcr-unbounded
     expect(v.kept).toEqual([false, true, true, true]);
     expect(v.direct).toBe(true);
     expect(v.left).toEqual([true, true, false]);
+  });
+});
+
+describe('the address of a removed app is held (secaudit2026oct22, app-label-recycled-after-delete)', () => {
+  const site = (s: Storage, subdomain: string, target: string, heldSince: string | null = null) => {
+    const now = new Date().toISOString();
+    return s.createSubdomainSite({ subdomain, kind: 'app', target, enabled: true, createdBy: 'x@node', createdAt: now, updatedAt: now, origin: 'publisher', heldSince });
+  };
+  const labelsCfg = (over: Record<string, unknown> = {}) => ({ appHost: 'apps.example.test', appHeldLabelDays: 90, appHeldLabelsPerOwner: 2, nodeId: 'node', ...over }) as unknown as AimeatConfig;
+
+  it('a package removal keeps the row as a held name, and the next publisher of the same file name gets another address', async () => {
+    const r = await onEach(async (s, p) => {
+      const owner = `own${p}`;
+      const label = `notes${p}`;
+      await site(s, label, `${owner}/${label}.html`);
+      await deleteComponent(s, 'app', `${label}.html`, `${owner}@node`);
+      const held = await s.getSubdomainSite(label);
+      const other = await ensureAppSubdomain(s, labelsCfg(), `third${p}`, `${label}.html`);
+      // The first owner publishes the same app again: the held address is theirs, and no longer held.
+      const back = await ensureAppSubdomain(s, labelsCfg(), owner, `${label}.html`);
+      const after = await s.getSubdomainSite(label);
+      return { kept: !!held, heldSet: !!held?.heldSince, other: other !== label, back: back === label, cleared: after?.heldSince ?? null };
+    });
+    expect(same(r)).toEqual({ kept: true, heldSet: true, other: true, back: true, cleared: null });
+  });
+
+  it('the daily sweep releases a held address past the days, starts the clock on an old unmarked one, and keeps an owner to the most held addresses', async () => {
+    const r = await onEach(async (s, run) => {
+      // A suffix of this case's own: the case above leaves labels that end in `run` too.
+      const p = `${run}z`;
+      const owner = `cap${p}`;
+      await site(s, `old${p}`, `${owner}/old.html`, ago(100));
+      await site(s, `fresh${p}`, `${owner}/fresh.html`, ago(10));
+      await site(s, `older${p}`, `${owner}/older.html`, ago(50));
+      await site(s, `newest${p}`, `${owner}/newest.html`, ago(1));
+      await site(s, `unmarked${p}`, `nobody${p}/gone.html`);
+      const off = await sweepHeldAppLabels(s, labelsCfg({ appHeldLabelDays: 0, appHeldLabelsPerOwner: 0 }));
+      const offLeft = (await s.listSubdomainSites()).filter(x => x.subdomain.endsWith(p)).length;
+      const out = await sweepHeldAppLabels(s, labelsCfg());
+      const bare = (labels: string[]) => labels.filter(l => l.endsWith(p)).map(l => l.slice(0, -p.length)).sort();
+      const left = bare((await s.listSubdomainSites()).map(x => x.subdomain));
+      const unmarked = await s.getSubdomainSite(`unmarked${p}`);
+      return { offReleased: bare(off.released).length, offLeft, released: bare(out.released), left, unmarkedHeld: !!unmarked?.heldSince };
+    });
+    const v = same(r);
+    expect(v.offReleased).toBe(0);
+    expect(v.offLeft).toBe(5);
+    // old is past 90 days; of the three left the cap of 2 releases the one held longest (older).
+    expect(v.released).toEqual(['old', 'older']);
+    expect(v.left).toEqual(['fresh', 'newest', 'unmarked']);
+    expect(v.unmarkedHeld).toBe(true);
   });
 });

@@ -13,6 +13,7 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-10-25 — appHeldLabelDays and appHeldLabelsPerOwner (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — companySmtpPrivateHosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — deviceAuthEmailLimit and deviceAuthEmailMax (secaudit2026oct22,
  *     device-authorize-email-owner-oracle).
@@ -44,6 +45,17 @@ export interface NodeLimitsConfig {
    * comma separated, default empty.
    */
   companySmtpPrivateHosts: string[];
+  /**
+   * Days a removed app's own address (its per-app label) stays held for its owner before the daily
+   * core job held-label-release releases it for anyone (services/held-app-labels.ts).
+   * AIMEAT_APP_HELD_LABEL_DAYS, default 90; 0 holds it until the operator releases it.
+   */
+  appHeldLabelDays: number;
+  /**
+   * The most held addresses one owner keeps; past it the one held longest is released first.
+   * AIMEAT_APP_HELD_LABELS_PER_OWNER, default 20; 0 is no limit.
+   */
+  appHeldLabelsPerOwner: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -58,5 +70,7 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     deviceAuthEmailLimit: env.AIMEAT_DEVICE_AUTHORIZE_EMAIL_LIMIT !== 'false',
     deviceAuthEmailMax: Math.max(1, wholeOr(env.AIMEAT_DEVICE_AUTHORIZE_EMAIL_MAX, 20)),
     companySmtpPrivateHosts: (env.AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    appHeldLabelDays: wholeOr(env.AIMEAT_APP_HELD_LABEL_DAYS, 90),
+    appHeldLabelsPerOwner: wholeOr(env.AIMEAT_APP_HELD_LABELS_PER_OWNER, 20),
   };
 }

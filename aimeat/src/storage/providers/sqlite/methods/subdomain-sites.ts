@@ -8,6 +8,8 @@
  * @structure subdomainSiteMethods
  * @usage Object.assign(SqliteStorage.prototype, subdomainSiteMethods) in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The `heldSince` column is written on create and update (null clears it) and
+ *     read back, mirroring Postgres 0117 (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.1.0 — 2026-10-25 — The `origin` column is written on create and update and read back (null when
  *     unset), mirroring Postgres 0116; listSubdomainSitesPage reads a keyset page (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
@@ -23,11 +25,12 @@ export const subdomainSiteMethods = {
 
   async createSubdomainSite(this: SqliteStorage, site: SubdomainSiteRecord): Promise<SubdomainSiteRecord> {
     this.db.prepare(
-      `INSERT INTO subdomain_sites (subdomain, kind, target, enabled, createdBy, createdAt, updatedAt, origin)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO subdomain_sites (subdomain, kind, target, enabled, createdBy, createdAt, updatedAt, origin, heldSince)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       site.subdomain, site.kind, site.target, site.enabled ? 1 : 0,
       site.createdBy, site.createdAt, site.updatedAt, site.origin ?? null,
+      site.heldSince ? new Date(site.heldSince).toISOString() : null,
     );
     return site;
   },
@@ -55,10 +58,11 @@ export const subdomainSiteMethods = {
 
   async updateSubdomainSite(this: SqliteStorage,
     subdomain: string,
-    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin'>>,
+    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin' | 'heldSince'>>,
   ): Promise<SubdomainSiteRecord | null> {
     const sets: string[] = [];
     const params: unknown[] = [];
+    if (updates.heldSince !== undefined) { sets.push('heldSince = ?'); params.push(updates.heldSince ? new Date(updates.heldSince).toISOString() : null); }
     if (updates.kind !== undefined) { sets.push('kind = ?'); params.push(updates.kind); }
     if (updates.target !== undefined) { sets.push('target = ?'); params.push(updates.target); }
     if (updates.enabled !== undefined) { sets.push('enabled = ?'); params.push(updates.enabled ? 1 : 0); }
@@ -87,6 +91,7 @@ export const subdomainSiteMethods = {
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
       origin: (row.origin as SubdomainSiteRecord['origin']) ?? null,
+      heldSince: (row.heldSince as string | null) ?? null,
     };
   },
 };

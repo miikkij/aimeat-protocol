@@ -858,6 +858,13 @@
       "refuseRestrictedWhy": "Se ei voi olla omassa verkko-osoitteessaan. Tarjoile se pääsivustolta.",
       "deleteLead": "Osoite lakkaa vastaamasta heti. Sovellus itse pysyy julkaistuna ja on yhä saatavilla pääsivustolta.",
       "deleteAppNote": "Kun sovellus avataan uudestaan, se saa oman osoitteen automaattisesti. Poisto ei siis pidä sovellusta poissa verkosta, mutta pois päältä kytkeminen pitää.",
+      "markHeld": "varattu",
+      "heldSub": "Sovellus on poistettu. Osoite on varattu sen omistajalle {date} alkaen, joten kenenkään muun sovellus ei saa sitä.",
+      "filterHeld": "varatut",
+      "release": "Vapauta",
+      "releaseTitle": "Vapautetaanko tämä osoite?",
+      "releaseLead": "Osoite on varattu, koska sovellus, jota se palveli, poistettiin. Sen käyttäjien selaimissa voi yhä olla tähän osoitteeseen tallennettua tietoa. Kun vapautat osoitteen, seuraava samalla tiedostonimellä julkaistu sovellus voi saada sen, myös toisen omistajan sovellus, ja lukea sen tiedon.",
+      "releaseHint": "Omistaja saa osoitteen takaisin julkaisemalla saman sovelluksen uudelleen vain niin kauan kuin osoite on varattu.",
       "deleteTypeLabel": "Vahvista kirjoittamalla nimi",
       "deleteHint": "Jokainen, joka on linkittänyt tähän osoitteeseen, saa tämän jälkeen tyhjää.",
       "emptyTitle": "Ei osoitteita vielä",
@@ -13351,6 +13358,8 @@
     "delete": "Poista",
     "themes": "Teemat ja tyylit",
     "cfgDesc_apps_audit_keep_default": "Montako uusinta merkintää kunkin sovelluksen auditointiloki säilyttää, kun omistaja ei ole asettanut omaa rajaa. 0 säilyttää kaikki ja siirtää vanhat vuoden arkistoon; muu luku poistaa vanhemmat merkinnät.",
+    "cfgDesc_apps_held_label_days": "Montako päivää poistetun sovelluksen oma osoite pysyy varattuna sen omistajalle. Näin kenenkään muun sovellusta ei näytetä osoitteessa, jossa sen käyttäjien selaintiedot ovat. 0 pitää osoitteen varattuna, kunnes vapautat sen Alidomainit-sivulla.",
+    "cfgDesc_apps_held_labels_per_owner": "Montako poistettujen sovellusten varattua osoitetta yksi omistaja voi pitää. Kun raja ylittyy, pisimpään varattuna ollut vapautetaan ensin. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Kuinka monta sekuntia omalla avainparilla tunnistautuvan agentin token on voimassa. Kun se vanhenee, agentti allekirjoittaa uuden pyynnön ja saa uuden tokenin.",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "Kuinka monta sekuntia agenttien lisäys- tai siirtotarjous on voimassa sen jälkeen, kun omistaja painaa painiketta. Liittimen on vastattava tämän ajan kuluessa, ja tarjous toimii kerran.",
     "cfgDesc_auth_app_origin_sign_in_refuse": "Estää kirjautumisen ja tilin luomisen sovelluksesta, jotta sovellus ei koskaan saa ihmisen omaa istuntoa. Pois päältä: jokainen tällainen yritys kirjataan lokiin ja sallitaan. Kytke tämä päälle, kun lokissa ei enää näy yrityksiä.",
@@ -13407,6 +13416,8 @@
     "cfgDesc_decide_laya_key_configured": "Onko valmiin laya-päätösmallin bearer-avain asetettu. Vain luku; itse arvoa ei näytetä koskaan.",
     "cfgDesc_decide_von_key_configured": "Onko valmiin von-päätösmallin bearer-avain asetettu. Vain luku; itse arvoa ei näytetä koskaan.",
     "cfg_apps_audit_keep_default": "Sovelluksen auditointilokin pituus",
+    "cfg_apps_held_label_days": "Poistetun sovelluksen osoite varattuna (päivää)",
+    "cfg_apps_held_labels_per_owner": "Varatut osoitteet omistajaa kohden",
     "cfg_auth_agent_v2_token_ttl_seconds": "Agentin tokenin voimassaolo (s)",
     "cfg_auth_app_origin_sign_in_refuse": "Estä kirjautuminen sovelluksesta",
     "cfg_auth_agent_enrolment_grant_ttl_seconds": "Agentin lisäystarjouksen voimassaolo (s)",
@@ -26270,6 +26281,26 @@
       }
     },
     "config": {
+      "apps": {
+        "held_label_days": {
+          "title": "Poistetun sovelluksen osoite varattuna (päivää)",
+          "short": "Montako päivää poistetun sovelluksen oma osoite pysyy varattuna sen omistajalle. 0 pitää sen varattuna, kunnes vapautat sen. Oletus on 90.",
+          "what": "Jokainen sovellus saa oman osoitteen, kuten notes.apps.example.com. Se, mitä sovelluksen käyttäjät tallensivat selaimiinsa (sovelluksen omat tiedot, tallennettu kirjautuminen), kuuluu tälle osoitteelle. Kun omistaja poistaa sovelluksen tai sovellus poistuu paketin mukana, osoite varataan samalle omistajalle: kenenkään muun sovellus ei saa sitä, ja omistaja saa sen takaisin julkaisemalla saman sovelluksen uudelleen. Siivous vapauttaa varatun osoitteen joka päivä klo 5.41, kun tämä määrä päiviä on kulunut. Sen jälkeen seuraava samalla tiedostonimellä julkaistu sovellus voi saada sen.",
+          "range": "Kokonaisluku päivinä, vähintään 0. Oletus on 90. 0 pitää osoitteen varattuna, kunnes vapautat sen Alidomainit-sivulla.",
+          "low": "Pienempi: osoite vapautuu muille nopeammin, ja toisen omistajan sovellus voi lukea vanhan sovelluksen käyttäjien tallentamat tiedot aiemmin.",
+          "high": "Suurempi: omistajalla on pidempään aikaa tuoda sovellus takaisin, ja osoite on pidempään käyttämättä.",
+          "tip": "Pidä muutama kuukausi. Selain säilyttää tallennetut tiedot, kunnes käyttäjä tyhjentää ne, joten lyhyt varaus suojaa vähän."
+        },
+        "held_labels_per_owner": {
+          "title": "Varatut osoitteet omistajaa kohden",
+          "short": "Montako poistettujen sovellusten varattua osoitetta yksi omistaja voi pitää. 0 tarkoittaa, että rajaa ei ole. Oletus on 20.",
+          "what": "Ilman rajaa yksi omistaja voisi viedä monta osoitetta julkaisemalla ja poistamalla sovelluksia. Päivittäinen siivous pitää kunkin omistajan varatut osoitteet tässä määrässä ja vapauttaa ensin sen, joka on ollut varattuna pisimpään. Olemassa olevan sovelluksen osoitetta ei lasketa koskaan.",
+          "range": "Kokonaisluku, vähintään 0. Oletus on 20. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: kullekin omistajalle varataan vähemmän osoitteita, ja vanhat vapautuvat nopeammin.",
+          "high": "Suurempi: omistaja, joka poistaa monta sovellusta, pitää kaikki osoitteensa koko varauksen ajan.",
+          "tip": "20 riittää omistajalle, joka siivoaa sovellusluetteloaan. Laske lukua, jos näet Alidomainit-sivulla yhden omistajan pitävän monta osoitetta."
+        }
+      },
       "email": {
         "company_smtp_private_hosts": {
           "title": "Yritysten postipalvelimet sisäverkossa",
