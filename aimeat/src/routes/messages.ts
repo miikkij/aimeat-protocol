@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-10-25 -- GET /v1/messages/overview takes `?compact=true`: previews and agent names only, for a list.
  *   2026-10-21 -- Group chat: /v1/messages/groups/* is registered here (./message-groups.ts).
  *   2026-10-17 -- POST /v1/messages/as-owner is registered here (./messages-as-owner.ts).
  *   2026-10-15 -- POST /v1/messages checks interactive answers against the question they reply to
@@ -494,11 +495,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   /* ── GET /v1/messages/overview — the whole inbox mount in ONE call (requests + conversations +
    * important-flags + tracked-responses + agents + groups), composed in one read scope by
    * MessagesInboxService. The individual list endpoints stay for interactive re-fetches.
-   * `?unread=true` and `?limit=` narrow the conversation list for a chat; without them it is whole. ── */
+   * `?unread=true` and `?limit=` narrow the conversation list for a chat; without them it is whole.
+   * `?compact=true` is the list's shape: previews instead of whole bodies, agents by id and names. ── */
   router.get('/v1/messages/overview', requireAuth(), requireLocalSession(), requireOwnerMailboxRead(config.nodeId), async (req, res) => {
     const limitRaw = parseInt(String(req.query.limit ?? ''), 10);
     res.json(success(config.nodeId, await readOwnerOverview(storage, readerOf(req), {
       unreadOnly: req.query.unread === 'true',
+      compact: req.query.compact === 'true',
       ...(Number.isFinite(limitRaw) ? { limit: Math.min(200, Math.max(1, limitRaw)) } : {}),
     })));
   });

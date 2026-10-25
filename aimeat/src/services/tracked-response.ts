@@ -19,6 +19,9 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.5.1 — 2026-10-25 — listTrackedResponses and evaluateOwnerTrackedResponses read under the contract key prefix. Each read every
+ *     memory record of the account and filtered by type, which took 3.3–3.8 s on an aimeat.io account
+ *     with three contracts and held GET /v1/messages/overview (the Messages page mount) to the same time.
  *   v1.5.0 — 2026-10-14 — A contract acts for the account whose memory holds it (bindToStore): the
  *     account and the sender are the stored row's owner, the recipient comes from that account's own
  *     stored message, and the watched key is read only from that account. The node took all three
@@ -382,7 +385,7 @@ export async function reconcileTrackedResponses(ctx: DeliveryCtx): Promise<{ eva
 
 /** Evaluate the caller's OWN due contracts now (manual trigger / test hook). */
 export async function evaluateOwnerTrackedResponses(ctx: DeliveryCtx, ownerGaii: string): Promise<{ evaluated: number }> {
-  const items = await ctx.storage.listMemory(ownerGaii);
+  const items = await ctx.storage.listMemory(ownerGaii, { prefix: CONTRACT_PREFIX });
   let evaluated = 0;
   for (const rec of items) {
     const c = rec.value as TrackedResponse | null;
@@ -401,7 +404,9 @@ export async function getTrackedResponse(storage: Storage, ownerGaii: string, id
 }
 
 export async function listTrackedResponses(storage: Storage, ownerGaii: string, state?: TrackedResponseState): Promise<TrackedResponse[]> {
-  const items = await storage.listMemory(ownerGaii);
+  // Under the contract prefix only: an account holds thousands of other records, and reading them all
+  // to keep three was the Messages page's whole load time.
+  const items = await storage.listMemory(ownerGaii, { prefix: CONTRACT_PREFIX });
   return items
     .map(i => i.value as TrackedResponse | null)
     .filter((c): c is TrackedResponse => !!c && c.type === 'tracked-response' && (!state || c.state === state))
