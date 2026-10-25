@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.28.0 — 2026-10-25 — `agent-goals.` is reserved and service-owned: the goals service is its one
+ *     writer (services/goals/, session cc-jouni-goals).
  *   v1.27.0 — 2026-10-22 — `commerce.hold.`, `commerce.hold-in.` and `commerce.benefit.` are service-owned:
  *     the hold book and the beneficiary book are their writers and read them as fact, and an owner or
  *     agent writing them through a memory route made the hold book call another seller's rail and put a
@@ -176,6 +178,12 @@ export const RESERVED_OWNER_KEY_PREFIXES = [
   // organism; the owner sets and clears it through /v1/agents/{name}/workplace. Also in
   // SERVICE_OWNED_KEY_PREFIXES below, so no memory route writes, restores or deletes it for anyone.
   'agent-workplace.',
+  // 2026-10-25: `agent-goals.<id>` is an agent goal (services/goals/). The node ACTS on it: a work in it
+  // becomes a task for whichever agent takes it, a reaction in it starts the next work, and its
+  // coordinator is woken by it. A granted app or an agent that could write the key could hand itself
+  // work, skip the chain limit or mark a person's approval given. Only the goals service writes it,
+  // server-side; everyone reads and changes goals through /v1/goals and the aimeat_goal_* tools.
+  'agent-goals.',
   // `ai.jobs.<id>` is a live AI job and `ai.jobs.log.<day>` is the record of what the finished ones
   // cost. Both are read by the server as fact: a job record says which model to call, whose key
   // pays, what prompt to send and which key to write the answer to. A granted app that could write
@@ -364,7 +372,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * into a provider's payout. The two books are their writers, straight to storage; people read them
  * through /v1/commerce/holds and /v1/commerce/beneficiary.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -376,6 +384,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['commerce.subscription.', 'a subscription, and only the subscription service writes it. Use /v1/commerce/subscriptions.'],
   ['identity.adult.', 'an adult verification, and only the verification service writes it.'],
   ['agent-workplace.', 'an agent\'s workplace, set through /v1/agents/{name}/workplace.'],
+  ['agent-goals.', 'an agent goal, and only the goals service writes it. Read and change goals with /v1/goals or the aimeat_goal_set, aimeat_goal_get, aimeat_goal_work and aimeat_goal_answer MCP tools.'],
   ['scope-use.', 'a record of permission use, and only the node writes it.'],
 ];
 

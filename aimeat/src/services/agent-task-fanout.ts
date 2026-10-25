@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.8.0 — 2026-10-25 — A task that does a work of an agent goal (workTrackingCode goal:…) settles
+ *     that work on done, failed and declined, and the goal moves on (services/goals/goals-hooks.ts).
  *   v1.7.0 — 2026-10-20 — The public feed entry for a completed task names the public deliverable
  *     instead of the task title, and it is written only for a deliverable the task produced
  *     (deliverableOfTask). The title is the task creator's private text, the assigned agent may
@@ -82,6 +84,7 @@ import { recordAccountEvent } from './account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { onUcpTaskDone } from '../commerce/ucp-guest-checkout.js';
 import { shareFinishedWork } from './agent-workplace.js';
+import { onGoalTaskSettled } from './goals/goals-hooks.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
 
@@ -178,6 +181,9 @@ export async function afterTaskCompleted(
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
         .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
 
+    // If this task does a work of an agent goal, the goal records the result and moves on.
+    void onGoalTaskSettled(deps, { ...(updated ?? task), deliverableKey: deliverableKey ?? updated?.deliverableKey ?? task.deliverableKey }, 'done', message);
+
     // A fulfilment task of an order an AI platform placed over UCP: its line is delivered, and the
     // platform hears it in the order webhook (commerce/ucp-guest-checkout.ts). Returns at once for
     // any other task, and never throws.
@@ -218,6 +224,7 @@ export async function afterTaskFailed(
     }, deps.config);
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
         .catch(e => logger.error('workflow advance on task fail failed', { taskId: task.id, error: String(e) }));
+    void onGoalTaskSettled(deps, task, 'failed', '');
 }
 
 /**
@@ -502,5 +509,6 @@ export async function declineTask(
     // The step a workflow dispatched this task for has ended; the engine judges it by its output.
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'declined')
         .catch(e => logger.error('workflow advance on task decline failed', { taskId: task.id, error: String(e) }));
+    void onGoalTaskSettled(deps, task, 'declined', why);
     return { ok: true, task: updated ?? task };
 }

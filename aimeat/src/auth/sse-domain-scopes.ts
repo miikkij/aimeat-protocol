@@ -109,6 +109,8 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   'agent-capabilities': 'task:read',
   'agent-directives': 'task:read',
   'agent-onboarding': 'task:read',
+  // The owner's agent goals (services/goals/): read with the same word as the tasks they become.
+  goals: 'task:read',
 
   // Automation
   workflows: 'workflow:read',

@@ -13,6 +13,7 @@
  *   v1.11.0 -- 2026-10-18 -- accountRightsCliTools: adult status, subscriptions, provenance embed (Comicland v3).
  *   v1.10.0 -- 2026-10-18 -- publishCliTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   v1.9.0 -- 2026-10-17 -- exposureCliTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
+ *   v1.10.1 -- 2026-10-25 -- goalCliTools: aimeat_goal_get, _set, _work and _answer (agent goals).
  *   v1.9.0 -- 2026-10-24 -- complianceAgreementCliTools: aimeat_compliance_agreement (plan doc-mvmr4i2wdk0p).
  *   v1.8.0 -- 2026-10-12 -- contactCliTools, companyCliTools, beneficiaryCliTools, exchangeRunCliTools,
  *     organismOwnerCliTools and notifyUsageCliTools: the 30 agent tools that had a handler on the
@@ -59,6 +60,7 @@ import { themeCliTools } from './tool-call-defs-themes.js';
 import { visibilityCliTools } from './tool-call-defs-visibility.js';
 import { docsignCliTools } from './tool-call-defs-docsign.js';
 import { complianceAgreementCliTools } from './tool-call-defs-compliance-agreements.js';
+import { goalCliTools } from './tool-call-defs-goals.js';
 import { contactCliTools } from './tool-call-defs-contacts.js';
 import { companyCliTools } from './tool-call-defs-companies.js';
 import { beneficiaryCliTools } from './tool-call-defs-beneficiaries.js';
@@ -109,6 +111,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...visibilityCliTools,
     ...docsignCliTools,
     ...complianceAgreementCliTools,
+    ...goalCliTools,
     ...contactCliTools,
     ...companyCliTools,
     ...beneficiaryCliTools,

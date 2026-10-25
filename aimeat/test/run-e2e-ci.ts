@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
  *   2026-10-24 -- e2e-cortex-board-ownership.ts joins the list (not the guard tier): a cortex activation answers 409 for a board id another account holds, and a deactivation deletes only the installing account's boards (secaudit2026oct22).
@@ -986,6 +987,9 @@ const ALL_SUITES = [
     // signing in the AIMEAT app, a returned PDF and scan, an announced change, end and deletion, and
     // who may do what (plan doc-mvmr4i2wdk0p).
     'test/e2e-compliance-agreements.ts',
+    // Agent goals: open work two agents race for, the chain and its limit, a reaction, a person's step,
+    // asking a result again, pause, and the refusals (session cc-jouni-goals).
+    'test/e2e-goals.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
