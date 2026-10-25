@@ -13,6 +13,8 @@
  *   the queue, a refused model label is an outcome, and the drain survives a bad item, retries it
  *   three times, and stops at the node's cap.
  * @version-history
+ *   v1.3.1 — 2026-10-25 — Each test starts with fresh rule budgets (resetRegexBudgets), since keyword
+ *     rule time now counts against them (secaudit2026oct22).
  *   v1.3.0 — 2026-09-30 — No default label hides from AI (option B): the hidden test sets the node
  *     policy to hide the highest label first.
  *   v1.2.0 — 2026-09-29 — The review fixes (TARGET-082 review, findings 2, 3 and 6).
@@ -28,7 +30,7 @@ vi.mock('../../src/services/ai/completion.js', () => ({ completeForOwner: (...a:
 
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { classifyText, drainQueue, enqueue, readQueue, type QueuedItem } from '../../src/services/classification/classifier.js';
-import { matchRules } from '../../src/services/classification/detect.js';
+import { matchRules, resetRegexBudgets } from '../../src/services/classification/detect.js';
 import { defaultPolicy, type ClassificationPolicy } from '../../src/services/classification/defaults.js';
 import { memoryTarget, readContentLabel, setLabel, type LabelActor } from '../../src/services/classification/labels.js';
 import { writePolicy } from '../../src/services/classification/policy-admin.js';
@@ -54,6 +56,9 @@ describe('the Content Classifier', () => {
     deps = { storage, config: { classificationMode: 'all', nodeId: N, decideEnabled: true } as unknown as AimeatConfig };
     decideMock.mockReset();
     completeMock.mockReset();
+    // Keyword rules count against the per-minute rule budgets since secaudit2026oct22; each test
+    // starts with a fresh minute so one test's rule time cannot skip another's rules.
+    resetRegexBudgets();
   });
   afterEach(() => storage.close());
 
