@@ -18,6 +18,8 @@
  *   - SUPERSEDED: old file → the file that replaces it
  *   - runMigrations(pool): apply every file not applied yet, in lexical order
  * @version-history
+ *   v1.2.1 — 2026-10-25 — The `superseded_by` column is added only when it is missing: the ALTER's lock
+ *     waited behind the nightly pg_dump and a restart during the dump failed to boot.
  *   v1.2.0 — 2026-10-16 — A migration's transaction lifts the pool's statement and lock limits for
  *     itself (QA audit E6-07).
  *   v1.1.0 — 2026-09-26 — SUPERSEDED, and the `superseded_by` column: 0085 is recorded as replaced by
@@ -47,8 +49,14 @@ const RECORD_SUPERSEDED = 'INSERT INTO "_kysely_migrations"(name, superseded_by)
 /** Apply every not-yet-applied migration file in lexical order, each in its own transaction. */
 export async function runMigrations(pool: pg.Pool): Promise<void> {
   await pool.query('CREATE TABLE IF NOT EXISTS "_kysely_migrations" (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())');
-  // Set on a file that never ran, to the file that replaced it.
-  await pool.query('ALTER TABLE "_kysely_migrations" ADD COLUMN IF NOT EXISTS superseded_by text');
+  // Set on a file that never ran, to the file that replaced it. ALTER TABLE takes its ACCESS EXCLUSIVE
+  // lock before IF NOT EXISTS is checked, so it waits behind any reader of the table (the nightly
+  // pg_dump holds one for minutes) and the boot dies on the pool's lock_timeout. It runs only when
+  // the column is missing.
+  const hasSupersededBy = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '_kysely_migrations' AND column_name = 'superseded_by'",
+  );
+  if (hasSupersededBy.rowCount === 0) await pool.query('ALTER TABLE "_kysely_migrations" ADD COLUMN IF NOT EXISTS superseded_by text');
   const applied = new Set((await pool.query<{ name: string }>('SELECT name FROM "_kysely_migrations"')).rows.map(r => r.name));
   const files = readdirSync(MIGRATIONS_DIR).filter(f => f.endsWith('.sql')).sort();
   for (const file of files) {
