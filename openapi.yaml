@@ -196,6 +196,8 @@ tags:
     description: OpenRouter AI integration for automated generator steps. Owner-only endpoints.
   - name: Agent Tasks
     description: Task queue for AI agents — create, track, and complete structured work items
+  - name: Agent Goals
+    description: A goal the owner gives their agents; agents take its open work, leave the next work for each other, and the person answers the steps that wait for them
   - name: Agent Integration
     description: Agent inbox, integration kit, and long-poll task endpoints
   - name: Agent Directives
@@ -23515,6 +23517,312 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/goals:
+    get:
+      operationId: listGoals
+      summary: The owner's agent goals, short
+      tags: [Agent Goals]
+      description: >
+        Every goal the owner gave their agents, newest change first: its status, how far it is (works
+        done, running, open, waiting for the person), who works on it now, what was spent and when it
+        ends. `status=running` lists the goals that are neither done, stopped nor expired. The owner,
+        or an agent of the owner holding `task:read`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [running, active, paused, done, stopped, expired] } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createGoal
+      summary: Give the owner's agents a goal
+      tags: [Agent Goals]
+      description: >
+        Makes a goal and moves it at once: a work named to an agent becomes its task, open work is
+        offered to every agent whose tags hold a skill it wants (the first free one takes it after a
+        minute), a person's step tells the owner. With no works, a single-agent goal is one open work:
+        the whole goal for whoever takes it. Fields: statement, title, done_when, done_kind
+        (human|check|all-done), mode (single|coordinator|plan), coordinator, substitute, permissions,
+        agents, skills, any_agent, limits { usd, hops, tasks_per_day, fix_rounds, claim_minutes },
+        ends_at, workplace, plan_workflow_id, works, reactions, rounds, parent_goal_id, reason.
+        The owner, or an agent of the owner holding `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [statement]
+              properties:
+                statement: { type: string }
+                title: { type: string }
+                done_when: { type: string }
+                done_kind: { type: string, enum: [human, check, all-done] }
+                mode: { type: string, enum: [single, coordinator, plan] }
+                coordinator: { type: string, nullable: true }
+                agents: { type: array, items: { type: string } }
+                skills: { type: array, items: { type: string } }
+                any_agent: { type: boolean }
+                limits: { type: object }
+                ends_at: { type: string, format: date-time, nullable: true }
+                works: { type: array, items: { type: object } }
+                reactions: { type: array, items: { type: object } }
+                rounds: { type: object, nullable: true }
+                parent_goal_id: { type: string }
+                reason: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/goals/waiting:
+    get:
+      operationId: listGoalsWaiting
+      summary: What waits for the person across the goals
+      tags: [Agent Goals]
+      description: >
+        Every step of a running goal that waits for the person (choose, approve, answer, do, provide)
+        and every open work no agent took in fifteen minutes, newest first. The HOME "Waiting for you"
+        reads this. `task:read`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/goals/available:
+    get:
+      operationId: listGoalWorkAvailable
+      summary: Open work the calling agent may take
+      tags: [Agent Goals]
+      description: >
+        For an agent: the open works across its owner's active goals that it may take (the goal lets it
+        take part and its tags hold a skill the work wants). Take one with
+        POST /v1/goals/{id}/works/{workId}/actions/claim. `task:read`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/goals/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getGoal
+      summary: One goal, whole
+      tags: [Agent Goals]
+      description: >
+        The goal with its works (status, who took it, result, cost), material, reactions, rounds, the
+        log of what happened and why, and its changes. `task:read`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      operationId: updateGoal
+      summary: Change a goal (preview=true answers what it would end)
+      tags: [Agent Goals]
+      description: >
+        The owner or the goal's coordinator changes it; the coordinator only within what the goal's
+        permissions allow. With `preview: true` nothing changes and the answer names the taken works the
+        change would end and what they cost so far. `this_round_only` makes a change for the current
+        round of a round goal. Taken works the change ends are told so in their tasks. `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { preview: { type: boolean }, this_round_only: { type: boolean }, reason: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteGoal
+      summary: Remove a finished goal
+      tags: [Agent Goals]
+      description: The owner in person removes a goal that is done, stopped or expired. `task:write`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/goals/{id}/actions/{action}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [pause, resume, stop, done, renew, start_round] } }
+    post:
+      operationId: goalAction
+      summary: Pause, resume, stop, finish, renew a goal, or start its round
+      tags: [Agent Goals]
+      description: >
+        pause: agents save where they are and nothing new starts; resume; stop: running work finishes
+        and nothing new starts; done: the goal is reached (the owner, or the coordinator when the goal
+        is done by a check); renew: a round goal runs 90 more days; start_round: the round template's
+        works start now. `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { reason: { type: string } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/goals/{id}/material:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: addGoalMaterial
+      summary: Add material every agent in the goal reads
+      tags: [Agent Goals]
+      description: >
+        A file (its storage key), a record (its key), a link or a text. Agents working in the goal are
+        told at once. `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, ref]
+              properties:
+                kind: { type: string, enum: [file, memory, link, text] }
+                ref: { type: string }
+                title: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/goals/{id}/works:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: addGoalWork
+      summary: Add a work, or leave the next work for another agent
+      tags: [Agent Goals]
+      description: >
+        action "add" (the owner or the coordinator; an agent's work or a person's step) or "leave" (an
+        agent working in the goal hands the next work to another agent: never to itself, and the chain
+        is counted; past the goal's limit the work waits for the owner's yes). `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [work]
+              properties:
+                action: { type: string, enum: [add, leave] }
+                work: { type: object }
+                reason: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/goals/{id}/works/{workId}/actions/{action}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: workId, in: path, required: true, schema: { type: string } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [claim, release, reroute, reject] } }
+    post:
+      operationId: goalWorkAction
+      summary: Take, give back, move or ask again a work
+      tags: [Agent Goals]
+      description: >
+        claim: the calling agent takes the open work and gets a task (the first to take it wins);
+        release: give it back with a reason; reroute: the owner or coordinator moves it to an agent or to
+        open work (body agent or wants); reject: ask a finished result again (body reason, which the next
+        agent reads). `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, properties: { reason: { type: string }, agent: { type: string }, wants: { type: array, items: { type: string } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/goals/{id}/works/{workId}/answer:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: workId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: answerGoalStep
+      summary: Answer a step that waits for the person
+      tags: [Agent Goals]
+      description: >
+        choose (option or options), approve (approve, and reason when false), answer (text), do (text
+        optional), provide (kind file|memory|text and ref). The owner, or the owner's own AI in a
+        conversation (an agent of mode workstation) that neither asked the question nor coordinates the
+        goal. `task:write`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                option: { type: string }
+                options: { type: array, items: { type: string } }
+                approve: { type: boolean }
+                text: { type: string }
+                reason: { type: string }
+                kind: { type: string, enum: [file, memory, text] }
+                ref: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/ai-transparency/mine:
     get:

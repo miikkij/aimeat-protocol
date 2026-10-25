@@ -38,6 +38,7 @@
  *   2026-10-18 — registerPublishRequestTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
  *   2026-10-18 — registerAccountRightsTools: aimeat_adult_status, aimeat_subscription_list,
  *     aimeat_subscription_cancel, aimeat_provenance_embed (Comicland v3 A-3, A-5, A-8).
+ *   2026-10-25 — registerGoalTools: aimeat_goal_get, _set, _work and _answer (agent goals, session cc-jouni-goals).
  *   2026-10-24 — registerComplianceAgreementTools: aimeat_compliance_agreement (plan doc-mvmr4i2wdk0p).
  *   2026-10-21 — registerDmGroupTools: the six aimeat_dm_group_* tools (group chat).
  *   2026-10-17 — registerExposureTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
@@ -177,6 +178,7 @@ import { registerRefineryTools } from './refinery.js';
 import { registerContentTools } from './content.js';
 import { registerDocsignTools } from './docsign.js';
 import { registerComplianceAgreementTools } from './compliance-agreements.js';
+import { registerGoalTools } from './goals.js';
 import { registerMcpProxyTools } from './mcp-proxy.js';
 import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
@@ -232,6 +234,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerContentTools(mcp, storage, config, caller);
     registerDocsignTools(mcp, storage, config, caller);
     registerComplianceAgreementTools(mcp, storage, config, caller);
+    registerGoalTools(mcp, storage, config, caller);
     registerMcpProxyTools(mcp, storage, config, agentGaii, scopes);
     registerKnowledgeTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
     registerAppdevPitfallTools(mcp, storage, config, agentGaii, emitResourceUpdated, scopes, caller);

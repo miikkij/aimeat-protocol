@@ -11,6 +11,8 @@
  * @structure TaskWake · runAgentTaskJob(storage, wake, job, trigger) · materialiseAgentTask(storage, wake, args)
  * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
  * @version-history
+ *   v1.3.0 — 2026-10-25 — materialiseAgentTask takes `workTrackingCode` and `startedBy`: an agent goal's
+ *     taken work becomes a task through the same wake path (services/goals/, session cc-jouni-goals).
  *   v1.2.1 — 2026-10-21 — The check is services/schedule-fire-refusal.ts: an app's schedule from before
  *     2026-10-05 runs as the account, as it did, and an agent's missing task:write is noted so the owner
  *     is asked (capability-loss review).
@@ -202,6 +204,10 @@ export async function materialiseAgentTask(storage: Storage, wake: TaskWake, arg
    *  knows WHERE to write its report (organism) and the completion hook knows whether to
    *  email the owner / gate the output. Omitted for non-automation triggers. */
   automation?: AgentTaskRecord['automation'];
+  /** The goal work this task does (`goal:<goal>:<work>`, services/goals/). Omitted elsewhere. */
+  workTrackingCode?: string;
+  /** What the start event says started it, when the caller is not an automation recipe. */
+  startedBy?: string;
 }): Promise<string> {
   const agent = await storage.getAgent(args.agentGaii);
   const autoActivated = decideTaskStart(await startFactsOf({ storage, config: wake.config }, agent)).startsNow;
@@ -226,6 +232,7 @@ export async function materialiseAgentTask(storage: Storage, wake: TaskWake, arg
     updatedAt: now,
     lastEventAt: autoActivated ? now : undefined,
     ...(args.automation ? { automation: args.automation } : {}),
+    ...(args.workTrackingCode ? { workTrackingCode: args.workTrackingCode } : {}),
   };
   const created = await storage.createAgentTask(record);
 
@@ -234,7 +241,7 @@ export async function materialiseAgentTask(storage: Storage, wake: TaskWake, arg
       id: randomUUID(),
       taskId: record.id,
       type: 'started',
-      message: `Task auto-activated from automation recipe "${args.parentRef}"`,
+      message: args.startedBy ?? `Task auto-activated from automation recipe "${args.parentRef}"`,
       details: { started_by: AUTO_START_MARK },
       timestamp: now,
     }).catch(err => { logger.warn('cfg: best-effort', { error: String(err) }); });

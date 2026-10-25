@@ -11,7 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
- *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/).
+ *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/). scheduleGoalSweep: the agent goals' minute sweep (services/goals/goals-sweep.ts).
  *   2026-10-24 — scheduleAgreementSweep: the hourly reminders, lapsed notices and signing reads of the
  *     data processing agreements (services/compliance-agreements-gaps.ts, plan doc-mvmr4i2wdk0p D4).
  *   2026-10-23 — flagOrphanPeerApprovalsOnce after the peer registry loads, with its node ids: the approved
@@ -162,6 +162,7 @@ import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { sweepMemoryBin } from '../services/memory-bin-sweep.js';
 import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
 import { scheduleAgreementSweep } from '../services/compliance-agreements-gaps.js';
+import { scheduleGoalSweep } from '../services/goals/goals-sweep.js';
 import { sweepHeldPushes, sweepNotificationDigests } from '../services/notification-sweeps.js';
 import { getNotifyPushService } from '../services/notify.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
@@ -619,6 +620,7 @@ export async function initializeServices(
   // requests read so a version signed in the signing app comes into force without anyone opening it.
   // Hourly: the shortest clock is a day.
   scheduleAgreementSweep({ storage, config });
+  scheduleGoalSweep({ storage, config });
 
   // Notifications the owner asked to be held or folded (services/notification-sweeps.ts): every
   // five minutes, the pushes held during quiet hours go out as one when the window has just ended;

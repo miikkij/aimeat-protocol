@@ -10,6 +10,7 @@
  *
  * @version-history
  *   2026-10-25 — internetOpeningRouter (routes/internet-opening.ts): one app opened to the internet on a closed node.
+ *   2026-10-25 — goalsRouter: agent goals (session cc-jouni-goals).
  *   2026-10-24 — complianceAgreementsRouter: data processing agreements, their signing and notices (plan doc-mvmr4i2wdk0p).
  *   2026-10-23 — complianceDocsRouter: the records of processing and the documents beside them (plan doc-mvlftkh9zmc9).
  *   2026-10-18 — registerAudienceSettle(): a label that rises lowers content over its audience cap
@@ -211,6 +212,7 @@ import { adminComplianceRouter } from '../routes/admin-compliance.js';
 import { complianceRouter } from '../routes/compliance.js';
 import { complianceDocsRouter } from '../routes/compliance-docs.js';
 import { complianceAgreementsRouter } from '../routes/compliance-agreements.js';
+import { goalsRouter } from '../routes/goals.js';
 import { capabilitiesRouter } from '../routes/capabilities.js';
 import { adminCapabilitiesRouter } from '../routes/admin-capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
@@ -751,6 +753,7 @@ export async function mountRoutes(
   // Data processing agreements (GDPR art. 28, plan doc-mvmr4i2wdk0p): the operator's agreements with
   // its customers, their signing in four ways and the notices each step sends.
   app.use(complianceAgreementsRouter(config, storage));
+  app.use(goalsRouter(config, storage)); // agent goals: open work, the next work, a person's steps
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));
