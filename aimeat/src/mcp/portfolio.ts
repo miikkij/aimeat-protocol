@@ -21,6 +21,8 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii, caller)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-24 — aimeat_portfolio_publish refuses the shared anonymous principal with AUTH_REQUIRED, as
+ *     PUT /v1/portfolio/upload does (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — `access` (anyone, signed-in, organism:<id>) says who may open the page, and `html` may be
@@ -58,6 +60,7 @@ import { publishAskedFields } from '../services/app-publish-gate.js';
 import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio-config.js';
 import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
 import { toolError } from './tool-error.js';
+import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -89,6 +92,9 @@ export function registerPortfolioTools(
             annotations: annotationsFor('aimeat_portfolio_publish'),
         },
         async ({ html, enable, access: accessIn }): Promise<TextResult> => {
+            // The page is a public page of the account, outside the anonymous/ namespace: the
+            // shared anonymous principal does not write it (PUT /v1/portfolio/upload refuses it too).
+            if (isAnonymousPrincipal({ sub: getAgentGaii() })) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             const owner = parseGAII(getAgentGaii()) ? localAccountName(getAgentGaii()) : '';
             if (!owner) {
                 return out({ error: 'NO_OWNER', message: 'Could not resolve the owner from this session' }, true);

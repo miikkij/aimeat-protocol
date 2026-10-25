@@ -9,6 +9,9 @@
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   2026-10-24 — PUT /v1/portfolio/config and PUT /v1/portfolio/upload refuse the shared anonymous
+ *     principal with refuseAnonymousPrincipal: the page is a public page of the account, outside the
+ *     anonymous/ namespace (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-21 — isAuthenticated asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.14.0 — 2026-10-18 — Who may open the page (plan doc-mvcn6c7e4e5q, V3.10): PUT /v1/portfolio/config
  *     and the JSON PUT /v1/portfolio/upload take `access` (anyone, signed-in, organism:<id>; an organism
@@ -76,7 +79,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, AgentRecord, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, optionalAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { listPublishedMembers } from '../services/portfolio-members.js';
 import { readerFor } from '../services/classification/reader.js';
@@ -390,7 +393,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * route disagreeing with it is how one of them would eventually erase the other's work. A caller
    * that wants a field GONE sends it as null rather than omitting it.
    */
-  router.put('/v1/portfolio/config', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  router.put('/v1/portfolio/config', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req, res) => {
     const ownerName = req.auth!.owner;
     const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
     let body = (req.body ?? {}) as Record<string, unknown>;
@@ -426,7 +429,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    * Two content types, one behaviour: `text/html` with the document as the raw body (what the
    * browser sends), or `application/json` with `{ "html": "..." }`.
    */
-  router.put('/v1/portfolio/upload', requireAuth(), requireScope('storage:write'), async (req, res) => {
+  router.put('/v1/portfolio/upload', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:write'), async (req, res) => {
     const ownerName = req.auth!.owner;
     // The NO_AGENT refusal that used to stand here is gone (11-avoimet-kysymykset.md): under the
     // remake the welcome mat IS the portfolio and it comes BEFORE the first agent, so the check

@@ -6,6 +6,9 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-10-24 — The sharing PATCH, the entry visibility PATCH and the clone refuse the shared
+ *     anonymous principal with refuseAnonymousPrincipal: a package lives under packages/<id>/, outside
+ *     the anonymous.* namespace (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   v1.8.0 — 2026-10-22 — The clone's derived-from link is a row of the cloner's namespace, and its
  *     linked_by is the cloner's full identity rather than the bare account name (secaudit 2026-10, v78
  *     and v79).
@@ -44,6 +47,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, KnowledgeManifest, MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseClassified } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -83,7 +87,7 @@ export function registerSharingRoutes(
   const { resolve, findOwnerScopeMemory, findReadableManifest } = helpers;
 
   /* ── PATCH /v1/knowledge/:id/sharing — Update package sharing settings ── */
-  router.patch('/v1/knowledge/:id/sharing', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/knowledge/:id/sharing', requireAuth(), refuseAnonymousPrincipal(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const { catalog_listed, allow_clone, audience } = req.body ?? {};
 
@@ -143,7 +147,7 @@ export function registerSharingRoutes(
   });
 
   /* ── PATCH /v1/knowledge/:id/entries/:entryKey/visibility — Change entry visibility ── */
-  router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/knowledge/:id/entries/:entryKey/visibility', requireAuth(), refuseAnonymousPrincipal(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
     const entryKey = req.params.entryKey as string;
     const { visibility, group_id: groupId } = req.body ?? {};
@@ -210,7 +214,7 @@ export function registerSharingRoutes(
   });
 
   /* ── POST /v1/knowledge/:id/clone — Clone public entries to your own namespace ── */
-  router.post('/v1/knowledge/:id/clone', requireAuth(), requireScope('memory:write'), async (req, res) => {
+  router.post('/v1/knowledge/:id/clone', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req, res) => {
     const requesterGaii = resolve(req);
     const requesterGhii = req.auth!.owner as string;
     const sourcePackageId = req.params.id as string;

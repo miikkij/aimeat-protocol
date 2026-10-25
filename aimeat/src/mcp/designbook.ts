@@ -10,6 +10,8 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-24 — keep, propose and adopt refuse the shared anonymous principal with AUTH_REQUIRED, as
+ *     the REST write routes do (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -57,6 +59,7 @@ import { DesignBookService } from '../services/design-book/service.js';
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 
 /** One text block per answer; refusals carry the service's words verbatim. */
 function text(payload: unknown, isError = false) {
@@ -70,6 +73,11 @@ export function registerDesignbookTools(
     getAgentGaii: () => string,
 ): void {
     const book = new DesignBookService(storage, config);
+
+    // The write tools (keep, propose, adopt) refuse the shared anonymous principal: the Design Book
+    // is node-wide and written under the node's identity, outside the anonymous.* namespace.
+    const refuseAnonymous = () => isAnonymousPrincipal({ sub: getAgentGaii() })
+        ? text(`AUTH_REQUIRED: ${ANONYMOUS_PRINCIPAL_REFUSAL}`, true) : null;
 
     const answer = async (work: () => Promise<unknown>) => {
         try {
@@ -129,7 +137,7 @@ export function registerDesignbookTools(
             inputSchema: zodShapeFor('aimeat_designbook_keep'),
             annotations: annotationsFor('aimeat_designbook_keep'),
         },
-        async ({ filename, kept }) => answer(() => book.keep(getAgentGaii(), filename, kept !== false)),
+        async ({ filename, kept }) => refuseAnonymous() ?? answer(() => book.keep(getAgentGaii(), filename, kept !== false)),
     );
 
     mcp.registerTool(
@@ -139,7 +147,7 @@ export function registerDesignbookTools(
             inputSchema: zodShapeFor('aimeat_designbook_propose'),
             annotations: annotationsFor('aimeat_designbook_propose'),
         },
-        async ({ part, ai_provenance, ai_provenance_id }) => answer(async () => {
+        async ({ part, ai_provenance, ai_provenance_id }) => refuseAnonymous() ?? answer(async () => {
             const out = await book.propose(getAgentGaii(), part, {
                 principal: getAgentGaii(),
                 declaredId: ai_provenance_id,
@@ -162,7 +170,7 @@ export function registerDesignbookTools(
             inputSchema: zodShapeFor('aimeat_designbook_adopt'),
             annotations: annotationsFor('aimeat_designbook_adopt'),
         },
-        async ({ id, filename, ai_provenance, ai_provenance_id }) => answer(async () => {
+        async ({ id, filename, ai_provenance, ai_provenance_id }) => refuseAnonymous() ?? answer(async () => {
             const out = await book.adopt(getAgentGaii(), id, filename, {
                 principal: getAgentGaii(),
                 declaredId: ai_provenance_id,

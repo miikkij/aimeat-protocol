@@ -14,6 +14,10 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-24 — Every write route (keep, propose, adopt, bench, status, delete) refuses the shared
+ *     anonymous principal with refuseAnonymousPrincipal: the Design Book is node-wide and written
+ *     under the node's identity, outside the anonymous.* namespace (secaudit2026oct22,
+ *     routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   v1.9.0 — 2026-10-24 — The preview of a grown genre INSIDE A FRAME (Sec-Fetch-Dest iframe/frame,
  *     or ?view=frame) is the node's own script-free card of the app (grownGenreFramePage): the
  *     redirect to the app left the gallery tile empty, since the app refuses another origin's frame.
@@ -62,7 +66,7 @@ import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { isAnonymousPrincipal, refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
@@ -171,7 +175,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
 
   // THE OWNER SAYS AN APP TURNED OUT WELL. The one moment anything counts as kept (reasons.ts).
   // Registered before /v1/designbook/:id/... so "keep" is never read as a part id.
-  router.post('/v1/designbook/keep', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+  router.post('/v1/designbook/keep', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const body = (req.body ?? {}) as { filename?: unknown; kept?: unknown };
       if (typeof body.filename !== 'string' || !body.filename.trim()) {
@@ -298,7 +302,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // Propose (or update your own). The bench refusal carries the validator's words.
-  router.post('/v1/designbook', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+  router.post('/v1/designbook', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const provenance = provenanceOf(req, res);
       if (!provenance) return;
@@ -311,7 +315,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // Adopt: the part's body becomes the named app's stored layout, through the app-ui write path.
-  router.post('/v1/designbook/:id/adopt', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+  router.post('/v1/designbook/:id/adopt', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const body = req.body as Record<string, unknown>;
       const filename = typeof body.filename === 'string' ? body.filename : '';
@@ -331,7 +335,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   // guarantees MEASURED (overflow, painted units, touch minimums) and stamped onto the record.
   // The operator's and the proposer's call — running a browser is work, and the result changes
   // what the gallery says about the part.
-  router.post('/v1/designbook/:id/bench', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+  router.post('/v1/designbook/:id/bench', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const { benchAndStamp } = await import('../services/design-book/bench.js');
       const id = req.params.id as string;
@@ -350,7 +354,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   // Lifecycle: the operator's door, plus a proposer retiring their own.
   // memory:write is the door's scope; WHO may move WHAT is the service's decision (operator, or
   // the proposer retiring their own) — a scope word cannot express that split, so it lives there.
-  router.post('/v1/designbook/:id/status', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+  router.post('/v1/designbook/:id/status', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), async (req: Request, res: Response) => {
     try {
       const status = typeof (req.body as Record<string, unknown>).status === 'string'
         ? (req.body as Record<string, string>).status : '';
@@ -367,7 +371,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   // no bin to restore them from. memory:delete is in every agent's default scopes because what it
   // removes comes back for the grace period; a removal that cannot come back takes the separate
   // word (security-development-dna.md, invariant 8).
-  router.delete('/v1/designbook/:id', requireAuth(), requireScope('memory:purge'), async (req: Request, res: Response) => {
+  router.delete('/v1/designbook/:id', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:purge'), async (req: Request, res: Response) => {
     try {
       const isOperator = await isOperatorCaller(storage, req.auth);
       const out = await book.delete(caller(req), isOperator, req.params.id as string);
