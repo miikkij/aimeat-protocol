@@ -228,7 +228,7 @@ export default function GoalView({ navigate }) {
         <${PageSection} group ends title=${g('gotTitle', 'What came out')}>
           ${results.map((w) => html`
             <div key=${w.id}>
-              <${Note} kind="message"><b>${w.title}</b> · ${w.claimed_by ?? w.result?.by ?? ''}<//>
+              <${Note} kind="message"><b>${w.title}</b> · ${takerName(w.claimed_by ?? w.result?.by)}<//>
               <${Markdown} text=${keepLineBreaks(w.result.summary.slice(0, 1500))} small />
             </div>`)}
         <//>`}

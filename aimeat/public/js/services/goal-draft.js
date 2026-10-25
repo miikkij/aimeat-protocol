@@ -36,8 +36,11 @@ const slug = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^\
  */
 export function goalPlanContext(agents, computers) {
   const live = (agents ?? []).filter((a) => !a.stopped);
+  const WEEK = 7 * 86_400_000;
+  // An agent nobody has seen in a week is likely not running anywhere: work given to it would wait.
+  const seen = (a) => [a.last_seen, a.mcp_last_seen].some((t) => t && Date.now() - Date.parse(t) < WEEK);
   return {
-    agents: live.filter((a) => a.mode !== 'workstation').map((a) => ({ name: a.name, tags: a.tags ?? [], platform: a.platform ?? null })),
+    agents: live.filter((a) => a.mode !== 'workstation').map((a) => ({ name: a.name, tags: a.tags ?? [], platform: a.platform ?? null, running: seen(a) })),
     ownAi: live.filter((a) => a.mode === 'workstation').map((a) => a.name),
     computers: computers ?? 0,
   };
@@ -45,7 +48,7 @@ export function goalPlanContext(agents, computers) {
 
 function planInstructions(ctx) {
   const agents = ctx.agents.length
-    ? ctx.agents.map((a) => `- ${a.name}${a.tags.length ? ` (skills: ${a.tags.join(', ')})` : ''}${a.platform ? ` on ${a.platform}` : ''}`).join('\n')
+    ? ctx.agents.map((a) => `- ${a.name}${a.tags.length ? ` (skills: ${a.tags.join(', ')})` : ''}${a.platform ? ` on ${a.platform}` : ''}${a.running ? '' : ' [NOT SEEN THIS WEEK: likely not running]'}`).join('\n')
     : '- none';
   return `You plan a goal for a person's AIMEAT from one sentence the person wrote, so the person only has to approve it.
 Answer with one JSON object and nothing else, in this shape:
@@ -77,7 +80,8 @@ Computers that run agents: ${ctx.computers}
 
 Plan with what exists, and keep it short:
 - A capable agent takes a big piece whole; do not cut the work into small steps. Two to five works is usual.
-- who "agent:<name>": only a name from the list above, and only when its skills or name fit the work.
+- "coordinator": null for almost every goal. Name one only when an agent above is made to lead (its name or skills say coordinator, concierge or lead) and is running.
+- who "agent:<name>": only a name from the list above, only when its skills or name fit the work, and never an agent marked NOT SEEN THIS WEEK (its work would wait; give it to the model or list the agent as missing instead).
 - who "skill:<tag>": open work any agent with that skill takes; use a tag an agent above has, or a tag from "missing".
 - who "model": the node's own model does it with the person's key: writing, a summary, a comparison, research from what the model already knows. It has no tools: it cannot open web pages, search, post, send or buy. Use it when no agent above fits and none is needed.
 - who "person:...": what only the person can do or decide: a choice, an approval, posting or sending in their own name, paying, giving a file. A "do" step says exactly what to do.
@@ -105,7 +109,8 @@ export function parseGoalPlan(content, ctx) {
   if (start < 0 || end <= start) throw new Error('NO_PLAN');
   let raw;
   try { raw = JSON.parse(text.slice(start, end + 1)); } catch { throw new Error('NO_PLAN'); }
-  const names = new Set(ctx.agents.map((a) => a.name));
+  // Only an agent that runs may be given work or lead; the rest of the plan goes to the model.
+  const names = new Set(ctx.agents.filter((a) => a.running !== false).map((a) => a.name));
   const missing = (Array.isArray(raw.missing) ? raw.missing : []).slice(0, 4)
     .map((m) => ({ sentence: String(m?.sentence || '').slice(0, 400), tag: slug(m?.tag), why: String(m?.why || '').slice(0, 300) }))
     .filter((m) => m.sentence && m.tag);
