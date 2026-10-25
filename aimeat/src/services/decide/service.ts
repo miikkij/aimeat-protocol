@@ -56,6 +56,7 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   2026-10-25 — DecideCaller.readerAs: the agent a decision run reads as (runs.ts; secaudit2026oct22).
  *   2026-10-22 — DecideCaller.readsAll: whether the caller reads the owner's private records, which a
  *     decision run's keys and prefix and its run store follow (runs.ts; secaudit 2026-10, v83, v84).
  *     A single decision does not read it.
@@ -135,6 +136,13 @@ export interface DecideCaller {
    * reads `keys` and `prefix`, and shows the runs of others, only to such a caller (runs.ts).
    */
   readsAll?: boolean;
+  /**
+   * The roles and scopes of an agent that started or resumed a decision run, so the run reads the
+   * owner's records as that agent and its clearance and the labels' audience apply (runs.ts;
+   * secaudit2026oct22). Set by the REST route and the MCP tool from the credential, never from a
+   * body. Absent for the owner in person and an app grant, whose runs read as before.
+   */
+  readerAs?: { roles: readonly string[]; scopes: readonly string[] };
   /** 'exempt' for node-internal work (an item of a run, the classifier, a refinery batch); absent,
    *  the decision counts against the account's AI call limit (services/account-limits.ts). Set by
    *  the code that builds the caller, never read from a request body. */

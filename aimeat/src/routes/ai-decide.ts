@@ -19,6 +19,8 @@
  * @structure decideRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.1 — 2026-10-25 — An agent's run carries its roles and scopes (readerAs), so the run reads as
+ *     that agent and its clearance applies (secaudit2026oct22).
  *   v1.7.0 — 2026-10-22 — The run routes carry whether the caller reads as the owner (readsAsOwner):
  *     any other caller's keys and prefix read only what the memory route shows it, and it lists,
  *     reads, resumes and stops only the runs it started; a list with runs left out carries `omitted`
@@ -155,8 +157,11 @@ export function decideRouter(config: AimeatConfig, storage: Storage): Router {
   // show it and sees the runs it started (secaudit 2026-10, v83, v84).
   const runCallerOf = (req: Request, bodyAppId?: unknown): DecideCaller => {
     // No real auth (none, or the anonymous identity) reads as nobody; callerOf refuses both.
-    const readsAll = req.auth && !req.auth.anonymous ? readsAsOwner(callerOf(req, config.nodeId, storage)) : false;
-    return { ...decideCallerOf(req, config.nodeId, bodyAppId), readsAll };
+    const who = req.auth && !req.auth.anonymous ? callerOf(req, config.nodeId, storage) : null;
+    const readsAll = who ? readsAsOwner(who) : false;
+    // An agent's run reads the owner's records as that agent, so its clearance applies (secaudit2026oct22).
+    const readerAs = who?.kind === 'agent' ? { roles: who.roles, scopes: who.scopes } : undefined;
+    return { ...decideCallerOf(req, config.nodeId, bodyAppId), readsAll, ...(readerAs ? { readerAs } : {}) };
   };
   /** A run that is absent, or hidden from this caller, answers the same; a narrowed caller is told why. */
   const noSuchRun = (res: Response, caller: DecideCaller) => res.status(404).json(error(config.nodeId, 'NOT_FOUND',

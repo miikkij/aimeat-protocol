@@ -37,6 +37,8 @@
  *   const run = await startDecideRun(storage, config, caller, { questions, keys, fields });
  *   const run = await getDecideRun(storage, caller.gaii, id, runViewerOf(caller));
  * @version-history
+ *   v1.7.1 — 2026-10-25 — A run an agent started or resumed reads the owner's records with a reader for
+ *     that agent (caller.readerAs), so its clearance and the labels' audience apply (secaudit2026oct22).
  *   v1.7.0 — 2026-10-22 — A caller that does not read as the owner reads only the records the memory
  *     route shows it (ownerScopeView), on keys, on prefix and again at each item's read, so a run
  *     stored before the change resumes under the caller's current rights; it sees, resumes and stops
@@ -77,7 +79,8 @@ import { DecideError } from './errors.js';
 import { Semaphore } from './pacer.js';
 import { isReservedServerKey } from '../../utils/reserved-keys.js';
 import { readAiRecords } from '../ai-inputs.js';
-import { systemReader, warningsNote, type ContentReader } from '../classification/reader.js';
+import { systemReader, readerForCaller, warningsNote, type ContentReader } from '../classification/reader.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { ClassificationError } from '../classification/labels.js';
 import { requireAiCallTurn } from '../account-limits.js';
 import { ownerScopeView, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
@@ -222,10 +225,17 @@ async function work(storage: Storage, config: AimeatConfig, caller: DecideCaller
   const gate = new Semaphore(config.decideConcurrency);
   let sinceSave = 0;
   const pending = run.items.filter(i => !run.results[i.subject]?.decision_id);
-  // The one loader of what a model reads (services/ai-inputs.ts) asks with the node's own reader,
-  // since a run continues with no caller. One reader for the run, so the warning-classified records
-  // it sent are collected in one place and kept on the run (TARGET-082 review, item 2).
-  const reader = systemReader({ storage, config }, caller.gaii);
+  // The one loader of what a model reads (services/ai-inputs.ts) asks with a reader for the agent
+  // that started or resumed the run, so its clearance and the labels' audience apply as on an AI
+  // job's input_keys (secaudit2026oct22); the owner in person and an app grant read with the node's
+  // own reader, as before. One reader for the run, so the warning-classified records it sent are
+  // collected in one place and kept on the run (TARGET-082 review, item 2).
+  const reader = caller.readerAs
+    ? readerForCaller({ storage, config }, {
+      gaii: caller.principal, owner: localAccountName(caller.gaii),
+      roles: [...caller.readerAs.roles], scopes: [...caller.readerAs.scopes],
+    })
+    : systemReader({ storage, config }, caller.gaii);
 
   const one = async (item: RunItem): Promise<void> => {
     if (flag.stop) return;
