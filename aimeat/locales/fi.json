@@ -11871,6 +11871,8 @@
     "cfgDesc_morsel_policy_board_post_cost_per_kb": "Lisää murusia tahdistukseen jokaista viestin rungon kilotavua kohden.",
     "cfgDesc_boards_public_per_owner_max": "Montako julkista ilmoitustaulua yksi tili voi pitää (järjestelmätaulut pysyvät operaattorilla).",
     "cfgDesc_auth_jwt_ttl_seconds": "JWT-tunnuksen elinaika sekunteina.",
+    "cfgDesc_auth_device_authorize_email_limit": "Laske verkko-osoitteittain agenttiyhteydet, jotka nimeävät tilin sähköpostiosoitteella. Näin kukaan ei voi kokeilla monia osoitteita ja selvittää, onko niillä tili täällä. Pois päältä tarkoittaa, että rajaa ei ole. Tilin nimeä ei lasketa koskaan.",
+    "cfgDesc_auth_device_authorize_email_max": "Kuinka monta agenttiyhteyttä, joka nimeää tilin sähköpostiosoitteella, yksi verkko-osoite voi aloittaa 10 minuutissa, kun raja on päällä.",
     "cfgDesc_auth_entra_allowed_tenants": "Microsoft Entra -vuokraajat, jotka saavat kirjautua (pilkuin eroteltuina GUID:eina). Tyhjä: portti tulee AIMEAT_ENTRA_OAUTH_TENANT-arvosta yksinään.",
     "cfgDesc_features_extended_features_enabled": "Laajennettu ominaisuusjoukko käytössä.",
     "cfgDesc_work_queue_max_pending": "Odottavien työkohteiden katto tarjoajaa kohden.",
@@ -11959,7 +11961,7 @@
     "cfgDesc_federation_sync_genesis_memory_cache_ttl_hours": "Genesis-muistivälimuistin elinaika tunteina.",
     "cfgDesc_personal_nodes_enabled": "Henkilökohtaisten ympäristöjen isännöinti käytössä.",
     "cfgDesc_personal_nodes_max_slots": "Henkilökohtaisten paikkojen katto.",
-    "cfgDesc_personal_nodes_max_per_owner": "Kuinka monta henkilökohtaista solmua yksi omistaja voi ankkuroida tänne. Näin yhteiset paikat riittävät kaikille. 0 tarkoittaa, että rajaa ei ole. Jo ankkuroidut solmut säilyvät.",
+    "cfgDesc_personal_nodes_max_per_owner": "Kuinka monta omaa palvelinta yksi omistaja voi liittää tänne. Näin yhteiset paikat riittävät kaikille. 0 tarkoittaa, että rajaa ei ole. Jo liitetyt palvelimet säilyvät.",
     "cfgDesc_echat_anonymous": "Salli anonyymit salatun chatin WebSocket-yhteydet.",
     "cfgDesc_node_base_url": "Tämän instanssin julkinen perusosoite.",
     "cfgDesc_node_dev_mode": "Kehitystila (localhost-webhookit; tunnusten nollaus säilyttää datan).",
@@ -12813,6 +12815,8 @@
     "cfg_morsel_policy_board_post_base_cost": "Tauluviestin tahdistus (perus)",
     "cfg_morsel_policy_board_post_cost_per_kb": "Tauluviestin tahdistus kilotavua kohden",
     "cfg_auth_jwt_ttl_seconds": "JWT-elinaika (sekuntia)",
+    "cfg_auth_device_authorize_email_limit": "Rajoita agenttiyhteyksiä sähköpostiosoitteella",
+    "cfg_auth_device_authorize_email_max": "Agenttiyhteydet sähköpostilla verkko-osoitetta kohden (10 min)",
     "cfg_features_extended_features_enabled": "Laajennetut ominaisuudet",
     "cfg_work_queue_max_pending": "Maks. odottavat",
     "cfg_work_webhook_max_retries": "Webhook-uudelleenyritykset",
@@ -26268,7 +26272,7 @@
         "unused_client_days": {
           "title": "Käyttämättömät MCP-rekisteröinnit (päivää)",
           "short": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. 0 säilyttää kaikki rekisteröinnit. Oletus on 30.",
-          "what": "Tekoälysovellus, kuten Claude, rekisteröityy tähän solmuun ennen kuin ihminen kirjautuu sisään. Kuka tahansa voi tehdä rekisteröinnin ilman tiliä. Rekisteröinti, jolla on kirjauduttu sisään, säilyy, koska kirjautuminen viittaa siihen yhä. Rekisteröinti, jolla ei koskaan kirjauduttu, jäisi tietokantaan pysyvästi. Siksi siivous poistaa joka yö klo 4.53 sellaisen rekisteröinnin, joka on vanhempi kuin tämä päivien määrä.",
+          "what": "Tekoälysovellus, kuten Claude, rekisteröityy tälle palvelimelle ennen kuin ihminen kirjautuu sisään. Kuka tahansa voi tehdä rekisteröinnin ilman tiliä. Rekisteröinti, jolla on kirjauduttu sisään, säilyy, koska kirjautuminen viittaa siihen yhä. Rekisteröinti, jolla ei koskaan kirjauduttu, jäisi tietokantaan pysyvästi. Siksi siivous poistaa joka yö klo 4.53 sellaisen rekisteröinnin, joka on vanhempi kuin tämä päivien määrä.",
           "range": "Kokonaisluku päivinä, vähintään 0. Oletus on 30. 0 säilyttää kaikki rekisteröinnit.",
           "low": "Pienempi: hylätyt rekisteröinnit poistuvat nopeammin. Sovellus, jonka rekisteröinti poistettiin, rekisteröityy uudelleen ennen kirjautumista.",
           "high": "Suurempi: hylätyt rekisteröinnit pysyvät tietokannassa pidempään.",
@@ -26277,13 +26281,13 @@
       },
       "personal_nodes": {
         "max_per_owner": {
-          "title": "Henkilökohtaisten solmujen paikat omistajaa kohden",
-          "short": "Kuinka monta henkilökohtaista solmua yksi omistaja voi ankkuroida tähän solmuun. 0 tarkoittaa, että rajaa ei ole. Oletus on 3.",
-          "what": "Tässä solmussa on tietty määrä paikkoja henkilökohtaisille solmuille (Maks. paikat), ja kaikki omistajat jakavat ne. Tämä raja estää yhtä omistajaa viemästä niitä kaikkia. Kun omistaja on rajalla, hänelle kerrotaan raja ja tapa vapauttaa paikka: hän poistaa solmun profiilin Solmut-välilehdellä tai kutsuu DELETE /v1/personal/anchor/<solmun tunniste>. Jo ankkuroidut solmut säilyvät, kun lasket rajaa. Raja koskee vain seuraavaa solmua.",
+          "title": "Omat palvelimet omistajaa kohden",
+          "short": "Kuinka monta omaa palvelinta yksi omistaja voi liittää tähän palvelimeen. 0 tarkoittaa, että rajaa ei ole. Oletus on 3.",
+          "what": "Tällä palvelimella on tietty määrä paikkoja ihmisten omille palvelimille (Maks. paikat), ja kaikki omistajat jakavat ne. Tämä raja estää yhtä omistajaa viemästä niitä kaikkia. Kun omistaja on rajalla, hänelle kerrotaan raja ja tapa vapauttaa paikka: hän poistaa palvelimen profiilin kohdassa Omat palvelimet tai kutsuu DELETE /v1/personal/anchor/<tunniste>. Jo liitetyt palvelimet säilyvät, kun lasket rajaa. Raja koskee vain seuraavaa palvelinta.",
           "range": "Kokonaisluku, vähintään 0. Oletus on 3. 0 tarkoittaa, että rajaa ei ole.",
-          "low": "1: jokainen omistaja ankkuroi yhden henkilökohtaisen solmun, sen jota hänen tunnelinsa käyttää.",
-          "high": "Suurempi: omistaja voi pitää useita henkilökohtaisia solmuja, ja yhteisiin paikkoihin mahtuu vähemmän omistajia.",
-          "tip": "Omistajan tunneli palvelee yhtä henkilökohtaista solmua, joten pieni luku riittää lähes kaikille."
+          "low": "1: jokainen omistaja liittää yhden oman palvelimen, sen jota hänen tunnelinsa käyttää.",
+          "high": "Suurempi: omistaja voi pitää täällä useita omia palvelimia, ja yhteisiin paikkoihin mahtuu vähemmän omistajia.",
+          "tip": "Omistajan tunneli palvelee yhtä omaa palvelinta, joten pieni luku riittää lähes kaikille."
         }
       },
       "morsel_policy": {
@@ -26443,6 +26447,25 @@
         }
       },
       "auth": {
+        "device_authorize_email_limit": {
+          "title": "Rajoita agenttiyhteyksiä sähköpostiosoitteella",
+          "short": "Kun asetus on päällä, agenttiyhteydet, jotka nimeävät tilin sähköpostiosoitteella, lasketaan verkko-osoitteittain. Pois päältä tarkoittaa, että rajaa ei ole. Oletuksena päällä.",
+          "what": "Kun agentti muodostaa yhteyden, se nimeää tilin, jota yhteys koskee: tilin nimellä tai tilin vahvistetulla sähköpostiosoitteella. Vastaus sähköpostimuotoon kertoo, onko osoitteella tili tällä palvelimella, eikä pyyntö vaadi kirjautumista. Siksi palvelin laskee sähköpostimuodon verkko-osoitteittain, enintään seuraavan asetuksen määrän 10 minuutissa. Sen ylittävä pyyntö torjutaan. Vastaus kertoo odotusajan ja neuvoo käyttämään tilin nimeä, jota ei lasketa koskaan.",
+          "range": "Päällä (oletus) tai pois.",
+          "low": "Pois: kuka tahansa voi kokeilla rajattomasti osoitteita ja selvittää, onko niillä tili täällä. Vain yleinen pyyntöraja rajoittaa.",
+          "high": "Päällä: yksi verkko-osoite voi kokeilla vain muutamaa osoitetta 10 minuutissa.",
+          "tip": "Pidä päällä. Ota pois vain palvelimella, jonka kaikki tilit tuntevat toisensa."
+        },
+        "device_authorize_email_max": {
+          "title": "Agenttiyhteydet sähköpostilla verkko-osoitetta kohden (10 min)",
+          "short": "Kuinka monta agenttiyhteyttä, joka nimeää tilin sähköpostiosoitteella, yksi verkko-osoite voi aloittaa 10 minuutissa. Oletus on 20.",
+          "what": "Kun yllä oleva raja on päällä, tämä on sähköpostimuotoisten pyyntöjen määrä, jonka yksi verkko-osoite voi tehdä 10 minuutissa. Oletuksella 21. pyyntö torjutaan koodilla 429, ja vastaus kertoo, montako sekuntia pitää odottaa. IPv6-osoite lasketaan /64-verkkonsa mukaan. Tilin nimellä tehtyjä pyyntöjä ei lasketa.",
+          "range": "Kokonaisluku, vähintään 1. Oletus on 20, sama kuin yhden tilin yhteystietohaun raja.",
+          "low": "Pienempi: osoitteita voi kokeilla vähemmän, ja saman toimiston osoitteen takana oleva tiimi tulee rajalle nopeammin.",
+          "high": "Suurempi: sähköpostilla voi muodostaa enemmän yhteyksiä, ja osoitteita voi kokeilla enemmän.",
+          "ex1": "20: ihminen, joka yhdistää tunnissa viisi agenttia sähköpostilla, ei tule koskaan rajalle.",
+          "tip": "Nosta lukua, jos moni yhdistää agentteja sähköpostilla samasta toimiston osoitteesta samaan aikaan."
+        },
         "jwt_ttl_seconds": {
           "title": "JWT-elinaika (sekuntia)",
           "short": "Kuinka kauan kirjautumisen token on voimassa, sekunteina. Arvo väliltä 60–86 400, oletus 3 600 eli tunti.",

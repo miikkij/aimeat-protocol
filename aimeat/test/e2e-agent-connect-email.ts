@@ -64,11 +64,17 @@ async function provisionVerifiedEmailAccount(inviterToken: string, email: string
 const deviceAuthorize = (owner: string) => json('/v1/agents/device-authorize', {
     method: 'POST', body: JSON.stringify({ owner, agent_name: 'assistant' }),
 });
-/** The owner recorded on the pending request, read via the consent-info endpoint. */
+/**
+ * The owner recorded on the pending request: the account whose own pending list holds it. The
+ * unauthenticated consent-info endpoint names the owner only to that owner (secaudit2026oct22).
+ */
+let targetToken = '';
 async function pendingOwnerFor(userCode: string): Promise<string> {
-    const info = await json(`/v1/agents/verify/info/${userCode}`);
-    assert(info.status === 200, `verify/info ${info.status}`);
-    return info.body.data.owner as string;
+    if (!targetToken) targetToken = (await ownerSignIn(BASE, target, 'SuperSecret99')).body.data.token as string;
+    const list = await json('/v1/agents/device-authorize/pending', { headers: auth(targetToken) });
+    assert(list.status === 200, `pending list ${list.status}`);
+    const mine = ((list.body.data.requests ?? []) as Array<{ user_code: string }>).some(r => r.user_code === userCode);
+    return mine ? target : '(not in the target account\'s pending list)';
 }
 
 console.log('\n=== AIMEAT Agent Connect by Email E2E ===\n');
@@ -147,6 +153,50 @@ await test('7. Another person cannot make an account here through somebody else\
     assert(mint.status === 201, `owner mint ${mint.status}`);
     const r = await deviceAuthorize(victim);
     assert(r.status === 404 && r.body.error?.code === 'NO_ACCOUNT', `an unverified key address resolved: ${r.status}`);
+});
+
+// secaudit2026oct22, device-authorize-email-owner-oracle: the consent-info endpoint is open (a code
+// is all it asks for), so it names the account only to that account, and the email form is counted
+// per network address against auth.device_authorize_email_max in 10 minutes.
+await test('8. verify/info names the owner only to that owner signed in; an anonymous caller and another owner see no owner', async () => {
+    const r = await deviceAuthorize(email);
+    assert(r.status === 200, `authorize ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const code = r.body.data.user_code as string;
+    const anon = await json(`/v1/agents/verify/info/${code}`);
+    assert(anon.status === 200 && anon.body.data.agent_name === 'assistant', `verify/info ${anon.status}`);
+    assert(!('owner' in anon.body.data), `an anonymous caller was told the owner: ${JSON.stringify(anon.body.data)}`);
+    const other = await json(`/v1/agents/verify/info/${code}`, { headers: auth(inviter.token) });
+    assert(other.status === 200 && !('owner' in other.body.data), `another owner was told the owner: ${JSON.stringify(other.body.data)}`);
+    if (!targetToken) targetToken = (await ownerSignIn(BASE, target, 'SuperSecret99')).body.data.token as string;
+    const own = await json(`/v1/agents/verify/info/${code}`, { headers: auth(targetToken) });
+    assert(own.status === 200 && own.body.data.owner === target, `the owner signed in reads their own name: ${JSON.stringify(own.body.data)}`);
+});
+
+await test('9. the email form is limited per address (auth.device_authorize_email_max); the handle is not, and the switch turns the limit off', async () => {
+    const set = (changes: Array<{ path: string; value: unknown }>) => json('/v1/admin/config', {
+        method: 'PUT', headers: auth(inviter.token), body: JSON.stringify({ changes }),
+    });
+    const lowered = await set([{ path: 'auth.device_authorize_email_max', value: 2 }]);
+    assert(lowered.status === 200, `set the limit: ${lowered.status} ${JSON.stringify(lowered.body.error)}`);
+    try {
+        let refused: { status: number; body: any } | null = null;
+        for (let i = 0; i < 4 && !refused; i++) {
+            const r = await deviceAuthorize(email);
+            if (r.status === 429) refused = r;
+        }
+        assert(refused !== null, 'the email form was never refused past a limit of 2');
+        assert(refused!.body.error?.code === 'RATE_LIMITED', `code ${refused!.body.error?.code}`);
+        const msg = String(refused!.body.error?.message ?? '');
+        assert(msg.includes('auth.device_authorize_email_max') && /account name/i.test(msg), `the refusal names the setting and the handle: ${msg}`);
+        const handle = await deviceAuthorize(target);
+        assert(handle.status === 200, `the handle is not counted: ${handle.status} ${JSON.stringify(handle.body.error)}`);
+        const off = await set([{ path: 'auth.device_authorize_email_limit', value: false }]);
+        assert(off.status === 200, `switch off: ${off.status} ${JSON.stringify(off.body.error)}`);
+        const free = await deviceAuthorize(email);
+        assert(free.status === 200, `with the limit off the email form answers: ${free.status} ${JSON.stringify(free.body.error)}`);
+    } finally {
+        await set([{ path: 'auth.device_authorize_email_limit', value: true }, { path: 'auth.device_authorize_email_max', value: 20 }]);
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

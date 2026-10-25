@@ -105,8 +105,8 @@ export function personalRouter(
       const ownNodes = allNodes.filter(n => n.ownerName === owner_name);
       if (perOwner > 0 && ownNodes.length >= perOwner) {
         res.status(409).json(error(config.nodeId, 'PERSONAL_NODE_LIMIT',
-          `You already anchor ${ownNodes.length} personal nodes here, and one owner may anchor ${perOwner} on this node. `
-          + 'To free a slot, remove one you no longer use with DELETE /v1/personal/anchor/<node id>, or on the Nodes tab of your profile. '
+          `You already connect ${ownNodes.length} of your own servers here, and one owner may connect ${perOwner} on this server. `
+          + 'To free a slot, remove one you no longer use under Your own servers in your profile, or with DELETE /v1/personal/anchor/<id>. '
           + 'The operator sets the limit (personal_nodes.max_per_owner).',
           undefined, {
             limit: perOwner,
