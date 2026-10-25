@@ -162,7 +162,7 @@ export async function flushUsageBuffer(): Promise<void> {
 export function initUsageBuffer(storage: Storage, flushIntervalMs: number = DEFAULT_FLUSH_INTERVAL_MS): void {
   storageRef = storage;
   if (flushTimer) return;
-  flushTimer = setInterval(() => { void flushUsageBuffer(); }, Math.max(1000, flushIntervalMs));
+  flushTimer = setInterval(() => { void flushUsageBuffer(); }, Math.max(100, flushIntervalMs));
   // Don't keep the process alive solely for the flush timer (matters for in-process tests).
   flushTimer.unref?.();
 }
