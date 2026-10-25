@@ -3,6 +3,31 @@
   "entries": [
     {
       "date": "2026-10-25",
+      "kind": "fix",
+      "id": "2026-10-25-reply-with-ai-goes-through-your-own-ai",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Reply with AI goes through your own AI",
+        "fi": "Vastaa tekoälyllä kulkee oman tekoälysi kautta"
+      },
+      "summary": {
+        "en": "Reply with AI in Messages now always gives the prompt for your AI connected over MCP.",
+        "fi": "Viestien Vastaa tekoälyllä antaa nyt aina kehotteen MCP:llä yhdistetylle tekoälyllesi."
+      },
+      "body": {
+        "en": "The Reply with AI dialog in Messages now always gives the prompt for an AI connected over MCP. If you have not connected one yet, it says so and takes you to Connect your AI.",
+        "fi": "Viestien Vastaa tekoälyllä -ruutu antaa nyt aina kehotteen MCP:llä yhdistetylle tekoälylle. Jos et ole vielä yhdistänyt tekoälyä, ruutu kertoo sen ja vie sinut Yhdistä tekoälysi -sivulle."
+      },
+      "impact": {
+        "en": "The copy-paste prompt is gone; connect your AI once, and it reads the conversation and replies as you after you approve.",
+        "fi": "Kopioitava kehote poistui. Yhdistä tekoälysi kerran, niin se lukee keskustelun ja vastaa sinun nimissäsi, kun hyväksyt vastauksen."
+      }
+    },
+    {
+      "date": "2026-10-25",
       "kind": "feature",
       "id": "2026-10-25-open-one-app-to-the-internet-on-a-closed-aimeat",
       "highlight": false,
