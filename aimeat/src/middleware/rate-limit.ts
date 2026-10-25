@@ -8,6 +8,9 @@
  * @usage app.use(rateLimit({ windowMs, max }, roleMultipliers))
  *        const loginLimit = rateLimit(() => ({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }))
  * @version-history
+ *   v1.5.0 — 2026-10-25 — secaudit2026oct22: the shared anonymous identity is keyed by address with
+ *     the visitor multiplier, as a request without a credential is, so each visitor has a count of
+ *     its own in anonymous mode.
  *   v1.4.0 — 2026-10-11 — The numbers are read on every request, from the object passed or from a
  *     function that answers them, so a rate limit saved while the node runs takes effect at once. A
  *     changed window starts a new bucket store.
@@ -24,6 +27,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { RateLimitTier, RoleMultipliers } from '../config.js';
 import { getStats } from '../services/stats.js';
 import { rateBuckets } from '../services/rate-buckets.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 /**
  * Normalise an IP into a rate-limit key. IPv6 addresses are aggregated to their
@@ -75,17 +79,22 @@ export function rateLimit(opts: RateLimitOptions | (() => RateLimitOptions) = {}
         // identity for every visitor, which would collapse a brute-force limiter into
         // a single global bucket.
         const rawIp = req.ip ?? req.socket.remoteAddress;
-        const resolvedKey = keyBy === 'ip' ? ipRateKey(rawIp) : (req.auth?.sub ?? ipRateKey(rawIp));
+        // The shared anonymous identity is one sub for every visitor without a credential (injected by
+        // optionalAuth in anonymous mode, or minted by POST /v1/auth/anonymous), so it is counted as
+        // no identity: by address, with the visitor multiplier. Keyed by its sub, one visitor used up
+        // the limit of all of them, password sign-in included (secaudit2026oct22).
+        const identified = req.auth?.sub && !isAnonymousPrincipal(req.auth) ? req.auth : undefined;
+        const resolvedKey = keyBy === 'ip' ? ipRateKey(rawIp) : (identified?.sub ?? ipRateKey(rawIp));
         const key = resolvedKey || 'unknown';
-        if ((keyBy === 'ip' || !req.auth?.sub) && !rawIp) getStats()?.increment('rate_limit.unknown_key');
+        if ((keyBy === 'ip' || !identified) && !rawIp) getStats()?.increment('rate_limit.unknown_key');
 
         // Determine role-based multiplier
         let multiplier = 1;
         if (roleMultipliers) {
-            const roles = req.auth?.roles as string[] | undefined;
+            const roles = identified?.roles as string[] | undefined;
             if (roles?.includes('operator')) multiplier = roleMultipliers.operator;
             else if (roles?.includes('owner')) multiplier = roleMultipliers.owner;
-            else if (req.auth) multiplier = roleMultipliers.agent;
+            else if (identified) multiplier = roleMultipliers.agent;
             else multiplier = roleMultipliers.anonymous;
         }
         const max = Math.ceil(baseMax * multiplier);
