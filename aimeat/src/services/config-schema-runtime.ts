@@ -16,7 +16,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial.
  */
-import type { AimeatConfig } from '../config-types.js';
+// Typed by the keys alone, not AimeatConfig: config-types.ts reaches config-schema.ts, so importing
+// the config type here would close an import cycle (config-schema-rate-limits.ts says the same).
+// config-schema.ts spreads these rows into CONFIG_FIELDS, where each key is checked against AimeatConfig.
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf } from './config-schema-validators.js';
 
@@ -26,7 +28,13 @@ const bool = (v: unknown): boolean => typeof v === 'boolean';
 const text = (v: unknown): boolean => typeof v === 'string';
 const textOrNull = (v: unknown): boolean => v === null || typeof v === 'string';
 
-export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<keyof AimeatConfig>[] = [
+type RuntimeKey = 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' | 'usageRollupBatch' | 'usageRollupPasses'
+  | 'usageBufferMs' | 'tallyBufferMs' | 'logLevel' | 'perfTrace' | 'nodeKeyPath' | 'keyPassphrase' | 'encryptionKey'
+  | 'federationPublicKey' | 'federationPrivateKey' | 'securityProfile' | 'allowPrivateEgress' | 'trustProxy' | 'appHost'
+  | 'appOriginEnabled' | 'portfolioHost' | 'portfolioOriginEnabled' | 'coHost' | 'coOriginEnabled' | 'connectFakeBaseUrl'
+  | 'x402TestFacilitator';
+
+export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   // ── Usage meter (mutable). The windows and batches are read on each run; the flush intervals at start. ──
   { key: 'usageHotDays', dotPath: 'usage.hot_days', envVar: 'AIMEAT_USAGE_HOT_DAYS', type: 'number', validate: whole(0), immutable: false, description: 'Days raw usage rows stay in the hot tables before the archive job moves them (0 keeps none hot). Nothing is deleted', range: '0-3650' },
   { key: 'usageHourRollupDays', dotPath: 'usage.hour_rollup_days', envVar: 'AIMEAT_USAGE_HOUR_ROLLUP_DAYS', type: 'number', validate: whole(0), immutable: false, description: 'Days the hour-by-hour usage figures are kept; the day-by-day figures keep the history', range: '0-3650' },

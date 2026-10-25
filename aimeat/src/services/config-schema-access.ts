@@ -17,7 +17,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial.
  */
-import type { AimeatConfig } from '../config-types.js';
+// Typed by the keys alone, not AimeatConfig, which would close an import cycle through
+// config-types.ts; config-schema.ts checks each key against AimeatConfig where it spreads the rows.
 import type { ConfigFieldShape } from './config-field-def.js';
 import { isEmptyOrHttpUrl } from './config-schema-validators.js';
 
@@ -27,7 +28,13 @@ const text = (v: unknown): boolean => typeof v === 'string';
 /** A list row that may be empty: every entry a non-empty word with no comma in it. */
 const words = (v: unknown): boolean => Array.isArray(v) && v.every(s => typeof s === 'string' && s.trim() !== '' && !s.includes(','));
 
-export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<keyof AimeatConfig>[] = [
+type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' | 'refreshGraceMs' | 'agentJwtTtlSeconds'
+  | 'ecoJwtTtlSeconds' | 'googleOAuthEnabled' | 'googleOAuthClientId' | 'googleOAuthClientSecret' | 'googleOAuthRedirectUri'
+  | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
+  | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
+  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes';
+
+export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
   { key: 'accessTtlSeconds', dotPath: 'auth.access_ttl_seconds', envVar: 'AIMEAT_ACCESS_TTL', type: 'number', validate: whole(60), immutable: false, description: 'How long a person\'s access token lasts, in seconds, before the refresh token renews it (default 900)', range: '60-86400' },
   { key: 'refreshIdleDays', dotPath: 'auth.refresh_idle_days', envVar: 'AIMEAT_REFRESH_IDLE_DAYS', type: 'number', validate: whole(1), immutable: false, description: 'Days a sign-in stays valid without use (default 30)', range: '1-365' },

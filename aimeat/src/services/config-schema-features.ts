@@ -20,7 +20,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial.
  */
-import type { AimeatConfig } from '../config-types.js';
+// Typed by the keys alone, not AimeatConfig, which would close an import cycle through
+// config-types.ts; config-schema.ts checks each key against AimeatConfig where it spreads the rows.
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf, isEmptyOrHttpUrl } from './config-schema-validators.js';
 
@@ -33,7 +34,19 @@ const words = (v: unknown): boolean => Array.isArray(v) && v.every(s => typeof s
 /** An object of name to text, the site key-value pairs. */
 const textPairs = (v: unknown): boolean => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v as Record<string, unknown>).every(x => typeof x === 'string');
 
-export const FEATURE_CONFIG_FIELDS: ConfigFieldShape<keyof AimeatConfig>[] = [
+type FeatureKey = 'aiProvenance' | 'aiProvenanceDetail' | 'aiProviderAllowlist' | 'aiCopSections' | 'aiCopSignedOn'
+  | 'aiSupervisoryName' | 'aiSupervisoryUrl' | 'sttMaxMb' | 'sttMaxSeconds' | 'voiceMsgMaxSeconds' | 'calibratorEnabled'
+  | 'packagesEnabled' | 'packageCreateRole' | 'packageMaxSizeMb' | 'packageMaxComponents' | 'packageMaxPerAuthor'
+  | 'packageFederationEnabled' | 'templatesEnabled' | 'templateReviewsEnabled' | 'templateDiscussionsEnabled'
+  | 'extensionMaxDebitPerCall' | 'extensionMaxPayMorsels' | 'capabilityPublishing' | 'capabilityWebhooks'
+  | 'capabilityWebhookDomainAllowlist' | 'federationAvailabilityWindowDays' | 'federationAvailabilityPermanentThreshold'
+  | 'federationAvailabilityMinSamples' | 'x402Enabled' | 'x402Network' | 'x402FacilitatorUrl' | 'x402RpcUrl'
+  | 'finvoiceOperator' | 'finvoiceOperatorUrl' | 'finvoiceOperatorApiKey' | 'outboundDailyLimit' | 'messageRetryIntervalMs'
+  | 'messageRetryTtlHours' | 'taskStallThresholdMinutes' | 'executionLogRetentionDays' | 'organismDecisionLogCap'
+  | 'workspaceMaxVersions' | 'appAssetProbe' | 'screenshotAutoCapture' | 'screenshotIntervalMin' | 'screenshotSettleMs'
+  | 'screenshotOnDemandPerHour' | 'homeRoomMonetise' | 'siteKv' | 'inactivityNudge';
+
+export const FEATURE_CONFIG_FIELDS: ConfigFieldShape<FeatureKey>[] = [
   // ── AI: the compliance statement, provenance and speech limits ──
   { key: 'aiProvenance', dotPath: 'ai.provenance', envVar: 'AIMEAT_AI_PROVENANCE', type: 'boolean', validate: bool, immutable: true, description: 'Record how AI-generated content was made. From 4.0.0 a public node records it whatever this says; only a local node may switch it off. Set in the environment' },
   { key: 'aiProvenanceDetail', dotPath: 'ai.provenance_detail', envVar: 'AIMEAT_AI_PROVENANCE_DETAIL', type: 'string', ...oneOf('full', 'minimal'), immutable: false, description: 'How much a provenance record says: full names the model and the steps, minimal only that AI was used' },

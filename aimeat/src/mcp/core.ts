@@ -734,7 +734,7 @@ export function registerCoreTools(
     registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
 
     // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
-    registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes);
+    registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, sessionScopes, caller);
     // BR-04: the operator's SSO administration and manual account lifecycle.
     registerAdminSsoTools(mcp, storage, config, getAgentGaii, sessionScopes);
     // The Security page in one read, and the incident action a chat could not do before.

@@ -253,11 +253,11 @@
       "digest": "sha256:0f8ab65ca51570d1234f367b"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-10-20",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:d8c0ddd3f743e712f66442c1"
+      "digest": "sha256:2ab00060a7cabf1973e92d96"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-10-23",
@@ -626,7 +626,7 @@
       "aimeat/src/services/ai-provenance.ts": "24021ea9d834c23b"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "ff184eec827653cc"
+      "aimeat/src/mcp/core-admin.ts": "359fed0863915c29"
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "fec5c4713440926b",
