@@ -19,6 +19,8 @@
  *   ordered lists
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-conformance-lists.test.ts
  * @version-history
+ *   2026-10-25 — Subdomain sites: listSubdomainSitesPage pages in byte order of the label, and origin
+ *     round-trips on create and update (secaudit2026oct22).
  *   2026-10-16 — Initial (QA audit P4-09, D4-01, E4-01, D4-04, D4-05, D4-07).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -208,5 +210,29 @@ describe('lists that had no order on PostgreSQL (QA audit D4-04)', () => {
       return { prompts, templates };
     });
     expect(same(r)).toEqual({ prompts: ['aa.c', 'aa.z', 'zz.a', 'zz.b'], templates: ['t1.en', 't1.fi', 't2.en', 't2.fi'] });
+  });
+});
+
+describe('subdomain sites: the keyset page and the origin (secaudit2026oct22)', () => {
+  it('pages in byte order of the label, and writes and reads origin back', async () => {
+    const r = await onEach(async (s, p) => {
+      const at = new Date().toISOString();
+      const site = (subdomain: string, origin?: 'operator' | 'publisher') =>
+        s.createSubdomainSite({ subdomain, kind: 'app', target: `o${p}/a.html`, enabled: true, createdBy: `o${p}@node`, createdAt: at, updatedAt: at, ...(origin ? { origin } : {}) });
+      // '-' sorts before 'a' in byte order; a locale collation that skips '-' would give another sequence.
+      await site(`${p}a`); await site(`${p}-b`, 'publisher'); await site(`${p}-a-2`); await site(`${p}-a`, 'operator');
+      await s.updateSubdomainSite(`${p}a`, { origin: 'operator' });
+      const seen: string[] = [];
+      let after = p;
+      for (let i = 0; i < 5; i++) {
+        const page = await s.listSubdomainSitesPage({ after, limit: 2 });
+        const mine = page.filter(x => x.subdomain.startsWith(p));
+        if (!mine.length) break;
+        seen.push(...mine.map(x => `${x.subdomain.slice(p.length)}:${x.origin ?? 'null'}`));
+        after = page[page.length - 1]!.subdomain;
+      }
+      return seen;
+    });
+    expect(same(r)).toEqual(['-a:operator', '-a-2:null', '-b:publisher', 'a:operator']);
   });
 });
