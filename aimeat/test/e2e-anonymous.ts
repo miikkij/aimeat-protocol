@@ -576,6 +576,36 @@ await test('POST /v1/memory/copy: the minted token copies only into anonymous.*,
     assert(agent.status === 200 || agent.status === 202, `agent copy: ${shown(agent)}`);
 });
 
+const hook = JSON.stringify({ url: 'http://127.0.0.1:9/anon-hook' });
+await test('The shared agent\'s webhook: the minted token is 401 on set, test and delete; an agent sets its own', async () => {
+    assert(ownerAgent !== null, 'agent fixture failed');
+    const set = await json('/v1/agents/shared/webhook', anonAuth({ method: 'PUT', body: hook }));
+    const probe = await json('/v1/agents/shared/webhook/test', anonAuth({ method: 'POST', body: '{}' }));
+    const del = await json('/v1/agents/shared/webhook', anonAuth({ method: 'DELETE' }));
+    assert(isAuthRequired(set) && isAuthRequired(probe) && isAuthRequired(del), `minted token webhook: set ${shown(set)}; test ${shown(probe)}; delete ${shown(del)}`);
+    const own = await json(`/v1/agents/${ownerAgent!.name}/webhook`, agentAuth({ method: 'PUT', body: hook }));
+    assert(own.status === 200, `agent own webhook: ${shown(own)}`);
+    await json(`/v1/agents/${ownerAgent!.name}/webhook`, agentAuth({ method: 'DELETE' }));
+});
+
+await test('The shared agent\'s public card: the minted token is refused on tags and capabilities (REST and MCP), an agent sets its own', async () => {
+    assert(ownerAgent !== null && agentMcp !== null, 'agent fixture failed');
+    const caps = JSON.stringify({ technical: [{ type: 'tool', name: 'anon-guard' }], domain: ['anon-guard'] });
+    const tags = JSON.stringify({ tags: [`anon-guard-${s3e}`] });
+    const restCaps = await json('/v1/agents/shared/capabilities', anonAuth({ method: 'PUT', body: caps }));
+    const restTags = await json('/v1/agents/shared/tags', anonAuth({ method: 'PATCH', body: tags }));
+    assert(isAuthRequired(restCaps) && isAuthRequired(restTags), `minted token REST: capabilities ${shown(restCaps)}; tags ${shown(restTags)}`);
+    const mcpTags = await callTool(anonMcp, 'aimeat_agent_tags_set', { target_agent_name: 'shared', tags: [`anon-guard-${s3e}`] });
+    const mcpCaps = await callTool(anonMcp, 'aimeat_agent_capabilities_report', { domain: ['anon-guard'] });
+    assert(mcpTags.isError && /AUTH_REQUIRED/.test(mcpTags.text) && mcpCaps.isError && /AUTH_REQUIRED/.test(mcpCaps.text),
+        `minted token MCP: tags ${mcpTags.text.slice(0, 160)}; capabilities ${mcpCaps.text.slice(0, 160)}`);
+    const ownCaps = await json(`/v1/agents/${ownerAgent!.name}/capabilities`, agentAuth({ method: 'PUT', body: caps }));
+    const ownTags = await json(`/v1/agents/${ownerAgent!.name}/tags`, agentAuth({ method: 'PATCH', body: tags }));
+    assert(ownCaps.status === 200 && ownTags.status === 200, `agent own: capabilities ${shown(ownCaps)}; tags ${shown(ownTags)}`);
+    const mcpOwn = await callTool(agentMcp!, 'aimeat_agent_tags_set', { target_agent_name: ownerAgent!.name, tags: [`anon-guard-${s3e}`] });
+    assert(!mcpOwn.isError, `agent own tags over MCP: ${mcpOwn.text.slice(0, 200)}`);
+});
+
 await test('The anonymous token still writes its own memory after the Phase 3e refusals', async () => {
     const key = `anonymous.after-3e-${s3e}`;
     const { status, body } = await json('/v1/memory', anonAuth({ method: 'POST', body: JSON.stringify({ key, value: { ok: true } }) }));

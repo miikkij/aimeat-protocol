@@ -10,6 +10,8 @@
  *   - PUT  /v1/agents/:name/capabilities -- Agent reports its capabilities
  *   - GET  /v1/agents/:name/capabilities -- Get agent capabilities + activity stats
  * @version-history
+ *   2026-10-24 — PUT refuses the shared anonymous principal with 401 AUTH_REQUIRED
+ *     (refuseAnonymousPrincipal): the capabilities are the shared agent's public card (secaudit2026oct22).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.3.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.0 -- 2026-08-11 -- The write moved to services/agent-profile-write.ts, which
@@ -27,6 +29,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { agentGaiiFromIdentifier, mayActOnAgent } from '../utils/gaii.js';
 import { setAgentCapabilities } from '../services/agent-profile-write.js';
 
@@ -46,7 +49,9 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
   }
 
   /* ── PUT /v1/agents/:name/capabilities -- Agent reports its capabilities ── */
-  router.put('/v1/agents/:name/capabilities', requireAuth(), async (req, res) => {
+  // The shared anonymous agent reports no capabilities: they are its public agent card, and every
+  // holder of the minted token is that one agent.
+  router.put('/v1/agents/:name/capabilities', requireAuth(), refuseAnonymousPrincipal(), async (req, res) => {
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
 

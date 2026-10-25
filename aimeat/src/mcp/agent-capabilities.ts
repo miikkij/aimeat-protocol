@@ -11,6 +11,8 @@
  *   import { registerAgentCapabilityTools } from './agent-capabilities.js';
  *   registerAgentCapabilityTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-24 — aimeat_agent_capabilities_report refuses the shared anonymous principal with
+ *     AUTH_REQUIRED, as PUT /v1/agents/:name/capabilities does (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -32,6 +34,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { setAgentCapabilities } from '../services/agent-profile-write.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
+import { toolError } from './tool-error.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -52,6 +56,9 @@ export function registerAgentCapabilityTools(
             annotations: annotationsFor('aimeat_agent_capabilities_report'),
         },
         async ({ technical, domain, languages }) => {
+            // The shared anonymous agent reports no capabilities, as PUT /v1/agents/:name/capabilities
+            // refuses it: they are its public card, and every holder of the minted token is that agent.
+            if (isAnonymousPrincipal({ sub: agentGaii })) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             // The caller reached this tool over an authenticated agent session. An mcp-type capability
             // is marked verified only when it also names a server the node knows for the owner
             // (setAgentCapabilities, feature-list audit 74).

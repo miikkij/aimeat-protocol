@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-24 — aimeat_agent_tags_set refuses the shared anonymous principal with AUTH_REQUIRED, as
+ *     PATCH /v1/agents/:name/tags does (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_agent_propose's next_step says when the proposed agent may invite people (proposalNextStep with the proposal's permissions).
@@ -63,6 +65,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, localAccountName, agentGaiiFromIdentifier } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { toolError } from './tool-error.js';
+import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, setAgentDescription, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
@@ -103,6 +106,9 @@ export function registerAgentManagementTools(
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
+            // The shared anonymous agent sets no tags, as PATCH /v1/agents/:name/tags refuses it: every
+            // holder of the minted token is that one agent, and its tags are on its public card.
+            if (isAnonymousPrincipal({ sub: agentGaii })) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             // Its own tags need no agent:write; a sibling's do (auth/self-or-scope.ts, the same rule
             // as PATCH /v1/agents/:name/tags). The tool is scope-exempt so an agent without the word
             // still sees it, which puts the sibling check here.
