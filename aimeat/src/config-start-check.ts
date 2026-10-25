@@ -39,7 +39,6 @@
  *     the loader parses each its own way, so the row's JSON validator does not describe that form.
  *   - A boolean row is not checked: the loader reads `=== 'true'` or `!== 'false'`, and every text
  *     has one meaning there.
- *   - START_ONLY_CHOICES: the fixed-set settings that have no schema row yet.
  *
  *   CASE IS NOT A TYPING ERROR. A fixed-set value that matches one of its words in another case or
  *   with spaces around it (`Operator`) is written back as that word, so the loader's exact compare
@@ -49,12 +48,14 @@
  *   number or fixed-set setting is removed from the environment before the check and the loader uses
  *   its default. That is what turns the empty lockout count back into 5 instead of NaN.
  *
- * @structure START_ONLY_CHOICES · REFUSE_ON_INVALID · dropEmptySettings() · normaliseFixedSetSettings() ·
+ * @structure REFUSE_ON_INVALID · dropEmptySettings() · normaliseFixedSetSettings() ·
  *   startSettingProblems() · applyStartSettings() · startSettingFallbacks() · ConfigStartError
  * @usage
  *   const setAside = applyStartSettings(process.env);           // in loadConfig, before the config is built
  *   const fallbacks = startSettingFallbacks(setAside, config);  // after: one log line per setting
  * @version-history
+ *   v2.1.0 — 2026-10-25 — START_ONLY_CHOICES is gone: capability publishing, capability webhooks and
+ *     the package creation role have Config-tab rows with their words, so the rows' check covers them.
  *   v2.0.0 — 2026-10-16 — A value the node does not accept no longer refuses the start: it is set
  *     aside, the default is used, one log line names it, and the server records a Security page
  *     incident. REFUSE_ON_INVALID keeps the refusal for the storage type, the node type and the
@@ -64,24 +65,6 @@
 
 import { CONFIG_FIELDS, parseConfigValue, readConfigField, type ConfigFieldDef } from './services/config-schema.js';
 import type { AimeatConfig } from './config-types.js';
-
-/**
- * Fixed-set settings the loader reads that have no CONFIG_FIELDS row (they are listed in
- * security/config-coverage-exemptions.json as not in the Config tab). Each list is the set of words
- * the loader and its consumers know; anything else used to mean the open setting.
- */
-export const START_ONLY_CHOICES: Readonly<Record<string, readonly string[]>> = {
-  AIMEAT_CAPABILITY_PUBLISHING: ['disabled', 'self_only', 'moderated', 'open'],
-  AIMEAT_CAPABILITY_WEBHOOKS: ['disabled', 'allowlist_only', 'open'],
-  AIMEAT_PACKAGE_CREATE_ROLE: ['operator', 'owner'],
-};
-
-/** The AimeatConfig key of each START_ONLY_CHOICES setting, to read the default the node uses. */
-const START_ONLY_KEYS: Readonly<Record<string, keyof AimeatConfig>> = {
-  AIMEAT_CAPABILITY_PUBLISHING: 'capabilityPublishing',
-  AIMEAT_CAPABILITY_WEBHOOKS: 'capabilityWebhooks',
-  AIMEAT_PACKAGE_CREATE_ROLE: 'packageCreateRole',
-};
 
 /**
  * The settings whose default would be unsafe or meaningless in place of the value the operator
@@ -144,12 +127,6 @@ export function dropEmptySettings(env: NodeJS.ProcessEnv = process.env): string[
       dropped.push(field.envVar);
     }
   }
-  for (const variable of Object.keys(START_ONLY_CHOICES)) {
-    if (empty(env[variable])) {
-      delete env[variable];
-      dropped.push(variable);
-    }
-  }
   return dropped;
 }
 
@@ -180,11 +157,6 @@ export function startSettingProblems(env: NodeJS.ProcessEnv = process.env): Star
       : field.validate(parseConfigValue(field, raw));
     if (!ok) problems.push({ variable: field.envVar, value: raw, takes: describe(field) });
   }
-  for (const [variable, choices] of Object.entries(START_ONLY_CHOICES)) {
-    const raw = env[variable];
-    if (raw === undefined || raw.trim() === '') continue;
-    if (!choices.includes(raw)) problems.push({ variable, value: raw, takes: `takes one of ${choices.join(', ')}` });
-  }
   return problems;
 }
 
@@ -196,10 +168,8 @@ export function startSettingProblems(env: NodeJS.ProcessEnv = process.env): Star
  */
 export function normaliseFixedSetSettings(env: NodeJS.ProcessEnv = process.env): string[] {
   const rewritten: string[] = [];
-  const lists: Array<[string, readonly string[]]> = [
-    ...CONFIG_FIELDS.filter(f => f.choices).map(f => [f.envVar, f.choices!] as [string, readonly string[]]),
-    ...Object.entries(START_ONLY_CHOICES),
-  ];
+  const lists: Array<[string, readonly string[]]> =
+    CONFIG_FIELDS.filter(f => f.choices).map(f => [f.envVar, f.choices!] as [string, readonly string[]]);
   for (const [variable, choices] of lists) {
     const raw = env[variable];
     if (raw === undefined || choices.includes(raw)) continue;
@@ -241,8 +211,7 @@ export function startSettingFallbacks(
 ): StartSettingFallback[] {
   return setAside.map((p) => {
     const field = CONFIG_FIELDS.find(f => f.envVar === p.variable);
-    const key = START_ONLY_KEYS[p.variable];
-    const used = asText(field ? readConfigField(config, field) : key ? config[key] : undefined);
+    const used = asText(field ? readConfigField(config, field) : undefined);
     warn(`[config] ${p.variable}="${p.value}" is not a value this node accepts: it ${p.takes}. `
       + `The node uses the default, ${used === '' ? 'no value' : used}, until the value is corrected; the Security page lists it.`);
     return { ...p, used, ...(field ? { dotPath: field.dotPath } : {}) };

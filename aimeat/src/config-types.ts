@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.20.0 — 2026-10-25 — RuntimeConfig mixed in (config-runtime.ts): the usage meter, write tally, log level, proxy trust and key settings.
  *   v1.19.1 — 2026-10-25 — OperatorConfig and OperatorType moved to config-types-operator.ts unchanged and re-exported (an import cycle through config-sealing.ts).
  *   v1.19.0 — 2026-10-20 — ContentClassConfig mixed in (config-content-class.ts): contentClassMode,
  *     ffprobePath, ffmpegPath.
@@ -128,8 +129,9 @@ import type { TurnConfig } from './config-turn.js';
 import type { DocsignConfig } from './config-docsign.js';
 import type { PagesConfig } from './config-pages.js';
 import type { ContentClassConfig } from './config-content-class.js';
+import type { RuntimeConfig } from './config-runtime.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig {
   port: number;
   baseUrl: string;
   /**

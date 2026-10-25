@@ -253,11 +253,11 @@
       "digest": "sha256:0f8ab65ca51570d1234f367b"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-10-20",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
-      "digest": "sha256:d8c0ddd3f743e712f66442c1"
+      "digest": "sha256:52ebcd099c3f0297a44fc1f2"
     },
     "node:manage-my-agents": {
       "reviewedOn": "2026-10-25",
@@ -265,7 +265,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:880dda102cbaf5de9995dc44"
+      "digest": "sha256:4d771aaaa4c2ac138a09e4f1"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -626,10 +626,10 @@
       "aimeat/src/services/ai-provenance.ts": "24021ea9d834c23b"
     },
     "node:aimeat-node-operations": {
-      "aimeat/src/mcp/core-admin.ts": "ff184eec827653cc"
+      "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "f1ffeb7752b77fcc",
+      "aimeat/src/mcp/core.ts": "0798cfa0dd0d2c52",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "40c81e6211e92fcb"
     },
     "node:manage-my-profile-data": {

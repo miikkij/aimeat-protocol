@@ -57,7 +57,8 @@ describe('setup node settings', () => {
     const r = parseSetupNodeSettings({ nodeId: 'n1', genesisUrl: 'https://aimeat.io', locale: 'es' });
     if (!r.ok) throw new Error(r.problem);
     const content = buildSetupEnv(r.settings, cfg, '2026-10-09T00:00:00.000Z');
-    expect(variablesIn(content)).toEqual(['AIMEAT_NODE_ID', 'AIMEAT_PORT', 'AIMEAT_NODE_TYPE', 'AIMEAT_GENESIS_URL', 'AIMEAT_LOCALE']);
+    // The language is the operator's own and is kept on their account, not in .env: no node code reads AIMEAT_LOCALE.
+    expect(variablesIn(content)).toEqual(['AIMEAT_NODE_ID', 'AIMEAT_PORT', 'AIMEAT_NODE_TYPE', 'AIMEAT_GENESIS_URL']);
     expect(content).toContain('AIMEAT_GENESIS_URL="https://aimeat.io"');
     expect(content).toContain('AIMEAT_NODE_TYPE="personal"');
   });

@@ -6,6 +6,8 @@
  *   reads as an array and `allowed.includes(origin)` became a substring test.
  * @usage pnpm test -- config-list-settings
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The list rows that came with the rest of the settings' rows, and the one
+ *     immutable list row (ai.provider_allowlist).
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -18,7 +20,11 @@ import type { Storage } from '../../src/storage/interface.js';
 const LIST_PATHS = [
     'cors.allowed_origins', 'scopes.default_agent_scopes', 'scopes.max_agent_scopes',
     'push.notify_types', 'realtime.stun_servers', 'federation.default_scopes',
+    // Rows since 2026-10-25, when every setting the node reads got one (check:config-coverage).
+    'scopes.default_eco_scopes', 'scopes.max_eco_scopes', 'ai.cop_sections', 'features.capability_webhook_domain_allowlist',
 ];
+/** List rows that are set in the environment only: a stored key is sent only to these hosts. */
+const IMMUTABLE_LIST_PATHS = ['ai.provider_allowlist'];
 
 describe('the list helpers', () => {
     it('split a comma-separated text, trim the parts and drop the empty ones', () => {
@@ -44,8 +50,9 @@ describe('the list helpers', () => {
 });
 
 describe('the list rows of the schema', () => {
-    it('are exactly the six settings the node holds as a list, typed object and marked list', () => {
-        expect(CONFIG_FIELDS.filter(f => f.list).map(f => f.dotPath).sort()).toEqual([...LIST_PATHS].sort());
+    it('are exactly the settings the node holds as a list, typed object and marked list', () => {
+        expect(CONFIG_FIELDS.filter(f => f.list).map(f => f.dotPath).sort()).toEqual([...LIST_PATHS, ...IMMUTABLE_LIST_PATHS].sort());
+        for (const path of IMMUTABLE_LIST_PATHS) expect(ALL_CONFIG_MAP[path].type, path).toBe('object');
         for (const path of LIST_PATHS) {
             expect(ALL_CONFIG_MAP[path].type, path).toBe('object');
             expect(ALL_CONFIG_MAP[path].immutable, path).toBe(false);

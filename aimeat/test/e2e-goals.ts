@@ -475,6 +475,24 @@ await test('23. a model work reads the record an agent\'s earlier work delivered
   assert(sent.includes('TUTKIMUSTULOS: Kilpailija X on halvin.'), `the model was given the deliverable's text: ${sent.slice(0, 400)}`);
 });
 
+await test('24. rejecting an approval a plan put after a model work asks the model again with the reason, and asks for approval again', async () => {
+  // aimeat.io, 2026-10-25: the planner's approve step names only `after`, and its rejection asked nothing again.
+  provider.reset();
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Kirjoita katsaus.', limits: { usd: 5 }, works: [{ title: 'Kirjoita', runner: 'model' }, { title: 'Hyväksy', kind: 'human', human_kind: 'approve', after: ['#1'] }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id;
+  const step = await waitFor('the approval to open', async () => (await readGoal(tokenA, id)).works.find((w: any) => w.kind === 'human' && w.status === 'open'), 30_000);
+  const no = await json(`/v1/goals/${id}/works/${step.id}/answer`, { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ approve: false, reason: 'Käytä tutkimusta, älä omia tietojasi.' }) });
+  assert(no.status === 200, `reject: ${no.status} ${JSON.stringify(no.body.error)}`);
+  const g = await waitFor('the second approval to open', async () => {
+    const x = await readGoal(tokenA, id);
+    return x.works.filter((w: any) => w.kind === 'human' && w.status === 'open').length === 1 && x.works.length === 4 ? x : null;
+  }, 30_000);
+  const retry = g.works.find((w: any) => w.retry_of);
+  assert(retry && retry.runner === 'model' && retry.status === 'done' && retry.claimed_by === 'model', `the model did it again: ${JSON.stringify(retry)}`);
+  assert(JSON.stringify(provider.lastRequest('chat')?.json ?? {}).includes('Käytä tutkimusta, älä omia tietojasi.'), 'the model read the reason');
+});
+
 await provider.close();
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

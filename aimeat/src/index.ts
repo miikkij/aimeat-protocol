@@ -6,6 +6,7 @@
  * @description Main AIMEAT CLI entry point, including node management commands and agent connector dispatch.
  * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
  * @usage Executed through the published `aimeat` binary.
+ * @version-history 2026-10-25 — --db-url, --db-path and --admin-password name storage.database_url, storage.sqlite_path and setup.admin_password, the rows' paths on the Config tab.
  * @version-history 2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  * @version-history v1.9.4 — 2026-05-28 — Allow agent connector flags and drain async auth handles before exit.
  * @version-history v1.9.5 — 2026-05-28 — Drain async handles before exiting one-shot connector commands on Windows.
@@ -143,10 +144,10 @@ const consulTokenFlag = stringFlag(values['consul-token']);
 
 if (portFlag) cliOverrides['node.port'] = portFlag;
 if (dbFlag) cliOverrides['storage.type'] = dbFlag;
-if (dbUrlFlag) cliOverrides['database_url'] = dbUrlFlag;
-if (dbPathFlag) cliOverrides['sqlite_path'] = dbPathFlag;
+if (dbUrlFlag) cliOverrides['storage.database_url'] = dbUrlFlag;
+if (dbPathFlag) cliOverrides['storage.sqlite_path'] = dbPathFlag;
 if (nodeIdFlag) cliOverrides['node.id'] = nodeIdFlag;
-if (adminPasswordFlag) cliOverrides['admin_password'] = adminPasswordFlag;
+if (adminPasswordFlag) cliOverrides['setup.admin_password'] = adminPasswordFlag;
 if (consulFlag) {
   cliOverrides['consul.enabled'] = 'true';
   cliOverrides['consul.url'] = consulFlag;

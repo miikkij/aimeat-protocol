@@ -12,6 +12,13 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-25 — Every AIMEAT_* setting the node reads has a row (check:config-coverage now reads all of
+ *     src/): the runtime, access and feature groups (config-schema-runtime.ts, -access.ts, -features.ts).
+ *     `applies: 'restart'` marks a stored row the code reads at start; totp.issuer, totp.backup_code_count,
+ *     passkey.rp_name, indexing.indexnow_key, push.vapid_subject, metrics.enabled and mcp.session_sweep_ms
+ *     are stored that way instead of immutable. The hidden rows are shown: storage.database_url and
+ *     setup.admin_password as whether they are set, storage.sqlite_path and the VAPID public key as values
+ *     (their old paths stay in LEGACY_DOT_PATHS).
  *   2026-10-20 — content_class.mode, content_class.ffprobe_path, content_class.ffmpeg_path
  *     (config-schema-content-class.ts; wish-sis-ll-n-purku-luokittelu-ja-owl). The email rows move
  *     to config-schema-email.ts, unchanged (max-file-lines).
@@ -128,6 +135,9 @@ import { CONNECT_CLIENT_CONFIG_FIELDS } from './config-schema-connections.js';
 import { DATA_ACCESS_CONFIG_FIELDS } from './config-schema-data-access.js';
 import { CONTENT_CLASS_CONFIG_FIELDS } from './config-schema-content-class.js';
 import { EMAIL_CONFIG_FIELDS } from './config-schema-email.js';
+import { RUNTIME_CONFIG_FIELDS } from './config-schema-runtime.js';
+import { ACCESS_CONFIG_FIELDS } from './config-schema-access.js';
+import { FEATURE_CONFIG_FIELDS } from './config-schema-features.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -152,9 +162,11 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'port', dotPath: 'node.port', envVar: 'AIMEAT_PORT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 65535, immutable: true, description: 'HTTP listen port', range: '1-65535' },
   { key: 'nodeType', dotPath: 'node.type', envVar: 'AIMEAT_NODE_TYPE', type: 'string', validate: v => ['full', 'relay', 'mirror', 'personal'].includes(v as string), immutable: true, description: 'Node type: full, relay, mirror, or personal' },
   { key: 'storageProvider', dotPath: 'storage.type', envVar: 'AIMEAT_STORAGE', type: 'string', validate: v => ['sqlite', 'memory', 'postgres', 'postgresql', 'postgres-kysely'].includes(v as string), immutable: true, description: 'Storage backend type' },
-  { key: 'dbUrl', dotPath: 'database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'Database connection URL', adminDisplay: 'hidden' },
-  { key: 'sqlitePath', dotPath: 'sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path', adminDisplay: 'hidden' },
-  { key: 'adminPassword', dotPath: 'admin_password', envVar: 'AIMEAT_ADMIN_PASSWORD', type: 'string', validate: () => true, immutable: true, description: 'Operator admin password', adminDisplay: 'hidden' },
+  // Shown on the Config tab since 2026-10-25, under storage and setup; the old paths still name them
+  // in a config file and on the command line (LEGACY_DOT_PATHS below).
+  { key: 'dbUrl', dotPath: 'storage.database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'PostgreSQL connection address. It holds the database password (secret)', adminDisplay: 'configured' },
+  { key: 'sqlitePath', dotPath: 'storage.sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path' },
+  { key: 'adminPassword', dotPath: 'setup.admin_password', envVar: 'AIMEAT_ADMIN_PASSWORD', type: 'string', validate: () => true, immutable: true, description: 'Password of the first operator account, used when the node is set up (secret)', adminDisplay: 'configured' },
   // Sealed configuration. `immutable: true` is doing real work here rather than describing a
   // boot-time-only value: it is what stops the seal list from being sealed or unsealed through
   // applyConfigOverrides(), which is the door the whole mechanism exists to close. Visible, not
@@ -234,7 +246,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // a node under a subdomain that wants its keys to work across the parent domain.
   { key: 'passkeyEnabled', dotPath: 'passkey.enabled', envVar: 'AIMEAT_PASSKEY_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Passkeys (WebAuthn) offered as a sign-in method' },
   { key: 'passkeyRpId', dotPath: 'passkey.rp_id', envVar: 'AIMEAT_PASSKEY_RP_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'The domain a passkey is bound to (derived from the node address)' },
-  { key: 'passkeyRpName', dotPath: 'passkey.rp_name', envVar: 'AIMEAT_PASSKEY_RP_NAME', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'The name shown in the device prompt' },
+  { key: 'passkeyRpName', dotPath: 'passkey.rp_name', envVar: 'AIMEAT_PASSKEY_RP_NAME', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, applies: 'restart', description: 'The name shown in the device prompt' },
   { key: 'passkeyExtraOrigins', dotPath: 'passkey.extra_origins', envVar: 'AIMEAT_PASSKEY_EXTRA_ORIGINS', type: 'object', validate: v => Array.isArray(v) && v.every(o => typeof o === 'string' && /^https?:\/\//i.test(o)), immutable: true, description: 'Extra origins a passkey ceremony may come from (the node address always counts)' },
 
   // ── TOTP secrets (immutable) ──
@@ -303,8 +315,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'pushEnabled', dotPath: 'push.enabled', envVar: 'AIMEAT_PUSH_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Web push notifications enabled' },
 
   // ── Push secrets (immutable) ──
-  { key: 'vapidPublicKey', dotPath: 'push.vapid_public_key', envVar: 'AIMEAT_VAPID_PUBLIC_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID public key (secret)', adminDisplay: 'hidden' },
-  { key: 'vapidPrivateKey', dotPath: 'push.vapid_private_key', envVar: 'AIMEAT_VAPID_PRIVATE_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID private key (secret)', adminDisplay: 'hidden' },
+  { key: 'vapidPublicKey', dotPath: 'push.vapid_public_key', envVar: 'AIMEAT_VAPID_PUBLIC_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID public key, which browsers receive when they subscribe to push' },
+  { key: 'vapidPrivateKey', dotPath: 'push.vapid_private_key', envVar: 'AIMEAT_VAPID_PRIVATE_KEY', type: 'string', validate: () => true, immutable: true, description: 'VAPID private key (secret)', adminDisplay: 'configured' },
 
   // ── EUDIW / Identity (Phase 3.3, mutable) ──
   { key: 'eudiwEnabled', dotPath: 'eudiw.enabled', envVar: 'AIMEAT_EUDIW_ENABLED', type: 'boolean', validate: eudiwSettingAllowed, refusal: EUDIW_SETTING_REFUSAL, immutable: false, description: 'EUDIW identity verification. Cannot be switched on in this release: the node refuses to start with it on, and a change here to on is refused (config-eudiw-guard.ts)' },
@@ -411,12 +423,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Work (mutable, additional) ──
   { key: 'appAnnouncementBoardId', dotPath: 'work.app_announcement_board_id', envVar: 'AIMEAT_APP_ANNOUNCEMENT_BOARD_ID', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Board ID for app announcements' },
 
-  // ── Indexing (immutable) ──
-  { key: 'indexNowKey', dotPath: 'indexing.indexnow_key', envVar: 'AIMEAT_INDEXNOW_KEY', type: 'string', validate: () => true, immutable: true, description: 'IndexNow API key for SEO', adminDisplay: 'configured' },
+  // ── Indexing (stored, from the next start) ──
+  { key: 'indexNowKey', dotPath: 'indexing.indexnow_key', envVar: 'AIMEAT_INDEXNOW_KEY', type: 'string', validate: () => true, immutable: false, applies: 'restart', description: 'IndexNow API key for SEO (secret)', adminDisplay: 'configured' },
 
-  // ── TOTP (immutable, additional) ──
-  { key: 'totpIssuer', dotPath: 'totp.issuer', envVar: 'AIMEAT_TOTP_ISSUER', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'TOTP issuer name shown in authenticator apps' },
-  { key: 'totpBackupCodeCount', dotPath: 'totp.backup_code_count', envVar: 'AIMEAT_TOTP_BACKUP_CODE_COUNT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: true, description: 'Number of TOTP backup codes to generate', range: '1-20' },
+  // ── TOTP (stored, from the next start) ──
+  { key: 'totpIssuer', dotPath: 'totp.issuer', envVar: 'AIMEAT_TOTP_ISSUER', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, applies: 'restart', description: 'TOTP issuer name shown in authenticator apps' },
+  { key: 'totpBackupCodeCount', dotPath: 'totp.backup_code_count', envVar: 'AIMEAT_TOTP_BACKUP_CODE_COUNT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 20, immutable: false, applies: 'restart', description: 'Number of TOTP backup codes to generate', range: '1-20' },
 
   // ── MSM (mutable) ──
   { key: 'msmInstallRole', dotPath: 'msm.install_role', envVar: 'AIMEAT_MSM_INSTALL_ROLE', type: 'string', ...oneOf('operator', 'owner'), immutable: false, description: 'Role required to install MSM modules: operator or owner' },
@@ -438,7 +450,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'crewTryTimeoutMs', dotPath: 'connect_tunnel.crew_try_timeout_ms', envVar: 'AIMEAT_CREW_TRY_TIMEOUT_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10_000, immutable: false, description: 'How long the Crew tab "Try" waits for a running crew to finish one trial run, in ms', range: '10000-1800000' },
 
   // ── Push Notifications (mutable, additional) ──
-  { key: 'vapidSubject', dotPath: 'push.vapid_subject', envVar: 'AIMEAT_VAPID_SUBJECT', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: true, description: 'VAPID subject (mailto: or https: URI)' },
+  { key: 'vapidSubject', dotPath: 'push.vapid_subject', envVar: 'AIMEAT_VAPID_SUBJECT', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, applies: 'restart', description: 'VAPID subject (mailto: or https: URI)' },
   { key: 'pushNotifyTypes', dotPath: 'push.notify_types', envVar: 'AIMEAT_PUSH_NOTIFY_TYPES', type: 'object', list: true, validate: isStringList, immutable: false, description: 'Notification types to push, one per line (comma-separated in the environment)' },
   { key: 'pushCooldownMin', dotPath: 'push.cooldown_min', envVar: 'AIMEAT_PUSH_COOLDOWN_MIN', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1440, immutable: false, description: 'Push notification cooldown in minutes', range: '1-1440' },
   { key: 'pushMaxSubscriptionsPerNode', dotPath: 'push.max_subscriptions_per_node', envVar: 'AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max push subscriptions per node', range: '1-100' },
@@ -473,7 +485,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'ftnProviderUrl', dotPath: 'eudiw.ftn_provider_url', envVar: 'AIMEAT_FTN_PROVIDER_URL', type: 'string', validate: () => true, immutable: false, description: 'Finnish Trust Network provider URL' },
   { key: 'vcIssuerDid', dotPath: 'eudiw.vc_issuer_did', envVar: 'AIMEAT_VC_ISSUER_DID', type: 'string', validate: () => true, immutable: false, description: 'Verifiable credential issuer DID' },
   { key: 'ftnClientId', dotPath: 'eudiw.ftn_client_id', envVar: 'AIMEAT_FTN_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'FTN broker OIDC client ID' },
-  { key: 'ftnClientSecret', dotPath: 'eudiw.ftn_client_secret', envVar: 'AIMEAT_FTN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'FTN broker OIDC client secret (secret)', adminDisplay: 'hidden' },
+  { key: 'ftnClientSecret', dotPath: 'eudiw.ftn_client_secret', envVar: 'AIMEAT_FTN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'FTN broker OIDC client secret (secret)', adminDisplay: 'configured' },
   { key: 'nonceTtlSeconds', dotPath: 'eudiw.nonce_ttl_seconds', envVar: 'AIMEAT_NONCE_TTL_SECONDS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60 && (v as number) <= 3600, immutable: false, description: 'Verification nonce TTL in seconds', range: '60-3600' },
   { key: 'nationalEidPidClaim', dotPath: 'eudiw.national_eid_pid_claim', envVar: 'AIMEAT_NATIONAL_EID_PID_CLAIM', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'National eID PID claim name (e.g., personal_identity_code)' },
 
@@ -486,12 +498,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Stats & Metrics (mutable) ──
   { key: 'statsEnabled', dotPath: 'stats.enabled', envVar: 'AIMEAT_STATS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable stats API' },
   { key: 'statsAccess', dotPath: 'stats.access', envVar: 'AIMEAT_STATS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Stats API visibility: public, authenticated, or operator' },
-  { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Enable Prometheus metrics endpoint. Read at start: the request counter mounts before any route, so a change takes effect after a restart' },
+  { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, applies: 'restart', description: 'Enable Prometheus metrics endpoint. Read at start: the request counter mounts before any route, so a change takes effect after a restart' },
   { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', ...oneOf('public', 'authenticated', 'operator'), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
 
   // ── MCP sessions (mutable) ──
   { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
-  { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 250 && (v as number) <= 600000, immutable: true, description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
+  { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 250 && (v as number) <= 600000, immutable: false, applies: 'restart', description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
 
   // ── Registration (mutable) ──
   { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
@@ -651,7 +663,22 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // The site links (the apps, the store and the people the public pages point at) are in
   // config-schema-site-links.ts, spread here in the place they always stood.
   ...SITE_LINK_CONFIG_FIELDS,
+
+  // The settings that were read with no row until 2026-10-25 (check:config-coverage, widened to src/).
+  ...RUNTIME_CONFIG_FIELDS,
+  ...ACCESS_CONFIG_FIELDS,
+  ...FEATURE_CONFIG_FIELDS,
 ];
+
+/**
+ * Paths a row had before it moved into a section of the Config tab (2026-10-25). A config file and
+ * the command line (--db-url, --db-path, --admin-password) may still name a setting by them.
+ */
+export const LEGACY_DOT_PATHS: Readonly<Record<string, string>> = {
+  database_url: 'storage.database_url',
+  sqlite_path: 'storage.sqlite_path',
+  admin_password: 'setup.admin_password',
+};
 
 // isJsonObject, isEmptyOrHttpUrl and isContactList live in config-schema-validators.ts (a pure move).
 
@@ -674,6 +701,11 @@ for (const field of CONFIG_FIELDS) {
   if (!field.immutable) MUTABLE_CONFIG_MAP[field.dotPath] = field;
   ENV_TO_DOT_PATH[field.envVar] = field.dotPath;
   DOT_PATH_TO_ENV[field.dotPath] = field.envVar;
+}
+// An old path reads as its row everywhere a path is looked up (a config file, the CLI, the seal list).
+for (const [old, now] of Object.entries(LEGACY_DOT_PATHS)) {
+  DOT_PATH_TO_ENV[old] = DOT_PATH_TO_ENV[now] as string;
+  ALL_CONFIG_MAP[old] = ALL_CONFIG_MAP[now] as ConfigFieldDef;
 }
 
 // ── Helper Functions ──
