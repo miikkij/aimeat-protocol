@@ -36,12 +36,12 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
 
 export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
-  { key: 'accessTtlSeconds', dotPath: 'auth.access_ttl_seconds', envVar: 'AIMEAT_ACCESS_TTL', type: 'number', validate: whole(60), immutable: false, description: 'How long a person\'s access token lasts, in seconds, before the refresh token renews it (default 900)', range: '60-86400' },
+  { key: 'accessTtlSeconds', dotPath: 'auth.access_ttl_seconds', envVar: 'AIMEAT_ACCESS_TTL', type: 'number', validate: whole(1), immutable: false, description: 'How long a person\'s access token lasts, in seconds, before the refresh token renews it (default 900)', range: '60-86400' },
   { key: 'refreshIdleDays', dotPath: 'auth.refresh_idle_days', envVar: 'AIMEAT_REFRESH_IDLE_DAYS', type: 'number', validate: whole(1), immutable: false, description: 'Days a sign-in stays valid without use (default 30)', range: '1-365' },
   { key: 'refreshAbsoluteDays', dotPath: 'auth.refresh_absolute_days', envVar: 'AIMEAT_REFRESH_ABSOLUTE_DAYS', type: 'number', validate: whole(1), immutable: false, description: 'Days a sign-in stays valid at most, however often it is used (default 90)', range: '1-3650' },
   { key: 'refreshGraceMs', dotPath: 'auth.refresh_grace_ms', envVar: 'AIMEAT_REFRESH_GRACE_MS', type: 'number', validate: whole(0), immutable: false, description: 'Milliseconds a replaced refresh token still works, for two tabs renewing at once (default 60000)', range: '0-600000' },
-  { key: 'agentJwtTtlSeconds', dotPath: 'auth.agent_jwt_ttl_seconds', envVar: 'AIMEAT_AGENT_JWT_TTL', type: 'number', validate: whole(60), immutable: false, description: 'How long an agent\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
-  { key: 'ecoJwtTtlSeconds', dotPath: 'auth.eco_jwt_ttl_seconds', envVar: 'AIMEAT_ECO_JWT_TTL', type: 'number', validate: whole(60), immutable: false, description: 'How long an ecosystem app\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
+  { key: 'agentJwtTtlSeconds', dotPath: 'auth.agent_jwt_ttl_seconds', envVar: 'AIMEAT_AGENT_JWT_TTL', type: 'number', validate: whole(1), immutable: false, description: 'How long an agent\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
+  { key: 'ecoJwtTtlSeconds', dotPath: 'auth.eco_jwt_ttl_seconds', envVar: 'AIMEAT_ECO_JWT_TTL', type: 'number', validate: whole(1), immutable: false, description: 'How long an ecosystem app\'s token lasts, in seconds (default 7776000, 90 days)', range: '60-31536000' },
 
   // ── Sign in with Google ──
   { key: 'googleOAuthEnabled', dotPath: 'auth.google_enabled', envVar: 'AIMEAT_GOOGLE_OAUTH_ENABLED', type: 'boolean', validate: bool, immutable: false, applies: 'restart', description: 'Offer "Sign in with Google"' },
