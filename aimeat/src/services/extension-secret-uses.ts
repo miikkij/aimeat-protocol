@@ -22,12 +22,14 @@
  *   const uses = parseUsesSecrets(manifest.uses_secrets);   // { ok, uses } | { ok: false, message }
  *   const use = declaredUse(ext.config, 'STRIPE_KEY');       // { name, hosts, why } | null
  * @version-history
+ *   2026-10-25 — declaredHostsFor leaves out the value of an unvetted host field (secaudit2026oct22).
  *   v1.1.0 — 2026-10-21 — A declared host without a port covers every port of that host; the
  *     manifest's `network:` hosts count as declared for every secret (declaredHostsFor).
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59 follow-up).
  */
 import { normalizeSecretHost, SECRET_NAME_RE } from './owner-secrets.js';
 import { capabilitiesOfRecord } from './extension-capability-declaration.js';
+import { withoutUnvettedHostValues } from './extension-network-hosts.js';
 
 /** Where `uses_secrets` is stored on the record's config. __-prefixed, so `config:` cannot set it. */
 export const USES_SECRETS_KEY = '__usesSecrets';
@@ -106,11 +108,13 @@ export function hostCovers(declared: string, host: string): boolean {
 /**
  * The hosts an extension declares for one secret: its `uses_secrets` entry for that name, and the
  * hosts its manifest's `network:` lets ctx.fetch reach (`network.hosts`, plus each host field's
- * current value on this install), which count for every secret it names (2026-10-21). Empty when it
+ * current value on this install unless it is unvetted), which count for every secret it names (2026-10-21). Empty when it
  * declares neither, and then a first use asks the owner.
  */
 export function declaredHostsFor(config: Record<string, unknown> | undefined, secretName: string): string[] {
-    const network = capabilitiesOfRecord({ config, actions: [] }).hosts ?? [];
+    // A host field value that a principal without the right to choose a secret's host set is not a
+    // declaration (secaudit2026oct22; services/extension-network-hosts.ts HOST_FIELDS_UNVETTED_KEY).
+    const network = capabilitiesOfRecord({ config: withoutUnvettedHostValues(config), actions: [] }).hosts ?? [];
     return [...(declaredUse(config, secretName)?.hosts ?? []), ...network];
 }
 

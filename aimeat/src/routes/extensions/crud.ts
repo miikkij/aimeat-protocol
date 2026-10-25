@@ -6,6 +6,9 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — PUT on an installed extension asks the manage rule as a code write (writesCode), so the install role still decides it (secaudit2026oct22).
+ *   2026-10-25 — GET :name/versions answers created_by only to the installing account and the operator (secaudit2026oct22).
+ *   2026-10-25 — PATCH :name/actions/:actionId keeps emailPolicy only for an operator caller, as PUT does (secaudit2026oct22).
  *   2026-10-21 — A changed action script drops the old-code first-use mark (services/extension-first-use-keep.ts).
  *   2026-10-21 — The list and GET /v1/extensions/:name answer `uses_secrets` (services/extension-secret-uses.ts).
  *   2026-10-21 — ?full=true asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
@@ -57,7 +60,7 @@ import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
   snapshotExtensionVersion,
 } from '../../services/component-versions.js';
-import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
+import { buildExtensionRecordFromManifest, NODE_OWNED_CONFIG_KEYS } from '../../services/extension-manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
@@ -241,7 +244,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
             'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
           return;
         }
-      } else if (!(await mayManageInstalledExt(req, config, storage, existing.installedBy, { action: 'update', subject: name }))) {
+      } else if (!(await mayManageInstalledExt(req, config, storage, existing.installedBy, { action: 'update', subject: name, writesCode: true }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
@@ -386,9 +389,16 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       return;
     }
     const versions = await listVersions(storage, 'extension', name);
+    // created_by is the principal that wrote each version, an agent's name included. Those names
+    // stay with the installing account and the operator, as GET /v1/extensions/:name keeps
+    // installedByPrincipal (secaudit2026oct22). Everyone keeps what pins a version.
+    const seesWriter = req.auth!.owner === ext.installedBy || await isOperatorCaller(storage, req.auth);
     res.json(success(config.nodeId, {
       name, current: ext.version,
-      versions: versions.map(v => ({ version: v.version, created_at: v.createdAt, created_by: v.createdBy, bytes: v.bytes, call_url: `/v1/ext/${encodeURIComponent(name)}@${v.version}/{action}` })),
+      versions: versions.map(v => ({
+        version: v.version, created_at: v.createdAt, ...(seesWriter ? { created_by: v.createdBy } : {}),
+        bytes: v.bytes, call_url: `/v1/ext/${encodeURIComponent(name)}@${v.version}/{action}`,
+      })),
       total: versions.length,
     }));
   });
@@ -508,8 +518,18 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Changed code falls under the first-use rules: the mark old code keeps goes with it
-      // (services/extension-first-use-keep.ts).
-      const updated = await storage.updateExtension(name, { actions: updatedActions, version, config: withoutFirstUseKeep(ext.config ?? {}) });
+      // (services/extension-first-use-keep.ts). The operator's emailPolicy grant stays only for code an
+      // operator caller wrote, as PUT rebuilds it through stripNodeOwnedConfig (secaudit2026oct22).
+      const keptConfig = { ...withoutFirstUseKeep(ext.config ?? {}) };
+      if (!(await isOperatorCaller(storage, req.auth))) {
+        for (const key of NODE_OWNED_CONFIG_KEYS) delete keptConfig[key];
+      }
+      // The script is new code, so the record names who wrote it, as writeExtensionRecord and the ZIP
+      // upload do on every code write: the unattended secret first use and file reach read it
+      // (secaudit2026oct22). The same value the install routes stamp.
+      const updated = await storage.updateExtension(name, {
+        actions: updatedActions, version, config: keptConfig, installedByPrincipal: req.auth!.sub,
+      });
       if (updated) {
         await snapshotExtensionVersion(storage, updated, resolveIdentity(req.auth!, config.nodeId))
           .catch(err => logger.warn('PATCH action script: version not kept', { name, version, error: String(err) }));

@@ -5,6 +5,7 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — NODE_OWNED_CONFIG_KEYS is exported: the config route and the action-script route ask it too (secaudit2026oct22).
  *   v1.15.0 — 2026-10-21 — `uses_secrets: [{ name, hosts, why }]`, stored as `config.__usesSecrets`.
  *   v1.14.0 — 2026-10-18 —An action may say `public: true`: it answers a caller without an account.
  *     Refused with a price or a pacing toll (Comicland v3 A-7).
@@ -444,7 +445,7 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
  * own SMTP identity. On a personal node the installer IS the operator, which is why this held for
  * as long as it did.
  */
-const NODE_OWNED_CONFIG_KEYS = ['emailPolicy'];
+export const NODE_OWNED_CONFIG_KEYS: readonly string[] = ['emailPolicy'];
 
 /**
  * An extension's name IS its memory address, so it has to be as tightly shaped as the other half of

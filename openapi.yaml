@@ -49674,7 +49674,9 @@ paths:
         limits and required APIs). An address that pins a version, `/v1/ext/<name>@<version>/<action>`,
         runs that snapshot's code with the live record's status, settings and instances; the bare
         address runs the latest. An app built against one version keeps running it after the
-        extension moves on; the dependency map records which version each app pinned.
+        extension moves on; the dependency map records which version each app pinned. `created_by`,
+        the principal that wrote the version (an agent's name included), is answered only to the
+        installing account's own principals and the operator; every other caller gets the rest.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -49682,7 +49684,7 @@ paths:
         - { name: name, in: path, required: true, schema: { type: string } }
       responses:
         '200':
-          description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, call_url), data.total
+          description: data.name, data.current, data.versions[] (version, created_at, created_by for the installing account and the operator, bytes, call_url), data.total
         '404':
           description: No such extension
 
@@ -50030,8 +50032,13 @@ paths:
         without a node key). A host field (manifest `network.host_fields`) takes one hostname or IPv4
         address with an optional :port, never a scheme, path, wildcard or list, and an empty string
         clears it; its host joins the fetch allowlist from the extension's next run on, and
-        `network_hosts` in the answer lists every host it reaches now. A refused value changes nothing
-        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. MCP:
+        `network_hosts` in the answer lists every host it reaches now. A host field value set by a
+        caller other than the account holder in person or a principal holding secrets:manage is
+        reached by ctx.fetch but does not count as a host the extension declares for a vault secret:
+        the first use of an unbound secret toward it asks the owner on the allow page. A refused value changes nothing
+        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. A key the node
+        owns (`emailPolicy`) is set only by the operator in person or the operator's agent holding
+        operator:admin; anyone else is refused 403 OPERATOR_REQUIRED and nothing is changed. MCP:
         aimeat_extension_config_set.
       tags: [Extensions]
       security:
@@ -50061,6 +50068,7 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'OPERATOR_REQUIRED: the body sets emailPolicy and the caller is not an operator caller.' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/extensions/{name}/unattended-reader:
@@ -57283,6 +57291,12 @@ paths:
         A `source` that differs from the stored one is normalised and checked as POST checks it, so
         an extension ref outside ext:<name>[@<version>][:<action>] is 400 INVALID_INPUT. A source
         equal to the stored one passes untouched.
+
+
+        Changing `visibility` to public meets the node's publishing policy as POST does: on a
+        `self_only` node a non-operator is refused 403 PUBLIC_DISABLED, and on a `moderated` node an
+        active capability made public is stored with status pending_review until the operator
+        reviews it. A capability that is already public keeps its status when another field changes.
       security:
         - BearerAuth: []
       parameters:
@@ -57300,7 +57314,7 @@ paths:
         '400':
           description: INVALID_INPUT, a changed source that POST would refuse.
         '403':
-          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner.
+          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner. PUBLIC_DISABLED, a change to public visibility on a self_only node by a non-operator.
     delete:
       operationId: capabilityDelete
       tags: [Capabilities]
@@ -62900,7 +62914,9 @@ paths:
 
         STORED AS A MEMORY RECORD at `crews.llm.<agent>` in the owner's own namespace, which is where
         their own tools already read and write. There is no table and no second permission: it needs
-        `memory:write`, like any other record in that namespace.
+        `memory:write`, like any other record in that namespace. A granted app is refused 403
+        ACCESS_DENIED, for a set and a clear: `crews.llm.*` is reserved from apps, because a `model`
+        choice names the address the crew sends its key to.
 
         A `provider` may NAME the environment variable holding a key (`api_key_env`) and must never
         carry the key itself; a field that looks like a credential is refused with `SECRET_IN_CHOICE`.
@@ -62945,7 +62961,7 @@ paths:
                           cleared: { type: boolean }
                           warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
         '400': { description: Not a choice this runtime could resolve, it carried a credential, or it names a key variable or an address the guard refuses (UNSAFE_CHOICE) }
-        '403': { description: Not this account's agent }
+        '403': { description: Not this account's agent, or the caller is a granted app (ACCESS_DENIED) }
         '404': { description: No agent of this account by that name }
 
   /v1/agents/llm-default:
@@ -62958,7 +62974,7 @@ paths:
         this too, because a crew that states its need is stating it about itself.
 
         `{"choice": null}` clears it, and routing falls back to the `llm_providers.json` on whatever
-        machine runs the agent.
+        machine runs the agent. A granted app is refused 403 ACCESS_DENIED, for a set and a clear.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -62989,6 +63005,7 @@ paths:
                           cleared: { type: boolean }
                           warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
         '400': { description: Not a choice this runtime could resolve, or it carried a credential }
+        '403': { description: The caller is a granted app (ACCESS_DENIED) }
 
   /v1/agents/{name}/crew/seed:
     post:
