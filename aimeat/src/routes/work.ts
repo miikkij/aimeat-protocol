@@ -12,6 +12,9 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-10-25 — Reject moves the item pending → cancelled on its status (storage.transitionWorkStatus)
+ *     in the same transaction as the refund, so concurrent rejects return the escrow once; a call that
+ *     lost answers 409 CONFLICT (secaudit2026oct22, work-status-transition-without-cas).
  *   2026-10-16 — Work the provider's node refused answers HTTP 502 PEER_REFUSED; the far node's status is
  *     only in details.peer_status, so its 401 cannot read as the caller's own session ending (decision 2026-10-16).
  *   2026-10-16 — The escrow hold and the work item's creation are one transaction (QA audit E6-03).
@@ -609,14 +612,20 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     const { reason } = req.body ?? {};
 
-    // Return escrow to requester
+    // Return escrow to requester. The item moves pending → cancelled on its status in the same
+    // transaction as the refund, and only the call that moved it refunds: the status was read, the
+    // escrow returned and the status written apart, so two concurrent rejects returned the escrow
+    // twice (secaudit2026oct22, work-status-transition-without-cas).
     const { returnEscrow } = await import('../services/morsel.js');
-    await returnEscrow(storage, work);
-
-    const updated = await storage.updateWork(tc, {
-      status: 'cancelled',
-      updatedAt: new Date().toISOString(),
+    const updated = await storage.transaction(async () => {
+      if (!await storage.transitionWorkStatus(tc, ['pending'], 'cancelled', new Date().toISOString())) return null;
+      await returnEscrow(storage, work);
+      return storage.getWork(tc);
     });
+    if (!updated) {
+      res.status(409).json(error(config.nodeId, 'CONFLICT', 'This work is no longer pending; it was accepted, rejected or expired in the meantime.'));
+      return;
+    }
     // A declined request counts against the provider's score (feature-list audit #144).
     await refreshTrustScore(storage, work.providerGaii);
 
