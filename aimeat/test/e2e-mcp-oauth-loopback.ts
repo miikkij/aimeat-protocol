@@ -24,6 +24,9 @@
  *   - Phase 3: the refusals: other host, other path, https loopback, non-loopback port
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-oauth-loopback
  * @version-history
+ *   v1.1.0 — 2026-10-25 — Phase 4: POST /v1/mcp/register refuses a client_name over 200 characters,
+ *     more than 20 redirect_uris and a redirect URI over 2048 characters or not text, and accepts the
+ *     shape Claude Code sends (secaudit2026oct22).
  *   v1.0.0 — 2026-10-22 — Initial: Claude Code could not sign in to aimeat.io. Failed on the old code first.
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -190,6 +193,43 @@ for (const [label, uri] of refused) {
         refusedAsUnregistered(await consent(uri, mcpPkce(BASE)), label);
     });
 }
+
+// ─── Phase 4 ───
+// secaudit2026oct22 (dcr-unbounded-client-records): registration needs no credential and its rows
+// stay, so each field has a ceiling no MCP client reaches.
+console.log('\nPhase 4 — registration field limits');
+
+const register = (body: unknown) => json('/v1/mcp/register', { method: 'POST', body: JSON.stringify(body) });
+
+await test('a registration shaped like Claude Code\'s is accepted', async () => {
+    const r = await register({ client_name: 'Claude Code (aimeat)', redirect_uris: [LOOPBACK_NAME, LOOPBACK_IP] });
+    assert(r.status === 201 && typeof r.body.client_id === 'string', `register: ${r.status} ${short(r.body)}`);
+    assert(r.body.redirect_uris?.length === 2, `uris echoed: ${short(r.body)}`);
+});
+
+await test('FAILURE: a client_name of 1 MB is refused 400, naming the field and its limit', async () => {
+    const r = await register({ client_name: 'a'.repeat(1024 * 1024), redirect_uris: [LOOPBACK_NAME] });
+    assert(r.status === 400 || r.status === 413, `expected 400 or 413, got ${r.status} ${short(r.body)}`);
+    if (r.status === 400) assert(/client_name/.test(String(r.body.error_description)), `names the field: ${short(r.body)}`);
+});
+
+await test('FAILURE: a client_name of 201 characters is refused 400', async () => {
+    const r = await register({ client_name: 'a'.repeat(201), redirect_uris: [LOOPBACK_NAME] });
+    assert(r.status === 400 && /client_name/.test(String(r.body.error_description)), `expected 400 naming client_name, got ${r.status} ${short(r.body)}`);
+});
+
+await test('FAILURE: more than 20 redirect_uris are refused 400', async () => {
+    const uris = Array.from({ length: 21 }, (_, i) => `http://localhost/cb${i}`);
+    const r = await register({ client_name: 'many uris', redirect_uris: uris });
+    assert(r.status === 400 && /redirect_uris/.test(String(r.body.error_description)), `expected 400 naming redirect_uris, got ${r.status} ${short(r.body)}`);
+});
+
+await test('FAILURE: a redirect URI longer than 2048 characters, or one that is not text, is refused 400', async () => {
+    const long = await register({ client_name: 'long uri', redirect_uris: [`https://client.example.test/${'p'.repeat(2048)}`] });
+    assert(long.status === 400, `long uri: expected 400, got ${long.status} ${short(long.body)}`);
+    const notText = await register({ client_name: 'object uri', redirect_uris: [{ href: 'http://localhost/cb' }] });
+    assert(notText.status === 400, `object uri: expected 400, got ${notText.status} ${short(notText.body)}`);
+});
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

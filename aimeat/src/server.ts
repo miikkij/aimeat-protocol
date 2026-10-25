@@ -13,6 +13,7 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-25 — secaudit2026oct22: POST /v1/mcp/register is parsed at 64 kB, not at the large /v1/mcp limit.
  *   2026-10-25 — secaudit2026oct22: optionalAuth counts refused credentials per address at the global
  *     rate (refusedLimiter), so a stream of forged or dead tokens is answered 429 past that rate.
  *   2026-10-25 — contentAccessGate takes the lazy storage getter the CORS middleware takes: the origin of an app opened to the internet is one keyed read.
@@ -210,7 +211,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
     // two or three pages; stored pictures by key are read on the node and count only against
     // IMAGE_INPUT_LIMITS (services/ai/call-files.ts).
     const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files') || req.path.startsWith('/v1/mcp') || req.path === '/v1/ai/image';
-    const limit = needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
+    // POST /v1/mcp/register (open client registration) carries a name and a few addresses, and needs
+    // no credential: it is parsed at 64 kB, not at the /v1/mcp file-call size (secaudit2026oct22).
+    const limit = req.path === '/v1/mcp/register' ? '64kb'
+      : needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
     // A UCP request may be signed (RFC 9421), and its Content-Digest is over the exact bytes, so the
     // UCP paths keep the raw body beside the parsed one (routes/ucp-checkout.ts).
     const keepRaw = req.path.startsWith('/ucp/')

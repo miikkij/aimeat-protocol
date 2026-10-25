@@ -38759,7 +38759,11 @@ paths:
     post:
       operationId: mcpRegisterClient
       summary: Register MCP OAuth client
-      description: Dynamic client registration for MCP OAuth 2.1 flow.
+      description: |
+        Dynamic client registration for MCP OAuth 2.1 flow. No credential is needed, so each field
+        has a ceiling (since 2026-10-25): `client_name` is text of at most 200 characters,
+        `redirect_uris` holds at most 20 addresses of at most 2048 characters each, and the body is
+        read up to 64 kB.
       tags: [MCP]
       requestBody:
         required: true
@@ -38770,10 +38774,13 @@ paths:
               properties:
                 client_name:
                   type: string
+                  maxLength: 200
                 redirect_uris:
                   type: array
+                  maxItems: 20
                   items:
                     type: string
+                    maxLength: 2048
       responses:
         '201':
           description: The registered client, as a bare OAuth object (RFC 7591), not the AIMEAT envelope. `client_secret` is shown once.
@@ -38794,7 +38801,7 @@ paths:
                     type: array
                     items: { type: string, enum: [authorization_code, refresh_token] }
         '400':
-          description: invalid_request (no client_name), as a bare OAuth error object.
+          description: invalid_request (no client_name), invalid_client_metadata (a client_name that is not text or is too long) or invalid_redirect_uri (too many redirect_uris, or one that is not text or is too long), as a bare OAuth error object.
           content:
             application/json:
               schema:
