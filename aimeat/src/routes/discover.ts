@@ -15,6 +15,9 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   2026-10-25 — scope=shared on GET /v1/discover and /v1/discover/facets asks organism:read of every
+ *     principal but the owner in person, as every other workspace read door does: 403 SCOPE_DENIED
+ *     names the word (secaudit2026oct22, discover-shared-scope-skips-organism-read).
  *   2026-10-21 — The organism caller asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v0.6.0 — 2026-10-20 — buildContext carries the caller for the organism read rule
  *     (organismCaller), so the own scope gives an agent no record of an organism that does not admit
@@ -30,8 +33,9 @@
  *     it, so the chip showed everything); +`organism` filter (records living in one organism).
  *   v0.1.0 — 2026-06-23 — Phase 1: /v1/discover + /facets over the memory/FTS source.
  */
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { requireScope } from '../auth/middleware.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -120,6 +124,19 @@ function buildContext(
   return { ctx };
 }
 
+/**
+ * scope=shared returns organism workspace content, which every other door that returns it reads
+ * only with the organism:read permission word (GET /v1/organisms/:id/workspace, /search,
+ * /workspace/records, the MCP workspace tools). The owner in person passes as requireScope lets them;
+ * an agent, an app grant, an ecosystem app and a visitor hold the word or are refused with the
+ * standard SCOPE_DENIED answer that names it. The anonymous principal has no memberships and keeps
+ * its empty answer (secaudit2026oct22, discover-shared-scope-skips-organism-read).
+ */
+const sharedScopeNeedsOrganismRead: RequestHandler = (req, res, next) => {
+  if (req.query.scope !== 'shared' || !req.auth || isAnonymousPrincipal(req.auth)) { next(); return; }
+  requireScope('organism:read')(req, res, next);
+};
+
 export function discoverRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -128,7 +145,7 @@ export function discoverRouter(config: AimeatConfig, storage: Storage): Router {
   const registry = buildDiscoveryRegistry(storage, config);
 
   // GET /v1/discover — ranked, paginated, faceted entries (entry mode).
-  router.get('/v1/discover', async (req, res) => {
+  router.get('/v1/discover', sharedScopeNeedsOrganismRead, async (req, res) => {
     const built = buildContext(req as never, config, storage);
     if ('errCode' in built) {
       res.status(built.status).json(error(config.nodeId, built.errCode, built.errMsg));
@@ -157,7 +174,7 @@ export function discoverRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // GET /v1/discover/facets — map mode: catalog-of-catalogs counts, no entries.
-  router.get('/v1/discover/facets', async (req, res) => {
+  router.get('/v1/discover/facets', sharedScopeNeedsOrganismRead, async (req, res) => {
     const built = buildContext(req as never, config, storage);
     if ('errCode' in built) {
       res.status(built.status).json(error(config.nodeId, built.errCode, built.errMsg));

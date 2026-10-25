@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-25 — aimeat_discover says the shared scope needs organism:read (secaudit2026oct22).
  *   2026-10-21 — aimeat_tools_find says that on MCP 2026-07-28 the list does not change and the found
  *     tools are called by name (one sentence added).
  *   2026-10-18 — aimeat_admin_incident_resolve decides an offered default audience cap too ("apply" /
@@ -92,7 +93,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_discover',
-        description: 'Master directory — discover what exists across the WHOLE node from one place: capabilities, workflows, knowledge, decisions, research, produced material, companies + offerings, live documents, apps, and memory. Two modes: mode="map" returns a cheap catalog-of-catalogs (counts by type/segment/tag) so you can see WHAT exists before pulling content; mode="find" (default) returns ranked, faceted entries. Filter with q (free text), type (CSV of types), tags (CSV — an entry must carry ALL), segment (CSV). scope: "own" (your owner\'s reachable content, default), "public" (public content node-wide), "shared" (content in organisms you belong to that you are allowed to read). Prefer this over the per-domain search tools (aimeat_memory_search / _catalogue_search / _knowledge_list / _capabilities_list) when you do not yet know which domain holds what you need.',
+        description: 'Master directory — discover what exists across the WHOLE node from one place: capabilities, workflows, knowledge, decisions, research, produced material, companies + offerings, live documents, apps, and memory. Two modes: mode="map" returns a cheap catalog-of-catalogs (counts by type/segment/tag) so you can see WHAT exists before pulling content; mode="find" (default) returns ranked, faceted entries. Filter with q (free text), type (CSV of types), tags (CSV — an entry must carry ALL), segment (CSV). scope: "own" (your owner\'s reachable content, default), "public" (public content node-wide), "shared" (content in organisms you belong to that you are allowed to read; needs the organism:read permission, as aimeat_workspace_read does). Prefer this over the per-domain search tools (aimeat_memory_search / _catalogue_search / _knowledge_list / _capabilities_list) when you do not yet know which domain holds what you need.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
