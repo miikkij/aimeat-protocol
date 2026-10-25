@@ -10,7 +10,8 @@
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
  *   v1.0.1 — 2026-10-11 — The stub sellable names its price `unitPrice` (was `priceMorsels`) and its pacing `tollMorsels`.
  *   v1.1.0 — 2026-10-25 — A price that is not whole cents is shown and charged as the same total
- *     (offer "tenth", 1.49 cents a unit; secaudit2026oct22).
+ *     (offer "tenth", 1.49 cents a unit; secaudit2026oct22). Canceled checkouts do not count toward
+ *     the seller's open limit; the fake storage answers countMemory and listMemory.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
@@ -83,6 +84,8 @@ function fakeStorage() {
     setMemory: async (r: { ownerGaii: string; key: string; value: unknown }) => { put(r.ownerGaii, r.key, r.value); return r; },
     deleteMemory: async (o: string, k: string) => mem.delete(`${o}|${k}`),
     listMemoryKeysByPrefix: async (p: string) => [...mem.values()].filter((r) => r.key.startsWith(p)).map((r) => ({ ownerGaii: r.ownerGaii, key: r.key })),
+    countMemory: async (owners: string[], opts?: { prefix?: string }) => [...mem.values()].filter((r) => owners.includes(r.ownerGaii) && (!opts?.prefix || r.key.startsWith(opts.prefix))).length,
+    listMemory: async (o: string, opts?: { prefix?: string }) => [...mem.values()].filter((r) => r.ownerGaii === o && (!opts?.prefix || r.key.startsWith(opts.prefix))).map((r) => ({ ...r, value: structuredClone(r.value) })),
   };
 }
 const config = { baseUrl: 'https://shop.example', nodeId: 'node-1', commerceEnabled: true, encryptionKey: null, totpSecretEncryptionKey: null } as never;
@@ -159,6 +162,18 @@ describe('the UCP guest checkout', () => {
     expect((g.toUcpOrder(order, config).totals as Array<{ amount: number }>)[1]!.amount).toBe(shown);
     expect(order.receipt?.charged).toBe(charges[0]!.amount);
   });
+
+  it('counts only open checkouts toward the seller\'s limit: closed ones do not stop a new create (secaudit2026oct22)', async () => {
+    const storage = fakeStorage();
+    const ids: string[] = [];
+    for (let i = 0; i < 500; i++) ids.push((await g.createGuestCheckout(storage as never, config, { profileUrl: PLATFORM, lineItems: line })).id);
+    // 500 open: the next one is refused, as designed.
+    await expect(g.createGuestCheckout(storage as never, config, { profileUrl: PLATFORM, lineItems: line })).rejects.toMatchObject({ code: 'rate_limited' });
+    for (const id of ids) await g.cancelGuestCheckout(storage as never, config, id, PLATFORM);
+    // All 500 canceled: their records are kept for replays, and a new checkout opens.
+    const next = await g.createGuestCheckout(storage as never, config, { profileUrl: 'https://gemini.google.com/.well-known/ucp', lineItems: line });
+    expect(next.status).toBe('incomplete');
+  }, 60_000);
 
   it('marks the line delivered when its task is done, and tries a failed webhook again when its wait is over', async () => {
     const storage = fakeStorage();
