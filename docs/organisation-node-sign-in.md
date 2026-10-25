@@ -316,8 +316,10 @@ brief for the operator's own AI. Two runtime switches govern the doors:
 What deprovisioning actually does: `active: false` (or DELETE) **deactivates** the account. The
 person's knowledge, memberships and history remain; every credential acting in their name —
 sessions, their agents' 90-day tokens, personal access tokens, app grants, live connect tunnels —
-ends within the request, and nothing new can be minted. Reactivation lets the person back in
-without resurrecting the old credentials. The same state is behind the operator's manual
+ends within the request, and nothing new can be minted. The account's background work waits: its
+schedules, its workflow triggers and its extensions' unattended runs are skipped with a log line
+that names the deactivation, and none of them is deleted. Reactivation lets the person back in
+without resurrecting the old credentials, and the waiting work runs again at its next time. The same state is behind the operator's manual
 Deactivate button on the Owners tab. A connection may only touch accounts it manages
 (`managedBy`), it can never deactivate an operator-role account, and it may ADOPT an existing
 account only when that account's locally verified email is in the connection's own domains. The

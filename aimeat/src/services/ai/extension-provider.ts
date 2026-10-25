@@ -17,6 +17,7 @@
  *   fallback price.
  * @structure CAPABILITY_OP · assertOwnExtensionProvider() · extensionRunner()
  * @version-history
+ *   v1.1.1 -- 2026-10-25 -- The run passes servesWaitingCaller: the AI call's caller waits for it, so a deactivated account does not stop it (secaudit2026oct22).
  *   v1.1.0 — 2026-10-08 — An operation the manifest does not list is the node's 400 INVALID_PROVIDER,
  *     not a provider status that a caller would answer as 502 (aiprov plan, A8).
  *   v1.0.0 — 2026-09-28 — Initial (V6 of the System 2 plan).
@@ -117,6 +118,8 @@ export function extensionRunner(
         logLabel: `ai-provider:${p.id}`, producerKind: 'extension',
         providerCall: { hosts: reachableHosts(config, decl), ...(inject ? { inject } : {}) },
         ...(signal ? { signal } : {}),
+        // The AI call's caller waits for this answer; it is not background work (account-deactivated.ts).
+        servesWaitingCaller: true,
       });
       result = out.result;
     } catch (e) {

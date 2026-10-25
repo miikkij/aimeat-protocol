@@ -28,6 +28,7 @@
  *   formatMdDelegateRefusal(opts) · renderAppMarkdown(deps, app)
  * @usage const md = await renderAppMarkdown({ storage, config }, app); // string or null
  * @version-history
+ *   v1.1.1 -- 2026-10-25 -- The action runs with servesWaitingCaller: a reader waits for it, so a deactivated account does not stop it (secaudit2026oct22).
  *   v1.1.0 — 2026-10-22 — formatMdDelegateRefusal(): a developer of another account may republish or
  *     remove the declaration the live version has, and only the full right may add one or change
  *     which extension or action it names (secaudit 2026-10, r54).
@@ -135,6 +136,8 @@ export async function renderAppMarkdown(deps: { storage: Storage; config: Aimeat
       input: { format: 'md', app: `${app.ownerName}/${app.filename}` },
       callerGaii: ownerGhii, ownerName: app.ownerName, storageOwnerGhii: ownerGhii,
       logLabel: 'format-md', producerKind: 'extension',
+      // A reader waits for this answer; it is not the account's background work (account-deactivated.ts).
+      servesWaitingCaller: true,
     });
     const md = typeof result === 'string' ? result
       : (result && typeof (result as { markdown?: unknown }).markdown === 'string' ? (result as { markdown: string }).markdown : null);

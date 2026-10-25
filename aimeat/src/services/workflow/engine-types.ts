@@ -7,6 +7,7 @@
  * @structure StartRunOpts · StartRunResult
  * @usage import type { StartRunOpts, StartRunResult } from './engine.js';
  * @version-history
+ *   v1.0.1 -- 2026-10-25 -- StartRunResult: an empty `runId` with `refused` is a deactivated account's skipped trigger start (secaudit2026oct22).
  *   v1.0.0 — 2026-10-13 — Moved from engine.ts, plus StartRunOpts.event.
  */
 import type { WorkflowCaller } from './step-authority.js';
@@ -32,7 +33,8 @@ export interface StartRunOpts {
  * new one. Every door passes the flag on, because a skip that looks like a start is the failure no
  * metric shows (a partner's intake logged a case as started on exactly that, 2026-09-09). With
  * `refused`, nothing started either: a trigger's start found its saver gone or short of a word, and
- * `runId` is the refusal's record.
+ * `runId` is the refusal's record, or empty when the account is deactivated and the start was only
+ * skipped (services/account-deactivated.ts).
  */
 export type StartRunResult =
   | { runId: string; skipped: boolean; refused?: string }
