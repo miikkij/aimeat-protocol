@@ -4,6 +4,31 @@
     {
       "date": "2026-10-25",
       "kind": "fix",
+      "id": "2026-10-25-messages-opens-at-once",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Messages opens at once",
+        "fi": "Viestit aukeavat heti"
+      },
+      "summary": {
+        "en": "Your message list appears straight away, and the current one follows from the node.",
+        "fi": "Viestilista näkyy heti, ja ajantasainen lista tulee nodelta perään."
+      },
+      "body": {
+        "en": "Your list appears straight away from the copy your browser kept, and the current one follows from the node. The page loaded in about three and a half seconds; the slow part read your whole memory to find three tracked replies. The copy holds the first 200 characters of each conversation's last message and is removed when you sign out.",
+        "fi": "Lista näkyy heti selaimen tallentamasta kopiosta, ja ajantasainen lista tulee nodelta perään. Sivu latautui noin kolme ja puoli sekuntia, koska hidas osa luki koko muistisi löytääkseen kolme seurattua vastausta. Kopiossa on kunkin keskustelun viimeisen viestin 200 ensimmäistä merkkiä, ja se poistuu, kun kirjaudut ulos."
+      },
+      "impact": {
+        "en": "Nothing to do: the Messages page is faster, and it works as before.",
+        "fi": "Sinun ei tarvitse tehdä mitään: Viestit-sivu on nopeampi ja toimii kuten ennen."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "fix",
       "id": "2026-10-25-ai-disclosure-uses-the-final-w3c-values",
       "highlight": false,
       "audience": [
