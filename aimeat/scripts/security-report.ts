@@ -25,6 +25,7 @@
  *   pnpm audit:security              # write the three files
  *   pnpm audit:security -- --dev     # include the build toolchain in the scan
  * @version-history
+ *  - 2026-10-25: the browser-library table names the newest release on our own pinned line.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-08-31 — Initial: both scanners, the licence gate, deprecations and the SBOM.
  */
@@ -306,18 +307,20 @@ function main(): void {
     md.push('compatibility contract for every published app — but the age of the bytes is worth');
     md.push('knowing, and nothing else here was telling anyone.');
     md.push('');
-    md.push('| Library | We serve | Latest | Behind | Our version | Upstream |');
-    md.push('|---|---|---|---|---|---|');
+    md.push('| Library | We serve | Our line | Latest | Behind | Our version | Upstream |');
+    md.push('|---|---|---|---|---|---|---|');
     for (const r of libs) {
       const upstream = (r.upstreamAgeDays ?? 0) > 540
         ? `quiet ${ageOf(r.upstreamAgeDays)}`
         : `active (${ageOf(r.upstreamAgeDays)} ago)`;
-      md.push(`| \`${r.name}\` | ${r.ours} | ${r.latest} | ${r.behind === 'major' ? '**major**' : r.behind} | ${ageOf(r.ourAgeDays)} old | ${upstream} |`);
+      const line = r.latestInLine === r.ours ? '=' : `**${r.latestInLine}**`;
+      md.push(`| \`${r.name}\` | ${r.ours} | ${line} | ${r.latest} | ${r.behind === 'major' ? '**major**' : r.behind} | ${ageOf(r.ourAgeDays)} old | ${upstream} |`);
     }
     md.push('');
     md.push(`${libs.filter(r => r.behind === 'current').length} current, `
       + `${libs.filter(r => r.behind === 'minor' || r.behind === 'patch').length} a minor or patch behind, `
       + `${libs.filter(r => r.behind === 'major').length} a major behind. `
+      + `${libs.filter(r => r.inLineBehind === 'minor' || r.inLineBehind === 'patch').length} can take a newer release on their own line in place. `
       + `${libs.filter(r => (r.ourAgeDays ?? 0) > 730).length} serve bytes more than two years old.`);
     md.push('');
 

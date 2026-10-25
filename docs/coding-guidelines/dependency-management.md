@@ -182,8 +182,8 @@ Three commands, and none of them opens a pull request:
 
 | Command | Answers |
 |---|---|
-| `pnpm outdated:libs` | What moved upstream: our version, the newest one, how old the bytes we serve are, whether anybody still releases it. |
-| `pnpm libs:usage -- --node https://aimeat.io` | Which published apps load which FILE. Reads public endpoints only, so it needs no token. |
+| `pnpm outdated:libs` | What moved upstream: our version, the newest release on the line we pin (which lands in place with no decision), the newest one overall, how old the bytes we serve are, whether anybody still releases it. |
+| `pnpm libs:usage -- --node https://aimeat.io` | Which published apps load which FILE: directly, through a served SDK lib or cortex pack that can load it (`aimeat-markdown` loads Mermaid), and whether the portal loads it. Reads public endpoints only, so it needs no token. |
 | `pnpm audit:security` | Both of the above plus the vulnerability scanners and the licence gate, as one dated report. |
 
 `.github/workflows/library-freshness.yml` runs the first two on the first of the month and keeps the
@@ -199,6 +199,12 @@ platform really rests on: daisyUI in 58 apps and Tailwind in 56, against 8 for C
 
 The scan cannot see an app published on another node or a draft that is not published yet, so zero
 apps means "retiring this is a decision rather than a risk", never "delete it".
+
+Until 2026-10-25 it counted only the paths written in an app's own HTML, and printed Mermaid, KaTeX
+and Motion with zero users while the markdown renderer, the living document and the Atelier kit load
+them for 21, 2 and 78 apps. It now reads which `/lib/` paths each SDK bundle and bundled cortex pack
+loads from this checkout, so against a node on older code the "via lib" column can differ by what
+changed since.
 
 ### Updating a browser library under public/lib/
 
