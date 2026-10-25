@@ -3,6 +3,27 @@
   "entries": [
     {
       "date": "2026-10-25",
+      "kind": "feature",
+      "id": "2026-10-25-maps-in-finlands-own-projection",
+      "highlight": false,
+      "audience": [
+        "developer"
+      ],
+      "title": {
+        "en": "Maps in Finland's own projection",
+        "fi": "Kartat Suomen omassa projektiossa"
+      },
+      "summary": {
+        "en": "Apps can draw maps in EPSG:3067, the projection of the National Land Survey's maps.",
+        "fi": "Sovellus voi piirtää kartan EPSG:3067-projektiossa, jossa Maanmittauslaitoksen kartat ovat."
+      },
+      "body": {
+        "en": "Apps can draw a map in ETRS-TM35FIN (EPSG:3067), the projection of the National Land Survey's maps. The node serves proj4 and Proj4Leaflet itself, next to Leaflet.",
+        "fi": "Sovellus voi piirtää kartan ETRS-TM35FIN-projektiossa (EPSG:3067), jossa Maanmittauslaitoksen kartat ovat. Palvelin jakaa proj4- ja Proj4Leaflet-kirjastot itse Leafletin rinnalla."
+      }
+    },
+    {
+      "date": "2026-10-25",
       "kind": "fix",
       "id": "2026-10-25-reply-with-ai-goes-through-your-own-ai",
       "highlight": false,
