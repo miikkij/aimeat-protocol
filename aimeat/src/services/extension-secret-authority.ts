@@ -49,6 +49,8 @@
  *   const vaultOwner = vaultOwnerForCall(deps.caller);
  *   resolveSecretForHeaders({ ..., ownerGhii: vaultOwner, firstUse: () => decideFirstUse({ ... }) });
  * @version-history
+ *   2026-10-25 — decideFirstUse: a host only an unvetted host field names binds only for the owner in
+ *     person or a caller holding secrets:manage, never by the keep, a declaration or the code writer (secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, v58 and v59).
  *   v1.0.1 — 2026-10-20 — A record that names no code writer (written before 2026-10-20) counts as
  *     the account holder's in an unattended run, as unattended file reads do; it was refused. An
@@ -89,6 +91,7 @@ import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js
 import { saverAuthority } from './workflow/trigger-authority.js';
 import { declaredUse, declaresHost } from './extension-secret-uses.js';
 import { keepsPreAuditFirstUse } from './extension-first-use-keep.js';
+import { namesUnvettedHost } from './extension-network-hosts.js';
 import { askOperatorsAboutSharedHost, sharedFirstUseMessage } from './shared-secret-ask.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 
@@ -266,7 +269,11 @@ export async function decideFirstUse(deps: {
     // write) keeps the pre-audit first use: it binds to the host its script names, whoever calls and
     // whoever wrote it. Only the caller's OWN account's extensions reach this line; another account's
     // was refused above (services/extension-first-use-keep.ts; Jouni, 2026-10-21).
-    if (keepsPreAuditFirstUse(deps.extConfig)) return { allowed: true, by: caller.gaii };
+    // A host only an unvetted host field names (a value an agent without secrets:manage set) never
+    // binds by the keep, a declaration or the code writer: only the owner in person or a caller
+    // holding secrets:manage chooses it, below (secaudit2026oct22).
+    const unvettedHost = namesUnvettedHost(deps.extConfig, deps.host) && !declaresHost(deps.extConfig, deps.secretName, deps.host);
+    if (!unvettedHost && keepsPreAuditFirstUse(deps.extConfig)) return { allowed: true, by: caller.gaii };
     // Declared: the extension says publicly that it sends this secret to this host, in `uses_secrets`
     // or in its `network:` hosts, matched by hostname unless a port is declared. A trusted code writer
     // made that declaration, so the first use binds whoever calls (2026-10-21).
@@ -282,9 +289,9 @@ export async function decideFirstUse(deps: {
     }
     if (scopeIsCovered(caller.scopes ?? [], SECRETS_MANAGE_SCOPE)) return { allowed: true, by: caller.gaii };
     if (!deps.unattended) return { allowed: false, by: caller.gaii };
-    // Unattended: the code writer decides.
+    // Unattended: the code writer decides, except for a host the code writer did not choose.
     const writer = await codeWriter(storage, config, extension, vaultOwnerGhii);
-    return { allowed: writer.trusted, by: writer.by };
+    return { allowed: writer.trusted && !unvettedHost, by: writer.by };
 }
 
 /**

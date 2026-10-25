@@ -20,11 +20,14 @@
  *
  *   A leaf module: the manifest builder, the capability reader and the config writers import it.
  * @structure NETWORK_HOST_FIELDS_KEY · NetworkHostField · hostRefusal() · parseHostFieldValue() ·
- *   parseNetworkDeclaration() · carryHostFieldValues() · hostFieldsOf()
+ *   parseNetworkDeclaration() · carryHostFieldValues() · HOST_FIELDS_UNVETTED_KEY · unvettedHostFields() ·
+ *   withoutUnvettedHostValues() · namesUnvettedHost() · hostFieldsOf()
  * @usage
  *   const net = parseNetworkDeclaration(manifest.network, capabilityList, manifestConfig, secretKeys);
  *   const v = parseHostFieldValue('wazuh.example.com:9200');   // { ok, value, host: 'wazuh.example.com' }
  * @version-history
+ *   2026-10-25 — HOST_FIELDS_UNVETTED_KEY: the host fields whose value a principal without the right to
+ *     choose a secret's host set; carryHostFieldValues() carries the mark with the value (secaudit2026oct22).
  *   v1.1.0 — 2026-10-09 — carryHostFieldValues(): an in-place extension update keeps the owner's host
  *     (found on aimeat.io by cc-jouni-soc-sale: an upload upsert reset WAZUH_HOST to '').
  *   v1.0.0 — 2026-10-09 — Initial: `host_fields`, and hostRefusal() moved here from extension-manifest.ts.
@@ -185,11 +188,52 @@ export function carryHostFieldValues(
   next: Record<string, unknown> | undefined, previous: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
   const out = { ...(next ?? {}) };
+  const unvetted = new Set(unvettedHostFields(previous));
+  const carriedUnvetted: string[] = [];
   for (const { field } of hostFieldsOf(out)) {
     const held = parseHostFieldValue(previous?.[field]);
-    if (held.ok && held.host) out[field] = held.value;
+    if (held.ok && held.host) {
+      out[field] = held.value;
+      // A carried value keeps who set it: an unvetted one stays unvetted.
+      if (unvetted.has(field)) carriedUnvetted.push(field);
+    }
   }
+  if (carriedUnvetted.length) out[HOST_FIELDS_UNVETTED_KEY] = carriedUnvetted.sort();
+  else delete out[HOST_FIELDS_UNVETTED_KEY];
   return out;
+}
+
+/**
+ * Where the record keeps the host fields whose current value was set by a principal that may not
+ * choose where the owner's secrets go: not the owner in person and not holding secrets:manage
+ * (secaudit2026oct22). ctx.fetch still reaches such a value; it does not count as a host the code
+ * writer declared for a secret's first use (services/extension-secret-uses.ts declaredHostsFor).
+ * __-prefixed, so neither a manifest's `config:` nor the config route can set it.
+ */
+export const HOST_FIELDS_UNVETTED_KEY = '__hostFieldsUnvetted';
+
+/** The host fields whose current value is unvetted, or []. */
+export function unvettedHostFields(config: Record<string, unknown> | undefined): string[] {
+  const raw = config?.[HOST_FIELDS_UNVETTED_KEY];
+  return Array.isArray(raw) ? raw.filter((f): f is string => typeof f === 'string') : [];
+}
+
+/** The config without the values of its unvetted host fields: what counts as declared. A new object. */
+export function withoutUnvettedHostValues(config: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  const unvetted = unvettedHostFields(config);
+  if (!config || !unvetted.length) return config;
+  const out = { ...config };
+  for (const field of unvetted) delete out[field];
+  return out;
+}
+
+/** Does `host` match the value of one of the unvetted host fields? Compared by hostname, as ctx.fetch does. */
+export function namesUnvettedHost(config: Record<string, unknown> | undefined, host: string): boolean {
+  const hostname = URL.canParse(`http://${host}`) ? new URL(`http://${host}`).hostname.toLowerCase() : host.toLowerCase();
+  return unvettedHostFields(config).some((field) => {
+    const parsed = parseHostFieldValue(config?.[field]);
+    return parsed.ok && !!parsed.host && parsed.host === hostname;
+  });
 }
 
 /** The host fields an installed record declares, or [] when its manifest named none. */

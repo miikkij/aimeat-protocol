@@ -8,6 +8,7 @@
  * @structure registerExtensionConfigRoutes(router, config, storage)
  * @usage registerExtensionConfigRoutes(router, config, storage) in routes/extensions.ts
  * @version-history
+ *   2026-10-25 — The service is told whether the caller may choose a secret's host, which decides whether a host field value it sets counts as declared (secaudit2026oct22).
  *   2026-10-25 — The service is told whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial: the owner points a host field (manifest network.host_fields) at a
  *     new address without reinstalling.
@@ -19,7 +20,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
-import { setExtensionConfig } from '../../services/extension-config-set.js';
+import { setExtensionConfig, mayChooseSecretHost } from '../../services/extension-config-set.js';
 import { capabilitiesOfRecord } from '../../services/extension-capability-declaration.js';
 import { mayManageInstalledExt } from './permissions.js';
 import { resolveIdentity } from '../../utils/gaii.js';
@@ -37,7 +38,12 @@ export function registerExtensionConfigRoutes(router: Router, config: AimeatConf
         return;
       }
       const out = await setExtensionConfig({ storage, config }, ext, (req.body as { config?: unknown } | undefined)?.config,
-        { isOperator: await isOperatorCaller(storage, req.auth) });
+        {
+          isOperator: await isOperatorCaller(storage, req.auth),
+          mayChooseSecretHosts: mayChooseSecretHost({
+            roles: req.auth!.roles, scopes: (req.auth as { scopes?: string[] }).scopes, principal: resolveIdentity(req.auth!, config.nodeId),
+          }),
+        });
       if (!out.ok) {
         res.status(out.status).json(error(config.nodeId, out.code, out.message));
         return;

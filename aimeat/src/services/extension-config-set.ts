@@ -22,6 +22,8 @@
  *   const out = await setExtensionConfig({ storage, config }, ext, { WAZUH_HOST: 'wazuh.example.com' });
  *   if (!out.ok) return refuse(out.status, out.code, out.message);
  * @version-history
+ *   2026-10-25 — A host field value set by a caller that may not choose a secret's host (not the
+ *     account holder in person, no secrets:manage) is marked unvetted (secaudit2026oct22).
  *   2026-10-25 — A node-owned key (emailPolicy) is set only by an operator caller; others get 403
  *     OPERATOR_REQUIRED, nothing written (secaudit2026oct22).
  *   v1.0.1 — 2026-10-09 — Secrets are encrypted bound to the extension's name (SecretBinding).
@@ -31,9 +33,11 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { getExtSecretKeys, prepareSecretConfigForWrite } from './extension-secrets.js';
 import { getEncryptionKey } from './encryption.js';
-import { hostFieldsOf, parseHostFieldValue } from './extension-network-hosts.js';
+import { hostFieldsOf, parseHostFieldValue, unvettedHostFields, HOST_FIELDS_UNVETTED_KEY } from './extension-network-hosts.js';
 import { emitChange } from './event-bus.js';
 import { NODE_OWNED_CONFIG_KEYS } from './extension-manifest.js';
+import { isOwnerInPerson } from '../utils/gaii.js';
+import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
 
 export type ConfigSetOutcome =
     | { ok: true; record: ExtensionRecord; changed: string[] }
@@ -54,6 +58,19 @@ export function declaredConfigFields(ext: Pick<ExtensionRecord, 'config'>): stri
 export interface ConfigSetter {
     /** isOperatorCaller(): the operator in person, or the operator's agent holding operator:admin. */
     isOperator: boolean;
+    /**
+     * May this caller choose where the owner's secrets go: the account holder in person, or a
+     * principal holding secrets:manage (mayChooseSecretHost). A host field value set by anyone else
+     * is marked unvetted: ctx.fetch reaches it, and it does not count as a host the code writer
+     * declared for a secret's first use (secaudit2026oct22). Absent reads as false.
+     */
+    mayChooseSecretHosts?: boolean;
+}
+
+/** The principal that may choose a vault secret's host, as decideFirstUse's ruling 6 reads it. */
+export function mayChooseSecretHost(caller: { roles?: string[]; scopes?: string[]; principal: string }): boolean {
+    if (isOwnerInPerson({ roles: caller.roles ?? [] }) && !caller.principal.includes('#')) return true;
+    return scopeIsCovered(caller.scopes ?? [], SECRETS_MANAGE_SCOPE);
 }
 
 /**
@@ -104,7 +121,17 @@ export async function setExtensionConfig(
     }
     if (problems.length) return refuse(400, 'INVALID_INPUT', `${problems.join('. ')}. Nothing was changed.`);
 
-    const prepared = prepareSecretConfigForWrite({ ...(ext.config ?? {}), ...next }, ext.config, getEncryptionKey(deps.config), { extension: ext.name });
+    // Who set each host field's value now decides whether it counts as declared for a first use.
+    const unvetted = new Set(unvettedHostFields(ext.config));
+    for (const field of Object.keys(next).filter(f => hostFields.has(f))) {
+        if (who.mayChooseSecretHosts || next[field] === '') unvetted.delete(field);
+        else unvetted.add(field);
+    }
+    const merged: Record<string, unknown> = { ...(ext.config ?? {}), ...next };
+    if (unvetted.size) merged[HOST_FIELDS_UNVETTED_KEY] = [...unvetted].sort();
+    else delete merged[HOST_FIELDS_UNVETTED_KEY];
+
+    const prepared = prepareSecretConfigForWrite(merged, ext.config, getEncryptionKey(deps.config), { extension: ext.name });
     if (prepared === null) {
         return refuse(503, 'ENCRYPTION_NOT_CONFIGURED', 'This node has no encryption key, so a secret field cannot be stored. The operator sets AIMEAT_ENCRYPTION_KEY.');
     }
