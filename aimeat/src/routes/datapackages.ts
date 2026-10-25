@@ -25,6 +25,9 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.4.1 -- 2026-10-24 -- POST /v1/datapackages refuses the shared anonymous principal with 401
+ *     AUTH_REQUIRED (refuseAnonymousPrincipal): a package is written outside the anonymous namespaces
+ *     (secaudit2026oct22).
  *   v1.4.0 -- 2026-10-20 -- The three GETs pass the caller's whole auth (roles and scopes) to the store:
  *     an agent, app grant or ecosystem app of the owner reads a private package only with
  *     storage:read, and gets 403 SCOPE_DENIED naming the word without it; members, organism and
@@ -49,6 +52,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
+import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
@@ -97,7 +101,10 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      * a package, and a half-published package is exactly the state this design refuses everywhere
      * else. Owner sessions bypass scopes as they do on every route.
      */
-    router.post('/v1/datapackages', requireAuth(), requireScope('storage:write', 'memory:write'), async (req, res) => {
+    // The shared anonymous principal does not publish: a package is stored under datapkg/ and its
+    // pointer in memory, outside the anonymous/ and anonymous.* namespaces, and a members or public
+    // package is read by other people (secaudit2026oct22).
+    router.post('/v1/datapackages', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:write', 'memory:write'), async (req, res) => {
         const caller = resolveIdentity(req.auth!, config.nodeId);
         const ownerGhii = ownerGhiiOf(caller);
         const body = (req.body ?? {}) as PublishBody;
