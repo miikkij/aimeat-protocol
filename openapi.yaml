@@ -30980,7 +30980,10 @@ paths:
         capability with the buyer's persisted input (result on session.fulfillment.results),
         unbound app-tools queue an agent TASK for the manifest agent or the app owner
         (session.fulfillment.taskIds) — writes the seller's order copy, and closes the session.
-        A fulfillment failure after a successful charge refunds and leaves the session open.
+        A fulfillment failure after a successful charge refunds and leaves the session open. A
+        retry whose payment is the one that was refunded (the same card page, or the same charge
+        answered again) is refused with 402 PAYMENT_REFUNDED; paying again completes it, and a card
+        retry after a refunded attempt is sent to Stripe as a new charge.
         One completion claims the session before anything is charged (status `completing`); a second
         completion of the same session while the first runs, or after it, answers 409 SESSION_NOT_OPEN
         and charges nothing. A refusal before the money stays moved puts the session back to `open`.

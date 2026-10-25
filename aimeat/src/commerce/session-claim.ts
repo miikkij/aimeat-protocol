@@ -20,12 +20,19 @@
  *   grant, a one-time pay token, a pacing pack) nothing can be withheld, so the buyer may name the
  *   invoice rail for it only when the seller has said they give credit for it: `invoiceImmediate:
  *   true` in their payment settings (commerce.psp), set with PUT /v1/commerce/payout/invoice.
- * @structure claimSessionForCompletion · expireOverdueSession · releaseSessionClaim · recordCollected ·
- *   deliversOnCompletion · sellerAcceptsImmediateInvoice · invoiceRailRefusal
+ *
+ *   A REFUNDED PAYMENT IS NOT TAKEN TWICE (secaudit2026oct22). A failed fulfilment that the rail
+ *   refunded puts the session back to `open` with that payment's tracking code kept
+ *   (releaseAfterRefund); a later collect that answers the same code is refused (refundedPaymentRefusal)
+ *   and the buyer pays again.
+ * @structure claimSessionForCompletion · expireOverdueSession · releaseSessionClaim · releaseAfterRefund ·
+ *   refundedPaymentRefusal · recordCollected · deliversOnCompletion · sellerAcceptsImmediateInvoice ·
+ *   invoiceRailRefusal
  * @usage
  *   await claimSessionForCompletion(storage, session, key);   // throws SESSION_NOT_OPEN
  *   const refusal = invoiceRailRefusal(handler?.id, sellables); if (refusal) throw refusal;
  * @version-history
+ *   v1.2.0 — 2026-10-25 — releaseAfterRefund and refundedPaymentRefusal (secaudit2026oct22).
  *   v1.1.0 — 2026-10-18 — expireOverdueSession, for getSession's lazy expiry
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit S8-03, S8-04).
@@ -33,6 +40,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { CheckoutSessionRecord, Sellable } from './types.js';
 import { CommerceError } from './errors.js';
+import { PaymentError } from './payment-handlers.js';
 import { putRecord } from './platform-fee.js';
 import { INVOICE_HANDLER_ID } from './invoice-handler.js';
 import { updateRecord, UNCHANGED } from '../services/record-cas.js';
@@ -84,6 +92,24 @@ export async function expireOverdueSession(
 /** Put a claimed session back to `open`, after a refusal that moved no money (or refunded it). */
 export async function releaseSessionClaim(storage: Storage, session: CheckoutSessionRecord, key: string): Promise<void> {
   await putRecord(storage, session.buyerGhii, key, { ...session, status: 'open', updatedAt: new Date().toISOString() });
+}
+
+/**
+ * Put a claimed session back to `open` after its fulfilment failed and the rail confirmed the refund.
+ * The refunded payment's tracking code is kept, and the attempt counted, so a retry that reaches the
+ * same payment again (a card page read back, an idempotent replay of the same charge) is not taken as
+ * payment, and a keyed rail makes a new charge (secaudit2026oct22).
+ */
+export async function releaseAfterRefund(storage: Storage, session: CheckoutSessionRecord, key: string, trackingCode: string): Promise<void> {
+  const refunded = [...(session.refundedTrackingCodes ?? []), trackingCode].slice(-20);
+  await releaseSessionClaim(storage, { ...session, refundedTrackingCodes: refunded, collectAttempt: (session.collectAttempt ?? 0) + 1 }, key);
+}
+
+/** The refusal when a collect answered a payment this checkout already refunded, or null. */
+export function refundedPaymentRefusal(session: CheckoutSessionRecord, trackingCode: string): PaymentError | null {
+  if (!(session.refundedTrackingCodes ?? []).includes(trackingCode)) return null;
+  return new PaymentError('PAYMENT_REFUNDED', 402,
+    'This payment was refunded because the order could not be delivered. Pay again to complete this checkout: open the card page again or use another payment method.');
 }
 
 /** Write the tracking code of the collected payment on the claimed session, before fulfilment. */

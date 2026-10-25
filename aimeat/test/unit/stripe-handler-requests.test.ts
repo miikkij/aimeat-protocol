@@ -13,6 +13,7 @@
  *   test/unit/stripe-testmode.test.ts, which needs STRIPE_TEST_SECRET_KEY.
  * @usage cd aimeat && pnpm exec vitest run test/unit/stripe-handler-requests.test.ts
  * @version-history
+ *   2026-10-25 — A retry after a refunded attempt carries a new Idempotency-Key (secaudit2026oct22).
  *   2026-10-16 — Initial (QA audit F14a-01, F23a-01, P7-02).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -69,6 +70,18 @@ describe('the Stripe handler on an accepted request', () => {
     expect(s.form).not.toHaveProperty('capture_method');
     expect(s.form).not.toHaveProperty('customer');
     noConnect(s);
+  });
+
+  it('a retry after a refunded attempt carries a new Idempotency-Key; a first try keeps the old one (secaudit2026oct22)', async () => {
+    const args = { buyerGhii: 'b@node', amount: 1_000_000, currency: 'EUR', reference: 'chk_r', instrument: 'pm_card_visa', seller };
+    answers.push({ status: 200, body: { id: 'pi_a', status: 'succeeded' } }, { status: 200, body: { id: 'pi_b', status: 'succeeded' } }, { status: 200, body: { id: 'pi_a', status: 'succeeded' } });
+    await handler.collect(ctx, args as never);
+    await handler.collect(ctx, { ...args, attempt: 1 } as never);
+    await handler.collect(ctx, args as never);
+    const keys = sent.map(s => s.headers['Idempotency-Key']);
+    expect(keys[0]).toMatch(/^aimeat-checkout-chk_r-[0-9a-f]{16}$/);
+    expect(keys[1]).toMatch(/^aimeat-checkout-chk_r-r1-[0-9a-f]{16}$/);
+    expect(keys[2]).toBe(keys[0]);
   });
 
   it('collect refuses an intent that did not succeed, with PAYMENT_NOT_CAPTURED', async () => {
