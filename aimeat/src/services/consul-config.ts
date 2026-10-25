@@ -12,7 +12,9 @@
  *   - polling watcher hashes loadAll() output to detect and dispatch config changes
  *
  * @version-history
- *   2026-10-25 — A log level Consul changed reaches the running logger (setLogLevel).
+ *   2026-10-25 — A log level Consul changed reaches the running logger (setLogLevel). On a running
+ *     node (the watch, the import) a row that applies at the next start is returned in `atRestart`
+ *     instead of being written to the running config.
  *   v1.2.0 — 2026-08-31 — Talks to Consul's HTTP API directly instead of through the `consul`
  *     package, which npm marks "no longer supported" and for which upstream names no successor.
  *     Three calls were all it was used for. NOT safeFetch, and that is the reason this could not
@@ -155,14 +157,22 @@ export function createConsulConfigService(config: AimeatConfig): ConsulConfigSer
  * Used at startup, by the watch callback and by POST /v1/admin/consul/import, which is why the
  * sealed check belongs here rather than at the import door: the watch callback fires on its own, so
  * a rule enforced at that door only would be enforced on one of the three roads in.
+ *
+ * `running: true` (the watch and the import, on a node that is already up): a row the code reads
+ * once at start (`applies: 'restart'`) is not written to the running config, because the code that
+ * uses it would not see it and the Config tab would show a value the node does not run with. It is
+ * returned in `atRestart` for the caller to store and mark as waiting for the restart. At startup
+ * nothing has read the settings yet, so every row is written.
  */
 export function applyConsulValues(
   config: AimeatConfig,
   values: Record<string, string>,
-): { applied: string[]; skipped: string[]; sealed: string[] } {
+  opts: { running?: boolean } = {},
+): { applied: string[]; skipped: string[]; sealed: string[]; atRestart: string[] } {
   const applied: string[] = [];
   const skipped: string[] = [];
   const sealed: string[] = [];
+  const atRestart: string[] = [];
   for (const [dotPath, rawValue] of Object.entries(values)) {
     if (isSealed(config, dotPath)) { sealed.push(dotPath); continue; }
     const field = MUTABLE_CONFIG_MAP[dotPath];
@@ -170,6 +180,7 @@ export function applyConsulValues(
     try {
       const value = parseConfigValue(field, rawValue);
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
+      if (opts.running && field.applies === 'restart') { atRestart.push(dotPath); continue; }
       writeConfigField(config, field, value);
       applied.push(dotPath);
       // eslint-disable-next-line aimeat/no-silent-catch -- not silent: the key is reported to the caller in the returned `skipped` list
@@ -178,5 +189,5 @@ export function applyConsulValues(
   // A rate limit that Consul changed reaches the running limiters (config-rate-limit-sync.ts), and a
   // log level the running logger.
   if (applied.length > 0) { syncRateLimitTiers(config); setLogLevel(config.logLevel); }
-  return { applied, skipped, sealed };
+  return { applied, skipped, sealed, atRestart };
 }

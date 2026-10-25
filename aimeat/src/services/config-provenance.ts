@@ -15,7 +15,8 @@
  *
  * @version-history
  *   v1.2.0 — 2026-10-25 — markDatabaseAtRestart(): a value saved for a row that takes effect at the
- *     next start is the database's, and the running value stays until a restart. bindConfigProvenance
+ *     next start is the database's, and the running value stays until a restart; markConsulAtRestart
+ *     is the same for a value the Consul watch brings while the node runs. bindConfigProvenance
  *     / provenanceOf: the MCP tools find the registry the admin Config API uses.
  *   v1.1.0 — 2026-10-11 — awaitsRestart(): a path whose database override was removed since start
  *     keeps its running value until a restart, and the Config tab says so (Jouni, 2026-10-11).
@@ -74,6 +75,11 @@ export class ConfigProvenance {
    */
   markDatabaseAtRestart(dotPaths: string[]): void {
     for (const p of dotPaths) { this.sources.set(p, 'database'); this.awaitingRestart.add(p); }
+  }
+
+  /** The same for a value the Consul watch brought while the node runs (it is not stored). */
+  markConsulAtRestart(dotPaths: string[]): void {
+    for (const p of dotPaths) { this.sources.set(p, 'consul'); this.awaitingRestart.add(p); }
   }
 
   /**
