@@ -27,6 +27,9 @@
  *     not own (CAPABILITY_NOT_OWNED_BY_APP), as its REST twin now does: the manifest names a bare id
  *     in a node-wide registry, so another owner's capability ran here with the manifest's
  *     lockedInput deciding the arguments (secaudit 2026-10).
+ *   2026-10-25 — aimeat_exchange_work_deliver delivers work the A2A door opened as its REST twin does:
+ *     paid through x402, with no metering and no local notice; unpaid, refused A2A_UNPAID and never
+ *     charged to a local contract (secaudit2026oct22, self-asserted-gaii-settled-as-local-consumer).
  *   2026-10-18 — aimeat_exchange_work_deliver claims the work before it settles (claimWorkForDelivery),
  *     so two deliveries at the same moment charge once; the second is WORK_NOT_OPEN
  *     (wish-rahapolkujen-kilpatilanteet).
@@ -341,8 +344,14 @@ export function registerExchangeRunTools(
             const w = await getWork(storage, work_id);
             if (!w || w.providerOwner !== owner) return fail('NOT_FOUND: no such work of yours to deliver');
             if (w.state !== 'open') return fail(`WORK_NOT_OPEN: work is ${w.state}`);
-            const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
-            if (!before || before.state !== 'active') return fail('CONTRACT_INACTIVE: the consumer contract is no longer active — cannot settle this delivery');
+            // Work the A2A door opened has no local caller (consumerOwner ''), and settles only through
+            // its own x402 payment, as on POST /v1/exchange/work/:id/deliver: paid, it is delivered with
+            // no metering; unpaid, it is refused and never charged to a local contract
+            // (secaudit2026oct22, self-asserted-gaii-settled-as-local-consumer).
+            const foreign = w.consumerOwner === '';
+            if (foreign && !(w.chargedUnits > 0)) return fail('A2A_UNPAID: this work came from an agent on another node and is not paid for yet. Deliver it after the payment arrives.');
+            const before = foreign ? null : await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
+            if (!foreign && (!before || before.state !== 'active')) return fail('CONTRACT_INACTIVE: the consumer contract is no longer active — cannot settle this delivery');
             // The provenance refusal is asked BEFORE the settlement (invariant 14). provenanceForWrite
             // below throws the same refusal, and when it ran after the charge the buyer was debited,
             // the work stayed open, and a retry charged again.
@@ -355,22 +364,24 @@ export function registerExchangeRunTools(
             // at the same moment, the second is refused here and charges nothing.
             if (!await claimWorkForDelivery(storage, w.workId)) return fail('WORK_NOT_OPEN: this work is being delivered or was delivered already');
             const workLabel = `${w.agentGaii}:${w.taskType}`;
-            const outcome = await authoriseMeteredCall({
+            const outcome = foreign ? null : await authoriseMeteredCall({
                 config, storage, caller: w.consumerGaii,
                 product: { ext: w.ext, action: w.action, label: workLabel },
             });
-            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') await releaseWorkClaim(storage, w);
-            if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
-            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
-                const r = meteredRefusalText(outcome, workLabel, config);
-                return fail(`${r.code}: ${r.message}`);
+            if (outcome) {
+                if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') await releaseWorkClaim(storage, w);
+                if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
+                if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
+                    const r = meteredRefusalText(outcome, workLabel, config);
+                    return fail(`${r.code}: ${r.message}`);
+                }
             }
-            const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
-            const charged = after && before ? Math.max(0, after.budget.spentUnits - before.budget.spentUnits) : 0;
+            const after = foreign ? null : await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
+            const charged = foreign ? w.chargedUnits : (after && before ? Math.max(0, after.budget.spentUnits - before.budget.spentUnits) : 0);
             // The delivering provider may name who shares this task's revenue, the same way a
             // capability does — it is their own cut either way, and the pool size stays their config.
             const shared = takeDesignations(output ?? null);
-            if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
+            if (outcome?.kind === 'settled') await outcome.accrue(shared.designations);
             // TARGET-058, and this is the sharpest commercial case on the surface: THIS is the thing
             // the buyer paid for. The hash covers the output as STORED (after the beneficiary
             // designations are taken out of it) plus the delivery note, because that pair is exactly
@@ -396,7 +407,9 @@ export function registerExchangeRunTools(
             if (aiProvenanceId) w.aiProvenanceId = aiProvenanceId;
             if (note) w.note = note.slice(0, 2000);
             await putWork(storage, w);
-            await notify(w.consumerOwner, 'EXCHANGE — your agent work was delivered',
+            // A buyer from another node has nobody on this node to tell; it reads the result at the
+            // A2A endpoint it created the work through.
+            if (!foreign) await notify(w.consumerOwner, 'EXCHANGE — your agent work was delivered',
                 `Your "${w.taskType}" task (work ${w.workId}) was delivered by ${owner} and charged to your contract.`);
             return ok({ work: await view(w), ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) });
         },

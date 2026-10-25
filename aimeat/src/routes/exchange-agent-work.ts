@@ -11,6 +11,9 @@
  * @usage
  *   registerExchangeAgentWorkRoutes(router, config, storage, notify);
  * @version-history
+ *   v1.2.2 — 2026-10-25 — Work the A2A door opened and nobody has paid for answers 402 A2A_UNPAID on
+ *     delivery and is never metered against a local contract (secaudit2026oct22,
+ *     self-asserted-gaii-settled-as-local-consumer).
  *   v1.2.1 — 2026-10-18 — A delivery claims the work (claimWorkForDelivery) before it settles, so two
  *     deliveries at the same moment charge the consumer once; the second is 409 WORK_NOT_OPEN
  *     (wish-rahapolkujen-kilpatilanteet).
@@ -163,6 +166,13 @@ export function registerExchangeAgentWorkRoutes(router: Router, config: AimeatCo
       // No notification: there is nobody on this node to tell. The buyer reads the result at the
       // A2A endpoint it created the work through.
       return res.json(success(config.nodeId, { work: await view(w) }));
+    }
+    // Work the A2A door opened (no local caller) and nobody has paid for yet. It settles only through
+    // its own x402 payment, so it is never metered against a local contract: the consumer named on
+    // it is the stranger's own claim (secaudit2026oct22, self-asserted-gaii-settled-as-local-consumer).
+    if (w.consumerOwner === '') {
+      await releaseWorkClaim(storage, w);
+      return res.status(402).json(error(config.nodeId, 'A2A_UNPAID', 'This work came from an agent on another node and is not paid for yet. Deliver it after the payment arrives.'));
     }
 
     // Settle the per-task price against the CONSUMER's contract (the consumer pays; the provider is credited).
