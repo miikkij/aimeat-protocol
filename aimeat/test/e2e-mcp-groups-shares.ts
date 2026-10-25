@@ -257,6 +257,16 @@ await test('5. …an agent holding neither word keeps the reads and loses the fo
     }
 });
 
+// secaudit2026oct22, aimeat_share_list:missing-memory-read. GET /v1/shares and /v1/shares/incoming ask
+// memory:read; the MCP tool asked nothing, so an agent the owner gave no memory:read listed the shares.
+await test('5b. An agent without memory:read is refused aimeat_share_list, as GET /v1/shares refuses it', async () => {
+    const socialAgent = await makeAgent(alice, ['social:read']);
+    const rest = await json('/v1/shares', { headers: authed(socialAgent) });
+    assert(rest.status === 403, `REST twin: expected 403, got ${rest.status}`);
+    const out = await callTool(await openSession(socialAgent), 'aimeat_share_list', { direction: 'outgoing' });
+    assert(out.isError && /SCOPE_DENIED|memory:read/.test(out.text), `share_list without memory:read must be refused: ${out.text.slice(0, 200)}`);
+});
+
 await test('6. The REST door behind them refuses an unauthenticated read with 401', async () => {
     const res = await fetch(`${BASE}/v1/groups`);
     assert(res.status === 401, `expected 401 without a token, got ${res.status}`);
