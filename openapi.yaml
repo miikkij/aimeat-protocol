@@ -57275,6 +57275,12 @@ paths:
         A `source` that differs from the stored one is normalised and checked as POST checks it, so
         an extension ref outside ext:<name>[@<version>][:<action>] is 400 INVALID_INPUT. A source
         equal to the stored one passes untouched.
+
+
+        Changing `visibility` to public meets the node's publishing policy as POST does: on a
+        `self_only` node a non-operator is refused 403 PUBLIC_DISABLED, and on a `moderated` node an
+        active capability made public is stored with status pending_review until the operator
+        reviews it. A capability that is already public keeps its status when another field changes.
       security:
         - BearerAuth: []
       parameters:
@@ -57292,7 +57298,7 @@ paths:
         '400':
           description: INVALID_INPUT, a changed source that POST would refuse.
         '403':
-          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner.
+          description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner. PUBLIC_DISABLED, a change to public visibility on a self_only node by a non-operator.
     delete:
       operationId: capabilityDelete
       tags: [Capabilities]
