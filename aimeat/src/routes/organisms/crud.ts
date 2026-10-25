@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-25 — GET /v1/organisms/waiting leaves out an organism that does not admit the calling
+ *     agent (agentAccess 'listed'), as aimeat_organism_list does (secaudit2026oct22).
  *   2026-10-23 — Deleting an organism deletes its compliance documents (plan doc-mvlftkh9zmc9).
  *   2026-10-21 — The member filter's self test asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-18 — POST /v1/organisms and PUT /v1/organisms/:id ask the publish gate: a public organism
@@ -74,7 +76,8 @@ import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism
 import { publicShapes } from '../../data/organism-shapes.js';
 import type { OrganismHelpers } from './shared.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, resolveIdentity } from '../../utils/gaii.js';
+import { agentBarred } from '../../services/organism-agent-access.js';
 import { isOwnerPrincipal } from '../../auth/account-security.js';
 import { purgeClassificationAudit } from '../../services/classification/audit.js';
 import { purgeExceptions } from '../../services/classification/exceptions.js';
@@ -239,7 +242,10 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   router.get('/v1/organisms/waiting', requireAuth(), requireRestScope('organism:read'), requireRole('agent'), async (req, res) => {
     const owner = req.auth!.owner as string;
     await expireOverdueApprovals(storage, new Date().toISOString());
-    const orgs = await storage.listOrganisms({ member: owner });
+    // An organism that admits only listed agents is left out for an agent it does not admit, as the
+    // MCP organism list leaves it out (secaudit2026oct22): its name and its waiting items are its own.
+    const principal = resolveIdentity(req.auth!, config.nodeId);
+    const orgs = (await storage.listOrganisms({ member: owner })).filter(o => !agentBarred(o, principal));
     const reviews: Array<{ kind: 'review'; n: number; orgId: string; orgName: string; wsId: string; wsName: string }> = [];
     const joinRequests: Array<{ kind: 'join'; n: number; orgId: string; orgName: string }> = [];
 
@@ -269,7 +275,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const invitations: Array<{ kind: 'invite'; orgName: string; organismId: string }> = [];
     for (const m of invited) {
       const org = await storage.getOrganism(m.organismId);
-      if (org) invitations.push({ kind: 'invite', orgName: org.name, organismId: org.id });
+      if (org && !agentBarred(org, principal)) invitations.push({ kind: 'invite', orgName: org.name, organismId: org.id });
     }
     // Flat `items` array in the exact shape the home widget renders (review | join | invite).
     res.json(success(config.nodeId, { items: [...reviews, ...joinRequests, ...invitations] }));

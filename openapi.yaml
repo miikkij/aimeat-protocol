@@ -44138,7 +44138,7 @@ paths:
       responses:
         '200': { description: Form defined; returns form_id + submit_url }
         '400': { description: Invalid input (missing fields, meta.* namespace, bad slug) }
-        '403': { description: Not the workspace creator / org admin }
+        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
         '404': { description: Organism or workspace not found }
         '422':
           description: >
@@ -44161,7 +44161,7 @@ paths:
         - { name: ws, in: query, required: true, schema: { type: string } }
       responses:
         '200': { description: The owner's forms in the workspace }
-        '403': { description: Not the workspace creator / org admin }
+        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
     delete:
       operationId: deleteIntakeForm
       summary: Delete an intake form — its public link stops working (owner)
@@ -44173,7 +44173,7 @@ paths:
         - { name: form_id, in: query, required: true, schema: { type: string } }
       responses:
         '200': { description: 'Deleted (or already absent). The conversations of a conversation form stay until their own date (`ttl_days` after the last visitor message), when the node deletes them.' }
-        '403': { description: Not the workspace creator / org admin }
+        '403': { description: Not the workspace creator / org admin, or an agent the organism does not admit (AGENT_NOT_ADMITTED) }
   /v1/intake/{org}/{ws}/{formId}:
     get:
       operationId: getIntakeFormDescriptor
