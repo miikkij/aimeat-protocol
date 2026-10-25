@@ -203,6 +203,31 @@ await test('aimeat_workspace_rows_stats: an outsider\'s agent is refused; the cr
     assert(!r.isError && r.data.stats?.rows === 2, `stats: ${r.text}`);
 });
 
+// secaudit2026oct22, mcp-catalog/workspace-read-tools-missing-rest-scope-word. The REST twins ask
+// organism:read or organism:rows (rows) and organism:invite (members); the MCP tools asked nothing,
+// so the owner's choice in the agent permission editor held on one door only.
+await test('rows_read, rows_stats and workspace_members ask the words their REST twins ask, and an agent holding them still gets the answer', async () => {
+    const SCOPE = /SCOPE_DENIED/;
+    const bare = await openSession(BASE, (await makeAgent(BASE, A, ['memory:read'])).token, 'wc-bare');
+    const bareToken = (await makeAgent(BASE, A, ['memory:read'])).token;
+    const restRows = await json(`/v1/organisms/${orgId}/workspace/rows/mail?ws=${WS}`, { headers: { Authorization: `Bearer ${bareToken}` } });
+    const restMembers = await json(`/v1/organisms/${orgId}/workspace-access?ws=${WS}`, { headers: { Authorization: `Bearer ${bareToken}` } });
+    assert(restRows.status === 403 && restMembers.status === 403, `REST twins: ${restRows.status} ${restMembers.status}`);
+    for (const tool of ['aimeat_workspace_rows_read', 'aimeat_workspace_rows_stats']) {
+        const r = await callTool(bare, tool, { organism_id: orgId, ws: WS, space: 'mail' });
+        assert(r.isError && SCOPE.test(r.text) && !r.text.includes('second'), `${tool} without organism:read: ${r.text.slice(0, 200)}`);
+    }
+    const m = await callTool(bare, 'aimeat_workspace_members', { organism_id: orgId, ws: WS });
+    assert(m.isError && SCOPE.test(m.text), `workspace_members without organism:invite: ${m.text.slice(0, 200)}`);
+
+    const rowsOnly = await openSession(BASE, (await makeAgent(BASE, A, ['organism:rows', 'memory:read'])).token, 'wc-rows');
+    const rr = await callTool(rowsOnly, 'aimeat_workspace_rows_read', { organism_id: orgId, ws: WS, space: 'mail' });
+    assert(!rr.isError && rr.data.rows.length === 2, `organism:rows alone reads rows, as on REST: ${rr.text.slice(0, 200)}`);
+    const inviter = await openSession(BASE, (await makeAgent(BASE, A, [...WORDS, 'organism:invite'])).token, 'wc-inv');
+    const mm = await callTool(inviter, 'aimeat_workspace_members', { organism_id: orgId, ws: WS });
+    assert(!mm.isError && Array.isArray(mm.data.members), `the creator's agent with organism:invite lists the members: ${mm.text.slice(0, 200)}`);
+});
+
 // ── Structure ────────────────────────────────────────────────────────────────────────────────
 
 await test('aimeat_workspace_sections_set: a viewer\'s agent is refused and nothing lands; the creator\'s agent sets the sections', async () => {

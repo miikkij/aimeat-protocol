@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-25 — aimeat_workspace_members declares organism:invite, the word its REST twin asks (secaudit2026oct22).
  *   2026-10-18 — aimeat_workspace_publish and aimeat_workspace_revert_to_draft: `namespace` takes the space's name as well as its namespace.
  *   2026-10-18 — aimeat_workspace_share, aimeat_organism_create and aimeat_organism_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_workspace_share takes access "organism": the members of the workspace's organism (V3.4).
@@ -702,6 +703,9 @@ export const organismsWorkspacesAppsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Workspace Members', readOnlyHint: true },
+        // The word GET /v1/organisms/:id/workspace-access asks, and the word its siblings
+        // aimeat_workspace_access, _member_grant and _member_revoke ask (secaudit2026oct22).
+        scope: 'organism:invite',
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
