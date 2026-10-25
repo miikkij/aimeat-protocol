@@ -1,9 +1,10 @@
 # Builds the AIMEAT Personal Node desktop app for Windows, macOS and Linux and publishes the
 # installers as a GitHub Release. Triggered by a `desktop-v*.*.*` tag whose numeric part must match
 # aimeat-desktop/src-tauri/tauri.conf.json `version` (mirrors the Python publish workflow's
-# tag-vs-manifest gate). workflow_dispatch on a branch builds and signs only (no release), which is
-# how a change to this file is proven before a tag depends on it; on the tag it releases, as a push of
-# the tag does.
+# tag-vs-manifest gate). workflow_dispatch on a branch builds and signs only (no release), with a key
+# made in the run rather than the release key (sign-throwaway), which is how a change to this file is
+# proven before a tag depends on it; on the tag it releases, as a push of the tag does, and only there
+# does the sign job reach the release key, through the `desktop-release` environment.
 #
 # WHAT SHIPS, per platform:
 #   Windows  NSIS installer (-setup.exe) and MSI. The updater installs the -setup.exe.
@@ -18,8 +19,8 @@
 #
 # THREE JOBS, EACH HOLDING ONLY WHAT IT NEEDS, as before macOS and Linux joined. The build runs the
 # whole dependency tree (npm packages, crates and their build scripts), once per platform, so it
-# holds no secret and a token that can only read. The sign job holds the updater signing key and
-# runs nothing but the Tauri CLI's signer, a fixed release checked by its sha256, over the three
+# holds no secret and a token that can only read. The sign job holds the updater signing key (on a
+# desktop-v* tag, from the `desktop-release` environment) and runs nothing but the Tauri CLI's signer, a fixed release checked by its sha256, over the three
 # files the updater installs. The publish job holds the token that writes releases and runs nothing
 # but a copy. `sign` needs every build, so a platform that fails to build publishes nothing at all:
 # a release that updates two platforms and strands the third is worse than no release.
@@ -225,8 +226,17 @@ jobs:
   # and writes <file>.sig beside the file; a minisign signature is over the bytes, so one signer on
   # Windows signs the macOS and Linux files the same way. No checkout, no package install and no
   # build script runs in this job.
+  #
+  # THE KEY IS AN ENVIRONMENT SECRET, NOT A REPOSITORY ONE (secaudit2026oct22,
+  # release-credentials-not-bound-to-release-ref). The job runs only on a desktop-v* tag and names the
+  # environment `desktop-release`, whose deployment rule admits only `desktop-v*` tags, and the two
+  # TAURI_SIGNING_* secrets live in that environment alone. A workflow file on a branch can name the
+  # environment, and GitHub refuses the job before any step runs, because the branch is not a
+  # desktop-v* tag. A run on a branch signs with a key made in the run instead (sign-throwaway below).
   sign:
     needs: build
+    if: startsWith(github.ref, 'refs/tags/desktop-v')
+    environment: desktop-release
     runs-on: windows-latest
     permissions: {}
     steps:
@@ -284,6 +294,48 @@ jobs:
           name: aimeat-desktop-update-manifest
           path: latest.json
           if-no-files-found: error
+
+  # A RUN THAT IS NOT A DESKTOP RELEASE SIGNS WITH A KEY MADE IN THE RUN. The proof a branch run gives
+  # (the three builds, the pinned signer, a signature over each file the updater installs) stays,
+  # and no release key is there to use: the key pair is generated here, never stored, and gone with
+  # the runner. Nothing this job writes is uploaded, so no signature it makes leaves the run.
+  sign-throwaway:
+    needs: build
+    if: "!startsWith(github.ref, 'refs/tags/desktop-v')"
+    runs-on: windows-latest
+    permissions: {}
+    steps:
+      - name: Download the installers
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: aimeat-desktop-*
+          path: dist
+
+      - name: Install the Tauri CLI (the signer only)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path tauri-cli | Out-Null
+          Invoke-WebRequest -Uri https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v2.11.2/cargo-tauri-x86_64-pc-windows-msvc.zip -OutFile tauri-cli/cargo-tauri.zip
+          $sha = (Get-FileHash -Algorithm SHA256 tauri-cli/cargo-tauri.zip).Hash.ToLowerInvariant()
+          if ($sha -ne 'b6844470bcbf1da6e5dbf01990ae317d4d7969171628bb8badbdbff2e3d06d23') { throw "cargo-tauri.zip: sha256 $sha is not the pinned one" }
+          Expand-Archive -Path tauri-cli/cargo-tauri.zip -DestinationPath tauri-cli
+          ./tauri-cli/cargo-tauri.exe --version
+
+      # `signer generate --ci` writes a key pair with an empty password and asks nothing.
+      - name: Make a throwaway signing key for this run
+        shell: bash
+        run: ./tauri-cli/cargo-tauri.exe signer generate --ci --write-keys "$RUNNER_TEMP/throwaway.key"
+
+      - name: Sign the three files the updater installs, with the throwaway key
+        shell: bash
+        run: |
+          export TAURI_SIGNING_PRIVATE_KEY="$(cat "$RUNNER_TEMP/throwaway.key")"
+          export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
+          for f in "$(ls dist/aimeat-desktop-windows/*-setup.exe | head -1)" "$(ls dist/aimeat-desktop-macos/*.app.tar.gz | head -1)" "$(ls dist/aimeat-desktop-linux/*.AppImage | head -1)"; do
+            ./tauri-cli/cargo-tauri.exe signer sign "$f"
+            test -s "$f.sig" || { echo "::error::no signature written for $f"; exit 1; }
+          done
+          echo "Signed with a throwaway key made in this run; nothing is published."
 
   # THE TOKEN THAT WRITES RELEASES IS HERE, and the job runs nothing but a copy: it downloads the
   # installers from the builds and the manifest from the sign job, and uploads them.
