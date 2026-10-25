@@ -21,7 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
- *   2026-10-25 — subdomain_set takes `subdomain_origin` (operator | publisher), the operator's decision
+ *   2026-10-25 — subdomain_set takes `origin` (operator | publisher), the operator's decision
  *     on who a label belongs to (secaudit2026oct22).
  *   2026-10-18 — settings says it answers with publish_request when the node asks the owner first (V4).
  *   2026-10-18 — marks takes `info` (the app-info mark) and `tucked` (the marks start tucked away).
@@ -124,7 +124,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     target: { type: 'string', description: 'For subdomain_set: what it serves, "owner/filename" for an app or an absolute URL for a redirect.' },
     subdomain_kind: { type: 'string', enum: ['app', 'redirect'], description: 'For subdomain_set: app serves an app at the subdomain, redirect sends visitors to target.' },
     enabled: { type: 'boolean', description: 'For subdomain_set: false keeps the entry but stops serving it.' },
-    subdomain_origin: { type: 'string', enum: ['operator', 'publisher'], description: 'For subdomain_set on an existing entry: who the label belongs to. operator: your own site, served at <label>.<apex> and at its app address. publisher: a label a publish gave an app, served only at its app address. Set it for an entry the Security page lists as undecided.' },
+    origin: { type: 'string', enum: ['operator', 'publisher'], description: 'For subdomain_set on an existing entry: who the label belongs to. operator: your own site, served at <label>.<apex> and at its app address. publisher: a label a publish gave an app, served only at its app address. Set it for an entry the Security page lists as undecided.' },
     // bundled agents
     bundled_agent: { type: 'string', description: 'For agent_*: the name of an agent the app declares in its manifest.' },
     runner_agent: { type: 'string', description: 'For agent_deploy, agent_undeploy and agent_status: which of your agents runs it. Omit to use your task runner.' },
@@ -301,7 +301,7 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
         summary: 'write a ZIP backup of all your apps to your private storage and answer its storage key (fetch it with aimeat_storage_download); restoring a backup is the owner\'s own act on the App Catalog page' },
     subdomain_list: { fields: F([], []), scope: 'operator:admin',
         summary: 'operator: the subdomains this server serves apps or redirects on' },
-    subdomain_set: { fields: F(['subdomain'], ['target', 'subdomain_kind', 'enabled', 'subdomain_origin']), scope: 'operator:admin',
+    subdomain_set: { fields: F(['subdomain'], ['target', 'subdomain_kind', 'enabled', 'origin']), scope: 'operator:admin',
         summary: 'operator: create or change one' },
     subdomain_delete: { fields: F(['subdomain'], []), scope: 'operator:admin',
         summary: 'operator: remove one' },
