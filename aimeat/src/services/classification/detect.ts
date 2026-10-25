@@ -16,16 +16,22 @@
  *   of the text; a pattern that fails the static check (regex-safety.ts unsafeRegexReason) is not
  *   compiled; and each match runs with a time limit (testWithin), at most RULE_MS for one rule and
  *   ITEM_MS for all of one item's regex rules. A rule that reaches its limit counts as no match and
- *   is logged once per rule; past ITEM_MS the item's remaining regex rules are skipped. Keyword rules
- *   are built here from escaped words, so they read the whole text (MAX_TEXT) without a limit.
+ *   is logged once per rule; past ITEM_MS the item's remaining rules are skipped. Keyword rules are
+ *   built here from escaped words, so they cannot backtrack; they read up to MAX_TEXT, and their time
+ *   counts against the same item, account and node limits as regex time (2026-10-25).
  *   ONE SCOPE CANNOT HOLD THE NODE EITHER (2026-09-30). The item limits bound one write, not a loop
  *   of them: rules that reach their limit on every write, written in an owner's own layer, blocked
- *   the event loop about a second per write. Each scope (an owner or an organism) has
- *   SCOPE_MS_PER_MINUTE of regex time per minute; past it, its regex rules are skipped until the
- *   minute is over, logged once per scope.
- * @structure RuleHit · REGEX_TEXT · ruleApplies() · matchRules() · resetRegexBudgets()
- * @usage const hit = matchRules(policy, target, text); if (hit) await setLabel(deps, ruleActor, target, { label: hit.label });
+ *   the event loop about a second per write. Each account (an owner, with the organisms the caller
+ *   names as theirs) has SCOPE_MS_PER_MINUTE of rule time per minute; past it, its rules are skipped
+ *   until the minute is over, logged once, and the run says `deferred` so the item is matched again
+ *   later (classifier.ts).
+ * @structure RuleHit · RuleRun · REGEX_TEXT · ruleApplies() · matchRules() · runRules() · resetRegexBudgets()
+ * @usage const { hit, deferred } = runRules(policy, target, text, { budgetKey }); if (hit) await setLabel(deps, ruleActor, target, { label: hit.label });
  * @version-history
+ *   v1.5.0 — 2026-10-25 — secaudit2026oct22: keyword rule time counts against the item, account and
+ *     node budgets (keyword-rules-no-time-limit); runRules takes the account an organism belongs to as
+ *     its budget key, and reports `deferred` when a budget skipped a rule (node-regex-budget-starvation).
+ *     matchRules is runRules' hit.
  *   v1.4.0 — 2026-10-18 — A container (organism, workspace, board, app) is matched only by a rule
  *     whose appliesTo.kinds names it, on its name and description (plan doc-mvdipuyqraas, L1.6).
  *   v1.3.0 — 2026-10-05 — The budget of personal content is its owner's, whichever agent holds it,
@@ -89,7 +95,11 @@ const scopeSpent = new Map<string, { since: number; ms: number }>();
  * owner had a budget of its own, so one owner multiplied it by their number of agents
  * (secaudit 2026-10, DATA-1).
  */
-function budgetKeyOf(scope: string): string {
+function budgetKeyOf(scope: string, account?: string): string {
+  // The caller names the account an organism belongs to (classifier.ts budgetAccountOf), so one
+  // account's organisms share one budget; each organism was a budget key of its own, and five of
+  // them spent the node's minute for every other owner (secaudit2026oct22).
+  if (account) return ownerGhiiOf(account);
   return scopeOrganism(scope) ? scope : ownerGhiiOf(scope);
 }
 
@@ -99,8 +109,8 @@ function spentOf(key: string, cap: number, now: number): number {
   return cap - s.ms;
 }
 
-function scopeLeft(scope: string, now: number): number {
-  return Math.min(spentOf(budgetKeyOf(scope), SCOPE_MS_PER_MINUTE, now), spentOf(NODE_BUDGET, NODE_MS_PER_MINUTE, now));
+function scopeLeft(key: string, now: number): number {
+  return Math.min(spentOf(key, SCOPE_MS_PER_MINUTE, now), spentOf(NODE_BUDGET, NODE_MS_PER_MINUTE, now));
 }
 
 function charge(key: string, ms: number, now: number): void {
@@ -113,8 +123,8 @@ function charge(key: string, ms: number, now: number): void {
   }
 }
 
-function chargeScope(scope: string, ms: number, now: number): void {
-  charge(budgetKeyOf(scope), ms, now);
+function chargeScope(key: string, ms: number, now: number): void {
+  charge(key, ms, now);
   charge(NODE_BUDGET, ms, now);
 }
 
@@ -178,43 +188,70 @@ function patternOf(rule: ClassificationRule): RegExp | null {
   return compiled.get(k) ?? null;
 }
 
+/** What one pass of the rules over an item found, and whether a budget skipped any rule. */
+export interface RuleRun {
+  hit: RuleHit | null;
+  /**
+   * A rule was skipped because the item's time or its account's or the node's minute was used up.
+   * The item is not finished: classifier.ts classifyText puts it in the queue for a later pass, where
+   * it was left unlabelled before (secaudit2026oct22, node-regex-budget-starvation).
+   */
+  deferred: boolean;
+}
+
 /** The most sensitive label the matching rules ask for, or null when none matches. */
 export function matchRules(policy: ClassificationPolicy, target: ContentLabelTarget, text: string): RuleHit | null {
+  return runRules(policy, target, text).hit;
+}
+
+/**
+ * Run the rules over one item. Keyword and regex rules both spend the item's time and the budget of
+ * its account and of the node: keyword rules read up to MAX_TEXT, and 500 of them of 1000 characters
+ * held the event loop 300 to 750 ms per write with no budget at all (secaudit2026oct22,
+ * keyword-rules-no-time-limit). A keyword rule is built from escaped words, so it cannot backtrack
+ * and runs without the vm time limit; only its time is counted. `budgetKey` names the account an
+ * organism belongs to; without it an organism is its own key, as before.
+ */
+export function runRules(policy: ClassificationPolicy, target: ContentLabelTarget, text: string, opts: { budgetKey?: string } = {}): RuleRun {
   const body = text.length > MAX_TEXT ? text.slice(0, MAX_TEXT) : text;
   const regexBody = body.length > REGEX_TEXT ? body.slice(0, REGEX_TEXT) : body;
+  const key = budgetKeyOf(target.scope, opts.budgetKey);
   // Only an active label: setting a retired one is refused (LABEL_UNKNOWN), which would fail the item.
   const rank = new Map(policy.labels.filter(l => l.status === 'active').map(l => [l.id, l.rank]));
   let best: RuleHit | null = null;
   let spent = 0;
+  let deferred = false;
   for (const rule of policy.rules) {
     if (!ruleApplies(rule, target)) continue;
     const r = rank.get(rule.minLabel);
     if (r === undefined) continue;
     const re = patternOf(rule);
     if (!re) continue;
+    if (spent >= ITEM_MS) {
+      sayOnce(rule.id, 'was skipped: the item\'s rules used up their time', { key: target.key, spentMs: Math.round(spent) });
+      deferred = true;
+      continue;
+    }
+    const t0 = performance.now();
+    const left = scopeLeft(key, t0);
+    if (left <= 0) {
+      sayOnce(`${key}\u0000budget`, 'was skipped: the rules of this account used up their time for this minute', { scope: target.scope, key: target.key });
+      deferred = true;
+      continue;
+    }
     let hit: boolean | null;
     if (rule.kind === 'regex') {
-      if (spent >= ITEM_MS) {
-        sayOnce(rule.id, 'was skipped: the item\'s regex rules used up their time', { key: target.key, spentMs: Math.round(spent) });
-        continue;
-      }
-      const t0 = performance.now();
-      const left = scopeLeft(target.scope, t0);
-      if (left <= 0) {
-        sayOnce(`${target.scope}\u0000budget`, 'was skipped: the regex rules of this scope used up their time for this minute', { scope: target.scope, key: target.key });
-        continue;
-      }
       hit = testWithin(re, regexBody, Math.min(RULE_MS, ITEM_MS - spent, left));
-      const took = performance.now() - t0;
-      spent += took;
-      chargeScope(target.scope, took, t0);
       if (hit === null) sayOnce(rule.id, `reached its time limit (${RULE_MS} ms) and counts as no match`, { key: target.key, chars: regexBody.length });
     } else {
       hit = re.test(body);
     }
+    const took = performance.now() - t0;
+    spent += took;
+    chargeScope(key, took, t0);
     if (!hit) continue;
     if (!best || r > best.rank) best = { label: rule.minLabel, rank: r, rules: [rule.id] };
     else if (r === best.rank) best.rules.push(rule.id);
   }
-  return best;
+  return { hit: best, deferred };
 }
