@@ -320,6 +320,12 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // goal record, never published, and the goal's log already says whether the owner answered in
   // person or through their AI (services/goals/goals-ops.ts answerOp), which is the provenance it needs.
   'aimeat_goal_answer',
+  // DECIDED, 2026-10-25 (the same session). The free text is a goal's statement, title, done-when
+  // sentence and work titles: what the owner wants their own agents to do, kept in the owner's goal
+  // record and never published. The goal's log and change list name who made and changed it (the
+  // owner in person or the principal of their AI), which is the provenance an instruction needs; what
+  // the agents then produce is written through aimeat_task_complete, which carries ai_provenance.
+  'aimeat_goal_set',
   // DECIDED, 2026-10-09 (the session that built document signing; the developer reviews it with the
   // build). The free text is a signing request's title and a short note to its parties: a label for
   // the document, which the request names by its hash and never stores. The provenance a signature
