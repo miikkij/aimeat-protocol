@@ -13679,6 +13679,8 @@
     "cfgDesc_extensions_max_debit_per_call": "Most morsels of pacing one call of an extension action may take (default 100).",
     "cfg_extensions_max_pay_morsels": "Highest pacing an extension may state",
     "cfgDesc_extensions_max_pay_morsels": "Highest pacing an extension's action may state in its manifest; a larger one is refused at install (default 10000).",
+    "cfg_extensions_fetch_inflight_mb": "Fetch data in flight per run (MB)",
+    "cfgDesc_extensions_fetch_inflight_mb": "Most answer data one extension run's fetches may hold at the same time. A fetch past it waits for an earlier one to finish (default 128, 0 is no limit).",
     "cfg_features_capability_publishing": "Who adds capabilities",
     "cfgDesc_features_capability_publishing": "Who may add a capability to the registry.",
     "cfgOpt_features_capability_publishing_disabled": "The operator only",
@@ -26520,6 +26522,19 @@
       }
     },
     "config": {
+      "extensions": {
+        "fetch_inflight_mb": {
+          "title": "Fetch data in flight per run",
+          "short": "How much answer data one extension run may hold from its ctx.fetch calls at the same time, in megabytes. A fetch past it waits for its turn and is not refused. The default is 128; 0 is no limit.",
+          "what": "An extension reads outside services with ctx.fetch. Each answer is kept in this server's memory until the call ends, outside the sandbox's own memory limit, so a run that starts many fetches together could fill the server's memory. The server divides this budget by the largest answer the extension may read (4 MB, or up to 32 MB when its manifest asks for more), and that many fetches run at once. The others wait in order and start when one ends. A waiting fetch ends with the run's time limit.",
+          "range": "A whole number from 0 up, in megabytes. The default is 128. 0 is no limit: every fetch starts at once.",
+          "low": "Lower: fewer fetches run at once, so an extension that reads many sources takes longer, and the server's memory peak is smaller.",
+          "high": "Higher: more fetches run at once, and one run can hold more of the server's memory.",
+          "ex1": "128 (the default) with the 4 MB answer limit: 32 fetches at once.",
+          "ex2": "128 with an extension that reads answers of up to 32 MB: 4 fetches at once.",
+          "tip": "Lower it when the server has little memory and extensions read many sources. Every fetch still runs; it only waits for its turn."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Burn rate (0–1)",

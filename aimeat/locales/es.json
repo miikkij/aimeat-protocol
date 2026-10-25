@@ -12003,6 +12003,8 @@
     "cfgDesc_extensions_max_debit_per_call": "Cuántos morsels de ritmo puede tomar como máximo una llamada a una acción de extensión (predeterminado 100).",
     "cfg_extensions_max_pay_morsels": "Ritmo máximo que declara una extensión",
     "cfgDesc_extensions_max_pay_morsels": "El ritmo más alto que puede declarar una acción de extensión en su manifiesto; uno mayor se rechaza al instalar (predeterminado 10000).",
+    "cfg_extensions_fetch_inflight_mb": "Datos de descargas en curso por ejecución (MB)",
+    "cfgDesc_extensions_fetch_inflight_mb": "Cuántos datos de respuesta pueden tener en memoria a la vez las descargas de una ejecución de extensión. Una descarga que no cabe espera a que termine otra anterior (predeterminado 128, 0 es sin límite).",
     "cfg_features_capability_publishing": "Quién agrega capacidades",
     "cfgDesc_features_capability_publishing": "Quién puede agregar una capacidad al registro.",
     "cfgOpt_features_capability_publishing_disabled": "Solo el operador",
@@ -24316,6 +24318,19 @@
       }
     },
     "config": {
+      "extensions": {
+        "fetch_inflight_mb": {
+          "title": "Datos de descargas en curso por ejecución",
+          "short": "Cuántos datos de respuesta de sus llamadas ctx.fetch puede tener en memoria a la vez una ejecución de extensión, en megabytes. Una descarga que pasa el límite espera su turno y no se rechaza. El valor predeterminado es 128; 0 es sin límite.",
+          "what": "Una extensión lee servicios externos con ctx.fetch. Cada respuesta queda en la memoria de este servidor hasta que termina la llamada, fuera del límite de memoria del entorno aislado, así que una ejecución que inicia muchas descargas a la vez podría llenar la memoria del servidor. El servidor divide este límite entre la respuesta más grande que la extensión puede leer (4 MB, o hasta 32 MB si su manifiesto pide más), y ese número de descargas corre a la vez. Las demás esperan en orden y empiezan cuando una termina. Una descarga en espera termina con el tiempo límite de la ejecución.",
+          "range": "Un número entero desde 0, en megabytes. El valor predeterminado es 128. Con 0 no hay límite: cada descarga empieza de inmediato.",
+          "low": "Menor: corren menos descargas a la vez, así que una extensión que lee muchas fuentes tarda más, y el pico de memoria del servidor es menor.",
+          "high": "Mayor: corren más descargas a la vez, y una ejecución puede ocupar más memoria del servidor.",
+          "ex1": "128 (el valor predeterminado) con el límite de respuesta de 4 MB: 32 descargas a la vez.",
+          "ex2": "128 con una extensión que lee respuestas de hasta 32 MB: 4 descargas a la vez.",
+          "tip": "Bájalo cuando el servidor tiene poca memoria y las extensiones leen muchas fuentes. Cada descarga se hace igual; solo espera su turno."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Ritmo de quemado",

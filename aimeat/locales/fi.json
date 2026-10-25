@@ -13851,6 +13851,8 @@
     "cfgDesc_extensions_max_debit_per_call": "Montako murusta tahdistusta laajennuksen toiminnon yksi kutsu saa enintään ottaa (oletus 100).",
     "cfg_extensions_max_pay_morsels": "Laajennuksen suurin tahdistus",
     "cfgDesc_extensions_max_pay_morsels": "Suurin tahdistus, jonka laajennuksen toiminto saa ilmoittaa manifestissaan; suurempi evätään asennuksessa (oletus 10000).",
+    "cfg_extensions_fetch_inflight_mb": "Hakujen data kerralla ajoa kohden (Mt)",
+    "cfgDesc_extensions_fetch_inflight_mb": "Kuinka paljon vastausdataa laajennuksen yhden ajon haut saavat pitää muistissa yhtä aikaa. Haku, joka ei mahdu rajaan, odottaa, kunnes aiempi haku päättyy (oletus 128, 0 = ei rajaa).",
     "cfg_features_capability_publishing": "Kuka lisää kyvykkyyksiä",
     "cfgDesc_features_capability_publishing": "Kuka saa lisätä kyvykkyyden rekisteriin.",
     "cfgOpt_features_capability_publishing_disabled": "Vain operaattori",
@@ -26673,6 +26675,19 @@
       }
     },
     "config": {
+      "extensions": {
+        "fetch_inflight_mb": {
+          "title": "Hakujen data kerralla ajoa kohden",
+          "short": "Kuinka paljon vastausdataa laajennuksen yksi ajo saa pitää ctx.fetch-hauista muistissa yhtä aikaa, megatavuina. Rajan ylittävä haku odottaa vuoroaan, eikä sitä hylätä. Oletus on 128, ja 0 tarkoittaa, ettei rajaa ole.",
+          "what": "Laajennus lukee ulkopuolisia palveluja ctx.fetch-kutsulla. Jokainen vastaus pysyy palvelimen muistissa, kunnes kutsu päättyy, eikä hiekkalaatikon oma muistiraja koske sitä. Siksi ajo, joka aloittaa monta hakua kerralla, voisi täyttää palvelimen muistin. Palvelin jakaa tämän rajan suurimmalla vastauksella, jonka laajennus saa lukea (4 Mt, tai enintään 32 Mt, jos manifesti pyytää enemmän), ja niin monta hakua on käynnissä yhtä aikaa. Muut odottavat järjestyksessä ja alkavat, kun jokin haku päättyy. Odottava haku päättyy ajon aikarajaan.",
+          "range": "Kokonaisluku nollasta ylöspäin, megatavuina. Oletus on 128. Arvolla 0 rajaa ei ole, ja jokainen haku alkaa heti.",
+          "low": "Pienempi: yhtä aikaa on käynnissä vähemmän hakuja, joten monesta lähteestä lukeva laajennus on hitaampi ja palvelimen muistihuippu pienempi.",
+          "high": "Suurempi: yhtä aikaa on käynnissä enemmän hakuja, ja yksi ajo voi varata enemmän palvelimen muistia.",
+          "ex1": "128 (oletus) ja 4 Mt:n vastausraja: 32 hakua yhtä aikaa.",
+          "ex2": "128 ja laajennus, joka lukee enintään 32 Mt:n vastauksia: 4 hakua yhtä aikaa.",
+          "tip": "Pienennä arvoa, jos palvelimella on vähän muistia ja laajennukset lukevat monta lähdettä. Jokainen haku tehdään silti, se vain odottaa vuoroaan."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Polttoosuus",

@@ -1623,6 +1623,15 @@
      "plain": "Extensions Server-side scripts in a WebAssembly sandbox, with scoped access to memory, outbound HTTP through the node's guard, secrets, the wallet and consent. Paywalls, pacing and priced actions are built in. An outbound read can inflate a gzipped answer and can return a binary answer (an image, a map file) intact as base64, and an extension that reads large files raises its own read ceiling in its manifest, up to 32 MB; the ceiling is kept on the installed extension, where your AI reads it, and the install approval does not show it. A script can give one outbound call its own time limit, so one address that does not answer does not fail the whole run, and every run ends at a wall-clock limit (twelve times its CPU limit, at least a minute), also one that only waits. Calendar arithmetic is given to a script by the node: occurrences of repeating events, free time, a time zone's local time to an instant and back, and ICS text to events and back, with the same library the browser uses, because a script has no time-zone data of its own. /v1/extensions, /v1/ext/:name/:action, aimeat_extension_* (aimeat_extension_get returns limits), ctx.fetch(url, { gunzip: true, timeoutMs, responseType: 'base64' }), ctx.calendar.*, manifest limits.fetch_max_mb"
     },
     {
+     "slug": "g-8-extension-load-limits",
+     "cells": [
+      "<strong>Extension load limits</strong>",
+      "The operator decides how much load extensions may put on the node, on the admin Config tab or from a chat, and each limit has a &quot;no limit&quot; value. One run's outbound reads hold at most 128 MB of answers at the same time by default; a read past that waits for its turn and is not refused, so an extension that reads many sources still gets every answer. The limits apply to the next run after a save.",
+      "<code>extensions.fetch_inflight_mb</code> on <code>/v1/admin/config</code>, <code>aimeat_admin_config_set</code>"
+     ],
+     "plain": "Extension load limits The operator decides how much load extensions may put on the node, on the admin Config tab or from a chat, and each limit has a \"no limit\" value. One run's outbound reads hold at most 128 MB of answers at the same time by default; a read past that waits for its turn and is not refused, so an extension that reads many sources still gets every answer. The limits apply to the next run after a save. extensions.fetch_inflight_mb on /v1/admin/config, aimeat_admin_config_set"
+    },
+    {
      "slug": "g-8-extension-actions-for-visitors-without-an-account",
      "cells": [
       "<strong>Extension actions for visitors without an account</strong>",
@@ -4343,6 +4352,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 439
+  "rows": 440
  }
 }

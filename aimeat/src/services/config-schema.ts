@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-25 — The extension load rows (config-schema-extension-load.ts), spread last (secaudit2026oct22).
  *   2026-10-25 — Every AIMEAT_* setting the node reads has a row (check:config-coverage now reads all of
  *     src/): the runtime, access and feature groups (config-schema-runtime.ts, -access.ts, -features.ts).
  *     `applies: 'restart'` marks a stored row the code reads at start; totp.issuer, totp.backup_code_count,
@@ -138,6 +139,7 @@ import { EMAIL_CONFIG_FIELDS } from './config-schema-email.js';
 import { RUNTIME_CONFIG_FIELDS } from './config-schema-runtime.js';
 import { ACCESS_CONFIG_FIELDS } from './config-schema-access.js';
 import { FEATURE_CONFIG_FIELDS } from './config-schema-features.js';
+import { EXTENSION_LOAD_CONFIG_FIELDS } from './config-schema-extension-load.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -668,6 +670,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   ...RUNTIME_CONFIG_FIELDS,
   ...ACCESS_CONFIG_FIELDS,
   ...FEATURE_CONFIG_FIELDS,
+  // The operator's limits on extension load (secaudit2026oct22).
+  ...EXTENSION_LOAD_CONFIG_FIELDS,
 ];
 
 /**
