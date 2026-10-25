@@ -13,14 +13,21 @@
  *   and videoAudio null. None of the three throws.
  *
  *   TEMP FILES. The bytes are written to a new directory under os.tmpdir() (mkdtemp), named
- *   "input.<ext>" where ext is the caller's extension cut to letters and digits, at most five, so no
- *   user input reaches a file name or a command line. The directory is removed in finally.
- * @structure probeVideo · videoFrames · videoAudio · withTempInput · run · parseFps · rotationOf
+ *   "input.<ext>" where ext is a known media container's extension or "bin" (mediaExt), so no user
+ *   input reaches a file name or a command line. The directory is removed in finally.
+ *
+ *   INPUT GUARD. Every run reads its input with `-protocol_whitelist file` and a format_whitelist
+ *   of media containers (INPUT_GUARD), so a playlist or concat file cannot make FFmpeg open other
+ *   files on the host.
+ * @structure probeVideo · videoFrames · videoAudio · withTempInput · run · parseFps · rotationOf ·
+ *   mediaExt · probeArgs · INPUT_GUARD
  * @usage
  *   const facts = await probeVideo({ ffprobePath: 'ffprobe' }, bytes, 'mp4');
  *   const frames = await videoFrames({ ffmpegPath: 'ffmpeg' }, bytes, 'mp4', 4, facts.durationSeconds);
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: the temp file is named from a fixed list of media
+ *     extensions, and ffprobe and ffmpeg read it with a protocol and a format whitelist.
  */
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -53,16 +60,41 @@ function run(bin: string, args: string[], timeoutMs: number, maxBuffer = 1024 * 
   });
 }
 
-/** The extension cut to letters and digits, at most five; "bin" when nothing is left. */
-function safeExt(ext: string): string {
-  return (ext || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 5).toLowerCase() || 'bin';
+/**
+ * The media containers the pipeline reads. The temp file is named with one of these extensions or
+ * "bin", never with the uploader's own: FFmpeg picks a demuxer from the extension and the bytes, and
+ * an extension such as m3u8 selects a playlist demuxer that opens further files the playlist names.
+ */
+const MEDIA_EXTENSIONS = new Set([
+  'mp4', 'm4v', 'mov', 'm4a', '3gp', '3g2', 'mkv', 'mka', 'webm', 'avi', 'mpg', 'mpeg', 'ts', 'mts', 'm2ts',
+  'flv', 'ogg', 'ogv', 'oga', 'opus', 'mp3', 'wav', 'flac', 'aac', 'wma', 'wmv', 'asf', 'aif', 'aiff', 'amr', 'caf', 'ac3',
+]);
+
+/**
+ * The demuxers ffprobe and ffmpeg may use on an upload (FFmpeg's format_whitelist), and the one
+ * protocol (the local temp file). A playlist or concat demuxer, which opens other files by name, is
+ * not on the list, so whatever the bytes say, only the one temp file is read.
+ */
+const FORMAT_WHITELIST = 'mov,mp4,m4a,3gp,3g2,mj2,matroska,webm,avi,mpegts,mpeg,flv,ogg,mp3,wav,w64,flac,aac,asf,aiff,amr,caf,ac3,eac3';
+/** Input options placed before the input path on every run. */
+export const INPUT_GUARD = ['-protocol_whitelist', 'file', '-format_whitelist', FORMAT_WHITELIST];
+
+/** The extension the temp file gets: a known media container's, or "bin". */
+export function mediaExt(ext: string): string {
+  const e = (ext || '').replace(/[^A-Za-z0-9]/g, '').toLowerCase();
+  return MEDIA_EXTENSIONS.has(e) ? e : 'bin';
+}
+
+/** The ffprobe arguments for one temp input. */
+export function probeArgs(input: string): string[] {
+  return ['-v', 'error', ...INPUT_GUARD, '-print_format', 'json', '-show_format', '-show_streams', input];
 }
 
 /** Writes the bytes to a fresh temp directory, runs fn with the file path, removes the directory. */
 async function withTempInput<T>(bytes: Buffer, ext: string, fn: (input: string, dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(join(tmpdir(), 'aimeat-media-'));
   try {
-    const input = join(dir, `input.${safeExt(ext)}`);
+    const input = join(dir, `input.${mediaExt(ext)}`);
     await writeFile(input, bytes);
     return await fn(input, dir);
   } finally {
@@ -124,9 +156,7 @@ function compact<T extends object>(o: T): T {
 export async function probeVideo(opts: { ffprobePath: string; timeoutMs?: number }, bytes: Buffer, ext: string): Promise<VideoFacts> {
   try {
     return await withTempInput(bytes, ext, async (input) => {
-      const { stdout } = await run(opts.ffprobePath,
-        ['-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', input],
-        opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, PROBE_MAX_BUFFER);
+      const { stdout } = await run(opts.ffprobePath, probeArgs(input), opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, PROBE_MAX_BUFFER);
       const json = JSON.parse(stdout) as { format?: Record<string, unknown> & { tags?: Record<string, unknown> }; streams?: Stream[] };
       const format = json.format ?? {};
       const tags = format.tags ?? {};
@@ -196,14 +226,14 @@ export async function videoFrames(
           const at = (durationSeconds * (i + 0.5)) / n;
           const out = join(dir, `frame-${i}.jpg`);
           await run(opts.ffmpegPath,
-            ['-v', 'error', '-y', '-ss', at.toFixed(3), '-i', input, '-frames:v', '1', '-vf', SCALE, '-q:v', '4', out], timeout);
+            ['-v', 'error', '-y', '-ss', at.toFixed(3), ...INPUT_GUARD, '-i', input, '-frames:v', '1', '-vf', SCALE, '-q:v', '4', out], timeout);
           frames.push(await readFile(out));
         }
         return frames;
       }
       const pattern = join(dir, 'frame-%03d.jpg');
       await run(opts.ffmpegPath,
-        ['-v', 'error', '-y', '-i', input, '-vf', `fps=1,${SCALE}`, '-frames:v', String(n), '-q:v', '4', pattern], timeout);
+        ['-v', 'error', '-y', ...INPUT_GUARD, '-i', input, '-vf', `fps=1,${SCALE}`, '-frames:v', String(n), '-q:v', '4', pattern], timeout);
       // A clip shorter than n seconds gives fewer frames than asked; only the files written are read.
       for (let i = 1; i <= n; i++) {
         const file = join(dir, `frame-${String(i).padStart(3, '0')}.jpg`);
@@ -233,7 +263,7 @@ export async function videoAudio(
   const timeout = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   try {
     return await withTempInput(bytes, ext, async (input, dir) => {
-      const base = ['-v', 'error', '-y', '-i', input, '-vn', '-map', '0:a:0', '-ac', '1', '-ar', '16000', '-t', String(seconds)];
+      const base = ['-v', 'error', '-y', ...INPUT_GUARD, '-i', input, '-vn', '-map', '0:a:0', '-ac', '1', '-ar', '16000', '-t', String(seconds)];
       const mp3 = join(dir, 'audio.mp3');
       try {
         await run(opts.ffmpegPath, [...base, '-c:a', 'libmp3lame', '-b:a', '32k', mp3], timeout);
