@@ -441,7 +441,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:88eb80f0c36dad1b810b2455"
+      "digest": "sha256:afaf3214893a907593b15d5f"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -661,7 +661,7 @@
       "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
       "aimeat/src/mcp/agent-schedules.ts": "d35f0d5e66f3eeaa",
       "aimeat/src/services/scheduler.ts": "a65cd86712893598",
-      "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
+      "aimeat/src/services/ai/route-plan.ts": "4cf8662cd968085b"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
