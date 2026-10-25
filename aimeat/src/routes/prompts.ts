@@ -6,6 +6,8 @@
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.
  * @version-history
+ *   2026-10-25 -- GET /v1/portal/prompts/:promptId names only the cortexes the caller may see (visibleCortexes;
+ *     secaudit2026oct22).
  *   2026-10-21 -- The hello-page funnel marker asks isAnonymousPrincipal (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.17.0 -- 2026-10-15 -- Mounts /v1/prompts/places/sections (where things are on this node's own
  *     pages, routes/prompts-places.ts).
@@ -48,6 +50,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
+import { visibleCortexes } from '../services/cortex-lifecycle.js';
+import { isOperatorCaller } from '../services/operator-override.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -705,10 +709,16 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const ownerName = req.auth?.owner ?? req.query.owner as string ?? 'user';
 
-    // Auto-detect active cortex extensions
+    // Auto-detect active cortex extensions, only those this caller may see (secaudit2026oct22): the
+    // MCP prompt twin and the cortex list routes apply the same fence. The signed-in owner counts,
+    // never the ?owner= query, and an anonymous caller sees public and node-installed ones only.
     let cortexExtDescriptions: string[] = [];
     try {
-      const extensions = await storage.listCortexExtensions({ status: 'active' });
+      const caller = {
+        ownerName: req.auth && !isAnonymousPrincipal(req.auth) ? String(req.auth.owner ?? '') : '',
+        isOperator: await isOperatorCaller(storage, req.auth),
+      };
+      const extensions = visibleCortexes(caller, await storage.listCortexExtensions({ status: 'active' }), config.nodeId);
       if (extensions && extensions.length > 0) {
         cortexExtDescriptions = extensions.map((ext) =>
           `- ${ext.name}: ${ext.description}`

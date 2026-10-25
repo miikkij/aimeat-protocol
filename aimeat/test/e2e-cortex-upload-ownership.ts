@@ -295,6 +295,21 @@ await test('Owner A reads all four doors and sees it in the list — the fence i
     assert((body.data.extensions as any[]).some(e => e.name === victimName), 'the owner cannot find their own private cortex in their own list');
 });
 
+// The REST prompt package fills {{cortex_extensions}} with the active cortexes. It named every one
+// on the node, another owner's private one included, to any caller (secaudit2026oct22).
+await test("The portal prompt package names A's private cortex to A only, never to B or an anonymous caller", async () => {
+    const line = `- ${victimName}:`;
+    const anon = await json('/v1/portal/prompts/app-builder-general');
+    assert(anon.status === 200, `anonymous package status ${anon.status}`);
+    assert(!String(anon.body.data?.prompt ?? '').includes(line), 'an anonymous caller was shown A\'s private cortex');
+    const asB2 = await json('/v1/portal/prompts/app-builder-general', asB);
+    assert(!String(asB2.body.data?.prompt ?? '').includes(line), 'B was shown A\'s private cortex');
+    const mine = await json('/v1/portal/prompts/app-builder-general', asA);
+    assert(String(mine.body.data?.prompt ?? '').includes(line), 'A was not shown their own private cortex');
+    assert(mine.body.data.cortex_extensions_available === anon.body.data.cortex_extensions_available + 1,
+        `the count: A ${mine.body.data.cortex_extensions_available}, anonymous ${anon.body.data.cortex_extensions_available}`);
+});
+
 await test('Flipped to PUBLIC, B reads it and lists it; flipped back, B loses it again', async () => {
     const pub = await json(`/v1/cortex/${VICTIM_ENC}/visibility`, { ...asA, method: 'POST', body: JSON.stringify({ visibility: 'public' }) });
     assert(pub.status === 200, `set public ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
