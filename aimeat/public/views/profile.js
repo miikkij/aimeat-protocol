@@ -10,6 +10,7 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-25 — The "Goals" tab (views/profile/goals-tab.js): the agents' goals and their rules.
  *   2026-10-24 — The "Agreements" tab (views/profile/agreements-tab.js): the data processing agreements in
  *     which the person is the counterparty, and the four ways to sign them (plan doc-mvmr4i2wdk0p).
  *   2026-10-18 — The "What others can see" tab (views/profile/exposure-tab.js): what of the person's own
@@ -105,6 +106,7 @@ import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
 import SchedulerTab from './profile/scheduler-tab.js';
 import WorkflowsTab from './profile/workflows-tab.js';
+import GoalsTab from './profile/goals-tab.js';
 import InboxTab from './profile/inbox-tab.js';
 import ContactsTab from './profile/contacts-tab.js';
 import NotebookTab from './profile/notebook-tab.js';
@@ -142,6 +144,7 @@ const TABS = [
   { id: 'offers',        key: 'profile.tabs.offers',         component: OffersTab,         minTier: 'active' },
   { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
   { id: 'workflows',     key: 'profile.tabs.workflows',      component: WorkflowsTab,      minTier: 'active' },
+  { id: 'goals',         key: 'profile.tabs.goals',          component: GoalsTab,          minTier: 'active' },
   { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
   // 'new', not 'active': this tab hosts Hello MCP, which is the FIRST thing a brand-new user is
   // sent to. Gating it behind 'active' hid the onboarding surface from exactly the people it is for.

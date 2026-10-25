@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.27.0 -- 2026-10-25 -- "Goals" under Automation, after Agents: the agents' goals and their rules.
  *   v1.26.0 -- 2026-10-24 -- "Agreements" under Account, after What others can see: the data processing agreements a person is the counterparty of (plan doc-mvmr4i2wdk0p).
  *   v1.26.0 -- 2026-10-19 -- The Agents card's rows show the agent's own picture (components/AgentAvatar.js) in place of the robot sign, when the agent has set one.
  *   v1.25.0 -- 2026-10-18 -- "What others can see" (the exposure tab) under Account, after Access, and in the basic menu: what of the person's own a stranger can read is a question a newcomer asks before anything goes in (plan doc-mvcn6c7e4e5q, V6.2).
@@ -617,6 +618,7 @@ export const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuAutomation', items: [    // agents + their infrastructure
     { id: 'fleet', labelKey: 'profile.tabs.fleet' },
     { id: 'agents', labelKey: 'profile.tabs.agents' },
+    { id: 'goals', labelKey: 'profile.tabs.goals' },
     { id: 'ecosystem', labelKey: 'profile.tabs.ecosystem' },
     { id: 'offers', labelKey: 'profile.tabs.offers' },
     { id: 'scheduler', labelKey: 'profile.tabs.scheduler' },

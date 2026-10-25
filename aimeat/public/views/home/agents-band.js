@@ -21,6 +21,9 @@
  * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-25 — The band's title carries the question mark that explains an agent, and its first rows
+ *     are the goals (views/home/goals-part.js): the field that gives the agents a goal, the running
+ *     goals, and what in them waits for the person (session cc-jouni-goals).
  *   2026-10-19 — A worker's line starts with the agent's own picture when it has set one.
  *   2026-10-12 — whenWords says "When something new arrives in a workspace" for an agent whose
  *     definition names the workspace spaces it watches.
@@ -43,6 +46,8 @@ import { Action, Loud } from '/components/Action.js';
 import { Mark, Marks } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { cronWordsIn } from '/views/profile/scheduler/cron-words.js';
+import { HelpTip } from '/components/HelpTip.js';
+import { GoalsPart } from './goals-part.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -126,11 +131,14 @@ export function AgentsBand({ data, navigate }) {
     navigate?.(newAgentPath(sentence ? '&say=' + encodeURIComponent(sentence) : ''));
   };
 
+  const title = tr('home.agents.title', 'Your agents');
   return html`
-    <${Band} title=${tr('home.agents.title', 'Your agents')}>
+    <${Band} title=${html`${title} <${HelpTip} term="concept.agent" label=${title} />`}>
       <${BandNote}>
         ${tr('home.agents.lead', 'Say in one sentence what you want. AIMEAT makes the agent, shows it to you, and starts it when you approve.')}
       <//>
+
+      <${GoalsPart} navigate=${navigate} />
 
       <${NamedRow} stack label=${tr('home.agents.newLabel', 'A new agent')}>
         <${TextField}

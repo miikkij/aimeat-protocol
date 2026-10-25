@@ -778,6 +778,9 @@
       "/views/home/agent-new.js": "/views/home/agent-new.js",
       "/views/home/agent.js": "/views/home/agent.js",
       "/views/home/agent-work.js": "/views/home/agent-work.js",
+      "/views/home/goal.js": "/views/home/goal.js",
+      "/views/home/goal-new.js": "/views/home/goal-new.js",
+      "/js/services/goals.js": "/js/services/goals.js",
       "/views/home/agent-app.js": "/views/home/agent-app.js",
       "/views/home/agent-ties-parts.js": "/views/home/agent-ties-parts.js",
       "/views/home/agent-watch-parts.js": "/views/home/agent-watch-parts.js",
@@ -1219,6 +1222,14 @@
       if (pathname === '/v1/home' && /[?&]new-agent=/.test(search)) {
         return () => import('/views/home/agent-new.js' + B);
       }
+      // The agents' goals: a new goal from one sentence (/v1/home?new-goal=1) and one goal with what
+      // waits for the person, what came out and how it got there (/v1/home?goal=<id>).
+      if (pathname === '/v1/home' && /[?&]new-goal=/.test(search)) {
+        return () => import('/views/home/goal-new.js' + B);
+      }
+      if (pathname === '/v1/home' && /[?&]goal=/.test(search)) {
+        return () => import('/views/home/goal.js' + B);
+      }
       // Every agent on a page of its own, the header's Agents link: /v1/home?agents=1.
       if (pathname === '/v1/home' && /[?&]agents=/.test(search)) {
         return () => import('/views/home/agents-page.js' + B);
@@ -1649,7 +1660,7 @@
       const currentPath = location.pathname;
       // The home's agent pages (the list, one agent, a new agent, the computers) light Agents, not
       // Home. Messages has no lit state: it opens a tab of /v1/profile, whose address keeps no tab.
-      const onAgentPage = currentPath === '/v1/home' && /[?&](agents|agent|new-agent|computers|machines)=/.test(location.search);
+      const onAgentPage = currentPath === '/v1/home' && /[?&](agents|agent|new-agent|computers|machines|goal|new-goal)=/.test(location.search);
 
       // The brand goes to ONE place per session state: signed in, the home; signed out, the front
       // page. It used to go to the front page for everyone and leave a per-tab flag behind so the
