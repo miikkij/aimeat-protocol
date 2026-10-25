@@ -45,6 +45,8 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-25 — installCortex refuses a name the node ships to anyone but an operator while the name
+ *     has no record, 409 NAME_RESERVED (reservedNameRefusal; secaudit2026oct22).
  *   2026-10-22 — deleteCortex settles the cortex's waiting publish requests `outdated` after the
  *     uninstall: an install again at the same version with other libraries was published by the old
  *     request (secaudit 2026-10,
@@ -100,6 +102,7 @@ import { cortexPublishAsk, fileCortexAsk } from './cortex-visibility.js';
 import type { DoorAsk, PublishGateInput } from './publish-requests/door.js';
 import { accountGhii } from './publish-requests/ask.js';
 import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
+import { bundledCortexNames } from './cortex-seeder.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -205,6 +208,19 @@ export function libsWithoutContent(
         .filter((c): c is Extract<typeof c, { type: 'lib' }> => c.type === 'lib')
         .map(c => c.filename)
         .filter(f => typeof libs[f] !== 'string' && !alreadyStored.has(f));
+}
+
+/**
+ * The refusal for a new cortex under a name the node ships (cortex-seeder.ts bundledCortexNames),
+ * asked by installCortex and the PUT create branch once the name has no record. Apps load a shipped
+ * library from its bare address, so the name stays the node's own; an operator may still use it.
+ */
+export function reservedNameRefusal(name: string, caller: Pick<CortexCaller, 'ownerName' | 'isOperator'>): CortexRefusal | null {
+    if (caller.isOperator || !bundledCortexNames().has(name)) return null;
+    return {
+        status: 409, code: 'NAME_RESERVED',
+        message: `The name "${name}" belongs to a library this node ships. Give your add-on another name, for example "${caller.ownerName}-${name}".`,
+    };
 }
 
 /** The refusal text for libsWithoutContent, naming the files and the key they belong under. */
@@ -322,6 +338,9 @@ export async function installCortex(
     if (prior) {
         return refuse(409, 'CONFLICT', `Extension "${ext.name}" is already installed`);
     }
+    // A name the node ships is the node's own even while it has no record (secaudit2026oct22).
+    const reserved = reservedNameRefusal(ext.name, caller);
+    if (reserved) return { ok: false, refusal: reserved };
 
     // Every lib component must arrive WITH its bytes. This read only `libs`, so a request that spelled
     // it `lib`, or a ZIP with the file outside libs/, answered 201 and recorded a component with

@@ -9,6 +9,8 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.6.3 — 2026-10-25 — The create branch refuses a name the node ships to anyone but an operator,
+ *     409 NAME_RESERVED (reservedNameRefusal; secaudit2026oct22).
  *   v1.6.2 — 2026-10-25 — The create branch inserts the record before it writes a lib byte and
  *     answers 409 CONFLICT on a collision with nothing written, as installCortex does
  *     (secaudit2026oct22).
@@ -40,7 +42,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../../services/cortex-manifest.js';
 import { cortexInstallRefusal } from '../../services/install-quotas.js';
 import {
-  libsWithoutContent, missingLibsMessage, type CortexCaller,
+  libsWithoutContent, missingLibsMessage, reservedNameRefusal, type CortexCaller,
   type CortexDeps, type CortexOutcome, type CortexRefusal,
 } from '../../services/cortex-lifecycle.js';
 import { activateExtension, activationRefusal, deactivateExtension } from './activation.js';
@@ -151,6 +153,8 @@ export async function upsertCortex(
   // ── CREATE branch — brand-new cortex, so the node's ceiling applies. It used to say "mirrors
   // POST" and then write the check out again; a mirror kept in step by hand is not a mirror.
   if (!existing) {
+    const reserved = reservedNameRefusal(name, caller);
+    if (reserved) return { ok: false, refusal: reserved };
     const overQuota = await cortexInstallRefusal({ storage, config }, true);
     if (overQuota) return upsertRefusal(overQuota.status, overQuota.code, overQuota.message);
     // A lib component with no bytes is refused before anything is written, as installCortex does:
