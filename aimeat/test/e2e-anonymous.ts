@@ -557,6 +557,25 @@ await test('MCP aimeat_datapackage_publish: the minted token is AUTH_REQUIRED, a
     assert(!own.isError && typeof own.data?.package_id === 'string', `agent over MCP: ${own.text.slice(0, 200)}`);
 });
 
+await test('POST /v1/memory/copy: the minted token copies only into anonymous.*, an agent of the owner copies any public record', async () => {
+    assert(dirOwner !== null && ownerAgent !== null, 'fixtures failed');
+    const plainKey = `anon-copy-src-${s3e}`;
+    const anonKey = `anonymous.copy-src-${s3e}`;
+    for (const key of [plainKey, anonKey]) {
+        const w = await json('/v1/memory', ownerAuth({ method: 'POST', body: JSON.stringify({ key, value: { text: 'public' }, visibility: 'public' }) }));
+        assert(w.status === 201 || w.status === 200, `owner write ${key}: ${shown(w)}`);
+    }
+    // The copy keeps its default level (private): the fence is what is asked here, not the publish gate.
+    const copy = (key: string) => JSON.stringify({ source_gaii: dirOwner!.ghii, key });
+    const outside = await json('/v1/memory/copy', anonAuth({ method: 'POST', body: copy(plainKey) }));
+    assert(outside.status === 403, `minted token copy outside anonymous.*: ${shown(outside)}`);
+    const inside = await json('/v1/memory/copy', anonAuth({ method: 'POST', body: copy(anonKey) }));
+    assert(inside.status === 200 || inside.status === 202, `minted token copy into anonymous.*: ${shown(inside)}`);
+    await json(`/v1/memory/${encodeURIComponent(anonKey)}`, anonAuth({ method: 'DELETE' }));
+    const agent = await json('/v1/memory/copy', agentAuth({ method: 'POST', body: copy(plainKey) }));
+    assert(agent.status === 200 || agent.status === 202, `agent copy: ${shown(agent)}`);
+});
+
 await test('The anonymous token still writes its own memory after the Phase 3e refusals', async () => {
     const key = `anonymous.after-3e-${s3e}`;
     const { status, body } = await json('/v1/memory', anonAuth({ method: 'POST', body: JSON.stringify({ key, value: { ok: true } }) }));
