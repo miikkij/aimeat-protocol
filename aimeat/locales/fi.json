@@ -13853,6 +13853,10 @@
     "cfgDesc_extensions_max_pay_morsels": "Suurin tahdistus, jonka laajennuksen toiminto saa ilmoittaa manifestissaan; suurempi evätään asennuksessa (oletus 10000).",
     "cfg_extensions_fetch_inflight_mb": "Hakujen data kerralla ajoa kohden (Mt)",
     "cfgDesc_extensions_fetch_inflight_mb": "Kuinka paljon vastausdataa laajennuksen yhden ajon haut saavat pitää muistissa yhtä aikaa. Haku, joka ei mahdu rajaan, odottaa, kunnes aiempi haku päättyy (oletus 128, 0 = ei rajaa).",
+    "cfg_extensions_namespace_max_mb": "Muisti laajennusta kohden (Mt)",
+    "cfgDesc_extensions_namespace_max_mb": "Kuinka paljon dataa laajennuksen muistissa saa olla. Laajennuksen jokainen kopio lasketaan erikseen. Rajan jälkeen uusi avain hylätään, mutta olemassa olevaa avainta voi yhä päivittää. Ihmisten omat muistirajat ovat tästä erillään (oletus 0 = ei rajaa).",
+    "cfg_extensions_max_instances": "Kopioita laajennusta kohden",
+    "cfgDesc_extensions_max_instances": "Kuinka monta kopiota laajennuksesta saa olla. Rajan jälkeen uusi kopio hylätään (oletus 0 = ei rajaa).",
     "cfg_features_capability_publishing": "Kuka lisää kyvykkyyksiä",
     "cfgDesc_features_capability_publishing": "Kuka saa lisätä kyvykkyyden rekisteriin.",
     "cfgOpt_features_capability_publishing_disabled": "Vain operaattori",
@@ -26686,6 +26690,28 @@
           "ex1": "128 (oletus) ja 4 Mt:n vastausraja: 32 hakua yhtä aikaa.",
           "ex2": "128 ja laajennus, joka lukee enintään 32 Mt:n vastauksia: 4 hakua yhtä aikaa.",
           "tip": "Pienennä arvoa, jos palvelimella on vähän muistia ja laajennukset lukevat monta lähdettä. Jokainen haku tehdään silti, se vain odottaa vuoroaan."
+        },
+        "namespace_max_mb": {
+          "title": "Muisti laajennusta kohden",
+          "short": "Kuinka paljon dataa yksi laajennus saa pitää muistissaan, megatavuina. Rajan jälkeen laajennus ei voi lisätä uutta avainta, mutta se voi yhä päivittää olemassa olevia avaimiaan. Oletus on 0, eli rajaa ei ole.",
+          "what": "Laajennus pitää datansa omassa muistissaan, erillään niiden ihmisten muistista, jotka sitä käyttävät. Laajennuksen jokaisella kopiolla on oma muistinsa, ja jokainen kopio lasketaan erikseen. Kun raja on asetettu ja muisti on täynnä, uusi avain hylätään viestillä, joka nimeää tämän asetuksen. Laajennus voi silti lukea, päivittää ja poistaa avaimia, jotka sillä jo on. Ihmisten omat muistirajat eivät laske laajennuksen muistia, eikä tämä asetus laske heidän muistiaan.",
+          "range": "Kokonaisluku nollasta ylöspäin, megatavuina. Oletus on 0, eli rajaa ei ole. Yhden arvon koolla on oma rajansa (muistiarvon kokoraja).",
+          "low": "Pienempi: dataa keräävän laajennuksen tila loppuu aiemmin, ja sen pitää koota datansa harvempiin avaimiin.",
+          "high": "Suurempi: laajennus voi pitää enemmän dataa palvelimen tietokannassa.",
+          "ex1": "0 (oletus): laajennuksella voi olla niin monta avainta kuin avainraja sallii.",
+          "ex2": "100: laajennus, jonka muistissa on 100 Mt, ei voi enää lisätä avaimia, mutta se päivittää edelleen avaimiaan.",
+          "tip": "Aseta raja, jos yhden laajennuksen data kasvaa yhteisessä tietokannassa loputtomasti. Laajennus, joka on jo rajan yli, toimii edelleen sillä datalla, joka sillä on."
+        },
+        "max_instances": {
+          "title": "Kopioita laajennusta kohden",
+          "short": "Kuinka monta kopiota yhdestä laajennuksesta saa olla. Rajan jälkeen uusi kopio hylätään. Oletus on 0, eli rajaa ei ole.",
+          "what": "Osa laajennuksista toimii monena kopiona, esimerkiksi yksi kopio kutakin asiakasta tai omistajan liittämää tiliä kohden. Jokaisella kopiolla on omat asetuksensa ja oma muistinsa. Tämä asetus rajaa, montako kopiota yhdellä laajennuksella saa olla. Rajan ylittävä uusi kopio hylätään viestillä, joka nimeää tämän asetuksen, ja olemassa olevat kopiot toimivat edelleen.",
+          "range": "Kokonaisluku nollasta ylöspäin. Oletus on 0, eli rajaa ei ole.",
+          "low": "Pienempi: yhdestä asennuksesta voi tehdä vähemmän kopioita ja siten vähemmän erillisiä muisteja.",
+          "high": "Suurempi: omistaja, joka liittää monta tiliä, voi tehdä kopion jokaiselle.",
+          "ex1": "0 (oletus): laajennuksella voi olla kuinka monta kopiota tahansa.",
+          "ex2": "20: omistaja voi liittää 20 tiliä yhden laajennuksen kautta.",
+          "tip": "Aseta tämä yhdessä laajennuskohtaisen muistin kanssa: jokaisella kopiolla on oma muistinsa, joten nämä kaksi yhdessä rajaavat, paljonko yksi laajennus voi tallentaa."
         }
       },
       "morsel_policy": {

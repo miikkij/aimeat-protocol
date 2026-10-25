@@ -13681,6 +13681,10 @@
     "cfgDesc_extensions_max_pay_morsels": "Highest pacing an extension's action may state in its manifest; a larger one is refused at install (default 10000).",
     "cfg_extensions_fetch_inflight_mb": "Fetch data in flight per run (MB)",
     "cfgDesc_extensions_fetch_inflight_mb": "Most answer data one extension run's fetches may hold at the same time. A fetch past it waits for an earlier one to finish (default 128, 0 is no limit).",
+    "cfg_extensions_namespace_max_mb": "Memory per extension (MB)",
+    "cfgDesc_extensions_namespace_max_mb": "Most data one extension's memory may hold, each copy counted on its own. Past it a new key is refused and an existing key is still updated. Separate from people's own memory limits (default 0, no limit).",
+    "cfg_extensions_max_instances": "Copies per extension",
+    "cfgDesc_extensions_max_instances": "Most copies (instances) one extension may have; past it a new copy is refused (default 0, no limit).",
     "cfg_features_capability_publishing": "Who adds capabilities",
     "cfgDesc_features_capability_publishing": "Who may add a capability to the registry.",
     "cfgOpt_features_capability_publishing_disabled": "The operator only",
@@ -26533,6 +26537,28 @@
           "ex1": "128 (the default) with the 4 MB answer limit: 32 fetches at once.",
           "ex2": "128 with an extension that reads answers of up to 32 MB: 4 fetches at once.",
           "tip": "Lower it when the server has little memory and extensions read many sources. Every fetch still runs; it only waits for its turn."
+        },
+        "namespace_max_mb": {
+          "title": "Memory per extension",
+          "short": "How much data one extension may keep in its memory, in megabytes. Past it the extension cannot add a new key, and it can still update the keys it has. The default is 0: no limit.",
+          "what": "An extension keeps its data in a memory of its own, apart from the memory of the people who use it. Each copy (instance) of an extension has its own memory and is counted on its own. When this limit is set and the memory is full, a new key is refused with a message that names this setting, and the extension can still read, update and delete its existing keys. People's own memory limits do not count an extension's memory, and this setting does not count theirs.",
+          "range": "A whole number from 0 up, in megabytes. The default is 0, which is no limit. The size of one value is limited separately (Memory value size cap).",
+          "low": "Lower: an extension that collects data runs out of room sooner and has to fold its data into fewer keys.",
+          "high": "Higher: an extension may keep more data in the server's database.",
+          "ex1": "0 (the default): an extension keeps as many keys as the key limit allows.",
+          "ex2": "100: an extension with 100 MB in its memory can no longer add keys, and it keeps updating the ones it has.",
+          "tip": "Set it when one extension's data grows without end in the shared database. An extension that is already over the limit keeps working with the data it has."
+        },
+        "max_instances": {
+          "title": "Copies per extension",
+          "short": "How many copies (instances) one extension may have. Past it a new copy is refused. The default is 0: no limit.",
+          "what": "Some extensions run as several copies, one per customer or per account the owner connects, each with its own settings and its own memory. This setting limits how many copies one extension may have. A new copy past it is refused with a message that names this setting; the copies that exist keep running.",
+          "range": "A whole number from 0 up. The default is 0, which is no limit.",
+          "low": "Lower: one install can make fewer copies, and so fewer separate memories.",
+          "high": "Higher: an owner who connects many accounts can make a copy for each one.",
+          "ex1": "0 (the default): an extension may have any number of copies.",
+          "ex2": "20: an owner can connect 20 accounts through one extension.",
+          "tip": "Set it together with Memory per extension: each copy has its own memory, so the two together bound what one extension can store."
         }
       },
       "morsel_policy": {

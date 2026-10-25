@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
  *   2026-10-25 -- e2e-sse-revocation.ts joins the list (not the guard tier): a live event stream ends when its credential is revoked (secaudit2026oct22).
  *   2026-10-25 -- e2e-realtime-signed-in-only.ts joins the list (not the guard tier): the realtime upgrade on a signed-in-only node admits its own accounts only (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-backup-reader.ts joins the list (not the guard tier): the classification reader and the export trail on GET /v1/admin/backup (secaudit2026oct22).
@@ -632,6 +633,9 @@ const ALL_SUITES = [
     'test/e2e-ext-paywall.ts',
     // A public extension action answers a caller without an account, read-only (Comicland v3 A-7).
     'test/e2e-ext-visitor-actions.ts',
+    // The operator's limits on extension load, set from the admin config: each refusal names its
+    // setting, and the designed use keeps working under it (secaudit2026oct22, round 7).
+    'test/e2e-ext-operator-limits.ts',
     // Subscriptions to an extension's plans and the card page route's refusals (Comicland v3 A-5, A-4).
     'test/e2e-subscriptions.ts',
     // AI provenance written into an exported file, as a marked copy (Comicland v3 A-8).
