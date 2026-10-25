@@ -20,6 +20,9 @@
  *   start value back and the switch off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=classification-clearance
  * @version-history
+ *   v1.1.0 -- 2026-10-25 -- An ai schedule the agent made is refused at the fire for an input above its
+ *     clearance, with a reason that names the clearance and the agent's page; the owner's own schedule
+ *     over the same record meets no clearance (secaudit2026oct22, lead 494).
  *   v1.0.1 — 2026-10-18 — The setup takes the default audience caps off, which a new node carries from
  *     plan doc-mvdipuyqraas L5.1; the suite tests the clearance, not the caps.
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L2.1-L2.4).
@@ -206,6 +209,35 @@ await test('The owner still reads all of it, and her log counts what was kept fr
     const rows = (log.body.data.rows as Body[]).filter(r => String(r.purpose ?? '').includes('clearance'));
     assert(rows.some(r => r.key === SECRET), `a refused row for the record: ${JSON.stringify(log.body.data.rows).slice(0, 600)}`);
     assert(rows.some(r => r.key === FILE), `a refused row for the file: ${JSON.stringify(rows).slice(0, 600)}`);
+});
+
+// An ai schedule the agent made reads its inputs as that agent, so its clearance applies at the fire,
+// as on an immediate AI job; the owner's own schedule over the same record reads as before
+// (secaudit2026oct22, lead 494).
+const aiSchedule = async (token: string, name: string): Promise<string> => {
+    const r = await call('POST', '/v1/schedules', token, {
+        kind: 'ai', cron: '0 6 1 1 *', display_name: name, prompt: 'Summarise the input.',
+        input_keys: [SECRET], input_namespaces: [bot.gaii], output_key: `clr.out.${name}.${stamp}`,
+    });
+    assert(r.status === 201, `schedule ${name}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    return r.body.data.schedule.id as string;
+};
+await test('SCHEDULE: the agent\'s ai schedule over the Confidential record is refused at the fire, and the refusal names the clearance and the agent\'s page', async () => {
+    const id = await aiSchedule(bot.token, 'agentmade');
+    const run = await call('POST', `/v1/schedules/${encodeURIComponent(id)}/trigger`, alice.token);
+    assert(run.status === 200 && run.body.data.outcome === 'error', `trigger: ${run.status} ${JSON.stringify(run.body?.data ?? run.body?.error)}`);
+    const reason = String(run.body.data.reason ?? '');
+    assert(/at most Internal/.test(reason) && reason.includes(`/profile?tab=agents&agent=${bot.name}`) && reason.includes(SECRET),
+        `the refusal names the clearance, the agent's page and the record: ${reason}`);
+    await call('DELETE', `/v1/schedules/${encodeURIComponent(id)}`, alice.token);
+});
+await test('SCHEDULE: the owner\'s own ai schedule over the same record is not refused by any clearance', async () => {
+    const id = await aiSchedule(alice.token, 'ownermade');
+    const run = await call('POST', `/v1/schedules/${encodeURIComponent(id)}/trigger`, alice.token);
+    assert(run.status === 200, `trigger: ${run.status} ${JSON.stringify(run.body?.error)}`);
+    const reason = String(run.body.data.reason ?? '');
+    assert(!/may read content classified at most/.test(reason), `the owner's schedule met a clearance: ${reason}`);
+    await call('DELETE', `/v1/schedules/${encodeURIComponent(id)}`, alice.token);
 });
 
 // ─── 3. Who may change it ───

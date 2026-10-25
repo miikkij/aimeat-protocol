@@ -15,6 +15,9 @@
  * @structure runAiJob(storage, config, job)
  * @usage scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
  * @version-history
+ *   v1.2.0 -- 2026-10-25 -- A schedule an agent made reads its inputs with that agent's reader, so the
+ *     agent's clearance applies at the fire and a refusal names it; the owner's, an app's and an
+ *     ecosystem app's schedules read as an unattended run as before (secaudit2026oct22, lead 494).
  *   v1.1.0 -- 2026-10-22 -- The inputs are read for the schedule's maker (services/schedule-ai-read.ts
  *     aiScheduleFireViewer): a private record of the owner or of a sibling agent is refused, naming
  *     memory:read-as-owner, to a maker that does not read as the owner, and the maker is asked before
@@ -31,7 +34,8 @@ import type { MemoryRecord, Storage, ScheduledJobRecord } from '../storage/inter
 import type { JobRunResult } from './scheduler.js';
 import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { completeForOwner } from './ai/completion.js';
-import { isSameOwner } from '../utils/gaii.js';
+import { isSameOwner, localAccountName } from '../utils/gaii.js';
+import { readerForCaller } from './classification/reader.js';
 import { aiJobKeyRefusal } from './ai-job-keys.js';
 import { readAiRecords } from './ai-inputs.js';
 import { unattendedReader } from './ai-jobs/starter.js';
@@ -94,16 +98,25 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   }
 
   // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
-  // classification check. A schedule fires with nobody present, so it always reads as an unattended
-  // AI run (TARGET-082 V4, decided 2026-09-29), whoever saved it. And it hands the model only the
+  // classification check. A schedule fires with nobody present, so it reads as an AI (TARGET-082 V4,
+  // decided 2026-09-29): an agent's schedule as that agent, any other as an unattended run (below).
+  // And it hands the model only the
   // same-owner records its maker may read (services/schedule-ai-read.ts): a private record of the
   // owner or of a sibling agent is refused to an agent without memory:read-as-owner before any model
   // is called (secaudit 2026-10 wave 3, r49 the scheduled variant). A schedule kept by the once-only
   // step reads as before until its input changes.
   const viewer = await aiScheduleFireViewer(storage, config, job, actor);
+  // A schedule an agent made reads its inputs as that agent, so the clearance its owner set on it
+  // applies at the fire as it does on the agent's immediate AI job (ai-jobs/starter.ts jobReader),
+  // and a refusal names that clearance (classification/reader.ts useForAi). The owner's own
+  // schedules, an app's and an ecosystem app's read as an unattended run, as before (secaudit2026oct22,
+  // scheduler-ai-job.ts:runAiJob:background-ai-input-read-as-owner-reader; developer decision 2026-10-25).
+  const reader = actor.roles.includes('agent')
+    ? readerForCaller({ storage, config }, { gaii: actor.principal, owner: localAccountName(owner), roles: [...actor.roles], scopes: [...actor.scopes] })
+    : unattendedReader({ storage, config }, owner);
   let inputs: Awaited<ReturnType<typeof readAiRecords>>;
   try {
-    inputs = await readAiRecords({ storage, config }, unattendedReader({ storage, config }, owner), owner, named, { capability: 'text' }, viewer);
+    inputs = await readAiRecords({ storage, config }, reader, owner, named, { capability: 'text' }, viewer);
   } catch (err) {
     // On the agent's card and in the owner's bell, once while the refusal stays open, as a fire
     // refused for a missing word is (services/schedule-fire-refusal.ts).
