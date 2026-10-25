@@ -22,6 +22,10 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
+ *   2026-10-25 -- loadAllAgents adopts once the commands an install already had, and takes a runner or
+ *     wake command nobody connected through the connector out of the agent's config, saying so in
+ *     `heldCommands`; saveConnectedAgentConfig records what the connect flow writes as trusted
+ *     (command-trust.ts; secaudit2026oct22, lead 4763; developer decision 2026-10-25).
  *   2026-10-25 — loadPerAgentConfig copies an old bare-name file's runner and wake only into the
  *     identity of the owner who wrote it (the file names them, or names nobody and no other owner
  *     holds the agent name); another owner's identity gets the rest (secaudit2026oct22).
@@ -58,6 +62,7 @@ import { parse, stringify } from 'yaml';
 import { listAllTokens, parseTokenFilename } from './keychain.js';
 import { listAllAgentKeys } from './agent-key.js';
 import { gaiiFromToken, isGaii } from './agent-gaii.js';
+import { heldBackCommands, trustWrittenCommands, adoptExistingCommands, type HeldCommands } from './command-trust.js';
 import { logger } from '../../utils/logger.js';
 
 // Connector home resolution (directory-scoped, home-dir.ts):
@@ -372,6 +377,27 @@ export interface LoadedAgent {
   gaii: string;
   token: string;
   config: AimeatPerAgentConfig;
+  /**
+   * The runner and wake command the config names that nobody connected through the connector (they
+   * came with the folder): taken out of `config`, so nothing runs them, until `aimeat connect` is run
+   * in the folder (command-trust.ts). Absent or null when there is none.
+   */
+  heldCommands?: HeldCommands | null;
+}
+
+/**
+ * Write the settings the connect flow chose (`aimeat connect`, an enrolment the person approved),
+ * and record their runner and wake command as trusted: connecting is the approval (command-trust.ts).
+ */
+export function saveConnectedAgentConfig(agent: string, owner: string, config: AimeatPerAgentConfig): void {
+  savePerAgentConfig(agent, owner, config);
+  trustWrittenCommands(config, getConfigDir());
+}
+
+/** The agent with any untrusted command taken out of its config (command-trust.ts). */
+function guarded(a: Omit<LoadedAgent, 'heldCommands'>): LoadedAgent {
+  const { config, held } = heldBackCommands(a.config, getConfigDir());
+  return held ? { ...a, config, heldCommands: held } : a;
 }
 
 /**
@@ -388,6 +414,9 @@ export interface LoadedAgent {
  * `resolveToken()` in agent-key.ts, which mints for a key-holder and reads the file for the other.
  */
 export async function loadAllAgents(): Promise<LoadedAgent[]> {
+  // The once-only adoption of the commands this install already had (command-trust.ts), before any
+  // file is read or migrated, so the move to the per-owner layout copies trusted commands.
+  adoptExistingCommands(getConfigDir());
   const credentials = await listAllTokens();
   const keyed = await listAllAgentKeys();
   if (credentials.length === 0 && keyed.length === 0) return [];
@@ -412,7 +441,7 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
       });
       continue;
     }
-    out.push({ agent: cred.agent, owner: cred.owner, gaii, token: cred.token, config: perAgent });
+    out.push(guarded({ agent: cred.agent, owner: cred.owner, gaii, token: cred.token, config: perAgent }));
   }
 
   for (const k of keyed) {
@@ -435,7 +464,7 @@ export async function loadAllAgents(): Promise<LoadedAgent[]> {
       });
       continue;
     }
-    out.push({ agent: k.agent, owner: k.owner, gaii: k.key.gaii, token: '', config: perAgent });
+    out.push(guarded({ agent: k.agent, owner: k.owner, gaii: k.key.gaii, token: '', config: perAgent }));
   }
 
   return out;

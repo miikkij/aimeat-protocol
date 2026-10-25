@@ -23,6 +23,9 @@
  *   const asset = getX402Asset(network, session.currency);   // undefined → this currency cannot settle
  *   const reqs = buildExactRequirements({ network, asset, payTo, amountMicros, resource, description });
  * @version-history
+ *   v1.1.2 -- 2026-10-25 -- The test double settles a proof whose nonce starts with
+ *     X402_TEST_UNANSWERED_NONCE_PREFIX and then throws, so a /settle whose answer never came back is
+ *     testable (secaudit2026oct22, lead 4432).
  *   v1.1.1 — 2026-10-16 — The test double refuses a proof whose recipient is not the requirement's
  *     payTo, as a real facilitator does (QA audit F14a-03).
  *   v1.1.0 — 2026-07-25 — Currency-aware asset registry: EURC joins USDC as a settlement asset on
@@ -208,6 +211,12 @@ export function httpFacilitator(baseUrl: string): X402Facilitator {
  * USDC contract's single-use EIP-3009 nonce. The used-nonce set lives in the closure, so each server
  * boot starts clean. Registered only when config.x402TestFacilitator; NEVER a real settlement.
  */
+/**
+ * TEST ONLY: a proof whose nonce starts with this is settled by the double and then answered with a
+ * thrown error, as a /settle that moved the money and timed out would be (commerce/possible-payment.ts).
+ */
+export const X402_TEST_UNANSWERED_NONCE_PREFIX = '0xdead5e771e';
+
 export function testFacilitator(): X402Facilitator {
   const usedNonces = new Set<string>();
   return {
@@ -228,6 +237,10 @@ export function testFacilitator(): X402Facilitator {
       const auth = payload.payload.authorization;
       if (usedNonces.has(auth.nonce)) return { success: false, errorReason: 'nonce_already_used' };
       usedNonces.add(auth.nonce);
+      // A settlement that went out and whose answer never came back, as a timed-out HTTP call does.
+      if (String(auth.nonce).toLowerCase().startsWith(X402_TEST_UNANSWERED_NONCE_PREFIX)) {
+        throw new Error('x402 facilitator /settle did not answer within 20 s (test double)');
+      }
       return { success: true, transaction: `0xtest${auth.nonce.replace(/[^a-fA-F0-9]/g, '').slice(0, 24)}`, network: requirements.network, payer: auth.from };
     },
   };

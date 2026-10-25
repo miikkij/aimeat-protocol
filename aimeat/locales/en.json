@@ -1270,7 +1270,9 @@
           "headless_browser": "The server's own browser does not start",
           "scope_words_kept": "Permissions the update gave to existing agents and apps",
           "config_setting": "A setting the server did not accept, so it runs the default",
-          "classification_default_caps": "Limits on who may see classified content"
+          "classification_default_caps": "Limits on who may see classified content",
+          "anonymous_principal_records": "What the shared anonymous agent wrote",
+          "erasure_leftover_schedules": "Schedules that erased accounts left"
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1296,7 +1298,30 @@
             "erittain-luottamuksellinen": "Highly confidential"
           }
         },
+        "entries": {
+          "lead": {
+            "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
+            "erasure_leftover_schedules": "These schedules belong to accounts that were erased before 25 October 2026. The erasure deleted only the schedules the person made, not the ones their agents or apps made. A schedule like this is shown to whoever registers the username next, and it can run as their agent of the same name. Nothing changes until you decide. Delete each one you do not need, and the incident is resolved with your last decision."
+          },
+          "rowResolved": "Every record is decided.",
+          "clear": "Clear",
+          "delete": "Delete",
+          "keep": "Keep as it is",
+          "done": "done",
+          "kept": "kept",
+          "confirmClear": "Remove this from the shared anonymous agent? {line}",
+          "confirmDelete": "Delete this for good? {line}",
+          "kind": {
+            "agent_webhook": "A webhook to {url}. It receives the messages sent to the shared agent.",
+            "agent_tags": "Tags on the shared agent: {tags}",
+            "agent_capabilities": "On the shared agent's public card: {technical} technical and {domain} other capabilities, {languages} languages",
+            "skill": "The skill {name}, with its files",
+            "datapackage": "The data package {name}, with its files",
+            "schedule": "The schedule \"{label}\" that {maker} made for {owner} ({cron})"
+          }
+        },
         "source": {
+          "boot": "server start",
           "start": "server start",
           "switch": "classification switched on",
           "workspace_import": "workspace import",
@@ -10028,6 +10053,8 @@
   "notiftext.package_renewed.body": "Your card was charged {amount}, and new versions come for another {days} days.",
   "notiftext.payment_not_delivered.title": "A payment of {amount} was taken and the order was not delivered",
   "notiftext.payment_not_delivered.body": "The order could not be delivered and the payment did not go back to the buyer, so you hold it. Return the payment to the buyer or deliver the order. Checkout reference: {session}.",
+  "notiftext.payment_possible.title": "A payment of {amount} may have arrived",
+  "notiftext.payment_possible.body": "The payment service did not answer when a buyer paid you, so it is not known whether the money arrived. Check your payout address for a transfer from {payer}. If it arrived, deliver the order or return the payment. Reference: {reference}.",
   "notiftext.package_sale_request_approved.title": "Your request for {name} was approved",
   "notiftext.package_sale_request_approved.body": "The seller approved it. Open your Packages page to see what comes next.",
   "notiftext.package_sale_request_refused.title": "Your request for {name} was not approved",

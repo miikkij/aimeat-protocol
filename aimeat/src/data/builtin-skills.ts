@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-25 -- diagnose-a-workflow, step 3: a deactivated account's schedules are skipped with outcome `stopped` and its triggers start nothing, until it is reactivated (secaudit2026oct22).
  *   2026-10-25 -- diagnose-a-workflow, step 3: a scheduled post's fire needs `connections:use` of its
  *     maker, and a schedule older than the account does not run (secaudit2026oct22).
  *   2026-10-21 -- diagnose-a-workflow, steps 3 and 6, and set-up-content-pipeline: an `extension` fire
@@ -613,7 +614,10 @@ metadata:
    owner is told in the notifications. A one-shot (max_runs 1) that fails is turned off at once and
    not retried: it keeps \`lastRunError\` and has no next run, and the owner turns it on again or runs
    it now once the cause is fixed. A run that fell while the node was down is logged as skipped
-   with a message starting \`Missed:\` and is not made up.
+   with a message starting \`Missed:\` and is not made up. While the operator has deactivated the
+   account, its schedules are logged as skipped with outcome \`stopped\` and a message that names
+   the deactivation, its workflow triggers start nothing, and nothing is deleted: they run again at
+   their next time after the account is reactivated.
    **A schedule acts as whoever made it**, asked again at every fire, so a run can fail for the
    maker rather than for the work. The message says which: the agent or app that made it is gone
    ("no longer connected", "no longer holds your permission"), it no longer holds the permission the

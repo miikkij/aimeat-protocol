@@ -29,6 +29,7 @@
  *   formatMdDelegateRefusal(opts) · formatMdLang(raw) · renderAppMarkdown(deps, app, opts)
  * @usage const md = await renderAppMarkdown({ storage, config }, app, { lang: formatMdLang(req.query.lang) }); // string or null
  * @version-history
+ *   v1.2.1 -- 2026-10-25 -- The action runs with servesWaitingCaller: a reader waits for it, so a deactivated account does not stop it (secaudit2026oct22).
  *   v1.2.0 — 2026-10-25 — formatMdLang() and the `lang` option: the reader's `?lang=` reaches the action
  *     as `input.lang`, so an app can answer ?format=md in the reader's language (Jouni: the Experience
  *     Center's markdown in English by default and in Spanish on request).
@@ -156,6 +157,8 @@ export async function renderAppMarkdown(deps: { storage: Storage; config: Aimeat
       input: { format: 'md', app: `${app.ownerName}/${app.filename}`, ...(opts.lang ? { lang: opts.lang } : {}) },
       callerGaii: ownerGhii, ownerName: app.ownerName, storageOwnerGhii: ownerGhii,
       logLabel: 'format-md', producerKind: 'extension',
+      // A reader waits for this answer; it is not the account's background work (account-deactivated.ts).
+      servesWaitingCaller: true,
     });
     const md = typeof result === 'string' ? result
       : (result && typeof (result as { markdown?: unknown }).markdown === 'string' ? (result as { markdown: string }).markdown : null);
