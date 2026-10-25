@@ -15,6 +15,7 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.14.0 -- 2026-10-25 -- The list draws at once from this browser's last overview (./inbox-tab/overview-cache.js) and is replaced when the server answers; the mount asks for `?compact=true` (previews and agent names, not whole bodies and agent records).
  *   v2.13.0 -- 2026-10-21 -- Group chat: "New group" opens a group with its first message, the list carries the
  *     group invitations, an open group has its members strip (./inbox-tab/group-chat.js). The peer names moved to ./inbox-tab/use-peer-names.js.
  *   v2.12.0 -- 2026-10-19 -- peerAvatar(id): an agent peer's own avatar, from the owner's agents and the profile reads the name lookup already makes (no extra request), passed to the list and the thread.
@@ -183,6 +184,7 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { usePeerNames } from './inbox-tab/use-peer-names.js';
+import { readCachedOverview, saveCachedOverview } from './inbox-tab/overview-cache.js';
 import { useGroupChat, GroupComposePane, GroupInvitations } from './inbox-tab/group-chat.js';
 import { isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
@@ -286,8 +288,27 @@ export default function InboxTab({ showToast }) {
   // conversations + important flags + tracked responses + the owner's agents + share groups — instead of
   // the 6-request fan-out. Interactive refreshes (live-update, post-send) keep using loadLists (the 4
   // lists); a composite failure falls back to the individual loaders so the inbox still populates.
+  // applyOverview puts one overview into the page's state: the browser's saved copy at mount, then the server's answer.
+  const applyOverview = useCallback((d) => {
+    // Seed the peer display-name cache from the composite BEFORE the lists render — the resolvePeerNames
+    // effect then finds every id present and fetches nothing (was ~48 profile GETs per mount). '' entries
+    // are kept: "looked up, not resolvable here" (federated peer) → handle fallback, no re-fetch.
+    // The server's names and pictures win over the saved copy's, which is all that can be there before.
+    if (d.peerNames && typeof d.peerNames === 'object') {
+      peerNamesRef.current = { ...peerNamesRef.current, ...d.peerNames };
+      setPeerNames({ ...peerNamesRef.current });
+    }
+    if (d.peerAvatars && typeof d.peerAvatars === 'object') setPeerAvatars(p => ({ ...p, ...d.peerAvatars }));
+    setRequests(d.requests || []);
+    setConversations(d.conversations || []);
+    setImportant(new Set(d.important || []));
+    setTrackedList((d.tracked || []).filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
+    setMyAgents(d.agents || []);
+    setMyGroups(d.groups || []);
+  }, [peerNamesRef, setPeerNames, setPeerAvatars]);
+
   const loadOverview = useCallback(async () => {
-    const r = await apiGet('/v1/messages/overview').catch(err => { swallowed('inbox-tab: isOperator', err); return null; });
+    const r = await apiGet('/v1/messages/overview?compact=true').catch(err => { swallowed('inbox-tab: isOperator', err); return null; });
     const d = r?.data;
     if (!d) {
       loadLists();
@@ -295,21 +316,9 @@ export default function InboxTab({ showToast }) {
       apiGet('/v1/groups').then(gr => setMyGroups(gr?.data?.groups || [])).catch(err => { swallowed('inbox-tab: isOperator', err); });
       return;
     }
-    // Seed the peer display-name cache from the composite BEFORE the lists render — the resolvePeerNames
-    // effect then finds every id present and fetches nothing (was ~48 profile GETs per mount). '' entries
-    // are kept: "looked up, not resolvable here" (federated peer) → handle fallback, no re-fetch.
-    if (d.peerNames && typeof d.peerNames === 'object') {
-      peerNamesRef.current = { ...d.peerNames, ...peerNamesRef.current };
-      setPeerNames({ ...peerNamesRef.current });
-    }
-    if (d.peerAvatars && typeof d.peerAvatars === 'object') setPeerAvatars(p => ({ ...d.peerAvatars, ...p }));
-    setRequests(d.requests || []);
-    setConversations(d.conversations || []);
-    setImportant(new Set(d.important || []));
-    setTrackedList((d.tracked || []).filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
-    setMyAgents(d.agents || []);
-    setMyGroups(d.groups || []);
-  }, [loadLists, peerNamesRef, setPeerNames, setPeerAvatars]);
+    saveCachedOverview(d);
+    applyOverview(d);
+  }, [loadLists, applyOverview]);
 
   // Cheap, single-request refresh of ONLY the Tracked Responses list. Used for 'agent-messages'
   // live events: on a busy node 40+ agents emit agent-message changes every second, and those only
@@ -430,7 +439,8 @@ export default function InboxTab({ showToast }) {
   const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
 
   // Mount: one composite call seeds all six sections (requests/conversations/important/tracked/agents/groups).
-  useEffect(() => { loadOverview(); }, [loadOverview]);
+  // The saved copy first, so the list is on screen before the server answers.
+  useEffect(() => { const saved = readCachedOverview(); if (saved) applyOverview(saved); loadOverview(); }, [loadOverview, applyOverview]);
 
   // Phase A: when the active thread is with an AGENT, read its public `chat.commands` so the composer can
   // offer fill-in command chips. Absent/empty key → no chips (graceful). Reset per-thread UI on switch.

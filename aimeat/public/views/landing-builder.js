@@ -22,6 +22,8 @@
  *   OtherAi · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   v2.1.0 — 2026-10-25 — No "Connect your AI" step, in the steps or the loop line, for a signed-in
+ *     person whose AI has connected (Jouni); on the prompt road the long prompt's fold starts open.
  *   v2.0.0 — 2026-10-25 — The connected AI is the road (Jouni): connect, describe, give the short
  *     prompt, and a new app is Atelier only. The track cards, the template picker and the pack pills
  *     are gone; the long Classic prompt stays, folded, for an AI that cannot connect.
@@ -44,6 +46,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { swallowed } from '/js/swallowed.js';
 import { connectedPrompt } from '/views/appcat/dialogs/generate-prompt.js';
+import { useAiConnected } from '/views/home/journey-steps.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -176,6 +179,10 @@ function BuildAppPrompt() {
   const saved = readBuilderDraft();
   const [idea, setIdea] = useState(saved.idea || '');
   const [other, setOther] = useState(false);
+  // A signed-in person whose AI has connected has nothing to connect: the steps start from the idea.
+  const { connected, road } = useAiConnected();
+  useEffect(() => { if (road === 'prompt') setOther(true); }, [road]);
+  const first = connected === false ? 1 : 0;
 
   useEffect(() => { writeBuilderDraft({ idea }); }, [idea]);
 
@@ -185,21 +192,21 @@ function BuildAppPrompt() {
     <div class="ld-gen">
       <p class="ld-gen-intro">${tr('landing.genIntroConnected', 'Your own AI builds the app and publishes it here. It reads this service\'s build instructions first, asks you a few questions and waits for your yes before it builds.')}</p>
 
-      <div class="ld-gen-step">
+      ${first ? html`<div class="ld-gen-step">
         <div class="ld-gen-head"><span class="ld-gen-num">1</span><span>${tr('landing.genConnectStep', 'Connect your AI')}</span></div>
         <p class="ld-gen-hint">${tr('landing.genConnectHint', 'Claude, ChatGPT and many other AIs connect to this service. You do it once, and after that your AI builds, publishes and fixes your apps.')}</p>
         <a class="btn-outline ld-gen-action" href="/v1/connect-your-ai">${tr('landing.genConnectBtn', 'Connect your AI')}</a>
-      </div>
+      </div>` : ''}
 
       <div class="ld-gen-step">
-        <div class="ld-gen-head"><span class="ld-gen-num">2</span><span>${tr('landing.genStep1', 'Describe your app')}</span></div>
+        <div class="ld-gen-head"><span class="ld-gen-num">${first + 1}</span><span>${tr('landing.genStep1', 'Describe your app')}</span></div>
         <textarea class="ld-gen-idea" rows="3" value=${idea} onInput=${(e) => setIdea(e.target.value)}
           aria-label=${tr('landing.genStep1', 'Describe your app')}
           placeholder=${tr('landing.genIdeaPh', 'Describe what the app should do…')}></textarea>
       </div>
 
       <div class="ld-gen-step">
-        <div class="ld-gen-head"><span class="ld-gen-num">3</span><span>${tr('landing.genGiveStep', 'Give the prompt to your AI')}</span></div>
+        <div class="ld-gen-head"><span class="ld-gen-num">${first + 2}</span><span>${tr('landing.genGiveStep', 'Give the prompt to your AI')}</span></div>
         <p class="ld-gen-hint">${tr('landing.genGiveHint', 'Copy the prompt and paste it into your connected AI. It asks what it needs to know, shows you what it will build and waits for your yes. It publishes the finished app itself and gives you its address.')}</p>
         <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
         <div class="ld-gen-preview">${prompt}</div>
@@ -226,6 +233,7 @@ export function BuildInvite({ openByDefault = false } = {}) {
   // openByDefault is the block's own setting (portal.build-invite) and the build-story page's
   // choice: there the generator IS the page's last word, so it starts open.
   const [open, setOpen] = useState(() => openByDefault || !!readBuilderDraft().idea);
+  const { connected } = useAiConnected();
   return html`
     <section class="ld-invite">
       <${Collapsible}
@@ -235,11 +243,11 @@ export function BuildInvite({ openByDefault = false } = {}) {
         `}
         open=${open} onToggle=${() => setOpen(o => !o)}>
         <div class="ld-loop">
-          <span class="ld-loop-step">① ${tr('landing.loopConnect1', 'Connect your AI')}</span>
+          ${connected === false ? html`<span class="ld-loop-step">① ${tr('landing.loopConnect1', 'Connect your AI')}</span>
+          <span class="ld-loop-arrow">→</span>` : ''}
+          <span class="ld-loop-step">${connected === false ? '②' : '①'} ${tr('landing.loopConnect2', 'Describe your app and give your AI the prompt')}</span>
           <span class="ld-loop-arrow">→</span>
-          <span class="ld-loop-step">② ${tr('landing.loopConnect2', 'Describe your app and give your AI the prompt')}</span>
-          <span class="ld-loop-arrow">→</span>
-          <span class="ld-loop-step">③ ${tr('landing.loopConnect3', 'Your AI builds and publishes the app. Share the link.')}</span>
+          <span class="ld-loop-step">${connected === false ? '③' : '②'} ${tr('landing.loopConnect3', 'Your AI builds and publishes the app. Share the link.')}</span>
         </div>
         <${BuildAppPrompt} />
       <//>

@@ -10,6 +10,7 @@
  * @structure TRANSLATIONS[lang][packId] = { title?, description }
  * @usage import { TRANSLATIONS } from './library-packs/translations.js'; (getLibraryPackIndex(lang))
  * @version-history
+ *   v1.5.0 - 2026-10-25 - proj4leaflet in Finnish and Spanish.
  *   v1.4.0 - 2026-10-05 - aimeat-validate in Finnish and Spanish.
  *   v1.3.0 - 2026-10-01 - aimeat-intake and aimeat-connect in Finnish and Spanish, now that they have packs.
  *   v1.2.0 - 2026-09-28 - System 2 plan, V5: aimeat-ai in Finnish and Spanish names the user's own
@@ -93,6 +94,7 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     fonts: { title: 'Näyttöfontit (Baloo 2 ja Bangers)', description: 'Näyttöfontit peleihin ja brändeihin tältä palvelimelta: pyöreä Baloo 2 (muuttuva 400–800) ja sarjakuvamainen Bangers. Latin ja latin-ext, joten ä ja ö ovat mukana; SIL OFL 1.1. Yksi CSS-rivi; fontteja ei koskaan ladata ulkopuolelta, koska sovelluksen CSP ja vakiointikäytäntö kieltävät sen.' },
     realtime: { title: 'Reaaliaikahuoneet (AimeatRealtime)', description: 'AimeatRealtime (window.AimeatRealtime): WebSocket-huoneet, WebRTC-datakanavat ja Yjs-CRDT-jaettu tila moninpeleihin, yhteistyöhön ja chattiin. Mukana SharedClock verkon yli tahdistettuihin aikajanoihin.' },
     leaflet: { title: 'Leaflet (oikeat kartat OpenStreetMapilla)', description: 'Tavallinen vuorovaikutteinen verkkokartta: panorointi, zoom, merkit, ponnahdusikkunat ja GeoJSON, tältä palvelimelta OpenStreetMapin katuruuduilla. Kun sovellus tarvitsee oikean maailman oikean kartan, tämä on se. Atelier-linjan sovellukset saavat saman map-lohkona kitin tyyleillä.' },
+    proj4leaflet: { title: 'Kartat omassa projektiossaan (proj4 + Proj4Leaflet)', description: 'Leaflet-kartta kansallisessa projektiossa Web Mercatorin sijaan: Suomen ETRS-TM35FIN (EPSG:3067), jossa Maanmittauslaitoksen kartat on piirretty, tai mikä tahansa muu proj4-määrittely. proj4 muuntaa myös koordinaatteja järjestelmästä toiseen ilman karttaa. Ladataan Leaflet-paketin jälkeen.' },
   },
   es: {
     'aimeat-calendar': { title: 'Lógica de calendario', description: 'Eventos recurrentes, zonas horarias, excepciones, importación y exportación ICS e intervalos disponibles.' },
@@ -164,5 +166,6 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     fonts: { title: 'Fuentes de display (Baloo 2 y Bangers)', description: 'Fuentes de display para juegos y marcas desde este servidor: la redondeada Baloo 2 (variable 400–800) y la de cómic Bangers. Latín y latín extendido; SIL OFL 1.1. Una línea de CSS; las fuentes nunca se cargan de fuera, porque el CSP de la app y la política de empaquetado lo prohíben.' },
     realtime: { title: 'Salas en tiempo real (AimeatRealtime)', description: 'AimeatRealtime (window.AimeatRealtime): salas WebSocket, canales de datos WebRTC y estado compartido Yjs CRDT para multijugador, colaboración y chat. Incluye SharedClock para líneas de tiempo sincronizadas por red.' },
     leaflet: { title: 'Leaflet (mapas reales sobre OpenStreetMap)', description: 'El mapa web interactivo de siempre: panorámica, zoom, marcadores, ventanas emergentes y GeoJSON, servido por este servidor con las teselas de calles de OpenStreetMap. Cuando una app necesita un mapa real del mundo real, es este. Las apps de la línea Atelier lo tienen como el bloque map con el estilo del kit.' },
+    proj4leaflet: { title: 'Mapas en su propia proyección (proj4 + Proj4Leaflet)', description: 'Un mapa de Leaflet en una proyección nacional en lugar de Web Mercator: la ETRS-TM35FIN de Finlandia (EPSG:3067), en la que el Instituto Nacional de Topografía finlandés (MML) dibuja sus mapas, o cualquier otra definición de proj4. proj4 también convierte coordenadas de un sistema a otro sin mapa. Se carga después del paquete leaflet.' },
   },
 };

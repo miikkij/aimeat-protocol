@@ -3,6 +3,78 @@
   "entries": [
     {
       "date": "2026-10-25",
+      "kind": "fix",
+      "id": "2026-10-25-ai-disclosure-uses-the-final-w3c-values",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "AI disclosure uses the final W3C values",
+        "fi": "Tekoälymerkintä käyttää W3C:n lopullisia arvoja"
+      },
+      "summary": {
+        "en": "Apps state human-only, ai-assisted or ai-autonomous, as the final W3C report defines.",
+        "fi": "Sovellus kertoo arvon human-only, ai-assisted tai ai-autonomous, kuten W3C:n lopullinen raportti määrää."
+      },
+      "body": {
+        "en": "Apps now carry human-only, ai-assisted or ai-autonomous, the three values of the final W3C AI Content Disclosure report. The earlier words were not values of the report, so a page marked with them declared nothing. An app that states its own value keeps it, and the node adds no second one.",
+        "fi": "Sovellukset kertovat nyt arvon human-only, ai-assisted tai ai-autonomous. Ne ovat W3C:n lopullisen tekoälymerkintäraportin kolme arvoa. Aiemmat sanat eivät olleet raportin arvoja, joten niillä merkitty sivu ei kertonut mitään. Jos sovellus kertoo arvon itse, alusta käyttää sitä eikä lisää omaansa."
+      },
+      "impact": {
+        "en": "Nothing to do. An app that writes its own value should use one of the three words.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Jos sovelluksesi kertoo arvon itse, käytä yhtä näistä kolmesta sanasta."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "feature",
+      "id": "2026-10-25-maps-in-finlands-own-projection",
+      "highlight": false,
+      "audience": [
+        "developer"
+      ],
+      "title": {
+        "en": "Maps in Finland's own projection",
+        "fi": "Kartat Suomen omassa projektiossa"
+      },
+      "summary": {
+        "en": "Apps can draw maps in EPSG:3067, the projection of the National Land Survey's maps.",
+        "fi": "Sovellus voi piirtää kartan EPSG:3067-projektiossa, jossa Maanmittauslaitoksen kartat ovat."
+      },
+      "body": {
+        "en": "Apps can draw a map in ETRS-TM35FIN (EPSG:3067), the projection of the National Land Survey's maps. The node serves proj4 and Proj4Leaflet itself, next to Leaflet.",
+        "fi": "Sovellus voi piirtää kartan ETRS-TM35FIN-projektiossa (EPSG:3067), jossa Maanmittauslaitoksen kartat ovat. Palvelin jakaa proj4- ja Proj4Leaflet-kirjastot itse Leafletin rinnalla."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "fix",
+      "id": "2026-10-25-reply-with-ai-goes-through-your-own-ai",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Reply with AI goes through your own AI",
+        "fi": "Vastaa tekoälyllä kulkee oman tekoälysi kautta"
+      },
+      "summary": {
+        "en": "Reply with AI in Messages now always gives the prompt for your AI connected over MCP.",
+        "fi": "Viestien Vastaa tekoälyllä antaa nyt aina kehotteen MCP:llä yhdistetylle tekoälyllesi."
+      },
+      "body": {
+        "en": "The Reply with AI dialog in Messages now always gives the prompt for an AI connected over MCP. If you have not connected one yet, it says so and takes you to Connect your AI.",
+        "fi": "Viestien Vastaa tekoälyllä -ruutu antaa nyt aina kehotteen MCP:llä yhdistetylle tekoälylle. Jos et ole vielä yhdistänyt tekoälyä, ruutu kertoo sen ja vie sinut Yhdistä tekoälysi -sivulle."
+      },
+      "impact": {
+        "en": "The copy-paste prompt is gone; connect your AI once, and it reads the conversation and replies as you after you approve.",
+        "fi": "Kopioitava kehote poistui. Yhdistä tekoälysi kerran, niin se lukee keskustelun ja vastaa sinun nimissäsi, kun hyväksyt vastauksen."
+      }
+    },
+    {
+      "date": "2026-10-25",
       "kind": "feature",
       "id": "2026-10-25-open-one-app-to-the-internet-on-a-closed-aimeat",
       "highlight": false,

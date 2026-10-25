@@ -39,6 +39,8 @@
  *   // In a Preact view prefer the hook: import { useSession } from '/js/use-session.js';
  *
  * @version-history
+ *   v2.2.0 — 2026-10-25 — PRIVATE_COPY_PREFIX: a page's browser copy of the person's own data is
+ *     removed on the auth lib's 'logout' event (the Messages list keeps one to draw at once).
  *   v2.1.0 — 2026-09-27 — authLoaded(): whether the auth lib is there yet (appcat's ?add=1 waits for it).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v2.0.0 — 2026-08-07 — Becomes the single session source: subscribes to the auth lib's own
@@ -236,6 +238,24 @@ function publish() {
 }
 
 /**
+ * The localStorage prefix for a copy of the signed-in person's own data that a page keeps to draw
+ * itself before the server answers (the Messages list). Every such key goes on sign-out, so the next
+ * person at the same browser finds none of it.
+ */
+export const PRIVATE_COPY_PREFIX = 'aimeat.private.';
+
+function clearPrivateCopies() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PRIVATE_COPY_PREFIX)) keys.push(k);
+    }
+    for (const k of keys) localStorage.removeItem(k);
+  } catch (err) { console.warn('[aimeat] private copies not cleared:', err); }
+}
+
+/**
  * Attach to the auth lib's own events. The lib is injected during boot, so this retries until it
  * exists instead of silently doing nothing when the module happens to import first.
  */
@@ -250,6 +270,7 @@ function ensureWired() {
   if (wireTimer !== null) { clearInterval(wireTimer); wireTimer = null; }
   // These three fire AFTER the lib's state changed — the property the whole module rests on.
   a.on('login', publish);
+  a.on('logout', clearPrivateCopies);
   a.on('logout', publish);
   a.on('session-updated', publish);
   publish(); // the lib may have restored a session before we attached

@@ -73,7 +73,7 @@ export const LABELS: Record<Lang, {
     officialText: sha => `The text of the Clauses below is the Annex of Commission Implementing Decision (EU) 2021/915 of 4 June 2021, as published by the Publications Office of the European Union (SHA-256 ${sha}).`,
   },
   fi: {
-    title: 'Käsittelijäsopimus', id: 'Sopimus', version: 'versio', subject: 'Kohde',
+    title: 'Käsittelysopimus', id: 'Sopimus', version: 'versio', subject: 'Kohde',
     choices: 'Lausekkeissa tehdyt valinnat', additional: 'Lisäsitoumukset',
     additionalLead: 'Lausekkeiden lisäksi ja niiden kanssa ristiriidattomasti (lauseke 2 b) osapuolet sopivat:',
     clauses: 'Vakiosopimuslausekkeet',

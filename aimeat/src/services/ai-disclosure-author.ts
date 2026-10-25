@@ -23,11 +23,14 @@
  *   const own = authorDisclosure(text);
  *   if (own.meta !== null) skip the node's meta and the attribute
  * @version-history
+ *   v1.0.1 — 2026-10-25 — The `<html>` attribute is read from the tag findDocumentElement finds, so a
+ *     `<html>` in a comment is not read as the author's declaration.
  *   v1.0.0 — 2026-10-25 — Initial. aimeat.io served an app's own `ai-autonomous` meta followed by the
  *     node's draft-vocabulary `autonomous` meta.
  */
 import { logger } from '../utils/logger.js';
 import { W3C_AI_DISCLOSURE_VALUES } from './ai-provenance-adapters.js';
+import { findDocumentElement } from '../utils/html-document-element.js';
 
 /** What the author declared. null means the author did not declare it there. */
 export interface AuthorDisclosure {
@@ -36,9 +39,6 @@ export interface AuthorDisclosure {
   /** The `ai-disclosure` attribute on the `<html>` tag, trimmed. */
   documentElement: string | null;
 }
-
-/** markDocumentElement looks for `<html>` in this many characters, so the author's attribute is read there too. */
-const DOCUMENT_ELEMENT_WINDOW = 512;
 
 /** Elements whose content is raw text: a `<meta>` written inside one is not a tag. */
 const RAW_TEXT = new Set(['script', 'style', 'template', 'noscript', 'title', 'textarea']);
@@ -99,12 +99,11 @@ function headMeta(html: string): string | null {
   }
 }
 
-/** The `ai-disclosure` attribute of the first `<html>` tag, in the window markDocumentElement reads. */
+/** The `ai-disclosure` attribute of the `<html>` tag markDocumentElement would mark (findDocumentElement). */
 function documentElementValue(html: string): string | null {
-  const head = html.slice(0, DOCUMENT_ELEMENT_WINDOW);
-  const m = /<html(\s[^>]*)?>/i.exec(head);
-  if (!m?.[1]) return null;
-  const value = attributes(m[1]).get('ai-disclosure');
+  const el = findDocumentElement(html);
+  if (!el?.attrs) return null;
+  const value = attributes(el.attrs).get('ai-disclosure');
   return value === undefined ? null : value.trim();
 }
 
