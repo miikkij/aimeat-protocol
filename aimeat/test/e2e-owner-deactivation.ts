@@ -268,6 +268,12 @@ async function run() {
         const job = await json(`/v1/admin/scheduler/jobs/${encodeURIComponent(scheduleId)}`, { headers: bearer(op.ownerToken) });
         assert(job.status === 200 && job.body.data.job.enabled === true, `the schedule is kept and on: ${job.status} ${JSON.stringify(job.body.data?.job?.enabled)}`);
     });
+    await test('a person who is not an operator reads neither the schedule nor its run log: 403', async () => {
+        const job = await json(`/v1/admin/scheduler/jobs/${encodeURIComponent(scheduleId)}`, { headers: bearer(bystander.ownerToken) });
+        assert(job.status === 403, `GET /v1/admin/scheduler/jobs/{id} as a non-operator: ${job.status}`);
+        const log = await json(`/v1/admin/scheduler/execution-log?jobId=${encodeURIComponent(scheduleId)}`, { headers: bearer(bystander.ownerToken) });
+        assert(log.status === 403, `GET /v1/admin/scheduler/execution-log as a non-operator: ${log.status}`);
+    });
 
     // ── Every credential family is dead, immediately ──
     await test('the owner session token answers 401', async () => {

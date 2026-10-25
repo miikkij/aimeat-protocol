@@ -10,6 +10,7 @@
  * @structure SignatureCheck · verifyRecordSignatures(ctx, rec)
  * @usage const checks = await verifyRecordSignatures(ctx, rec);
  * @version-history
+ *   v1.2.1 -- 2026-10-25 -- The request's shape is written out here instead of imported from records.ts, which imports this file (check:deps no-circular).
  *   v1.2.0 -- 2026-10-25 -- A check carries the sealed certificate subject and issuer (secaudit2026oct22, lead 3924).
  *   v1.1.0 -- 2026-10-25 -- A check carries the caveats sealed into the statement (secaudit2026oct22, lead 3895).
  *   v1.0.0 -- 2026-10-25 -- Moved from records.ts (max-file-lines), bodies verbatim.
@@ -17,8 +18,24 @@
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import type { AimeatConfig } from '../../config.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
-import { intentChallenge, keyMessage, evidenceHash, verifySeal, type SignMethod, type Assurance, type StatementCaveat } from './statement.js';
-import type { DocsignCtx, DocSignRecord, PasskeyEvidence } from './records.js';
+import type { Storage } from '../../storage/interface.js';
+import {
+  intentChallenge, keyMessage, evidenceHash, verifySeal,
+  type SignMethod, type Assurance, type StatementCaveat, type SealedStatement, type Seal, type SignIntent,
+} from './statement.js';
+
+// The parts of a stored request the checks read. records.ts DocSignRecord has them all; they are
+// written out here so this file imports nothing from records.ts, which imports it (no-circular).
+interface PasskeyEvidence { credentialId: string; publicKey: string; origin: string; intent: SignIntent; assertion: Record<string, unknown> }
+interface CheckedSignature {
+  statement: SealedStatement;
+  seal: Seal;
+  passkey?: PasskeyEvidence;
+  key?: { publicKey: string; signature: string; message: string };
+  wallet?: { validation: { test: boolean } };
+}
+interface DocSignRecord { id: string; document: { sha256: string }; signatures: Record<string, CheckedSignature> }
+interface DocsignCtx { storage: Pick<Storage, 'getNodeKey'>; config: AimeatConfig }
 
 export interface SignatureCheck {
   signer: string;
