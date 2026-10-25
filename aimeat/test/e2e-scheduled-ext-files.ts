@@ -27,6 +27,7 @@
  *   (16), and the owner can widen it back (17).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scheduled-ext-files
  * @version-history
+ *   2026-10-25 -- 27: an action-script PATCH records who wrote the code, agent or owner (secaudit2026oct22).
  *   v1.5.3 -- 2026-10-24 -- 23d prints the test's and the server's view of the kept schedule before and
  *     after its first fire, to tell an old read from an overwrite.
  *   v1.5.2 -- 2026-10-23 -- 23c and 23d: a direct database edit must land (landed()), and a refusal
@@ -869,6 +870,31 @@ await test('26. A ZIP upload URL kept by an agent the owner deleted is refused 4
   assert(ext.status === 200, `read ${ext.status}`);
   const version = ext.body.data?.version ?? ext.body.data?.extension?.version;
   assert(version === '1.0.2', `the code must be unchanged, got version ${version}`);
+});
+
+await test("27. An agent's action-script PATCH records the agent as the code writer; the owner's own PATCH records the owner (secaudit2026oct22)", async () => {
+  // OWNER_EXT: the owner's code since test 25, set to 'installer' in test 18.
+  const before = await readerSetting(OWNER_EXT, reader.token);
+  assert(before.installed_by_kind === 'self' && before.authority === 'installer', `start: ${JSON.stringify(before)}`);
+  const agentEdit = await json(`/v1/extensions/${OWNER_EXT}/actions/probe`, {
+    method: 'PATCH', headers: auth(agent.token), body: JSON.stringify({ scriptContent: PROBE_SCRIPTS.probe.replace('var out;', "var out; var editedBy = 'agent';") }),
+  });
+  assert(agentEdit.status === 200, `agent PATCH ${agentEdit.status}: ${JSON.stringify(agentEdit.body?.error)}`);
+  const view = await readerSetting(OWNER_EXT, reader.token);
+  assert(view.installed_by_kind === 'agent', `the agent wrote this code, got ${view.installed_by_kind}`);
+  assert(view.installed_by_principal === agent.gaii, `named exactly, got ${view.installed_by_principal}`);
+  await runProbeUnattended(OWNER_EXT);
+  const refused = await probeOutcome(OWNER_EXT, reader.token);
+  assert(refused.ok === false, `the agent's code must be refused the private file, got ${JSON.stringify(refused)}`);
+
+  const ownerEdit = await json(`/v1/extensions/${OWNER_EXT}/actions/probe`, {
+    method: 'PATCH', headers: auth(reader.token), body: JSON.stringify({ scriptContent: PROBE_SCRIPTS.probe.replace('var out;', "var out; var editedBy = 'owner';") }),
+  });
+  assert(ownerEdit.status === 200, `owner PATCH ${ownerEdit.status}: ${JSON.stringify(ownerEdit.body?.error)}`);
+  assert((await readerSetting(OWNER_EXT, reader.token)).installed_by_kind === 'self', 'the owner wrote the code again');
+  await runProbeUnattended(OWNER_EXT);
+  const read = await probeOutcome(OWNER_EXT, reader.token);
+  assert(read.ok === true && read.size === SECRET_TEXT.length, `the owner's code reads the file, got ${JSON.stringify(read)}`);
 });
 
 await test('Cleanup', async () => {
