@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-25: YourTurnBlock passes each thread's last message time and the person's window
+ *     (home.prefs.turnDays), and writes the window when it is changed.
  *   2026-10-10: AgentsBlock, the band where a person makes an agent from one sentence and sees the
  *     ones at work and their machines (views/home/agents-band.js, GET /v1/home/agents).
  *   2026-10-06: OwnAimeatBlock passes `soon` and the discount code, so its slab gives the code when
@@ -118,6 +120,7 @@ function handleOf(id) {
  */
 export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { props = {} }) {
   const max = Number.isFinite(props.max) ? props.max : 5;
+  const { prefs, writePrefs } = useHomePrefs();
   const { data } = useShared('turn', '/v1/messages/conversations', ['messages'],
     (d) => (d?.conversations ?? [])
       .filter((c) => c.lastDirection === 'inbound' && !c.viaAgent)
@@ -125,9 +128,13 @@ export function YourTurnBlock(/** @type {{ ctx?: any, props?: Record<string, any
         id: c.conversationId,
         who: c.groupAlias || handleOf(c.peerGhii),
         said: String(c.lastMessage ?? '').trim(),
+        at: c.updatedAt,
       })));
   if (!data) return null;
-  return html`<${YourTurn} threads=${data} max=${max} />`;
+  // How far back the band looks is the person's choice, kept in home.prefs so it follows them to
+  // every device and an AI can read or set it with the memory tools.
+  return html`<${YourTurn} threads=${data} max=${max}
+    days=${prefs?.turnDays} onDays=${(d) => writePrefs({ turnDays: d })} />`;
 }
 
 export function FleetBlock() {

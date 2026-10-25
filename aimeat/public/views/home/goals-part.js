@@ -15,6 +15,8 @@
  * @structure GoalsPart({ navigate })
  * @usage html`<${GoalsPart} navigate=${navigate} />`   // views/home/agents-band.js
  * @version-history
+ *   v1.0.1 — 2026-10-25 — The live-update handler reads the domains with .has: they are a Set, and
+ *     .includes threw, so the goals never refreshed on their own.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { h } from 'preact';
@@ -63,7 +65,8 @@ export function GoalsPart({ navigate }) {
   useEffect(() => {
     const handler = (e) => {
       const domains = e?.detail?.domains;
-      if (!domains || domains.includes('goals') || domains.includes('agent-tasks')) loadRef.current();
+      // A Set from lib/live-updates.js, so .has: .includes threw on every live update.
+      if (!domains || domains.has('goals') || domains.has('agent-tasks')) loadRef.current();
     };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
