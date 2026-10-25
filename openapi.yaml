@@ -76444,7 +76444,7 @@ paths:
       operationId: stripeWebhookForSeller
       tags: [Finance]
       summary: Per-seller Stripe webhook → accounting vouchers
-      description: 'Verifies the Stripe v1 signature against the seller''s endpoint secret (set via PUT /v1/commerce/payout/stripe webhook_secret — every seller runs their own Stripe account). Books payment_intent.succeeded as an income voucher, or marks the matching invoice paid when metadata.aimeat_reference matches; charge.refunded as an expense voucher; payout.paid as a transfer voucher. Idempotent by event id. Unknown owners and unconfigured endpoints answer 404 identically.'
+      description: 'Verifies the Stripe v1 signature against the seller''s endpoint secret (set via PUT /v1/commerce/payout/stripe webhook_secret — every seller runs their own Stripe account). Books payment_intent.succeeded as an income voucher, or marks the matching invoice paid when metadata.aimeat_reference matches; charge.refunded as an expense voucher; payout.paid as a transfer voucher. checkout.session.completed for the node''s hosted card page finishes the AIMEAT checkout it was for; any other checkout.session.completed, or checkout.session.async_payment_succeeded, becomes an AI shopping agent''s order when a line names a product of the seller''s feed and Stripe reads the session as paid (an unpaid one answers action agent_order_not_yet_paid and takes no order). Idempotent by event id. Unknown owners and unconfigured endpoints answer 404 identically.'
       parameters: [{ name: owner, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
