@@ -17,6 +17,8 @@
  *   - labelFromHost(req) — leftmost label under app/portfolio/co/apex host
  * @usage app.use(subdomainMiddleware(config)); // before route mounting
  * @version-history
+ *   v1.6.1 — 2026-10-25 — secaudit2026oct22: labelFromHost and the hostname fallback read the raw
+ *     Host (hostOf), not req.hostname, which is the client's X-Forwarded-Host under 'trust proxy'.
  *   v1.6.0 — 2026-10-16 — `req.pageOrigin`: the page host (`config.pageHost`), one exact host read
  *     off the raw Host before every family, for the HTML pages of workspaces (routes/page-host.ts).
  *   v1.3.0 — 2026-07-28 — On the header path, a missing `X-Subdomain` falls back to the Host label
@@ -166,7 +168,8 @@ export function subdomainMiddleware(config: AimeatConfig) {
    * marks the host family without naming the subdomain.
    */
   const labelFromHost = (req: Request): string | null => {
-    const host = (req.hostname || '').toLowerCase();
+    // The raw Host, for the reason hostOf gives: req.hostname is X-Forwarded-Host under 'trust proxy'.
+    const host = hostOf(req);
     for (const parent of [appHost, portfolioHost, coHost, apexHost]) {
       if (!parent) continue;
       // The BARE family host names no subdomain. Without this the loop fell through to the apex,
@@ -220,8 +223,9 @@ export function subdomainMiddleware(config: AimeatConfig) {
 
     // Hostname fallback (dev / no proxy). App + portfolio hosts checked before
     // apex — they are themselves apex subdomains and would otherwise be misread
-    // as the single-label subdomains "apps" / "portfolio".
-    const host = (req.hostname || '').toLowerCase();
+    // as the single-label subdomains "apps" / "portfolio". Read from the raw Host (hostOf), never
+    // req.hostname, which a client sets through X-Forwarded-Host whenever 'trust proxy' matches.
+    const host = hostOf(req);
     if (appHost) {
       if (host === appHost) {
         req.appOrigin = true; // bare apps.<apex> — path-form app serving
