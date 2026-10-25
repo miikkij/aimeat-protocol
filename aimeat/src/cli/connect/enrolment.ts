@@ -55,8 +55,8 @@
  *     ? handleEnrolOffer(frame.input, { receiver: entry, ...deps }).then(r => tunnel.replyInvoke(frame.id, r.ok, r.result))
  *     : inv.handleInvoke(frame)
  * @version-history
- *   2026-10-25 -- An enrolled agent is attached without a runner or wake command the person has not
- *     confirmed (command-trust.ts; secaudit2026oct22, lead 4763).
+ *   2026-10-25 -- An enrolment the person approved writes its config with saveConnectedAgentConfig, so
+ *     the runner and wake command it keeps are recorded as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  *   v1.2.0 — 2026-10-02 — The offering node is proven by its card at the connector's own address
  *     (node id and public key), not by comparing the offer's URL with the connector's. Settings
  *     already held at another address of the same node are that node, by the same card read.
@@ -66,9 +66,8 @@
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import {
-  savePerAgentConfig, loadPerAgentConfig, peekPerAgentConfig, fallbackConfigFor, getConfigDir, type AimeatPerAgentConfig,
+  saveConnectedAgentConfig, loadPerAgentConfig, peekPerAgentConfig, fallbackConfigFor, type AimeatPerAgentConfig,
 } from './config.js';
-import { heldBackCommands, heldNotice, type HeldCommands } from './command-trust.js';
 import {
   generateAgentKey, signCompact, storeAgentKey, cacheToken, getAgentKey, hasAgentKey, type AgentKey,
 } from './agent-key.js';
@@ -134,7 +133,7 @@ export interface EnrolDeps {
   /** Forward a request over the daemon's existing tunnel, so it authenticates as this daemon. */
   forward(method: string, path: string, opts: { body?: unknown }): Promise<{ status: number; body: unknown }>;
   /** Bring one newly credentialled agent into the live registry and give it its own tunnel. */
-  attach(entry: { agent: string; owner: string; gaii: string; config: AimeatPerAgentConfig; heldCommands?: HeldCommands | null }): Promise<void>;
+  attach(entry: { agent: string; owner: string; gaii: string; config: AimeatPerAgentConfig }): Promise<void>;
   /** The connector's own version, for the card's runtime block. */
   version?: string;
   /** Read a node's card at an address this connector uses. Defaults to fetchNodeCard. */
@@ -407,13 +406,11 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
       // beside the node on loopback); it is the node's word and this one is ours.
       const existing = loadPerAgentConfig(e.name, offer.owner) ?? {};
       const perAgent: AimeatPerAgentConfig = { ...existing, node_url: deps.receiver.config.node_url };
-      savePerAgentConfig(e.name, offer.owner, perAgent);
+      // An enrolment the person approved is a connect: what it keeps is recorded as trusted (command-trust.ts).
+      saveConnectedAgentConfig(e.name, offer.owner, perAgent);
       // The identity the node just confirmed, carried straight through: the registry keys by it
       // and must never have to assemble one from a name.
-      // A runner or wake command the person has not confirmed stays out, as loadAllAgents keeps it out (command-trust.ts).
-      const { config: served, held } = heldBackCommands(perAgent, getConfigDir());
-      if (held) console.error(heldNotice([`${e.name}@${offer.owner}`], held));
-      await deps.attach({ agent: e.name, owner: offer.owner, gaii: e.gaii, config: served, heldCommands: held });
+      await deps.attach({ agent: e.name, owner: offer.owner, gaii: e.gaii, config: perAgent });
       attached.push(e.name);
     } catch (err) {
       logger.warn('enrolment: agent enrolled but could not be attached', { agent: e.name, error: String(err) });

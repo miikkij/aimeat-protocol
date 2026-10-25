@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
- *   2026-10-25 -- `aimeat connect trust` (secaudit2026oct22, lead 4763).
  *   2026-10-16 — backup and restore say the export is partial and name the operator token they need
  *     (--token or AIMEAT_OP_TOKEN) and --url (QA audit P6-07, F19b-01).
  *   2026-10-15 — The client help says --surface is used by claude-desktop only (feature-list audit #6).
@@ -66,8 +65,6 @@ USAGE
                                  a task on the node, and what the agent reports comes back into
                                  the editor's chat.
   aimeat connect status          Show agent connection status
-  aimeat connect trust           Allow, once, a runner or wake command in this folder's settings
-                                 that the connector did not write (it shows each command and asks)
   aimeat connect inbox           Check message inbox
   aimeat connect tasks           List assigned tasks
   aimeat connect send [opts]     Send a message (--to GAII --body "text")
@@ -203,12 +200,6 @@ USAGE
 
   aimeat connect status
       Show the connected agent, owner, node, and token status.
-
-  aimeat connect trust
-      A runner or wake command in this folder's .aimeat settings runs only after
-      you allow it once: the setting may have come with the folder, for example
-      in a cloned project. This shows each command, what starts it and for which
-      agents, and asks. A daemon started in a terminal asks the same at start.
 
   aimeat connect inbox
       Show pending agent messages.

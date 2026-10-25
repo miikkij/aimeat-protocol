@@ -2,42 +2,51 @@
  * @file src/cli/connect/command-trust.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Which local commands the connector may run: an agent's `runner` (spawned for each
- *   task) and `wake.command` (passed to a shell on new work). A command the person confirmed once
- *   runs; any other is held back until they confirm it, in plain words, with the command shown.
+ * @description Which local commands the connector runs: an agent's `runner` (spawned for each task)
+ *   and `wake.command` (passed to a shell on new work).
  *
  *   WHY. With no AIMEAT_HOME the connector home is `<cwd>/.aimeat`, the folder the command runs in.
  *   A folder that came from somewhere else (a cloned project, a received archive) can carry
- *   `.aimeat/agents/.../config.yaml` with a runner or wake command, and `aimeat connect` then
- *   `aimeat connect serve` in that folder ran it with the agent's token in its environment, with
- *   nothing shown and nobody asked (secaudit2026oct22, home-dir.ts:resolveConnectorHome:cwd-home-executable-settings;
- *   developer decision 2026-10-25).
+ *   `.aimeat/agents/.../config.yaml` with a runner or a wake command, and `aimeat connect serve` in
+ *   that folder ran it with the agent's token in its environment (secaudit2026oct22,
+ *   home-dir.ts:resolveConnectorHome:cwd-home-executable-settings).
+ *
+ *   THE RULE (developer decision 2026-10-25: "jos käyttäjä yhdistää tuon niin se on silloin myös
+ *   hyväksynyt sen"):
+ *   1. A command the connector's own connect flow writes (`aimeat connect`, an enrolment the person
+ *      approved) is trusted by that act: trustWrittenCommands() records it as it is written.
+ *   2. Every command an install already has at the first start after this update is adopted once
+ *      (adoptExistingCommands): a config file older than the record's `firstRunAt`, which the first
+ *      start writes. No existing fleet or unattended daemon stops, and nobody is asked.
+ *   3. Any other command, one in a folder that arrived after that first start and that nobody
+ *      connected through the connector, does not run: heldBackCommands() takes it out of the config,
+ *      and heldNotices() gives one plain line that names it and says that `aimeat connect` in that
+ *      folder connects it. Running `aimeat connect` there is the approval.
  *
  *   THE RECORD. A hash of the connector home's absolute path and the commands (the whole runner block
- *   and wake.command), kept in a file OUTSIDE every connector home:
- *   `~/.config/aimeat/trusted-commands.json` (AIMEAT_COMMAND_TRUST_FILE overrides it, for tests). A
- *   folder cannot bring its own approval with it, because the record is not in the folder. The home's
- *   path is in the hash, so a relative command (`./run.sh`) approved in one project is asked again in
- *   another. The agent's name is not, so the same command for many agents of one home is asked once,
- *   and the connector's own copies of a confirmed command (a re-connect keeps the runner, the move
- *   to the per-owner layout copies it) stay confirmed without a write here.
+ *   and wake.command), kept in a file OUTSIDE every connector home: `~/.config/aimeat/trusted-commands.json`
+ *   (AIMEAT_COMMAND_TRUST_FILE overrides it, for tests). A folder cannot bring its own record. The
+ *   home's path is in the hash, so a relative command (`./run.sh`) recorded in one project is not
+ *   trusted in another; the agent's name is not, so a fleet with one runner is one entry, and the
+ *   connector's own copies of a recorded command (the move to the per-owner layout) stay trusted.
  *
- *   WHERE IT IS ASKED. heldBackCommands() takes the commands out of a config that has unconfirmed
- *   ones and says what it held back; config.ts loadAllAgents and the enrolment attach use it, so no
- *   path hands an unconfirmed command to the runner or the wake adapter. `aimeat connect serve` in a
- *   terminal asks at start (confirmHeldCommands); in stdio mode, or with no terminal, it says how to
- *   confirm, and `aimeat connect trust` asks.
- * @structure HeldCommands · commandTrustFile · commandHash · isTrustedCommand · trustCommand ·
- *   heldBackCommands · describeHeld · confirmHeldCommands
- * @usage const { config, held } = heldBackCommands(perAgent, getConfigDir());
+ *   KNOWN RESIDUAL. Adoption reads file times. An archive that keeps the times of its files, older
+ *   than this machine's first start after the update, is adopted as an existing install would be.
+ * @structure HeldCommands · commandTrustFile · commandHash · isTrustedCommand · trustWrittenCommands ·
+ *   adoptExistingCommands · heldBackCommands · heldNotices
+ * @usage adoptExistingCommands(home); const { config, held } = heldBackCommands(perAgent, home);
  * @version-history
+ *   v2.0.0 -- 2026-10-25 -- Connecting is the approval: no question and no `aimeat connect trust`. The
+ *     connect flow records what it writes, the first start after the update adopts what an install
+ *     has, and a folder nobody connected gets one line (developer decision 2026-10-25).
+ *   v1.0.1 -- 2026-10-25 -- The config shapes it reads are written out here (check:deps no-circular).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, lead 4763).
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { createInterface } from 'node:readline/promises';
+import { parse } from 'yaml';
 import { logger } from '../../utils/logger.js';
 
 // The parts of a per-agent config this file reads and changes. config.ts AimeatPerAgentConfig and
@@ -46,7 +55,7 @@ import { logger } from '../../utils/logger.js';
 interface RunnerConfig { command: string; args?: string[]; cwd?: string; env?: Record<string, string> }
 interface AimeatPerAgentConfig { runner?: RunnerConfig; wake?: { command?: string; webhook?: string; strategy?: string } }
 
-/** The commands one agent's config would have the connector run, held back until confirmed. */
+/** The commands one agent's config names that the connector does not run. */
 export interface HeldCommands {
   hash: string;
   home: string;
@@ -54,7 +63,9 @@ export interface HeldCommands {
   wakeCommand?: string;
 }
 
-/** Where the confirmed commands are recorded: outside every connector home. */
+interface TrustRecord { firstRunAt?: string; hashes: Record<string, { at: string; how: 'connected' | 'adopted' }> }
+
+/** Where the trusted commands are recorded: outside every connector home. */
 export function commandTrustFile(env: NodeJS.ProcessEnv = process.env): string {
   return env.AIMEAT_COMMAND_TRUST_FILE?.trim() || join(homedir(), '.config', 'aimeat', 'trusted-commands.json');
 }
@@ -74,71 +85,115 @@ export function commandHash(home: string, runner: RunnerConfig | undefined, wake
   return createHash('sha256').update(canonical({ home: resolve(home), runner: runner ?? null, wake: wakeCommand ?? null })).digest('hex');
 }
 
-function readTrust(file: string): { hashes: Record<string, { at: string; what: string }> } {
-  if (!existsSync(file)) return { hashes: {} };
+/** The commands a config names, or null when it names none. A wake webhook is not a command. */
+function commandsOf(config: AimeatPerAgentConfig | null | undefined): { runner?: RunnerConfig; wakeCommand?: string } | null {
+  const runner = config?.runner?.command ? config.runner : undefined;
+  const wakeCommand = config?.wake?.command || undefined;
+  return runner || wakeCommand ? { runner, wakeCommand } : null;
+}
+
+function readTrust(file: string): TrustRecord | null {
+  if (!existsSync(file)) return null;
   try {
-    const v = JSON.parse(readFileSync(file, 'utf-8')) as { hashes?: Record<string, { at: string; what: string }> };
-    return { hashes: v.hashes && typeof v.hashes === 'object' ? v.hashes : {} };
+    const v = JSON.parse(readFileSync(file, 'utf-8')) as Partial<TrustRecord>;
+    return { ...(typeof v.firstRunAt === 'string' ? { firstRunAt: v.firstRunAt } : {}), hashes: v.hashes && typeof v.hashes === 'object' ? v.hashes : {} };
   } catch (err) {
-    // A record that does not parse confirms nothing; the person is asked again, and the next
-    // confirmation writes a whole file.
-    logger.warn('connector: the record of confirmed commands could not be read; every command is asked again', { file, error: String(err) });
+    // A record that does not parse trusts nothing; the next write replaces it with a whole file.
+    logger.warn('connector: the record of trusted commands could not be read', { file, error: String(err) });
     return { hashes: {} };
   }
 }
 
-export function isTrustedCommand(hash: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  return Object.prototype.hasOwnProperty.call(readTrust(commandTrustFile(env)).hashes, hash);
-}
-
-/** Record that the person confirmed these commands. tmp-then-rename, so a half-written file cannot exist. */
-export function trustCommand(held: HeldCommands, env: NodeJS.ProcessEnv = process.env): void {
-  const file = commandTrustFile(env);
-  const now = readTrust(file);
-  now.hashes[held.hash] = { at: new Date().toISOString(), what: describeHeld(held).slice(0, 500) };
+/** tmp-then-rename, so a half-written record cannot exist. */
+function writeTrust(file: string, record: TrustRecord): void {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.tmp-${process.pid}`;
-  writeFileSync(tmp, JSON.stringify(now, null, 2), { encoding: 'utf-8', mode: 0o600 });
+  writeFileSync(tmp, JSON.stringify(record, null, 2), { encoding: 'utf-8', mode: 0o600 });
   renameSync(tmp, file);
 }
 
+export function isTrustedCommand(hash: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  return Object.prototype.hasOwnProperty.call(readTrust(commandTrustFile(env))?.hashes ?? {}, hash);
+}
+
+/** Record that the connect flow wrote these commands in `home`: the person who connected approved them. */
+export function trustWrittenCommands(config: AimeatPerAgentConfig, home: string, env: NodeJS.ProcessEnv = process.env): void {
+  const c = commandsOf(config);
+  if (!c) return;
+  const file = commandTrustFile(env);
+  const record = readTrust(file) ?? { firstRunAt: new Date().toISOString(), hashes: {} };
+  const hash = commandHash(home, c.runner, c.wakeCommand);
+  if (record.hashes[hash]) return;
+  record.hashes[hash] = { at: new Date().toISOString(), how: 'connected' };
+  writeTrust(file, record);
+}
+
+/** The config files of one home: the per-owner layout, the old bare-name layout and the global file. */
+function configFilesOf(home: string): string[] {
+  const out: string[] = [];
+  const add = (p: string) => { if (existsSync(p)) out.push(p); };
+  add(join(home, 'config.yaml'));
+  const agents = join(home, 'agents');
+  if (!existsSync(agents)) return out;
+  for (const a of readdirSync(agents, { withFileTypes: true })) {
+    if (!a.isDirectory()) continue;
+    add(join(agents, a.name, 'config.yaml'));
+    for (const b of readdirSync(join(agents, a.name), { withFileTypes: true })) {
+      if (b.isDirectory()) add(join(agents, a.name, b.name, 'config.yaml'));
+    }
+  }
+  return out;
+}
+
 /**
- * The config with any unconfirmed runner and wake.command taken out, and what was taken out. A
- * config with no command, or with confirmed ones, comes back unchanged and `held` is null. A wake
- * webhook is not a command and stays.
+ * The once-only adoption: the first start after this update writes `firstRunAt`, and every command
+ * of this home whose config file is older than that is trusted, so an install keeps running what it
+ * ran. A file written later (a folder cloned after the update) is not adopted. Never throws: a home
+ * that cannot be read adopts nothing, and its commands do not run.
+ */
+export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = process.env): void {
+  try {
+    const file = commandTrustFile(env);
+    const found = readTrust(file);
+    const record: TrustRecord = found?.firstRunAt ? found : { firstRunAt: new Date().toISOString(), hashes: found?.hashes ?? {} };
+    const before = Date.parse(record.firstRunAt!);
+    let changed = !found?.firstRunAt;
+    for (const path of configFilesOf(home)) {
+      if (statSync(path).mtimeMs >= before) continue;
+      let c: ReturnType<typeof commandsOf>;
+      try { c = commandsOf(parse(readFileSync(path, 'utf-8')) as AimeatPerAgentConfig); } catch (err) {
+        logger.warn('connector: a config file could not be read for adoption; its commands do not run', { path, error: String(err) });
+        continue;
+      }
+      if (!c) continue;
+      const hash = commandHash(home, c.runner, c.wakeCommand);
+      if (record.hashes[hash]) continue;
+      record.hashes[hash] = { at: new Date().toISOString(), how: 'adopted' };
+      changed = true;
+    }
+    if (changed) writeTrust(file, record);
+  } catch (err) {
+    logger.warn('connector: the commands of this home could not be adopted', { home, error: String(err) });
+  }
+}
+
+/**
+ * The config with an untrusted runner and wake.command taken out, and what was taken out. A config
+ * with no command, or with trusted ones, comes back unchanged and `held` is null.
  */
 export function heldBackCommands<T extends AimeatPerAgentConfig>(config: T, home: string, env: NodeJS.ProcessEnv = process.env): { config: T; held: HeldCommands | null } {
-  const runner = config.runner?.command ? config.runner : undefined;
-  const wakeCommand = config.wake?.command || undefined;
-  if (!runner && !wakeCommand) return { config, held: null };
-  const hash = commandHash(home, runner, wakeCommand);
+  const c = commandsOf(config);
+  if (!c) return { config, held: null };
+  const hash = commandHash(home, c.runner, c.wakeCommand);
   if (isTrustedCommand(hash, env)) return { config, held: null };
   const wake = config.wake ? { ...config.wake, command: undefined } : undefined;
   return {
     config: { ...config, runner: undefined, ...(wake ? { wake } : {}) },
-    held: { hash, home: resolve(home), ...(runner ? { runner } : {}), ...(wakeCommand ? { wakeCommand } : {}) },
+    held: { hash, home: resolve(home), ...(c.runner ? { runner: c.runner } : {}), ...(c.wakeCommand ? { wakeCommand: c.wakeCommand } : {}) },
   };
 }
 
-/** The held commands as the person reads them: what runs, when, and from which folder. */
-export function describeHeld(held: HeldCommands): string {
-  const lines: string[] = [];
-  if (held.runner) {
-    const r = held.runner;
-    lines.push(`  for each task: ${[r.command, ...(r.args ?? [])].join(' ')}`
-      + (r.cwd ? ` (in ${r.cwd})` : '') + (r.env && Object.keys(r.env).length ? ` (with the settings ${Object.keys(r.env).join(', ')})` : ''));
-  }
-  if (held.wakeCommand) lines.push(`  on new work: ${held.wakeCommand}`);
-  return lines.join('\n');
-}
-
-/** The sentence that says what was held back and how to confirm it, for a run that cannot ask. */
-export function heldNotice(agents: string[], held: HeldCommands): string {
-  return `The settings in ${held.home} ask this connector to run a command for ${agents.join(', ')}:\n${describeHeld(held)}\n`
-    + 'The connector did not write this setting, so it does not run it. If you wrote it yourself, run `aimeat connect trust` in a terminal in this folder to allow it once.';
-}
-
-/** One notice per distinct held command, naming every agent it was held for. */
+/** One plain line per distinct command that does not run, naming the agents it was meant for. */
 export function heldNotices(agents: Array<{ agent: string; owner: string; heldCommands?: HeldCommands | null }>): string[] {
   const byHash = new Map<string, { held: HeldCommands; names: string[] }>();
   for (const a of agents) {
@@ -147,47 +202,11 @@ export function heldNotices(agents: Array<{ agent: string; owner: string; heldCo
     g.names.push(`${a.agent}@${a.owner}`);
     byHash.set(a.heldCommands.hash, g);
   }
-  return [...byHash.values()].map(g => heldNotice(g.names, g.held));
-}
-
-/**
- * Ask the person, one question per distinct command, whether it may run. Yes records it and the
- * commands are put back into each agent's config; anything else leaves them out. Returns how many
- * were allowed. `input` and `output` default to the terminal; the question is plain words with the
- * command shown.
- */
-export async function confirmHeldCommands(
-  agents: Array<{ agent: string; owner: string; config: AimeatPerAgentConfig; heldCommands?: HeldCommands | null }>,
-  io: { input?: NodeJS.ReadableStream; output?: NodeJS.WritableStream; env?: NodeJS.ProcessEnv } = {},
-): Promise<number> {
-  const byHash = new Map<string, { held: HeldCommands; who: typeof agents }>();
-  for (const a of agents) {
-    if (!a.heldCommands) continue;
-    const g = byHash.get(a.heldCommands.hash) ?? { held: a.heldCommands, who: [] };
-    g.who.push(a);
-    byHash.set(a.heldCommands.hash, g);
-  }
-  if (byHash.size === 0) return 0;
-  const rl = createInterface({ input: io.input ?? process.stdin, output: io.output ?? process.stderr, terminal: false });
-  let allowed = 0;
-  try {
-    for (const { held, who } of byHash.values()) {
-      const names = who.map(w => `${w.agent}@${w.owner}`).join(', ');
-      const answer = await rl.question(
-        `\nThe settings in ${held.home} ask this connector to run a command on this computer for ${names}:\n${describeHeld(held)}\n`
-        + 'The connector did not write this setting. It may have come with the folder, for example in a cloned project.\n'
-        + 'The command runs with the agent\'s access to your AIMEAT account. Allow it? Type yes to allow it, or press Enter to leave it off: ');
-      if (answer.trim().toLowerCase() !== 'yes') continue;
-      trustCommand(held, io.env);
-      for (const w of who) {
-        w.config.runner = held.runner;
-        if (held.wakeCommand) w.config.wake = { ...(w.config.wake ?? {}), command: held.wakeCommand };
-        w.heldCommands = null;
-      }
-      allowed++;
-    }
-  } finally {
-    rl.close();
-  }
-  return allowed;
+  return [...byHash.values()].map(({ held, names }) => {
+    const cmds = [
+      held.runner ? `"${[held.runner.command, ...(held.runner.args ?? [])].join(' ')}" for each task` : '',
+      held.wakeCommand ? `"${held.wakeCommand}" on new work` : '',
+    ].filter(Boolean).join(' and ');
+    return `The settings in ${held.home} name ${cmds} for ${names.join(', ')}, but nobody connected this folder through the connector, so the command does not run. Run \`aimeat connect\` in this folder to connect it.`;
+  });
 }
