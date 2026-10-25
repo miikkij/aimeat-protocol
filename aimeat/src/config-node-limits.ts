@@ -1,0 +1,39 @@
+/**
+ * @file src/config-node-limits.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The operator settings that keep one account's use of what the node shares from reaching
+ *   every other account: unused MCP client registrations, the email form of device authorization,
+ *   the per-app labels a removed app holds, and the private SMTP hosts a company may send through.
+ *   Its own file because config.ts and config-types.ts are at the line ceiling. Each limit has a
+ *   value that turns it off (0, or false), and each is a row in services/config-schema-node-limits.ts,
+ *   so it is set from the Config tab or through chat (PUT /v1/admin/config).
+ * @structure NodeLimitsConfig · nodeLimitsDefaults()
+ * @usage
+ *   import { nodeLimitsDefaults } from './config-node-limits.js';
+ *   const config = { ...nodeLimitsDefaults(), ... };
+ * @version-history
+ *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22): mcpUnusedClientDays.
+ */
+
+/** Declared here, not picked from AimeatConfig, so this file imports nothing (config-decide.ts gives the reason). */
+export interface NodeLimitsConfig {
+  /**
+   * Days after which a dynamically registered MCP OAuth client (POST /v1/mcp/register) that holds no
+   * refresh token and no remembered approval is deleted by the daily core job mcp-client-cleanup.
+   * AIMEAT_MCP_UNUSED_CLIENT_DAYS, default 30; 0 keeps every registration.
+   */
+  mcpUnusedClientDays: number;
+}
+
+/** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
+function wholeOr(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return raw !== undefined && raw.trim() !== '' && Number.isInteger(n) && n >= 0 ? n : fallback;
+}
+
+export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLimitsConfig {
+  return {
+    mcpUnusedClientDays: wholeOr(env.AIMEAT_MCP_UNUSED_CLIENT_DAYS, 30),
+  };
+}
