@@ -282,6 +282,17 @@ export async function createGuestCheckout(
   return session;
 }
 
+/**
+ * Whether this checkout exists and was created by this platform profile, with no write. The routes
+ * ask it before an Idempotency-Key is claimed, so a request naming a checkout that is absent or
+ * another platform's writes nothing under the seller (secaudit2026oct22).
+ */
+export async function guestCheckoutExists(storage: Storage, config: AimeatConfig, id: string, profileUrl: string): Promise<boolean> {
+  const seller = sellerOfSessionId(id, config);
+  const session = seller ? (await storage.getMemory(seller, sessionKey(id)))?.value as UcpGuestSession | undefined : undefined;
+  return !!session && session.platformProfile === profileUrl;
+}
+
 /** The checkout, for the platform that created it. A checkout past its time reads as canceled. */
 export async function readGuestCheckout(storage: Storage, config: AimeatConfig, id: string, profileUrl: string): Promise<UcpGuestSession> {
   const seller = sellerOfSessionId(id, config);

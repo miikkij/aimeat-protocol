@@ -8,6 +8,7 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-10-25 — countMemory passes excludePrefixes (secaudit2026oct22).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01); listAllMemory and
  *     listAllMemoryMeta filter expired rows in SQL and break order ties by owner (QA audit D4-05); key
@@ -253,7 +254,7 @@ export const memoryMethods = {
     return results;
   },
 
-  async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string }): Promise<number> {
+  async countMemory(this: SqliteStorage, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; excludePrefixes?: string[] }): Promise<number> {
     return countMemoryRepo(this.db, ownerGaiis, opts);
   },
 
