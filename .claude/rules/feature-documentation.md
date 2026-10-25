@@ -20,7 +20,7 @@ of these and no single page said so.
 | 3 | The surface handbooks (`src/services/handbooks/*.ts`) | an agent's first call, `aimeat_handbook_get` | `check:prompt-refs` (only that named tools exist) |
 | 4 | A served library's registry entry (`src/data/library-packs/`), its `aiDoc` and `promptLine` | the app-building prompt, `GET /v1/libs`, bootstrap, llms.txt | `check:sdk` (bundle only) |
 | 5 | `docs/AIMEAT-Feature-List.md`, then `pnpm build:everything` | anyone reading `/v1/everything` | `check:everything` (freshness only) |
-| 6 | `aimeat/public/changelog.json`, newest first | people on the landing page | `check:changelog` (shape only). **Ask Jouni first**, platform work only |
+| 6 | `aimeat/public/changelog.json`, newest first | people on the landing page | `check:changelog` (shape only). **At the end of every feature, ask Jouni whether it goes in, with the proposed entry**; write it only on his yes; platform work only |
 | 7 | Settings: `src/services/config-schema.ts` row, `.env.example`, a Config-tab group in `public/views/admin/config-tab.js` `DOMAINS` | the operator | `check:config-coverage` |
 | 8 | Locales `en`, `fi`, `es`, and a row in the language context for any new term (skill `aimeat-writing`); a new setting a person cannot read from its label gets `help` and `explain.<term>.*` (`.claude/rules/frontend.md`) | people in their language, and an AI through `aimeat_handbook_get { tier: "settings/<term>" }` | `check:locales` |
 | 9 | A skill: node-wide (`src/data/builtin-skills*.ts`) or the owner's registry (`aimeat_skill_publish`) | an AI using the feature | `check:skill-reviews` (for skills that already watch the code) |
@@ -30,7 +30,7 @@ of these and no single page said so.
 | 13 | The TARGET record or the wish: closed in the session that shipped it | Jouni, the wish bucket | none |
 | 14 | A decision record for any ruling made while building | every project under the goal | none |
 
-Rows 10, 12, 13 and 14 have no gate, so they are the ones that get skipped. The `note-writer` agent
+Rows 10, 12, 13 and 14 have no gate, so they are the ones that get skipped. Row 5 is never skipped: every new feature gets its feature list row. Row 6 is a question, never a silence: the report that says a feature is done ends with the proposed changelog entry (title and summary in en and fi) and the question whether it goes in. Read "ask first" as a duty to ask, not only as a limit on writing: read as a limit, it let 17 features from 2026-10-22 to 25 reach main with no entry and no question (Jouni, 2026-10-25). The `note-writer` agent
 does 12 to 14 from a commit hash and a list of what was decided.
 
 ## The feature guide itself (row 5)
