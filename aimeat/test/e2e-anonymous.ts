@@ -606,6 +606,19 @@ await test('The shared agent\'s public card: the minted token is refused on tags
     assert(!mcpOwn.isError, `agent own tags over MCP: ${mcpOwn.text.slice(0, 200)}`);
 });
 
+const skillMd = (name: string) => `---\nname: ${name}\ndescription: A guard skill for the anonymous suite. Use when testing.\n---\n\n# Guard\n\nNothing to do.\n`;
+await test('MCP aimeat_skill_publish and aimeat_skill_update: the minted token is AUTH_REQUIRED, an agent of the owner publishes', async () => {
+    assert(agentMcp !== null, 'agent fixture failed');
+    const name = `anon-guard-${s3e}`;
+    const anon = await callTool(anonMcp, 'aimeat_skill_publish', { skill_md: skillMd(name), visibility: 'members' });
+    assert(anon.isError && /AUTH_REQUIRED/.test(anon.text), `minted token publish: ${anon.text.slice(0, 200)}`);
+    const upd = await callTool(anonMcp, 'aimeat_skill_update', { name, visibility: 'members' });
+    assert(upd.isError && /AUTH_REQUIRED/.test(upd.text), `minted token update: ${upd.text.slice(0, 200)}`);
+    const own = await callTool(agentMcp!, 'aimeat_skill_publish', { skill_md: skillMd(`own-${name}`), visibility: 'members' });
+    assert(!own.isError, `agent publish: ${own.text.slice(0, 200)}`);
+    await json(`/v1/skills/own-${name}`, ownerAuth({ method: 'DELETE' }));
+});
+
 await test('The anonymous token still writes its own memory after the Phase 3e refusals', async () => {
     const key = `anonymous.after-3e-${s3e}`;
     const { status, body } = await json('/v1/memory', anonAuth({ method: 'POST', body: JSON.stringify({ key, value: { ok: true } }) }));
