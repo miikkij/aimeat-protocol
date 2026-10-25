@@ -142,8 +142,11 @@ function claimSaysFalse(v: unknown): boolean {
 export function parseLinkDomains(raw: string | undefined | null): '*' | string[] | null {
   const list = (raw ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   if (!list.length) return null;
-  return list.includes('*') ? '*' : list;
+  return list.includes(EVERY_DOMAIN) ? EVERY_DOMAIN : list;
 }
+
+/** The link-domain value that trusts every domain. An address domain, not a permission word. */
+const EVERY_DOMAIN = '*';
 
 /** Whether an address's domain is inside a parsed link-domain list. */
 export function emailInLinkDomains(email: string, domains: '*' | string[]): boolean {
