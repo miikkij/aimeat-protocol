@@ -78277,7 +78277,9 @@ paths:
       summary: One prompt package with the node's own values filled in
       description: >-
         The stored prompt for this id with the node URL, the owner name and the descriptions of the
-        active cortex extensions substituted in, so the text is ready to paste. The owner name comes
+        active cortex extensions the caller may see substituted in, so the text is ready to paste:
+        public and node-installed ones for everyone, plus the signed-in owner's own and, for the
+        operator, all of them; `cortex_extensions_available` counts the same set. The owner name comes
         from the caller's token when there is one, else from `?owner=`, else the word `user`. An
         inactive or unknown prompt answers 404. Public.
       tags: [Discovery]
