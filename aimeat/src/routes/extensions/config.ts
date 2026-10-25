@@ -9,6 +9,8 @@
  * @usage registerExtensionConfigRoutes(router, config, storage) in routes/extensions.ts
  * @version-history
  *   2026-10-25 — `:name` is read through services/component-address.ts (owner namespaces wish, secaudit2026oct22).
+ *   2026-10-25 — emailPolicy 'unrestricted' from a caller that is not an operator caller is asked of the
+ *     operators: 202 with `approval_request` when nothing else changed (secaudit2026oct22).
  *   2026-10-25 — The service is told whether the caller may choose a secret's host, which decides whether a host field value it sets counts as declared (secaudit2026oct22).
  *   2026-10-25 — The service is told whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial: the owner points a host field (manifest network.host_fields) at a
@@ -28,6 +30,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { callerOf } from '../../middleware/caller.js';
 import { findExtension } from '../../services/component-address.js';
+import { requesterOf } from '../../services/publish-requests/ask.js';
 
 export function registerExtensionConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── PATCH /v1/extensions/:name/config — set config values of an installed extension ──
@@ -40,10 +43,12 @@ export function registerExtensionConfigRoutes(router: Router, config: AimeatConf
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
       }
+      const caller = callerOf(req, config.nodeId, storage);
       const out = await setExtensionConfig({ storage, config }, ext, (req.body as { config?: unknown } | undefined)?.config,
         {
           isOperator: await isOperatorCaller(storage, req.auth),
-          mayChooseSecretHosts: mayChooseSecretHost(callerOf(req, config.nodeId, storage).principalView),
+          mayChooseSecretHosts: mayChooseSecretHost(caller.principalView),
+          asker: requesterOf({ storage, config }, caller, req.auth?.app),
         });
       if (!out.ok) {
         res.status(out.status).json(error(config.nodeId, out.code, out.message));
@@ -51,12 +56,15 @@ export function registerExtensionConfigRoutes(router: Router, config: AimeatConf
       }
       logger.info(`Extension config set: ${name}`, { by: resolveIdentity(req.auth!, config.nodeId), fields: out.changed });
       const hosts = capabilitiesOfRecord(out.record).hosts;
-      res.json(success(config.nodeId, {
+      // 202 when the only change asked waits for the operators (emailPolicy), as a publish request answers.
+      res.status(out.approval_request && out.changed.length === 0 ? 202 : 200).json(success(config.nodeId, {
         name,
         changed: out.changed,
         config: maskSecretFields(out.record.config, getExtSecretKeys(out.record)),
         // What ctx.fetch reaches from the next run on, when the manifest limits it.
         ...(hosts ? { network_hosts: hosts } : {}),
+        ...(out.approval_request ? { approval_request: out.approval_request } : {}),
+        ...(out.warnings ? { warnings: out.warnings } : {}),
       }, [
         { description: 'Read the extension', method: 'GET', url: `/v1/extensions/${encodeURIComponent(name)}` },
       ]));

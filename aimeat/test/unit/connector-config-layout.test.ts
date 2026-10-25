@@ -18,6 +18,8 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/connector-config-layout.test.ts
  * @version-history
+ *   v1.0.2 -- 2026-10-25 -- Each case has its own record of trusted commands, so its start is the first
+ *     one after the update and the old file's runner is adopted (cli/connect/command-trust.ts; secaudit2026oct22).
  *   v1.0.1 — 2026-09-24 — The re-enrolment case stays on one node and names its receiving identity:
  *     an offer may no longer move an agent to another node (secaudit 2026-09, A9-2).
  *   v1.0.0 — 2026-09-01 — Initial, with the slimmed file and the per-owner layout.
@@ -65,8 +67,14 @@ const newPath = (agent: string, owner: string) => join(home, 'agents', owner, ag
 const oldPath = (agent: string) => join(home, 'agents', agent, 'config.yaml');
 
 describe('an old-layout install on first start', () => {
-    beforeEach(() => { home = resolve(process.cwd(), `test/.tmp-layout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`); });
+    beforeEach(() => {
+        home = resolve(process.cwd(), `test/.tmp-layout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+        // A record of its own, so this test's start is the first one after the update (command-trust.ts).
+        process.env.AIMEAT_COMMAND_TRUST_FILE = join(home, '..', `${home.split(/[\\/]/).pop()}-trust.json`);
+    });
     afterEach(() => {
+        rmSync(process.env.AIMEAT_COMMAND_TRUST_FILE ?? '', { force: true });
+        delete process.env.AIMEAT_COMMAND_TRUST_FILE;
         delete process.env.AIMEAT_HOME;
         try { rmSync(home, { recursive: true, force: true }); } catch { /* best effort */ }
     });
@@ -78,7 +86,10 @@ describe('an old-layout install on first start', () => {
         expect(a.owner).toBe('alice');
         expect(a.config.node_url).toBe('http://old.example:1');
         expect(a.config.poll_interval).toBe(45);
+        // An install that had the runner before the update keeps it: the first start adopts it
+        // (cli/connect/command-trust.ts; secaudit2026oct22).
         expect(a.config.runner?.command).toBe('echo');
+        expect(a.heldCommands).toBeFalsy();
     });
 
     it('is COPIED forward, and the old file is still there afterwards', async () => {

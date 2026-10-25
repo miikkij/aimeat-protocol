@@ -8,6 +8,7 @@
  * @structure publishCliTools[]
  * @usage import { publishCliTools } from './tool-call-defs-publish.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — `account` is forwarded on the read and the decision (secaudit2026oct22, the approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import { optionalString, requiredString, type ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -20,14 +21,18 @@ export const publishCliTools: ConnectCliToolDefinition[] = [
     input: {
       request_id: { type: 'string', description: 'One request. Omit to list them all.' },
       decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
+      account: { type: 'string', description: 'Operators only: the account whose request waiting for the operators you read or answer.' },
     },
     handler: ({ client }, input) => {
       const decision = optionalString(input, 'decision');
       const requestId = optionalString(input, 'request_id');
+      const account = optionalString(input, 'account');
       if (decision !== undefined) {
-        return client.post(`/v1/publish-requests/${encodeURIComponent(requiredString(input, 'request_id'))}/decision`, { decision });
+        return client.post(`/v1/publish-requests/${encodeURIComponent(requiredString(input, 'request_id'))}/decision`, { decision, ...(account ? { account } : {}) });
       }
-      if (requestId !== undefined) return client.get(`/v1/publish-requests/${encodeURIComponent(requestId)}`);
+      if (requestId !== undefined) {
+        return client.get(`/v1/publish-requests/${encodeURIComponent(requestId)}${account ? `?account=${encodeURIComponent(account)}` : ''}`);
+      }
       return client.get('/v1/publish-requests');
     },
   },

@@ -22,6 +22,7 @@ import { createHash } from 'node:crypto';
 import { oauthLoginRouter } from '../../src/routes/oauth-login.js';
 import {
   mapGoogleClaims, mapCasdoorClaims, makeEntraMapper, makeEntraValidator, type OidcProvider,
+  makeCasdoorLinkFence, makeEntraLinkFence,
 } from '../../src/services/oidc-providers.js';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
@@ -67,14 +68,16 @@ const googleProvider = (client: OidcClient | null, enabled = true): OidcProvider
   id: 'google', label: 'Continue with Google', i18nKey: 'googleSignIn',
   enabled, client, scopes: ['openid', 'email', 'profile'], nonceType: 'google_login', mapClaims: mapGoogleClaims,
 });
-const casdoorProvider = (client: OidcClient | null, enabled = true): OidcProvider => ({
+const casdoorProvider = (client: OidcClient | null, enabled = true, linkDomains: () => string = () => 'corp.example'): OidcProvider => ({
   id: 'casdoor', label: 'Continue with Casdoor', i18nKey: 'casdoorSignIn',
   enabled, client, scopes: ['openid', 'email', 'profile'], nonceType: 'casdoor_login', mapClaims: mapCasdoorClaims,
+  emailLinkFence: makeCasdoorLinkFence(linkDomains),
 });
 const entraProvider = (client: OidcClient | null, enabled = true): OidcProvider => ({
   id: 'entra', label: 'Continue with Microsoft', i18nKey: 'entraSignIn',
   enabled, client, scopes: ['openid', 'email', 'profile'], nonceType: 'entra_login',
   mapClaims: makeEntraMapper(ENTRA_TENANT), validateClaims: makeEntraValidator(ENTRA_TENANT),
+  emailLinkFence: makeEntraLinkFence(ENTRA_TENANT, [], () => ''),
 });
 
 interface RawResponse { status: number; location?: string; setCookie?: string[]; body: string }
@@ -130,6 +133,8 @@ describe('Multi-provider social login (oauth-login router)', () => {
   let fakeCasdoor: ReturnType<typeof makeFakeClient>;
   let fakeEntra: ReturnType<typeof makeFakeClient>;
   let config: AimeatConfig;
+  /** The Casdoor link-domain setting the fake Casdoor provider reads at each sign-in. */
+  let casdoorDomains = 'corp.example';
 
   beforeAll(async () => {
     storage = new SqliteStorage(':memory:');
@@ -148,7 +153,7 @@ describe('Multi-provider social login (oauth-login router)', () => {
     app.use(express.json());
     app.use(oauthLoginRouter(config, storage, [
       googleProvider(fakeGoogle.client),
-      casdoorProvider(fakeCasdoor.client),
+      casdoorProvider(fakeCasdoor.client, true, () => casdoorDomains),
       entraProvider(fakeEntra.client),
     ]));
     server = http.createServer(app);
@@ -383,6 +388,64 @@ describe('Multi-provider social login (oauth-login router)', () => {
     const ghii = await storage.getGHII(`shareduser@${NODE_ID}`);
     expect(ghii!.externalIdentities).toMatchObject({ google: 'g-x-1', casdoor: 'cas-x-1' });
     expect((await storage.listOwners()).length).toBe(ownersBefore); // no new owner
+  });
+
+  // ── Link domains (secaudit2026oct22, oidc-email-verified-without-idp-proof) ──
+
+  it('a Casdoor address OUTSIDE the link domains does not link into the existing account with that address', async () => {
+    const seed = await loginWith('google', fakeGoogle, { sub: 'g-fence-1', email: 'boss@other.example', email_verified: true, name: 'Boss' });
+    const seedCookie = cookieFrom(seed.setCookie, 'aimeat_pending_signup')!;
+    await rawReq('POST', `${base}/v1/ghii/login/google/finalize`, { cookie: seedCookie, body: JSON.stringify({ username: 'fenceboss' }) });
+
+    const res = await loginWith('casdoor', fakeCasdoor, { sub: 'cas-fence-1', email: 'boss@other.example', name: 'Boss' });
+    expect(res.status).toBe(302);
+    expect(res.location).toBe(`${base}/?aimeat_signup=1`); // no link, no session
+    expect((res.setCookie ?? []).some((c) => c.startsWith('aimeat_rt='))).toBe(false);
+    const ghii = await storage.getGHII(`fenceboss@${NODE_ID}`);
+    expect(ghii!.externalIdentities?.casdoor).toBeUndefined();
+  });
+
+  it('an empty Casdoor link-domain setting trusts no domain; `*` trusts every domain', async () => {
+    casdoorDomains = '';
+    try {
+      const res = await loginWith('casdoor', fakeCasdoor, { sub: 'cas-fence-2', email: 'shared@corp.example', name: 'Shared' });
+      expect(res.location).toBe(`${base}/?aimeat_signup=1`);
+      casdoorDomains = '*';
+      const res2 = await loginWith('casdoor', fakeCasdoor, { sub: 'cas-fence-3', email: 'boss@other.example', name: 'Boss' });
+      expect(res2.location).toBe(`${base}/`);
+      expect((await storage.getGHII(`fenceboss@${NODE_ID}`))!.externalIdentities).toMatchObject({ casdoor: 'cas-fence-3' });
+    } finally {
+      casdoorDomains = 'corp.example';
+    }
+  });
+
+  it('Casdoor `email_verified: false` inside a link domain does not link', async () => {
+    const res = await loginWith('casdoor', fakeCasdoor, { sub: 'cas-fence-4', email: 'shared@corp.example', email_verified: false, name: 'Shared' });
+    expect(res.location).toBe(`${base}/?aimeat_signup=1`);
+  });
+
+  it('a new Casdoor account outside the link domains starts without a verified address', async () => {
+    const res = await loginWith('casdoor', fakeCasdoor, { sub: 'cas-fence-5', email: 'guest@webmail.example', name: 'Guest' });
+    const pendingCookie = cookieFrom(res.setCookie, 'aimeat_pending_signup')!;
+    const fin = await rawReq('POST', `${base}/v1/ghii/login/casdoor/finalize`, { cookie: pendingCookie, body: JSON.stringify({ username: 'fenceguest' }) });
+    expect(fin.status).toBe(200);
+    const ghii = await storage.getGHII(`fenceguest@${NODE_ID}`);
+    expect(ghii!.emailVerifiedAt ?? null).toBeNull();
+    expect(await storage.getGHIIByEmailHash(emailHashOf('guest@webmail.example'))).toBeNull();
+  });
+
+  it('the Entra fence: one tenant trusts every domain when empty, several tenants trust none, a listed domain is trusted', () => {
+    const T2 = '22222222-2222-2222-2222-222222222222';
+    expect(makeEntraLinkFence(ENTRA_TENANT, [], () => '')('a@anything.example')).toBe(true);
+    expect(makeEntraLinkFence('organizations', [ENTRA_TENANT], () => '')('a@anything.example')).toBe(true);
+    expect(makeEntraLinkFence('organizations', [ENTRA_TENANT, T2], () => '')('a@corp.example')).toBe(false);
+    const listed = makeEntraLinkFence('organizations', [ENTRA_TENANT, T2], () => 'corp.example, Partner.example');
+    expect(listed('a@corp.example')).toBe(true);
+    expect(listed('a@PARTNER.example')).toBe(true);
+    expect(listed('a@evil.example')).toBe(false);
+    expect(makeEntraMapper(ENTRA_TENANT)({ sub: 's', email: 'a@corp.example', xms_edov: false })!.emailVerified).toBe(false);
+    expect(makeEntraMapper(ENTRA_TENANT)({ sub: 's', email: 'a@corp.example', email_verified: false })!.emailVerified).toBe(false);
+    expect(makeEntraMapper(ENTRA_TENANT)({ sub: 's', email: 'a@corp.example' })!.emailVerified).toBe(true);
   });
 
   // ── Microsoft Entra ID (single-tenant gating) ──

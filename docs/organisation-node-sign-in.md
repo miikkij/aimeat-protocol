@@ -3,8 +3,8 @@
 *How to run one AIMEAT node for your company and the partner companies you approve, with Microsoft
 Entra ID as the way in.*
 
-**Version:** 1.3 — Section 6a: a welcome page and a company front page take the same access as an app
-**Date:** 2026-10-18
+**Version:** 1.4 — Section 5: the domains a gated Entra sign-in vouches for (`AIMEAT_ENTRA_LINK_DOMAINS`)
+**Date:** 2026-10-25
 **License:** MIT
 
 ---
@@ -120,6 +120,16 @@ Then:
 A gated sign-in also lets the node vouch for the email address, which is what makes an invited
 account link to its Entra identity on the first sign-in instead of dead-ending at "username taken".
 Ungated Entra sign-in (`common` or `organizations` with no allowlist) does not vouch for it.
+
+Which domains it vouches for is `AIMEAT_ENTRA_LINK_DOMAINS` (`auth.entra_link_domains`, settable on
+the Config tab and through `PUT /v1/admin/config`; `*` means every domain). Left empty, a gate of
+exactly one tenant vouches for every domain, as before, and an allowlist of several tenants vouches
+for none: the admin of each partner tenant sets its own users' addresses, so a partner admin could
+otherwise give one of them the address of an account in your company. On a partner node, list the
+domains each approved organisation owns. A token whose `email_verified` or `xms_edov` claim says
+false is never vouched for. Outside the listed domains the person still signs in; they choose a
+username, and the address is confirmed here like any other. Casdoor has the same setting,
+`AIMEAT_CASDOOR_LINK_DOMAINS`, which vouches for no domain while it is empty.
 
 ## 6. What the gate does not cover
 
@@ -316,8 +326,10 @@ brief for the operator's own AI. Two runtime switches govern the doors:
 What deprovisioning actually does: `active: false` (or DELETE) **deactivates** the account. The
 person's knowledge, memberships and history remain; every credential acting in their name —
 sessions, their agents' 90-day tokens, personal access tokens, app grants, live connect tunnels —
-ends within the request, and nothing new can be minted. Reactivation lets the person back in
-without resurrecting the old credentials. The same state is behind the operator's manual
+ends within the request, and nothing new can be minted. The account's background work waits: its
+schedules, its workflow triggers and its extensions' unattended runs are skipped with a log line
+that names the deactivation, and none of them is deleted. Reactivation lets the person back in
+without resurrecting the old credentials, and the waiting work runs again at its next time. The same state is behind the operator's manual
 Deactivate button on the Owners tab. A connection may only touch accounts it manages
 (`managedBy`), it can never deactivate an operator-role account, and it may ADOPT an existing
 account only when that account's locally verified email is in the connection's own domains. The

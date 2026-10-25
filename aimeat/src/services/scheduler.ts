@@ -7,6 +7,9 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-10-25 — A fire for a deactivated account is skipped with outcome `stopped` and a run-log line
+ *     that names the deactivation; the job is kept and runs again after reactivation
+ *     (services/account-deactivated.ts; secaudit2026oct22, owner-deactivation:background-work-keeps-acting).
  *   2026-10-25 — A connections-publish fire asks its maker first (scheduleFireRefusal): a deleted agent,
  *     a revoked app grant or a maker without connections:use does not post (secaudit2026oct22).
  *   2026-10-19 — A one-shot user schedule (max_runs limit 1) that fails is turned off at once with one
@@ -123,6 +126,7 @@ import { claimCronFire } from './scheduler-fire-claim.js';
 import { withRunLimit, runLimitFor, type RUN_LIMIT_MS } from './scheduler-run-limit.js';
 import { onFailedRun, noteSuccess, tellScheduleOwner, isOneShot, oneShotFailedReason } from './scheduler-failures.js';
 import { missedFire, missedMessage, type MissedFire } from './scheduler-catch-up.js';
+import { deactivatedAccountSkip } from './account-deactivated.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -437,6 +441,14 @@ export class Scheduler {
         logger.info(`Scheduler: core job ${job.id} is skipped, its handler "${job.coreHandler}" is not active on this node (the feature it serves is turned off)`);
       }
       return { code: 'error', detail: `The handler of this job is not active on this node, because the feature it serves is turned off. Turn the feature on, or disable the job.` };
+    }
+
+    // ── The account is deactivated: skip, keep the job (services/account-deactivated.ts) ──
+    const paused = await deactivatedAccountSkip(this.storage, job.ownerScope);
+    if (paused) {
+      logger.info(`Scheduler skipped ${job.id}: ${paused}`);
+      await this.writeLog(job, trigger, 'skipped', { errorMessage: paused, durationMs: 0, reads: [], writes: [] });
+      return { code: 'stopped', detail: paused };
     }
 
     // ── Overlap guard: never run two fires of the same job concurrently ──

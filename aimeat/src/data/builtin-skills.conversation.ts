@@ -41,6 +41,9 @@
  *   2026-10-16 — aimeat-mail-to-data: a read of the owner's mailbox without connections:read-as-owner
  *     answers READ_AS_OWNER_REQUIRED on MCP and REST alike (Jouni, 2026-10-16).
  *   2026-10-15 — aimeat-mail-to-data: a mailbox the owner connected appears with holder owner and is read on connections:read-as-owner (feature-list audit 128).
+ *   2026-10-25 — aimeat-paying-for-the-ai: on the node's key a call is priced before it runs, its answer
+ *     is at most the operator's limit long, and one that costs more than is left is a spent allowance
+ *     (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.4.1 — 2026-10-05 — aimeat-paying-for-the-ai: a call that names its model is refused once the
  *     allowance is spent, and the operator may choose daily limits instead (secaudit 2026-10, AI-1).
  *   v1.4.0 — 2026-10-03 — aimeat-first-conversation: the first move is the profile interview and the
@@ -510,6 +513,15 @@ not you:
    and its key pays nothing more. The operator may choose otherwise: with daily limits on, the
    node's key keeps paying past the allowance up to a cap per account and a cap for all accounts,
    and the refusal then says which cap was reached and that it opens again the next day (UTC).
+
+**On the node's key a call is priced before it runs.** The node estimates the call from the length
+of the prompt and of the answer, and an answer there is at most the operator's limit long (32,000
+tokens by default; a longer one comes back cut short, with \`truncated: true\`). While the call runs,
+its price is held against what is left, so calls side by side cannot spend more than is left
+together. A call that would cost more than is left is treated like a spent allowance: a text call
+that named no model gets the free model, and any other is refused (\`QUOTA_EXHAUSTED\`) with the
+price and what is left. The fix is in the refusal: ask for a shorter answer (\`max_tokens\`), name a
+cheaper model, or wait for a call still running to finish.
 
 **One step can come before all three: a key for a single agent.** The owner may give one agent a key
 of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls

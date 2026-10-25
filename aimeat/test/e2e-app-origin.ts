@@ -10,6 +10,8 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-25 — Phases 13 and 14 address `<label>.localhost` with a real Host (onApexSub): X-Subdomain
+ *     counts only when it equals the Host's label (secaudit2026oct22, subdomain-label-from-client-headers).
  *   2026-10-25 — Phase 2 (secaudit2026oct22): a runnable /v1/apps request on the bare app host 301s to
  *     the app's own origin instead of running on the shared host.
  *   2026-10-25 — Phase 14 (secaudit2026oct22): a publisher's auto-assigned label with an ordinary name
@@ -108,6 +110,17 @@ function onAppOrigin(
     const headers: Record<string, string> = { 'x-app-origin': '1', ...extra };
     if (sub && label === 'header') headers['x-subdomain'] = sub;
     return hostRequest(BASE, path, host, { headers });
+}
+
+/**
+ * A GET on an operator subdomain of the apex, `<label>.localhost`, the way nginx delivers it: that
+ * Host plus `x-subdomain` naming the same label. Since 2026-10-25 the node honours `x-subdomain` only
+ * when it equals the Host's label (middleware/subdomain.ts; secaudit2026oct22), so a fetch from
+ * `localhost` with the header alone is the apex.
+ */
+async function onApexSub(path: string, label: string) {
+    const res = await hostRequest(BASE, path, `${label}.${new URL(BASE).hostname}:${PORT}`, { headers: { 'x-subdomain': label } });
+    return { status: res.status, body: { _raw: res.body }, headers: { get: (name: string) => res.header(name) } };
 }
 
 /** The `name=value` of the grant cookie a response set, or '' when it set none. */
@@ -1289,7 +1302,7 @@ async function main() {
         });
 
         await test('login.<apex> does not serve the publisher\'s page', async () => {
-            const r = await json('/', { headers: { 'X-Subdomain': 'login' } });
+            const r = await onApexSub('/', 'login');
             assert(!String(r.body._raw ?? '').includes('publisher login page'), `login.<apex> served the publisher's page: ${r.status}`);
             assert(r.status === 404, `expected 404 for login.<apex>, got ${r.status}`);
         });
@@ -1318,7 +1331,7 @@ async function main() {
             });
             assert(redir.status === 201, `redirect mapping: ${redir.status} ${JSON.stringify(redir.body)}`);
             try {
-                const r = await fetch(`${BASE}/`, { headers: { 'X-Subdomain': 'signin' }, redirect: 'manual' });
+                const r = await onApexSub('/', 'signin');
                 assert(r.status === 301 && r.headers.get('location') === `${BASE}/login`, `signin redirect: ${r.status} ${r.headers.get('location')}`);
             } finally {
                 await json('/v1/admin/subdomains/signin', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
@@ -1332,7 +1345,7 @@ async function main() {
             });
             assert(made.status === 201, `mapping: ${made.status} ${JSON.stringify(made.body)}`);
             try {
-                const r = await json('/', { headers: { 'X-Subdomain': 'labelcheck' } });
+                const r = await onApexSub('/', 'labelcheck');
                 assert(r.status === 200 && String(r.body._raw ?? '').includes('app origin demo'), `labelcheck.<apex>: ${r.status}`);
             } finally {
                 await json('/v1/admin/subdomains/labelcheck', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
@@ -1370,15 +1383,15 @@ async function main() {
         });
 
         await test('<label>.<apex> does not serve the publisher\'s app and sends the visitor to its app origin', async () => {
-            const r = await fetch(`${BASE}/?utm_source=x`, { headers: { 'X-Subdomain': notesLabel }, redirect: 'manual' });
-            const body = await r.text();
+            const r = await onApexSub('/?utm_source=x', notesLabel);
+            const body = r.body._raw;
             assert(!body.includes('publisher notes page'), `${notesLabel}.<apex> served the publisher's page: ${r.status}`);
             assert(r.status === 302, `expected 302 for ${notesLabel}.<apex>, got ${r.status}`);
             assert(r.headers.get('location') === `http://${notesLabel}.${APP_HOST}:${PORT}/?utm_source=x`, `Location: ${r.headers.get('location')}`);
         });
 
         await test('<label>--draft.<apex> sends the visitor to the draft\'s app origin', async () => {
-            const r = await fetch(`${BASE}/?preview=t`, { headers: { 'X-Subdomain': `${notesLabel}--draft` }, redirect: 'manual' });
+            const r = await onApexSub('/?preview=t', `${notesLabel}--draft`);
             assert(r.status === 302, `expected 302 for ${notesLabel}--draft.<apex>, got ${r.status}`);
             assert(r.headers.get('location') === `http://${notesLabel}--draft.${APP_HOST}:${PORT}/?preview=t`, `Location: ${r.headers.get('location')}`);
         });
@@ -1394,7 +1407,7 @@ async function main() {
                 const mine = (list.body.data.sites as Array<{ subdomain: string; origin: string | null }>).find(s => s.subdomain === notesLabel);
                 assert(mine?.origin === 'publisher', `listed origin: ${JSON.stringify(mine)}`);
                 // The operator's own mapping of the same app still serves on the apex.
-                const r = await json('/', { headers: { 'X-Subdomain': 'origincheck' } });
+                const r = await onApexSub('/', 'origincheck');
                 assert(r.status === 200 && String(r.body._raw ?? '').includes('publisher notes page'), `origincheck.<apex>: ${r.status}`);
             } finally {
                 await json('/v1/admin/subdomains/origincheck', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
@@ -1410,13 +1423,13 @@ async function main() {
                 method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ origin: 'operator' }),
             });
             assert(keep.status === 200 && keep.body.data.site.origin === 'operator', `origin operator: ${keep.status} ${JSON.stringify(keep.body)}`);
-            const onApex = await json('/', { headers: { 'X-Subdomain': notesLabel } });
+            const onApex = await onApexSub('/', notesLabel);
             assert(onApex.status === 200 && String(onApex.body._raw ?? '').includes('publisher notes page'), `after the decision: ${onApex.status}`);
             const back = await json(`/v1/admin/subdomains/${notesLabel}`, {
                 method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ origin: 'publisher' }),
             });
             assert(back.status === 200 && back.body.data.site.origin === 'publisher', `origin publisher: ${back.status}`);
-            const r = await fetch(`${BASE}/`, { headers: { 'X-Subdomain': notesLabel }, redirect: 'manual' });
+            const r = await onApexSub('/', notesLabel);
             assert(r.status === 302, `after publisher again: ${r.status}`);
         });
 

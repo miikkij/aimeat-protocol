@@ -25,6 +25,8 @@
  *   - GET    /v1/agents/:name/crew/llm        the model choice that applies now, for the runtime
  * @usage app.use(agentCrewRouter(config, storage));
  * @version-history
+ *   2026-10-25 — PUT .../crew/llm and PUT /v1/agents/llm-default answer 202 with `approval_request`
+ *     when an app names a model's own address: the owner allows it first (secaudit2026oct22).
  *   2026-10-15 — PUT .../crew/llm and PUT /v1/agents/llm-default answer with `warning` when the
  *     owner's model policy leaves the chosen model out (feature-list audit #82).
  *   v1.4.0 — 2026-10-11 — The publish, restore and seed answers carry `warnings`.
@@ -59,6 +61,7 @@ import {
   resolveCrewAgent, type CrewCaller, type CrewRefusal,
 } from '../services/crew-ops.js';
 import { crewMenu, writeLlmChoice, effectiveLlmChoice } from '../services/crew-menu.js';
+import { requesterOf } from '../services/publish-requests/ask.js';
 
 /** A crew definition as the request carries it. Shape only; the rules are the runtime's. */
 const DocSchema = z.record(z.string(), z.unknown());
@@ -82,6 +85,21 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   // must match requireScopeUnlessSelf, which reads the parameter the same way (secaudit 2026-10-10 I0).
   const name = (req: Request) => req.params.name as string;
   const refuse = (res: Response, r: CrewRefusal) => { res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details)); };
+  /** The app that asks, when its model choice waits for the owner (services/crew-model-ask.ts). */
+  const askerOf = (req: Request) => requesterOf(deps, requestCaller(req, config.nodeId, storage), req.auth?.app);
+  /**
+   * A model choice's answer. `warning`: the owner's model policy leaves this model out; the choice is
+   * saved anyway. `approval_request`: an app named the model's address, so the owner allows it first
+   * and nothing changed yet (202).
+   */
+  const answerChoice = (res: Response, out: Extract<Awaited<ReturnType<typeof writeLlmChoice>>, { ok: true }>) => {
+    res.status(out.approval_request ? 202 : 200).json(success(config.nodeId, {
+      key: out.key, cleared: out.cleared,
+      ...(out.warning ? { warning: out.warning } : {}),
+      ...(out.approval_request ? { approval_request: out.approval_request } : {}),
+      ...(out.warnings ? { warnings: out.warnings } : {}),
+    }));
+  };
 
   // GET /v1/agents/:name/crew — the live definition, the draft, the kept revisions, what the
   // runtime last loaded, and whether the agent is on the tunnel right now.
@@ -179,18 +197,17 @@ export function agentCrewRouter(config: AimeatConfig, storage: Storage): Router 
   router.put('/v1/agents/:name/crew/llm', requireAuth(), requireScope('memory:write'), validateBody(LlmBody, config.nodeId), async (req, res) => {
     const target = await resolveCrewAgent(deps, callerOf(req, 'rest.agent-crew.llm'), name(req));
     if (!target.ok) return refuse(res, target);
-    const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm'), target.agent.name, req.body.choice ?? null);
+    const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm'), target.agent.name, req.body.choice ?? null, askerOf(req));
     if (!out.ok) return refuse(res, out);
-    // `warning`: the owner's model policy leaves this model out; the choice is saved anyway.
-    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared, ...(out.warning ? { warning: out.warning } : {}) }));
+    answerChoice(res, out);
   });
 
   // PUT /v1/agents/llm-default — the same choice, for every agent this owner has. A literal path, so
   // it is registered here rather than under `:name`, which would read "llm-default" as an agent.
   router.put('/v1/agents/llm-default', requireAuth(), requireScope('memory:write'), validateBody(LlmBody, config.nodeId), async (req, res) => {
-    const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm-default'), null, req.body.choice ?? null);
+    const out = await writeLlmChoice(deps, callerOf(req, 'rest.agent-crew.llm-default'), null, req.body.choice ?? null, askerOf(req));
     if (!out.ok) return refuse(res, out);
-    res.json(success(config.nodeId, { key: out.key, cleared: out.cleared, ...(out.warning ? { warning: out.warning } : {}) }));
+    answerChoice(res, out);
   });
 
   return router;

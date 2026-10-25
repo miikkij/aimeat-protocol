@@ -11,6 +11,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-25 -- diagnose-a-workflow, step 7: a 402 on the node's key may be a call that costs more
+ *     than is left; aimeat-node-guide: the email form of device-authorize is counted per network
+ *     address (secaudit2026oct22).
+ *   2026-10-25 -- diagnose-a-workflow, step 3: a deactivated account's schedules are skipped with outcome `stopped` and its triggers start nothing, until it is reactivated (secaudit2026oct22).
  *   2026-10-25 -- diagnose-a-workflow, step 3: a scheduled post's fire needs `connections:use` of its
  *     maker, and a schedule older than the account does not run (secaudit2026oct22).
  *   2026-10-21 -- diagnose-a-workflow, steps 3 and 6, and set-up-content-pipeline: an `extension` fire
@@ -311,7 +315,9 @@ Fetch these in order of depth; each is self-describing:
 
 Agents are never created implicitly. The paved path:
 
-1. The agent calls \`POST /v1/agents/device-authorize\` and shows the returned code.
+1. The agent calls \`POST /v1/agents/device-authorize\` and shows the returned code. It names the
+   owner by account name, or by the account's verified email; the email form is counted per
+   network address (20 in 10 minutes by default) and answers 429 past it, the account name never.
 2. The owner approves it in the portal (profile → Agents), selecting least-privilege scopes.
 3. The agent polls \`POST /v1/agents/device-token\` and receives its access token, its GAII and
    its Ed25519 key. The token works at once, with the full approved scope.
@@ -613,7 +619,10 @@ metadata:
    owner is told in the notifications. A one-shot (max_runs 1) that fails is turned off at once and
    not retried: it keeps \`lastRunError\` and has no next run, and the owner turns it on again or runs
    it now once the cause is fixed. A run that fell while the node was down is logged as skipped
-   with a message starting \`Missed:\` and is not made up.
+   with a message starting \`Missed:\` and is not made up. While the operator has deactivated the
+   account, its schedules are logged as skipped with outcome \`stopped\` and a message that names
+   the deactivation, its workflow triggers start nothing, and nothing is deleted: they run again at
+   their next time after the account is reactivated.
    **A schedule acts as whoever made it**, asked again at every fire, so a run can fail for the
    maker rather than for the work. The message says which: the agent or app that made it is gone
    ("no longer connected", "no longer holds your permission"), it no longer holds the permission the
@@ -667,7 +676,9 @@ metadata:
    at the provider to fix. An answer that did come carries \`route\`: when \`fellBack\` is true, the
    first provider failed and the attempts say why. A 402 \`QUOTA_EXHAUSTED\` on the node's key means
    the owner's allowance is spent and the operator's setting refuses, or a daily cap the operator
-   set was reached; its message says which. The owner's own key, or more allowance, is the fix.
+   set was reached, or the call would cost more than is left (the node prices a call before it
+   runs, with the answer at most the operator's length limit); its message says which. The owner's
+   own key, more allowance, or a shorter answer or a cheaper model for the last case, is the fix.
    The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
    saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
    for that agent or app apply, and they can refuse a step that the owner's own call would pass.

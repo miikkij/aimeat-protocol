@@ -52,9 +52,13 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
- *   v1.10.0 -- 2026-10-25 -- The extension is found through services/component-address.ts, the owner's
+ *   v1.10.1 -- 2026-10-25 -- The extension is found through services/component-address.ts, the owner's
  *     own first, so a run named with the bare name of an install made since names carry the owner
  *     reaches it (owner namespaces wish, secaudit2026oct22).
+ *   v1.10.0 -- 2026-10-25 -- A run for a deactivated account is refused with a sentence that names the
+ *     deactivation (code ACCOUNT_DEACTIVATED), unless somebody waits for its answer
+ *     (`servesWaitingCaller`: an app's markdown action, an AI provider call). Nothing is deleted
+ *     (secaudit2026oct22, owner-deactivation:background-work-keeps-acting).
  *   v1.9.0 -- 2026-10-22 -- ctx.files and ctx.datapackage ask the node's publish gate about the
  *     principal that installed the extension (and `alsoPublishFor`, a workflow run's principal) before
  *     they make anything public; an extension an agent installed before this keeps its old behaviour
@@ -107,6 +111,8 @@ import { getEncryptionKey } from './encryption.js';
 import { findExtension } from './component-address.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
+import { deactivatedAccountSkip } from './account-deactivated.js';
+import { logger } from '../utils/logger.js';
 
 export interface SystemRunDeps {
     storage: Storage;
@@ -168,6 +174,13 @@ export interface SystemRunArgs {
     /** The caller's cancellation. When it aborts, the run rejects with `Extension run aborted`
      *  (services/extension-runtime.ts). */
     signal?: AbortSignal;
+    /**
+     * Somebody is waiting for this run's answer: an app's markdown action for a reader
+     * (services/app-format-md.ts) or an AI call through an extension provider. Such a run is not the
+     * account's own background work, so a deactivated account does not stop it. Every other run is
+     * refused for a deactivated account, with the sentence of services/account-deactivated.ts.
+     */
+    servesWaitingCaller?: boolean;
 }
 
 export interface SystemRunResult {
@@ -233,6 +246,16 @@ export async function unattendedExtensionReader(
 export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: SystemRunArgs): Promise<SystemRunResult> {
     const { storage, config, emailService } = deps;
     const { extensionName, actionId, instanceId, ownerName, callerGaii, storageOwnerGhii, logLabel } = args;
+
+    // A deactivated account's background work waits (services/account-deactivated.ts). Thrown like
+    // every refusal here; the scheduler and the trigger start skip before they reach this point.
+    if (!args.servesWaitingCaller) {
+        const paused = await deactivatedAccountSkip(storage, ownerName);
+        if (paused) {
+            logger.info(`[ext:${extensionName}:${logLabel}] the unattended run of "${actionId}" is skipped. ${paused}`);
+            throw Object.assign(new Error(paused), { code: 'ACCOUNT_DEACTIVATED' });
+        }
+    }
 
     // An unattended run calls only the owner's own extension, so a bare name is the owner's own first
     // (services/component-address.ts): a schedule or a workflow step written as `weather` reaches

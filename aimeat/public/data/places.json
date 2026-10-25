@@ -49,6 +49,7 @@
           { "id": "agp-connect", "num": "04", "labelKey": "profile.agents.page.secConnect" },
           { "id": "agp-list", "num": "05", "labelKey": "profile.agents.page.secAgents" }
         ] },
+        { "id": "goals", "labelKey": "profile.tabs.goals" },
         { "id": "ecosystem", "labelKey": "profile.tabs.ecosystem" },
         { "id": "offers", "labelKey": "profile.tabs.offers", "sections": [
           { "id": "op-back", "num": "01", "labelKey": "profile.offers.cover.secBack" },

@@ -24,6 +24,8 @@
  *   return { ...securityDoorDefaults(), … };
  *   if (!ownerKeyLoginAllowed(config)) refuse();
  * @version-history
+ *   v1.5.0 — 2026-10-25 — secretHostAskDefault (AIMEAT_SECRET_HOST_ASK_DEFAULT, default true): the node's
+ *     default for "Ask me before my secret is sent to a new address for the first time" (secaudit2026oct22).
  *   v1.4.0 — 2026-10-12 — OWNER_KEY_LOGIN_REMOVED_IN and WS_QUERY_TOKEN_REMOVED_IN (4.0.0) with
  *     ownerKeyLoginAllowed and wsQueryTokenAllowed: from that release both are off whatever the
  *     environment or a live change says (wish-4-0-0-n-poistot-koodiin-versioporttina-ei-kommenttina).
@@ -106,6 +108,17 @@ export interface SecurityDoorConfig {
    * upgrade, so a live change applies at once. AIMEAT_WS_QUERY_TOKEN, default true.
    */
   wsQueryToken: boolean;
+
+  /**
+   * The node's default for each account's "Ask me before my secret is sent to a new address for the
+   * first time" (services/secret-host-ask-setting.ts). On: the first send of an owner's vault secret
+   * that has no address yet, to an address chosen by code one of the owner's agents wrote or by a host
+   * field such an agent set, asks the owner first, unless that agent holds secrets:manage. Off: it is
+   * sent and the address is kept, as before the audit. An account's own choice wins over it. Read on
+   * every such first send, so a live change applies at once. AIMEAT_SECRET_HOST_ASK_DEFAULT, default
+   * true (secaudit2026oct22; Jouni, 2026-10-25).
+   */
+  secretHostAskDefault: boolean;
 }
 
 /**
@@ -135,5 +148,6 @@ export function securityDoorDefaults(): SecurityDoorConfig {
     adminSetupOpenAfterFirstOperator: process.env.AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR === 'true',
     ownerKeyLogin: process.env.AIMEAT_OWNER_KEY_LOGIN !== 'false' && !versionAtLeast(getSoftwareVersion(), OWNER_KEY_LOGIN_REMOVED_IN),
     wsQueryToken: process.env.AIMEAT_WS_QUERY_TOKEN !== 'false' && !versionAtLeast(getSoftwareVersion(), WS_QUERY_TOKEN_REMOVED_IN),
+    secretHostAskDefault: process.env.AIMEAT_SECRET_HOST_ASK_DEFAULT !== 'false',
   };
 }

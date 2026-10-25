@@ -1680,9 +1680,15 @@
     "src/services/anonymous-principal-records.ts": {
       "reads": {
         "listMemory": 1,
-        "listStorageFiles": 1
+        "listStorageFiles": 2
       },
-      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step lists the shared anonymous account's skill manifests and data-package files to name them in one Security page incident for the operator. No value or file content is read or shown."
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step lists the shared anonymous account's skill manifests and data-package files to name them in one Security page incident for the operator, and clearAnonymousRecord lists the same account's files to delete the ones under datapkg/<name>/ when the operator chooses Delete on the incident. No value or file content is read or shown."
+    },
+    "src/services/verified-name.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22, lead 3924), the node's own read: the record of the name an identity verification proved, under a service-owned key, read to keep its version when it is written again and read by the wallet seal to compare with the signing certificate. It is never shown to anyone and never sent to a model."
     },
     "src/services/cortex-seeder.ts": {
       "reads": {
@@ -2020,6 +2026,12 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index; content goes through collectWorkspaceSummary with the reader."
+    },
+    "src/services/secret-host-ask-setting.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-25 (secaudit2026oct22), the node's own read: the owner's own setting record profile.<username>.secret_host_ask, read to decide whether a secret's first send asks the owner, and read again before it is written to keep its version. No content."
     },
     "src/services/notification-settings.ts": {
       "reads": {

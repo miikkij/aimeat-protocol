@@ -7,6 +7,8 @@
  *   approvals, plus the bulk delete of refresh tokens by GAII. Approvals are keyed by the unique
  *   (clientId, gaii) pair. Translated 1:1 from the Prisma implementation.
  * @version-history
+ *   2026-10-25 — deleteUnusedOAuthClients: a client registered before a cutoff that no refresh token
+ *     and no approval names is deleted (secaudit2026oct22, dcr-unbounded-client-records).
  *   v1.1.0 — 2026-09-09 — deleteOAuthClient, listOAuthClients, deleteOAuthRefreshTokensByClient,
  *     deleteOAuthApproval, deleteOAuthApprovalsByClient, deleteOAuthApprovalsByGaii and
  *     listOAuthApprovalsByOwner deleted: no caller.
@@ -51,6 +53,18 @@ export const oauthMethods = {
   async getOAuthClient(this: PostgresKyselyStorage, clientId: string): Promise<OAuthClientRecord | null> {
     const r = await this.db.selectFrom('OAuthClient').selectAll().where('clientId', '=', clientId).executeTakeFirst();
     return r ? mapClient(r) : null;
+  },
+
+  async deleteUnusedOAuthClients(this: PostgresKyselyStorage, createdBefore: string): Promise<number> {
+    // A client registered before the cutoff that no refresh token and no remembered approval names.
+    const r = await this.db.deleteFrom('OAuthClient')
+      .where('createdAt', '<', new Date(createdBefore))
+      .where(eb => eb.not(eb.exists(eb.selectFrom('OAuthRefreshToken').select('OAuthRefreshToken.id')
+        .whereRef('OAuthRefreshToken.clientId', '=', 'OAuthClient.clientId'))))
+      .where(eb => eb.not(eb.exists(eb.selectFrom('OAuthApproval').select('OAuthApproval.id')
+        .whereRef('OAuthApproval.clientId', '=', 'OAuthClient.clientId'))))
+      .executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 
   // ── Refresh tokens ──

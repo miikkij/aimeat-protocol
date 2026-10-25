@@ -6,6 +6,9 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.22.0 -- 2026-10-25 -- A deactivated account's background work waits; incidents that name records
+ *     to clear, delete or keep, among them the schedules older erasures left (secaudit2026oct22).
+ *   v1.21.0 -- 2026-10-25 -- aimeat_admin_config lists every node setting (section, q); aimeat_admin_config_set changes them.
  *   v1.20.0 -- 2026-10-25 -- Apps open to the internet on a closed node: the list, the decision, the trusted owners.
  *   v1.19.1 -- 2026-10-24 -- The records of processing: scope "all", and item_id with set (C7.7).
  *   v1.19.0 -- 2026-10-23 -- Security classes (the TL and NATO packs) and the records of processing (plan doc-mvlftkh9zmc9).
@@ -79,8 +82,13 @@ memory, refusals, the day-by-day tallies, and the live gauges — give both \`fr
 period, neither for the node's whole life, and read it both ways to tell a quiet period from a
 counter nothing writes) · \`aimeat_admin_stats\` (a different question: how many agents, actions,
 boards and work items the node HOLDS, and the morsels in circulation) · \`aimeat_admin_agents\`
-(all agents) · \`aimeat_admin_config\` (node config) · \`aimeat_admin_mint\` (mint morsels —
-irreversible ledger credit, daily cap enforced; a financial action, use sparingly).
+(all agents) · \`aimeat_admin_config\` (every node setting, as the admin Config page shows it; pass
+\`section\` such as ai or auth, or \`q\`, because the whole list is over four hundred) ·
+\`aimeat_admin_config_set\` (change settings, \`changes: [{ path, value }]\`, through the same checks as
+the Config page; a setting marked \`appliesAt: "restart"\` takes effect when the node next starts, so
+say that; a secret is set on its \`set_path\` and never read back; a setting the node's host sealed is
+refused) · \`aimeat_admin_mint\` (mint morsels — irreversible ledger credit, daily cap enforced; a
+financial action, use sparingly).
 
 **Updates (operator).** \`aimeat_admin_node_update\` — is a newer AIMEAT out on npm than this node
 runs, when it was released, and what is new in it (\`whatsNew\`, the change-log entries the node does
@@ -124,7 +132,7 @@ confidential, highly confidential, or a level an owner or an organism adds), whi
 people and which AI may read it. The node's switch, \`classification.mode\`, is off (nothing is
 classified or checked), owner (each owner turns it on for their own content, and an organism's
 creator or admin for the organism's) or all. \`aimeat_admin_config\` shows it as
-\`classification_mode\`, and \`aimeat_classification\` with \`action: "switch_set"\` and \`mode\` sets it:
+\`classification.mode\`, and \`aimeat_classification\` with \`action: "switch_set"\` and \`mode\` sets it:
 you may turn it on, or from owner to all, but turning it off, or from all to owner, gives protection
 away, so you are refused (PERSON_REQUIRED) and the operator does it on the admin Config page. Every
 change of the switch is a row in the audit log. The node policy is \`policy_get\` and \`policy_set\`
@@ -260,7 +268,19 @@ above is refused with SEALED_CONFIG.
 credential acting in its name (sessions, its agents' tokens, access keys, app permissions) stops
 immediately, the account and its knowledge remain, and \`aimeat_admin_owner_enable\` lets the
 person back in without resurrecting the old credentials. Never works on your own account. This is
-the manual offboarding door; a connected directory does the same automatically over SCIM.
+the manual offboarding door; a connected directory does the same automatically over SCIM. While the
+account is deactivated, its schedules, workflow triggers and unattended extension runs are skipped
+with a log line that names the deactivation; nothing is deleted, and they run again after enable.
+
+**Security incidents that name records (operator).** Some incidents list \`entries\`, each with an
+\`id\`, an \`action\` ("clear" or "delete") and a status: the records the shared anonymous agent wrote
+before its token was refused there (type \`anonymous_principal_records\`: its webhook, tags and
+capabilities, and the skills and data packages it published) and the schedules that account
+erasures before 2026-10-25 left (type \`erasure_leftover_schedules\`, the entry id is the schedule id:
+its account is gone, or was registered again by someone else after the schedule was made). Read them with
+\`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
+\`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
+the operator says. The incident is resolved with the last entry.
 
 ## Typical uses
 - Audit the node: \`aimeat_admin_statistics\` / \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.

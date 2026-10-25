@@ -21,8 +21,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-format-md
  * @version-history
- *   v1.2.0 — 2026-10-25 — Case 3 names the first owner's extension in full, and a bare name from another
+ *   v1.2.1 — 2026-10-25 — Case 3 names the first owner's extension in full, and a bare name from another
  *     account names nothing of the first owner's (owner namespaces wish, secaudit2026oct22).
+ *   v1.2.0 — 2026-10-25 — Cases 17 and 18: ?lang= reaches the action as input.lang, cached per language;
+ *     a value that is not a language tag is dropped.
  *   v1.1.1 — 2026-10-22 — Case 8b: the developer of another account is refused with a 403
  *     (check:denial-coverage).
  *   v1.1.0 — 2026-10-22 — Cases 7 to 16: a delegated developer and the ?format=md declaration (secaudit 2026-10, r54).
@@ -83,7 +85,7 @@ limits:
 `;
 const scripts = {
     'actions/render.js': `export default async function(ctx, input) {
-    return { markdown: '# Live from the app\\n\\nAsked for ' + input.format + ' of ' + input.app + '.' };
+    return { markdown: '# Live from the app\\n\\nAsked for ' + input.format + ' of ' + input.app + '.' + (input.lang ? ' Language: ' + input.lang + '.' : ' No language.') };
   }`,
     'actions/broken.js': `export default async function() { throw new Error('nothing to say'); }`,
 };
@@ -282,6 +284,24 @@ await test('15. the owner\'s own agent adds the declaration for the owner, uncha
 await test('16. an app published before any of this still answers ?format=md', async () => {
     const md = await mdText('live-md.html');
     assert(md.status === 200 && md.text.includes('# Live from the app'), `served: ${md.text.slice(0, 200)}`);
+});
+
+await test('17. ?lang= reaches the action as input.lang, on the apex route and per language, and no lang gives none', async () => {
+    const es = await (await fetch(`${BASE}/v1/apps/${a.name}/live-md.html?format=md&lang=es`)).text();
+    assert(es.includes('Language: es.'), `es: ${es.slice(0, 200)}`);
+    const ptBr = await (await fetch(`${BASE}/v1/apps/${a.name}/live-md.html?format=md&lang=PT-BR`)).text();
+    assert(ptBr.includes('Language: pt-BR.'), `pt-BR, primary subtag lowercased: ${ptBr.slice(0, 200)}`);
+    // The answer for one language is cached on its own: asking without lang after es is not served es.
+    const none = await (await fetch(`${BASE}/v1/apps/${a.name}/live-md.html?format=md`)).text();
+    assert(none.includes('No language.'), `no lang: ${none.slice(0, 200)}`);
+});
+
+await test('18. FAILURE: a ?lang= that is not a language tag is dropped, and the page still answers', async () => {
+    for (const bad of ['../../etc', 'en-US-x-private-long', '<script>', 'e', 'english']) {
+        const res = await fetch(`${BASE}/v1/apps/${a.name}/live-md.html?format=md&lang=${encodeURIComponent(bad)}`);
+        const text = await res.text();
+        assert(res.status === 200 && text.includes('No language.'), `lang=${bad}: ${res.status} ${text.slice(0, 160)}`);
+    }
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

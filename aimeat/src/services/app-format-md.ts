@@ -20,17 +20,22 @@
  *
  *   THE RUN. buildAppAgentFace (services/agent-face.ts) calls renderAppMarkdown first. The action runs
  *   unattended in the owner's name (runExtensionActionAsSystem: only the owner's own extension, no
- *   wallet, no paywall) with the input `{ format: 'md', app }`, and returns `{ markdown }` (a bare
+ *   wallet, no paywall) with the input `{ format: 'md', app, lang? }` (`lang` is the reader's
+ *   `?lang=`, given only when it reads as a language tag), and returns `{ markdown }` (a bare
  *   string is taken too). Anything else, a refusal, a timeout or a result past the 256 KB face cap,
  *   is logged and answers null, and the node serves what it served before: the stored face or the
  *   converted HTML. The caller's per-version cache bounds how often an anonymous GET starts a sandbox.
  * @structure withoutComments(text) · parseFormatMdMeta(html) · formatMdRefusal(storage, ownerName, decl) ·
- *   formatMdDelegateRefusal(opts) · renderAppMarkdown(deps, app)
- * @usage const md = await renderAppMarkdown({ storage, config }, app); // string or null
+ *   formatMdDelegateRefusal(opts) · formatMdLang(raw) · renderAppMarkdown(deps, app, opts)
+ * @usage const md = await renderAppMarkdown({ storage, config }, app, { lang: formatMdLang(req.query.lang) }); // string or null
  * @version-history
- *   v1.2.0 — 2026-10-25 — The declaration may name `<owner>/<name>` (encoded as one path segment), and
+ *   v1.2.2 — 2026-10-25 — The declaration may name `<owner>/<name>` (encoded as one path segment), and
  *     the extension is found as the run finds it, the owner's own first (owner namespaces wish,
  *     secaudit2026oct22).
+ *   v1.2.1 -- 2026-10-25 -- The action runs with servesWaitingCaller: a reader waits for it, so a deactivated account does not stop it (secaudit2026oct22).
+ *   v1.2.0 — 2026-10-25 — formatMdLang() and the `lang` option: the reader's `?lang=` reaches the action
+ *     as `input.lang`, so an app can answer ?format=md in the reader's language (Jouni: the Experience
+ *     Center's markdown in English by default and in Spanish on request).
  *   v1.1.0 — 2026-10-22 — formatMdDelegateRefusal(): a developer of another account may republish or
  *     remove the declaration the live version has, and only the full right may add one or change
  *     which extension or action it names (secaudit 2026-10, r54).
@@ -132,17 +137,36 @@ export function formatMdDelegateRefusal(opts: {
     + `To publish this version, ${keep}. To make the change, ask ${ownerName} to publish a version with the line themselves, or to give you the full development right on this app.`;
 }
 
-/** The markdown the app's own action returns, or null when it has none to give right now. */
-export async function renderAppMarkdown(deps: { storage: Storage; config: AimeatConfig }, app: AppRecord): Promise<string | null> {
+/**
+ * The reader's `?lang=` as a language tag the action may use, or undefined. A primary subtag of two or
+ * three letters with at most one region or script subtag ("en", "es", "pt-BR", "zh-Hant"), primary
+ * subtag lowercased. Anything else is dropped rather than refused: the page still answers, in the
+ * app's default language. The tag is also part of the cache key, so the shape bounds the key space.
+ */
+export function formatMdLang(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const m = /^([A-Za-z]{2,3})(?:-([A-Za-z0-9]{2,8}))?$/.exec(raw.trim());
+  if (!m) return undefined;
+  return m[2] ? `${m[1]!.toLowerCase()}-${m[2]}` : m[1]!.toLowerCase();
+}
+
+/**
+ * The markdown the app's own action returns, or null when it has none to give right now. `lang` is
+ * the reader's language from `?lang=` (formatMdLang), passed to the action as `input.lang`; the action
+ * decides what to do with it, and an action that ignores it answers as before.
+ */
+export async function renderAppMarkdown(deps: { storage: Storage; config: AimeatConfig }, app: AppRecord, opts: { lang?: string } = {}): Promise<string | null> {
   const decl = app.manifest?.formatMd;
   if (!decl) return null;
   const ownerGhii = `${app.ownerName}@${deps.config.nodeId}`;
   try {
     const { result } = await runExtensionActionAsSystem(deps, {
       extensionName: decl.extension, actionId: decl.action,
-      input: { format: 'md', app: `${app.ownerName}/${app.filename}` },
+      input: { format: 'md', app: `${app.ownerName}/${app.filename}`, ...(opts.lang ? { lang: opts.lang } : {}) },
       callerGaii: ownerGhii, ownerName: app.ownerName, storageOwnerGhii: ownerGhii,
       logLabel: 'format-md', producerKind: 'extension',
+      // A reader waits for this answer; it is not the account's background work (account-deactivated.ts).
+      servesWaitingCaller: true,
     });
     const md = typeof result === 'string' ? result
       : (result && typeof (result as { markdown?: unknown }).markdown === 'string' ? (result as { markdown: string }).markdown : null);

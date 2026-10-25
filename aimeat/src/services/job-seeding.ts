@@ -11,6 +11,8 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-10-25 — Seed core:held-label-release (daily 05:41; secaudit2026oct22, app-label-recycled-after-delete).
+ *   2026-10-25 — Seed core:mcp-client-cleanup (daily 04:53; secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-25 — Seed core:internet-opening-sweep (hourly at :12).
  *   2026-10-18 — Seed core:subscription-renewals (daily 05:19; Comicland v3 A-5).
  *   2026-10-15 — Seed core:gate-expiry (every 10 minutes; feature-list audit #59) and
@@ -118,6 +120,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
 
   // Expired device authorizations and the agent credentials an approved one holds -- every 5 minutes
   jobs.push({ id: 'core:device-auth-cleanup', name: 'Device Authorization Cleanup', coreHandler: 'device-auth-cleanup', cron: '*/5 * * * *' });
+  // MCP client registrations no sign-in used, past mcp.unused_client_days (mcp-client-cleanup.ts). Daily at 04:53.
+  jobs.push({ id: 'core:mcp-client-cleanup', name: 'MCP Client Registration Cleanup', coreHandler: 'mcp-client-cleanup', cron: '53 4 * * *' });
+  // The own addresses of removed apps, held and then released (held-app-labels.ts). Daily at 05:41.
+  jobs.push({ id: 'core:held-label-release', name: 'Held App Address Release', coreHandler: 'held-label-release', cron: '41 5 * * *' });
 
   // Agent task stall detection (Phase 1) -- runs every 5 minutes
   jobs.push({ id: 'core:task-stall-detection', name: 'Task Stall Detection', coreHandler: 'task-stall-detection', cron: '*/5 * * * *' });

@@ -22,6 +22,8 @@
  * @structure viewerOf(req) · registerPublishRequestRoutes(router, config, storage)
  * @usage registerPublishRequestRoutes(router, config, storage);  // routes/memory.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The read and the decision take `account`: an operator answers the operators'
+ *     question of another account from their own session (secaudit2026oct22, the approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import type { Router, Request } from 'express';
@@ -49,13 +51,13 @@ export function registerPublishRequestRoutes(router: Router, config: AimeatConfi
   });
 
   router.get('/v1/publish-requests/:id', requireAuth(), requireLocalSession(), requireScope('memory:write'), async (req, res) => {
-    const out = await readPublishRequestFor(ctx, viewerOf(req), req.params.id as string);
+    const out = await readPublishRequestFor(ctx, viewerOf(req), req.params.id as string, req.query.account);
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
     res.json(success(config.nodeId, { request: out.request }));
   });
 
   router.post('/v1/publish-requests/:id/decision', requireAuth(), requireLocalSession(), requireScope('memory:write'), async (req, res) => {
-    const out = await decidePublishRequest(ctx, viewerOf(req), req.params.id as string, req.body?.decision);
+    const out = await decidePublishRequest(ctx, viewerOf(req), req.params.id as string, req.body?.decision, req.body?.account);
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
     res.json(success(config.nodeId, { decision: out.decision, request: out.request }));
   });

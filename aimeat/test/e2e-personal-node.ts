@@ -8,6 +8,8 @@
  *   10 cleanup.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-node
  * @version-history
+ *   2026-10-25 — Phase 4d: one owner anchors at most personal_nodes.max_per_owner nodes (default 3),
+ *            refused with PERSONAL_NODE_LIMIT; 0 lifts the limit (secaudit2026oct22).
  *   v1.1.0 — 2026-07-29 — Add a second, non-operator owner and the cross-owner denials for
  *            PATCH/DELETE /v1/personal/anchor/:nodeId, GET /v1/personal/mailbox/:nodeId and
  *            GET /v1/personal/nodes (batch 01, holes 7-10); make the bootstrap assertion depend on
@@ -260,6 +262,51 @@ await test('GET /v1/personal/nodes — a NON-operator owner is refused the full 
     assert(status === 403, `non-operator listing every personal node must be 403, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${body.error?.code}`);
     assert(body.data?.personal_nodes === undefined, `the refusal must not carry the inventory: ${JSON.stringify(body.data)}`);
+});
+
+// ─── Phase 4d: Slots per owner (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit) ───
+// The node's slots are shared by every owner, so one owner holds at most personal_nodes.max_per_owner
+// of them (default 3). The refusal names the limit and the call that frees a slot; 0 is no limit.
+console.log('Phase 4d — Slots per owner');
+
+const bAnchor = (id: string) => json('/v1/personal/anchor', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerBToken}` },
+    body: JSON.stringify({ node_id: id, owner_name: ownerBName, public_key: 'test-key-base64', agent_gaiis: [], visibility: 'private' }),
+});
+const bNodeIds = [1, 2, 3, 4].map(i => `${personalNodeId}-b${i}`);
+
+await test('POST /v1/personal/anchor — one owner anchors up to the per-owner limit (3) and the next one is refused with the limit and the way to free a slot', async () => {
+    for (const id of bNodeIds.slice(0, 3)) {
+        const r = await bAnchor(id);
+        assert(r.status === 201, `anchor ${id} within the limit: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
+    const fourth = await bAnchor(bNodeIds[3]);
+    assert(fourth.status === 409 && fourth.body?.error?.code === 'PERSONAL_NODE_LIMIT',
+        `the fourth anchor must be refused with PERSONAL_NODE_LIMIT: ${fourth.status} ${JSON.stringify(fourth.body?.error)}`);
+    const msg = String(fourth.body?.error?.message ?? '');
+    assert(msg.includes('3') && msg.includes('DELETE /v1/personal/anchor/'), `the refusal names the limit and the delete call: ${msg}`);
+    assert(fourth.body?.error?.details?.limit === 3, `details.limit: ${JSON.stringify(fourth.body?.error?.details)}`);
+});
+
+await test('…the operator setting 0 lifts the limit, and the owner\'s existing anchors stay as they are', async () => {
+    const set = await json('/v1/admin/config', {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ changes: [{ path: 'personal_nodes.max_per_owner', value: 0 }] }),
+    });
+    assert(set.status === 200, `set max_per_owner 0: ${set.status} ${JSON.stringify(set.body?.error)}`);
+    try {
+        const fourth = await bAnchor(bNodeIds[3]);
+        assert(fourth.status === 201, `with no limit the fourth anchor is accepted: ${fourth.status} ${JSON.stringify(fourth.body?.error)}`);
+    } finally {
+        await json('/v1/admin/config', {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ changes: [{ path: 'personal_nodes.max_per_owner', value: 3 }] }),
+        });
+        for (const id of bNodeIds) {
+            await json(`/v1/personal/anchor/${encodeURIComponent(id)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerBToken}` } });
+        }
+    }
 });
 
 // ─── Phase 5: Mailbox — Check mailbox stats ───

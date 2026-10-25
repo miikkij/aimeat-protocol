@@ -13,6 +13,12 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.9.0 — 2026-10-25 — The secret host question switched off at an agent's or app's request
+ *     (apply-account-setting.ts; secaudit2026oct22).
+ *   v1.8.0 — 2026-10-25 — A crew model choice with its own address an app set, approved by the owner
+ *     (apply-crew-model.ts; secaudit2026oct22).
+ *   v1.7.0 — 2026-10-25 — An extension's emailPolicy grant, approved by an operator
+ *     (apply-extension-email-policy.ts; secaudit2026oct22).
  *   v1.6.0 — 2026-10-25 — An app opened to the internet on a closed node (apply-internet-opening.ts).
  *   v1.5.0 — 2026-10-20 — A consent to everyone (apply-consent.ts; secaudit 2026-10,
  *     grantConsent:wildcard-recipient-skips-publish-gate).
@@ -39,6 +45,9 @@ import { applyPortfolioPublish } from './apply-portfolio.js';
 import { applyCompanyPublish } from './apply-company.js';
 import { applyConsentPublish } from './apply-consent.js';
 import { applyInternetOpening } from './apply-internet-opening.js';
+import { applyExtensionEmailPolicy } from './apply-extension-email-policy.js';
+import { applyCrewModel } from './apply-crew-model.js';
+import { applyAccountSetting } from './apply-account-setting.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -57,4 +66,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   company: applyCompanyPublish,
   consent: applyConsentPublish,
   'internet-opening': applyInternetOpening,
+  'extension-email-policy': applyExtensionEmailPolicy,
+  'crew-model': applyCrewModel,
+  'account-setting': applyAccountSetting,
 };

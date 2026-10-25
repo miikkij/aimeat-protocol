@@ -4462,6 +4462,17 @@ components:
             `<label>--draft.<apex>` answer 302 there (404 when the node has no app origin). Null: a
             mapping from before this field that the node could not classify at start, served as
             before until the operator sets it (the Security page names each one).
+        heldSince:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            When the app this label served went away (a package removal or an app deletion). The
+            label is then held for that app's owner: no other owner's app gets it, and the owner gets
+            it back by publishing the same app again. The daily core job held-label-release releases it
+            after `apps.held_label_days` (default 90; 0 holds it until released), and an owner keeps at
+            most `apps.held_labels_per_owner` held labels (default 20; the one held longest goes
+            first). DELETE on the mapping releases it at once. Null while the app is there.
 
     CrewDef:
       type: object
@@ -4702,7 +4713,9 @@ components:
           description: >-
             The app's manifest. Among its fields, `formatMd` ({ extension, action }) names the action
             of the owner's own extension that answers `?format=md`, read from
-            `<meta name="aimeat-format-md">` at publish.
+            `<meta name="aimeat-format-md">` at publish. The action receives `{ format, app, lang? }`:
+            `lang` is the reader's `?lang=` when it reads as a language tag (two or three letters,
+            at most one subtag), so the app can answer in that language.
         size: { type: integer }
         mime_type: { type: string }
         protected: { type: boolean, description: True when an access code gates downloads }
@@ -8985,8 +8998,13 @@ paths:
       summary: Refresh access token
       description: |
         Refresh an access token. Two modes:
-          * **Owner session (cookie):** send the httpOnly `aimeat_rt` refresh cookie (set at
-            login) plus the `X-AIMEAT-Refresh: 1` header (CSRF guard). The refresh token is
+          * **Owner session (cookie):** send the httpOnly refresh cookie (set at login) plus the
+            `X-AIMEAT-Refresh: 1` header (CSRF guard). On an https node the cookie is
+            `__Host-aimeat_rt` (Secure, Path=/, host-only); a plain-http node keeps `aimeat_rt`
+            (Path=/v1/auth). An https node still reads `aimeat_rt` until the day the setting
+            `auth.refresh_cookie_legacy_until` names, and then sets `__Host-aimeat_rt` and clears
+            the old name; a personal access token under the old name is not read on https, and a
+            request carrying two `aimeat_rt` values is read as carrying none. The refresh token is
             rotated one-time-use with a short grace window and a new cookie is set; replaying
             a consumed token revokes the whole session. Returns `{ token, expires_in, display_name }`
             (the owner's current display name, so the client login pill picks up profile edits).
@@ -9057,7 +9075,8 @@ paths:
       operationId: revokeToken
       summary: Revoke session / logout
       description: |
-        Revoke the current session and clear the `aimeat_rt` refresh cookie. Accepts the
+        Revoke the current session and clear the refresh cookie (`__Host-aimeat_rt` and `aimeat_rt`
+        on https, `aimeat_rt` on plain http). Accepts the
         refresh cookie and/or a Bearer token, and works even after the access token expired.
       tags: [Auth]
       security:
@@ -12662,6 +12681,10 @@ paths:
                     `NO_ACCOUNT`; malformed email → 400 `INVALID_EMAIL`; (should-never-happen) more than
                     one match → 409 `AMBIGUOUS`. The value only SELECTS which account this request targets
                     — it is not an authentication factor (the human still approves the device code).
+                    The email form is counted per network address: past `auth.device_authorize_email_max`
+                    requests in 10 minutes (default 20) it answers 429 `RATE_LIMITED` with Retry-After;
+                    the operator turns the count off with `auth.device_authorize_email_limit`. The handle
+                    form is not counted.
                 agent_name:
                   type: string
                   description: Agent name (3-32 chars, lowercase alphanumeric + hyphens)
@@ -12989,6 +13012,11 @@ paths:
                             type: string
                           owner:
                             type: string
+                            description: >
+                              The account the request names. Present only when the caller is that
+                              account, signed in in person; an anonymous caller and any other account
+                              get no owner. The consent page checks the owner through the owner's own
+                              GET /v1/agents/device-authorize/pending.
                           status:
                             type: string
                             enum: [pending, approved, denied, expired]
@@ -14056,7 +14084,13 @@ paths:
       summary: Rotate agent keys
       description: |
         Generate a new Ed25519 keypair for the agent. The old public key is
-        replaced and all previously issued JWTs are invalidated.
+        replaced and every credential issued to the agent before the rotation stops:
+        its session tokens, its connect tunnel, its open MCP sessions, and its MCP OAuth
+        grant. The MCP OAuth access tokens are refused from now on (the agent's
+        credentials-valid-after time), and its MCP OAuth refresh tokens are deleted, so each
+        AI connected as this agent (Claude, ChatGPT, Claude Code and others) asks the owner to
+        approve the connection once more the next time it connects. The answer says so in
+        `note`, with `mcp_reconsent: true` and the number of ended refresh tokens.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -14089,6 +14123,15 @@ paths:
                             description: New Ed25519 private key (hex). Store securely.
                           public_key:
                             type: string
+                          mcp_reconsent:
+                            type: boolean
+                            description: Always true. Each AI connected as this agent over MCP asks the owner to approve it once more.
+                          mcp_refresh_tokens_ended:
+                            type: integer
+                            description: How many MCP OAuth refresh tokens of the agent were deleted.
+                          note:
+                            type: string
+                            description: What happened and what the owner sees next, in plain words.
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -14526,7 +14569,9 @@ paths:
       description: >-
         The allow page (/v1/allow?agent=&need=) reads this. For each permission in `need`: whether the
         agent holds it already (`held`) and whether one press may give it (`one_press`: "Full access"
-        carries it and the node does not call it powerful). A permission that is not one press is
+        carries it and the node does not call it powerful), and when the person said no to it on an
+        open refusal (`declined_at`, null otherwise), so the page shows that answer instead of the
+        buttons. A permission that is not one press is
         given on the agent's own page, `agent_page`. The owner in person only: anything acting in
         their name is refused with 403. An agent that lacks a permission is handed this page's address
         in its SCOPE_DENIED answer (`details.allow_url` on REST, the text on MCP).
@@ -19368,6 +19413,15 @@ paths:
         agent's own key (`/v1/agents/{name}/ai-keys`), the owner's own key, the server's key. The
         agent's daily cap, when the owner set one, refuses with 402 `AGENT_QUOTA_EXHAUSTED`. The
         same holds for `/v1/llm/chat/completions` and `POST /v1/ai/jobs`.
+
+
+        THE SERVER'S KEY. A call on the server's key gets an answer of at most
+        `ai.node_key_max_output_tokens` tokens (default 32000; 0 is no limit), also when `max_tokens`
+        asks for more or is absent, and `data.truncated` says when the answer was cut. Before it runs,
+        the call is priced from the prompt's size and that length with the model catalogue and held
+        against what is left of the allowance (or the daily limits) while it runs; a call that would
+        cost more answers 402 `QUOTA_EXHAUSTED` with the price, except that a text call that named no
+        model gets the free model. A call on the owner's or an agent's own key is not affected.
 
 
         MODEL POLICY. The owner may limit which models their calls use (`GET/PUT /v1/ai/policy`), and
@@ -29983,7 +30037,7 @@ paths:
     get:
       operationId: lookupDocsignByHash
       summary: Who signed this document on this node (public)
-      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with. Each signature carries `test`, true for a wallet signature whose certificate comes from an EU reference-wallet test CA (a test with no legal effect).
+      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with. Each signature carries `test`, true for a wallet signature whose certificate comes from an EU reference-wallet test CA (a test with no legal effect), and `caveats`, what the node could not establish when it sealed the signature, as sealed in its statement (`code` and `text`; empty when nothing). REVOCATION_UNKNOWN says that whether the wallet's signing certificate had been revoked could not be established; the signature was sealed anyway, because the person signed in their own wallet a moment before. NAME_NOT_VERIFIED says that the certificate's holder name was compared with the account's display name, because no identity verification has recorded a name for the account; with a verified name the node compares with that name and refuses a certificate that names someone else (422 NAME_MISMATCH). A wallet signature also carries `certificate` (`subject`, `issuer`), the certificate the node matched with the signer, as sealed; null for other methods and for seals made before 2026-10-25.
       tags: [Document signing]
       security: []
       parameters:
@@ -31088,6 +31142,14 @@ paths:
             x402 settlement, which cannot be reversed, or a refund the payment service refused). A
             payment taken and not returned names the checkout reference, is stored for the seller as
             `commerce.undelivered.{session id}`, and is told to the operator.
+
+            X402_SETTLE_UNKNOWN. The x402 facilitator did not answer the settlement (a timeout, a
+            network failure or a server error), so whether the stablecoin moved is not known. The
+            pacing went back and the session is open again. The message tells the buyer not to pay
+            again yet and names the checkout reference; the possible payment (payer address, proof
+            nonce, amount) is stored for the seller as `commerce.possible.{session id}`, the seller
+            is notified and the operator is told. Reconciling it with the facilitator is not done
+            here yet.
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
@@ -32400,6 +32462,19 @@ paths:
         /v1/admin/config/{path}) since the node started: `value` is still the removed value, which
         the node runs with until a restart, and `source` names where the value comes from after it.
 
+        A field carries `appliesAt: "restart"` when the code that uses it reads it once when the node
+        starts. PUT stores such a value and it takes effect at the next start; until then `value` is
+        the running value and the field carries `restartPending: true`.
+
+        Every AIMEAT_* setting the node reads has a field here (the check `check:config-coverage`
+        holds that). A secret shows only whether it is set, as `<path>_configured`; when the operator
+        may set it, the entry carries `set_path`, the path PUT takes for it. The value is never sent
+        back, by GET or by PUT.
+
+        The list is over four hundred fields. `section` narrows it to the fields whose path starts
+        with that first part (`ai`, `auth`, `packages`), `q` to the fields whose path or description
+        contains the text. The MCP tool aimeat_admin_config answers the same list.
+
         SEALED FIELDS. On a node one party runs on behalf of another, the party that STARTED the
         node may nominate paths as read-only (`AIMEAT_SEALED_CONFIG_KEYS`). Such a field carries
         `sealed: true`, `mutable: false`, `editable: false` and `source: "sealed"`, and its VALUE is
@@ -32410,6 +32485,17 @@ paths:
       tags: [Admin]
       security:
         - BearerAuth: []
+      parameters:
+        - name: section
+          in: query
+          required: false
+          description: Only the fields whose dot-path starts with this section, such as ai, auth, packages.
+          schema: { type: string }
+        - name: q
+          in: query
+          required: false
+          description: Only the fields whose dot-path or description contains this text.
+          schema: { type: string }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -32423,7 +32509,11 @@ paths:
         tune the node via this endpoint.
 
         Each change is checked, stored in the node's database and then applied to the running node;
-        it takes effect on the next request, the rate limits included. The request is NOT atomic
+        it takes effect on the next request, the rate limits and the log level included. A field
+        GET marks `appliesAt: "restart"` is stored and takes effect at the next start: its entry in
+        `applied` carries `applies: "restart"`, and `note` names it. A secret is set on the
+        `set_path` GET names, and is answered as `{ configured }`. The MCP tool
+        aimeat_admin_config_set calls the same function. The request is NOT atomic
         across changes: a change that passes is applied even when another one in the same request is
         refused. The answer carries `applied` (path, old_value, new_value; a secret as
         `{ configured }`) and `errors` (path and reason) for the refused ones. When nothing passed
@@ -40034,6 +40124,54 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/ghii/me/secret-host-ask:
+    get:
+      operationId: getSecretHostAsk
+      tags: [Identity]
+      summary: Whether the owner is asked before a secret goes to a new address for the first time
+      description: |
+        The account's "Ask me before my secret is sent to a new address for the first time". While it
+        is on, the first send of a vault secret that has no address yet, to an address chosen by code
+        one of the owner's agents wrote or by a host field such an agent set, asks the owner first with
+        one press (an agent holding secrets:manage is not asked about); while it is off, it is sent and
+        the address is kept. `setting` is `{ on, defaulted, node_default, set_by, set_at }`: `defaulted`
+        is true while the owner never chose and the node's default (security.secret_host_ask_default,
+        on) applies. Any principal of the account holding memory:read. MCP: aimeat_secret_host_ask.
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: setSecretHostAsk
+      tags: [Identity]
+      summary: Switch the question before a secret goes to a new address on or off
+      description: |
+        `{ on: true }` switches it on at once, for any principal of the account holding memory:write.
+        `{ on: false }` switches it off at once for the owner in person or a principal holding
+        secrets:manage; anyone else gets 202 with `approval_request` (awaiting_owner, the approve_url),
+        the owner is asked with Allow and Don't allow, it stays on until the owner allows it, and the
+        one who asked hears the answer either way. MCP: aimeat_secret_host_ask.
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [on]
+              properties:
+                on: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '202':
+          description: Switching it off waits for the owner (`data.approval_request`); `data.setting` is what is in force now.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/ghii/me/adult:
     get:
       x-aimeat-scope: { word: 'memory:read' }
@@ -45999,6 +46137,39 @@ paths:
         '403': { description: Not an owner session }
         '503': { description: "SETTINGS_UNAVAILABLE: the owner's settings could not be read, so the decision per sender cannot be shown truthfully." }
 
+  /v1/notifications/{id}/answered:
+    post:
+      operationId: markNotificationAnswered
+      summary: A notification's button ran and answered; the notice shows the answer and no buttons
+      description: |
+        The bell and the Notifications page call this after an `api` button's own call answered, so the
+        notification keeps `answered: { outcome, by, at, change? }` (outcome allowed, declined, done, or
+        answered when the call said the question was decided before, with `already: true`) and its
+        `actions` are emptied, for every kind of notification. A question decided anywhere else (an
+        allow page, an agent, the Access page) marks its notices the same way on the server. GET
+        /v1/notifications answers `answered.by_you`. Only a button the notification carries may be
+        named, on the caller's own account. Requires memory:write.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action: { type: string, description: "The id of the button that ran, e.g. allow or deny." }
+                already: { type: boolean, description: "The button's call answered that the question was decided before." }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/notifications/read:
     post:
       operationId: markNotificationsRead
@@ -50091,10 +50262,13 @@ paths:
         caller other than the account holder in person or a principal holding secrets:manage is
         reached by ctx.fetch but does not count as a host the extension declares for a vault secret:
         the first use of an unbound secret toward it asks the owner on the allow page. A refused value changes nothing
-        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. A key the node
-        owns (`emailPolicy`) is set only by the operator in person or the operator's agent holding
-        operator:admin; anyone else is refused 403 OPERATOR_REQUIRED and nothing is changed. MCP:
-        aimeat_extension_config_set.
+        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. `emailPolicy:
+        "unrestricted"` (the extension may email any address) is the operator's grant: the operator in
+        person and the operator's agent holding operator:admin set it at once; anyone else asks, the
+        grant waits for an operator's Allow (the operators get the question with Allow and Don't allow),
+        and the answer carries `approval_request` (status awaiting_operator), 202 when nothing else in
+        the body changed. The asker hears the answer either way. Any other emailPolicy value narrows
+        and is set at once. MCP: aimeat_extension_config_set.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50116,14 +50290,22 @@ paths:
       responses:
         '200':
           description: >-
-            `data` is `{ name, changed: [field], config (secrets masked), network_hosts? }`.
+            `data` is `{ name, changed: [field], config (secrets masked), network_hosts?, approval_request?, warnings? }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '202':
+          description: >-
+            The only change asked, emailPolicy "unrestricted", waits for an operator: `data.approval_request`
+            names the request (GET /v1/publish-requests/{id} reads its state).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: 'OPERATOR_REQUIRED: the body sets emailPolicy and the caller is not an operator caller.' }
+        '403': { description: 'SCOPE_DENIED: the caller does not hold ext:write.' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/extensions/{name}/unattended-reader:
@@ -50247,6 +50429,13 @@ paths:
         client address. A public action takes no price and no toll. Any other unsigned call answers
         401, whether or not the extension or the action exists.
 
+        Run slots: a run takes a slot of the node's pool of request-driven runs, within one account's
+        share (an owner's agents and apps share it; a visitor counts per client address). The pool
+        and the share are the operator settings `extensions.run_slots` (64) and
+        `extensions.run_slots_per_account` (16), 0 being no limit. When either is full the call is
+        answered at once with 503 `EXTENSION_RUNS_BUSY` and a `Retry-After` header, before anything is
+        charged; the message names the setting. Retry after that many seconds.
+
         Pacing and price (per action, optional; declared in the manifest): the extension owner always
         calls free. A non-owner owes (a) the pacing amount `tollMorsels` (else the node default),
         taken from the caller's owner: the burn rate's share burns and the rest goes to the extension
@@ -50326,7 +50515,14 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
-          description: Extension not active
+          description: >-
+            Extension not active (EXTENSION_INACTIVE), or the run slots are full
+            (EXTENSION_RUNS_BUSY, with Retry-After).
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying, sent with EXTENSION_RUNS_BUSY.
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -50346,7 +50542,7 @@ paths:
       operationId: executeExtensionInstanceAction
       summary: Execute extension action on specific instance
       description: |
-        Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}.
+        Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}. The run slots apply as there (503 EXTENSION_RUNS_BUSY with Retry-After).
 
         The same three segments are the literal form of `<owner>/<name>/<action>`, which the SDK's
         `AIMEAT.data.action('<owner>/<name>', id)` sends. They are read in this order: an extension the
@@ -50384,6 +50580,17 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          description: The instance or extension is not active, or the run slots are full (EXTENSION_RUNS_BUSY, with Retry-After).
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying, sent with EXTENSION_RUNS_BUSY.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/extensions/{name}/actions/{actionId}:
     get:
@@ -50417,7 +50624,13 @@ paths:
         `version`, or leave it out and the node takes the next version not kept yet (1.1.0 becomes
         1.1.1). The answer carries `version` and `previous_version`, and the new version is kept.
         The same script again answers with the current version and `unchanged: true`. Only the
-        installing owner, an agent of theirs holding ext:write, or an operator may patch.
+        installing owner, an agent of theirs holding ext:write, or an operator may patch. The record
+        names who wrote the new code. When the extension held the operator's grant to email any
+        address (emailPolicy "unrestricted") and the caller is not an operator caller, the grant is
+        held back from the new code and the operators are asked to confirm it: the answer carries
+        `approval_request` (awaiting_operator), and until an operator allows it the extension emails
+        only the addresses the normal rules allow. POST and PUT /v1/extensions answer the same
+        `approval_request` when such a caller's manifest asks for the grant.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50468,6 +50681,8 @@ paths:
         `instances.config_per_instance`) are encrypted at rest with AES-256-GCM (the node master
         key) and are NEVER returned in plaintext — read responses show a mask sentinel. The
         decrypted value is provided only to the extension's sandboxed action code at run time.
+        Past the operator setting `extensions.max_instances` (0, no limit, by default) a new
+        instance is refused with 409 `LIMIT_EXCEEDED`, and the message names the setting.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50488,6 +50703,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
     get:
       x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0', orScope: 'ext:write' }
       operationId: listExtensionInstances
@@ -63021,6 +63238,13 @@ paths:
         variable (a name ending in `_API_KEY` that does not start with `AIMEAT_`, or `NVIDIA_KEY`),
         and every address in the provider must be public https; anything else is refused with
         `UNSAFE_CHOICE`, because the crew sends that variable's value to that address.
+
+        The owner and the owner's agents set any choice at once. An app grant or an ecosystem app sets
+        a `node` or `profile` choice, a `model` choice that names no address of its own, or a clear at
+        once too; a `model` choice that names its own address (base_url, api_base, endpoint or url)
+        waits for the owner's one-press approval, because the crew sends the owner's key there: 202
+        with `approval_request` (awaiting_owner, the approve_url), the crew keeps the model it has, the
+        owner's Allow writes exactly that choice, and the app's account hears the answer either way.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -63042,6 +63266,11 @@ paths:
                   nullable: true
                   description: The choice, or null to clear it and fall back to the owner's default.
       responses:
+        '202':
+          description: An app named a model's own address; it waits for the owner (`data.approval_request`), and nothing changed yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '200':
           description: Stored, or cleared
           content:
@@ -63071,7 +63300,8 @@ paths:
         this too, because a crew that states its need is stating it about itself.
 
         `{"choice": null}` clears it, and routing falls back to the `llm_providers.json` on whatever
-        machine runs the agent.
+        machine runs the agent. A `model` choice with its own address set by an app waits for the
+        owner's approval, as on the per-agent route (202 `approval_request`). Requires memory:write.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -63086,6 +63316,12 @@ paths:
                   type: object
                   nullable: true
       responses:
+        '202':
+          description: An app named a model's own address; it waits for the owner (`data.approval_request`), and nothing changed yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { description: 'SCOPE_DENIED: the caller does not hold memory:write.' }
         '200':
           description: Stored, or cleared
           content:
@@ -69148,6 +69384,19 @@ paths:
         it without one. No content changes either way: content already shown more widely keeps its
         level (the exposure report lists it). The incident closes with its last decision; resolving
         it before that answers 409.
+
+        An incident that names records to act on lists them as `entries` (`id`, `kind`, `where`,
+        `what`, `action`, `status`, and once decided `decidedAt`, `decidedBy`, `done`). The start step
+        of type `anonymous_principal_records` names what the shared anonymous agent wrote before its
+        token was refused there. The start step of type `erasure_leftover_schedules` names the
+        schedules that account erasures before 2026-10-25 left: a schedule whose `ownerScope` names an
+        account no one holds now, or an account registered after the schedule was made; the entry id
+        is the schedule id. With `{ name: <entry id>, resolution }` this endpoint decides one
+        entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
+        none) or `delete` (the skill or the data package is deleted with its files, the schedule is
+        removed from the scheduler and from storage), or `keep`
+        (nothing changes). Deciding an entry again answers 409. The incident resolves itself with its
+        last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
         - BearerAuth: []
@@ -69163,8 +69412,8 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, description: 'An account name from the incident''s `names`, or a classification id from the incident''s `caps`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one).' }
+                name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear or delete, or keep.' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -69182,7 +69431,8 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete], description: With a name. }
+                          entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object
                             description: With a name. What the decision did; a counter that does not apply stays 0.
@@ -69905,7 +70155,11 @@ paths:
         Registers a personal node against this operator node. Owner session; requires the
         `tunnel:connect` scope. The `owner_name` in the body must match the authenticated owner.
         Returns 503 when personal-node support is disabled, 409 if the node id is already anchored,
-        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. Work sent to an
+        and 503 (`CAPACITY_FULL`) when the operator's slot limit is reached. One owner anchors at
+        most `personal_nodes.max_per_owner` nodes (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3,
+        0 = no limit); the next one is refused with 409 `PERSONAL_NODE_LIMIT`, whose `details`
+        carry the `limit`, the owner's node ids and the call that frees a slot
+        (DELETE /v1/personal/anchor/{nodeId}). Work sent to an
         identity in `agent_gaiis` is queued for this node, so each entry must be the owner's own
         agent on it, `name#<owner_name>` or `name#<owner_name>@<node_id>`; any other entry is
         refused with 400 `AGENT_GAII_NOT_YOURS`.
@@ -72776,7 +73030,7 @@ paths:
       operationId: postAdminConsulImport
       tags: [Federation, Admin]
       summary: Pull config from Consul KV and apply
-      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported.
+      description: Operator-only (requireRole('operator')). Loads all Consul KV values, applies them to the runtime config, and persists to the database when supported. A setting GET /v1/admin/config marks `appliesAt "restart"` is stored and takes effect at the next start; the answer names those in `at_restart`, and the running value stays until then.
       security:
         - BearerAuth: []
       responses:
@@ -77279,6 +77533,11 @@ paths:
         `target` and `change`. `waiting` is how many still wait. The owner and the owner's agents see
         every request of the account; an app grant sees the requests it filed. A request is decidable
         for seven days. Requires memory:write. The MCP tool aimeat_publish_requests returns the same.
+        The same list holds the account's other one-press approvals, the requests that make nothing
+        public (an extension's emailPolicy grant, a crew model choice with its own address set by an
+        app, switching off the question before a secret goes to a new address). Such a request has
+        `waiting_for` (owner or operators), `asks` and `why` in plain words; while it waits for the
+        node's operators its `state` is awaiting_operator.
       security: [{ BearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
@@ -77289,10 +77548,11 @@ paths:
       operationId: readPublishRequest
       tags: [Memory]
       summary: One request to make something public
-      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write.'
+      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`.'
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads. Omit for your own.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -77319,6 +77579,13 @@ paths:
         still waiting, checked as its own request; declining it, or its ending expired or outdated,
         settles its parts the same way. A part decided on its own decides only itself. A part has no
         list item or notification of its own: the request's own name it.
+        A request that makes nothing public (`waiting_for`, `asks`, `why`) runs its change on approval
+        and nothing on decline. When it waits for the owner, the owner in person answers it, and an
+        agent of the owner that did not ask approves it only while holding the word the request names
+        (403 SCOPE_DENIED). When it waits for the operators, only an operator caller answers it (403
+        OPERATOR_DECIDES), naming the account in `account` when it is another account's. The one who
+        asked hears the answer either way: an agent as a message with the request id, a person and an
+        app's account in the bell.
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
@@ -77331,6 +77598,7 @@ paths:
               required: [decision]
               properties:
                 decision: { type: string, enum: [approve, decline] }
+                account: { type: string, description: "The account (name or GHII) whose question an operator answers. Omit for your own." }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -77923,7 +78191,7 @@ paths:
       operationId: setCompanySmtp
       tags: [Companies]
       summary: Store the company's own sending identity
-      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one."
+      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one. A host at an address outside the public internet (loopback, private, link-local or reserved) is refused with 400 SMTP_HOST_NOT_ALLOWED unless the operator lists the host, the address or its network in email.company_smtp_private_hosts (AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS); loopback is allowed on a node in local mode. A host name that does not resolve is accepted, and the same check runs again before each send, which connects to the checked address. A failed send reports the failure in fixed words by its code, never with the mail server's own reply text."
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:

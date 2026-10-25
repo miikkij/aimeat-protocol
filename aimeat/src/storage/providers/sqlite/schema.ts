@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-25 — subdomain_sites.heldSince (migration 0118, secaudit2026oct22).
  *   2026-10-25 — subdomain_sites.origin (migration 0116, secaudit2026oct22).
  *   2026-10-18 — companies.frontPageAccess (migration 0106).
  *   2026-10-17 — direct_messages.sentByAgent and sentByAgentName (migration 0105).
@@ -709,6 +710,8 @@ export function initializeSchema(db: Database.Database): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_storage_files_ai_provenance ON storage_files(aiProvenanceId) WHERE aiProvenanceId IS NOT NULL;');
   // Who chose a subdomain label, 'operator' or 'publisher'; NULL until classified. Mirrors Postgres 0116.
   safeAddColumn('subdomain_sites', 'origin', 'TEXT');
+  // When the app a label served went away, so the label is held (ISO text); NULL otherwise. Mirrors Postgres 0117.
+  safeAddColumn('subdomain_sites', 'heldSince', 'TEXT');
   // The AI-provenance record of delivered work and a settled v2 task. Mirrors Postgres 0098.
   safeAddColumn('work', 'aiProvenanceId', 'TEXT');
   safeAddColumn('agent_v2_tasks', 'aiProvenanceId', 'TEXT');

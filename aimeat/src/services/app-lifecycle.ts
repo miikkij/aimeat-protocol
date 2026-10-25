@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.10.2 — 2026-10-25 — deleteOwnedApp marks the app's own address held (held-app-labels.ts;
+ *     secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.10.1 — 2026-10-25 — A fork into another account's catalogue leaves out the source owner's
  *     named reviewer, its log, the legal pages and the data-map gap (secaudit2026oct22).
  *   v1.10.0 — 2026-10-23 — Deleting every version of an app deletes its compliance documents (plan
@@ -124,6 +126,7 @@ import { publishExposure } from './app-publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 import type { PublishAsk } from './publish-requests/ask.js';
 import { removeComplianceDocs } from './compliance-docs.js';
+import { holdAppLabels } from './held-app-labels.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
 /**
@@ -688,6 +691,10 @@ export async function deleteOwnedApp(
     // The whole app went, so its compliance documents go (plan doc-mvlftkh9zmc9).
     await removeComplianceDocs(storage, ownerGhii.slice(ownerGhii.indexOf('@') + 1), { kind: 'app', ownerName, app: filename })
       .catch(err => logger.warn('deleteOwnedApp: compliance documents not removed', { filename, error: String(err) }));
+    // Its own address stays as a held name for this owner, and the hold's clock starts now
+    // (services/held-app-labels.ts; secaudit2026oct22). The daily sweep starts it if this fails.
+    await holdAppLabels(storage, ownerName, filename)
+      .catch(err => logger.warn('deleteOwnedApp: address not marked held', { filename, error: String(err) }));
   } else {
     // Single-version case: try the buckets in order, delete from the one that has it.
     let app = await storage.getApp(ownerGhii, filename, version);

@@ -16,6 +16,7 @@
  *   2026-10-25 — secaudit2026oct22: POST /v1/mcp/register is parsed at 64 kB, not at the large /v1/mcp limit.
  *   2026-10-25 — secaudit2026oct22: optionalAuth counts refused credentials per address at the global
  *     rate (refusedLimiter), so a stream of forged or dead tokens is answered 429 past that rate.
+ *   2026-10-25 — The proxy trust comes from config.trustProxy (security.trust_proxy on the admin Config tab), not process.env.
  *   2026-10-25 — contentAccessGate takes the lazy storage getter the CORS middleware takes: the origin of an app opened to the internet is one keyed read.
  *   2026-10-18 — POST /v1/ai/image is parsed at the large JSON limit: it carries reference pictures.
  *   2026-10-17 — contentAccessGate after appOriginSignIn: a node set to signed-in content access
@@ -152,8 +153,10 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // server listens after createServer returns, so a request arrives as no node until this line.
   app.use((_req, _res, next) => runAsNode(config.nodeId, () => next()));
 
-  // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies
-  const trustProxy = process.env.AIMEAT_TRUST_PROXY;
+  // SECURITY: Trust proxy configuration for correct IP detection behind reverse proxies. From the
+  // config (security.trust_proxy), which shows it on the admin Config tab; it is a fact about the
+  // deployment, so it is set in the environment and read at start.
+  const trustProxy = config.trustProxy;
   if (trustProxy === 'true') {
     // SECURITY: `true` trusts the X-Forwarded-For header from ANY upstream, so a
     // direct client can spoof its source IP and defeat per-IP rate limiting. Only

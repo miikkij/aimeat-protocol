@@ -7,7 +7,7 @@
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
  *   v1.15.0 — 2026-10-25 — released_component_names: a bare extension or cortex name released by
- *     uninstall, and its holder (owner namespaces wish, secaudit2026oct22). Mirrors Postgres 0118.
+ *     uninstall, and its holder (owner namespaces wish, secaudit2026oct22). Mirrors Postgres 0119.
  *   v1.14.0 — 2026-10-22 — Ends with applyWorkspaceRowRevisionSchema: workspace_rows.updatedBy and
  *     workspace_row_revisions (secaudit 2026-10, v80). Mirrors Postgres 0113.
  *   v1.13.0 — 2026-10-09 — secrets.hostBinding: who bound a vault secret to its host. Mirrors Postgres 0099.
@@ -604,7 +604,7 @@ export function applySchemaTables4(db: Database.Database): void {
     );
 
     -- A bare extension or cortex name released by uninstall, and the account that held it
-    -- (services/component-address.ts). Mirrors Postgres 0118.
+    -- (services/component-address.ts). Mirrors Postgres 0119.
     CREATE TABLE IF NOT EXISTS released_component_names (
       kind       TEXT NOT NULL,
       name       TEXT NOT NULL,

@@ -22,14 +22,18 @@
  *   name, and whether mail is available. ctx.buy takes no credential of the caller: the seller's
  *   action runs through this same sequence for the buying extension's own GEAI. The paywall function itself is passed in, so this service does not import the route
  *   module that holds it (dependency-cruiser services-do-not-import-routes).
- * @structure invokeExtensionAction · ExtensionInvokeCaller · ExtensionInvokeOutcome
+ * @structure invokeExtensionAction · ExtensionInvokeArgs · ExtensionInvokeCaller · ExtensionInvokeOutcome
  * @usage
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
- *   v1.4.0 -- 2026-10-25 -- extRef may be `<owner>/<name>`; a bare name is the bare record, else the
+ *   v1.4.1 -- 2026-10-25 -- extRef may be `<owner>/<name>`; a bare name is the bare record, else the
  *     caller's own extension of that name (services/component-address.ts; owner namespaces wish,
  *     secaudit2026oct22).
+ *   v1.4.0 -- 2026-10-25 -- Every run takes a slot of the node's pool of request-driven runs within the
+ *     account's share (services/extension-run-slots.ts; extensions.run_slots, run_slots_per_account);
+ *     a full one answers 503 EXTENSION_RUNS_BUSY with retryAfterSec. ctx.buy's seller run is admitted
+ *     inside its buyer's slot (secaudit2026oct22, lead 817).
  *   v1.3.0 -- 2026-10-24 -- ctx.buy no longer receives the caller's bearer; the `bearer` argument is
  *     gone. The seller's action runs in-process for the buying extension's GEAI (services/
  *     extension-purchase.ts; secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
@@ -72,6 +76,7 @@ import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './
 import { resolveExtensionForCall } from './component-versions.js';
 import { readAdult, NOT_VERIFIED } from './adult-assurance.js';
 import { activeSubscriptions } from '../commerce/subscriptions.js';
+import { takeExtensionRunSlot } from './extension-run-slots.js';
 
 /** Who runs the action. Built by the surface from its own session, once. */
 export interface ExtensionInvokeCaller {
@@ -95,7 +100,9 @@ export type ExtensionInvokeOutcome =
   | { kind: 'ok'; result: unknown; extName: string }
   /** Refused or failed before or during the run. `keepMessage`: the text is the extension author's
    *  answer and passes the 500 text filter (middleware/internal-error-text.ts). */
-  | { kind: 'refused'; status: number; code: string; message: string; keepMessage?: boolean }
+  | { kind: 'refused'; status: number; code: string; message: string; keepMessage?: boolean;
+      /** A retryable refusal (the run slots are full): the seconds a Retry-After carries. */
+      retryAfterSec?: number }
   /** The paywall refused and has written its answer into the surface's responder. */
   | { kind: 'paywall' };
 
@@ -115,11 +122,8 @@ function producerKindOf(kind: CallerKind): 'app' | 'agent' | 'manual' {
   return 'manual';
 }
 
-/**
- * Run one extension action as `caller`. Never throws for a refusal or a script failure; an error the
- * sequence did not expect (a storage failure) propagates to the surface's own error handler.
- */
-export async function invokeExtensionAction(args: {
+/** What a surface hands invokeExtensionAction. */
+export interface ExtensionInvokeArgs {
   config: AimeatConfig;
   storage: Storage;
   /** routes/extensions/paywall.ts enforcePaywall, passed in by the surface. */
@@ -138,7 +142,35 @@ export async function invokeExtensionAction(args: {
   correlationId?: string | null;
   /** The mail service; without one ctx.email answers false and logs why. */
   emailService?: EmailService;
-}): Promise<ExtensionInvokeOutcome> {
+  /**
+   * Whose share of the node's run slots this run takes (services/extension-run-slots.ts): the
+   * caller's account by default, `visitor:<address>` for a visitor. 'inherited' for a run started
+   * inside another run (ctx.buy's seller action), which runs within the slot its buyer holds.
+   */
+  admission?: { account: string } | 'inherited';
+}
+
+/**
+ * Run one extension action as `caller`. Never throws for a refusal or a script failure; an error the
+ * sequence did not expect (a storage failure) propagates to the surface's own error handler.
+ *
+ * The run takes a slot of the node's pool of request-driven runs first, within the account's share
+ * (extensions.run_slots, extensions.run_slots_per_account). A full pool or share answers 503
+ * EXTENSION_RUNS_BUSY with `retryAfterSec`, before anything else is read or charged (lead 817).
+ */
+export async function invokeExtensionAction(args: ExtensionInvokeArgs): Promise<ExtensionInvokeOutcome> {
+  if (args.admission === 'inherited') return invokeAdmitted(args);
+  const account = args.admission?.account ?? ownerGhiiOf(args.caller.gaii);
+  const slot = takeExtensionRunSlot(args.config, account);
+  if (!slot.ok) return { kind: 'refused', status: 503, code: slot.code, message: slot.message, retryAfterSec: slot.retryAfterSec };
+  try {
+    return await invokeAdmitted(args);
+  } finally {
+    slot.release();
+  }
+}
+
+async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvokeOutcome> {
   const { config, storage, caller, instanceId, actionId } = args;
   // A bare name is the bare record, else the caller's own extension of that name (services/component-address.ts).
   const resolved = await resolveExtensionForCall(storage, args.extRef, caller.kind === 'anonymous' ? null : caller.owner);
@@ -294,6 +326,8 @@ export async function invokeExtensionAction(args: {
             config, storage, enforcePaywall: args.enforcePaywall, emailService: args.emailService,
             extRef: run.extRef, actionId: run.actionId, method: 'POST', input: run.input,
             caller: run.caller, paywall: { res: run.res, internalPass: run.internalPass },
+            // Runs inside this run's slot: taking a second one could refuse a purchase mid-run.
+            admission: 'inherited',
           }),
           correlationId: args.correlationId ?? null,
         });

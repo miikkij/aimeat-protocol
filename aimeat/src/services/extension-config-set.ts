@@ -22,6 +22,10 @@
  *   const out = await setExtensionConfig({ storage, config }, ext, { WAZUH_HOST: 'wazuh.example.com' });
  *   if (!out.ok) return refuse(out.status, out.code, out.message);
  * @version-history
+ *   2026-10-25 — emailPolicy 'unrestricted' from a caller that is not an operator caller is asked of
+ *     the operators (services/extension-email-policy-ask.ts) instead of 403 OPERATOR_REQUIRED; the
+ *     rest of the change is written, and a narrowing is set at once (secaudit2026oct22, the developer's
+ *     ruling of 2026-10-25 on leads 294 and 354).
  *   2026-10-25 — A host field value set by a caller that may not choose a secret's host (not the
  *     account holder in person, no secrets:manage) is marked unvetted (secaudit2026oct22).
  *   2026-10-25 — A node-owned key (emailPolicy) is set only by an operator caller; others get 403
@@ -36,11 +40,20 @@ import { getEncryptionKey } from './encryption.js';
 import { hostFieldsOf, parseHostFieldValue, unvettedHostFields, HOST_FIELDS_UNVETTED_KEY } from './extension-network-hosts.js';
 import { emitChange } from './event-bus.js';
 import { NODE_OWNED_CONFIG_KEYS } from './extension-manifest.js';
+import {
+    askOperatorsForEmailPolicy, grantsUnrestrictedEmail, EMAIL_POLICY_KEY, UNRESTRICTED_EMAIL, type EmailPolicyAsk,
+} from './extension-email-policy-ask.js';
+import type { PublishRequester } from './publish-requests/store.js';
 import { isOwnerInPerson } from '../utils/gaii.js';
 import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js';
 
 export type ConfigSetOutcome =
-    | { ok: true; record: ExtensionRecord; changed: string[] }
+    | {
+        ok: true; record: ExtensionRecord; changed: string[];
+        /** The emailPolicy grant asked of the operators, pending (services/extension-email-policy-ask.ts). */
+        approval_request?: Extract<EmailPolicyAsk, { approval_request: unknown }>['approval_request'];
+        warnings?: Extract<EmailPolicyAsk, { warnings: unknown }>['warnings'];
+    }
     | { ok: false; status: number; code: string; message: string };
 
 /** Config keys the node keeps beside the declared fields; never a caller's to set. */
@@ -65,6 +78,12 @@ export interface ConfigSetter {
      * declared for a secret's first use (secaudit2026oct22). Absent reads as false.
      */
     mayChooseSecretHosts?: boolean;
+    /**
+     * Who asks, when this caller's change waits for the operators: an emailPolicy grant from a
+     * caller that is not an operator caller (services/extension-email-policy-ask.ts). Absent: such a
+     * change is left out and named in a warning, never written.
+     */
+    asker?: PublishRequester;
 }
 
 /** The principal that may choose a vault secret's host, as decideFirstUse's ruling 6 reads it. */
@@ -87,16 +106,23 @@ export async function setExtensionConfig(
     if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length === 0) {
         return refuse(400, 'INVALID_INPUT', 'config must be a non-empty object of field: value, e.g. { "WAZUH_HOST": "wazuh.example.com" }.');
     }
-    const given = values as Record<string, unknown>;
-    // A key the node owns (emailPolicy) is the operator's grant. Managing the extension is not
-    // enough: an agent of the operator's account holding ext:write passes that check without
-    // operator:admin (secaudit2026oct22). The install paths strip it the same way (stripNodeOwnedConfig).
-    const nodeOwned = Object.keys(given).filter(k => NODE_OWNED_CONFIG_KEYS.includes(k));
-    if (nodeOwned.length && !who.isOperator) {
-        return refuse(403, 'OPERATOR_REQUIRED', `${nodeOwned.join(', ')} is set by the operator of this node. `
-            + 'Ask the operator to set it, or have them give the agent the operator:admin permission. Nothing was changed.');
+    const given = { ...(values as Record<string, unknown>) };
+    // emailPolicy 'unrestricted' is the operator's grant. Managing the extension is not enough: an
+    // agent of the operator's account holding ext:write passes that check without operator:admin
+    // (secaudit2026oct22). Such a caller ASKS: the grant waits for an operator's answer and nothing
+    // about the policy changes meanwhile (services/extension-email-policy-ask.ts; Jouni, 2026-10-25).
+    // Any other value narrows and is set at once; the grant already held asks nothing.
+    let asksGrant = false;
+    if (!who.isOperator && given[EMAIL_POLICY_KEY] === UNRESTRICTED_EMAIL) {
+        asksGrant = !grantsUnrestrictedEmail(ext.config);
+        delete given[EMAIL_POLICY_KEY];
     }
-    const declared = declaredConfigFields(ext);
+    if (Object.keys(given).length === 0) {
+        if (!asksGrant) return { ok: true, record: ext, changed: [] };
+        return { ok: true, record: ext, changed: [], ...await askGrant(deps, ext, who) };
+    }
+    // The node-owned keys count as declared, so the operator sets the grant on any extension.
+    const declared = [...new Set([...declaredConfigFields(ext), ...NODE_OWNED_CONFIG_KEYS])];
     const unknown = Object.keys(given).filter(k => RESERVED_KEY.test(k) || !declared.includes(k));
     if (unknown.length) {
         return refuse(400, 'INVALID_INPUT', `${ext.name} does not declare ${unknown.join(', ')}. `
@@ -140,5 +166,13 @@ export async function setExtensionConfig(
         return refuse(500, 'WRITE_NOT_APPLIED', `The config of "${ext.name}" was NOT changed: the storage write did not apply.`);
     }
     emitChange('extensions');
-    return { ok: true, record: updated, changed: Object.keys(next).sort() };
+    return { ok: true, record: updated, changed: Object.keys(next).sort(), ...(asksGrant ? await askGrant(deps, updated, who) : {}) };
+}
+
+/** File the operators' question about the grant, or say why none was filed. */
+async function askGrant(deps: { storage: Storage; config: AimeatConfig }, ext: ExtensionRecord, who: ConfigSetter): Promise<EmailPolicyAsk> {
+    if (!who.asker) {
+        return { warnings: [{ code: 'APPROVAL_NOT_ASKED', message: `${EMAIL_POLICY_KEY} was not changed: an operator of this node sets it.` }] };
+    }
+    return askOperatorsForEmailPolicy(deps, ext, who.asker, 'asked');
 }

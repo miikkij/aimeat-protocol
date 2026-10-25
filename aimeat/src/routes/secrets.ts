@@ -38,6 +38,7 @@
  *   - DELETE /v1/secrets/:name/approvals?extension=&installer=&host= — withdraw one
  * @usage app.use(secretsRouter(config, storage));
  * @version-history
+ *   2026-10-25 — Allow and Don't allow tell the one whose call asked (secaudit2026oct22, the approval standard).
  *   v1.2.0 — 2026-10-21 — PATCH sets the address without the value; the approvals routes answer a
  *     refused first use (services/secret-approvals.ts; secaudit 2026-10, v58 and v59 follow-up).
  *   v1.1.0 — 2026-10-09 — PUT takes an optional `host` (host or host:port): the secret goes only there
@@ -129,7 +130,7 @@ export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
     const ownerGhii = inPerson(req, res);
     if (!ownerGhii) return;
     const k = keyOf(req.body);
-    const r = await approveSecretUse(storage, ownerGhii, req.params.name as string, k.extension, k.host, resolveIdentity(req.auth!, config.nodeId));
+    const r = await approveSecretUse(storage, ownerGhii, req.params.name as string, k.extension, k.host, resolveIdentity(req.auth!, config.nodeId), config);
     if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
     res.json(success(config.nodeId, { approval: r.approval }));
   });
@@ -138,7 +139,8 @@ export function secretsRouter(config: AimeatConfig, storage: Storage): Router {
     const ownerGhii = inPerson(req, res);
     if (!ownerGhii) return;
     const k = keyOf(req.body);
-    const declined = await declineSecretUse(storage, ownerGhii, req.params.name as string, k.extension, k.host);
+    const declined = await declineSecretUse(storage, ownerGhii, req.params.name as string, k.extension, k.host,
+      { config, by: resolveIdentity(req.auth!, config.nodeId) });
     res.json(success(config.nodeId, { declined }));
   });
 

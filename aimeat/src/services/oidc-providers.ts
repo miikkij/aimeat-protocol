@@ -17,6 +17,12 @@
  *   entraTenantGate/mapGoogleClaims/mapCasdoorClaims/makeEntraMapper/makeEntraValidator — pure, exported for tests.
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-10-25 — Link domains per provider (secaudit2026oct22, oidc-email-verified-without-idp-proof):
+ *     a Casdoor or Entra address counts as verified only inside the provider's link domains
+ *     (auth.casdoor_link_domains, auth.entra_link_domains; `*` = every domain), read at each sign-in
+ *     through the descriptor's emailLinkFence. Empty: Casdoor trusts no domain; Entra trusts every
+ *     domain only behind a gate of exactly one tenant, and none behind an allowlist of several.
+ *     Casdoor and Entra read an `email_verified: false` (and Entra an `xms_edov: false`) as unverified.
  *   v1.1.0 — 2026-08-21 — Entra tenant ALLOWLIST (AIMEAT_ENTRA_ALLOWED_TENANTS): several approved
  *     organisations sign in, every other tenant and every personal account is refused. Needs a
  *     multi-tenant app registration (`AIMEAT_ENTRA_OAUTH_TENANT=organizations`), whose discovery
@@ -66,6 +72,12 @@ export interface OidcProvider {
   mapClaims(claims: Record<string, unknown>): MappedClaims | null;
   /** Optional pre-mapping gate. Returns an ERROR CODE string to reject, or null to allow. */
   validateClaims?(claims: Record<string, unknown>): string | null;
+  /**
+   * Optional domain fence on a verified address: false means the address is treated as unverified,
+   * so it neither links to an existing account nor becomes a new account's verified address.
+   * Absent = no fence (Google, whose `email_verified` is the mailbox proof).
+   */
+  emailLinkFence?(email: string): boolean;
 }
 
 /** Display metadata per provider (button label + its modal i18n key). */
@@ -118,15 +130,67 @@ export function mapGoogleClaims(claims: Record<string, unknown>): MappedClaims |
   return { sub, email, emailVerified, displayName };
 }
 
+/** True when the IdP sent the claim and it says false (boolean or the string 'false'). */
+function claimSaysFalse(v: unknown): boolean {
+  return v === false || v === 'false';
+}
+
 /**
- * Casdoor: it is the authority for its organisation's accounts, so a present email is treated as
- * verified (enabling safe link-by-verified-email). Display name from name → preferred_username.
+ * A link-domain setting: `*` trusts every domain, otherwise a comma-separated list of domains
+ * (lowercased). Returns null for an empty setting, so the caller applies its provider's default.
+ */
+export function parseLinkDomains(raw: string | undefined | null): '*' | string[] | null {
+  const list = (raw ?? '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (!list.length) return null;
+  return list.includes(EVERY_DOMAIN) ? EVERY_DOMAIN : list;
+}
+
+/** The link-domain value that trusts every domain. An address domain, not a permission word. */
+const EVERY_DOMAIN = '*';
+
+/** Whether an address's domain is inside a parsed link-domain list. */
+export function emailInLinkDomains(email: string, domains: '*' | string[]): boolean {
+  if (domains === '*') return true;
+  const at = email.lastIndexOf('@');
+  if (at < 0) return false;
+  return domains.includes(email.slice(at + 1).toLowerCase());
+}
+
+/**
+ * Casdoor's fence. Empty setting: no domain is trusted, so a Casdoor address never links to an
+ * existing account and a new account starts without a verified address. Casdoor lets an
+ * application allow sign-up and profile edits without an address code, so its assertion alone is
+ * not a proof of the mailbox (secaudit2026oct22, oidc-email-verified-without-idp-proof).
+ */
+export function makeCasdoorLinkFence(getSetting: () => string | undefined): (email: string) => boolean {
+  return (email) => {
+    const domains = parseLinkDomains(getSetting());
+    return domains ? emailInLinkDomains(email, domains) : false;
+  };
+}
+
+/**
+ * Entra's fence. Empty setting: behind a gate of exactly one tenant (the organisation's own
+ * directory) every domain is trusted, as before; behind an allowlist of several tenants no domain
+ * is trusted, because a partner tenant's admin sets its users' mail attribute; ungated, the mapper
+ * already marks nothing verified.
+ */
+export function makeEntraLinkFence(tenant: string, allowedTenants: string[], getSetting: () => string | undefined): (email: string) => boolean {
+  const gate = entraTenantGate(tenant, allowedTenants);
+  const emptyDefault: '*' | string[] = gate && gate.size === 1 ? '*' : [];
+  return (email) => emailInLinkDomains(email, parseLinkDomains(getSetting()) ?? emptyDefault);
+}
+
+/**
+ * Casdoor: the address is verified unless Casdoor sends `email_verified: false`; whether it may link
+ * or become a verified address is then the link-domain fence's call (makeCasdoorLinkFence).
+ * Display name from name → preferred_username.
  */
 export function mapCasdoorClaims(claims: Record<string, unknown>): MappedClaims | null {
   const sub = str(claims.sub);
   if (!sub) return null;
   const email = str(claims.email) ?? null;
-  const emailVerified = !!email;
+  const emailVerified = !!email && !claimSaysFalse(claims.email_verified);
   const displayName = str(claims.name) || str(claims.preferred_username) || email?.split('@')[0] || 'AIMEAT User';
   return { sub, email, emailVerified, displayName };
 }
@@ -134,7 +198,8 @@ export function mapCasdoorClaims(claims: Record<string, unknown>): MappedClaims 
 /**
  * Entra: email may arrive as `email`, `preferred_username`, or `upn`. The email is only treated as
  * verified (auto-linkable) when the sign-in passed a TENANT GATE — a pinned single tenant, or a
- * tenant on the allowlist. Ungated (`common`/`organizations`/`consumers` with no allowlist) we
+ * tenant on the allowlist — and no `email_verified`/`xms_edov` claim says false; the link-domain
+ * fence (makeEntraLinkFence) then decides by domain. Ungated (`common`/`organizations`/`consumers` with no allowlist) we
  * can't vouch for the address, so new users go through the username-choice step and are never
  * silently linked.
  */
@@ -144,7 +209,8 @@ export function makeEntraMapper(tenant: string, allowedTenants: string[] = []): 
     const sub = str(claims.sub);
     if (!sub) return null;
     const email = str(claims.email) || str(claims.preferred_username) || str(claims.upn) || null;
-    const emailVerified = gated && !!email && email.includes('@');
+    const emailVerified = gated && !!email && email.includes('@')
+      && !claimSaysFalse(claims.email_verified) && !claimSaysFalse(claims.xms_edov);
     const displayName = str(claims.name) || str(claims.preferred_username) || email?.split('@')[0] || 'AIMEAT User';
     return { sub, email, emailVerified, displayName };
   };
@@ -223,6 +289,7 @@ export function buildOidcProviders(config: AimeatConfig): OidcProvider[] {
     providers.push({
       id: 'casdoor', ...PROVIDER_META.casdoor, enabled, client, scopes: OIDC_SCOPES,
       nonceType: 'casdoor_login', mapClaims: mapCasdoorClaims,
+      emailLinkFence: makeCasdoorLinkFence(() => config.casdoorLinkDomains),
     });
   }
 
@@ -259,6 +326,7 @@ export function buildOidcProviders(config: AimeatConfig): OidcProvider[] {
       nonceType: 'entra_login',
       mapClaims: makeEntraMapper(tenant, allowedTenants),
       validateClaims: makeEntraValidator(tenant, allowedTenants),
+      emailLinkFence: makeEntraLinkFence(tenant, allowedTenants, () => config.entraLinkDomains),
     });
   }
 

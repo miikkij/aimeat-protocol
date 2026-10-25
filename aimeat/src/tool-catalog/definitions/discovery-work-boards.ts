@@ -6,8 +6,12 @@
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
  *   2026-10-25 — aimeat_discover says the shared scope needs organism:read (secaudit2026oct22).
+ *   2026-10-25 — aimeat_admin_config answers the whole Config list (section, q); aimeat_admin_config_set changes settings.
  *   2026-10-21 — aimeat_tools_find says that on MCP 2026-07-28 the list does not change and the found
  *     tools are called by name (one sentence added).
+ *   2026-10-25 -- aimeat_admin_incident_resolve decides an entry of an incident that names records to
+ *     act on: its action ("clear" or "delete") or "keep"; the schedules older erasures left are such
+ *     an incident too (secaudit2026oct22).
  *   2026-10-18 — aimeat_admin_incident_resolve decides an offered default audience cap too ("apply" /
  *     "keep", plan doc-mvdipuyqraas, L5.1).
  *   2026-10-18 — aimeat_storage_upload says that a public upload without publish:public answers with
@@ -372,13 +376,32 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_admin_config',
-        description: 'Operator-only. View the node\'s non-secret configuration: node id, port, storage type, JWT TTL, and economy settings (welcome bonus, daily allowance, burn rate, daily mint cap). On a node run by somebody else, also lists the settings that party set and this node cannot change, with their values. Returns an operator-role error for non-operators. Read-only — this tool does not change settings.',
+        description: 'Operator-only. Every node setting the admin Config page shows, the same list as GET /v1/admin/config: each one\'s value, type, range or choices, where the value comes from (default, env, file, consul, database or sealed), whether it can be changed here (`editable`), whether a saved value waits for the next start (`appliesAt: "restart"`, `restartPending`), and settings set by whoever runs this node (`sealed`). A secret shows only whether it is set (`<path>_configured`), and `set_path` when the operator may set it. The whole list is over four hundred settings: pass `section` (the first part of a path, such as ai, auth, packages) or `q` (text in a path or description) for the part you need. Change a setting with aimeat_admin_config_set. Returns an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Read Config', readOnlyHint: true },
         scope: 'operator:admin',
         surfaces: ['admin'],
-        input: {},
+        input: {
+            section: { type: 'string', description: 'Only settings whose path starts with this section, such as ai, auth, packages, security.' },
+            q: { type: 'string', description: 'Only settings whose path or description contains this text.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_config_set',
+        description: 'Operator-only. Change node settings, the same as saving on the admin Config page (PUT /v1/admin/config): each change is checked against the setting\'s type and range, stored in this node\'s database and applied. A setting with appliesAt "restart" is stored and takes effect when the node next starts. A secret is set on its set_path and is never answered back. A request that names a setting sealed by whoever runs this node, or that turns the classification switch off or from all to owner, is refused whole and changes nothing. Read the paths and current values with aimeat_admin_config first.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        // Not destructive: every change can be set back, and a saved value can be removed on the Config page.
+        annotations: { title: 'Admin: Change Config', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'operator:admin',
+        surfaces: ['admin'],
+        input: {
+            changes: { type: 'array', required: true, description: 'The settings to change: [{ path, value }], path as aimeat_admin_config names it (a secret by its set_path), value of the setting\'s type.', zod: z.array(z.object({
+                path: z.string().min(1).describe('The setting\'s path, such as packages.max_size_mb.'),
+                value: z.unknown().describe('The new value, of the setting\'s type: number, true or false, text, or a list.'),
+            })).min(1) },
+        },
     },
     {
         name: 'aimeat_admin_sso_list',
@@ -526,7 +549,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_admin_incident_resolve',
-        description: 'Operator-only. Mark a security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. The incident the move to the full identity and the settling of what deleted accounts installed and were issued open at start (type held_account_names) lists account names whose rows are older than the account that holds the name now, left as they were (actions, work, ledger lines, cortexes, ecosystem apps, app grants, access tokens; such an app can still act for that account until the name is decided, and the tokens of such an app grant or access token are refused whatever the decision): decide each with `name` and `resolution` — "holder" moves its rows, its own ledger lines and the hook bindings to its actions to that account\'s full identity, and keeps its cortexes, ecosystem apps, app grants and access tokens; "previous" settles them as a deleted account\'s (actions deleted, open work cancelled with what was held going back only to an account that existed when it was written, finished work and ledger lines under one pseudonym, cortexes and ecosystem apps deleted with what they hold, so the apps\' tokens stop, and the older app grants and access tokens deleted). That incident closes with its last name, and closing it before answers CONFLICT. The incident a node that ran before default audience caps opens once classification is on (type classification_default_caps; at start when it is on, else when it is switched on, never while it is off) offers, per classification, the widest audience its content may be given (Internal: everyone signed in; Confidential and Highly confidential: an organisation\'s members): decide each with `name` (the classification id) and `resolution` — "apply" puts that limit on the classification in the node\'s policy, "keep" leaves it without one. No content changes either way: content already shown more widely keeps its level, and the exposure report lists it. That incident too closes with its last decision. Returns NOT_FOUND for an unknown id or name, CONFLICT for a case decided the other way, and an operator-role error for non-operators.',
+        description: 'Operator-only. Mark a security incident resolved; the quarantined bytes stay until the incident is deleted. Read aimeat_admin_security_overview first to see the incidents and their ids. The incident the move to the full identity and the settling of what deleted accounts installed and were issued open at start (type held_account_names) lists account names whose rows are older than the account that holds the name now, left as they were (actions, work, ledger lines, cortexes, ecosystem apps, app grants, access tokens; such an app can still act for that account until the name is decided, and the tokens of such an app grant or access token are refused whatever the decision): decide each with `name` and `resolution` — "holder" moves its rows, its own ledger lines and the hook bindings to its actions to that account\'s full identity, and keeps its cortexes, ecosystem apps, app grants and access tokens; "previous" settles them as a deleted account\'s (actions deleted, open work cancelled with what was held going back only to an account that existed when it was written, finished work and ledger lines under one pseudonym, cortexes and ecosystem apps deleted with what they hold, so the apps\' tokens stop, and the older app grants and access tokens deleted). That incident closes with its last name, and closing it before answers CONFLICT. The incident a node that ran before default audience caps opens once classification is on (type classification_default_caps; at start when it is on, else when it is switched on, never while it is off) offers, per classification, the widest audience its content may be given (Internal: everyone signed in; Confidential and Highly confidential: an organisation\'s members): decide each with `name` (the classification id) and `resolution` — "apply" puts that limit on the classification in the node\'s policy, "keep" leaves it without one. No content changes either way: content already shown more widely keeps its level, and the exposure report lists it. That incident too closes with its last decision. An incident that names records to act on lists them as `entries`, each with an `id` and an `action` (type anonymous_principal_records: what the shared anonymous agent wrote before its token was refused there; type erasure_leftover_schedules: the schedules account erasures before 2026-10-25 left, whose account is gone or was registered again after the schedule was made, the entry id being the schedule id): decide each with `name` (the entry id) and `resolution` — the entry\'s action, "clear" (the shared agent\'s webhook, tags or capabilities are set back to none) or "delete" (the skill, the data package or the schedule is deleted), or "keep" (nothing changes). Such an incident resolves itself with its last entry, and resolving it earlier keeps the open entries as they are. Returns NOT_FOUND for an unknown id or name, CONFLICT for a case decided already or the other way, and an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Resolve Security Incident', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
@@ -534,8 +557,8 @@ export const discoveryWorkBoardsTools = [
         surfaces: ['admin'],
         input: {
             id: { type: 'string', required: true, description: 'The incident id, from the overview\'s incidents list.' },
-            name: { type: 'string', description: 'To decide one case of an incident: the account name, from the names of an incident the move to the full identity opened, or the classification id, from the caps of a classification_default_caps incident.' },
-            resolution: { type: 'string', description: 'With `name`, for an offered cap: "apply" or "keep". For a held name: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s).' },
+            name: { type: 'string', description: 'To decide one case of an incident: the account name, from the names of an incident the move to the full identity opened, the classification id, from the caps of a classification_default_caps incident, or the entry id, from the entries of an incident that names records to act on.' },
+            resolution: { type: 'string', description: 'With `name`, for an offered cap: "apply" or "keep". For a held name: "holder" (its rows, cortexes, ecosystem apps, app grants and access tokens are the account\'s that holds the name now) or "previous" (they were a previous holder\'s). For an entry: its `action` ("clear" or "delete") or "keep".' },
         },
     },
     {

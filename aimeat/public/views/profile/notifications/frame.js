@@ -9,6 +9,8 @@
  * @structure c · rel · Switch · inboxRows · inboxHead · senderRows · crumb · pageLinks
  * @usage import { c, inboxRows, senderRows, crumb, pageLinks } from './frame.js';
  * @version-history
+ *   v1.11.0 -- 2026-10-25 -- A decided notice shows who decided what and when, and where to change it,
+ *     and no buttons; Open stays only where it leads to another page (secaudit2026oct22).
  *   v1.10.0 -- 2026-09-26 -- Every part is a kit component (the inbox and the senders are the List: When, Who, Name with its unread mark and the answer's note, Lead with the agent's mark, Doors with Loud and Action answers, Mark for a muted sender; the crumb and the rail are data): the page passes data and writes no class (page group G8).
  *   2026-09-26 -- A button that carries its own words is said in the reader's language (actionTextOf).
  *   v1.9.0 -- 2026-09-26 -- A notification's answers are the library's row of actions (og-doors: one gap, one line, wrapping on a phone): the main one the loud action, a refusal the action link's danger tone, Open the action link (Jouni: the answers were not aligned and touched each other).
@@ -32,7 +34,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { date as fmtDate, time as fmtTime } from '/js/format.js';
 import { formatRelativeTime } from '/views/profile/memory-tab/helpers.js';
-import { titleOf, bodyOf, sourceName, kindWord, groupWord, actionTextOf } from '/js/services/notifications.js';
+import { titleOf, bodyOf, sourceName, kindWord, groupWord, actionTextOf, answerTextOf, answerChangeOf } from '/js/services/notifications.js';
 import { Switch } from '/components/Switch.js';
 import { List, Row, When, Who, Name, Lead, Desc, Doors } from '/components/List.js';
 import { Mark } from '/components/Mark.js';
@@ -64,17 +66,23 @@ function answer(ctx, n, a, busy) {
 export function inboxRows(ctx, rows) {
   return html`<${List} cols="when-who-name-doors" keepCols head=${[c('colWhen'), c('colWho'), c('colWhat'), '']}>
     ${rows.map(n => {
-      const acts = Array.isArray(n.actions) ? n.actions.filter(a => a.kind === 'api') : [];
+      // A decided question shows its answer and where to change it, never its buttons (answerTextOf).
+      const decided = answerTextOf(n);
+      const change = decided ? answerChangeOf(n) : null;
+      const acts = !decided && Array.isArray(n.actions) ? n.actions.filter(a => a.kind === 'api') : [];
       const busy = ctx.busyId === n.id;
       const res = ctx.results[n.id];
+      // Open only when it leads somewhere other than this page, and not beside the way to change a decided one.
+      const opens = !!n.link && !/^\/v1\/profile\?tab=notifications$/.test(n.link) && !change;
       return html`
       <${Row} key=${n.id}>
         <${When} at=${clock(n.createdAt)}>${rel(n.createdAt)}<//>
         <${Who} sub=${n.source?.kind === 'aimeat' ? groupWord(n.group) : kindWord(n.source?.kind)}>${sourceName(n)}<//>
-        <${Name} unread=${!n.read} meta=${firstLine(bodyOf(n))} note=${res ? res.msg : null} noteTone=${res?.ok ? 'fine' : undefined}>${titleOf(n)}<//>
+        <${Name} unread=${!n.read} meta=${firstLine(bodyOf(n))} note=${decided || (res ? res.msg : null)} noteTone=${(decided ? n.answered.outcome === 'allowed' : res?.ok) ? 'fine' : undefined}>${titleOf(n)}<//>
         <${Doors}>
           ${acts.slice(0, 2).map(a => answer(ctx, n, a, busy))}
-          <${Action} small onClick=${() => ctx.open(n)}>${c('open')}<//>
+          ${change ? html`<${Action} small href=${change.link}>${change.label}<//>` : null}
+          ${opens ? html`<${Action} small onClick=${() => ctx.open(n)}>${c('open')}<//>` : null}
         <//>
       <//>`; })}
   <//>`;

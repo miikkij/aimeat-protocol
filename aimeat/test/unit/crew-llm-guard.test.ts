@@ -6,11 +6,31 @@
  *   provider key variable only (an allow-list), and a public https address only. Literal addresses,
  *   so no test depends on a name lookup.
  * @version-history
+ *   v1.1.0 — 2026-10-25 — choiceAddresses and needsOwnerForChoice: which app choices wait for the owner (secaudit2026oct22).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { keyEnvProblem, crewAddressProblem, crewChoiceProblem } from '../../src/services/crew-llm-guard.js';
+import { keyEnvProblem, crewAddressProblem, crewChoiceProblem, choiceAddresses } from '../../src/services/crew-llm-guard.js';
 import { validChoice } from '../../src/services/crew-menu.js';
+import { needsOwnerForChoice } from '../../src/services/crew-model-ask.js';
+
+describe('needsOwnerForChoice: an address an app names waits for the owner', () => {
+  const pointed = { kind: 'model', provider: { type: 'openai', base_url: 'https://8.8.8.8/v1', api_key_env: 'OPENROUTER_API_KEY' } };
+  it('reads every address field at any depth', () => {
+    expect(choiceAddresses(pointed.provider)).toEqual(['https://8.8.8.8/v1']);
+    expect(choiceAddresses({ models: [{ api_base: 'https://1.1.1.1' }] })).toEqual(['https://1.1.1.1']);
+    expect(choiceAddresses({ type: 'openrouter', api_key_env: 'OPENROUTER_API_KEY' })).toEqual([]);
+  });
+  it('asks only for an app naming an address', () => {
+    expect(needsOwnerForChoice(['app'], pointed)).toBe(true);
+    expect(needsOwnerForChoice(['ecosystem'], pointed)).toBe(true);
+    expect(needsOwnerForChoice(['agent'], pointed)).toBe(false);
+    expect(needsOwnerForChoice(['owner'], pointed)).toBe(false);
+    expect(needsOwnerForChoice(['app'], { kind: 'node' })).toBe(false);
+    expect(needsOwnerForChoice(['app'], { kind: 'profile', profile: 'coding' })).toBe(false);
+    expect(needsOwnerForChoice(['app'], { kind: 'model', provider: { type: 'openrouter', api_key_env: 'OPENROUTER_API_KEY' } })).toBe(false);
+  });
+});
 
 describe('keyEnvProblem: an allow-list of provider key variables', () => {
   it.each(['OPENROUTER_API_KEY', 'XAI_API_KEY', 'MY_VENDOR_API_KEY', 'NVIDIA_KEY'])('allows %s', (name) => {

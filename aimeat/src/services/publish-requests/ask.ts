@@ -13,13 +13,16 @@
  *
  *   Its own file, apart from decide.ts, because the doors import it and decide.ts imports the
  *   appliers, which import the doors' services: one file for both would be an import cycle.
- * @structure PublishAsk · accountGhii · publishAskOf · fileAsk · publishRequestedBody
+ * @structure PublishAsk · accountGhii · publishAskOf · fileAsk · requesterOf · publishRequestedBody
  * @usage
  *   const ask = publishAskOf(ctx, callerOf(req, config.nodeId, storage), req.auth?.app);
  *   if (ask.kind === 'refused') return res.status(ask.status).json(error(nodeId, ask.code, ask.message));
  *   ... store at the level it had ...
  *   if (ask.kind === 'ask') { const filed = await fileAsk(ctx, caller.owner, ask.requester, draft); ... 202 }
  * @version-history
+ *   2026-10-25 — requesterOf(), and publishRequestedBody answers a request that makes nothing public
+ *     with who answers it, what it asks and why, and pending until then (secaudit2026oct22, the
+ *     developer's approval standard).
  *   2026-10-22 — fileAsk binds the content digest of a user skill (its files) and of a cortex (its
  *     manifest and served libraries) as `target.digest` (content-digests.ts): a skill deleted and
  *     created again restarts at 1.0.0, and a cortex takes a new manifest under the same version
@@ -117,9 +120,45 @@ export async function fileAsk(
   return filePublishRequest(ctx, accountGhii(owner, ctx.config.nodeId), { ...draft, target, requested_by: requester });
 }
 
+/**
+ * Who asks, for a question no publish gate decides (services/approval-standard.ts): an app grant by
+ * its app (`eco:<app>#<owner>@<node>`), an ecosystem app by its GEAI, an agent by its GAII, and the
+ * account holder in person by their GHII. `app` is an app grant's `owner/filename`.
+ */
+export function requesterOf(ctx: PublishStoreCtx, caller: CallerContext, app?: string): PublishRequester {
+  if (caller.kind === 'app' || caller.kind === 'ecosystem') {
+    return { principal: callerPrincipal({ ...caller.auth, ...(app ? { app } : {}) }, ctx.config.nodeId), kind: 'app', sub: caller.auth.sub };
+  }
+  return { principal: caller.kind === 'agent' ? caller.principal : caller.ownerGhii, kind: caller.kind === 'agent' ? 'agent' : 'person', sub: caller.auth.sub };
+}
+
+/** What a door answers for a filed request that makes nothing public: pending, who answers, and what to say. */
+function approvalRequestedBody(ctx: PublishStoreCtx, r: PublishRequest, words: NonNullable<PublishRequest['approval']>, alreadyWaiting: boolean) {
+  const operators = words.approver === 'operators';
+  const url = approveUrl(ctx.config.baseUrl);
+  return {
+    request_id: r.id,
+    status: operators ? 'awaiting_operator' as const : 'awaiting_owner' as const,
+    waiting_for: words.approver,
+    kind: r.kind,
+    title: r.title,
+    asks: words.asks,
+    why: words.why,
+    expires_at: r.expires_at,
+    already_waiting: alreadyWaiting,
+    ...(operators ? {} : { approve_url: url }),
+    next_step: `Nothing changed yet: ${words.why} It waits for ${operators ? "this node's operators, who have been told" : 'your owner'} until ${r.expires_at.slice(0, 10)}. `
+      + (operators
+        ? `Tell your owner in one sentence that you asked the operators to ${words.asks}. `
+        : `Tell your owner in one sentence that you asked to ${words.asks}, and give them this address: ${url}. `)
+      + 'The answer comes back either way, as a message with this request id; aimeat_publish_requests and GET /v1/publish-requests/{request_id} read its state at any time.',
+  };
+}
+
 /** What a door answers for a filed request, the same on REST and on MCP. */
 export function publishRequestedBody(ctx: PublishStoreCtx, filed: { request: PublishRequest; alreadyWaiting: boolean }) {
   const r = filed.request;
+  if (r.approval) return approvalRequestedBody(ctx, r, r.approval, filed.alreadyWaiting);
   const url = approveUrl(ctx.config.baseUrl);
   return {
     request_id: r.id,

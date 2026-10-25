@@ -21,6 +21,9 @@
  *   suite's own server with the variable unset.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-sealed-config.ts
  * @version-history
+ *   2026-10-25 -- 13b and 13c: aimeat_admin_config answers the Config list narrowed by section, and
+ *     aimeat_admin_config_set changes a setting through PUT's checks and refuses a request naming a
+ *     sealed path whole.
  *   2026-10-15 -- The sealed boolean is seo.indexnow_auto: metrics.enabled is restart-required (immutable)
  *     now, and an immutable setting is never sealed, so it no longer stood for a sealed mutable boolean
  *     (feature-list audit #181).
@@ -519,6 +522,36 @@ async function main() {
             const secret = payload.sealed.find((s: any) => s.path === SEALED_SECRET);
             assert(secret?.configured === true && !('value' in secret), `the sealed secret shows only that it is configured: ${JSON.stringify(secret)}`);
             assert(typeof payload.sealed_note === 'string', 'the MCP door says who set them');
+        });
+
+        await test('13b. aimeat_admin_config answers the Config list narrowed by section, and aimeat_admin_config_set changes a setting through its checks', async () => {
+            const rpc = mcpClient(() => mcpToken);
+            await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Sealed Config E2E', version: '1.0.0' } });
+            const read = await rpc('tools/call', { name: 'aimeat_admin_config', arguments: { section: 'usage' } }, 3);
+            assert(read.body?.result?.isError !== true, `read errored: ${JSON.stringify(read.body?.result ?? read.body)}`);
+            const listed = Object.keys(JSON.parse(read.body.result.content[0].text).schema);
+            assert(listed.length > 0 && listed.every(p => p.startsWith('usage.')), `section usage lists only usage.*: ${JSON.stringify(listed)}`);
+            assert(listed.includes('usage.hot_days'), `the usage meter's window is on the list: ${JSON.stringify(listed)}`);
+
+            const set = await rpc('tools/call', { name: 'aimeat_admin_config_set', arguments: { changes: [{ path: 'usage.hot_days', value: 45 }] } }, 4);
+            assert(set.body?.result?.isError !== true, `set errored: ${JSON.stringify(set.body?.result ?? set.body)}`);
+            const applied = JSON.parse(set.body.result.content[0].text).applied;
+            assert(applied?.[0]?.path === 'usage.hot_days' && applied[0].new_value === 45, `applied: ${JSON.stringify(applied)}`);
+            const entry = (await json('/v1/admin/config', { headers: auth(opToken) })).body.data.schema['usage.hot_days'];
+            assert(entry.value === 45 && entry.source === 'database', `the Config page shows the value the AI saved: ${JSON.stringify(entry)}`);
+        });
+
+        await test('13c. aimeat_admin_config_set refuses a request that names a sealed setting, and applies none of it', async () => {
+            const rpc = mcpClient(() => mcpToken);
+            await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Sealed Config E2E', version: '1.0.0' } });
+            const { body } = await rpc('tools/call', { name: 'aimeat_admin_config_set', arguments: { changes: [
+                { path: 'usage.hot_days', value: 46 }, { path: 'quota.memory_mb', value: 1 },
+            ] } }, 5);
+            assert(body?.result?.isError === true, `a sealed path must be refused: ${JSON.stringify(body?.result ?? body)}`);
+            assert(String(body.result.content[0].text).startsWith('SEALED_CONFIG'), `the refusal names the seal: ${body.result.content[0].text}`);
+            const schema = (await json('/v1/admin/config', { headers: auth(opToken) })).body.data.schema;
+            assert(schema['usage.hot_days'].value === 45, `the unsealed change in the same request was not applied: ${JSON.stringify(schema['usage.hot_days'])}`);
+            assert(schema['quota.memory_mb'].value === HOST_MEMORY_QUOTA_MB, 'the sealed value stands');
         });
 
         // ── Phase 5: an agent that is not the operator is refused, seal or no seal ──

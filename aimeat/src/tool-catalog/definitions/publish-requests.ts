@@ -9,6 +9,7 @@
  * @structure publishRequestTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The requests that make nothing public, `awaiting_operator` and `account` (secaudit2026oct22, the approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
@@ -16,7 +17,7 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const publishRequestTools = [
     {
         name: 'aimeat_publish_requests',
-        description: 'Requests to make something public to anyone (a record, a file, an app, a page) that waited for your owner because the one asking lacked the publish:public permission. With no arguments: the list, newest first, each with its state (awaiting_owner, approved, declined, expired, outdated). With request_id: one request. With request_id and decision "approve" or "decline": decide it. You may approve only a request you did not file and only when you hold publish:public; you may decline any request you did not file. Otherwise your owner decides on their Notifications page. When a write of yours answered 202 with a publish request, tell your owner in one sentence what you asked to make public and give them the approve_url from that answer.',
+        description: 'The requests on your owner\'s account that wait for a one-press answer. Most ask to make something public to anyone (a record, a file, an app, a page) because the one asking lacked the publish:public permission. Others make nothing public and carry `asks` and `why` in plain words: an extension\'s permission to email any address (answered by this node\'s operators), a crew model with its own address set by an app, switching off the question before a secret goes to a new address. With no arguments: the list, newest first, each with its state (awaiting_owner, awaiting_operator, approved, declined, expired, outdated). With request_id: one request. With request_id and decision "approve" or "decline": decide it. You may approve only a request you did not file, and only when you hold the permission it needs (publish:public for publishing); you may decline any request you did not file. A request waiting for the operators is answered only by an operator caller, who names another account with `account`. Otherwise your owner decides on their Notifications page. When a write of yours answered 202 with a request, tell your owner in one sentence what you asked and give them the approve_url from that answer when it has one; the answer comes back to you as a message with the request id.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Lists and reads, and decides: approving makes the target public, declining closes the request.
@@ -28,6 +29,7 @@ export const publishRequestTools = [
         input: {
             request_id: { type: 'string', description: 'One request. Omit to list them all.' },
             decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
+            account: { type: 'string', description: 'Operators only: the account (name or GHII) whose request waiting for the operators you read or answer. Omit for your own account.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

@@ -23,6 +23,7 @@
  * @usage
  *   const report = await readUsageReport(storage, { report: 'model', ownerGhii, from, to });
  * @version-history
+ *   2026-10-25 — The hot window comes from the config (usage-settings.ts), not from process.env.
  *   2026-10-05 — OWNER_REPORTS moved unchanged to models/tool-input-vocabulary.ts and is re-exported:
  *     the tool catalog states it (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-14 — Initial: one read service over the precomputed rollups.
@@ -33,6 +34,7 @@ import type {
 import { findCut, type UsageDim } from './rollup-cuts.js';
 import { pendingRollupDeltas } from './rollup-engine.js';
 import { pendingUsageCalls } from './usage-buffer.js';
+import { usageSettings } from './usage-settings.js';
 
 /** Reports an owner may ask about their OWN usage. Every cut here carries ownerGhii. In models/ since 2026-10-05 (the tool catalog states it). */
 import { OWNER_REPORTS } from '../../models/tool-input-vocabulary.js';
@@ -334,7 +336,7 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
     return b.calls - a.calls;
   }).slice(0, limit);
 
-  const hotWindowStart = dayNDaysAgo(Number(process.env.AIMEAT_USAGE_HOT_DAYS) || 90);
+  const hotWindowStart = dayNDaysAgo(usageSettings().usageHotDays);
 
   return {
     report: args.report,

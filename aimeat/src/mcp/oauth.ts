@@ -12,6 +12,8 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.8.4 — 2026-10-25 — The refresh_token grant refuses a refresh token made before the agent's key
+ *     rotation (agent.credentialsValidAfter; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.8.3 — 2026-10-25 — secaudit2026oct22: POST /v1/mcp/register refuses a client_name that is not
  *     text or is over 200 characters, and more than 20 redirect_uris or one that is not text or is
  *     over 2048 characters, before anything is stored; server.ts parses its body at 64 kB.
@@ -60,6 +62,7 @@ import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
+import { madeAfter, recordIssuedAt } from '../auth/credential-age.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -649,6 +652,12 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
 
             // A refresh must not widen what the original grant carried.
             const refreshAgent = await storage.getAgent(existing.gaii);
+            // A refresh token made before the agent's key rotation mints nothing: the rotation deletes
+            // them, and this covers one written while it ran (routes/agents/rekey.ts; secaudit2026oct22).
+            if (madeAfter(refreshAgent?.credentialsValidAfter, recordIssuedAt(existing.createdAt))) {
+                res.status(400).json({ error: 'invalid_grant', error_description: 'The agent\'s key was rotated. Connect again and approve the connection once more.' });
+                return;
+            }
             const newAccessToken = await issueJWT({
                 sub: existing.gaii,
                 owner: existing.owner,

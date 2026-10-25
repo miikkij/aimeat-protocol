@@ -14,6 +14,8 @@
  * @structure default export SecretAllow() — signed out: sign in; gone; ready: the question; done
  * @usage routed at /v1/secret-allow by spa.html (and a spaRoute in routes/portal.ts)
  * @version-history
+ *   v1.3.0 — 2026-10-25 — The question is read again on the live `secrets` and `notifications` events,
+ *     and an Allow that finds it answered elsewhere shows it as it stands, never a failure (the developer's review).
  *   v1.2.0 — 2026-10-22 — A decline the node did not record (allowed meanwhile) reloads the question
  *     instead of saying "Not allowed" (found by the eco-capability-allow browser check).
  *   v1.1.0 — 2026-10-21 — Browser check: buttons at the control size, the tag at the label size, a
@@ -33,6 +35,7 @@ import { Action, Loud } from '/components/Action.js';
 import { Box } from '/components/Box.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 
 const html = htm.bind(h);
 
@@ -59,7 +62,12 @@ export default function SecretAllow() {
     if (!secret || !extension || !host) { setView({ status: 'gone', data: null }); return undefined; }
     let live = true;
     load().then((v) => { if (live) setView(v); });
-    return () => { live = false; };
+    // An answer given elsewhere (the bell, another tab, the Access page) arrives as a live event: the
+    // question is read again, so the page never offers buttons for a question already answered.
+    const off = onLiveUpdate(['secrets', 'notifications'], () => load().then((v) => {
+      if (live) setView((cur) => (cur.status === 'allowed' || cur.status === 'declined' ? cur : v));
+    }));
+    return () => { live = false; off(); };
   }, [secret, extension, host, session, load]);
 
   const answer = useCallback(async (allow) => {
@@ -72,7 +80,9 @@ export default function SecretAllow() {
       else setView((v) => ({ ...v, status: allow ? 'allowed' : 'declined' }));
     } catch (err) {
       swallowed('secret-allow: answer', err);
-      setFailed(t('secretAllow.failed'));
+      // Answered elsewhere since this page opened: show the question as it stands now, not a failure.
+      if (err?.code === 'APPROVAL_NOT_FOUND' || err?.status === 404) setView(await load());
+      else setFailed(t('secretAllow.failed'));
     }
     setBusy(false);
   }, [path, extension, host, load]);

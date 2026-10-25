@@ -13,6 +13,7 @@
  *   - DELETE /v1/ecosystem-apps/:app/capability-approvals?capability=  — withdraw (owner)
  * @usage registerEcoCapabilityApprovalRoutes(router, config, storage) from ecosystemAppsRouter().
  * @version-history
+ *   2026-10-25 — Allow and Don't allow tell the one whose call asked (secaudit2026oct22, the approval standard).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, capability-invoke.ts ecosystem source, r45).
  */
 import type { Router, Request, Response } from 'express';
@@ -66,7 +67,7 @@ export function registerEcoCapabilityApprovalRoutes(router: Router, config: Aime
     const capability = capabilityOf(req.body);
     if (!capability) { missing(res); return; }
     const caller = callerOf(req, config.nodeId, storage);
-    const r = await approveEcoCapabilityUse(storage, config.nodeId, owner, req.params.app as string, capability, caller.principal);
+    const r = await approveEcoCapabilityUse(storage, config.nodeId, owner, req.params.app as string, capability, caller.principal, config);
     if (!r.ok) { res.status(r.status).json(error(config.nodeId, r.code, r.message)); return; }
     res.json(success(config.nodeId, { approval: r.approval }));
   });
@@ -76,7 +77,8 @@ export function registerEcoCapabilityApprovalRoutes(router: Router, config: Aime
     if (!owner) return;
     const capability = capabilityOf(req.body);
     if (!capability) { missing(res); return; }
-    const declined = await declineEcoCapabilityUse(storage, config.nodeId, owner, req.params.app as string, capability);
+    const declined = await declineEcoCapabilityUse(storage, config.nodeId, owner, req.params.app as string, capability,
+      { config, by: callerOf(req, config.nodeId, storage).principal });
     res.json(success(config.nodeId, { declined }));
   });
 

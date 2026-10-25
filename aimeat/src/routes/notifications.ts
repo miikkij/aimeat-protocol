@@ -17,6 +17,8 @@
  *   - DELETE /v1/notifications          — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   2026-10-25 — POST /v1/notifications/:id/answered: a notice whose button ran shows the answer and
+ *     loses its buttons, for every kind (services/notification-answers.ts; secaudit2026oct22).
  *   2026-10-16 — DELETE /v1/notifications from an agent or an app grant puts the notifications in the
  *     deleted-memory bin (bulkBinMemory) and answers in_bin and restorable_until; the account holder
  *     in person still clears for good. memory:delete, a default agent scope, removed them for good
@@ -61,9 +63,10 @@ import {
 } from '../services/notification-settings.js';
 import { listOwnerNotifications, listOwnerNotificationRecords } from '../services/notification-sweeps.js';
 import { logger } from '../utils/logger.js';
+import { answerNotifications, outcomeOfAction, type NotifAnswer } from '../services/notification-answers.js';
 import { isOwnerInPerson, resolveIdentity } from '../utils/gaii.js';
 
-interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean }
+interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string; source?: NotifSource; i18n?: unknown; held?: boolean; answered?: NotifAnswer }
 
 export function notificationsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -87,7 +90,9 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       // travel only when the page may run them: the owner's browser runs an `api` button with the
       // owner's own session, so one that does not call a door of this node is dropped and logged,
       // whatever wrote the record and whenever (services/notify.ts servableNotifActions).
-      .map(v => ({ ...v, actions: servableNotifActions(v.actions, { recipient: ghii, notif: v.id }), source: sourceOf(v), group: groupOfType(v.type) }));
+      .map(v => ({ ...v, actions: servableNotifActions(v.actions, { recipient: ghii, notif: v.id }), source: sourceOf(v), group: groupOfType(v.type) }))
+      // An answered notice says whether the reader gave the answer, so the page can say "You allowed this".
+      .map(v => (v.answered ? { ...v, answered: { ...v.answered, by_you: v.answered.by === ghii || v.answered.by === req.auth!.owner } } : v));
     const unread = mine.filter(n => !n.read).length;
     const onlyUnread = req.query.unread === '1' || req.query.unread === 'true';
     const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 50));
@@ -221,6 +226,31 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   /* ── POST /v1/notifications/read — mark notifications read ({ ids: [...] } or { all: true }) ── */
+  /* ── POST /v1/notifications/:id/answered — the button this page ran has answered ──
+   * { action: '<button id>', already?: true }. The bell and the Notifications page call it after an
+   * `api` button's own call answered (ok, or "already decided" with `already`), so the notice shows
+   * the answer, who gave it and when, and never offers its buttons again, for every kind of
+   * notification (services/notification-answers.ts; the developer, 2026-10-25). Only a button the
+   * notice really carries may be named, and only on the caller's own account. */
+  router.post('/v1/notifications/:id/answered', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const ghii = ownerGhii(req);
+    const id = req.params.id as string;
+    const action = typeof req.body?.action === 'string' ? req.body.action : '';
+    const row = (await listOwnerNotificationRecords(storage, ghii)).map(r => r.value as NotifValue).find(v => v.id === id);
+    if (!row) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such notification on this account.')); return; }
+    if (row.answered) { res.json(success(config.nodeId, { answered: row.answered })); return; }
+    if (!(row.actions ?? []).some(a => a.id === action && a.kind === 'api')) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name a button this notification carries: { "action": "<id>" }.'));
+      return;
+    }
+    const answer = {
+      outcome: req.body?.already === true ? 'answered' as const : outcomeOfAction(action),
+      by: resolveIdentity(req.auth!, config.nodeId), at: new Date().toISOString(),
+    };
+    await answerNotifications(storage, ghii, { id }, answer);
+    res.json(success(config.nodeId, { answered: answer }));
+  });
+
   router.post('/v1/notifications/read', requireAuth(), requireScope('memory:write'), async (req, res) => {
     const ghii = ownerGhii(req);
     const { ids, all } = req.body ?? {};

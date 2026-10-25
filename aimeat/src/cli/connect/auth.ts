@@ -25,10 +25,11 @@
  * @version-history v2.0.0 -- 2026-05-29 -- Write per-agent config alongside token + token table; mark first agent as primary so multi-agent serve has a sensible default.
  * @version-history v2.1.0 -- 2026-09-30 -- `--scopes a,b,c`: the permissions the agent asks for go into the device authorization request.
  * @version-history v2.1.1 -- 2026-10-14 -- Print the approval address with the user code (approvalUrl); the bare verification_uri opened the consent page on "Missing code parameter".
+ * @version-history v2.2.0 -- 2026-10-25 -- The per-agent config is written with saveConnectedAgentConfig: connecting records the runner and wake command it keeps as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken, listAllTokens } from './keychain.js';
-import { saveConfig, savePerAgentConfig, loadPerAgentConfig } from './config.js';
+import { saveConfig, saveConnectedAgentConfig, loadPerAgentConfig } from './config.js';
 import { downloadSkillBundle, readSkillBundleGuide } from './skill-bundle.js';
 import { buildAgentOnboardingInstruction } from './onboarding-prompt.js';
 
@@ -383,8 +384,10 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   // Per-agent config (<home>/agents/{owner}/{agent}/config.yaml). Preserve any existing
   // runner/wake/poll_interval if the agent is being re-connected. `agent`, `owner` and `mode` are
   // NOT written: identity comes from the credential and the mode is the node's.
+  // Connecting is the approval of the runner and wake command this folder's settings name: they are
+  // recorded as trusted as they are written (command-trust.ts; developer decision 2026-10-25).
   const existingPerAgent = loadPerAgentConfig(agentName, ownerHandle);
-  savePerAgentConfig(agentName, ownerHandle, {
+  saveConnectedAgentConfig(agentName, ownerHandle, {
     node_url: nodeUrl,
     primary: existingPerAgent?.primary ?? isFirstAgentOfOwner,
     poll_interval: existingPerAgent?.poll_interval,

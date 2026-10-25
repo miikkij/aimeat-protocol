@@ -5,6 +5,8 @@
  *   (dev). Locks the H-2 two-level app-origin parsing (`<sub>.apps.<apex>` / `apps.<apex>`)
  *   and ensures the app host is never mis-parsed as the apex subdomain "apps".
  * @version-history
+ *   2026-10-25 — X-Subdomain counts only when it equals the Host's label; the case that asserted it set
+ *     the label on an unrelated Host now asserts null (approved by Jouni, secaudit2026oct22).
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -83,12 +85,35 @@ describe('subdomainMiddleware — header path (nginx)', () => {
     });
 
     it('x-subdomain alone (apex subdomain) → subdomain, not app origin', () => {
-        expect(run(mockReq('whatever', { 'x-subdomain': 'sanomat' })))
+        expect(run(mockReq('sanomat.aimeat.io', { 'x-subdomain': 'sanomat' })))
             .toEqual({ subdomain: 'sanomat', appOrigin: false });
     });
 
+    // Approved behaviour change (Jouni, 2026-10-25): X-Subdomain counts only when it names the label
+    // the Host yields. On a Host in no family it set req.subdomain by itself (secaudit2026oct22,
+    // subdomain-label-from-client-headers).
+    it('x-subdomain on a Host that yields no label is dropped', () => {
+        expect(run(mockReq('whatever', { 'x-subdomain': 'sanomat' })))
+            .toEqual({ subdomain: null, appOrigin: false });
+        expect(run(mockReq('aimeat.io', { 'x-subdomain': 'sanomat' })))
+            .toEqual({ subdomain: null, appOrigin: false });
+    });
+
+    it('x-subdomain naming another label than the Host is dropped; the Host label stands', () => {
+        expect(run(mockReq('blog.aimeat.io', { 'x-subdomain': 'sanomat' })))
+            .toEqual({ subdomain: 'blog', appOrigin: false });
+        expect(run(mockReq('mine.apps.aimeat.io', { 'x-app-origin': '1', 'x-subdomain': 'theirs' })))
+            .toEqual({ subdomain: 'mine', appOrigin: true });
+    });
+
+    it('the label never comes from X-Forwarded-Host (req.hostname)', () => {
+        const req = mockReq('aimeat.io', { 'x-subdomain': 'sanomat' });
+        (req as unknown as { hostname: string }).hostname = 'sanomat.aimeat.io';
+        expect(run(req)).toEqual({ subdomain: null, appOrigin: false });
+    });
+
     it('x-app-origin: 0 is treated as not the app origin', () => {
-        expect(run(mockReq('whatever', { 'x-app-origin': '0', 'x-subdomain': 'sanomat' })))
+        expect(run(mockReq('sanomat.aimeat.io', { 'x-app-origin': '0', 'x-subdomain': 'sanomat' })))
             .toEqual({ subdomain: 'sanomat', appOrigin: false });
     });
 });

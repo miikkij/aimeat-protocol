@@ -93,18 +93,18 @@
       building: "Preparing the prompt…"
     },
     fi: {
-      copy: "Kopioi prompti",
+      copy: "Kopioi kehote",
       copied: "Kopioitu",
-      show: "Näytä prompti",
-      hide: "Piilota prompti",
-      hint: "Kopioi prompti, aja se omassa AI-chatissasi ja liitä koko vastaus alle.",
-      hintCopyOnly: "Kopioi prompti ja aja se omassa AI-chatissasi.",
+      show: "Näytä kehote",
+      hide: "Piilota kehote",
+      hint: "Kopioi kehote, anna se omalle tekoälyllesi ja liitä koko vastaus alle.",
+      hintCopyOnly: "Kopioi kehote ja anna se omalle tekoälyllesi.",
       answer: "Liitä vastaus tähän",
       use: "Käytä tätä vastausta",
-      copyFailed: "Kopiointi ei onnistunut. Valitse promptin teksti ja kopioi se käsin.",
+      copyFailed: "Kopiointi ei onnistunut. Valitse kehotteen teksti ja kopioi se käsin.",
       empty: "Liitä ensin vastaus.",
-      notJson: "Vastauksesta ei löytynyt JSONia. Pyydä AI:ta vastaamaan pelkällä JSONilla ja liitä uudelleen.",
-      building: "Valmistellaan promptia…"
+      notJson: "Vastauksesta ei löytynyt JSONia. Pyydä tekoälyäsi vastaamaan pelkällä JSONilla ja liitä vastaus uudelleen.",
+      building: "Kehotetta valmistellaan…"
     },
     es: {
       copy: "Copiar el prompt",
