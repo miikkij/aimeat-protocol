@@ -50474,6 +50474,8 @@ paths:
         `instances.config_per_instance`) are encrypted at rest with AES-256-GCM (the node master
         key) and are NEVER returned in plaintext — read responses show a mask sentinel. The
         decrypted value is provided only to the extension's sandboxed action code at run time.
+        Past the operator setting `extensions.max_instances` (0, no limit, by default) a new
+        instance is refused with 409 `LIMIT_EXCEEDED`, and the message names the setting.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50494,6 +50496,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
     get:
       x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0', orScope: 'ext:write' }
       operationId: listExtensionInstances

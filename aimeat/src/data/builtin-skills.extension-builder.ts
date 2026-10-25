@@ -37,6 +37,8 @@
  *   2026-10-21 — Section 9: declare `uses_secrets`; a first use to a declared host binds by itself for
  *     a trusted code writer; every refused first use names the owner's one-press allow page; tell users
  *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
+ *   2026-10-25 — The operator's limits on one namespace's data and on the copies of one extension
+ *     (extensions.namespace_max_mb, extensions.max_instances; secaudit2026oct22, lead 750).
  *   2026-10-21 — Section 9, v58 as Jouni amended it: `{{secret:NAME}}` reads the caller's own vault
  *     for every extension the caller runs (bring your own key), a secret with a host goes only there,
  *     and a secret with no host is never bound through another account's extension.
@@ -148,6 +150,9 @@ may already do it.
 - \`ctx.memory\` is the extension's own namespace, \`ext:{name}\`. **A key is public unless the write
   passes \`{ visibility: 'private' }\`**: pass it on every write that holds personal data. Write one
   key per period or per collection, never one per item: the namespace holds 1000 keys by default.
+  An operator may also limit the data one namespace holds (\`extensions.namespace_max_mb\`, no limit
+  by default): past it a new key is refused with a message naming the setting, and updating an
+  existing key still works, so fold new data into the keys you have.
 - \`ctx.now()\` is the run's start time, fixed for the run; \`ctx.hash(s)\` is the FNV-1a hash an app
   can compute the same way.
 - A run has 500 host calls and 5 seconds by default (\`AIMEAT_EXT_MAX_API_CALLS\`,
@@ -191,6 +196,8 @@ action asks \`ext:invoke\` of an agent or an app, and reading the instances asks
 deprecated), so an app that calls an extension through its cortex declares \`ext:invoke\`. Each instance
 has its own namespace, \`ext:{name}.{instanceId}\`, and the script reads \`ctx.instance.config\`. A
 \`type: secret\` field in the instance config is encrypted per instance: bring-your-own-key per tenant.
+An operator may limit the copies one extension has (\`extensions.max_instances\`, no limit by
+default); past it the create answers 409 \`LIMIT_EXCEEDED\` naming the setting.
 
 ## 7. Schedules
 

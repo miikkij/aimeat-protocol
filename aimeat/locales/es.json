@@ -12005,6 +12005,10 @@
     "cfgDesc_extensions_max_pay_morsels": "El ritmo más alto que puede declarar una acción de extensión en su manifiesto; uno mayor se rechaza al instalar (predeterminado 10000).",
     "cfg_extensions_fetch_inflight_mb": "Datos de descargas en curso por ejecución (MB)",
     "cfgDesc_extensions_fetch_inflight_mb": "Cuántos datos de respuesta pueden tener en memoria a la vez las descargas de una ejecución de extensión. Una descarga que no cabe espera a que termine otra anterior (predeterminado 128, 0 es sin límite).",
+    "cfg_extensions_namespace_max_mb": "Memoria por extensión (MB)",
+    "cfgDesc_extensions_namespace_max_mb": "Cuántos datos puede guardar la memoria de una extensión; cada copia cuenta por separado. Al pasar el límite se rechaza una clave nueva y una clave que ya existe se sigue actualizando. Es aparte de los límites de memoria de cada persona (predeterminado 0, sin límite).",
+    "cfg_extensions_max_instances": "Copias por extensión",
+    "cfgDesc_extensions_max_instances": "Cuántas copias (instancias) puede tener una extensión; al pasar el límite se rechaza una copia nueva (predeterminado 0, sin límite).",
     "cfg_features_capability_publishing": "Quién agrega capacidades",
     "cfgDesc_features_capability_publishing": "Quién puede agregar una capacidad al registro.",
     "cfgOpt_features_capability_publishing_disabled": "Solo el operador",
@@ -24329,6 +24333,28 @@
           "ex1": "128 (el valor predeterminado) con el límite de respuesta de 4 MB: 32 descargas a la vez.",
           "ex2": "128 con una extensión que lee respuestas de hasta 32 MB: 4 descargas a la vez.",
           "tip": "Bájalo cuando el servidor tiene poca memoria y las extensiones leen muchas fuentes. Cada descarga se hace igual; solo espera su turno."
+        },
+        "namespace_max_mb": {
+          "title": "Memoria por extensión",
+          "short": "Cuántos datos puede guardar una extensión en su memoria, en megabytes. Al pasar el límite la extensión no puede agregar una clave nueva, y sí puede actualizar las que ya tiene. El valor predeterminado es 0: sin límite.",
+          "what": "Una extensión guarda sus datos en una memoria propia, aparte de la memoria de las personas que la usan. Cada copia (instancia) de una extensión tiene su propia memoria y cuenta por separado. Cuando el límite está puesto y la memoria está llena, una clave nueva se rechaza con un mensaje que nombra este ajuste, y la extensión puede seguir leyendo, actualizando y borrando las claves que ya tiene. Los límites de memoria de cada persona no cuentan la memoria de la extensión, y este ajuste no cuenta la de ellas.",
+          "range": "Un número entero desde 0, en megabytes. El valor predeterminado es 0, sin límite. El tamaño de un valor tiene su propio límite (tamaño máximo de un valor de memoria).",
+          "low": "Menor: una extensión que recopila datos se queda sin espacio antes y tiene que juntar sus datos en menos claves.",
+          "high": "Mayor: una extensión puede guardar más datos en la base de datos del servidor.",
+          "ex1": "0 (el valor predeterminado): una extensión guarda tantas claves como permite el límite de claves.",
+          "ex2": "100: una extensión con 100 MB en su memoria ya no puede agregar claves, y sigue actualizando las que tiene.",
+          "tip": "Ponlo cuando los datos de una extensión crecen sin fin en la base de datos compartida. Una extensión que ya pasó el límite sigue funcionando con los datos que tiene."
+        },
+        "max_instances": {
+          "title": "Copias por extensión",
+          "short": "Cuántas copias (instancias) puede tener una extensión. Al pasar el límite se rechaza una copia nueva. El valor predeterminado es 0: sin límite.",
+          "what": "Algunas extensiones funcionan como varias copias, una por cliente o por cada cuenta que conecta el propietario, cada una con sus propios ajustes y su propia memoria. Este ajuste limita cuántas copias puede tener una extensión. Una copia nueva que pasa el límite se rechaza con un mensaje que nombra este ajuste; las copias que existen siguen funcionando.",
+          "range": "Un número entero desde 0. El valor predeterminado es 0, sin límite.",
+          "low": "Menor: una instalación puede hacer menos copias y así menos memorias separadas.",
+          "high": "Mayor: un propietario que conecta muchas cuentas puede hacer una copia para cada una.",
+          "ex1": "0 (el valor predeterminado): una extensión puede tener cualquier número de copias.",
+          "ex2": "20: un propietario puede conectar 20 cuentas con una extensión.",
+          "tip": "Ponlo junto con Memoria por extensión: cada copia tiene su propia memoria, así que los dos juntos limitan cuánto puede guardar una extensión."
         }
       },
       "morsel_policy": {
