@@ -27170,7 +27170,7 @@
   "explain.concept.round.ex2": "Hoida tarjouspyynnöt: kierros jokaisesta saapuvasta pyynnöstä.",
   "explain.concept.round.tip": "Muutos vain tähän kierrokseen ei koske seuraavaa kierrosta.",
   "explain.concept.subgoal.title": "Alitavoite",
-  "explain.concept.subgoal.short": "Pienempi tavoite tavoitteen sisällä. Sen tekee sinä, koordinaattori tai agentti, joka työskentelee tavoitteessa.",
+  "explain.concept.subgoal.short": "Pienempi tavoite tavoitteen sisällä. Sen voit tehdä sinä, koordinaattori tai tavoitteessa työskentelevä agentti.",
   "explain.concept.subgoal.what": "Alitavoitteella on omat työnsä, mutta sen kulut lasketaan päätavoitteen kulukatosta, eikä se pääty myöhemmin kuin päätavoite. Päätavoite on valmis vasta, kun sen alitavoitteet ovat valmiita.",
   "explain.concept.subgoal.ex1": "Tutkija-agentti huomaa, että kilpailijalla on Ruotsissa omat hintansa, ja lisää alitavoitteen \"selvitä Ruotsin hinnat\".",
   "explain.concept.subgoal.tip": "Näet jokaisen alitavoitteen tavoitesivulla ja voit lopettaa sen erikseen.",
