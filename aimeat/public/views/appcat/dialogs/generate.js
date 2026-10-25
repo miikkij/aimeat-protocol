@@ -20,6 +20,9 @@
  *        app (html: its source as text; track: the manifest's track, 'atelier' or anything else for
  *        Classic; owner and filename: where it is on the node; own: false for somebody else's app).
  * @version-history
+ *   v2.1.0 — 2026-10-25 — No "Connect your AI" step for a person whose AI has connected (the node's
+ *     journey stage `connect`); the steps then start from the description (Jouni). On the prompt road
+ *     the "Your AI cannot connect?" fold starts open.
  *   v2.0.0 — 2026-10-25 — The connected AI is the road (Jouni): connect, describe, give the short
  *     prompt; a new app is Atelier only. The track choice, the template picker and the pack pills
  *     are gone; the long Classic prompt stays, folded, for an AI that cannot connect.
@@ -43,6 +46,7 @@ import { Dialog, openDialog } from '/views/appcat/dialogs/host.js';
 import { useFlash } from '/views/appcat/dialogs/parts.js';
 import { signInThen } from '/views/appcat/dialogs/app-io.js';
 import { buildPrompt, connectedPrompt } from '/views/appcat/dialogs/generate-prompt.js';
+import { useAiConnected } from '/views/home/journey-steps.js';
 
 const html = htm.bind(h);
 
@@ -144,25 +148,31 @@ export default function GenerateDialog({ app, close }) {
   const [description, setDescription] = useState('');
   const [other, setOther] = useState(false);
   const [copied, flashCopied] = useFlash(1400);
+  // The node knows whether this person's AI has connected: then there is nothing to connect, and the
+  // steps start from the description. While that is being read, the step stays away rather than
+  // showing and vanishing. A person who said their AI cannot connect finds the long prompt open.
+  const { connected, road } = useAiConnected();
+  useEffect(() => { if (road === 'prompt') setOther(true); }, [road]);
+  const first = connected === false ? 1 : 0;
 
   const prompt = connectedPrompt({ app: app || null, description, lang: l });
 
   return html`<${Dialog} title=${x('pb.title')} size="lg" footer=${html`<${Action} onClick=${close}>${x('common.close')}<//>`}>
     <${Note} kind="lead">${x(improving ? 'pb.introImprove' : 'pb.introConnected')}<//>
-    <${StepCard} rule num="1" title=${x('pb.connectStep')}>
+    ${first ? html`<${StepCard} rule num="1" title=${x('pb.connectStep')}>
       <${Stack} gap="small">
         <${Note} kind="hint">${x('pb.connectHint')}<//>
         <div><${Action} href="/v1/connect-your-ai" newTab>${x('pb.connectBtn')}<//></div>
       <//>
-    <//>
-    <${StepCard} rule num="2" title=${x(improving ? 'pb.changeStep' : 'pb.step1')}>
+    <//>` : null}
+    <${StepCard} rule num=${String(first + 1)} title=${x(improving ? 'pb.changeStep' : 'pb.step1')}>
       <${Stack} gap="medium">
         ${improving ? html`<${Note} kind="report" tone="refused" role="note"><strong>${x('pb.improving')}: ${app.name || app.filename || x('pb.thisApp')}</strong><//>` : null}
         <${TextArea} autoFocus rows=${3} ariaLabel=${x(improving ? 'pb.changeStep' : 'pb.step1')} placeholder=${x(improving ? 'pb.changePh' : 'pb.descPhNew')}
           value=${description} onInput=${setDescription} />
       <//>
     <//>
-    <${StepCard} rule num="3" title=${x('pb.giveStep')}>
+    <${StepCard} rule num=${String(first + 2)} title=${x('pb.giveStep')}>
       <${Stack} gap="small">
         <${Note} kind="hint">${x(improving ? 'pb.giveHintImprove' : 'pb.giveHint')}<//>
         <${Label} ruled>${x('pb.promptPreview')}<//>

@@ -15,8 +15,11 @@
  *   - openSteps(journey) — the open stages from `next` onward, or null without a journey
  *   - stepTitle(id), stepLine(id), stepHref(id)
  *   - useJourney() — the shared /v1/home/state read, empty for a visitor
+ *   - useAiConnected() — whether the person's AI has connected, and the road they named
  * @usage import { openSteps, stepTitle, useJourney } from './home/journey-steps.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — useAiConnected(): Generate app with AI and the front page's builder drop
+ *     their "connect your AI" step for a person whose AI is connected (Jouni).
  *   v1.0.0 — 2026-10-03 — Initial: one first step everywhere a person meets one (guidance A2).
  */
 import { t } from '/js/i18n.js';
@@ -65,4 +68,16 @@ export function useJourney() {
   const { data, ready } = useShared('home-state', hasSession() ? '/v1/home/state' : '', DOMAINS,
     (d) => d?.journey ?? null);
   return { journey: data, ready };
+}
+
+/**
+ * Whether the person's AI has reached this node over MCP (stage `connect`): true or false, null
+ * while the read is under way. A visitor's is false, because nothing says it is connected. `road` is
+ * the road in the person named, 'prompt' when their AI cannot connect.
+ */
+export function useAiConnected() {
+  const { journey, ready } = useJourney();
+  if (!hasSession()) return { connected: false, road: null };
+  if (!ready) return { connected: null, road: null };
+  return { connected: !!journey?.stages?.find((s) => s.id === 'connect')?.done, road: journey?.road ?? null };
 }
