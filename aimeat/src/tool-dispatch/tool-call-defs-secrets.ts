@@ -17,6 +17,7 @@
  * @structure secretTools[] — the shell handler table, registered by tool-call.ts
  * @usage import { secretTools } from './tool-call-defs-secrets.js';
  * @version-history
+ *   v1.3.0 -- 2026-10-25 -- aimeat_secret_host_ask (GET/PUT /v1/ghii/me/secret-host-ask; secaudit2026oct22).
  *   v1.2.0 -- 2026-10-21 -- aimeat_secret_host_set (PATCH) and aimeat_secret_approval_withdraw (DELETE
  *     .../approvals).
  *   v1.1.0 -- 2026-10-09 -- aimeat_secret_set forwards the optional `host` (secrets audit 2026-10-09,
@@ -72,5 +73,14 @@ export const secretTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.delete(
             `/v1/secrets/${encodeURIComponent(requiredString(input, 'name'))}`,
         ),
+    },
+    {
+        // → GET /v1/ghii/me/secret-host-ask, or PUT with { on }.
+        name: 'aimeat_secret_host_ask',
+        handler: ({ client }, input) => {
+            if (input.on === undefined) return client.get('/v1/ghii/me/secret-host-ask');
+            if (typeof input.on !== 'boolean') throw new Error('on must be true or false');
+            return client.put('/v1/ghii/me/secret-host-ask', { on: input.on });
+        },
     },
 ];

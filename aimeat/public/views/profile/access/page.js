@@ -24,9 +24,11 @@
  *   or the sign-in row above them already says both, so each is given `inRow` and leaves them out
  *   (until 2026-09-26 a page rule, .ac-kept and .ac-panel, hid them after they were drawn).
  * @structure renderPage · marks · mastActions · strip · secretTile · secSignIn · secKeys ·
- *   tokenFold · secAccounts · secMcp · secSecrets · secretFold · secGroups · secAddresses · secRoads
+ *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.31.0 -- 2026-10-25 -- Section 05 carries the switch "Ask me before my secret is sent to a new
+ *     address for the first time" (secaudit2026oct22, Jouni 2026-10-25).
  *   v1.30.0 -- 2026-10-21 -- The add form takes the address a secret may be sent to (optional).
  *   v1.29.0 -- 2026-10-03 --The page's start (components/PageStart.js: the first prompt asks the person's AI what each key may do, its button opens the keys) and the title's question mark, concept.scope (guidance part B).
  *   v1.28.0 -- 2026-10-02 -- The question mark that explains a key's level: access.scopes on the level Field group (components/HelpTip.js).
@@ -105,6 +107,7 @@ import { Roads, Road } from '/components/Roads.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
+import { Check } from '/components/Check.js';
 import { TwoFactorSection } from '../security-tab/two-factor.js';
 import { PasskeysSection } from '../security-tab/passkeys.js';
 import { ConnectionsSection } from '../access-tab/connections.js';
@@ -370,7 +373,23 @@ function secSecrets(ctx) {
         <//>`
       : (!ctx.secretsFailed ? html`<${Note} kind="quiet"><b>${x('secrets.emptyTitle')}</b> ${x('secrets.emptyBody')}<//>` : null)}
       <${Box}><b>${x('secrets.whoTitle')}</b> ${x('secretsWho')}<//>
+      ${hostAskSwitch(ctx)}
       <${Space} above="large">${secretFold(ctx)}<//>
+    <//>`;
+}
+
+/**
+ * "Ask me before my secret is sent to a new address for the first time": the one place an owner's
+ * agents do not act with the owner's full rights (services/secret-host-ask-setting.ts). The hint says
+ * what the node does either way, and whether this is the node's default or the person's own choice.
+ */
+function hostAskSwitch(ctx) {
+  const s = ctx.hostAsk;
+  if (!s) return null;
+  const hint = `${x(s.on ? 'secrets.hostAskHintOn' : 'secrets.hostAskHintOff')} ${x(s.defaulted ? 'secrets.hostAskDefaulted' : 'secrets.hostAskChosen')}`;
+  return html`
+    <${Space} above="large">
+      <${Check} checked=${s.on} hint=${hint} disabled=${ctx.busy === 'hostAsk'} onChange=${(on) => ctx.setHostAsk(on)}>${x('secrets.hostAskLabel')}<//>
     <//>`;
 }
 

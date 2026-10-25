@@ -32,6 +32,9 @@
  *   THE RECEIVER runs on 127.0.0.1, which the runner admits with AIMEAT_ALLOW_PRIVATE_EGRESS=true,
  *   on E2E_SECRETS_AUTHORITY_PORT (40674 by default).
  * @version-history
+ *   2026-10-25 — 22 to 26: the owner's "Ask me before my secret is sent to a new address for the first
+ *     time": on by default, an agent switching it off asks the owner, off lets the agent's code and the
+ *     host field it set choose the first host, and on again asks again (secaudit2026oct22).
  *   2026-10-25 — 18 to 21: a host field value set by an agent without secrets:manage does not choose
  *     the first host of the owner's unbound secret; one set by the owner or a secrets:manage agent does (secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, v58 and v59).
@@ -494,6 +497,66 @@ await test('21. the owner in person setting the host field counts too, after the
     const out = await probe(HF_EXT, wildAgent.token, '/hf-owner', 'HF_B');
     assert(out.failed === null, `refused: ${out.failed}`);
     assert(arrived('/hf-owner')[0]?.headers['x-api-key'] === 'zz-HF_B-zz', `the receiver got: ${JSON.stringify(arrived('/hf-owner'))}`);
+});
+
+// ── The owner's setting "Ask me before my secret is sent to a new address for the first time" ──
+// (secaudit2026oct22; Jouni, 2026-10-25): code an owner's agent writes runs with the owner's rights;
+// this setting, on unless switched off, is the one exception.
+console.log('\n-- the owner\'s question before a secret goes to a new address --');
+const askSetting = async (token: string) => (await json('/v1/ghii/me/secret-host-ask', { headers: auth(token) })).body?.data?.setting;
+let offRequest = '';
+
+await test('22. the question is on by default; the wildcard agent switching it off asks the owner, and it stays on', async () => {
+    const before = await askSetting(owner.token);
+    assert(before?.on === true && before.defaulted === true && before.node_default === true, `default: ${JSON.stringify(before)}`);
+    const r = await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(wildAgent.token), body: JSON.stringify({ on: false }) });
+    assert(r.status === 202 && r.body.data.approval_request?.status === 'awaiting_owner', `expected 202 pending, got ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+    offRequest = r.body.data.approval_request.request_id;
+    assert((await askSetting(owner.token))?.on === true, 'switched off before the owner allowed it');
+    const n = await json('/v1/notifications', { headers: auth(owner.token) });
+    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.i18n?.key === 'approval_secret_host_ask_off');
+    assert(!!notice && (notice.actions ?? []).map((a: any) => a.id).sort().join(',') === 'allow,deny', `owner notice: ${JSON.stringify(notice)}`);
+});
+
+await test('23. the owner allows it: the question is off, and the agent is told', async () => {
+    const yes = await json(`/v1/publish-requests/${offRequest}/decision`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    const s = await askSetting(owner.token);
+    assert(s?.on === false && s.defaulted === false && s.set_by === wildAgent.gaii, `after Allow: ${JSON.stringify(s)}`);
+    const inbox = await json(`/v1/agents/v2/messages?context_id=${encodeURIComponent(offRequest)}`, { headers: auth(owner.token) });
+    assert((inbox.body?.data?.messages ?? []).some((m: any) => m.parts?.[1]?.data?.outcome === 'allowed'), 'the agent was not told');
+});
+
+const UNATT_WILD_OFF = `sau-unwildoff-${STAMP}`;
+await test("24. question off: the wildcard agent's unattended code makes the first use with the owner's rights, and the binding names the agent", async () => {
+    await installProbe(wildAgent.token, UNATT_WILD_OFF, '/unattended-wild-off', 'V59_U_WILD_OFF');
+    await storeSecret(owner.token, 'V59_U_WILD_OFF', 'zz-V59_U_WILD_OFF-zz');
+    deliveries.length = 0;
+    const out = await runUnattended(UNATT_WILD_OFF);
+    assert(out.failed === null, `refused: ${out.failed}`);
+    assert(arrived('/unattended-wild-off')[0]?.headers['x-api-key'] === 'zz-V59_U_WILD_OFF-zz', 'nothing arrived');
+    const row = await rowOf(owner.token, 'V59_U_WILD_OFF');
+    assert(row.hostBinding?.by === wildAgent.gaii, `binding names the code writer: ${JSON.stringify(row)}`);
+});
+
+await test('25. question off: a host field the wildcard agent set chooses the first host, as before the audit', async () => {
+    assert((await setTarget(wildAgent.token, RECEIVER_HOST)).status === 200, 'agent set');
+    await storeSecret(owner.token, 'HF_C', 'zz-HF_C-zz');
+    deliveries.length = 0;
+    const out = await probe(HF_EXT, wildAgent.token, '/hf-off', 'HF_C');
+    assert(out.failed === null, `refused: ${out.failed}`);
+    assert(arrived('/hf-off')[0]?.headers['x-api-key'] === 'zz-HF_C-zz', `the receiver got: ${JSON.stringify(arrived('/hf-off'))}`);
+});
+
+await test('26. switching it back on is at once for the agent, and the agent-set host field asks again', async () => {
+    const on = await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(wildAgent.token), body: JSON.stringify({ on: true }) });
+    assert(on.status === 200 && on.body.data.setting.on === true, `agent on ${on.status}: ${JSON.stringify(on.body?.data ?? on.body?.error)}`);
+    await storeSecret(owner.token, 'HF_D', 'zz-HF_D-zz');
+    deliveries.length = 0;
+    const out = await probe(HF_EXT, wildAgent.token, '/hf-on-again', 'HF_D');
+    assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:') && deliveries.length === 0, `not asked again: ${JSON.stringify(out)}`);
+    const bad = await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(wildAgent.token), body: JSON.stringify({ on: 'no' }) });
+    assert(bad.status === 400, `a value that is not true or false: ${bad.status}`);
 });
 
 await stopReceiver();

@@ -9,9 +9,11 @@
  *   ALLOWING IS NOT HERE. A first use the node refused is allowed by the account holder signed in, on
  *   the page whose address the refusal names (POST /v1/secrets/{name}/approvals asks for the owner in
  *   person). Withdrawing only narrows, so secrets:manage is enough for it.
- * @structure secretAddressTools — aimeat_secret_host_set · aimeat_secret_approval_withdraw
+ * @structure secretAddressTools — aimeat_secret_host_set · aimeat_secret_approval_withdraw · aimeat_secret_host_ask
  * @usage imported by tool-catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.2.0 — 2026-10-25 — aimeat_secret_host_ask: the owner's "Ask me before my secret is sent to a
+ *     new address for the first time", read and switched (secaudit2026oct22; Jouni, 2026-10-25).
  *   v1.1.0 — 2026-10-21 — aimeat_secret_host_set gives only a FIRST address; changing or removing one
  *     is the owner's in person (secaudit 2026-10, R62).
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59 follow-up).
@@ -45,6 +47,20 @@ export const secretAddressTools = [
             extension: { type: 'string', required: true, description: 'The extension the approval names.' },
             installer: { type: 'string', required: true, description: 'The account that installed it, as the approval names it.' },
             host: { type: 'string', required: true, description: 'The host the approval names.' },
+        },
+    },
+    {
+        name: 'aimeat_secret_host_ask',
+        description: "Your owner's setting \"Ask me before my secret is sent to a new address for the first time\". While it is on (the default), when code you or another of their agents wrote, or an address such an agent set, would send one of their stored secrets to an address it has never gone to, the owner is asked first with one press, unless that agent holds secrets:manage. While it is off, it is sent and the address is kept. Without `on`: the setting, whether the owner chose it, and the node's default. With `on: true`: switched on at once. With `on: false`: switched off at once if you hold secrets:manage; otherwise your owner is asked, the answer carries approval_request (give them its approve_url), and it stays on until they allow it. Change it only when your owner asks.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Ask Before a Secret Goes Somewhere New', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // GET /v1/ghii/me/secret-host-ask takes memory:read; the PUT takes memory:write, asked by the
+        // route the CLI twin calls and by the node MCP handler before it writes.
+        scope: 'memory:read',
+        surfaces: ['agent', 'service'],
+        input: {
+            on: { type: 'boolean', description: 'true: ask the owner first; false: do not ask. Omit to read the setting.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

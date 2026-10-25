@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-25 — registerSecretHostAskTools: aimeat_secret_host_ask (secaudit2026oct22).
  *   2026-10-25 — registerInternetOpeningTools: an app opened to the internet on a closed node (six tools).
  *   2026-10-22 — registerDecideTools takes the session's caller, so a decision run reads and shows only what the session may read (secaudit 2026-10, v83, v84).
  *   2026-10-21 — registerAiImageTool takes the session's caller, for the publish gate on a public picture.
@@ -135,6 +136,7 @@ import { registerExposureTools } from './exposure.js';
 import { registerInternetOpeningTools } from './internet-opening.js';
 import { registerDmGroupTools } from './dm-groups.js';
 import { registerPublishRequestTools } from './publish-requests.js';
+import { registerSecretHostAskTools } from './secret-host-ask.js';
 import { registerAccountRightsTools } from './account-rights.js';
 import { registerAppManageTool } from './app-manage.js';
 import { registerAppsTools } from './apps.js';
@@ -274,6 +276,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerExposureTools(mcp, storage, config, caller);
     registerInternetOpeningTools(mcp, storage, config, caller);
     registerPublishRequestTools(mcp, storage, config, caller);
+    registerSecretHostAskTools(mcp, storage, config, caller);
     registerAccountRightsTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);

@@ -19,6 +19,7 @@
  * @usage app.use(ghiiRouter(config, storage, emailService)) from server.ts
  *
  * @version-history
+ *   2026-10-25 — GET and PUT /v1/ghii/me/secret-host-ask (ghii/secret-host-ask.ts; secaudit2026oct22).
  *   v1.3.0 — 2026-09-09 — The registration limiter keys by IP only; a bearer token no longer buys
  *     its own bucket on the public sign-up door.
  *   v1.2.0 — 2026-07-13 — Split route handlers into sibling modules under ./ghii/ (max-file-lines);
@@ -39,6 +40,7 @@ import { registerAttachEmailRoute } from './ghii/attach-email.js';
 import { registerWebVerifyRoutes } from './ghii/web-verify.js';
 import { registerRecoveryRoutes } from './ghii/recovery.js';
 import { registerProfileRoutes } from './ghii/profile.js';
+import { registerSecretHostAskRoutes } from './ghii/secret-host-ask.js';
 
 export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?: EmailService, onDirectoryChange?: () => void, peers?: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -54,6 +56,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     registerAttachEmailRoute(router, config, storage, emailService);
     registerWebVerifyRoutes(router, config, storage, emailService, onDirectoryChange, registrationLimit);
     registerRecoveryRoutes(router, config, storage, emailService);
+    registerSecretHostAskRoutes(router, config, storage);
     registerProfileRoutes(router, config, storage, onDirectoryChange);
 
     return router;

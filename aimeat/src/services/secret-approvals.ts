@@ -93,7 +93,8 @@ function askNotice(baseUrl: string, secret: string, key: ApprovalKey, why: strin
     return {
         type: SECRET_USE_ASK_TYPE,
         title: `Extension ${key.extension} asks to use your secret ${secret}`,
-        body: `${key.extension}, installed by ${key.installer}, needs your secret ${secret} for ${key.host}${purpose}. Open this to see why, or answer here.`,
+        body: `${key.extension}, installed by ${key.installer}, needs your secret ${secret} for ${key.host}${purpose}. `
+            + 'Your secret has not gone to this address before, so you are asked first, and nothing was sent. Open this to see why, or answer here.',
         link: url.slice(url.indexOf('/v1/')),
         i18n: { key: SECRET_USE_ASK_TYPE, vars: { extension: key.extension, installer: key.installer, secret, host: key.host, why: why ?? '' } },
         // Both answers on the notice, as on the page: a question with only Allow cannot be answered no.
