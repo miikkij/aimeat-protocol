@@ -8,6 +8,7 @@
  *   every symbol so no consumer import changes.
  * @version-history
  *   2026-10-25 — personalNodeMaxPerOwner (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
+ *   2026-10-25 — NodeLimitsConfig mixed in (config-node-limits.ts; secaudit2026oct22).
  *   v1.19.1 — 2026-10-25 — OperatorConfig and OperatorType moved to config-types-operator.ts unchanged and re-exported (an import cycle through config-sealing.ts).
  *   v1.19.0 — 2026-10-20 — ContentClassConfig mixed in (config-content-class.ts): contentClassMode,
  *     ffprobePath, ffmpegPath.
@@ -129,8 +130,9 @@ import type { TurnConfig } from './config-turn.js';
 import type { DocsignConfig } from './config-docsign.js';
 import type { PagesConfig } from './config-pages.js';
 import type { ContentClassConfig } from './config-content-class.js';
+import type { NodeLimitsConfig } from './config-node-limits.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, NodeLimitsConfig {
   port: number;
   baseUrl: string;
   /**

@@ -11751,6 +11751,7 @@
     "cfg_metrics_enabled": "Metrics endpoint",
     "cfg_metrics_access": "Metrics visibility",
     "cfg_mcp_session_idle_minutes": "MCP session idle limit",
+    "cfg_mcp_unused_client_days": "Unused client registrations (days)",
     "cfg_registration_mode": "Who may register",
     "cfg_scopes_default_agent_scopes": "Default agent scopes",
     "cfg_scopes_max_agent_scopes": "Available agent scopes",
@@ -12052,6 +12053,7 @@
     "cfgDesc_metrics_enabled": "Enable Prometheus metrics endpoint",
     "cfgDesc_metrics_access": "Metrics endpoint visibility: public, authenticated, or operator",
     "cfgDesc_mcp_session_idle_minutes": "Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)",
+    "cfgDesc_mcp_unused_client_days": "An MCP client registration that no sign-in used is deleted after this many days. A client someone signed in with stays. 0 keeps every registration.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
     "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, one per line. Out of the box it may read and write its owner's memory, read the catalogue, read the workspaces of its owner's organisms and see its owner's other agents.",
     "cfgDesc_scopes_max_agent_scopes": "The most permissions an agent can be given, one per line (* = all).",
@@ -26283,6 +26285,28 @@
       }
     },
     "config": {
+      "mcp": {
+        "unused_client_days": {
+          "title": "Unused MCP client registrations (days)",
+          "short": "An MCP client registration that no sign-in used is deleted after this many days. 0 keeps every registration. The default is 30.",
+          "what": "An AI app such as Claude registers itself with this node before the person signs in, and anyone can make such a registration without an account. A registration that led to a sign-in stays, because that sign-in still points to it. A registration that never led to a sign-in would stay in the database for good, so a cleanup each night at 04:53 deletes one that is older than this number of days.",
+          "range": "A whole number of days, 0 or more. The default is 30. 0 keeps every registration.",
+          "low": "Lower: abandoned registrations go sooner. An app whose registration was deleted registers again before it signs in.",
+          "high": "Higher: abandoned registrations stay longer in the database.",
+          "tip": "Keep the default. A client that someone signed in with is never deleted, whatever the number."
+        }
+      },
+      "personal_nodes": {
+        "max_per_owner": {
+          "title": "Personal node slots per owner",
+          "short": "How many personal nodes one owner may anchor to this node. 0 means no limit. The default is 3.",
+          "what": "This node has a number of slots for personal nodes (Max Slots), and every owner shares them. This limit stops one owner from taking all of them. An owner who has reached the limit is told the limit and how to free a slot: remove a node on the Nodes tab of the profile, or call DELETE /v1/personal/anchor/<node id>. Nodes that are anchored already stay when you lower the limit; it decides only the next one.",
+          "range": "A whole number, 0 or more. The default is 3. 0 means no limit.",
+          "low": "1: each owner anchors one personal node, which is the one their tunnel uses.",
+          "high": "Higher: an owner can keep several personal nodes, and fewer owners fit in the shared slots.",
+          "tip": "The tunnel of an owner serves one personal node, so a small number is enough for almost everyone."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Burn rate (0–1)",

@@ -11749,6 +11749,7 @@
     "cfg_metrics_enabled": "Mittaripääte",
     "cfg_metrics_access": "Mittarien näkyvyys",
     "cfg_mcp_session_idle_minutes": "MCP-session jouten-raja",
+    "cfg_mcp_unused_client_days": "Käyttämättömät asiakasrekisteröinnit (päivää)",
     "cfg_registration_mode": "Kuka saa rekisteröityä",
     "cfg_scopes_default_agent_scopes": "Agentin oletusoikeudet",
     "cfg_scopes_max_agent_scopes": "Tarjolla olevat agenttioikeudet",
@@ -12050,6 +12051,7 @@
     "cfgDesc_metrics_enabled": "Prometheus-mittaripääte käytössä.",
     "cfgDesc_metrics_access": "Mittaripäätteen näkyvyys: public, authenticated tai operator.",
     "cfgDesc_mcp_session_idle_minutes": "Sulje MCP-sessio, kun pyyntöjä ei ole tullut näin moneen minuuttiin (murto-osat sallittu; suljettu asiakas alustaa itsensä uudelleen).",
+    "cfgDesc_mcp_unused_client_days": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. Rekisteröinti, jolla joku on kirjautunut, säilyy. 0 säilyttää kaikki rekisteröinnit.",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
     "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Yksi oikeus rivillä. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia, lukea omistajansa organismien työtiloja ja nähdä omistajansa muut agentit.",
     "cfgDesc_scopes_max_agent_scopes": "Oikeudet, joita agentille voi enintään antaa, yksi rivillä (* = kaikki).",
@@ -26262,6 +26264,28 @@
       }
     },
     "config": {
+      "mcp": {
+        "unused_client_days": {
+          "title": "Käyttämättömät MCP-rekisteröinnit (päivää)",
+          "short": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. 0 säilyttää kaikki rekisteröinnit. Oletus on 30.",
+          "what": "Tekoälysovellus, kuten Claude, rekisteröityy tähän solmuun ennen kuin ihminen kirjautuu sisään. Kuka tahansa voi tehdä rekisteröinnin ilman tiliä. Rekisteröinti, jolla on kirjauduttu sisään, säilyy, koska kirjautuminen viittaa siihen yhä. Rekisteröinti, jolla ei koskaan kirjauduttu, jäisi tietokantaan pysyvästi. Siksi siivous poistaa joka yö klo 4.53 sellaisen rekisteröinnin, joka on vanhempi kuin tämä päivien määrä.",
+          "range": "Kokonaisluku päivinä, vähintään 0. Oletus on 30. 0 säilyttää kaikki rekisteröinnit.",
+          "low": "Pienempi: hylätyt rekisteröinnit poistuvat nopeammin. Sovellus, jonka rekisteröinti poistettiin, rekisteröityy uudelleen ennen kirjautumista.",
+          "high": "Suurempi: hylätyt rekisteröinnit pysyvät tietokannassa pidempään.",
+          "tip": "Pidä oletus. Asiakasta, jolla joku on kirjautunut, ei poisteta koskaan, olipa luku mikä tahansa."
+        }
+      },
+      "personal_nodes": {
+        "max_per_owner": {
+          "title": "Henkilökohtaisten solmujen paikat omistajaa kohden",
+          "short": "Kuinka monta henkilökohtaista solmua yksi omistaja voi ankkuroida tähän solmuun. 0 tarkoittaa, että rajaa ei ole. Oletus on 3.",
+          "what": "Tässä solmussa on tietty määrä paikkoja henkilökohtaisille solmuille (Maks. paikat), ja kaikki omistajat jakavat ne. Tämä raja estää yhtä omistajaa viemästä niitä kaikkia. Kun omistaja on rajalla, hänelle kerrotaan raja ja tapa vapauttaa paikka: hän poistaa solmun profiilin Solmut-välilehdellä tai kutsuu DELETE /v1/personal/anchor/<solmun tunniste>. Jo ankkuroidut solmut säilyvät, kun lasket rajaa. Raja koskee vain seuraavaa solmua.",
+          "range": "Kokonaisluku, vähintään 0. Oletus on 3. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "1: jokainen omistaja ankkuroi yhden henkilökohtaisen solmun, sen jota hänen tunnelinsa käyttää.",
+          "high": "Suurempi: omistaja voi pitää useita henkilökohtaisia solmuja, ja yhteisiin paikkoihin mahtuu vähemmän omistajia.",
+          "tip": "Omistajan tunneli palvelee yhtä henkilökohtaista solmua, joten pieni luku riittää lähes kaikille."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Polttoosuus",

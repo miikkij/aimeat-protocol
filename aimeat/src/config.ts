@@ -15,7 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
- *   2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3 (secaudit2026oct22).
+ *   2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, and nodeLimitsDefaults() (config-node-limits.ts) (secaudit2026oct22).
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
  *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
  *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
@@ -102,6 +102,7 @@ import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
 import { pagesDefaults } from './config-pages.js';
+import { nodeLimitsDefaults } from './config-node-limits.js';
 import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
@@ -287,6 +288,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     coHost: (process.env.AIMEAT_CO_HOST ?? deriveCoHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     ...pagesDefaults(),
+    ...nodeLimitsDefaults(),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party

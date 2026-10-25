@@ -33,10 +33,10 @@
      "slug": "g-1-mcp-server",
      "cells": [
       "<strong>MCP server</strong>",
-      "Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects.",
-      "<code>/v1/mcp</code>"
+      "Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects. A client registers itself before the sign-in; a registration that no sign-in used is deleted after 30 days by a nightly cleanup, and one that someone signed in with stays. The operator sets the number of days, or 0 to keep all, from the Config tab or through chat.",
+      "<code>/v1/mcp</code>, <code>POST /v1/mcp/register</code>, <code>mcp.unused_client_days</code>"
      ],
-     "plain": "MCP server Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects. /v1/mcp"
+     "plain": "MCP server Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects. A client registers itself before the sign-in; a registration that no sign-in used is deleted after 30 days by a nightly cleanup, and one that someone signed in with stays. The operator sets the number of days, or 0 to keep all, from the Config tab or through chat. /v1/mcp, POST /v1/mcp/register, mcp.unused_client_days"
     },
     {
      "slug": "g-1-purpose-sized-mcp-surfaces",
