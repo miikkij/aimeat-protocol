@@ -20,9 +20,9 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-10-25 — The silent bridge reads the refresh cookie by the node's config (`__Host-aimeat_rt` on https; secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  *   2026-10-25 — A grant given to an earlier holder's app of the author's name counts as absent on the silent bridge, the code exchange and the refresh (services/app-grant-author.ts; secaudit2026oct22).
- *   v1.27.0 — 2026-10-25 — A redirect on the bare app host is the app's own path-form address, or the host's root in
- *     web_message mode, else 400 INVALID_REDIRECT_URI (secaudit2026oct22; Jouni, 2026-10-25).
+ *   v1.27.0 — 2026-10-25 — A redirect on the bare app host is the app's own path-form address, or the host's root in web_message mode, else 400 INVALID_REDIRECT_URI (secaudit2026oct22; Jouni, 2026-10-25).
  *   v1.26.0 — 2026-10-13 — An app's allowance from the move to 4.0 (services/app-scope-allowance.ts) counts as declared:
  *     authorize and the silent bridge ask for it, and the refresh's narrowing keeps it.
  *   v1.25.0 — 2026-10-06 — SECURITY: code at an app's draft origin (`<sub>--draft.<appHost>`) is
@@ -628,7 +628,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
     // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation. The same check
     // the refresh makes (checkRefreshSession: the account's age and a reused token too, AUTH-1).
-    const raw = readRefreshCookie(req);
+    const raw = readRefreshCookie(req, config);
     const check = raw ? await checkRefreshSession(storage, hashToken(raw)) : null;
     // Include the resolved app so the SDK can open the consent popup (which prompts apex login) even
     // when no one is logged in — the user logs in there, then approves, in one flow.

@@ -16,6 +16,9 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-25 — maybeSetPatBrowserSession reads the refresh cookie by the node's config, so on https it
+ *     sets `__Host-aimeat_rt` when only the old name is present (secaudit2026oct22,
+ *     refresh-cookie-unprefixed-first-match).
  *   2026-10-25 — maybeSetPatBrowserSession sets the PAT session cookie only for a request this node's
  *     own page or a navigation made (Sec-Fetch-Site none or same-origin, Origin absent or this node's);
  *     a request another origin composed is still authenticated by the token and gets no cookie
@@ -246,7 +249,7 @@ function maybeSetPatBrowserSession(req: Request, res: Response, rawToken: string
   if (req.path.startsWith('/v1/auth/')) return;
   if (!String(req.headers['user-agent'] || '').includes('Mozilla')) return;
   if (!requestMadeByThisOrigin(req, config.baseUrl)) return;
-  if (readRefreshCookie(req)) return;
+  if (readRefreshCookie(req, config)) return;
   setRefreshCookie(req, res, config, rawToken);
 }
 

@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.31.1 — 2026-10-25 — casdoorLinkDomains, entraLinkDomains and refreshCookieLegacyUntil read from the environment (secaudit2026oct22).
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
  *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
  *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
@@ -330,6 +331,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     refreshIdleDays: parseInt(process.env.AIMEAT_REFRESH_IDLE_DAYS ?? '30', 10),
     refreshAbsoluteDays: parseInt(process.env.AIMEAT_REFRESH_ABSOLUTE_DAYS ?? '90', 10),
     refreshGraceMs: parseInt(process.env.AIMEAT_REFRESH_GRACE_MS ?? '60000', 10),     // 60s
+    refreshCookieLegacyUntil: process.env.AIMEAT_REFRESH_COOKIE_LEGACY_UNTIL ?? '',
 
     welcomeBonus: parseInt(process.env.AIMEAT_WELCOME_BONUS ?? '100', 10),
     dailyAllowance: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE ?? '50', 10),

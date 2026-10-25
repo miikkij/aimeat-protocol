@@ -8979,8 +8979,13 @@ paths:
       summary: Refresh access token
       description: |
         Refresh an access token. Two modes:
-          * **Owner session (cookie):** send the httpOnly `aimeat_rt` refresh cookie (set at
-            login) plus the `X-AIMEAT-Refresh: 1` header (CSRF guard). The refresh token is
+          * **Owner session (cookie):** send the httpOnly refresh cookie (set at login) plus the
+            `X-AIMEAT-Refresh: 1` header (CSRF guard). On an https node the cookie is
+            `__Host-aimeat_rt` (Secure, Path=/, host-only); a plain-http node keeps `aimeat_rt`
+            (Path=/v1/auth). An https node still reads `aimeat_rt` until the day the setting
+            `auth.refresh_cookie_legacy_until` names, and then sets `__Host-aimeat_rt` and clears
+            the old name; a personal access token under the old name is not read on https, and a
+            request carrying two `aimeat_rt` values is read as carrying none. The refresh token is
             rotated one-time-use with a short grace window and a new cookie is set; replaying
             a consumed token revokes the whole session. Returns `{ token, expires_in, display_name }`
             (the owner's current display name, so the client login pill picks up profile edits).
@@ -9051,7 +9056,8 @@ paths:
       operationId: revokeToken
       summary: Revoke session / logout
       description: |
-        Revoke the current session and clear the `aimeat_rt` refresh cookie. Accepts the
+        Revoke the current session and clear the refresh cookie (`__Host-aimeat_rt` and `aimeat_rt`
+        on https, `aimeat_rt` on plain http). Accepts the
         refresh cookie and/or a Bearer token, and works even after the access token expired.
       tags: [Auth]
       security:

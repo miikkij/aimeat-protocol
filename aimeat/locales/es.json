@@ -10125,6 +10125,7 @@
     "cfg_auth_entra_allowed_tenants": "Inquilinos de Entra permitidos",
     "cfg_auth_casdoor_link_domains": "Dominios de confianza de Casdoor",
     "cfg_auth_entra_link_domains": "Dominios de confianza de Entra",
+    "cfg_auth_refresh_cookie_legacy_until": "Cookie de sesión anterior leída hasta",
     "cfg_email_smtp_secure": "TLS implícito",
     "cfg_email_smtp_reject_unauthorized": "Rechazar certificados TLS no válidos",
     "cfg_account_events_window": "Ventana de eventos de la cuenta",
@@ -10369,6 +10370,7 @@
     "cfgDesc_auth_entra_allowed_tenants": "GUIDs de inquilinos de Microsoft Entra que pueden iniciar sesión (separados por comas). Vacío: la puerta la decide AIMEAT_ENTRA_OAUTH_TENANT por sí sola.",
     "cfgDesc_auth_casdoor_link_domains": "Dominios cuyas direcciones de Casdoor cuentan como verificadas (separados por comas, * = todos). Solo una dirección así une un inicio de sesión con Casdoor a una cuenta existente o pasa a ser la dirección verificada de una cuenta nueva. Vacío: ninguno.",
     "cfgDesc_auth_entra_link_domains": "Dominios cuyas direcciones de Microsoft Entra cuentan como verificadas (separados por comas, * = todos). Vacío: todos cuando puede entrar un solo inquilino, ninguno cuando la lista de inquilinos permitidos nombra varios.",
+    "cfgDesc_auth_refresh_cookie_legacy_until": "Último día (AAAA-MM-DD, UTC) en que un servidor https todavía lee el nombre anterior de la cookie de sesión, aimeat_rt, y pasa el navegador a __Host-aimeat_rt. Si está vacío, se fija 30 días después del primer arranque. Una fecha pasada: el nombre anterior se ignora desde ya, y un navegador que solo tiene esa cookie inicia sesión de nuevo.",
     "cfgDesc_features_extended_features_enabled": "Conjunto de funciones extendidas activado.",
     "cfgDesc_work_queue_max_pending": "Máximo de trabajos pendientes por proveedor.",
     "cfgDesc_work_webhook_max_retries": "Máximo de reintentos de entrega de webhooks.",
@@ -24201,6 +24203,15 @@
           "ex1": "Vacío y un solo inquilino: tu personal entra en sus cuentas existentes desde el primer inicio de sesión con Microsoft.",
           "ex2": "corp.example, partner.example con dos inquilinos permitidos: las direcciones de esos dos dominios se unen a cuentas existentes; una dirección de otro dominio lleva a elegir un nombre de usuario.",
           "tip": "Con varios inquilinos permitidos, agrega los dominios propios de cada organización. Un dominio de la lista permite al administrador de ese inquilino entrar en las cuentas de aquí que tengan una dirección en ese dominio."
+        },
+        "refresh_cookie_legacy_until": {
+          "title": "Cookie de sesión anterior leída hasta",
+          "short": "El último día en que este servidor todavía lee el nombre anterior de la cookie de sesión del navegador. Después, un navegador que solo tiene la cookie anterior inicia sesión de nuevo.",
+          "what": "El navegador mantiene la sesión de una persona con una cookie. En un servidor https, la cookie ahora se llama __Host-aimeat_rt. El navegador acepta una cookie con ese nombre solo de este mismo servidor, así que una aplicación en su propia dirección bajo este servidor no puede ponerla en el navegador. Antes, la cookie se llamaba aimeat_rt, y una aplicación sí podía escribir una cookie con ese nombre. Hasta el final de este día (UTC), el servidor todavía lee el nombre anterior. Cuando lo lee, le da al navegador la cookie nueva y quita la anterior, así que quien vuelve a tiempo sigue con su sesión. Después de este día, el nombre anterior se ignora. Un servidor solo con http mantiene el nombre anterior, porque el nuevo necesita https.",
+          "range": "Una fecha, AAAA-MM-DD. Si está vacía al arrancar, el servidor la fija 30 días después de ese arranque y la guarda. Una fecha pasada ignora el nombre anterior desde ya.",
+          "ex1": "La fecha fijada en el primer arranque: quien vuelve dentro de 30 días sigue con su sesión.",
+          "ex2": "La fecha de ayer: el nombre anterior deja de funcionar ya, y quien solo tenía la cookie anterior inicia sesión de nuevo.",
+          "tip": "Deja la fecha que fijó el servidor. Pon una fecha anterior si quieres cerrar antes el nombre anterior, por ejemplo cuando una aplicación de este servidor pudo escribir cookies."
         }
       },
       "totp": {
