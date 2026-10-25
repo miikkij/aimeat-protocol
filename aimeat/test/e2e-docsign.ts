@@ -29,6 +29,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=docsign
  * @version-history
+ *   2026-10-25 -- Alice's wallet signature, matched with her display name since she has no verified name, is sealed with the caveat NAME_NOT_VERIFIED and the certificate subject, in the statement and the lookup; the verified-name key is refused on the memory routes (secaudit2026oct22, lead 3924).
  *   2026-10-25 -- Alice's wallet signature, whose revocation status the offline suite cannot know, is sealed with the caveat REVOCATION_UNKNOWN, in the statement and the public lookup (secaudit2026oct22, lead 3895).
  *   2026-10-15 — The wallet signer comes from the test CA the node trusts; a chain to no trusted root and a certificate naming somebody else are refused (feature-list audit 38).
  *   2026-10-15 — An owner-level personal access token is refused method "session", used directly and
@@ -485,6 +486,15 @@ async function main() {
         assert((sig.statement.caveats ?? []).some((c: any) => c.code === 'REVOCATION_UNKNOWN'), `the sealed caveat: ${JSON.stringify(sig.statement.caveats)}`);
         const pubSig = look.body.data.requests.find((q: any) => q.id === walletRequestId).signatures.find((x: any) => x.signer === ghii(names.alice));
         assert((pubSig?.caveats ?? []).some((c: any) => c.code === 'REVOCATION_UNKNOWN' && /could not be established/.test(c.text)), `the lookup's caveat: ${JSON.stringify(pubSig)}`);
+        // Alice has no name an identity verification proved, so the certificate was matched with her
+        // display name: the seal says so, and it names the certificate (secaudit2026oct22, lead 3924).
+        assert((sig.statement.caveats ?? []).some((c: any) => c.code === 'NAME_NOT_VERIFIED'), `the name caveat: ${JSON.stringify(sig.statement.caveats)}`);
+        assert(String(sig.statement.certificate?.subject ?? '').includes(names.alice), `the sealed certificate subject: ${JSON.stringify(sig.statement.certificate)}`);
+        assert(String(pubSig?.certificate?.subject ?? '').includes(names.alice) && (pubSig?.caveats ?? []).some((c: any) => c.code === 'NAME_NOT_VERIFIED'),
+            `the lookup names the certificate and the caveat: ${JSON.stringify(pubSig)}`);
+        // The verified name is the node's to write: no memory route takes it, the account holder in person included.
+        const forged = await json('/v1/memory', { method: 'POST', headers: auth(alice.token), body: JSON.stringify({ key: 'identity.verified-name.current', value: { name: 'Somebody Else', method: 'ftn', verifiedAt: new Date().toISOString() }, visibility: 'private' }) });
+        assert(forged.status === 403 || forged.status === 400, `a written verified name: ${forged.status} ${JSON.stringify(forged.body)}`);
     });
 
     await test('bob signs the signed PDF with his wallet, never the original; an agent starts it for its owner over MCP', async () => {

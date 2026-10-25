@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-25 -- A wallet signature's statement carries the certificate's subject and issuer, and the checks and the public lookup show them (secaudit2026oct22, lead 3924).
  *   2026-10-25 -- A wallet signature's caveats (WalletEvidence.caveats) are sealed into its statement, and the checks and the public lookup carry them (secaudit2026oct22, lead 3895).
  *   2026-10-25 -- verifyRecordSignatures and SignatureCheck moved unchanged to verify-signatures.ts (max-file-lines); exported from here as before.
  *   2026-10-25 — A wallet signature from an EU reference-wallet test certificate is sealed with test: true, and the signature checks and the public lookup carry `test` (secaudit2026oct22, records.ts:test-anchor-wallet-signature-sealed-without-test-mark).
@@ -108,6 +109,8 @@ export interface WalletEvidence {
   nameMatches: boolean | null;
   /** What could not be established, sealed into the statement (statement.ts STATEMENT_CAVEATS). */
   caveats?: StatementCaveat[];
+  /** Which name the certificate was matched with: the verified one, or the display name (eudi.ts walletNameBinding). */
+  nameBasis?: 'verified' | 'display-name';
 }
 
 export interface DocSignature {
@@ -519,6 +522,8 @@ async function sealInto(
     ...(ev.wallet?.validation.test ? { test: true as const } : {}),
     // What the node could not establish is sealed with the signature it qualifies (secaudit2026oct22).
     ...(ev.wallet?.caveats?.length ? { caveats: ev.wallet.caveats } : {}),
+    // Whose certificate the node matched with the signer, so the seal and the lookup name it (lead 3924).
+    ...(ev.wallet ? { certificate: { subject: ev.wallet.certificate.subject, issuer: ev.wallet.certificate.issuer } } : {}),
   };
   const seal = await sealStatement(statement, nodeKey);
   rec.signatures[signer] = {
@@ -679,6 +684,8 @@ export interface PublicSignature {
   test: boolean;
   /** What the node could not establish when it sealed the signature, as sealed; empty when nothing. */
   caveats: StatementCaveat[];
+  /** A wallet signature's certificate subject and issuer, as sealed; null for other methods and older seals. */
+  certificate: { subject: string; issuer: string | null } | null;
 }
 
 export interface PublicRequestView {
@@ -698,7 +705,7 @@ export async function publicView(ctx: DocsignCtx, rec: DocSignRecord): Promise<P
     id: rec.id, title: rec.title, state: rec.state,
     document: { sha256: rec.document.sha256, name: rec.document.name, size: rec.document.size },
     createdAt: rec.createdAt, completedAt: rec.completedAt, partiesTotal: rec.parties.length,
-    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test, caveats: c.caveats })),
+    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test, caveats: c.caveats, certificate: c.certificate })),
   };
 }
 

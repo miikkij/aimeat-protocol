@@ -10,6 +10,7 @@
  * @structure SignatureCheck · verifyRecordSignatures(ctx, rec)
  * @usage const checks = await verifyRecordSignatures(ctx, rec);
  * @version-history
+ *   v1.2.0 -- 2026-10-25 -- A check carries the sealed certificate subject and issuer (secaudit2026oct22, lead 3924).
  *   v1.1.0 -- 2026-10-25 -- A check carries the caveats sealed into the statement (secaudit2026oct22, lead 3895).
  *   v1.0.0 -- 2026-10-25 -- Moved from records.ts (max-file-lines), bodies verbatim.
  */
@@ -37,6 +38,8 @@ export interface SignatureCheck {
   test: boolean;
   /** What the node could not establish when it sealed the signature, as sealed; empty when nothing. */
   caveats: StatementCaveat[];
+  /** A wallet signature's certificate subject and issuer, as sealed; null for other methods and older seals. */
+  certificate: { subject: string; issuer: string | null } | null;
 }
 
 export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord): Promise<SignatureCheck[]> {
@@ -64,6 +67,7 @@ export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord
       test: st.test === true || sig.wallet?.validation.test === true,
       // Read from the sealed statement, so a caveat is shown only as the seal covers it.
       caveats: st.caveats ?? [],
+      certificate: st.certificate ?? null,
     });
   }
   return out;
