@@ -11629,6 +11629,8 @@
     "cfg_morsel_policy_pacing_pack_currency": "Tahdistuspaketti: valuutta",
     "cfg_boards_public_per_owner_max": "Julkiset taulut per tili",
     "cfg_auth_entra_allowed_tenants": "Sallitut Entra-vuokraajat",
+    "cfg_auth_casdoor_link_domains": "Casdoorin luotetut verkkotunnukset",
+    "cfg_auth_entra_link_domains": "Entran luotetut verkkotunnukset",
     "cfg_email_smtp_secure": "Suora TLS",
     "cfg_email_smtp_reject_unauthorized": "Hylkää kelvottomat TLS-varmenteet",
     "cfg_account_events_window": "Tilitapahtumien ikkuna",
@@ -11871,6 +11873,8 @@
     "cfgDesc_boards_public_per_owner_max": "Montako julkista ilmoitustaulua yksi tili voi pitää (järjestelmätaulut pysyvät operaattorilla).",
     "cfgDesc_auth_jwt_ttl_seconds": "JWT-tunnuksen elinaika sekunteina.",
     "cfgDesc_auth_entra_allowed_tenants": "Microsoft Entra -vuokraajat, jotka saavat kirjautua (pilkuin eroteltuina GUID:eina). Tyhjä: portti tulee AIMEAT_ENTRA_OAUTH_TENANT-arvosta yksinään.",
+    "cfgDesc_auth_casdoor_link_domains": "Verkkotunnukset, joiden Casdoor-osoitteet lasketaan vahvistetuiksi (pilkuin eroteltuina, * = kaikki). Vain tällainen osoite liittää Casdoor-kirjautumisen olemassa olevaan tiliin tai tulee uuden tilin vahvistetuksi osoitteeksi. Tyhjä: ei mikään.",
+    "cfgDesc_auth_entra_link_domains": "Verkkotunnukset, joiden Microsoft Entra -osoitteet lasketaan vahvistetuiksi (pilkuin eroteltuina, * = kaikki). Tyhjä: kaikki, kun yksi vuokraaja saa kirjautua, eikä mikään, kun sallittuja vuokraajia on useampi.",
     "cfgDesc_features_extended_features_enabled": "Laajennettu ominaisuusjoukko käytössä.",
     "cfgDesc_work_queue_max_pending": "Odottavien työkohteiden katto tarjoajaa kohden.",
     "cfgDesc_work_webhook_max_retries": "Webhook-toimituksen uusintayritysten katto.",
@@ -26428,6 +26432,24 @@
           "ex2": "900: 15 minuuttia palvelimelle, jolla on arkaluonteista tietoa.",
           "ex3": "86 400: vuorokausi testipalvelimelle, jolla uusimiset ovat haitaksi.",
           "tip": "Pidä oletus, ellei sinulla ole syytä muuttaa sitä. Lyhyempi aika on turvallisempi. Pidempi aika helpottaa ohjelmia, jotka eivät uusi tokeniaan hyvin."
+        },
+        "casdoor_link_domains": {
+          "title": "Casdoorin luotetut verkkotunnukset",
+          "short": "Verkkotunnukset, joiden sähköpostiosoitteet Casdoor saa vahvistaa. Vain niiden osoite lasketaan vahvistetuksi. Tyhjä: ei mikään. *: kaikki.",
+          "what": "Kun joku kirjautuu Casdoorilla ensimmäistä kertaa, Casdoor kertoo hänen sähköpostiosoitteensa. Jos täällä on jo tili, jolla on sama vahvistettu osoite, kirjautuminen liitetään siihen tiliin ja hän pääsee sisään sille tilille. Uusi tili saa osoitteen vahvistettuna. Kumpikin tapahtuu vain, kun osoitteen verkkotunnus on tällä listalla. Muuten osoite on vahvistamaton: henkilö valitsee uuden käyttäjätunnuksen, ja uusi tili vahvistaa osoitteensa täällä. Casdoorin voi asettaa niin, että käyttäjä saa vaihtaa osoitteensa ilman vahvistuskoodia. Siksi listalle kuuluvat vain ne verkkotunnukset, joiden postilaatikoita organisaatiosi hallitsee. Jos Casdoor ilmoittaa email_verified: false, osoite on vahvistamaton kaikissa verkkotunnuksissa. Muutos koskee seuraavaa kirjautumista.",
+          "range": "Pilkuin eroteltu luettelo verkkotunnuksista, esimerkiksi corp.example, corp-group.example. * tarkoittaa kaikkia verkkotunnuksia. Oletus on tyhjä, jolloin mihinkään verkkotunnukseen ei luoteta.",
+          "ex1": "corp.example: työntekijä, jonka osoite on corp.example-verkkotunnuksessa, pääsee omalle tililleen jo ensimmäisellä Casdoor-kirjautumisella.",
+          "ex2": "Tyhjä: Casdoor-kirjautuminen, jota ei ole liitetty tiliin, vie aina käyttäjätunnuksen valintaan.",
+          "tip": "Lisää vain verkkotunnukset, joiden postilaatikoita organisaatiosi hallitsee. Käytä tähteä vain, jos Casdoor kysyy vahvistuskoodin jokaisesta osoitteesta."
+        },
+        "entra_link_domains": {
+          "title": "Entran luotetut verkkotunnukset",
+          "short": "Verkkotunnukset, joiden sähköpostiosoitteet Microsoft Entra saa vahvistaa. Tyhjä: kaikki, kun yksi vuokraaja saa kirjautua, eikä mikään, kun useampi saa.",
+          "what": "Kun joku kirjautuu Microsoftilla ensimmäistä kertaa, Entra kertoo hänen sähköpostiosoitteensa. Jos täällä on jo tili, jolla on sama vahvistettu osoite, kirjautuminen liitetään siihen tiliin ja hän pääsee sisään sille tilille. Uusi tili saa osoitteen vahvistettuna. Kumpikin tapahtuu vain, kun osoite lasketaan vahvistetuksi. Kun vuokraajia on yksi (oma organisaatiosi), tyhjä asetus luottaa kaikkiin verkkotunnuksiin. Kun sallittujen vuokraajien luettelossa on useampi organisaatio, kunkin kumppanin ylläpitäjä asettaa käyttäjiensä osoitteet. Silloin tyhjä asetus ei luota yhteenkään osoitteeseen, joten lisää listalle kunkin hyväksytyn organisaation omat verkkotunnukset. Jos email_verified- tai xms_edov-tieto on false, osoite on vahvistamaton kaikissa verkkotunnuksissa. Jos Microsoft-kirjautumista ei ole rajattu vuokraajiin, mikään osoite ei ole vahvistettu. Muutos koskee seuraavaa kirjautumista.",
+          "range": "Pilkuin eroteltu luettelo verkkotunnuksista. * tarkoittaa kaikkia verkkotunnuksia. Oletus on tyhjä.",
+          "ex1": "Tyhjä ja yksi vuokraaja: omat työntekijäsi pääsevät omille tileilleen jo ensimmäisellä Microsoft-kirjautumisella.",
+          "ex2": "corp.example, partner.example ja kaksi sallittua vuokraajaa: näiden kahden verkkotunnuksen osoitteet liitetään olemassa oleviin tileihin, ja muun verkkotunnuksen osoite vie käyttäjätunnuksen valintaan.",
+          "tip": "Kun vuokraajia on useampi, lisää listalle kunkin organisaation omat verkkotunnukset. Listalla oleva verkkotunnus antaa sen vuokraajan ylläpitäjälle pääsyn täällä oleviin tileihin, joiden osoite on siinä verkkotunnuksessa."
         }
       },
       "totp": {

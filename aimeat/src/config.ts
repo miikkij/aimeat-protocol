@@ -550,10 +550,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     casdoorOAuthClientId: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_ID ?? '',
     casdoorOAuthClientSecret: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_SECRET ?? '',
     casdoorOAuthRedirectUri: process.env.AIMEAT_CASDOOR_OAUTH_REDIRECT_URI ?? '',
+    casdoorLinkDomains: process.env.AIMEAT_CASDOOR_LINK_DOMAINS ?? '',
     entraOAuthEnabled: process.env.AIMEAT_ENTRA_OAUTH_ENABLED === 'true',
     entraOAuthTenant: process.env.AIMEAT_ENTRA_OAUTH_TENANT ?? 'common',
     entraAllowedTenants: (process.env.AIMEAT_ENTRA_ALLOWED_TENANTS ?? '')
       .split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+    entraLinkDomains: process.env.AIMEAT_ENTRA_LINK_DOMAINS ?? '',
     entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
     entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
     entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',

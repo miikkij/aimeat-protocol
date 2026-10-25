@@ -17,6 +17,9 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-10-25 — The callback applies the provider's link-domain fence (OidcProvider.emailLinkFence)
+ *     before the mapping tree: a Casdoor or Entra address outside the provider's link domains counts
+ *     as unverified (secaudit2026oct22, oidc-email-verified-without-idp-proof).
  *   2026-10-25 — A round finishes only in the browser that started it: authorize sets the round's
  *     cookie and stores its hash, and the callback answers ?auth_error=<ID>_OTHER_BROWSER to a request
  *     without it, before the code is exchanged (middleware/login-round-binding.ts; secaudit2026oct22,
@@ -149,12 +152,17 @@ export function oauthLoginRouter(
         const mapped = p.mapClaims(tokenResult.claims);
         if (!mapped) { fail(`${PREFIX}_NO_SUBJECT`); return; }
 
+        // The provider's link domains: outside them the address is treated as unverified, so it
+        // neither links to an existing account nor becomes a new account's verified address.
+        const emailVerified = mapped.emailVerified && !!mapped.email
+          && (!p.emailLinkFence || p.emailLinkFence(mapped.email));
+
         // The shared account-mapping tree (services/external-login.ts).
         const result = await mapExternalIdentity(storage, {
           providerId: p.id,
           sub: mapped.sub,
           email: mapped.email,
-          emailVerified: mapped.emailVerified,
+          emailVerified,
           displayName: mapped.displayName,
           redirect: postLoginPath,
         });
