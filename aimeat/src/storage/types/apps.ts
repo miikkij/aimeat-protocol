@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.20.0 — 2026-10-25 — SubdomainSiteRecord gains `origin` (SubdomainSiteOrigin): who chose the
+ *     label, the operator or a publish. Postgres 0116, SQLite safeAddColumn (secaudit2026oct22).
  *   v1.19.0 — 2026-10-18 — AppMarks gains `info` and `tucked`; a draft's manifest may carry
  *     `draftNotice` (AppDraftNotice), what the draft is changing. Both live in JSON, no migration.
  *   v1.18.0 — 2026-10-17 — AppRecord gains `access`: who may open the app (absent anyone,
@@ -534,7 +536,18 @@ export interface SubdomainSiteRecord {
   createdBy: string;            // GHII of the operator who created the mapping
   createdAt: string;            // ISO timestamp
   updatedAt: string;            // ISO timestamp
+  /**
+   * Who chose this label. 'operator': the operator routes (or the operator's decision on a row), and
+   * the app is served on the apex namespace `<label>.<apex>` too. 'publisher': the label a publish or
+   * an open assigned to the app (routes/subdomains.ts ensureAppSubdomain), served only on the app
+   * origin `<label>.<appHost>`. Null or absent: a row written before the column existed that the
+   * start step could not classify (services/subdomain-site-origin-keep.ts), served as before.
+   */
+  origin?: SubdomainSiteOrigin | null;
 }
+
+/** Who chose a subdomain label (SubdomainSiteRecord.origin). */
+export type SubdomainSiteOrigin = 'operator' | 'publisher';
 
 // Phase E — App Marketplace purchase receipts (immutable, self-contained)
 export interface AppPurchaseRecord {

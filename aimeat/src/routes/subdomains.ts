@@ -14,6 +14,10 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.34.0 — 2026-10-25 — SECURITY (secaudit2026oct22): a label a publish assigns is written with
+ *     origin 'publisher' and, like a node name, is not served on the apex namespace: `<label>.<apex>`
+ *     and `<label>--draft.<apex>` answer 302 to the app origin (404 without one). An operator's site
+ *     serves on the apex as before (services/subdomain-site-origin.ts).
  *   v1.33.0 — 2026-10-24 — SECURITY (secaudit2026oct22): a node name (login, account, pay..., and the
  *     label of a configured node host; services/subdomain-node-labels.ts) is never auto-assigned as an
  *     app's label, and on the apex namespace an app row holding one answers 302 to its per-app origin
@@ -185,6 +189,7 @@ import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain
 import { pageOriginRefused } from './page-open.js';
 import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
 import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
+import { apexServesSite, autoLabelCandidates } from '../services/subdomain-site-origin.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -239,15 +244,13 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
   const taken = new Set(sites.map(s => s.subdomain));
   // A node name (login, account, pay...) is never an app's label (services/subdomain-node-labels.ts).
   const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !isNodeApexLabel(n, config) && !taken.has(n) && draftBaseLabel(n) === null;
-  let base = filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
-  if (base.length < 2) base = `app-${base}`.replace(/-+$/g, '').slice(0, 50);
-  const candidates = [base, `${ownerBare}-${base}`.replace(/^-+|-+$/g, '').slice(0, 63), ...Array.from({ length: 50 }, (_, i) => `${base}-${i + 2}`)];
-  const name = candidates.find(free);
+  const name = autoLabelCandidates(ownerBare, filename).find(free);
   if (!name) return null;
 
   const now = new Date().toISOString();
   try {
-    await storage.createSubdomainSite({ subdomain: name, kind: 'app', target, enabled: true, createdBy: `${ownerBare}@${config.nodeId}`, createdAt: now, updatedAt: now });
+    // origin 'publisher': this label is served only on the app origin (services/subdomain-site-origin.ts).
+    await storage.createSubdomainSite({ subdomain: name, kind: 'app', target, enabled: true, createdBy: `${ownerBare}@${config.nodeId}`, createdAt: now, updatedAt: now, origin: 'publisher' });
     return name;
   } catch {
     // Race: a concurrent request created the mapping — re-resolve, on the same terms as above.
@@ -632,6 +635,14 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown subdomain'));
 
     if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return notFound();
+    // A label the apex does not serve (a node name, or a publisher's label) answers with its app
+    // origin, path and query kept (services/subdomain-site-origin.ts apexServesSite).
+    const toAppOrigin = () => {
+      const there = nodeLabelAppOrigin(config, sub, req.originalUrl);
+      if (!there) return notFound();
+      res.setHeader('Cache-Control', 'no-store');
+      res.redirect(302, there);
+    };
 
     // An app's draft origin (DRAFT_LABEL_SUFFIX): the app's unpublished draft, against a draft-preview
     // token and nothing else. The published app is never served here, no frame grant widens the
@@ -640,7 +651,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     if (draftOf !== null) {
       const draftSite = await storage.getSubdomainSite(draftOf);
       const draftToken = req.query.preview as string | undefined;
-      if (!draftSite || !draftSite.enabled || draftSite.kind !== 'app' || !draftToken) return notFound();
+      if (!draftSite || !draftSite.enabled || draftSite.kind !== 'app') return notFound();
+      if (!req.appOrigin && !apexServesSite(draftSite, draftOf, config)) return toAppOrigin();
+      if (!draftToken) return notFound();
       await serveDraftPreview(res, storage, config, draftSite.target, draftToken, appCsp(apexOrigin), apexOrigin);
       return;
     }
@@ -653,16 +666,10 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
 
-    // A node name (login, account, pay...) never shows an app on the apex namespace, where the
-    // node's own pages answer on the same host. A row that already holds one keeps serving on its
-    // per-app origin, and the apex sends the visitor there (services/subdomain-node-labels.ts).
-    if (!req.appOrigin && isNodeApexLabel(sub, config)) {
-      const there = nodeLabelAppOrigin(config, sub, req.originalUrl);
-      if (!there) return notFound();
-      res.setHeader('Cache-Control', 'no-store');
-      res.redirect(302, there);
-      return;
-    }
+    // A node name and a label a publish assigned never show an app on the apex namespace, where the
+    // node's own pages and sign-in answer. The app keeps serving on its per-app origin. An operator's
+    // site, and a row from before `origin` not yet classified, serve here as before.
+    if (!req.appOrigin && !apexServesSite(site, sub, config)) return toAppOrigin();
 
     // Draft preview (staging): a valid, short-lived draft-preview token serves this
     // app's UNPUBLISHED draft instead of the live version — the owner tests the next

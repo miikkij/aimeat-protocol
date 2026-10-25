@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-25 -- subdomain_set forwards `subdomain_origin` as `origin` (secaudit2026oct22).
  *   2026-10-18 -- marks forwards `info` and `tucked`.
  *   2026-10-17 -- settings forwards `open_to` (who may open the app).
  *   2026-10-13 -- scope_allowance and scope_allowance_remove over GET and DELETE .../scope-allowance.
@@ -150,6 +151,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             const sub = String(input.subdomain);
             const body: Input = pick(input, ['target', 'enabled']);
             if (input.subdomain_kind !== undefined) body.kind = input.subdomain_kind;
+            if (input.subdomain_origin !== undefined) body.origin = input.subdomain_origin;
             // Change it when it exists, create it when it does not: the route pair has no upsert.
             const updated = await client.patch(`/v1/admin/subdomains/${enc(sub)}`, body);
             if (updated.ok || updated.error?.code !== 'NOT_FOUND') return updated;
