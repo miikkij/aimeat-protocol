@@ -18,6 +18,10 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-25 — aimeat_schedule_list without workflow:read lists the schedules the agent may manage
+ *     (canManageSchedule: its own and its sibling agents') and those that target it; app-made and
+ *     ecosystem-app-made schedules, with their prompts, need workflow:read as on GET /v1/schedules
+ *     (secaudit2026oct22, aimeat_schedule_list:createdByAgent-filter-without-word).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — The write caller names the session's kind and roles, as the REST door does, so
@@ -51,7 +55,8 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord, canManageSchedule } from '../services/schedule-write.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { schedulePromptOf } from '../services/schedule-prompt.js';
@@ -152,7 +157,15 @@ export function registerAgentScheduleTools(
     },
     async ({ detail }) => {
       const all = await storage.listScheduledJobs({ ownerScope });
-      const mine = all.filter(j => j.createdByAgent || j.agentGaii === agentGaii);
+      // Without a word: the schedules this agent may manage (its own and its sibling agents', the
+      // canManageSchedule rule) and those that target it. createdByAgent alone is also true for an
+      // app-made and an ecosystem-app-made schedule, and those, with their prompts, are the
+      // owner-wide list GET /v1/schedules gives on workflow:read, so a session holding that word
+      // keeps the list it had (secaudit2026oct22).
+      const withWord = scopeIsCovered(sessionScopes, 'workflow:read');
+      const self = writeCaller();
+      const mine = all.filter(j => j.agentGaii === agentGaii
+        || (withWord ? j.createdByAgent : canManageSchedule(self, ownerScope, j)));
       return text({
         schedules: mine.map(j => ({
           id: j.id, display_name: j.displayName, kind: j.type, cron: j.cron, timezone: j.timezone,

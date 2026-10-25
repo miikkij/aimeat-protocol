@@ -43,6 +43,9 @@
  * @structure ForeignPeer · identifyForeignCaller() · FOREIGN_HEADERS
  * @usage const who = await identifyForeignCaller(config, storage, req.headers);
  * @version-history
+ *   v1.3.0 — 2026-10-25 — A card whose gaii names no node, or this node, is refused 401
+ *     A2A_LOCAL_IDENTITY before anything is pinned or written, so a stranger cannot file work under
+ *     a local principal's identity (secaudit2026oct22, self-asserted-gaii-settled-as-local-consumer).
  *   v1.2.0 — 2026-09-24 — The spend is keyed on the assertion's sub, aud and jti rather than its raw
  *     bytes (services/assertion-spend.ts), so an empty jti is refused with the other missing claims.
  *   v1.1.0 — 2026-09-01 — The assertion is actually spent. v1.0.0's header claimed a spent `jti`
@@ -178,6 +181,18 @@ export async function identifyForeignCaller(
     return refuse(401, 'A2A_CARD_INVALID', 'That card cannot be read as a signed agent card.');
   }
   const card = read.card;
+
+  // The card's gaii is the caller's own claim, and the work it starts is filed under it. A claim
+  // with no node, or naming THIS node, would be read downstream as a local principal: its work was
+  // metered against that principal's own EXCHANGE contract on delivery, and its tasks were readable
+  // by the stranger (secaudit2026oct22, self-asserted-gaii-settled-as-local-consumer). A principal of
+  // this node uses its own credential on the same address, so nothing that works is refused here.
+  const at = card.gaii.lastIndexOf('@');
+  const claimedNode = at > 0 ? card.gaii.slice(at + 1).toLowerCase() : '';
+  if (!claimedNode || claimedNode === config.nodeId.toLowerCase()) {
+    return refuse(401, 'A2A_LOCAL_IDENTITY',
+      'A card here names an agent on another node. An account on this node signs in with its own credential instead.');
+  }
 
   // 2 before 1, because verifying the assertion needs the key and the card is where the key is.
   if (!await verifyCardJws(cardJws, card.publicKey)) {

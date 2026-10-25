@@ -6,6 +6,8 @@
  *   inbox/sent + the owner delete/usage cascades. Translated 1:1 from the Prisma implementation; the
  *   flat cost columns fold back into the nested `cost` object. Replaces the listWorkBy* placeholders.
  * @version-history
+ *   v1.3.0 — 2026-10-25 — transitionWorkStatus: one conditional UPDATE on the status, so an escrow is
+ *     settled or returned once under concurrent calls (secaudit2026oct22).
  *   v1.2.0 — 2026-10-11 — The column costBasePrice maps to cost.toll, the escrowed pacing amount (a
  *     morsel is pacing, not a price). The column keeps its name; no migration. A write that still
  *     carries the 3.26.x `basePrice` stores it as the toll.
@@ -60,6 +62,14 @@ export const workMethods = {
     if (Object.keys(data).length === 0) return this.getWork(trackingCode);
     const rows = await this.db.updateTable('Work').set(data as never).where('trackingCode', '=', trackingCode).returningAll().execute();
     return rows[0] ? toWork(rows[0]) : null;
+  },
+  async transitionWorkStatus(this: PostgresKyselyStorage, trackingCode: string, from: readonly string[], to: string, updatedAt: string): Promise<boolean> {
+    if (from.length === 0) return false;
+    // READ COMMITTED re-evaluates the WHERE after a concurrent writer commits, so the second of two
+    // concurrent calls matches no row once the first moved the status.
+    const r = await this.db.updateTable('Work').set({ status: to, updatedAt: new Date(updatedAt) } as never)
+      .where('trackingCode', '=', trackingCode).where('status', 'in', [...from]).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
   },
   async listWorkByProvider(this: PostgresKyselyStorage, gaii: string): Promise<WorkRecord[]> {
     return (await this.db.selectFrom('Work').selectAll().where('providerGaii', '=', gaii).execute()).map(toWork);

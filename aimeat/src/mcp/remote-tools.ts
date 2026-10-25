@@ -25,6 +25,9 @@
  * @structure remoteToolName · splitRemoteToolName · registerRemoteTools
  * @usage await registerRemoteTools(mcp, { storage, config, agentGaii, scopes });
  * @version-history
+ *   2026-10-25 — A name the far side lists twice is registered once, and a registration that throws
+ *     is logged and skipped, so one bad tools/list entry no longer fails the owner's whole MCP
+ *     session (secaudit2026oct22, duplicate-upstream-tool-name-aborts-session).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.0 — 2026-09-24 — Each call resolves the server row again through requireUsableServer, as
  *     the gateway does, so a server switched off, detached or re-credentialed mid-session is honoured.
@@ -111,6 +114,19 @@ export async function registerRemoteTools(
   }
 
   let registered = 0;
+  const seen = new Set<string>();
+  /** Register one tool; a refusal is logged with the server and tool, and the session goes on. */
+  const attempt = (from: string, toolName: string, register: () => unknown): boolean => {
+    try {
+      register();
+      return true;
+    } catch (err) {
+      logger.warn('mcp-remote-tools: one flattened tool could not be registered; it stays behind the gateway', {
+        agent: agentGaii(), from, tool: toolName, error: String(err),
+      });
+      return false;
+    }
+  };
   for (const server of servers) {
     if (server.exposure !== 'flatten' || server.status !== 'active') continue;
 
@@ -131,7 +147,17 @@ export async function registerRemoteTools(
       if (!access.allowed) continue;
 
       const name = remoteToolName(server.slug, tool.name);
-      mcp.registerTool(
+      // The far side's tools/list is untrusted data, and the SDK's registerTool throws for a name it
+      // already holds. A repeated name is skipped and any other refusal of one tool is logged, so one
+      // bad entry stays behind the gateway instead of failing the whole session (secaudit2026oct22).
+      if (seen.has(name)) {
+        logger.warn('mcp-remote-tools: the server lists this tool name more than once; the repeat stays behind the gateway', {
+          agent: agentGaii(), from: server.slug, tool: tool.name,
+        });
+        continue;
+      }
+      seen.add(name);
+      const ok = attempt(server.slug, tool.name, () => mcp.registerTool(
         name,
         {
           // The far side's own words, with one sentence saying whose tool this is. Without that a
@@ -175,8 +201,8 @@ export async function registerRemoteTools(
             ...(result.isError ? { isError: true } : {}),
           };
         },
-      );
-      registered++;
+      ));
+      if (ok) registered++;
     }
   }
   return registered;

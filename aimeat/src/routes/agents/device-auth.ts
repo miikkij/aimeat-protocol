@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-25 — The ten-pending cap per owner refuses only requests that do not come from the owner:
+ *     the owner's own request and one from an agent of the owner go through when strangers' rows fill
+ *     it (secaudit2026oct22, pending-cap-per-owner-unauthenticated).
  *   2026-10-21 — autoApprovePrincipal asks isAnonymousPrincipal, so the minted anonymous token is no
  *     approver of the anonymous account's agents (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.15.0 — 2026-10-20 — approveDeviceAuth and scopesExceedNodeMax move to
@@ -209,8 +212,13 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       }
     }
 
-    // Rate limit: max 10 pending per owner name
-    const pendingCount = await storage.countPendingDeviceAuthByOwner(ownerName);
+    // Rate limit: max 10 pending per owner name, for requests that do not come from the owner. Anyone
+    // can write such a row by naming the owner, so the cap applied to the owner's own request and to
+    // an agent of the owner too, and ten strangers' rows stopped both for two hours
+    // (secaudit2026oct22, pending-cap-per-owner-unauthenticated). A request authenticated as this
+    // owner, or as one of this owner's agents, is not refused by it; it still counts as a row.
+    const fromOwner = autoApprovePrincipal(req, ownerName) !== null;
+    const pendingCount = fromOwner ? 0 : await storage.countPendingDeviceAuthByOwner(ownerName);
     if (pendingCount >= 10) {
       res.status(429).json(error(config.nodeId, 'RATE_LIMITED', 'Too many pending authorization requests for this owner'));
       return;

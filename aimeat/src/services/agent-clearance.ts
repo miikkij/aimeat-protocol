@@ -27,11 +27,15 @@
  *
  *   NEW AGENTS. newAgentClearance(config) is what each place that creates an agent spreads into the
  *   record: the node's classification.agent_clearance_default, or nothing (decision 10.5: no limit).
- * @structure ClearanceOutcome · newAgentClearance() · clearanceView() · setAgentClearance()
+ *   An agent made or re-approved by another agent of the owner (same-owner auto-approval) gets no
+ *   looser a clearance than that agent's own (clearanceBoundByApprover).
+ * @structure ClearanceOutcome · newAgentClearance() · clearanceBoundByApprover() · clearanceView() · setAgentClearance()
  * @usage
  *   await storage.createAgent({ ..., ...agentListingTags(config), ...newAgentClearance(config) });
  *   const out = await setAgentClearance({ storage, config }, callerOf(req, config.nodeId, storage), name, 'sisainen');
  * @version-history
+ *   v1.1.0 — 2026-10-25 — clearanceBoundByApprover(): the stricter of an agent's clearance and its
+ *     approving agent's (secaudit2026oct22, agent-approver-sibling-skips-clearance).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L2.1, L2.3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -57,6 +61,22 @@ export function newAgentClearance(config: Pick<AimeatConfig, 'agentClearanceDefa
 function rankOf(policy: ClassificationPolicy, id: string | null): number {
   if (id === null) return Number.POSITIVE_INFINITY;
   return labelById(policy, id)?.rank ?? -1;
+}
+
+/**
+ * The clearance an agent made or re-approved by ANOTHER agent of the owner gets: the stricter of
+ * what it would get anyway (`current`, null for no limit) and the approver's own. An agent never
+ * changes its own clearance and only the owner in person raises one, so the agents an agent makes
+ * through same-owner auto-approval read no more than it does (secaudit2026oct22,
+ * agent-approver-sibling-skips-clearance). An approver with no clearance passes none on.
+ */
+export async function clearanceBoundByApprover(
+  deps: Pick<AgentWriteDeps, 'storage' | 'config'>, ownerGhii: string, current: string | null, approver: string | null,
+): Promise<string | null> {
+  if (approver === null) return current;
+  if (current === null) return approver;
+  const policy = await policyFor(deps.storage, deps.config, ownerGhii);
+  return rankOf(policy, approver) < rankOf(policy, current) ? approver : current;
 }
 
 /**

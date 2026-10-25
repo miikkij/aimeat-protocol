@@ -22,10 +22,12 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=device-auth-requested-scopes
  * @version-history
+ *   v1.1.0 — 2026-10-25 — Strangers' pending requests do not block the owner's own connection (secaudit2026oct22).
  *   v1.0.0 — 2026-08-29 — Initial, with the fix.
  */
 
 import { registerOwner as registerPasswordOwner } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const owner = `req${Date.now() % 100000}`;
@@ -263,6 +265,29 @@ await test('Junk in the requested list is dropped, not stored', async () => {
     const row = await pendingRow(code);
     assert(sorted(row.requested_scopes) === 'task:read',
         `only real scope tokens are kept: ${JSON.stringify(row.requested_scopes)}`);
+});
+
+// secaudit2026oct22, device-auth.ts:pending-cap-per-owner-unauthenticated. Ten unauthenticated rows
+// filled the per-owner cap, and the cap was checked before same-owner auto-approval, so the owner's
+// own request and an agent of the owner holding agent:write got 429 for two hours.
+await test('Ten strangers\' pending requests do not block the owner\'s own connection, and an eleventh stranger is still refused', async () => {
+    const capOwner = `cap${Date.now() % 100000}`;
+    const capToken = await registerOwner(capOwner);
+    const forge = await makeAgent(BASE, { name: capOwner, token: capToken }, ['agent:write', 'memory:read']);
+    const ask = (agent_name: string, token?: string) => json('/v1/agents/device-authorize', {
+        method: 'POST', ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+        body: JSON.stringify({ agent_name, owner: capOwner, scopes: ['memory:read'] }),
+    });
+    for (let i = 0; i < 10; i++) {
+        const r = await ask(`stranger${i}`);
+        assert(r.status === 200 && r.body.data.status === 'pending', `stranger ${i}: ${r.status} ${JSON.stringify(r.body.error)}`);
+    }
+    const eleventh = await ask('stranger10');
+    assert(eleventh.status === 429, `the stranger cap still holds: ${eleventh.status}`);
+    const own = await ask('mine', capToken);
+    assert(own.status === 200 && own.body.data.auto_approved === true, `the owner's own request: ${own.status} ${JSON.stringify(own.body.error ?? own.body.data?.status)}`);
+    const byAgent = await ask('crewmate', forge.token);
+    assert(byAgent.status === 200 && byAgent.body.data.auto_approved === true, `the owner's agent with agent:write: ${byAgent.status} ${JSON.stringify(byAgent.body.error ?? byAgent.body.data?.status)}`);
 });
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

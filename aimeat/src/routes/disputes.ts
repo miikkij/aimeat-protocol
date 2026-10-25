@@ -8,9 +8,17 @@
  *
  * @structure
  *   - computeAuditHash/appendAuditEntry: build the SHA-256 hash-chained dispute audit log
+ *   - resolveDisputeOnce: claim a dispute on its status, then move the morsels, in one transaction
  *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
  *
  * @version-history
+ *   2026-10-25 — A dispute is resolved once: every resolution (accept-fault, accept-partial,
+ *     accept-redelivery, withdraw, the operator ruling) claims it active → resolved with one
+ *     conditional UPDATE (storage.transitionDisputeStatus) before the refund moves, in one
+ *     transaction; a concurrent call that lost answers 404 DISPUTE_CLOSED (409 on the operator route)
+ *     and moves nothing. Opening claims the work delivered|rated → disputed, so one delivery gets one
+ *     dispute; counter-dispute and escalate move only an active dispute (secaudit2026oct22,
+ *     dispute-resolution-without-cas).
  *   2026-10-16 — A dispute re-divides what delivery paid the provider (the toll) and nothing more:
  *     accept-fault and an accepted partial refund take the requester's share back from the provider,
  *     withdraw and accept-redelivery move no money, and a ruling takes the requester's and the burned
@@ -130,6 +138,43 @@ async function appendAuditEntry(
     return storage.addDisputeAuditEntry(disputeId, full);
 }
 
+/** The statuses of a dispute that is still open to a resolution or a move. */
+const ACTIVE_DISPUTE: readonly string[] = ['open', 'contested', 'escalated'];
+/** The statuses of a work item whose dispute is still active. */
+const DISPUTED_WORK: readonly string[] = ['disputed', 'contested', 'escalated'];
+
+/** Thrown inside the resolution transaction so the claim on the dispute rolls back with it. */
+class ProviderBalanceShort extends Error {}
+
+/**
+ * Resolve a dispute once: claim it (active → resolved, one conditional UPDATE), then move the
+ * morsels and settle the work, in ONE transaction. The status was read and then written apart, with
+ * the refund between the two, so concurrent accept-partial, accept-fault or ruling calls each took
+ * the refund back from the provider (secaudit2026oct22, dispute-resolution-without-cas). The claim is
+ * the compare-and-swap: a call that did not move the status moves no morsel and answers 'closed'.
+ * When `moveMorsels` answers false (the provider's balance is short) the claim rolls back, so the
+ * dispute stays open for the next try.
+ */
+async function resolveDisputeOnce(
+    storage: Storage,
+    disputeId: string,
+    trackingCode: string,
+    moveMorsels: () => Promise<boolean>,
+): Promise<'resolved' | 'closed' | 'short'> {
+    try {
+        return await storage.transaction(async () => {
+            const now = new Date().toISOString();
+            if (!await storage.transitionDisputeStatus(disputeId, ACTIVE_DISPUTE, 'resolved', now)) return 'closed' as const;
+            if (!await moveMorsels()) throw new ProviderBalanceShort();
+            await storage.updateWork(trackingCode, { status: 'settled', updatedAt: now });
+            return 'resolved' as const;
+        });
+    } catch (err) {
+        if (err instanceof ProviderBalanceShort) return 'short';
+        throw err;
+    }
+}
+
 export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
@@ -162,17 +207,25 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const now = new Date().toISOString();
         const disputeId = `dispute-${randomBytes(8).toString('hex')}`;
 
-        const dispute = await storage.createDispute({
-            id: disputeId,
-            trackingCode: tc,
-            status: 'open',
-            openedBy: me,
-            reason,
-            createdAt: now,
-            updatedAt: now,
+        // The work moves to disputed on its status (delivered or rated → disputed) before the dispute
+        // is written, so two concurrent openings make one dispute; two disputes on one delivery could
+        // each be resolved, and each resolution moves a refund (secaudit2026oct22).
+        const dispute = await storage.transaction(async () => {
+            if (!await storage.transitionWorkStatus(tc, ['delivered', 'rated'], 'disputed', now)) return null;
+            return storage.createDispute({
+                id: disputeId,
+                trackingCode: tc,
+                status: 'open',
+                openedBy: me,
+                reason,
+                createdAt: now,
+                updatedAt: now,
+            });
         });
-
-        await storage.updateWork(tc, { status: 'disputed', updatedAt: now });
+        if (!dispute) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'A dispute is already open for this work item'));
+            return;
+        }
 
         await appendAuditEntry(storage, disputeId, 'dispute_opened', me, { reason });
 
@@ -249,8 +302,12 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         const { reason } = req.body ?? {};
 
-        await storage.updateDispute(dispute.id, { status: 'contested', updatedAt: new Date().toISOString() });
-        await storage.updateWork(tc, { status: 'contested', updatedAt: new Date().toISOString() });
+        // Moved only while the dispute is still active, so a resolution that landed meanwhile is never
+        // turned back into an open dispute that could be resolved, and refunded, a second time.
+        if (!await storage.transitionDisputeStatus(dispute.id, ACTIVE_DISPUTE, 'contested', new Date().toISOString())) {
+            res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return;
+        }
+        await storage.transitionWorkStatus(tc, DISPUTED_WORK, 'contested', new Date().toISOString());
         await appendAuditEntry(storage, dispute.id, 'counter_dispute', me, { reason });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'contested' }, [
@@ -299,7 +356,9 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // nothing on every accepted fault (QA audit S8-02). The network fee was burned or split at
         // delivery and is not the provider's to return. Refuse before you write.
         const refund = disputedAmount(work);
-        if (!await takeBackFromProvider(storage, work, { toRequester: refund })) {
+        const outcome = await resolveDisputeOnce(storage, dispute.id, tc, () => takeBackFromProvider(storage, work, { toRequester: refund }));
+        if (outcome === 'closed') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
+        if (outcome === 'short') {
             res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
                 `Your balance holds fewer than the ${refund} morsels this work paid you, so nothing changed. Offer a smaller partial refund instead.`,
                 409, { refund_morsels: refund, tracking_code: tc }));
@@ -309,11 +368,9 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // Recorded as the verdict it is, so the trust score reads it as a dispute the provider lost.
         // Without a ruling this outcome was invisible to the score (feature-list audit #144).
         await storage.updateDispute(dispute.id, {
-            status: 'resolved',
             ruling: { ruling: 'requester_wins', distribution: { toRequester: refund, toProvider: 0, burned: 0 }, reason: 'The provider accepted fault.' },
             updatedAt: new Date().toISOString(),
         });
-        await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
         await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'accept_fault', me, { full_refund: true, refund_morsels: refund });
 
@@ -371,8 +428,9 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // No money moves: delivery already paid the provider. This paid them a second time, which
         // created the toll out of nothing (QA audit S8-02).
 
-        await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
-        await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
+        if (await resolveDisputeOnce(storage, dispute.id, tc, async () => true) === 'closed') {
+            res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return;
+        }
         await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'accept_redelivery', me, {});
 
@@ -402,15 +460,15 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         // The refund comes out of what delivery paid the provider, who keeps the rest. It returned
         // the refund from nowhere and paid the provider the remainder again (QA audit S8-02).
-        if (!await takeBackFromProvider(storage, work, { toRequester: refundAmount })) {
+        const outcome = await resolveDisputeOnce(storage, dispute.id, tc, () => takeBackFromProvider(storage, work, { toRequester: refundAmount }));
+        if (outcome === 'closed') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
+        if (outcome === 'short') {
             res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
                 `The provider's balance holds less than the ${refundAmount} morsels offered, so nothing changed. Try again later, or escalate the dispute.`,
                 409, { refund_morsels: refundAmount, tracking_code: tc }));
             return;
         }
 
-        await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
-        await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
         await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'partial_accepted', me, { refund_morsels: refundAmount });
 
@@ -451,8 +509,9 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // No money moves: delivery already paid the provider, and a withdrawn dispute leaves it so.
         // This paid them a second time (QA audit S8-02).
 
-        await storage.updateDispute(dispute.id, { status: 'resolved', updatedAt: new Date().toISOString() });
-        await storage.updateWork(tc, { status: 'settled', updatedAt: new Date().toISOString() });
+        if (await resolveDisputeOnce(storage, dispute.id, tc, async () => true) === 'closed') {
+            res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return;
+        }
         await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'withdraw_dispute', me, {});
 
@@ -475,8 +534,12 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const dispute = await storage.getDisputeByTrackingCode(tc);
         if (!dispute || dispute.status === 'resolved') { res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return; }
 
-        await storage.updateDispute(dispute.id, { status: 'escalated', updatedAt: new Date().toISOString() });
-        await storage.updateWork(tc, { status: 'escalated', updatedAt: new Date().toISOString() });
+        // Moved only while the dispute is still active, so a resolution that landed meanwhile is never
+        // turned back into an escalated dispute that the operator or the timeout could resolve again.
+        if (!await storage.transitionDisputeStatus(dispute.id, ACTIVE_DISPUTE, 'escalated', new Date().toISOString())) {
+            res.status(404).json(error(config.nodeId, 'DISPUTE_CLOSED', 'No active dispute')); return;
+        }
+        await storage.transitionWorkStatus(tc, DISPUTED_WORK, 'escalated', new Date().toISOString());
         await appendAuditEntry(storage, dispute.id, 'escalated', me, {});
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, status: 'escalated' }, [
@@ -525,7 +588,10 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         // The requester's share and the burned share come back from the provider in one debit; the
         // provider keeps the rest of what delivery paid.
-        if (!await takeBackFromProvider(storage, work, { toRequester: to_requester, burned })) {
+        const outcome = await resolveDisputeOnce(storage, dispute.id, dispute.trackingCode,
+            () => takeBackFromProvider(storage, work, { toRequester: to_requester, burned }));
+        if (outcome === 'closed') { res.status(409).json(error(config.nodeId, 'DISPUTE_CLOSED', 'Dispute already resolved')); return; }
+        if (outcome === 'short') {
             res.status(409).json(error(config.nodeId, 'PROVIDER_BALANCE_SHORT',
                 `The provider's balance holds less than the ${to_requester + burned} morsels this ruling takes back, so nothing was written. Rule a smaller share instead.`,
                 409, { take_back_morsels: to_requester + burned, dispute_id: dispute.id }));
@@ -534,11 +600,9 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const keptByProvider = paid - to_requester - burned;
 
         await storage.updateDispute(dispute.id, {
-            status: 'resolved',
             ruling: { ruling, distribution: { toRequester: to_requester, toProvider: keptByProvider, burned }, reason },
             updatedAt: new Date().toISOString(),
         });
-        await storage.updateWork(dispute.trackingCode, { status: 'settled', updatedAt: new Date().toISOString() });
         await refreshTrustScore(storage, work.providerGaii);
         await appendAuditEntry(storage, dispute.id, 'operator_ruled', me, { ruling, distribution: { to_requester, to_provider: keptByProvider, burned }, reason });
 

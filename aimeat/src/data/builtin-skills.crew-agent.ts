@@ -12,6 +12,8 @@
  * @structure CREW_AGENT_SKILL_ENTRY
  * @usage import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
  * @version-history
+ *   2026-10-25 -- Section 2: an agent made by another agent gets no looser a clearance than that
+ *     agent's, and strangers' waiting requests do not block the call (secaudit2026oct22).
  *   2026-10-20 -- Section 2: when one of the owner's agents starts device authorization, the node
  *     approves it at once only for a name that is new, or for an agent that agent is or registered;
  *     any other existing name waits for the owner (secaudit 2026-10, routes/agents/device-auth.ts).
@@ -272,7 +274,9 @@ was granted.
 
 **When another agent of the owner starts that call.** A device-authorize call made with the token of
 an agent of the same owner that holds \`agent:write\` is approved at once, and the agent is created
-with the scopes that were asked for, never more than the asking agent itself holds. For a name that
+with the scopes that were asked for, never more than the asking agent itself holds. When the owner
+limited what the asking agent may read (its clearance), the new agent gets the same limit or a
+stricter one. Ten waiting requests from strangers do not block this call. For a name that
 already EXISTS the node approves at once only when the asking agent is that agent, or is the agent
 that registered it. Any other agent leaves the request waiting for the owner, and the answer says
 so: re-approval rotates the agent's key and hands out a new token, so it is the owner's decision.

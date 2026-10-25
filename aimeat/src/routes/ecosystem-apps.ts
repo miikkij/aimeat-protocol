@@ -22,6 +22,11 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.10.0 — 2026-10-25 — GET /pending says whether a request reconnects an app the owner already
+ *     connected (`reconnect`) and whether its key differs from the pinned one (`key_changed`, with
+ *     both fingerprints); approving a key change ends the sessions issued under the old key, as
+ *     DELETE does, while a same-key reconnect keeps them (secaudit2026oct22,
+ *     rehello-repins-live-binding-key).
  *   v1.9.0 — 2026-10-22 — Mounts the capability-approval routes (ecosystem-apps-capability-approvals.ts)
  *     and GET /v1/ecosystem-apps returns `capability_approvals` (secaudit 2026-10, r45).
  *   v1.8.0 — 2026-10-09 — The approval token carries `auth_time`, the start of the app's refresh chain.
@@ -62,7 +67,7 @@
  *     The portal renders it (locale-appropriate) as the app's own setup guidance in the card.
  */
 import { Router } from 'express';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, EcoDataAreaGrant, EcosystemAppRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
@@ -87,6 +92,26 @@ const ECO_AUTH_EXPIRY_MS = 1_800_000;
 /** Validate a list of requested scopes against the node's ceiling (mirror of agents.ts:318-330). */
 function scopesWithinCeiling(requested: string[], ceiling: string[]): string[] {
   return exceedsCeiling(ceiling, requested);
+}
+
+/** A short, comparable name for a public key, for the owner to tell two keys apart. */
+function keyFingerprint(publicKey: string): string {
+  return createHash('sha256').update(publicKey).digest('hex').slice(0, 16).match(/.{4}/g)!.join(':');
+}
+
+/**
+ * What a pending request says about the app's live connection: `reconnect` when the owner already
+ * connected this app, `key_changed` when the request carries another key than the pinned one, and
+ * then both fingerprints.
+ */
+function reconnectView(pinnedKey: string | undefined, requestKey: string | undefined) {
+  const reconnect = pinnedKey !== undefined;
+  const keyChanged = reconnect && !!requestKey && requestKey !== pinnedKey;
+  return {
+    reconnect,
+    key_changed: keyChanged,
+    ...(keyChanged ? { pinned_key_fingerprint: keyFingerprint(pinnedKey!), key_fingerprint: keyFingerprint(requestKey!) } : {}),
+  };
 }
 
 export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
@@ -285,8 +310,17 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
   // ── GET /v1/ecosystem-apps/pending — owner lists pending hello requests ──
   router.get('/v1/ecosystem-apps/pending', requireAuth(), requireRole('owner'), async (req, res) => {
     const pending = await storage.listPendingEcoAuthByOwner(req.auth!.owner);
+    // Whether each request reconnects an app this owner already has, and whether its key differs
+    // from the pinned one: approving such a request replaces the key of a working connection, so the
+    // owner is told before pressing approve (secaudit2026oct22, rehello-repins-live-binding-key).
+    const connected = new Map<string, string>();
+    for (const app of new Set(pending.map(r => r.app))) {
+      const live = await storage.getEcosystemAppByOwnerAndApp(req.auth!.owner, app);
+      if (live) connected.set(app, live.publicKey ?? '');
+    }
     res.json(success(config.nodeId, {
       requests: pending.map((r) => ({
+        ...reconnectView(connected.get(r.app), r.publicKey),
         user_code: r.userCode,
         app: r.app,
         display_name: r.displayName,
@@ -366,6 +400,15 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     const now = new Date().toISOString();
 
     if (existing) {
+      // A new key is a new holder: the owner approved replacing the key of a working connection (the
+      // pending row said so), so the credentials issued under the old key end here, as DELETE ends
+      // them. A reconnect with the same key (the yearly re-approval) keeps them (secaudit2026oct22,
+      // rehello-repins-live-binding-key).
+      if (existing.publicKey && appPublicKey !== existing.publicKey) {
+        for (const s of await storage.listActiveSessions(request.ownerName)) {
+          if (s.gaii === geai) await storage.revokeSession(s.sessionId);
+        }
+      }
       // Re-approval: re-pin the key + refresh the grant rather than duplicating the principal.
       await storage.updateEcosystemApp(geai, {
         publicKey: appPublicKey,

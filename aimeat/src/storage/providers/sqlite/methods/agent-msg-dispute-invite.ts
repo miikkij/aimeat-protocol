@@ -9,6 +9,8 @@
  * @structure agentMessageMethods, disputeMethods, invitationMethods
  * @usage Object.assign(SqliteStorage.prototype, agentMessageMethods, disputeMethods, invitationMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — transitionDisputeStatus: one conditional UPDATE on the status, so a dispute
+ *     is resolved once under concurrent calls (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — 9 methods (createDispute, getDispute, getDisputeByTrackingCode, …) moved here from
  *     work.ts; 10 methods (mapInvitationRow, createInvitation, getInvitationByHash, …) moved here from
  *     extensions-notify.ts; createMessage, getMessage, listMessages, listPendingMessages,
@@ -94,6 +96,14 @@ export const disputeMethods = {
       updated.createdAt, updated.updatedAt, id,
     );
     return updated;
+  },
+
+  async transitionDisputeStatus(this: SqliteStorage, id: string, from: readonly string[], to: string, updatedAt: string): Promise<boolean> {
+    if (from.length === 0) return false;
+    const p = from.map(() => '?').join(',');
+    const result = this.db.prepare(`UPDATE disputes SET status = ?, updatedAt = ? WHERE id = ? AND status IN (${p})`)
+      .run(to, updatedAt, id, ...from);
+    return result.changes > 0;
   },
 
   async addDisputeAuditEntry(this: SqliteStorage, disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry> {

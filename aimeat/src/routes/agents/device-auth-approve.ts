@@ -11,6 +11,10 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — An agent approver passes on no looser a clearance than its own: a new agent
+ *     gets the stricter of the node default and the approver's clearance, and a re-approved agent is
+ *     lowered to the approver's when it held more (secaudit2026oct22,
+ *     agent-approver-sibling-skips-clearance).
  *   v1.0.0 — 2026-10-20 — Extracted from device-auth.ts (max-file-lines). The code is unchanged by
  *     the move; its history up to v1.14.0 is in that file's header.
  */
@@ -31,7 +35,7 @@ import { detectPlatform } from '../../services/platform-detector.js';
 import { scopeIsCovered, SCOPES_OUTSIDE_WILDCARD, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { recordAgentScopeRequest } from '../../services/agent-refusals.js';
 import { agentListingTags } from '../../services/content-defaults.js';
-import { newAgentClearance } from '../../services/agent-clearance.js';
+import { newAgentClearance, clearanceBoundByApprover } from '../../services/agent-clearance.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 export function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -112,6 +116,15 @@ export async function approveDeviceAuth(
    */
   let grantedScopes = finalScopes;
 
+  // An AGENT approver passes on no more clearance than it holds, the clearance half of the rule
+  // above for scopes: an agent the owner limited to a classification made an unlimited sibling and
+  // collected its token from the device-token poll (secaudit2026oct22,
+  // agent-approver-sibling-skips-clearance). An approver with no clearance passes none on, and the
+  // owner in person keeps the node default.
+  const ownerGhii = `${request.ownerName}@${config.nodeId}`;
+  const approverClearance = approverAgentScopes ? (await storage.getAgent(approvedBy))?.clearance ?? null : null;
+  const bound = (current: string | null) => clearanceBoundByApprover({ storage, config }, ownerGhii, current, approverClearance);
+
   if (existing) {
     // Existing agent: generate new keypair (rotate keys) and issue JWT
     keyPair = await generateKeyPair();
@@ -132,10 +145,13 @@ export async function approveDeviceAuth(
     if (approverAgentScopes) {
       grantedScopes = grantedScopes.filter(s => scopeIsCovered(approverAgentScopes, s));
     }
+    const heldClearance = existing.clearance ?? null;
+    const clearance = await bound(heldClearance);
     await storage.updateAgent(gaii, {
       publicKey: keyPair.publicKey,
       defaultScopes: grantedScopes,
       lastSeen: now,
+      ...(clearance !== heldClearance ? { clearance } : {}),
     });
     // Re-approval is the other door that changes what an agent may do, and an agent being
     // re-approved is exactly the one likely to have a session open — an open MCP session AND an
@@ -145,6 +161,7 @@ export async function approveDeviceAuth(
   } else {
     // New agent: create from scratch
     keyPair = await generateKeyPair();
+    const startClearance = await bound(newAgentClearance(config).clearance ?? null);
 
     await storage.createAgent({
       name: request.agentName,
@@ -162,7 +179,7 @@ export async function approveDeviceAuth(
       mode: request.mode ?? 'interactive',
       // Tagged `unlisted` when new agents are listed nowhere (visibility.agent_listed_default, plan V5.8).
       ...agentListingTags(config),
-      ...newAgentClearance(config),
+      ...(startClearance ? { clearance: startClearance } : {}),
       // Who asked for this agent: the owner's name when a person approved on the consent screen,
       // the approving sibling's GAII when same-owner auto-approval did. The same value goes on the
       // device-authorization record as `approvedBy`, and that record is swept when it expires — so

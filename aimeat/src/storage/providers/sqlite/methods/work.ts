@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge. The board
  *   history below now belongs to methods/boards.ts.
  * @version-history
+ *   v1.10.0 — 2026-10-25 — transitionWorkStatus: one conditional UPDATE on the status, so an escrow is
+ *     settled or returned once under concurrent calls (secaudit2026oct22).
  *   v1.9.0 — 2026-10-11 — deserializeWork reads a stored `cost.basePrice` as `cost.toll`, the escrowed
  *     pacing amount (a morsel is pacing, not a price).
  *   v1.8.0 — 2026-10-08 — Work round-trips aiProvenanceId, the record of the delivered output
@@ -101,6 +103,14 @@ export const workMethods = {
       trackingCode,
     );
     return updated;
+  },
+
+  async transitionWorkStatus(this: SqliteStorage, trackingCode: string, from: readonly string[], to: string, updatedAt: string): Promise<boolean> {
+    if (from.length === 0) return false;
+    const p = from.map(() => '?').join(',');
+    const result = this.db.prepare(`UPDATE work SET status = ?, updatedAt = ? WHERE trackingCode = ? AND status IN (${p})`)
+      .run(to, updatedAt, trackingCode, ...from);
+    return result.changes > 0;
   },
 
   async listWorkByProvider(this: SqliteStorage, gaii: string): Promise<WorkRecord[]> {
