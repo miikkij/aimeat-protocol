@@ -403,7 +403,7 @@ provider.setDefault('chat', chatJson('Kilpailija A on halvin, B nopein ja C laaj
 
 await test('20. a work for the node\'s model runs with the owner\'s key, and its answer and cost land in the goal', async () => {
   const s = await json('/v1/memory', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ key: 'openrouter.settings', visibility: 'private', value: { provider: 'custom', baseUrl: provider.baseUrl, model: 'stub/test-model', daily_budget_usd: 5 } }) });
-  assert(s.status === 200 || s.status === 201, `settings: ${s.status} ${JSON.stringify(s.body.error)}`);
+  assert(s.status === 201, `settings: ${s.status} ${JSON.stringify(s.body.error)}`);
   const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Vertaa kolmea kilpailijaa hinnan mukaan.', limits: { usd: 5 }, works: [{ title: 'Kirjoita vertailu', runner: 'model' }] }) });
   assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
   const id = c.body.data.goal.id; const wid = c.body.data.goal.works[0].id;
@@ -453,6 +453,26 @@ await test('22. the owner\'s AI proposes a goal; it waits, only the person appro
   assert(!no.isError, `the AI declines its own proposal: ${no.text.slice(0, 200)}`);
   const gone = await json(`/v1/goals/${id2}`, { headers: auth(tokenA) });
   assert(gone.status === 404, `a declined proposal is gone: ${gone.status}`);
+});
+
+await test('23. a model work reads the record an agent\'s earlier work delivered, not only its one-line summary', async () => {
+  // aimeat.io, 2026-10-25: web-researcher finished with "deliverable published to memory at …" and the
+  // model wrote the summary without the research, because only that sentence reached its prompt.
+  provider.reset();
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Tutki ja tiivistä.', limits: { usd: 5 }, works: [{ title: 'Tutki', agent: 'grok1' }, { title: 'Tiivistä', runner: 'model', after: ['#1'] }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id;
+  const research = await waitFor('the research task', async () => (await readGoal(tokenA, id)).works[0].task_id);
+  const key = `crews.grok1.goal-test-${Date.now()}.latest_output`;
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(grok1.token), body: JSON.stringify({ key, value: 'TUTKIMUSTULOS: Kilpailija X on halvin.', visibility: 'owner' }) });
+  assert(w.status === 201, `the agent writes its deliverable: ${w.status} ${JSON.stringify(w.body.error)}`);
+  const s = await json(`/v1/agents/grok1/tasks/${research}/start`, { method: 'POST', headers: auth(tokenA), body: '{}' });
+  assert(s.status === 200, `start: ${s.status}`);
+  const done = await json(`/v1/agents/grok1/tasks/${research}/complete`, { method: 'POST', headers: auth(grok1.token), body: JSON.stringify({ message: `Crew finished; deliverable published to memory at ${key}.`, deliverable_key: key }) });
+  assert(done.status === 200, `complete: ${done.status} ${JSON.stringify(done.body.error)}`);
+  await waitFor('the model work to finish', async () => (await readGoal(tokenA, id)).works[1].status === 'done', 30_000);
+  const sent = JSON.stringify(provider.lastRequest('chat')?.json ?? {});
+  assert(sent.includes('TUTKIMUSTULOS: Kilpailija X on halvin.'), `the model was given the deliverable's text: ${sent.slice(0, 400)}`);
 });
 
 await provider.close();
