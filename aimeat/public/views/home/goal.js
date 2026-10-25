@@ -58,6 +58,7 @@ const titled = (title, term) => html`${title} <${HelpTip} term=${term} label=${t
 /** A goal's status in words and the tone of its fact. */
 export function goalStatusWords(status) {
   return ({
+    proposed: { word: g('statusProposed', 'Proposed, waits for your yes'), tone: 'attention' },
     active: { word: g('statusActive', 'Running'), tone: 'fine' },
     paused: { word: g('statusPaused', 'Paused'), tone: 'attention' },
     done: { word: g('statusDone', 'Done'), tone: 'fine' },
@@ -66,10 +67,13 @@ export function goalStatusWords(status) {
   })[status] ?? { word: status, tone: 'off' };
 }
 
+/** Who took a work, as a person reads it: an agent's name, or AIMEAT's model. */
+const takerName = (name) => (name === 'model' ? g('modelName', 'AIMEAT\'s model') : name ?? '');
+
 /** A work's state as one phrase. */
 function workState(w) {
-  if (w.status === 'claimed') return g('wClaimed', '{agent} is doing it').replace('{agent}', w.claimed_by ?? '');
-  if (w.status === 'done') return w.kind === 'human' ? g('wAnswered', 'answered') : g('wDone', 'done by {agent}').replace('{agent}', w.claimed_by ?? w.result?.by ?? '');
+  if (w.status === 'claimed') return g('wClaimed', '{agent} is doing it').replace('{agent}', takerName(w.claimed_by));
+  if (w.status === 'done') return w.kind === 'human' ? g('wAnswered', 'answered') : g('wDone', 'done by {agent}').replace('{agent}', takerName(w.claimed_by ?? w.result?.by));
   if (w.status === 'open') return w.kind === 'human' ? g('wYours', 'waits for you') : w.nobody_took ? g('wNobody', 'nobody took it yet') : g('wOpen', 'not taken yet');
   if (w.status === 'waiting') return g('wWaiting', 'starts when the works before it are done');
   if (w.status === 'failed') return g('wFailed', 'could not be done');
@@ -80,6 +84,7 @@ function workState(w) {
 /** Who does a work, as the line under its title says it. */
 function workWho(w) {
   if (w.kind === 'human') return g('whoYou', 'You');
+  if (w.runner === 'model') return w.model ? g('whoModelNamed', 'AIMEAT\'s model ({model}), with your key').replace('{model}', w.model) : g('whoModel', 'AIMEAT\'s model, with your key');
   if (w.agent) return w.agent;
   if (w.wants?.length) return g('whoOpen', 'Open work for an agent that knows {skills}').replace('{skills}', w.wants.join(', '));
   return g('whoAny', 'Open work for any of your agents');
@@ -152,6 +157,7 @@ export default function GoalView({ navigate }) {
     setBusy(true); setActionError('');
     try {
       if (action === 'delete') { await deleteGoal(id); navigate(AGENTS); return; }
+      if (action === 'decline') { await goalAction(id, action); navigate(AGENTS); return; }
       await goalAction(id, action);
       await load();
     } catch (err) { setActionError(err?.message || String(err)); }
@@ -203,7 +209,16 @@ export default function GoalView({ navigate }) {
         <${Note} kind="aside">${g('pausedNote', 'Paused. Agents saved where they were; nothing new starts until you resume.')}
           ${' '}<${Action} tone="inline" disabled=${busy} onClick=${() => act('resume')}>${g('resume', 'Resume')}<//><//>`}
 
-      ${(waiting.length > 0 || nobody.length > 0) && html`
+      ${goal.status === 'proposed' && html`
+        <${PageSection} group ends title=${g('proposalTitle', 'A proposal waits for your yes')}>
+          <${Note}>${g('proposalNote', 'Your AI proposed this goal. Read the work below; nothing starts and nobody is asked anything until you approve it.')}<//>
+          <${Actions}>
+            <${Loud} control disabled=${busy} onClick=${() => act('approve')}>${g('approveStart', 'Approve and start')}<//>
+            <${Action} control tone="danger" disabled=${busy} onClick=${() => act('decline')}>${g('decline', 'Decline')}<//>
+          <//>
+        <//>`}
+
+      ${goal.status !== 'proposed' && (waiting.length > 0 || nobody.length > 0) && html`
         <${PageSection} group ends title=${titled(g('waitingTitle', 'Waiting for you'), 'concept.waiting_for_you')}>
           ${waiting.map((w) => html`<${StepCard} key=${w.id} item=${{ goal_id: goal.id, goal: goal.title, work: w }} onDone=${load} />`)}
           ${nobody.map((w) => html`<${NobodyCard} key=${w.id} item=${{ goal_id: goal.id, goal: goal.title, work: w }} navigate=${navigate} />`)}
@@ -256,8 +271,10 @@ export default function GoalView({ navigate }) {
           id: String(c.v), name: `v${c.v} · ${c.who === 'owner' ? g('you', 'you') : String(c.who).split('#')[0]}`, text: `${c.what} · ${ago(c.at)}` }))} />`}
       <//>
 
+      ${goal.status === 'proposed' && actionError && html`<${ErrorNote} text=${actionError} />`}
+      ${goal.status !== 'proposed' && html`
+      <${PageSection} group ends title=${g('controlTitle', 'Steer the goal')}>
       <${PromptCard} label=${g('ownAi', 'Steer it from your own AI')} prompt=${goalPrompt(goal)} copyLabel=${g('copyPrompt', 'Copy the prompt')} />
-
       ${actionError && html`<${ErrorNote} text=${actionError} />`}
       <${Actions}>
         ${goal.status === 'active' && html`<${Action} control disabled=${busy} onClick=${() => act('pause')}>${g('pause', 'Pause')}<//>`}
@@ -269,5 +286,6 @@ export default function GoalView({ navigate }) {
         ${settled && html`<${Action} control tone="danger" disabled=${busy} onClick=${() => act('delete')}>${g('delete', 'Remove the goal')}<//>`}
         <${Action} tone="more" href=${`/v1/profile?tab=goals&goal=${encodeURIComponent(goal.id)}`}>${g('settings', 'Rules and the whole chain →')}<//>
       <//>
+      <//>`}
     <//>`;
 }

@@ -94,7 +94,11 @@ export function StepCard({ item, onDone, showGoal }) {
       <${TextField} label=${g('answerLabel', 'Your answer')} value=${text} onInput=${setText} onEnter=${() => text.trim() && send({ text })}
         actions=${html`<${Loud} control disabled=${busy || !text.trim()} onClick=${() => send({ text })}>${g('send', 'Send')}<//>`} />`;
   } else if (w.human_kind === 'do') {
+    const lead = (w.links ?? []).length && (w.texts ?? []).length
+      ? g('doLeadLinks', 'Your turn. Open each link, copy the ready text under it and post it there yourself. Then press "I did this".')
+      : g('doLead', 'Your turn: this is something only you can do. When it is done, press "I did this".');
     body = html`
+      <${Note}>${lead}<//>
       ${(w.links ?? []).map((l, i) => html`
         <div key=${'l' + i}>
           <${Action} tone="inline" href=${l.url} newTab>${l.title || l.url} →<//>
@@ -124,6 +128,20 @@ export function StepCard({ item, onDone, showGoal }) {
       ${w.description && html`<${Markdown} text=${w.description} small />`}
       ${body}
       ${err && html`<${ErrorNote} text=${err} />`}
+    <//>`;
+}
+
+/** A goal the person's AI proposed: one press opens it to read and approve. */
+export function ProposalCard({ item, navigate }) {
+  // The log names the person 'owner' and an AI by its principal; the card says "You" or the AI's name.
+  const raw = String(item.proposed_by || '');
+  const by = raw === 'owner' ? g('youWord', 'You') : raw.split('#')[0];
+  return html`
+    <${Card} tone="framed" state="raised" kicker=${g('proposalTag', 'A proposed goal')} name=${item.goal}>
+      <${Note} kind="quiet">${g('proposalBy', '{who} proposed it, with {n} works. Nothing starts before you approve it.').replace('{who}', by || g('yourAi', 'Your AI')).replace('{n}', String(item.works ?? 0))}<//>
+      <${Actions}>
+        <${Loud} control onClick=${() => navigate?.(`/v1/home?goal=${encodeURIComponent(item.goal_id)}`)}>${g('proposalOpen', 'Read and approve')}<//>
+      <//>
     <//>`;
 }
 

@@ -20,8 +20,11 @@
  *
  *   Composed from library components only; it has no sheet of its own.
  * @structure default AgentNewView({ navigate })
- * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>)
+ * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>, and from a
+ *   goal's proposal tag=<skill>&goal=<id>)
  * @version-history
+ *   v1.10.0 — 2026-10-25 — From a goal's proposal (goal-new.js): `tag` is given to the new agent so it
+ *     takes the goal's open work for that skill, and `goal` returns the person to the goal afterwards.
  *   v1.9.0 — 2026-10-14 — "Not sure what to ask? Start from an example": three examples from the
  *     node's list of ideas under the box and the ideas dialog behind "All ideas, also for apps"
  *     (ideas-dialog.js). An example only fills the box, and says when it works through an app; an
@@ -90,7 +93,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
-import { apiGet, apiPost } from '/js/api.js';
+import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
@@ -149,6 +152,10 @@ export default function AgentNewView({ navigate }) {
   const said = query.get('say') || '';
   // An example chosen on the home arrives as ?idea=<id> and fills the box, nothing more.
   const ideaId = query.get('idea') || '';
+  // From a goal's proposal (goal-new.js): the skill tag the goal's open work asks for, given to the
+  // agent when it is made so it takes that work, and the goal to return to.
+  const goalTag = (query.get('tag') || '').trim().toLowerCase().slice(0, 64);
+  const goalId = query.get('goal') || '';
   const ideas = useHomeIdeas();
 
   const [home, setHome] = useState(null);
@@ -375,6 +382,12 @@ export default function AgentNewView({ navigate }) {
           if (joinsAgentList(organism)) await attachAgent(organismId, gaii).catch((err) => swallowed('agent-new: attach to the organism', err));
         }
       }
+      if (goalTag) {
+        // The goal's open work asks for this skill; with the tag the new agent may take it.
+        await apiPatch(`/v1/agents/${encodeURIComponent(name)}/tags`, { tags: [goalTag] })
+          .catch((err) => swallowed('agent-new: the goal\'s tag', err));
+      }
+      if (goalId) { navigate(`${HOME}?goal=${encodeURIComponent(goalId)}`); return; }
       navigate(`${HOME}?agent=${encodeURIComponent(name)}&started=${state}${out?.schedule_problem ? '&schedule=failed' : ''}`);
     } catch (err) {
       setProblem(err?.message || String(err));
