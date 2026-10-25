@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-10-25 — aimeat_extension_config_set says emailPolicy "unrestricted" is asked of the operators (secaudit2026oct22).
  *   v1.8.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read when it runs with nobody present, and that only the person can change it (Jouni, 2026-10-20).
  *   v1.7.2 — 2026-10-18 — aimeat_cortex_install says it answers publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   v1.7.1 — 2026-10-09 — aimeat_extension_install says which config values an update keeps.
@@ -120,7 +121,7 @@ export const extensionsCortexTools = [
     },
     {
         name: 'aimeat_extension_config_set',
-        description: 'Change config values of an installed extension in place: no new version, no reinstall, its memory and status untouched. Give only the fields to change; the answer lists what changed and the extension\'s config, secrets masked. A field the manifest does not declare is refused, and a secret field is stored encrypted. A HOST FIELD (one the manifest names in network.host_fields, e.g. WAZUH_HOST) takes one hostname or IPv4 address with an optional :port, never a scheme, path, wildcard or list; its value is a host the extension may reach from its next run on, and the answer\'s network_hosts lists every host it reaches now. Use it when your owner\'s service moved to a new address. Only the installing owner (or an operator) may change it.',
+        description: 'Change config values of an installed extension in place: no new version, no reinstall, its memory and status untouched. Give only the fields to change; the answer lists what changed and the extension\'s config, secrets masked. A field the manifest does not declare is refused, and a secret field is stored encrypted. A HOST FIELD (one the manifest names in network.host_fields, e.g. WAZUH_HOST) takes one hostname or IPv4 address with an optional :port, never a scheme, path, wildcard or list; its value is a host the extension may reach from its next run on, and the answer\'s network_hosts lists every host it reaches now. Use it when your owner\'s service moved to a new address. Only the installing owner (or an operator) may change it. emailPolicy "unrestricted" (the extension may email any address) is the operator\'s to give: unless you hold operator:admin, setting it asks this node\'s operators instead, the answer carries approval_request (awaiting_operator), and you hear their answer as a message with that request id.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Set Extension Config', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
