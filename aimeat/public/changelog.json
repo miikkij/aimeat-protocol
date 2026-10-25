@@ -26,6 +26,125 @@
       }
     },
     {
+      "date": "2026-10-25",
+      "kind": "feature",
+      "id": "2026-10-25-your-own-ai-builds-and-publishes-your-app",
+      "highlight": true,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "Your own AI builds and publishes your app",
+        "fi": "Oma tekoälysi rakentaa ja julkaisee sovelluksesi"
+      },
+      "summary": {
+        "en": "Connect your AI once, say what the app should do, and your AI builds and publishes it for you.",
+        "fi": "Yhdistä tekoälysi kerran, kerro mitä sovelluksen pitää tehdä, ja tekoäly rakentaa ja julkaisee sen."
+      },
+      "body": {
+        "en": "Generate App with AI in the App Catalog and the builder on the front page now have three steps: connect your AI, describe the app, and give your AI a short prompt. Your AI reads how apps are built here, asks you what it needs to know, waits for your yes, publishes the app and gives you its address. To improve an app, the same prompt keeps the app as it was built; somebody else's app is copied to you first. An AI that cannot connect, such as Microsoft 365 Copilot, still gets the long prompt under \"Your AI cannot connect?\", and you add the file it returns.",
+        "fi": "Sovellusluettelon Luo sovellus tekoälyllä ja etusivun rakentaja etenevät nyt kolmessa vaiheessa: yhdistä tekoälysi, kuvaile sovellus ja anna tekoälylle lyhyt kehote. Tekoäly lukee, miten sovellukset täällä rakennetaan, kysyy sinulta tarvitsemansa, odottaa hyväksyntääsi, julkaisee sovelluksen ja antaa sen osoitteen. Kun parannat sovellusta, sama kehote säilyttää sen tavan, jolla sovellus on rakennettu. Jonkun toisen sovellus kopioidaan ensin sinulle. Tekoäly, joka ei pysty yhdistämään, kuten Microsoft 365 Copilot, saa yhä pitkän kehotteen kohdasta \"Eikö tekoälysi pysty yhdistämään?\", ja sinä lisäät sen palauttaman tiedoston."
+      }
+    },
+    {
+      "date": "2026-10-24",
+      "kind": "feature",
+      "id": "2026-10-24-gdpr-records-and-processing-agreements-made-from",
+      "highlight": true,
+      "audience": [
+        "operator",
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "GDPR records and processing agreements, made from what AIMEAT already knows",
+        "fi": "GDPR-rekisterit ja käsittelysopimukset AIMEATin omista tiedoista"
+      },
+      "summary": {
+        "en": "Keep the GDPR record of processing, and make, sign and follow processing agreements with your customers.",
+        "fi": "Pidä GDPR:n seloste käsittelytoimista, ja tee, allekirjoita ja seuraa käsittelysopimukset asiakkaidesi kanssa."
+      },
+      "body": {
+        "en": "The admin Compliance page keeps the record of processing (GDPR article 30) for the node, each shared place and each app, with a draft AIMEAT fills from its own data: the registers, the processors and transfers, data subject requests with their deadline, breaches with the 72-hour clock, impact assessments and the questions of GDPR, NIS2, DORA, CRA and other laws. Every row opens by place, and one entry can be changed in place. A register under a law such as health or defence raises the classification of the places it covers, and the TL and NATO labels can be switched on. An app's page in the App Catalog shows what personal data the app keeps. When you process a customer's personal data, AIMEAT makes the processing agreement from the European Commission's standard clauses in Finnish or English and fills the annexes from what it knows. You and the customer sign with an AIMEAT signature, the EU digital wallet, your own signing service or on paper, and both of you get a notice and an e-mail at every step. The customer sees the agreement under Settings → Agreements. Your AI does all of this too. Limits: not legal advice; have a lawyer read the filled agreement before your first customer.",
+        "fi": "Hallinnan Compliance-sivu pitää selosteen käsittelytoimista (GDPR:n 30 artikla) palvelimelle, jokaiselle yhteiselle paikalle ja jokaiselle sovellukselle. AIMEAT täyttää luonnoksen omista tiedoistaan: rekisterit, käsittelijät ja siirrot, rekisteröityjen pyynnöt määräaikoineen, tietoturvaloukkaukset 72 tunnin kelloineen, vaikutustenarvioinnit sekä GDPR:n, NIS2:n, DORAn, CRA:n ja muiden lakien kysymykset. Jokainen rivi avautuu paikoittain, ja yhtä kohtaa voi muuttaa paikallaan. Rekisteri, joka kuuluu esimerkiksi terveys- tai puolustustietoa koskevan lain alle, nostaa kattamiensa paikkojen luokitusta, ja TL- ja NATO-luokitukset voi ottaa käyttöön. Sovelluksen sivu sovellusluettelossa näyttää, mitä henkilötietoja sovellus säilyttää. Kun käsittelet asiakkaan henkilötietoja, AIMEAT tekee käsittelysopimuksen EU-komission vakiolausekkeista suomeksi tai englanniksi ja täyttää liitteet omista tiedoistaan. Sinä ja asiakas allekirjoitatte AIMEAT-allekirjoituksella, EU:n digitaalisella lompakolla, omalla allekirjoituspalvelulla tai paperilla, ja kumpikin saa ilmoituksen ja sähköpostin jokaisesta vaiheesta. Asiakas näkee sopimuksen kohdassa Asetukset → Sopimukset. Tekoälysi tekee kaiken tämän myös. Rajat: tämä ei ole oikeudellinen neuvo. Anna juristin lukea täytetty sopimus ennen ensimmäistä asiakasta."
+      }
+    },
+    {
+      "date": "2026-10-23",
+      "kind": "feature",
+      "id": "2026-10-23-let-an-agent-start-its-work-without-your-ok",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Let an agent start its work without your OK",
+        "fi": "Anna agentin aloittaa työnsä ilman lupaasi"
+      },
+      "summary": {
+        "en": "An agent that can buy, send or delete in your name can now start its work by itself, when you allow it.",
+        "fi": "Agentti, joka voi ostaa, lähettää tai poistaa nimissäsi, voi nyt aloittaa työnsä itse, kun sallit sen."
+      },
+      "body": {
+        "en": "An agent with a permission to buy, send mail or messages in your name, delete messages, use your outside accounts or purge memory always waited for you to press Start. On the agent's card, \"Why its work waits\" now has \"Let it start anyway\": after you confirm, its work starts without your OK and you see afterwards what it did. Only you, signed in, can allow it, and only for the permissions you name. \"Take back\" makes its work wait again.",
+        "fi": "Agentti, jolla on lupa ostaa, lähettää sähköpostia tai viestejä nimissäsi, poistaa viestejä, käyttää ulkoisia tilejäsi tai tyhjentää muistia, odotti aina, että painat Aloita. Agentin kortin kohdassa \"Miksi sen työ odottaa\" on nyt \"Anna aloittaa silti\". Kun vahvistat, sen työ alkaa ilman lupaasi, ja näet jälkikäteen, mitä se teki. Vain sinä itse kirjautuneena voit sallia sen, ja vain niille luville, jotka nimeät. \"Peru\" laittaa sen työn taas odottamaan."
+      }
+    },
+    {
+      "date": "2026-10-23",
+      "kind": "security",
+      "id": "2026-10-23-the-october-security-review-fixed-in-three-round",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator",
+        "agent"
+      ],
+      "title": {
+        "en": "The October security review, fixed in three rounds",
+        "fi": "Lokakuun tietoturvakatselmus korjattu kolmessa kierroksessa"
+      },
+      "summary": {
+        "en": "Sign-in, two-step sign-in links, invitations, skills, payments and federation are safer, and what you use still works.",
+        "fi": "Kirjautuminen, kaksivaiheiset kirjautumislinkit, kutsut, taidot, maksut ja federointi ovat turvallisempia, ja käyttämäsi toimii yhä."
+      },
+      "body": {
+        "en": "A security review of the whole node found weak points, and they are fixed. A password reset now ends your sign-in sessions on every device, and a password change ends all but the one you changed it on. A sign-in link asks for your two-step code before it is used. Accepting an invitation while signed in joins your account without opening a new session. A skill's files stay inside the skill. Payment holds and shares are written only where the money is kept. Approval notices carry Don't allow beside Allow. Every use the product is built for was checked to still work after the fixes. An operator who runs AIMEAT with the compose files now sets the admin password, and the database is reachable only on the machine itself.",
+        "fi": "Tietoturvakatselmus kävi koko palvelimen läpi ja löysi heikkoja kohtia, ja ne on korjattu. Salasanan nollaus päättää nyt kirjautumisesi kaikilla laitteilla, ja salasanan vaihto päättää kaikki muut paitsi sen, jolla vaihdoit sen. Kirjautumislinkki kysyy kaksivaiheisen koodin ennen kuin sitä käytetään. Kun hyväksyt kutsun kirjautuneena, se liittyy tiliisi avaamatta uutta istuntoa. Taidon tiedostot pysyvät taidon sisällä. Maksuvarauksia ja osuuksia kirjoitetaan vain siellä, missä rahat pidetään. Hyväksyntäilmoituksissa on Älä salli Salli-painikkeen vieressä. Jokainen käyttötapa, jota varten tuote on tehty, tarkistettiin toimivaksi korjausten jälkeen. Ylläpitäjä, joka ajaa AIMEATia compose-tiedostoilla, asettaa nyt itse hallinnan salasanan, ja tietokantaan pääsee vain samalta koneelta."
+      },
+      "impact": {
+        "en": "After a password reset or change, sign in again on your other devices; an operator on the compose files sets AIMEAT_ADMIN_PASSWORD before starting.",
+        "fi": "Kirjaudu salasanan nollauksen tai vaihdon jälkeen uudelleen muilla laitteillasi. Compose-tiedostoja käyttävä ylläpitäjä asettaa AIMEAT_ADMIN_PASSWORDin ennen käynnistystä."
+      }
+    },
+    {
+      "date": "2026-10-22",
+      "kind": "fix",
+      "id": "2026-10-22-claude-code-signs-in-to-aimeat-again",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "Claude Code signs in to AIMEAT again",
+        "fi": "Claude Code kirjautuu taas AIMEATiin"
+      },
+      "summary": {
+        "en": "Connecting Claude Code to AIMEAT no longer ends in a redirect error.",
+        "fi": "Claude Coden yhdistäminen AIMEATiin ei enää pääty uudelleenohjausvirheeseen."
+      },
+      "body": {
+        "en": "Claude Code signs in through an address on your own machine, with a different port each time. AIMEAT compared that address letter by letter, so every sign-in ended in \"redirect_uri not registered\". An address on your own machine now matches on any port, as the sign-in standard asks; every other address is still compared exactly.",
+        "fi": "Claude Code kirjautuu oman koneesi osoitteen kautta, ja portti vaihtuu joka kerta. AIMEAT vertasi osoitetta merkki merkiltä, joten jokainen kirjautuminen päättyi virheeseen \"redirect_uri not registered\". Oman koneesi osoite täsmää nyt millä tahansa portilla, kuten kirjautumisstandardi vaatii. Kaikkia muita osoitteita verrataan yhä tarkasti."
+      },
+      "impact": {
+        "en": "If Claude Code failed to connect, connect it again; nothing else changes.",
+        "fi": "Jos Claude Code ei aiemmin saanut yhteyttä, yhdistä se uudelleen. Muu ei muutu."
+      }
+    },
+    {
       "date": "2026-10-21",
       "kind": "feature",
       "id": "2026-10-21-talk-with-several-people-in-one-group",
