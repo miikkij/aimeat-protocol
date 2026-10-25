@@ -23,6 +23,7 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-10-25 — subdomain_set passes `subdomain_origin` as `origin` (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — action "settings" asks the publish gate as PATCH /v1/apps/:filename does: a change that
@@ -355,6 +356,7 @@ export function registerAppManageTool(
                 }
                 const body: Record<string, unknown> = pick(args, ['target', 'enabled']);
                 if (args.subdomain_kind !== undefined) body.kind = args.subdomain_kind;
+                if (args.subdomain_origin !== undefined) body.origin = args.subdomain_origin;
                 const updated = await updateSubdomainSite(storage, config, sub, body);
                 if (updated.ok) return answer({ site: updated.site, created: false });
                 if (updated.code !== 'NOT_FOUND') return refusalText(updated);

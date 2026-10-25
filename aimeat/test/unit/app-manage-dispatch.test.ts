@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.9.0 — 2026-10-25 — subdomain_set carries subdomain_origin (secaudit2026oct22).
  *   v1.8.0 — 2026-10-17 — settings carries open_to (who may open the app).
  *   v1.7.0 — 2026-10-13 — scope_allowance and scope_allowance_remove, and the words field.
  *   v1.6.3 — 2026-10-12 — A probe value for settings.listing (listed, community, unlisted).
@@ -57,7 +58,7 @@ const VALUE: Record<string, unknown> = {
     content: 'zqxcontent', remove: true, limit: 7, playtest: true, days: 9, on: true, geo: 'region', detail: ['zqxdetail'],
     layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, listing: 'unlisted', parked: true,
     forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
-    subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, bundled_agent: 'zqxagent',
+    subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, subdomain_origin: 'publisher', bundled_agent: 'zqxagent',
     runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },
     account: 'zqxacct', role: 'zqxrole', level: 4, offerings: ['zqxoff'], expires_at: '2027-01-02T03:04:05Z',
     roles: { zqxrole: ['zqxoff'] }, seats: { zqxrole: 2 }, terms: { zqxrole: { days: 30, renewal: 'manual' } },

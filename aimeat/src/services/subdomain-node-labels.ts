@@ -16,6 +16,7 @@
  *   - nodeLabelAppOrigin(cfg, label, originalUrl) — the per-app origin address for that label, or null
  * @usage import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
  * @version-history
+ *   v1.0.2 — 2026-10-25 — nodeLabelAppOrigin also answers for a publisher's label (secaudit2026oct22).
  *   v1.0.1 — 2026-10-25 — Moved unchanged from routes/ to services/: services/subdomain-sites.ts reads
  *     it, and a service does not import a route (check:deps).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22, subdomains.ts app-label-served-on-apex-namespace).
@@ -58,8 +59,9 @@ export function isNodeApexLabel(label: string, config: HostConfig): boolean {
 }
 
 /**
- * The per-app origin address for an app row that holds a node label, keeping the request's path
- * and query, or null when this node has no app origin (the apex then answers 404).
+ * The per-app origin address for an app row the apex does not serve (a node label, or a label a
+ * publish assigned: services/subdomain-site-origin.ts), keeping the request's path and query, or
+ * null when this node has no app origin (the apex then answers 404).
  */
 export function nodeLabelAppOrigin(
   config: Pick<AimeatConfig, 'baseUrl' | 'appHost' | 'appOriginEnabled'>, label: string, originalUrl: string,

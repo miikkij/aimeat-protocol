@@ -4382,6 +4382,17 @@ components:
         createdBy: { type: string }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        origin:
+          type: string
+          nullable: true
+          enum: [operator, publisher, null]
+          description: >
+            Who chose the label. `operator`: a mapping made through these routes, served at
+            `<label>.<apex>` and at `<label>.<appHost>`. `publisher`: the label a publish or an open
+            gave the app, served only at `<label>.<appHost>`; `<label>.<apex>` and
+            `<label>--draft.<apex>` answer 302 there (404 when the node has no app origin). Null: a
+            mapping from before this field that the node could not classify at start, served as
+            before until the operator sets it (the Security page names each one).
 
     CrewDef:
       type: object
@@ -33648,9 +33659,11 @@ paths:
       operationId: updateSubdomainSite
       summary: Update a subdomain mapping (node operator)
       description: >
-        Changes kind, target or enabled; the resulting kind and target are checked
+        Changes kind, target, enabled or origin; the resulting kind and target are checked
         again as on create, and a change of kind to `app` on a node name is
-        rejected with 400 RESERVED_SUBDOMAIN. 404 NOT_FOUND when the subdomain is not mapped. The node
+        rejected with 400 RESERVED_SUBDOMAIN. `origin` is the operator's decision on who
+        the label belongs to (see SubdomainSiteRecord.origin); any other value is
+        400 INVALID_ORIGIN. 404 NOT_FOUND when the subdomain is not mapped. The node
         operator, or an agent of the operator holding `operator:admin`.
       tags: [Admin]
       security:
@@ -33675,6 +33688,9 @@ paths:
                   type: string
                 enabled:
                   type: boolean
+                origin:
+                  type: string
+                  enum: [operator, publisher]
       responses:
         '200':
           description: Mapping updated

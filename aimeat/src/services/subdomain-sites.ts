@@ -22,6 +22,9 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
+ *   v1.4.0 — 2026-10-25 — A mapping created here has origin 'operator' (served on the apex namespace
+ *     too), and an update takes `origin` ('operator' | 'publisher', else 400 INVALID_ORIGIN): the
+ *     operator's decision on a row the start step could not classify (secaudit2026oct22).
  *   v1.3.0 — 2026-10-24 — A node name (services/subdomain-node-labels.ts: login, account, pay...) is
  *     refused as kind app on create, and a change of kind to app on one is refused; a redirect there
  *     is accepted, and an existing app row on one is kept (secaudit2026oct22).
@@ -44,7 +47,7 @@ import { isNodeApexLabel } from './subdomain-node-labels.js';
 export interface SubdomainRefusal {
   ok: false;
   status: 400 | 404 | 409;
-  code: 'INVALID_SUBDOMAIN' | 'RESERVED_SUBDOMAIN' | 'INVALID_KIND' | 'INVALID_TARGET'
+  code: 'INVALID_SUBDOMAIN' | 'RESERVED_SUBDOMAIN' | 'INVALID_KIND' | 'INVALID_TARGET' | 'INVALID_ORIGIN'
     | 'APP_NOT_FOUND' | 'APP_RESTRICTED' | 'ALREADY_EXISTS' | 'NOT_FOUND';
   message: string;
 }
@@ -55,6 +58,8 @@ export interface SubdomainSiteInput {
   kind?: unknown;
   target?: unknown;
   enabled?: unknown;
+  /** Update only: 'operator' or 'publisher'. A create is always 'operator'. */
+  origin?: unknown;
 }
 
 function refuse(status: SubdomainRefusal['status'], code: SubdomainRefusal['code'], message: string): SubdomainRefusal {
@@ -134,10 +139,13 @@ export async function createSubdomainSite(
   }
 
   const now = new Date().toISOString();
+  // A mapping made here is the operator's own site, served on the apex namespace too
+  // (services/subdomain-site-origin.ts).
   const site: SubdomainSiteRecord = {
     subdomain, kind, target, enabled,
     createdBy,
     createdAt: now, updatedAt: now,
+    origin: 'operator',
   };
   await storage.createSubdomainSite(site);
   return { ok: true, site };
@@ -159,7 +167,15 @@ export async function updateSubdomainSite(
     return refuse(404, 'NOT_FOUND', `Subdomain "${subdomain}" is not mapped`);
   }
 
-  const updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled'>> = {};
+  const updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'origin'>> = {};
+  // The operator's decision on who the label belongs to: 'operator' serves the app on the apex
+  // namespace too, 'publisher' only on its app origin (services/subdomain-site-origin.ts).
+  if (input.origin !== undefined) {
+    if (input.origin !== 'operator' && input.origin !== 'publisher') {
+      return refuse(400, 'INVALID_ORIGIN', 'origin must be "operator" (served at <label>.<apex> too) or "publisher" (served only at its app address)');
+    }
+    updates.origin = input.origin;
+  }
   if (input.kind !== undefined) {
     if (input.kind !== 'app' && input.kind !== 'redirect') {
       return refuse(400, 'INVALID_KIND', 'kind must be "app" or "redirect"');

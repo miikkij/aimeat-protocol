@@ -8,6 +8,8 @@
  * @structure subdomainSiteMethods
  * @usage Object.assign(SqliteStorage.prototype, subdomainSiteMethods) in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The `origin` column is written on create and update and read back (null when
+ *     unset), mirroring Postgres 0116 (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
  *     deleteSubdomainSite, deserializeSubdomainSite moved here from apps.ts so the file mirrors
  *     postgres-kysely/methods/subdomain-sites.ts (secaudit 2026-10, M8).
@@ -21,11 +23,11 @@ export const subdomainSiteMethods = {
 
   async createSubdomainSite(this: SqliteStorage, site: SubdomainSiteRecord): Promise<SubdomainSiteRecord> {
     this.db.prepare(
-      `INSERT INTO subdomain_sites (subdomain, kind, target, enabled, createdBy, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO subdomain_sites (subdomain, kind, target, enabled, createdBy, createdAt, updatedAt, origin)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       site.subdomain, site.kind, site.target, site.enabled ? 1 : 0,
-      site.createdBy, site.createdAt, site.updatedAt,
+      site.createdBy, site.createdAt, site.updatedAt, site.origin ?? null,
     );
     return site;
   },
@@ -44,13 +46,14 @@ export const subdomainSiteMethods = {
 
   async updateSubdomainSite(this: SqliteStorage, 
     subdomain: string,
-    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt'>>,
+    updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled' | 'updatedAt' | 'origin'>>,
   ): Promise<SubdomainSiteRecord | null> {
     const sets: string[] = [];
     const params: unknown[] = [];
     if (updates.kind !== undefined) { sets.push('kind = ?'); params.push(updates.kind); }
     if (updates.target !== undefined) { sets.push('target = ?'); params.push(updates.target); }
     if (updates.enabled !== undefined) { sets.push('enabled = ?'); params.push(updates.enabled ? 1 : 0); }
+    if (updates.origin !== undefined) { sets.push('origin = ?'); params.push(updates.origin); }
     sets.push('updatedAt = ?');
     params.push(updates.updatedAt ?? new Date().toISOString());
     params.push(subdomain);
@@ -74,6 +77,7 @@ export const subdomainSiteMethods = {
       createdBy: row.createdBy as string,
       createdAt: row.createdAt as string,
       updatedAt: row.updatedAt as string,
+      origin: (row.origin as SubdomainSiteRecord['origin']) ?? null,
     };
   },
 };
