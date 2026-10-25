@@ -23,11 +23,12 @@
  *   const { url } = await openStripeCheckout(config, session, psp, returnUrl);
  *   registerPaymentHandler(stripeCheckoutHandler(config));
  * @version-history
+ *   v1.0.1 — 2026-10-25 — A test-mode payment records no adult check (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-4, A-5, KAU-07).
  */
 import type { PaymentHandler, CheckoutSessionRecord } from './types.js';
 import { PaymentError } from './payment-handlers.js';
-import { stripePaymentHandler, stripeApi, sellerKey, stripeIdempotencyKey, cardFundingOf, recordCreditCardAdult } from './stripe-handler.js';
+import { stripePaymentHandler, stripeApi, sellerKey, stripeIdempotencyKey, cardFundingOf, recordCreditCardAdult, isStripeTestMode } from './stripe-handler.js';
 import { microsToStripeMinor } from './money.js';
 
 type EncryptionConfig = { encryptionKey: string | null; totpSecretEncryptionKey: string | null };
@@ -122,7 +123,7 @@ export function stripeCheckoutHandler(config: EncryptionConfig): PaymentHandler 
       const intent = (typeof cs.payment_intent === 'object' && cs.payment_intent ? cs.payment_intent : null) as Record<string, unknown> | null;
       const intentId = intent ? String(intent.id) : String(cs.payment_intent ?? '');
       if (!intentId) throw new PaymentError('PSP_ERROR', 502, 'The card payment provider did not say which payment this was.');
-      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent));
+      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent), isStripeTestMode(cs, intent));
       const customer = typeof cs.customer === 'string' ? cs.customer : null;
       const method = intent && typeof intent.payment_method === 'string' ? intent.payment_method : null;
       return { trackingCode: intentId, ...(customer && method ? { saved: { customer, payment_method: method } } : {}) };
