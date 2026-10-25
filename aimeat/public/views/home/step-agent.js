@@ -17,6 +17,8 @@
  * @structure StepAgent({ state, onChanged }) — the open step 2.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   2026-10-25: An approval of a new device taking over an existing agent sends end_other_sessions when
+ *     the owner chose it on the card (secaudit2026oct22).
  *   2026-09-27: The step writes no class: its buttons are Loud, `quiet` while it is not their turn,
  *     and the prompt's copy is PromptCard `loud`/`quiet`; the markup is the same (page group G9, a
  *     move).
@@ -124,7 +126,7 @@ export function StepAgent({ onChanged, showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [loadPending]);
 
-  const approve = useCallback(async (userCode, scopes) => {
+  const approve = useCallback(async (userCode, scopes, opts) => {
     setBusyCode(userCode);
     try {
       // owner_token in the BODY, not just the Authorization header: /v1/agents/verify is reachable
@@ -132,6 +134,7 @@ export function StepAgent({ onChanged, showToast }) {
       // trusting the session middleware.
       const resp = await apiPost('/v1/agents/verify', {
         user_code: userCode, action: 'approve', scopes, owner_token: session?.jwt,
+        ...(opts?.endOtherSessions ? { end_other_sessions: true } : {}),
       });
       if (resp?.ok === false) throw new Error(resp?.error?.message || 'approve failed');
       setPending(prev => prev.filter(r => r.user_code !== userCode));

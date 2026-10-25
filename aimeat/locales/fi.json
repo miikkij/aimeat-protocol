@@ -15257,6 +15257,8 @@
       "packageInstalled": "Paketti {name} on asennettu. Sitä pyysi {who}.",
       "packageUpdated": "Paketti {name} on päivitetty. Sitä pyysi {who}.",
       "agentRemoved": "{name} ei ole enää yhteydessä.",
+      "agentTakeover": "Annoit uuden laitteen ottaa agentin {name} käyttöönsä. Agentin muut istunnot toimivat edelleen.",
+      "agentTakeoverEnded": "Annoit uuden laitteen ottaa agentin {name} käyttöönsä, ja agentin muut istunnot kirjattiin ulos.",
       "taskDone": "{agent} sai tehtävän valmiiksi.",
       "taskDoneTitled": "{agent} sai valmiiksi: {title}",
       "taskFailed": "{agent} ei saanut tehtävää valmiiksi.",
@@ -18787,7 +18789,9 @@
         "keepCurrent": "Pidä nykyiset oikeudet",
         "asRequested": "Mitä se pyysi",
         "requestedNote": "Tämä agentti pyysi: {scopes}",
-        "returningAgent": "Tämä agentti on jo käytössä. Hyväksyminen ilman muutoksia jättää sen oikeudet täsmälleen ennalleen."
+        "returningAgent": "Tämä agentti on jo käytössä. Hyväksyminen ilman muutoksia jättää sen oikeudet täsmälleen ennalleen.",
+        "takeover": "Uusi laite on ottamassa agenttisi {name} käyttöönsä. Laite ei todistanut olevansa {name}, joka palaa takaisin, joten pyytäjä voi olla joku muu. Hyväksy vain, jos yllä oleva koodi on sama, jonka oma tekoälysi näyttää. Jos hyväksyt, uusi laite saa agentin {name} ja sen oikeudet.",
+        "endOtherSessions": "Kirjaa {name} ulos kaikkialta muualta. Sen muiden laitteiden ja yhteyksien on yhdistettävä uudelleen."
       },
       "mode": {
         "autonomous": "Autonominen",

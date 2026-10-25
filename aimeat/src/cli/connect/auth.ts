@@ -25,10 +25,13 @@
  * @version-history v2.0.0 -- 2026-05-29 -- Write per-agent config alongside token + token table; mark first agent as primary so multi-agent serve has a sensible default.
  * @version-history v2.1.0 -- 2026-09-30 -- `--scopes a,b,c`: the permissions the agent asks for go into the device authorization request.
  * @version-history v2.1.1 -- 2026-10-14 -- Print the approval address with the user code (approvalUrl); the bare verification_uri opened the consent page on "Missing code parameter".
+ * @version-history v2.3.0 -- 2026-10-25 -- The agent's private key of each approval is kept beside its token, and a reconnect signs the device-authorize request with it (`proof`), so the owner sees the agent coming back rather than a new device taking it over (services/device-return-proof.ts; secaudit2026oct22, lead 2150).
  * @version-history v2.2.0 -- 2026-10-25 -- The per-agent config is written with saveConnectedAgentConfig: connecting records the runner and wake command it keeps as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  */
 import { AimeatClient } from './api-client.js';
-import { storeToken, getToken, listAllTokens } from './keychain.js';
+import { storeToken, getToken, listAllTokens, storeAgentKey, getAgentKey } from './keychain.js';
+import { sign } from '../../auth/keypair.js';
+import { returnProofMessage } from '../../services/device-return-proof.js';
 import { saveConfig, saveConnectedAgentConfig, loadPerAgentConfig } from './config.js';
 import { downloadSkillBundle, readSkillBundleGuide } from './skill-bundle.js';
 import { buildAgentOnboardingInstruction } from './onboarding-prompt.js';
@@ -62,6 +65,8 @@ interface DeviceTokenResponse {
   gaii: string;
   name: string;
   owner?: string;
+  /** The agent's private key of this approval (base64 Ed25519). */
+  privateKey?: string;
 }
 
 /**
@@ -285,6 +290,20 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   const s = createProgress(interactive, prompts);
   s.start('Requesting device authorization...');
 
+  // An agent this machine connected before proves it is coming back with the key its last approval
+  // gave it, so the owner sees a return rather than a new device taking it over
+  // (services/device-return-proof.ts). No key here: the request goes without proof, as before.
+  const heldKey = await getAgentKey(agentName, owner);
+  let proof: { signed_at: string; signature: string } | undefined;
+  if (heldKey) {
+    const signedAt = new Date().toISOString();
+    try {
+      proof = { signed_at: signedAt, signature: await sign(heldKey, returnProofMessage(owner, agentName, signedAt)) };
+    } catch {
+      warn('The key this machine kept for the agent could not sign; connecting without proof that it is the same agent.');
+    }
+  }
+
   let authResp;
   try {
     authResp = await client.post('/v1/agents/device-authorize', {
@@ -292,6 +311,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
       owner,
       ...(mode ? { mode } : {}),
       ...(scopes.length ? { scopes } : {}),
+      ...(proof ? { proof } : {}),
     });
   } catch (e) {
     s.stop('Authorization request failed.');
@@ -379,6 +399,8 @@ export async function runAuth(args: AuthArgs): Promise<void> {
     .filter(t => t.owner === ownerHandle && t.agent !== agentName).length === 0;
 
   await storeToken(agentName, ownerHandle, token.access_token);
+  // The key of this approval, so the next reconnect from this machine proves it is this agent.
+  if (typeof token.privateKey === 'string' && token.privateKey) await storeAgentKey(agentName, ownerHandle, token.privateKey);
   success(`Token stored (aimeat:${agentName}@${ownerHandle})`);
 
   // Per-agent config (<home>/agents/{owner}/{agent}/config.yaml). Preserve any existing

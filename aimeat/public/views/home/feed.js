@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-25: agent_device_takeover: a new device took over an agent, with or without its other
+ *     sessions signed out; filed with trouble (secaudit2026oct22).
  *   2026-10-25: memory_accessed_by_operator with action export: an operator's backup holds this many of
  *     your entries (secaudit2026oct22).
  *   2026-10-16: password_changed (reset, changed or set) under access, session_token_reused under trouble,
@@ -112,6 +114,10 @@ export function line(item) {
     // language the person reads.
     case 'agent_removed':
       return tr('home.feed.agentRemoved', '{name} is no longer connected.').replace('{name}', d.agent || d.name || '');
+    case 'agent_device_takeover':
+      return (d.other_sessions_ended === 'yes'
+        ? tr('home.feed.agentTakeoverEnded', 'You let a new device take over {name}, and its other sessions were signed out.')
+        : tr('home.feed.agentTakeover', 'You let a new device take over {name}. Its other sessions still work.')).replace('{name}', d.name || '');
     case 'agent_task_done':
       return d.title
         ? tr('home.feed.taskDoneTitled', '{agent} finished: {title}').replace('{agent}', d.agent || '').replace('{title}', d.title)
@@ -289,7 +295,7 @@ export function kindCategory(kind) {
   // The operator reset sits with 'trouble' rather than with the other two: a second factor that
   // disappeared without the person doing it is the one row on this feed they must not scroll past.
   if (['agent_task_failed', 'workflow_run_failed', 'ai_budget_reached', 'checkout_cancelled',
-    'agent_removed', 'two_factor_reset_by_operator', 'session_token_reused'].includes(k)) return 'trouble';
+    'agent_removed', 'two_factor_reset_by_operator', 'session_token_reused', 'agent_device_takeover'].includes(k)) return 'trouble';
   if (['payment_received', 'payment_sent', 'checkout_completed', 'app_tool_paid', 'ai_spend_daily',
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
