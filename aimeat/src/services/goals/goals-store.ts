@@ -5,7 +5,7 @@
  * @description Reading and writing one agent goal record, and deciding who may read or change it.
  *   Every write goes through updateRecord (services/record-cas.ts), so two agents taking the same open
  *   work at the same moment cannot both win: the second write finds a newer version, reads again and
- *   sees the work taken. The prefix `goals.` is service-owned (utils/reserved-keys.ts), so no memory
+ *   sees the work taken. The prefix `agent-goals.` is service-owned (utils/reserved-keys.ts), so no memory
  *   route writes a goal for anyone and this file is its one writer.
  *
  *   WHO MAY DO WHAT. A goal belongs to its owner. The owner in person reads and changes everything. An
