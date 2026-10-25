@@ -17,13 +17,15 @@
  *   - `redirect_ok` and `redirect_host`: whether the redirect is one the client registered, and its
  *     host. The page shows the host and sends a Deny only to a redirect this checked.
  * @structure OAuthConsentInfo · oauthConsentInfo(storage, clientId, redirectUri)
- * @usage const info = await oauthConsentInfo(storage, clientId, redirectUri); if (!info) 404
+ * @usage const info = await oauthConsentInfo(storage, clientId, redirectUri, redirectUriRegistered); if (!info) 404
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import type { Storage } from '../storage/interface.js';
 import { resolveClientIdMetadata } from './oauth-client-metadata.js';
-import { redirectUriRegistered } from '../mcp/oauth-redirect.js';
+
+/** The OAuth routes' own redirect test (mcp/oauth-redirect.ts redirectUriRegistered), handed in: a service does not import mcp/. */
+export type RedirectMatcher = (registered: readonly string[], requested: string) => boolean;
 
 export interface OAuthConsentInfo {
   client_id: string;
@@ -38,7 +40,9 @@ export interface OAuthConsentInfo {
 const hostOf = (url: string): string | null => (URL.canParse(url) ? new URL(url).host || null : null);
 
 /** The checked facts, or null when this server knows no such client. */
-export async function oauthConsentInfo(storage: Pick<Storage, 'getOAuthClient'>, clientId: string, asked: string): Promise<OAuthConsentInfo | null> {
+export async function oauthConsentInfo(
+  storage: Pick<Storage, 'getOAuthClient'>, clientId: string, asked: string, redirectUriRegistered: RedirectMatcher,
+): Promise<OAuthConsentInfo | null> {
   const client = await storage.getOAuthClient(clientId);
   const viaUrl = client ? null : await resolveClientIdMetadata(clientId);
   if (!client && !viaUrl) return null;
