@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-25 — secaudit2026oct22: optionalAuth counts refused credentials per address at the global
+ *     rate (refusedLimiter), so a stream of forged or dead tokens is answered 429 past that rate.
  *   2026-10-25 — contentAccessGate takes the lazy storage getter the CORS middleware takes: the origin of an app opened to the internet is one keyed read.
  *   2026-10-18 — POST /v1/ai/image is parsed at the large JSON limit: it carries reference pictures.
  *   2026-10-17 — contentAccessGate after appOriginSignIn: a node set to signed-in content access
@@ -264,8 +266,12 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   // E2-07). Before optionalAuth, so a refusal that middleware answers is seen as well.
   app.use(refusalRecorder());
 
-  // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution
-  app.use(optionalAuth());
+  // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution.
+  // A credential it refuses is answered there, before the limiters below, so its refusals are
+  // counted per address at the global rate a caller without a credential gets (secaudit2026oct22).
+  app.use(optionalAuth({
+    refusedLimiter: rateLimit(() => ({ ...config.rateLimits.global, keyBy: 'ip' }), config.rateLimits.roleMultipliers),
+  }));
 
   // Rewrite /v1/agents/me/... to /v1/agents/{agentName}/... when the caller is an
   // agent. The handbook tells agents to use "/me/" everywhere; this middleware

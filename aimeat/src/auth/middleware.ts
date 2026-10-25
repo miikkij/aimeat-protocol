@@ -16,6 +16,10 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-25 — secaudit2026oct22: optionalAuth and requireAuth check a JWT's signature before
+ *     they read the revoked-token table, so a value this node never signed costs no storage read;
+ *     optionalAuth({ refusedLimiter }) counts each refused credential before its 401 (server.ts
+ *     passes an address-keyed limiter at the global rate), and answers 429 past the limit.
  *   2026-10-20 — credentialRevoked and its four storage questions move unchanged to
  *     ./credential-revoked.ts (max-file-lines), re-exported here; there it asks a SEVENTH question
  *     (./visitor-peer.ts): a visitor's session counts only while its home peer is an active peer that
@@ -255,11 +259,25 @@ declare global {
 // the 800-line ceiling. Re-exported so every existing import of it still resolves here.
 export { credentialRevoked };
 
+/** What optionalAuth() is built with. */
+export interface OptionalAuthOptions {
+  /**
+   * Counts each refused credential before its 401 is sent, and answers 429 itself past its limit
+   * (server.ts passes an address-keyed rateLimit). A refused credential is answered here, before
+   * any limiter of the request chain runs, so without this no bucket counted it (secaudit2026oct22).
+   */
+  refusedLimiter?: (req: Request, res: Response, next: NextFunction) => void;
+}
+
 /**
  * Optional auth middleware — parses JWT if present, does not reject if absent.
  * Use requireAuth() or requireRole() for endpoints that need auth.
  */
-export function optionalAuth() {
+export function optionalAuth(opts: OptionalAuthOptions = {}) {
+  const refuse = (req: Request, res: Response, message: string): void => {
+    if (opts.refusedLimiter) opts.refusedLimiter(req, res, () => denyInvalidToken(req, res, message));
+    else denyInvalidToken(req, res, message);
+  };
   return async (req: Request, res: Response, next: NextFunction) => {
     const token = extractToken(req);
     if (token) {
@@ -279,12 +297,13 @@ export function optionalAuth() {
           req.auth = patAuth;
           maybeSetPatBrowserSession(req, res, token, patAuth);
         } else if (refuseDead) {
-          denyInvalidToken(req, res, REFUSED_CREDENTIAL_MESSAGE);
+          refuse(req, res, REFUSED_CREDENTIAL_MESSAGE);
           return;
         }
-      } else if (await isRevoked(token)) {
-        if (refuseDead) { denyInvalidToken(req, res, REFUSED_CREDENTIAL_MESSAGE); return; }
       } else {
+        // The signature is checked before the revoked-token table is read: a value this node never
+        // signed costs no storage read and no cache entry (secaudit2026oct22). credentialRevoked()
+        // asks isRevoked() first, so a revoked token this node did sign is refused as before.
         const verified = await verifyJWT(token);
         // SECURITY: the session check belongs HERE, not only in requireAuth(). This middleware is
         // mounted globally (server.ts), so requireAuth() finds req.auth already set and returns at
@@ -308,7 +327,7 @@ export function optionalAuth() {
           // surface, the tunnel's forwarded calls — reads the same answer without asking again.
           req.auth = await withCurrentScopes(sessionStorage(), verified);
         } else {
-          if (refuseDead) { denyInvalidToken(req, res, REFUSED_CREDENTIAL_MESSAGE); return; }
+          if (refuseDead) { refuse(req, res, REFUSED_CREDENTIAL_MESSAGE); return; }
         }
       }
     }
@@ -368,14 +387,15 @@ export function requireAuth() {
       return;
     }
 
-    if (await isRevoked(token)) {
-      deny401(req, res, 'Token has been revoked');
-      return;
-    }
-
+    // Signature first, then the revoked-token table, as in optionalAuth (secaudit2026oct22).
     const verified = await verifyJWT(token);
     if (!verified) {
       deny401(req, res, 'Invalid or expired token');
+      return;
+    }
+
+    if (await isRevoked(token)) {
+      deny401(req, res, 'Token has been revoked');
       return;
     }
 
