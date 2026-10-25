@@ -34,6 +34,9 @@
  *   const refused = await refuseTriggerStart({ storage, config }, ownerGhii, def);
  *   if (refused) return { runId: refused.runId, skipped: true, refused: refused.reason };
  * @version-history
+ *   v1.5.0 -- 2026-10-25 -- refuseTriggerStart skips the start for a deactivated account, whoever saved
+ *     the workflow, with a log sentence and no refusal record (secaudit2026oct22,
+ *     owner-deactivation:background-work-keeps-acting).
  *   v1.4.0 — 2026-10-20 — openInFlightRefusal: a run refused before a step is dispatched becomes the
  *     workflow's open refusal and the owner is told once, with "Run as me" and "Approve again" and the
  *     step named (secaudit 2026-10, v64).
@@ -61,6 +64,7 @@ import { runKey, getWorkflow } from './store.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { loc } from './engine-util.js';
 import { missingStepScopes } from './step-authority.js';
+import { deactivatedAccountSkip } from '../account-deactivated.js';
 import type { WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowSaver } from '../../models/workflow-schemas.js';
 
 export interface TriggerAuthorityDeps { storage: Storage; config: AimeatConfig }
@@ -182,10 +186,20 @@ function refusalReason(saverName: string, missing: string[], gone: boolean): str
  * May the trigger start this run? Null when it may. Otherwise the refusal is recorded (or counted on
  * the one already open) and the owner is told the first time; the answer is that record's id and
  * reason, which is what the caller reports instead of a run.
+ *
+ * A deactivated account's trigger starts nothing, whoever saved the workflow: the start is skipped
+ * with a log sentence that names the deactivation, no refusal record is written and the owner is not
+ * told (they cannot sign in), and `runId` is empty. Reactivation lets the next event start it
+ * (services/account-deactivated.ts; secaudit2026oct22).
  */
 export async function refuseTriggerStart(
   deps: TriggerAuthorityDeps, ownerGhii: string, def: WorkflowDef,
 ): Promise<{ runId: string; reason: string } | null> {
+  const paused = await deactivatedAccountSkip(deps.storage, ownerGhii);
+  if (paused) {
+    logger.info(`workflow "${def.id}": the trigger's start is skipped. ${paused}`);
+    return { runId: '', reason: paused };
+  }
   const saver = saverOfDef(def);
   if (saver.kind === 'owner') return null;
   const now = await saverAuthority(deps.storage, saver);

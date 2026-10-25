@@ -16,6 +16,9 @@
  *   every REST route — including the session-resume branch, which asked nothing at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=owner-deactivation
  * @version-history
+ *   v1.1.0 -- 2026-10-25 -- A schedule of the account is skipped while it is deactivated, with a run-log
+ *     line naming the deactivation, is kept, and runs again after reactivation (secaudit2026oct22,
+ *     owner-deactivation:background-work-keeps-acting).
  *   v1.0.4 -- 2026-10-13 -- The owner-key /v1/auth/token answer is chosen by the node's release and
  *     security.owner_key_login: 403 ACCOUNT_DISABLED on 3.x with the sign-in on, 410 OWNER_KEY_LOGIN_OFF
  *     otherwise. It accepted either one before (4.0-testimuutokset.md §4 item 2).
@@ -210,6 +213,29 @@ async function run() {
         assert(consent.status === 201, `consent ${consent.status} ${JSON.stringify(consent.body?.error)}`);
     });
 
+    // A schedule of the account, so the background half of deactivation is asserted too: its fire is
+    // skipped while the account is deactivated, and it runs again after reactivation (secaudit2026oct22).
+    let scheduleId = '';
+    await test('setup: the victim schedules a task for their agent', async () => {
+        const made = await json(`/v1/agents/${agent.name}/schedules`, {
+            method: 'POST', headers: bearer(victim.ownerToken),
+            body: JSON.stringify({
+                kind: 'agent_task', cron: '0 7 1 1 *', timezone: 'Europe/Helsinki', display_name: 'Yearly run', purpose: 'deactivation e2e',
+                task_template: { title: 'DEACT_OCCURRENCE', description: 'the scheduled run' },
+            }),
+        });
+        assert(made.status === 201, `schedule ${made.status}: ${JSON.stringify(made.body?.error)}`);
+        scheduleId = made.body.data.schedule.id;
+    });
+    /** The operator runs the schedule now and reads the newest run-log line. */
+    async function operatorRunsSchedule(): Promise<{ result: string; message: string }> {
+        const t = await json(`/v1/admin/scheduler/jobs/${encodeURIComponent(scheduleId)}/trigger`, { method: 'POST', headers: bearer(op.ownerToken) });
+        assert(t.status === 200, `trigger ${t.status}: ${JSON.stringify(t.body?.error)}`);
+        const log = await json(`/v1/admin/scheduler/execution-log?jobId=${encodeURIComponent(scheduleId)}&limit=1`, { headers: bearer(op.ownerToken) });
+        assert(log.status === 200 && log.body.data.entries.length === 1, `log ${log.status}: ${JSON.stringify(log.body?.error)}`);
+        return { result: log.body.data.entries[0].result, message: log.body.data.entries[0].errorMessage ?? '' };
+    }
+
     // ── Failure paths on the door itself ──
     await test('a non-operator cannot deactivate anyone: 403', async () => {
         const r = await json(`/v1/admin/owners/${victim.owner}/disable`, { method: 'POST', headers: bearer(bystander.ownerToken) });
@@ -232,6 +258,15 @@ async function run() {
         assert(r.body.data.sessions_revoked >= 2, `owner + agent sessions ended, got ${r.body.data.sessions_revoked}`);
         assert(r.body.data.pats_revoked >= 1, `PAT ended, got ${r.body.data.pats_revoked}`);
         assert(r.body.data.grants_revoked >= 1, `app grant ended, got ${r.body.data.grants_revoked}`);
+    });
+
+    // ── Background work waits, and nothing is deleted ──
+    await test('the account\'s schedule is skipped with a sentence that names the deactivation, and kept', async () => {
+        const run = await operatorRunsSchedule();
+        assert(run.result === 'skipped', `expected a skipped run, got ${run.result}: ${run.message}`);
+        assert(/deactivated/.test(run.message), `the run-log line names the deactivation: ${run.message}`);
+        const job = await json(`/v1/admin/scheduler/jobs/${encodeURIComponent(scheduleId)}`, { headers: bearer(op.ownerToken) });
+        assert(job.status === 200 && job.body.data.job.enabled === true, `the schedule is kept and on: ${job.status} ${JSON.stringify(job.body.data?.job?.enabled)}`);
     });
 
     // ── Every credential family is dead, immediately ──
@@ -315,6 +350,10 @@ async function run() {
         assert(en.status === 200 && en.body.data.disabled === false, `enable ${en.status}`);
         const login = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: victim.owner, password: PASSWORD }) });
         assert(login.status === 200, `login after enable ${login.status}: ${JSON.stringify(login.body?.error)}`);
+    });
+    await test('reactivation resumes the account\'s schedule without recreating it', async () => {
+        const run = await operatorRunsSchedule();
+        assert(run.result === 'success', `expected a successful run after reactivation, got ${run.result}: ${run.message}`);
     });
     await test('…but the credentials ended by deactivation stay dead', async () => {
         for (const [label, t] of [['owner', victim.ownerToken], ['agent', agent.token], ['pat', pat], ['app', appToken]] as const) {

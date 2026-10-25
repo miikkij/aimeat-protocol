@@ -25,6 +25,11 @@
  *   Reactivation clears the flag and nothing else: credentials revoked by deactivation stay dead,
  *   which is the difference between "the person is back" and "their old tokens are back".
  *
+ *   BACKGROUND WORK carries no credential, so no step here touches it. The scheduler fire, the
+ *   workflow trigger start and the unattended extension run ask the flag themselves
+ *   (services/account-deactivated.ts) and skip while it is set; nothing is deleted, so reactivation
+ *   resumes them (secaudit2026oct22).
+ *
  * @structure
  *   - OwnerLifecycleResult: what was ended, so the caller can claim it truthfully
  *   - deactivateOwner(storage, name, by): flag + revoke everything, one transaction
@@ -32,6 +37,7 @@
  *   - resolveOperatorAgentName / OPERATOR_AGENT_REFUSAL: re-exported from operator-principal.ts
  * @usage const result = await deactivateOwner(storage, 'alice', 'operator-bob');
  * @version-history
+ *   2026-10-25 -- The header says where background work asks the flag (services/account-deactivated.ts; secaudit2026oct22).
  *   v1.3.0 — 2026-10-16 — Each tolerant step runs in a savepoint, and the flag is read back after the
  *     commit: on PostgreSQL one rejected statement had turned the COMMIT into a silent rollback of the
  *     flag and every revocation while the caller was told the account was disabled (QA audit E6-01).
