@@ -29,6 +29,7 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=docsign
  * @version-history
+ *   2026-10-25 -- Alice's wallet signature, whose revocation status the offline suite cannot know, is sealed with the caveat REVOCATION_UNKNOWN, in the statement and the public lookup (secaudit2026oct22, lead 3895).
  *   2026-10-15 — The wallet signer comes from the test CA the node trusts; a chain to no trusted root and a certificate naming somebody else are refused (feature-list audit 38).
  *   2026-10-15 — An owner-level personal access token is refused method "session", used directly and
  *     exchanged; alice in person signs the same request (feature-list audit #37).
@@ -479,6 +480,11 @@ async function main() {
         assert(file.status === 200 && Buffer.from(await file.arrayBuffer()).equals(signedPdf), `bob reads the signed PDF: ${file.status}`);
         const look = await json(`/v1/docsign/lookup/${createHash('sha256').update(signedPdf).digest('hex')}`);
         assert(look.body.data.requests.some((q: any) => q.id === walletRequestId), 'the signed PDF\'s own hash finds the request');
+        // The suite validates offline, so the certificate's revocation status is not known: the
+        // signature is sealed anyway, with the caveat in the statement and the lookup (secaudit2026oct22, lead 3895).
+        assert((sig.statement.caveats ?? []).some((c: any) => c.code === 'REVOCATION_UNKNOWN'), `the sealed caveat: ${JSON.stringify(sig.statement.caveats)}`);
+        const pubSig = look.body.data.requests.find((q: any) => q.id === walletRequestId).signatures.find((x: any) => x.signer === ghii(names.alice));
+        assert((pubSig?.caveats ?? []).some((c: any) => c.code === 'REVOCATION_UNKNOWN' && /could not be established/.test(c.text)), `the lookup's caveat: ${JSON.stringify(pubSig)}`);
     });
 
     await test('bob signs the signed PDF with his wallet, never the original; an agent starts it for its owner over MCP', async () => {

@@ -27,6 +27,8 @@
  *   verifySeal · evidenceHash · canonicalJson
  * @usage const challenge = intentChallenge(intent);
  * @version-history
+ *   v1.2.0 -- 2026-10-25 -- SealedStatement.caveats: what the node could not establish when it sealed a
+ *     wallet signature, first REVOCATION_UNKNOWN (secaudit2026oct22, lead 3895).
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: SealedStatement.test, set only for a wallet signature
  *     that chains to an EU reference-wallet test CA.
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
@@ -83,7 +85,26 @@ export interface SealedStatement {
    * statement sealed before the field existed is unchanged and its seal still verifies.
    */
   test?: true;
+  /**
+   * What the node could not establish when it sealed this signature, each with its code and the
+   * sentence a reader is shown (a wallet signature only, STATEMENT_CAVEATS). Absent when there is
+   * none, so a statement sealed before the field existed keeps its canonical JSON and its seal.
+   */
+  caveats?: StatementCaveat[];
 }
+
+/** One recorded caveat of a sealed statement. */
+export interface StatementCaveat { code: StatementCaveatCode; text: string }
+
+export type StatementCaveatCode = 'REVOCATION_UNKNOWN';
+
+/** The sentence each caveat is sealed with, in English, as the statement is. */
+export const STATEMENT_CAVEATS: Record<StatementCaveatCode, string> = {
+  REVOCATION_UNKNOWN: 'Whether the signing certificate had been revoked could not be established when this signature was sealed.',
+};
+
+/** A caveat with its sentence. */
+export const caveat = (code: StatementCaveatCode): StatementCaveat => ({ code, text: STATEMENT_CAVEATS[code] });
 
 export interface Seal {
   alg: 'Ed25519';

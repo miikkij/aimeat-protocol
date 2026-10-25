@@ -29977,7 +29977,7 @@ paths:
     get:
       operationId: lookupDocsignByHash
       summary: Who signed this document on this node (public)
-      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with. Each signature carries `test`, true for a wallet signature whose certificate comes from an EU reference-wallet test CA (a test with no legal effect).
+      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with. Each signature carries `test`, true for a wallet signature whose certificate comes from an EU reference-wallet test CA (a test with no legal effect), and `caveats`, what the node could not establish when it sealed the signature, as sealed in its statement (`code` and `text`; empty when nothing). REVOCATION_UNKNOWN says that whether the wallet's signing certificate had been revoked could not be established; the signature was sealed anyway, because the person signed in their own wallet a moment before.
       tags: [Document signing]
       security: []
       parameters:

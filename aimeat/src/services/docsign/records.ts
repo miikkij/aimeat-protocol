@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-25 -- A wallet signature's caveats (WalletEvidence.caveats) are sealed into its statement, and the checks and the public lookup carry them (secaudit2026oct22, lead 3895).
  *   2026-10-25 -- verifyRecordSignatures and SignatureCheck moved unchanged to verify-signatures.ts (max-file-lines); exported from here as before.
  *   2026-10-25 — A wallet signature from an EU reference-wallet test certificate is sealed with test: true, and the signature checks and the public lookup carry `test` (secaudit2026oct22, records.ts:test-anchor-wallet-signature-sealed-without-test-mark).
  *   2026-10-24 — refuseVisitor also refuses the shared anonymous principal by identity (isAnonymousPrincipal), so the token POST /v1/auth/anonymous mints no longer creates, signs or starts a signature on a request (secaudit2026oct22, caller-context.ts:kindOf:anonymous-by-flag-only:docsign-refuseVisitor).
@@ -66,7 +67,7 @@ import { logger } from '../../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import {
   canonicalJson, intentChallenge, keyMessage, evidenceHash, sealStatement, sha256Hex,
-  type SignIntent, type SealedStatement, type Seal, type SignMethod, type Assurance,
+  type SignIntent, type SealedStatement, type Seal, type SignMethod, type Assurance, type StatementCaveat,
 } from './statement.js';
 import { verifyRecordSignatures } from './verify-signatures.js';
 
@@ -105,6 +106,8 @@ export interface WalletEvidence {
   validation: { verdict: string; level: string; reasons: string[]; trustSource: string | null; test: boolean };
   /** The certificate's holder name matches the signer's display name on this node; null when it cannot be told. */
   nameMatches: boolean | null;
+  /** What could not be established, sealed into the statement (statement.ts STATEMENT_CAVEATS). */
+  caveats?: StatementCaveat[];
 }
 
 export interface DocSignature {
@@ -514,6 +517,8 @@ async function sealInto(
     // A test-anchored wallet signature says so in what the node seals, so the checks and the public
     // lookup can say it too. Every other statement has no such field.
     ...(ev.wallet?.validation.test ? { test: true as const } : {}),
+    // What the node could not establish is sealed with the signature it qualifies (secaudit2026oct22).
+    ...(ev.wallet?.caveats?.length ? { caveats: ev.wallet.caveats } : {}),
   };
   const seal = await sealStatement(statement, nodeKey);
   rec.signatures[signer] = {
@@ -672,6 +677,8 @@ export interface PublicSignature {
   valid: boolean;
   /** A wallet signature from an EU reference-wallet test certificate: a test with no legal effect. */
   test: boolean;
+  /** What the node could not establish when it sealed the signature, as sealed; empty when nothing. */
+  caveats: StatementCaveat[];
 }
 
 export interface PublicRequestView {
@@ -691,7 +698,7 @@ export async function publicView(ctx: DocsignCtx, rec: DocSignRecord): Promise<P
     id: rec.id, title: rec.title, state: rec.state,
     document: { sha256: rec.document.sha256, name: rec.document.name, size: rec.document.size },
     createdAt: rec.createdAt, completedAt: rec.completedAt, partiesTotal: rec.parties.length,
-    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test })),
+    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test, caveats: c.caveats })),
   };
 }
 
