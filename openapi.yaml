@@ -62898,7 +62898,9 @@ paths:
 
         STORED AS A MEMORY RECORD at `crews.llm.<agent>` in the owner's own namespace, which is where
         their own tools already read and write. There is no table and no second permission: it needs
-        `memory:write`, like any other record in that namespace.
+        `memory:write`, like any other record in that namespace. A granted app is refused 403
+        ACCESS_DENIED, for a set and a clear: `crews.llm.*` is reserved from apps, because a `model`
+        choice names the address the crew sends its key to.
 
         A `provider` may NAME the environment variable holding a key (`api_key_env`) and must never
         carry the key itself; a field that looks like a credential is refused with `SECRET_IN_CHOICE`.
@@ -62943,7 +62945,7 @@ paths:
                           cleared: { type: boolean }
                           warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
         '400': { description: Not a choice this runtime could resolve, it carried a credential, or it names a key variable or an address the guard refuses (UNSAFE_CHOICE) }
-        '403': { description: Not this account's agent }
+        '403': { description: Not this account's agent, or the caller is a granted app (ACCESS_DENIED) }
         '404': { description: No agent of this account by that name }
 
   /v1/agents/llm-default:
@@ -62956,7 +62958,7 @@ paths:
         this too, because a crew that states its need is stating it about itself.
 
         `{"choice": null}` clears it, and routing falls back to the `llm_providers.json` on whatever
-        machine runs the agent.
+        machine runs the agent. A granted app is refused 403 ACCESS_DENIED, for a set and a clear.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -62987,6 +62989,7 @@ paths:
                           cleared: { type: boolean }
                           warning: { type: string, description: "Present when the owner's model policy leaves the chosen model out. The choice is saved anyway, because the crew runs on its own machine." }
         '400': { description: Not a choice this runtime could resolve, or it carried a credential }
+        '403': { description: The caller is a granted app (ACCESS_DENIED) }
 
   /v1/agents/{name}/crew/seed:
     post:

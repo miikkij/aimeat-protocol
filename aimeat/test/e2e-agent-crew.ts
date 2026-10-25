@@ -11,6 +11,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { appGrantToken } from './helpers/purpose-kit.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -424,6 +425,32 @@ await test('26. Another owner can neither read the menu nor set the choice', asy
   assert(m.status === 404 || m.status === 403, `menu as another owner: ${m.status}`);
   const w = await json(crew('/llm'), { method: 'PUT', headers: auth(otherToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
   assert(w.status === 404 || w.status === 403, `set as another owner: ${w.status}`);
+});
+
+await test("26b. A granted app can neither set nor clear the owner's model choice; the owner's agent still can (secaudit2026oct22)", async () => {
+  const appToken = await appGrantToken({ name: ownerName, token: ownerToken }, `crewllm${stamp}.html`, 'memory:read memory:write',
+    '<!doctype html><html><head><title>crew llm probe</title></head><body>probe</body></html>', BASE);
+  const pointed = JSON.stringify({ choice: { kind: 'model', label: 'probe', provider: { type: 'openai_compat', base_url: 'https://example.com/v1', model: 'm', api_key_env: 'OPENROUTER_API_KEY' } } });
+  const kept = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'content' } }) });
+  assert(kept.status === 200, `owner default ${kept.status}`);
+  try {
+    const profile = JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } });
+    for (const [path, body] of [['/v1/agents/llm-default', profile], [crew('/llm'), profile], ['/v1/agents/llm-default', pointed], ['/v1/agents/llm-default', JSON.stringify({ choice: null })]] as const) {
+      const r = await json(path, { method: 'PUT', headers: auth(appToken), body });
+      assert(r.status === 403, `app grant on ${path} should be refused, got ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+      assert(typeof r.body?.error?.message === 'string' && r.body.error.message.includes('Crew tab'), `the refusal names the Crew tab: ${r.body?.error?.message}`);
+    }
+    const mem = await json('/v1/memory/crews.llm.default', { headers: auth(ownerToken) });
+    assert(mem.status === 200 && mem.body?.data?.value?.profile === 'content', `the owner's default is unchanged: ${JSON.stringify(mem.body?.data?.value)}`);
+
+    // The owner's own agent sets and clears its model on the per-agent route, as before.
+    const set = await json(crew('/llm'), { method: 'PUT', headers: auth(agentToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
+    assert(set.status === 200, `agent set ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    const clear = await json(crew('/llm'), { method: 'PUT', headers: auth(agentToken), body: JSON.stringify({ choice: null }) });
+    assert(clear.status === 200 && clear.body.data.cleared === true, `agent clear ${clear.status}`);
+  } finally {
+    await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: null }) });
+  }
 });
 
 await test('Teardown — close tunnel', async () => { await tunnel?.close(); });
