@@ -3,6 +3,32 @@
   "entries": [
     {
       "date": "2026-10-25",
+      "kind": "feature",
+      "id": "2026-10-25-diagrams-use-mermaid-12",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "Diagrams use Mermaid 12",
+        "fi": "Kaaviot käyttävät Mermaid 12:ta"
+      },
+      "summary": {
+        "en": "Diagrams in documents and on the node's own pages are laid out more clearly, and nine other libraries are up to date.",
+        "fi": "Dokumenttien ja noden omien sivujen kaaviot asettuvat selkeämmin, ja yhdeksän muuta kirjastoa on päivitetty."
+      },
+      "body": {
+        "en": "Diagrams in Pages, in workspace documents and on organism pages are drawn with Mermaid 12, which lays them out with the ELK engine. Apps that render Markdown with AIMEAT.md.renderRich() get it too. The node also updated KaTeX, Motion, daisyUI, Chart.js, PixiJS, PDF.js, yaml, p5 and Lenis in their own files, so the apps that load them get the fixes without an edit.",
+        "fi": "Pagesin, työtilojen dokumenttien ja organismisivujen kaaviot piirretään nyt Mermaid 12:lla, joka asettelee ne ELK-moottorilla. Myös apit, jotka näyttävät Markdownia AIMEAT.md.renderRich()-funktiolla, saavat sen. Lisäksi node päivitti KaTeXin, Motionin, daisyUI:n, Chart.js:n, PixiJS:n, PDF.js:n, yamlin, p5:n ja Lenisin samoihin tiedostoihin, joten niitä lataavat apit saavat korjaukset ilman muutoksia."
+      },
+      "impact": {
+        "en": "Nothing to do. An app that loads /lib/mermaid/ directly stays on Mermaid 11; to move it, change its script line to /lib/mermaid@12/.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Appi, joka lataa /lib/mermaid/ suoraan, pysyy Mermaid 11:ssä. Kun haluat siirtää apin, vaihda sen script-riviksi /lib/mermaid@12/."
+      }
+    },
+    {
+      "date": "2026-10-25",
       "kind": "fix",
       "id": "2026-10-25-messages-opens-at-once",
       "highlight": false,
