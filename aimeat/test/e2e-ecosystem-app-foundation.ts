@@ -742,7 +742,10 @@ await test('An organisms-wide area the owner unticks on the row is not granted; 
   assert(hello.status === 200, `hello ${hello.status}`);
   const list = await json('/v1/ecosystem-apps/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
   const row = (list.body.data.requests as any[]).find(r => r.user_code === hello.body.data.user_code);
-  assert(JSON.stringify(row?.requested_data_areas) === JSON.stringify(asked), `the row has the areas to show: ${JSON.stringify(row?.requested_data_areas)}`);
+  // Compared field by field: PostgreSQL's jsonb keeps the areas but not the order of their keys.
+  const shown = (row?.requested_data_areas ?? []) as Array<{ area: string; pattern: string; rights: string[] }>;
+  assert(shown.length === asked.length && asked.every((a, i) => shown[i].area === a.area && shown[i].pattern === a.pattern
+    && JSON.stringify(shown[i].rights) === JSON.stringify(a.rights)), `the row has the areas to show: ${JSON.stringify(shown)}`);
   // Exactly the body the Outside apps row sends: the Read only preset and the areas left ticked.
   const ok = await json(`/v1/ecosystem-apps/${row.user_code}/approve`, {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
