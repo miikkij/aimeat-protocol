@@ -11,6 +11,7 @@ import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { TunnelClient } from './helpers/tunnel-harness.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { appGrantToken } from './helpers/purpose-kit.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -424,6 +425,66 @@ await test('26. Another owner can neither read the menu nor set the choice', asy
   assert(m.status === 404 || m.status === 403, `menu as another owner: ${m.status}`);
   const w = await json(crew('/llm'), { method: 'PUT', headers: auth(otherToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
   assert(w.status === 404 || w.status === 403, `set as another owner: ${w.status}`);
+});
+
+const PAGE = '<!doctype html><html><head><title>crew llm probe</title></head><body>probe</body></html>';
+const POINTED = { kind: 'model', label: 'probe', provider: { type: 'openai_compat', base_url: 'https://8.8.8.8/v1', model: 'm', api_key_env: 'OPENROUTER_API_KEY' } };
+const defaultChoice = async () => (await json('/v1/memory/crews.llm.default', { headers: auth(ownerToken) })).body?.data?.value;
+
+await test("26b. A granted app sets a node or profile choice at once; a model address it names waits for the owner's Allow (secaudit2026oct22, Jouni 2026-10-25)", async () => {
+  const appToken = await appGrantToken({ name: ownerName, token: ownerToken }, `crewllm${stamp}.html`, 'memory:read memory:write', PAGE, BASE);
+  try {
+    const prof = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
+    assert(prof.status === 200 && !prof.body.data.approval_request, `app profile ${prof.status}: ${JSON.stringify(prof.body?.error ?? prof.body?.data)}`);
+    const node = await json(crew('/llm'), { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ choice: { kind: 'node' } }) });
+    assert(node.status === 200, `app node choice ${node.status}: ${JSON.stringify(node.body?.error)}`);
+    assert((await defaultChoice())?.profile === 'coding', 'the profile choice was not written');
+
+    // The address: pending for the owner, nothing changed, readable by the app that asked.
+    const asked = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ choice: POINTED }) });
+    const req = asked.body?.data?.approval_request;
+    assert(asked.status === 202 && req?.status === 'awaiting_owner' && String(req.approve_url).includes('/v1/profile?tab=notifications'),
+      `expected 202 pending for the owner, got ${asked.status} ${JSON.stringify(asked.body?.data ?? asked.body?.error)}`);
+    assert((await defaultChoice())?.profile === 'coding', 'the address was written before the owner allowed it');
+    const seen = await json(`/v1/publish-requests/${req.request_id}`, { headers: auth(appToken) });
+    assert(seen.status === 200 && seen.body.data.request.state === 'awaiting_owner' && seen.body.data.request.kind === 'crew-model',
+      `the app reads its request: ${seen.status} ${JSON.stringify(seen.body?.data ?? seen.body?.error)}`);
+    const n = await json('/v1/notifications', { headers: auth(ownerToken) });
+    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.i18n?.key === 'approval_crew_model_default');
+    assert(!!notice && notice.i18n.vars.host === '8.8.8.8' && notice.i18n.vars.key === 'OPENROUTER_API_KEY'
+      && (notice.actions ?? []).map((a: any) => a.id).sort().join(',') === 'allow,deny', `owner notice: ${JSON.stringify(notice)}`);
+
+    // Don't allow: nothing changes, and the app sees the answer on its request.
+    const no = await json(`/v1/publish-requests/${req.request_id}/decision`, { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ decision: 'decline' }) });
+    assert(no.status === 200 && (await defaultChoice())?.profile === 'coding', `decline ${no.status}`);
+    const after = await json(`/v1/publish-requests/${req.request_id}`, { headers: auth(appToken) });
+    assert(after.body?.data?.request?.state === 'declined', `the app reads the decline: ${JSON.stringify(after.body?.data)}`);
+
+    // Allow: exactly the asked choice is written.
+    const again = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ choice: POINTED }) });
+    assert(again.status === 202, `ask again ${again.status}`);
+    const yes = await json(`/v1/publish-requests/${again.body.data.approval_request.request_id}/decision`, { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    const v = await defaultChoice();
+    assert(v?.kind === 'model' && v?.provider?.base_url === 'https://8.8.8.8/v1', `after Allow: ${JSON.stringify(v)}`);
+
+    // The owner's own agent sets an address at once, and the app clears at once, as before.
+    const own = await json(crew('/llm'), { method: 'PUT', headers: auth(agentToken), body: JSON.stringify({ choice: POINTED }) });
+    assert(own.status === 200 && !own.body.data.approval_request, `agent address ${own.status}: ${JSON.stringify(own.body?.data ?? own.body?.error)}`);
+    const clear = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(appToken), body: JSON.stringify({ choice: null }) });
+    assert(clear.status === 200 && clear.body.data.cleared === true, `app clear ${clear.status}`);
+  } finally {
+    await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: null }) });
+    await json(crew('/llm'), { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ choice: null }) });
+  }
+});
+
+await test('26c. A principal without memory:write cannot set the choice (403)', async () => {
+  const readOnly = await appGrantToken({ name: ownerName, token: ownerToken }, `crewllmro${stamp}.html`, 'memory:read', PAGE, BASE);
+  const r = await json('/v1/agents/llm-default', { method: 'PUT', headers: auth(readOnly), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
+  assert(r.status === 403, `expected 403 without memory:write, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  const p = await json(crew('/llm'), { method: 'PUT', headers: auth(readOnly), body: JSON.stringify({ choice: { kind: 'profile', profile: 'coding' } }) });
+  assert(p.status === 403, `per-agent: expected 403 without memory:write, got ${p.status}`);
 });
 
 await test('Teardown — close tunnel', async () => { await tunnel?.close(); });
