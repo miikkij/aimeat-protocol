@@ -72,6 +72,7 @@
  *   v1.9.0 — 2026-10-25 — The owner's own app shows the screen for the scopes its grant lacks when another
  *     account published the live version (it names who) or the owner narrowed the grant by hand, with
  *     one line that says which (secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing).
+ *     Its exact permissions open with the screen, and with no live grant each is marked new.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -169,7 +170,9 @@ export default function AppGrant() {
         // Pass-through: when NOT explicitly managing (the gear), the owner's own app, and an app whose
         // live grant covers what it asks for, are approved with no second prompt (app-grant-auto.js).
         if (autoApproves(res.data, myOwner, grant)) { setState({ status: 'autoapprove', request: res.data }); return; }
-        if (grant) setDetails(true); // manage / add-scopes → open the exact list + checkboxes up front
+        // manage / add-scopes, or the owner's own app asking after all → the exact list + checkboxes up
+        // front, so the scopes the notice calls "marked new below" are in view.
+        if (grant || (isOwnApp(res.data, myOwner) && ownAppAsks(res.data, grant))) setDetails(true);
         setState({ status: 'ready', request: res.data });
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
@@ -332,7 +335,7 @@ export default function AppGrant() {
               <${Check} checked=${selected.has(s.scope)} onChange=${() => toggle(s.scope)} ariaLabel=${s.scope}
                 hint=${html`<${Code}>${s.scope}<//>`}>
                 ${scopeSentence(s.scope, t, s.description)}
-                ${existingGrant && !existingGrant.scopes.includes(s.scope) && html` <${Mark} tone="coral">${tr('appGrant.newScope', 'new')}<//>`}
+                ${(existingGrant ? !existingGrant.scopes.includes(s.scope) : ownAsks) && html` <${Mark} tone="coral">${tr('appGrant.newScope', 'new')}<//>`}
               <//>
             <//>`)}
         <//>
