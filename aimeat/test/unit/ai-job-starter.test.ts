@@ -10,6 +10,7 @@
  *   was handed: that reader's kind is the evidence. The model call is mocked too.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-starter.test.ts
  * @version-history
+ *   2026-10-25 — The stub answers getOwner (no account), which scheduleActor now asks (secaudit2026oct22).
  *   v1.0.0 — 2026-09-29 — Initial (TARGET-082 V4).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -82,6 +83,8 @@ function memoryStorage(): { storage: Storage; rows: Map<string, MemoryRecord> } 
         transaction: async <T>(fn: () => Promise<T>) => fn(),
         getAgentsByOwner: async () => [],
         getEcosystemAppsByOwner: async () => [],
+        // scheduleActor asks whether the account is newer than the schedule (secaudit2026oct22).
+        getOwner: async () => null,
     } as unknown as Storage;
     return { storage, rows };
 }

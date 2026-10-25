@@ -7,6 +7,8 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   2026-10-25 — scope=shared asks organism:read of an agent on REST and MCP; an agent holding it or
+ *     '*' still sees the shared record (secaudit2026oct22, discover-shared-scope-skips-organism-read).
  *   v0.4.0 — 2026-10-20 — The own scope asks the organism read rule: an agent that a 'listed' organism
  *     does not admit sees none of its records on GET /v1/discover or MCP aimeat_discover; a listed
  *     agent and the owner in person still do (secaudit 2026-10, the v57 shape).
@@ -536,6 +538,29 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         const r = await discover('scope=shared&per_page=100', sB.token);
         assert(hasId(r.body.data.entries, SHARED_KEY), 'post-approval: member must now see the shared content');
         assert(byId(r.body.data.entries, SHARED_KEY)?.type === 'document', 'classified as document');
+    });
+
+    // secaudit2026oct22 (discover-shared-scope-skips-organism-read). Every other door that returns
+    // workspace content asks organism:read of an agent or an app; the shared scope asks it too.
+    await test('scope=shared asks organism:read of an agent: refused without it on REST and MCP, admitted with it or with *', async () => {
+        const narrow = await makeAgent(BASE, sB, ['memory:read']);
+        const r = await discover('scope=shared&per_page=100', narrow.token);
+        assert(r.status === 403 && r.body.error?.code === 'SCOPE_DENIED', `an agent without organism:read read shared content: ${r.status} ${JSON.stringify(r.body.data?.entries?.map((e: any) => e.id) ?? r.body.error)}`);
+        assert(JSON.stringify(r.body.error).includes('organism:read'), `the refusal names the word: ${JSON.stringify(r.body.error)}`);
+        const f = await json('/v1/discover/facets?scope=shared', { headers: auth(narrow.token) });
+        assert(f.status === 403, `facets without organism:read: ${f.status}`);
+        const own = await discover('scope=own&per_page=5', narrow.token);
+        assert(own.status === 200, `the own scope stays open to the same agent: ${own.status}`);
+        const s = await openSession(BASE, narrow.token);
+        const m = await callTool(s, 'aimeat_discover', { scope: 'shared', limit: 100 });
+        assert(m.isError && m.text.includes('organism:read') && !m.text.includes(SHARED_KEY), `MCP shared without organism:read: ${m.text.slice(0, 300)}`);
+        for (const scopes of [['memory:read', 'organism:read'], ['*']]) {
+            const ok = await makeAgent(BASE, sB, scopes);
+            const rr = await discover('scope=shared&per_page=100', ok.token);
+            assert(rr.status === 200 && hasId(rr.body.data.entries, SHARED_KEY), `an agent with ${scopes.join(' ')} must see the shared record: ${rr.status}`);
+            const ms = await callTool(await openSession(BASE, ok.token), 'aimeat_discover', { scope: 'shared', q: 'Collab', limit: 100, response_format: 'concise' });
+            assert(!ms.isError && ms.text.includes(SHARED_KEY), `MCP shared with ${scopes.join(' ')}: ${ms.text.replace(/\s+/g, ' ').slice(0, 300)}`);
+        }
     });
 
     await test('scope=shared requires auth', async () => {

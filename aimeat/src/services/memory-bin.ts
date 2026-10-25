@@ -21,6 +21,9 @@
  *   lowerRestored() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-25 — With owner_scope, locate walks the owner's identity and agents only for a principal
+ *     of that account on this node: an ecosystem app and a visitor from another node reach their own
+ *     identity only (secaudit2026oct22, memory-key-route:owner-scope-ecosystem-not-excluded).
  *   2026-10-22 — The account holder in person deletes a hold or beneficiary share of their own
  *     (OWNER_REMOVABLE_SERVICE_PREFIXES); restoring one and every other service-owned key stay refused
  *     (secaudit2026oct22).
@@ -169,6 +172,10 @@ async function locate(
   const first = req.ownerOverride || req.caller;
   if (await look(first)) return first;
   if (req.ownerOverride || !req.ownerScope) return null;
+  // The owner's reach belongs to a principal of that same account on this node. An ecosystem app
+  // works in its own eco: namespace, and a visitor from another node names no account here, so for
+  // them owner_scope looks no further than their own identity (as GET and the list rule).
+  if (isGEAI(req.caller) || localAccountOf(req.caller) !== req.ownerName) return null;
   // The owner's own identity before the agents, the order every owner-scope read uses
   // (services/owner-memory.ts), so the copy an agent reads with owner_scope is the copy it removes.
   // This lookup was missing until 2026-10-12: an agent that wrote records under its owner with

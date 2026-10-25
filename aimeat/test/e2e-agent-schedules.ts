@@ -6,6 +6,8 @@
  *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
  * @version-history
+ *   2026-10-25 — 47: erasing an account removes the schedules its agents made, and a schedule older
+ *     than the account that holds its name does not fire in it (secaudit2026oct22).
  *   2026-10-21 — 45 and 46 (capability-loss review): a narrowed maker's refusal tells the owner where to
  *     allow the word and runs again after; an app's agent_task schedule from before 2026-10-05 still runs.
  *   2026-10-20 — Phase 13 (secaudit 2026-10, runAgentTaskJob:fires-without-asking-maker): an
@@ -1097,6 +1099,54 @@ await test('46. KEPT: an app\'s agent_task schedule from before 2026-10-05 (no g
     const fired = await v65Fire(id);
     assert(fired.outcome === 'created', `an old app schedule must keep firing: ${fired.outcome} ${fired.schedule?.lastRunError ?? ''}`);
     assert((await v65Tasks('V65_OLD_APP')).length === 1, 'its task is in the queue');
+});
+
+// secaudit2026oct22 (owner-erasure:agent-made-schedules-survive-and-rebind). Erasing an account removes
+// every schedule that acts in it, the ones its agents made included, and a schedule older than the
+// account that holds its name now (left by a previous holder) does not fire in the new account.
+await test('47. Erasure removes the schedules the account\'s agents made, and a schedule older than the account does not fire in it', async () => {
+    const provider = (process.env.AIMEAT_DB ?? '') as StorageProvider;
+    const dbUrl = serverDbUrl();
+    const sqlitePath = pinnedSqlitePath();
+    assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+    const storage = await createStorage({ provider, sqlitePath, dbUrl });
+    const name = `schederase${Date.now()}`;
+    const schedule = async (token: string, title: string) => {
+        const made = await json('/v1/schedules', {
+            method: 'POST', headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ kind: 'agent_task', agent_name: 'erasebot', cron: '0 0 1 1 *', display_name: title, task_template: { title } }),
+        });
+        assert(made.status === 201, `agent create: ${made.status} ${JSON.stringify(made.body?.error)}`);
+        return made.body.data.schedule.id as string;
+    };
+    const first = await registerOwner(BASE, name);
+    const bot = await scopedAgent(name, first.token, 'erasebot', ['task:write', 'workflow:read']);
+    const oldId = await schedule(bot, 'ERASED_AGENT_JOB');
+    const del = await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${first.token}` } });
+    assert(del.status === 200, `erase: ${del.status} ${JSON.stringify(del.body?.error)}`);
+    assert(!(await storage.getScheduledJob(oldId)), 'a schedule the erased account\'s agent made survived the erasure');
+
+    // The name is registered again. A schedule a previous holder left (written behind the server's
+    // back, older than the new account) does not fire as the new holder's same-named agent.
+    const second = await registerOwner(BASE, name);
+    const bot2 = await scopedAgent(name, second.token, 'erasebot', ['task:write', 'workflow:read']);
+    const listed = await json('/v1/schedules', { headers: { Authorization: `Bearer ${second.token}` } });
+    assert(!JSON.stringify(listed.body?.data ?? {}).includes(oldId), 'the previous holder\'s schedule is listed to the new holder');
+    const leftId = await schedule(bot2, 'LEFT_BY_PREVIOUS_HOLDER');
+    // updateScheduledJob never writes createdAt on Postgres, so the row is aged with one statement there.
+    if (provider === 'postgres-kysely') {
+        await (storage as unknown as { pool: { query(q: string, p: unknown[]): Promise<unknown> } }).pool
+            .query('UPDATE "ScheduledJob" SET "createdAt" = $1 WHERE "id" = $2', [new Date('2020-01-01T00:00:00.000Z'), leftId]);
+    } else {
+        await storage.updateScheduledJob(leftId, { createdAt: '2020-01-01T00:00:00.000Z' });
+    }
+    const run = await json(`/v1/schedules/${leftId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${second.token}` } });
+    assert(run.status === 200 && run.body.data.outcome !== 'created', `a schedule older than the account fired in it: ${run.status} ${run.body?.data?.outcome}`);
+    // Control: the new holder's own agent schedule fires.
+    const ownId = await schedule(bot2, 'NEW_HOLDER_JOB');
+    const ok = await json(`/v1/schedules/${ownId}/trigger`, { method: 'POST', headers: { Authorization: `Bearer ${second.token}` } });
+    assert(ok.status === 200 && ok.body.data.outcome === 'created', `the new holder's own schedule did not fire: ${ok.status} ${ok.body?.data?.outcome} ${JSON.stringify(ok.body?.error)}`);
+    await json(`/v1/owners/${encodeURIComponent(name)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${second.token}` } });
 });
 
 console.log('\nCleanup');

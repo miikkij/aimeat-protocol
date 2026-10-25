@@ -517,6 +517,46 @@ await test('9e. Notification link: a node-relative deep link is kept, a foreign 
     `a foreign host must fall back to the default link, got ${foreign.link}`);
 });
 
+// secaudit2026oct22 (extension-uninstall:name-keyed-consents-survive-reinstall). A consent names the
+// extension the person chose. A redeploy of it keeps the consent; after an uninstall, a new install of
+// the same name is another extension and gets no earlier consent until the person grants again.
+const notifyTarget = async (message: string, id: number) => {
+  const { body } = await mcpRpc('tools/call', {
+    name: 'aimeat_extension_invoke',
+    arguments: { extension_name: extName, action_id: 'notifytest', input: { message, to: targetName } },
+  }, id);
+  assert(!body.result.isError, `not an error: ${body.result?.content?.[0]?.text}`);
+  return JSON.parse(body.result.content[0].text).sent as boolean;
+};
+
+await test('9f. A redeploy keeps the consent; a reinstall under the same name after an uninstall does not inherit it', async () => {
+  const put = await json(`/v1/extensions/${extName}`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ manifest: testManifest, scripts: testScripts }),
+  });
+  assert(put.status === 200 || put.status === 201, `redeploy: ${put.status} ${JSON.stringify(put.body?.error)}`);
+  assert(await notifyTarget('after the redeploy', 113) === true, 'a redeploy of the same extension dropped the consent');
+
+  const del = await json(`/v1/extensions/${extName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(del.status === 200, `uninstall: ${del.status} ${JSON.stringify(del.body?.error)}`);
+  const again = await json('/v1/extensions', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ manifest: testManifest, scripts: testScripts }),
+  });
+  assert(again.status === 201, `reinstall: ${again.status} ${JSON.stringify(again.body?.error)}`);
+  const act = await json(`/v1/extensions/${extName}/activate`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(act.status === 200, `activate: ${act.status}`);
+  assert(await notifyTarget('after the reinstall', 114) === false, 'a new install of the same name inherited the consent given to the earlier one');
+
+  // The person consents to the new install, and it delivers again.
+  const grant = await json('/v1/consent', {
+    method: 'POST', headers: { Authorization: `Bearer ${targetToken}` },
+    body: JSON.stringify({ data_pattern: `ext:${extName}`, recipient: '*', purpose: 'extension_notify' }),
+  });
+  assert(grant.status === 201 || grant.status === 200, `consent again: ${grant.status}`);
+  assert(await notifyTarget('after consenting again', 115) === true, 'a consent to the new install does not deliver');
+});
+
 // ─── Phase 6: Extension resource ───
 console.log('\nPhase 6 — Extension Resource');
 

@@ -7,6 +7,8 @@
  *   Supports special @activate trigger: runs on extension activation AND every server startup.
  *   Every execution creates an ExecutionLogEntry with timing, result, and memory I/O.
  * @version-history
+ *   2026-10-25 — A connections-publish fire asks its maker first (scheduleFireRefusal): a deleted agent,
+ *     a revoked app grant or a maker without connections:use does not post (secaudit2026oct22).
  *   2026-10-19 — A one-shot user schedule (max_runs limit 1) that fails is turned off at once with one
  *     bell entry, no retry; autoDisable() clears nextRunAt, so a schedule that is off shows no next
  *     run (wish a-failed-one-shot-schedule-does-not-wait-a-year).
@@ -114,6 +116,7 @@ import { SlotPool } from './slot-pool.js';
 import { runExtensionJob } from './scheduler-extension-job.js';
 import { runWorkflowJob, runEcoCapabilityJob } from './scheduler-remote-jobs.js';
 import { scheduleStorageFileRefusal } from './schedule-file-access.js';
+import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import { runAgentTaskJob, materialiseAgentTask as materialiseAgentTaskRecord, type TaskWake } from './scheduler-agent-task.js';
 import { emitResourceUpdated } from '../mcp/resource-events.js';
 import { claimCronFire } from './scheduler-fire-claim.js';
@@ -674,6 +677,12 @@ export class Scheduler {
    * produces one post rather than two.
    */
   private async executeConnectionsPublishJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    // The maker is asked at every fire, as the extension and agent_task kinds ask it: a maker that is
+    // gone, or one that no longer holds connections:use, does not post. The file check below asks
+    // nothing when the post names no file (secaudit2026oct22,
+    // scheduler:connections-publish-fires-without-maker-check).
+    const makerRefusal = await scheduleFireRefusal(this.storage, job, { nodeId: this.config.nodeId, baseUrl: this.config.baseUrl });
+    if (makerRefusal) throw new Error(makerRefusal);
     // A schedule a non-owner made may publish only a file its maker can read. The create and edit
     // doors refuse one it cannot, and this asks again at the fire because a file's visibility can be
     // narrowed after the schedule was saved (services/schedule-file-access.ts; secaudit 2026-10).

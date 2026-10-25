@@ -301,6 +301,32 @@ async function run() {
         assert(!w.isError, `a listed agent of the workspace creator could not write its workspace: ${w.text.slice(0, 300)}`);
     });
 
+    // secaudit2026oct22 (intake.ts:requireWsOwner:listed-agent-gate-missing). The intake management
+    // routes sit at /v1/intake/forms, outside the /v1/organisms/:id refusal, and GET /v1/organisms/waiting
+    // lists every organism of the owner. Both now refuse or leave out an organism that bars the agent.
+    await test('an unlisted agent cannot define, list or delete intake forms, and /v1/organisms/waiting leaves the organism out', async () => {
+        const formBody = (formId: string) => JSON.stringify({ organism_id: orgId, ws: wsId, namespace: 'shared.docs', form_id: formId, allowed_fields: ['title'] });
+        const own = await json('/v1/intake/forms', { method: 'POST', headers: bearer(A.ownerToken), body: formBody('owner-form') });
+        assert(own.status === 200, `the owner could not define a form: ${own.status} ${JSON.stringify(own.body?.error)}`);
+        const def = await json('/v1/intake/forms', { method: 'POST', headers: bearer(a2.token), body: formBody('agent-form') });
+        assert(def.status === 403 && def.body?.error?.code === 'AGENT_NOT_ADMITTED', `an unlisted agent defined a form: ${def.status} ${JSON.stringify(def.body?.error ?? def.body?.data)}`);
+        const list = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${wsId}`, { headers: bearer(a2.token) });
+        assert(list.status === 403 && list.body?.error?.code === 'AGENT_NOT_ADMITTED', `an unlisted agent listed the forms: ${list.status}`);
+        const del = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${wsId}&form_id=owner-form`, { method: 'DELETE', headers: bearer(a2.token) });
+        assert(del.status === 403 && del.body?.error?.code === 'AGENT_NOT_ADMITTED', `an unlisted agent deleted a form: ${del.status}`);
+        const pub = await json(`/v1/intake/${orgId}/${wsId}/owner-form`);
+        assert(pub.status === 200, `the owner's form is gone: ${pub.status}`);
+        const waiting = await json('/v1/organisms/waiting', { headers: bearer(a2.token) });
+        assert(waiting.status === 200 && !JSON.stringify(waiting.body.data.items).includes(orgId), `the waiting list names the organism to an unlisted agent: ${JSON.stringify(waiting.body.data?.items)}`);
+        // Positive control: the listed agent manages forms as its owner does.
+        const listed = await json('/v1/intake/forms', { method: 'POST', headers: bearer(A.agent.token), body: formBody('listed-form') });
+        assert(listed.status === 200, `the listed agent could not define a form: ${listed.status} ${JSON.stringify(listed.body?.error)}`);
+        const listedList = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${wsId}`, { headers: bearer(A.agent.token) });
+        assert(listedList.status === 200 && JSON.stringify(listedList.body.data).includes('owner-form'), `the listed agent could not list the forms: ${listedList.status}`);
+        const listedDel = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${wsId}&form_id=listed-form`, { method: 'DELETE', headers: bearer(A.agent.token) });
+        assert(listedDel.status === 200, `the listed agent could not delete its form: ${listedDel.status} ${JSON.stringify(listedDel.body?.error)}`);
+    });
+
     await test('a listed agent reads the organism record through the owner-scope paths (v57 positive control)', async () => {
         const read = await callTool(A, 'aimeat_memory_read', { key: probeKey, owner_scope: true });
         assert(!read.isError && read.text.includes('v57 organism record'), `the listed agent could not read it: ${read.text.slice(0, 300)}`);

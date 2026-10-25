@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — PUT /:key with owner_scope reaches the owner's agents only for a principal of this
+ *     node that is not an ecosystem app, as GET and the list do (secaudit2026oct22,
+ *     memory-key-route:owner-scope-ecosystem-not-excluded). DELETE and restore ask the same in
+ *     services/memory-bin.ts.
  *   2026-10-19 — PUT /cors/:key writes the origin list on the version it read (setMemoryIfVersion) and
  *     reads again on a conflict, so a value written meanwhile stays (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   2026-10-18 — PUT /:key asks the publish gate like POST: 202 with `publish_request` (plan
@@ -418,8 +422,11 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // The owner can update anything the owner owns, whoever wrote it; `?owner_scope=true` extends
     // the same reach to another same-owner principal that already carries memory:write — an app
-    // grant, or an agent — as GET and DELETE do (same-owner-access invariant).
-    const ownerScopeWrite = isOwnerInPerson(req.auth) || req.query.owner_scope === 'true';
+    // grant, or an agent — as GET and DELETE do (same-owner-access invariant). An ecosystem app and
+    // a visitor from another node are excluded, as on GET and on the list: the app works in its own
+    // eco: namespace, and a visitor's owner name names no account here.
+    const ownerScopeWrite = (isOwnerInPerson(req.auth) || req.query.owner_scope === 'true')
+      && !req.auth!.roles.includes('ecosystem') && !isForeignPrincipal(req.auth);
     let existing = await storage.getMemory(gaii, key);
     let effectiveGaii = gaii;
     if (!existing && ownerScopeWrite) {

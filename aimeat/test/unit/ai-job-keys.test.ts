@@ -11,6 +11,7 @@
  *   mocked.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-job-keys.test.ts
  * @version-history
+ *   2026-10-25 — The stub answers getOwner (no account), which scheduleActor now asks (secaudit2026oct22).
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09: A6-1, 573704db10ed).
  *   v1.1.0 — 2026-09-29 — assembleJobPrompt takes a classification reader (TARGET-082).
  *   v1.2.0 — 2026-10-20 — The stub storage answers createMemoryIfAbsent, setMemoryIfVersion and
@@ -115,6 +116,8 @@ function watchedStorage(seed: Record<string, unknown> = {}, schedules: Scheduled
         getAgentsByOwner: async () => [],
         getEcosystemAppsByOwner: async () => [],
         getAgent: async () => null,
+        // scheduleActor asks whether the account is newer than the schedule (secaudit2026oct22).
+        getOwner: async () => null,
         createScheduledJob: async (job: ScheduledJobRecord) => { w.createdSchedules.push(job); return job; },
         getScheduledJob: async (id: string) => schedules.find(s => s.id === id) ?? null,
         updateScheduledJob: async (id: string, patch: Partial<ScheduledJobRecord>) => {

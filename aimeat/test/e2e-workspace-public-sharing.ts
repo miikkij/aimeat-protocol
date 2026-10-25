@@ -6,6 +6,8 @@
  *   PUBLISHED docs the share meta marks public are served, that drafts never leak, that per-doc
  *   overrides win over the space flag, and that the share write is creator/admin-gated.
  * @version-history
+ *   2026-10-25 — 14c: the search index holds no word of the share password hash, and the record is
+ *     still found by its key (secaudit2026oct22, search-index-prefix-oracle-on-masked-fields).
  *   v1.5.0 — 2026-10-17 — 21b: a share for the organism's members: anonymous 401, a signed-in
  *     outsider 403 SHARE_MEMBERS_ONLY, a member 200 (plan doc-mvcn6c7e4e5q V3.4).
  *   v1.4.0 — 2026-10-09 — 19b: a password change ends the share tokens minted under the old
@@ -50,6 +52,8 @@ async function raw(path: string, opts: RequestInit = {}) {
 }
 
 import { ownerSignIn } from './helpers/owner-login.js';
+import { pinnedSqlitePath, serverDbUrl } from './helpers/server-db.js';
+import { createStorage, type StorageProvider } from '../src/storage/storage-factory.js';
 
 /** Register owner + an owner JWT (no agent needed — sharing is owner/member-driven). */
 async function setupOwner(label: string) {
@@ -233,6 +237,30 @@ await test('14b. the generic memory routes show has_password, never the hash, of
         assert(!text.includes('passwordHash'), `${door} carries the passwordHash field`);
         assert(!/\$scrypt|v2:[0-9a-f]{16,}/.test(text), `${door} carries the hash value: ${text.slice(0, 200)}`);
     }
+});
+
+await test('14c. the search index holds no word of the share password hash; the record is still found by its key', async () => {
+    // secaudit2026oct22 (search-index-prefix-oracle-on-masked-fields). Search matches a word at its
+    // start, so a hit or a miss on a hex prefix of an indexed hash recovers it character by character.
+    // The masked fields are left out of the search text the index is built from.
+    const key = `${root()}.meta.share`;
+    const provider = (process.env.AIMEAT_DB ?? '') as StorageProvider;
+    const dbUrl = serverDbUrl();
+    const sqlitePath = pinnedSqlitePath();
+    assert((provider === 'sqlite' && !!sqlitePath) || (provider === 'postgres-kysely' && !!dbUrl), `backend "${provider}" is not reachable from this process`);
+    const storage = await createStorage({ provider, sqlitePath, dbUrl });
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+    const hash = String((items.find(r => r.key === key)?.value as { passwordHash?: string } | undefined)?.passwordHash ?? '');
+    const [, salt, derived] = hash.split(':');
+    assert(!!salt && !!derived, `the stored share record carries a v2 hash: ${hash.slice(0, 3)}`);
+    const hits = async (q: string) => {
+        const r = await json(`/v1/memory/search?prefix=${encodeURIComponent(key)}&q=${encodeURIComponent(q)}`, { headers: AH() });
+        assert(r.status === 200, `search ${r.status}`);
+        return JSON.stringify(r.body.data).includes(key);
+    };
+    assert(!(await hits(salt.slice(0, 6))), 'a prefix of the stored salt finds the share record');
+    assert(!(await hits(derived.slice(0, 6))), 'a prefix of the stored key finds the share record');
+    assert(await hits('share'), 'the share record is no longer found by its key');
 });
 
 await test('15. password mode: anonymous public reads → 401 SHARE_PASSWORD_REQUIRED (list, single, md)', async () => {

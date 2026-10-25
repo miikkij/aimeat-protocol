@@ -10,6 +10,9 @@
  * @structure canWriteNamespaceRule · roleSatisfies · fresherRec · ownerGhiiOf · collapseKeyTo · revertRecordToDraft
  * @usage import { fresherRec, ownerGhiiOf } from './record-helpers.js';
  * @version-history
+ *   2026-10-25 — readOrganismConfig takes the newest copy of a current creator or admin of the
+ *     organism on this node, not the first copy in storage order (secaudit2026oct22,
+ *     readOrganismConfig:first-copy-any-owner).
  *   v1.1.0 — 2026-09-13 — revertRecordToDraft(): the body of shared.ts revertToDraft, moved unchanged
  *     (max-file-lines) when the UNDECLARED_SPACE refusal took that file past 800 lines. The closure
  *     in shared.ts keeps the refusal and calls this.
@@ -17,6 +20,7 @@
  */
 import type { MemoryRecord, Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { localAccountOf } from '../../utils/gaii.js';
 
 /**
  * Who may write in which namespace of a workspace: `meta.*` is the organism's own structure — its
@@ -94,11 +98,39 @@ export async function collapseKeyTo(storage: Storage, key: string, keepOwner: st
  * bypassed by the door that needed it most.
  *
  * Moved here from ./shared.ts on 2026-09-14 (max-file-lines), unchanged.
+ *
+ * WHICH COPY COUNTS. Every creator or admin who sets a gate writes their own copy (memory is keyed by
+ * the writer), so the key can be stored under several identities. The copy that counts is the newest
+ * one whose writer is a creator or admin of the organism NOW, on this node. A plain member's copy, a
+ * removed, banned or demoted admin's copy and another node's copy count for nothing. The order the
+ * store returns the copies in plays no part: it put the copy whose owner id sorts first in charge,
+ * whatever that person's role (secaudit2026oct22, readOrganismConfig:first-copy-any-owner).
  */
 export async function readOrganismConfig(
     storage: Storage, organismId: string,
 ): Promise<Record<string, unknown> | null> {
     const key = `organism.${organismId}.meta.config`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: ORGANISM_CONFIG_COPIES });
+    const managers: MemoryRecord[] = [];
+    const roles = new Map<string, boolean>();
+    for (const rec of items) {
+        if (rec.key !== key) continue;
+        const account = localAccountOf(rec.ownerGaii);
+        if (!account) continue;
+        if (!roles.has(account)) {
+            const m = await storage.getMembership(organismId, account);
+            roles.set(account, !!m && m.status === 'active' && (m.role === 'creator' || m.role === 'admin'));
+        }
+        if (roles.get(account)) managers.push(rec);
+    }
+    managers.sort((a, b) => {
+        const at = String(a.updatedAt);
+        const bt = String(b.updatedAt);
+        if (at !== bt) return at > bt ? -1 : 1;
+        return a.ownerGaii < b.ownerGaii ? -1 : a.ownerGaii > b.ownerGaii ? 1 : 0;
+    });
+    return (managers[0]?.value as Record<string, unknown> | undefined) ?? null;
 }
+
+/** How many copies of an organism's meta.config are read: one per creator, admin or their agent. */
+const ORGANISM_CONFIG_COPIES = 100;
