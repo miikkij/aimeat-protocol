@@ -41,6 +41,9 @@
  *   setStoredFileHeaders(res, file);       // then Content-Length / Content-Range / Cache-Control
  *   res.end(file.data);
  * @version-history
+ *   v1.2.2 -- 2026-10-25 -- secaudit2026oct22: a stored type that is not one MIME type (a
+ *     comma-separated list, no subtype) is served as an application/octet-stream attachment;
+ *     isSingleMimeType() added. A clean single type is served as before.
  *   v1.2.1 -- 2026-09-24 -- setStoredImageHeaders() serves GIF and AVIF too, the pictures a screenshot
  *     could be stored as before A7-2; SVG stays out.
  *   v1.2.0 -- 2026-09-24 -- setStoredImageHeaders(): the app icon and screenshot doors serve a PNG,
@@ -67,6 +70,7 @@ import { rasterImageType, type RasterImageType } from './raster-image.js';
  * and `startsWith('image/')` would otherwise wave it through.
  */
 export function isInlineSafeFileType(mimeType: string | undefined | null): boolean {
+    if (!isSingleMimeType(mimeType)) return false;
     const type = (mimeType ?? '').split(';')[0].trim().toLowerCase();
     if (type.startsWith('image/svg')) return false;
     if (type.startsWith('image/')) return true;
@@ -81,6 +85,20 @@ export function isInlineSafeFileType(mimeType: string | undefined | null): boole
     // browser decides to handle next) is not worth guessing about.
     if (type === 'text/plain') return true;
     return false;
+}
+
+/** RFC 9110 token characters, the only ones a type or subtype may hold. */
+const MIME_ESSENCE = /^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i;
+
+/**
+ * Whether a stored type is ONE MIME type: `type/subtype`, optionally followed by `;` parameters,
+ * and no comma anywhere. A browser that receives a comma-separated list acts on the last valid
+ * member, while the inline decision reads the first, so a list is never treated as either.
+ */
+export function isSingleMimeType(mimeType: string | undefined | null): boolean {
+    const raw = (mimeType ?? '').trim();
+    if (!raw || raw.includes(',')) return false;
+    return MIME_ESSENCE.test(raw.split(';')[0].trim());
 }
 
 /**
@@ -166,9 +184,12 @@ export function setStoredFileHeaders(
     // valid UTF-8, and the sniffer would cheerfully stamp `charset=utf-8` on a file it has never
     // seen. A genuinely empty file loses nothing by not being told which encoding its no bytes are in.
     const supplied = file.data && file.data.length > 0 ? file.data : null;
+    // A stored value that is not one MIME type goes out as an octet-stream, so the header a browser
+    // acts on and the inline decision above come from the same reading of it.
+    const stored = isSingleMimeType(file.mimeType) ? file.mimeType : 'application/octet-stream';
     res.setHeader('Content-Type', file.utf8Verified === undefined
-        ? sniffedContentType(file.mimeType, supplied)
-        : verifiedContentType(file.mimeType, file.utf8Verified));
+        ? sniffedContentType(stored, supplied)
+        : verifiedContentType(stored, file.utf8Verified));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', inline ? CSP_INLINE : CSP_ATTACHMENT);
     // The name the file is SAVED as. A key is an address, and its last segment is only the closest
