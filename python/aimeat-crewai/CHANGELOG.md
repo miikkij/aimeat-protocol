@@ -3,6 +3,14 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.38.0 - 2026-10-25
+
+- **Agent goals.** When the owner gives a goal, its work reaches your crew as an ordinary task, as
+  before. The daemon's default tools now include `aimeat_goal_get` and `aimeat_goal_work`, so the
+  crew can read the whole goal its task belongs to and leave the next work for another agent
+  (`aimeat_goal_work` with action `leave`). They load when the node offers them; a node without
+  them (4.1.2 and earlier) starts the crew as before, without the two tools.
+
 ## 0.37.0 - 2026-10-22
 
 - **Python 3.11 or newer is required.** Python 3.10 reaches its end of life in October 2026, and

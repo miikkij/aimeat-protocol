@@ -1473,6 +1473,10 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     # A request the crew should not take ends as declined with the reason, not as failed (0.32.1).
     "aimeat_task_decline",
     "aimeat_task_create",  # for crew-to-crew delegation
+    # Agent goals (0.38.0): a task that is a goal's work names its goal; the crew reads the goal and
+    # leaves the next work for another agent. Loaded when offered, see DAEMON_TOOLS_IF_OFFERED.
+    "aimeat_goal_get",
+    "aimeat_goal_work",
     # Deliverables.
     #
     # AI PROVENANCE (TARGET-058): each of these write tools takes an optional
@@ -1510,13 +1514,14 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
 # The names in the default list that the liaison loads when the MCP server
 # offers them and runs without when it does not. A filter normally refuses to
 # start on a tool the server did not expose (liaison.select_liaison_tools), and
-# these five can be missing for a reason that is not an error:
+# these seven can be missing for a reason that is not an error:
 #   - a connector started with `--surface agent` offers `aimeat_discover` and
 #     not `aimeat_invoke` or the three `aimeat_mcp_*` tools (they are on the
 #     `primitives`, `chat` and `full` surfaces);
 #   - a node's own MCP lists `aimeat_mcp_*` only to a session that holds
 #     `mcp:read` / `mcp:use`, which an agent with default permissions does not;
-#   - a connector older than a tool does not have it.
+#   - a connector or a node older than a tool does not have it (the two
+#     `aimeat_goal_*` tools arrived after node 4.1.2).
 # The 25 names above them stay required: without one of those the daemon's
 # own loop cannot work, so a missing one still stops the start with its name.
 DAEMON_TOOLS_IF_OFFERED: tuple[str, ...] = (
@@ -1525,6 +1530,8 @@ DAEMON_TOOLS_IF_OFFERED: tuple[str, ...] = (
     "aimeat_mcp_list",
     "aimeat_mcp_tools",
     "aimeat_mcp_call",
+    "aimeat_goal_get",
+    "aimeat_goal_work",
 )
 
 
