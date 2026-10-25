@@ -29883,7 +29883,7 @@ paths:
     post:
       operationId: postDocsignWalletResponse
       summary: Where a wallet posts the signed PDF or an error (public, by session and state)
-      description: A form with state and documentWithSignature (a JSON array of base64 PDFs), or state and error. The PDF must begin with the bytes that were sent, and its new signature must check out; it is then stored in the signer's files and sealed into the request. Answers redirect_uri.
+      description: A form with state and documentWithSignature (a JSON array of base64 PDFs), or state and error. The PDF must begin with the bytes that were sent, and its new signature must check out, with a certificate that is not revoked now (422 CERTIFICATE_REVOKED); it is then stored in the signer's files and sealed into the request. Answers redirect_uri.
       tags: [Document signing]
       security: []
       parameters:
