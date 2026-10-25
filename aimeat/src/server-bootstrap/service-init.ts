@@ -11,7 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
- *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/). scheduleGoalSweep: the agent goals' minute sweep (services/goals/goals-sweep.ts).
+ *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/). scheduleGoalSweep: the agent goals' minute sweep (services/goals/goals-sweep.ts). seedBundledCortexes gets the node id, for the incident a shipped cortex name held by another account opens (secaudit2026oct22).
  *   2026-10-24 — scheduleAgreementSweep: the hourly reminders, lapsed notices and signing reads of the
  *     data processing agreements (services/compliance-agreements-gaps.ts, plan doc-mvmr4i2wdk0p D4).
  *   2026-10-23 — flagOrphanPeerApprovalsOnce after the peer registry loads, with its node ids: the approved
@@ -330,7 +330,7 @@ export async function initializeServices(
     .catch(err => logger.error('Failed to seed built-in skills', { error: String(err) }));
 
   // Auto-install bundled cortex extensions (aimeat-ui-*, aimeat-canvas, aimeat-charts)
-  seedBundledCortexes(storage, `system@${config.nodeId}`)
+  seedBundledCortexes(storage, `system@${config.nodeId}`, { nodeId: config.nodeId })
     .then(count => { if (count > 0) logger.info(`Auto-installed ${count} bundled cortex extensions`); })
     .catch(err => logger.error('Failed to seed bundled cortexes', { error: String(err) }));
 

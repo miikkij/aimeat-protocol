@@ -51627,6 +51627,10 @@ paths:
           $ref: '#/components/responses/PublishRequested'
         '400':
           description: INVALID_MANIFEST. The manifest does not validate (errors in error.details.errors), or a lib component's filename has no content in libs.
+        '409':
+          description: >-
+            CONFLICT, a cortex of that name is already installed; or NAME_RESERVED, the name is a
+            library this node ships and only an operator may install it.
 
   /v1/cortex/{name}:
     get:
@@ -51708,8 +51712,10 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '409':
           description: >-
-            VERSION_EXISTS, this version is already kept with other lib bytes; or BOARD_ID_TAKEN, the
-            redeploy of an active cortex would make a board whose id is a board of another account.
+            VERSION_EXISTS, this version is already kept with other lib bytes; BOARD_ID_TAKEN, the
+            redeploy of an active cortex would make a board whose id is a board of another account;
+            CONFLICT, another install took the free name first, and nothing was written; or
+            NAME_RESERVED, the name is a library this node ships and only an operator may create it.
         '413':
           description: Manifest, lib, or quota limit exceeded.
     delete:
