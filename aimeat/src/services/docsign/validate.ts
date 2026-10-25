@@ -33,6 +33,8 @@
  *   v1.2.0 — 2026-10-25 — secaudit2026oct22: a SignedData with no SignerInfo (NO_SIGNER) or a
  *     SignerInfo with no messageDigest (NO_MESSAGE_DIGEST) is invalid, and a check that established
  *     neither integrity nor the signature is never valid by default.
+ *   v1.2.1 — 2026-10-25 — secaudit2026oct22: a signature or document timestamp proves the signing
+ *     time only when its authority is on a trusted list or chains to an operator anchor.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -208,14 +210,23 @@ async function assess(
     else if (ts.genTime) {
       signingTime = new Date(ts.genTime);
       timeSource = 'timestamp';
-      proven = true;
       const tsa = ts.tsaCert ? safeRead(ts.tsaCert) : null;
       tsaName = tsa ? holderLabel(tsa.subject) : null;
-      if (tsa && online) {
+      // The time counts as PROVEN only when a trusted authority vouches for it: a TSA on a trusted
+      // list, or one that chains to an operator anchor. A token from any other TSA is intact but is
+      // a time its maker states, so the rules for a claimed time apply (an expired or revoked
+      // certificate is then not excused by it). Offline, only an operator anchor can be checked.
+      if (tsa) {
         const tsaChain = await buildChain(config, tsa.der, ts.certificates, online);
-        const tsaTrust = await findIssuingService(config, tsaChain.certs, signingTime, ['TSA/QTST', 'TSA', 'CA/QC', 'CA/PKC']);
-        if (tsaTrust.match?.positiveAt) timeSource = tsaTrust.match.service.type === 'TSA/QTST' ? 'qualified-timestamp' : 'timestamp';
-        else if (!tsaChain.operatorAnchor) reasons.push('TIMESTAMP_UNTRUSTED');
+        const tsaTrust = online ? await findIssuingService(config, tsaChain.certs, signingTime, ['TSA/QTST', 'TSA', 'CA/QC', 'CA/PKC']) : null;
+        if (tsaTrust?.match?.positiveAt) {
+          timeSource = tsaTrust.match.service.type === 'TSA/QTST' ? 'qualified-timestamp' : 'timestamp';
+          proven = true;
+        } else if (tsaChain.operatorAnchor) {
+          proven = true;
+        } else if (online) {
+          reasons.push('TIMESTAMP_UNTRUSTED');
+        }
       }
     }
   }
@@ -433,7 +444,9 @@ export async function validatePdf(config: AimeatConfig, pdf: Buffer, opts: { onl
   const docTs = new Map<number, TimestampCheck>();
   for (const f of fields.filter((x) => x.isDocTimestamp && x.cms.length)) {
     const { report, ts } = await assessDocTimestamp(config, f, online);
-    docTs.set(f.index, ts);
+    // Only a document timestamp whose own authority is trusted proves when an earlier signature
+    // existed; an untrusted one is a time its maker states.
+    if (report.trust.trusted && report.verdict !== 'invalid') docTs.set(f.index, ts);
     signatures.push(report);
   }
   for (const f of fields) {
