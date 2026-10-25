@@ -323,7 +323,11 @@ await test('PUT, complete and cancel on a checkout that does not exist, or is an
         body: JSON.stringify({ line_items: [{ item: { id: sku }, quantity: 1 }], buyer: { email: 'pat@example.com' } }) });
     const first = await put();
     const second = await put();
-    assert(first.status === 200 && second.status === 200 && JSON.stringify(first.body) === JSON.stringify(second.body), `replayed: ${first.status} ${second.status}`);
+    // Key order is not kept by a PostgreSQL jsonb column, so the two answers are compared by content.
+    const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical)
+        : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, canonical(x)])) : v;
+    assert(first.status === 200 && second.status === 200 && JSON.stringify(canonical(first.body)) === JSON.stringify(canonical(second.body)),
+        `replayed: ${first.status} ${second.status} ${JSON.stringify(first.body).slice(0, 200)} / ${JSON.stringify(second.body).slice(0, 200)}`);
 });
 
 await test('The node\'s own UCP records do not count against the seller\'s memory key limit', async () => {
