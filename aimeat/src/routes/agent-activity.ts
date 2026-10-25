@@ -14,6 +14,7 @@
  *   - GET /v1/agents/:name/refusals      -- calls the node refused this agent, still unresolved
  *   - POST /v1/agents/:name/refusals/decline -- the owner will not give those permissions
  * @version-history
+ *   2026-10-25 — POST /refusals/decline tells the agent the "no" (secaudit2026oct22, the approval standard).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.6.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.6.0 -- 2026-09-30 -- POST /refusals/decline: the owner's "no", in person; GET /refusals flags
@@ -40,6 +41,7 @@ import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, ownerGhiiOf, mayActOnAgent } from '../utils/gaii.js';
 import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent-refusals.js';
+import { tellPermissionAnswer } from '../services/permission-ask-notice.js';
 import { requireOwnerPrincipal } from '../auth/account-security.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
@@ -239,6 +241,10 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
     const declined = await declineRefusals(storage, agentGaii, needed as string[] | undefined);
+    // The agent hears the "no" as well as reading it on its refusals (services/approval-standard.ts).
+    if (declined > 0) {
+      await tellPermissionAnswer({ storage, config }, agent, (needed as string[] | undefined) ?? [], 'declined', `${req.auth!.owner}@${config.nodeId}`);
+    }
     res.json(success(config.nodeId, { agent: agentGaii, declined }, [
       { description: 'What is still refused', method: 'GET', url: `/v1/agents/${agentName}/refusals` },
     ]));

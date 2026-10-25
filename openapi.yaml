@@ -77230,6 +77230,11 @@ paths:
         `target` and `change`. `waiting` is how many still wait. The owner and the owner's agents see
         every request of the account; an app grant sees the requests it filed. A request is decidable
         for seven days. Requires memory:write. The MCP tool aimeat_publish_requests returns the same.
+        The same list holds the account's other one-press approvals, the requests that make nothing
+        public (an extension's emailPolicy grant, a crew model choice with its own address set by an
+        app, switching off the question before a secret goes to a new address). Such a request has
+        `waiting_for` (owner or operators), `asks` and `why` in plain words; while it waits for the
+        node's operators its `state` is awaiting_operator.
       security: [{ BearerAuth: [] }]
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
@@ -77240,10 +77245,11 @@ paths:
       operationId: readPublishRequest
       tags: [Memory]
       summary: One request to make something public
-      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write.'
+      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`.'
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads. Omit for your own.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -77270,6 +77276,13 @@ paths:
         still waiting, checked as its own request; declining it, or its ending expired or outdated,
         settles its parts the same way. A part decided on its own decides only itself. A part has no
         list item or notification of its own: the request's own name it.
+        A request that makes nothing public (`waiting_for`, `asks`, `why`) runs its change on approval
+        and nothing on decline. When it waits for the owner, the owner in person answers it, and an
+        agent of the owner that did not ask approves it only while holding the word the request names
+        (403 SCOPE_DENIED). When it waits for the operators, only an operator caller answers it (403
+        OPERATOR_DECIDES), naming the account in `account` when it is another account's. The one who
+        asked hears the answer either way: an agent as a message with the request id, a person and an
+        app's account in the bell.
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
@@ -77282,6 +77295,7 @@ paths:
               required: [decision]
               properties:
                 decision: { type: string, enum: [approve, decline] }
+                account: { type: string, description: "The account (name or GHII) whose question an operator answers. Omit for your own." }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }

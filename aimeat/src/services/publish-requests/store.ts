@@ -32,6 +32,12 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-25 — A request may ask something other than making a thing public (`approval`): the
+ *     kinds `extension-email-policy`, `crew-model` and `account-setting`. It names who answers (the
+ *     owner, or the node's operators, who get the item and the notice with the account in the
+ *     decision body) and says in plain words what is checked and why; the one who asked hears the
+ *     answer either way through services/approval-standard.ts tellAsker, a person and an app in the
+ *     bell as well as an agent on its inbox (secaudit2026oct22, the developer's approval standard).
  *   2026-10-25 — The kind `internet-opening`: an agent or an app asks to open one app to the internet
  *     on a closed node (services/internet-opening/opening-door.ts).
  *   2026-10-22 — settleRequestsForRemovedTarget(): a deleted user skill or an uninstalled cortex
@@ -58,11 +64,10 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { addItem, closeItem, getItem } from '../open-items.js';
 import { notify } from '../notify.js';
-import { sendAgentV2Message } from '../agent-v2-messaging.js';
 import { emitChange } from '../event-bus.js';
+import { approverGhiis, tellAsker, type Approver, type ApprovalOutcome } from '../approval-standard.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { serialByKey } from '../../utils/serial-by-key.js';
-import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { PUBLISH_REQUEST_DAYS, publishRequestExpired } from './policy.js';
 import { announcePart } from './parts.js';
@@ -79,17 +84,39 @@ export type PublishKind =
   | 'memory' | 'file' | 'workspace-share' | 'app' | 'organism' | 'board' | 'skill'
   | 'package' | 'knowledge' | 'datapackage' | 'portfolio' | 'company' | 'cortex' | 'consent'
   // An app opened to the internet on a closed node, asked by an agent or an app (services/internet-opening/).
-  | 'internet-opening';
+  | 'internet-opening'
+  // Approvals that make nothing public (`approval` on the request; services/approval-standard.ts):
+  // an extension's emailPolicy grant (the operators answer), a crew model choice with its own
+  // address set by an app, and switching off the owner's secret host question.
+  | 'extension-email-policy' | 'crew-model' | 'account-setting';
 
+/** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
 
 /** Who asked. */
 export interface PublishRequester {
-  /** An agent's GAII, or `eco:<app>#<owner>@<node>` for an app grant. */
+  /** An agent's GAII, `eco:<app>#<owner>@<node>` for an app grant, or a person's GHII. */
   principal: string;
-  kind: 'agent' | 'app';
+  kind: 'agent' | 'app' | 'person';
   /** The token's subject. */
   sub: string;
+}
+
+/**
+ * A request that asks something other than making a thing public (services/approval-standard.ts):
+ * who answers it, and what is checked and why, in plain English an AI passes on. The approver's
+ * notice says it from `i18n` in the reader's language.
+ */
+export interface ApprovalAsk {
+  approver: Approver;
+  /** What the one who asked wants, as the phrase after "asks to": "let the extension mailer send email to any address". */
+  asks: string;
+  /** Why the node checks it first, in one or two sentences. */
+  why: string;
+  /** The word an agent of the owner must hold to approve it. Absent: being the owner's agent is enough. */
+  approve_scope?: string;
+  /** The approver notice's locale key under `notiftext.` and its variables (names, never sentences). */
+  i18n: { key: string; vars: Record<string, string> };
 }
 
 export interface PublishRequest {
@@ -122,6 +149,10 @@ export interface PublishRequest {
   part_of?: string;
   /** The ids of the requests filed as parts of this one. Absent when it has none. */
   parts?: string[];
+  /** Present on a request that makes nothing public: who answers, and what is checked and why. */
+  approval?: ApprovalAsk;
+  /** The items the question put on the operators' lists, one per operator (approval.approver 'operators'). */
+  approver_items?: Array<{ ghii: string; id: string }>;
 }
 
 export type PublishRequestFail = { ok: false; status: number; code: string; message: string };
@@ -185,12 +216,20 @@ export function effectiveState(request: PublishRequest, now = Date.now()): Publi
   return request.state === 'awaiting_owner' && publishRequestExpired(request, now) ? 'expired' : request.state;
 }
 
-/** The request as a door answers it. */
+/** Who answers a waiting request: the owner, unless its `approval` names the operators. */
+export function waitingFor(request: Pick<PublishRequest, 'approval'>): Approver {
+  return request.approval?.approver ?? 'owner';
+}
+
+/** The request as a door answers it. A waiting question for the operators reads `awaiting_operator`. */
 export function summarizePublishRequest(request: PublishRequest, now = Date.now()) {
+  const state = effectiveState(request, now);
   return {
     id: request.id,
     kind: request.kind,
-    state: effectiveState(request, now),
+    state: state === 'awaiting_owner' && waitingFor(request) === 'operators' ? 'awaiting_operator' as const : state,
+    waiting_for: waitingFor(request),
+    ...(request.approval ? { asks: request.approval.asks, why: request.approval.why } : {}),
     title: request.title,
     name: request.name,
     target: request.target,
@@ -228,7 +267,22 @@ export function requesterName(r: PublishRequester): string {
   return hash > 0 ? r.principal.slice(0, hash).replace(/^eco:/, '') : r.principal;
 }
 
+/** The sentence the one who asked reads for a request that makes nothing public. */
+function approvalSentence(request: PublishRequest, words: ApprovalAsk, state: PublishRequestState, by: string | null): string {
+  const what = `your request to ${words.asks}`;
+  const cap = `${what.charAt(0).toUpperCase()}${what.slice(1)}`;
+  const who = words.approver === 'operators' ? 'An operator of this node' : by && by.includes('#') ? `${by.split('#')[0]}, in the owner's name,` : 'The owner';
+  switch (state) {
+    case 'approved': return `${who} allowed ${what}. It is in effect now.`;
+    case 'declined': return `${who} did not allow ${what}. Nothing changed.`;
+    case 'expired': return `${cap} expired before anyone answered it. Nothing changed. Ask again if it is still needed.`;
+    case 'outdated': return `${cap} can no longer be carried out as asked: ${request.outcome?.reason ?? 'it changed after you asked'}. Nothing changed. Ask again.`;
+    default: return `${cap} is waiting for ${words.approver === 'operators' ? "this node's operators" : 'the owner'}.`;
+  }
+}
+
 function outcomeSentence(request: PublishRequest, state: PublishRequestState, by: string | null): string {
+  if (request.approval) return approvalSentence(request, request.approval, state, by);
   const what = `your request to make ${request.title} public`;
   const cap = `${what.charAt(0).toUpperCase()}${what.slice(1)}`;
   switch (state) {
@@ -244,7 +298,7 @@ function outcomeSentence(request: PublishRequest, state: PublishRequestState, by
 }
 
 /** The draft a door hands over: everything but the bookkeeping. */
-export type PublishRequestDraft = Pick<PublishRequest, 'kind' | 'target' | 'title' | 'name' | 'change' | 'requested_by' | 'part_of'>;
+export type PublishRequestDraft = Pick<PublishRequest, 'kind' | 'target' | 'title' | 'name' | 'change' | 'requested_by' | 'part_of' | 'approval'>;
 
 /**
  * Put a request in front of the owner. Changes nothing about the target. Returns the standing
@@ -277,7 +331,7 @@ export async function filePublishRequest(
     }
     if (waiting.length >= MAX_WAITING) {
       return fail(409, 'TOO_MANY_REQUESTS',
-        `${MAX_WAITING} requests to make something public already wait for the owner. They need to decide some before another one is filed.`);
+        `${MAX_WAITING} requests already wait for an answer on this account. Some need to be answered before another one is filed.`);
     }
     const request: PublishRequest = {
       spec: SPEC, id: randomUUID(), ...draft,
@@ -304,6 +358,10 @@ export async function filePublishRequest(
         by: draft.requested_by.principal, part_of: parent.id,
       });
       return { ok: true as const, request: part, alreadyWaiting: false };
+    }
+    if (draft.approval) {
+      await announceApproval(ctx, ownerGhii, request, draft.approval, who);
+      return { ok: true as const, request, alreadyWaiting: false };
     }
     const item = await addItem(storage, ownerGhii, {
       title: `${who} asks to make ${draft.title} public`.slice(0, 200),
@@ -339,6 +397,72 @@ export async function filePublishRequest(
 }
 
 /**
+ * Put a request that makes nothing public in front of whoever answers it (services/approval-
+ * standard.ts): an item on each answerer's list and a notice that says what is checked and why, with
+ * Allow and Don't allow. A question for the operators carries the account in the decision body, since
+ * the operator answers from their own session; the account's holder hears of it without buttons when
+ * they are not an operator themselves.
+ */
+async function announceApproval(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest, words: ApprovalAsk, who: string): Promise<void> {
+  const { storage } = ctx;
+  const to = await approverGhiis(ctx, ownerGhii, words.approver);
+  const items: Array<{ ghii: string; id: string }> = [];
+  for (const ghii of to) {
+    const item = await addItem(storage, ghii, {
+      title: `${who} asks to ${words.asks}`.slice(0, 200),
+      kind: 'decision',
+      origin: request.requested_by.principal,
+      object: { type: 'publish-request', id: request.id },
+      by: request.requested_by.kind === 'person' ? 'person' : 'ai',
+    });
+    if (item?.id) items.push({ ghii, id: item.id });
+  }
+  const own = items.find(i => i.ghii === ownerGhii);
+  request.item_id = own?.id ?? null;
+  const others = items.filter(i => i.ghii !== ownerGhii);
+  if (others.length) request.approver_items = others;
+  await putRequest(storage, ownerGhii, request);
+
+  const door = `/v1/publish-requests/${request.id}/decision`;
+  const account = words.approver === 'operators' ? { account: ownerGhii } : {};
+  const vars = { who, ...words.i18n.vars };
+  for (const ghii of to) {
+    await notify(storage, ghii, {
+      type: 'approval_request',
+      title: `${who} asks to ${words.asks}`,
+      body: `${words.why} If you allow it, it is in effect at once. If you do not, nothing changes. ${who} hears the answer either way.`,
+      link: '/v1/profile?tab=notifications',
+      i18n: { key: words.i18n.key, vars },
+      actions: [
+        { id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline', ...account }, style: 'default', i18n: { key: 'approval_request.deny' } },
+        { id: 'allow', label: 'Allow', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve', ...account }, style: 'primary', i18n: { key: 'approval_request.allow' } },
+      ],
+    });
+    emitChange('notifications', ghii);
+    emitChange('open-items', ghii);
+  }
+  if (!to.includes(ownerGhii)) {
+    // The account the question is about hears of it; the operators answer it.
+    await notify(storage, ownerGhii, {
+      type: 'approval_request_sent',
+      title: `${who} asked this node's operators to ${words.asks}`,
+      body: `${words.why} It waits for an operator. You hear the answer here.`,
+      link: '/v1/profile?tab=notifications',
+      i18n: { key: `${words.i18n.key}_sent`, vars },
+    });
+  }
+  logger.info('Approval request filed', {
+    event: 'publish.request_filed', owner: ownerGhii, id: request.id, kind: request.kind,
+    by: request.requested_by.principal, approver: words.approver, to: to.length,
+  });
+}
+
+/** The outcome word the approval standard tells the one who asked. */
+function outcomeOf(state: Exclude<PublishRequestState, 'awaiting_owner'>): ApprovalOutcome {
+  return state === 'approved' ? 'allowed' : state;
+}
+
+/**
  * Record how a request ended, close the item it put on the owner's list, and tell the one who asked.
  * `by` is who decided: the owner's GHII, an agent's GAII, or null when time decided.
  */
@@ -355,37 +479,41 @@ export async function settlePublishRequest(
   };
   await putRequest(storage, ownerGhii, settled);
 
-  if (request.item_id) {
+  const closedBy = how.by && how.by.includes('#') ? 'ai' as const : 'person' as const;
+  const lists = [
+    ...(request.item_id ? [{ ghii: ownerGhii, id: request.item_id }] : []),
+    ...(request.approver_items ?? []),
+  ];
+  for (const it of lists) {
     try {
-      if (await getItem(storage, ownerGhii, request.item_id)) {
-        await closeItem(storage, ownerGhii, request.item_id, how.by && how.by.includes('#') ? 'ai' : 'person');
-      }
+      if (await getItem(storage, it.ghii, it.id)) await closeItem(storage, it.ghii, it.id, closedBy);
+      if (it.ghii !== ownerGhii) emitChange('open-items', it.ghii);
     } catch (err) {
-      logger.warn('Publish request: could not close the owner list item', { owner: ownerGhii, id: request.id, error: String(err) });
+      logger.warn('Publish request: could not close a list item', { owner: it.ghii, id: request.id, error: String(err) });
     }
   }
 
-  if (request.requested_by.kind === 'agent') {
-    try {
-      await sendAgentV2Message(storage, {
-        owner: localAccountName(ownerGhii),
-        from: how.by ?? ownerGhii,
-        to: request.requested_by.principal,
-        role: 'agent',
-        contextId: request.id,
-        parts: [
-          { kind: 'text', text: outcomeSentence(settled, state, how.by) },
-          { kind: 'data', data: { request_id: request.id, kind: request.kind, target: request.target, state, ...(settled.outcome ?? {}) } },
-        ],
-        metadata: { kind: 'publish-request' },
-      });
-    } catch (err) {
-      logger.warn('Publish request: the requester could not be told; the record says it', { owner: ownerGhii, id: request.id, error: String(err) });
-    }
+  // The one who asked hears the answer, Allow and Don't allow alike (services/approval-standard.ts).
+  // A publish request asked by an app was told to the owner by the owner's own press, or by the
+  // agent-decided notice below, so only its agent asker gets a message, as before.
+  if (request.approval || request.requested_by.kind === 'agent') {
+    await tellAsker(ctx, {
+      accountGhii: ownerGhii,
+      asker: request.requested_by.principal,
+      outcome: outcomeOf(state),
+      sentence: outcomeSentence(settled, state, how.by),
+      what: request.name,
+      decidedBy: how.by,
+      contextId: request.id,
+      data: { kind: request.kind, target: request.target, state, ...(settled.outcome ?? {}) },
+      messageKind: 'publish-request',
+      link: '/v1/profile?tab=notifications',
+    });
   }
 
-  // A part decided with its parent is told to the owner once, by the parent's own notice.
-  if (how.by && how.by.includes('#') && (state === 'approved' || state === 'declined') && !how.withParent) {
+  // A part decided with its parent is told to the owner once, by the parent's own notice. A request
+  // the operators answer is told to the account by tellAsker and by its own notice at filing.
+  if (!request.approval && how.by && how.by.includes('#') && (state === 'approved' || state === 'declined') && !how.withParent) {
     const agentName = how.by.split('#')[0];
     const asker = requesterName(request.requested_by);
     await notify(storage, ownerGhii, {

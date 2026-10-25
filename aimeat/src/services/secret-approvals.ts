@@ -28,6 +28,8 @@
  * @usage
  *   const url = await requestSecretApproval({ storage, config }, { ownerGhii, secret, extension, installer, host, why, requestedBy });
  * @version-history
+ *   v1.3.0 — 2026-10-25 — Allow and Don't allow tell the one whose call asked (approval-standard.ts
+ *     tellAsker): an agent on its inbox, anyone else in the bell (secaudit2026oct22, the approval standard).
  *   v1.2.0 — 2026-10-22 — The bell notice carries Don't allow beside Allow (the developer: a question
  *     with only Allow cannot be answered no).
  *   v1.1.0 — 2026-10-21 — An Allow pressed on a notice whose question no longer waits (the secret was
@@ -41,6 +43,7 @@ import { notify, type NotifyInput } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { declaredHostsFor, declaresHost, usesSecretsOf } from './extension-secret-uses.js';
 import { listOwnerSecrets, purposeText, type SecretSummary } from './owner-secrets.js';
+import { tellAsker } from './approval-standard.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -206,8 +209,29 @@ export type ApprovalAnswer =
  * account that asked: a reinstall by someone else is a different question, and the old page must not
  * answer it.
  */
+/** Tell the one whose call asked how the owner answered (services/approval-standard.ts). */
+async function tellSecretAsker(
+    config: AimeatConfig | undefined, storage: Storage, ownerGhii: string, secret: string,
+    entry: SecretApproval | null, outcome: 'allowed' | 'declined', decidedBy: string,
+): Promise<void> {
+    if (!config || !entry?.requestedBy) return;
+    const what = `${entry.extension} sends ${secret} to ${entry.host}`;
+    await tellAsker({ storage, config }, {
+        accountGhii: ownerGhii, asker: entry.requestedBy, outcome, what, decidedBy,
+        contextId: `secret-approval:${secret}:${entry.extension}:${entry.host}`,
+        sentence: outcome === 'allowed'
+            ? `The owner allowed ${entry.extension} to send their secret ${secret} to ${entry.host}. Call it again; it goes through now.`
+            : `The owner did not allow ${entry.extension} to send their secret ${secret} to ${entry.host}. Nothing was sent. A later call asks the owner again.`,
+        data: { secret, extension: entry.extension, host: entry.host },
+        messageKind: 'secret-approval',
+        link: '/v1/profile?tab=access',
+    });
+}
+
 export async function approveSecretUse(
     storage: Storage, ownerGhii: string, secret: string, extension: string, host: string, approvedBy: string,
+    /** With the node's config, the one whose call asked is told (services/approval-standard.ts). */
+    config?: AimeatConfig,
 ): Promise<ApprovalAnswer> {
     const ext = await storage.getExtension(extension);
     let approved: SecretApproval | null = null;
@@ -226,17 +250,29 @@ export async function approveSecretUse(
         + 'still needs the secret, its next call asks you again.';
     if (!out) return { ok: false, status: 404, code: 'APPROVAL_NOT_FOUND', message: gone };
     if (!approved) return { ok: false, status: 404, code: 'APPROVAL_NOT_FOUND', message: gone };
-    if (out.changed) emitChange('secrets', ownerGhii);
+    if (out.changed) {
+        emitChange('secrets', ownerGhii);
+        await tellSecretAsker(config, storage, ownerGhii, secret, approved, 'allowed', approvedBy);
+    }
     return { ok: true, approval: approved };
 }
 
-/** The owner says no to a waiting request: it is removed, and the next refused call asks again. */
-export async function declineSecretUse(storage: Storage, ownerGhii: string, secret: string, extension: string, host: string): Promise<boolean> {
+/** The owner says no to a waiting request: it is removed, the one who asked is told, and the next refused call asks again. */
+export async function declineSecretUse(
+    storage: Storage, ownerGhii: string, secret: string, extension: string, host: string,
+    /** With the node's config and who pressed, the one whose call asked is told. */
+    tell?: { config: AimeatConfig; by: string },
+): Promise<boolean> {
+    let dropped: SecretApproval | null = null;
     const out = await updateApprovals(storage, ownerGhii, secret, (list) => {
+        dropped = list.find(a => a.extension === extension && a.host === host && !a.approvedAt) ?? null;
         const next = list.filter(a => !(a.extension === extension && a.host === host && !a.approvedAt));
         return next.length === list.length ? null : next;
     });
-    if (out?.changed) emitChange('secrets', ownerGhii);
+    if (out?.changed) {
+        emitChange('secrets', ownerGhii);
+        await tellSecretAsker(tell?.config, storage, ownerGhii, secret, dropped, 'declined', tell?.by ?? ownerGhii);
+    }
     return !!out?.changed;
 }
 
