@@ -85,6 +85,11 @@ export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: st
     const body = taskBody(taken, work, true);
     const started = await service.startJob({
       prompt: `${body.title}\n\n${body.description}`,
+      // The records the work builds on (an earlier work's deliverable, the goal's material): the
+      // model has no tools, so the job reads them and pastes them into the prompt. Without them an
+      // agent's result reached the model only as its one-line summary ("deliverable published to
+      // memory at …") and the model wrote from what it knew (aimeat.io, 2026-10-25).
+      ...(body.memoryKeys.length ? { input_keys: body.memoryKeys } : {}),
       system_prompt: 'You do one work of a goal for the person who owns it. Write the result itself, complete and ready to use, with no preamble.',
       result_key: runKey(goalId, workId),
       result_visibility: 'private',
