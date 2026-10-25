@@ -46,6 +46,7 @@ import { createServer, type Server } from 'node:http';
 import { CompactSign, importJWK, calculateJwkThumbprint } from 'jose';
 import * as ed from '@noble/ed25519';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { openSession, callTool } from './helpers/mcp-session.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -963,6 +964,54 @@ async function run(): Promise<void> {
         // And after all of that the real one still works: a refusal did not re-pin anything.
         const still = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
         assert(!still.error, `the pinned caller still gets in, got ${JSON.stringify(still.error)}`);
+    });
+
+    // secaudit2026oct22, identifyForeignCaller:self-asserted-gaii-settled-as-local-consumer. A card's
+    // gaii is the caller's own claim; one naming a principal of this node was pinned and its work was
+    // settled against that principal's own EXCHANGE contract on delivery.
+    await test('a stranger whose card names a principal of this node is refused at the door, and no work is written', async () => {
+        const before = ((await json('/v1/exchange/work?role=provider', { headers: authA })).body.data.work as any[]).length;
+        for (const gaii of [`${b.owner}@${NODE_ID}`, outsider.gaii, 'nobody-without-a-node']) {
+            const local = await makeStranger('local-claim', { gaii });
+            const r = await foreignRpc(a.owner, worker.name, local, 'SendMessage', {
+                message: { messageId: `local-${gaii}`, role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'charge it to b' }] },
+            });
+            assert(r.status === 401 && r.body?.error?.code === 'A2A_LOCAL_IDENTITY',
+                `a card naming ${gaii} must be refused, got ${r.status}/${JSON.stringify(r.body?.error ?? r.result).slice(0, 200)}`);
+        }
+        const after = ((await json('/v1/exchange/work?role=provider', { headers: authA })).body.data.work as any[]).length;
+        assert(after === before, `no work was written for a refused card: ${before} -> ${after}`);
+        // The genuine stranger on its own node still gets in.
+        const still = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
+        assert(!still.error, `the foreign caller still gets in, got ${JSON.stringify(still.error)}`);
+    });
+
+    // Same finding, second half: work a stranger opened over A2A settles only through its own x402
+    // payment. Neither delivery route meters it against a local contract, and the MCP route delivers
+    // paid foreign work as the REST route does.
+    await test('unpaid foreign work is refused on both delivery routes; once paid, the MCP route delivers it', async () => {
+        const opened = await foreignRpc(a.owner, worker.name, stranger, 'SendMessage', {
+            message: { messageId: 'foreign-mcp-1', role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'Summarise: a slow tortoise.' }] },
+        });
+        assert(!opened.error && opened.result?.task?.status?.state === 'TASK_STATE_AUTH_REQUIRED', `quoted: ${JSON.stringify(opened.error ?? opened.result).slice(0, 200)}`);
+        const id = opened.result.task.id as string;
+        const quote = opened.result.task.metadata?.accepts?.[0];
+
+        const rest = await json(`/v1/exchange/work/${id}/deliver`, { method: 'POST', headers: authA, body: JSON.stringify({ output: { summary: 'early' } }) });
+        assert(rest.status === 402 && rest.body?.error?.code === 'A2A_UNPAID', `REST deliver of unpaid foreign work: ${rest.status} ${JSON.stringify(rest.body?.error)}`);
+        const session = await openSession(BASE, worker.token, 'a2a-mcp-deliver');
+        const early = await callTool(session, 'aimeat_exchange_work_deliver', { work_id: id, output: { summary: 'early' } });
+        assert(early.isError && /^A2A_UNPAID/.test(early.text), `MCP deliver of unpaid foreign work: ${early.text.slice(0, 200)}`);
+
+        const paid = await foreignRpc(a.owner, worker.name, stranger, 'SendMessage', {
+            message: { messageId: 'foreign-mcp-2', role: 'ROLE_USER', taskId: id, parts: [{ text: 'paid' }] },
+        }, { payment: buildXPayment(quote, BUYER_WALLET) });
+        assert(!paid.error && paid.result.task.status.state === 'TASK_STATE_WORKING', `paid: ${JSON.stringify(paid.error ?? paid.result?.task?.status)}`);
+        const delivered = await callTool(session, 'aimeat_exchange_work_deliver', { work_id: id, output: { summary: 'A tortoise, slowly.' } });
+        assert(!delivered.isError, `MCP deliver of paid foreign work: ${delivered.text.slice(0, 300)}`);
+        const r = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id });
+        assert(r.result?.status?.state === 'TASK_STATE_COMPLETED' && r.result.artifacts?.[0]?.parts?.[0]?.data?.summary === 'A tortoise, slowly.',
+            `the stranger reads the result: ${JSON.stringify(r.result?.status)}`);
     });
 
     await test('an assertion is worth ONE call, and a fresh one still works', async () => {

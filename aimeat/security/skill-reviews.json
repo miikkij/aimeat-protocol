@@ -50,14 +50,14 @@
       "digest": "sha256:e7d6e96dedba4f85193d1706"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:62d11341d3c36aa9f7330946"
+      "digest": "sha256:9ef1401eb49b0c96ac0788ff"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-02",
@@ -236,13 +236,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:2644a91f0772f91b4c42d6f3"
+      "digest": "sha256:a871722f264db4c76cfaa63f"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-18",
@@ -275,7 +275,7 @@
       "digest": "sha256:d78eaf80767d1827ba9352b7"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/tool-catalog/scopes.ts",
@@ -283,7 +283,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:0ca471194f8813380a07917e"
+      "digest": "sha256:d2c10b8dbb929d9a60891fd3"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-21",
@@ -434,14 +434,14 @@
       "digest": "sha256:86b918b2382facc544199a46"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:5a5c90c5d8f38a009cffa03d"
+      "digest": "sha256:726216003e505e633172058c"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -617,7 +617,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "7c55889f06008cad",
+      "aimeat/src/routes/agents/device-auth.ts": "8b793a7cf0829469",
       "aimeat/src/routes/ghii/register-login.ts": "c60b76bc22aaea67",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -636,7 +636,7 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "7c55889f06008cad",
+      "aimeat/src/routes/agents/device-auth.ts": "8b793a7cf0829469",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
@@ -659,7 +659,7 @@
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
-      "aimeat/src/mcp/agent-schedules.ts": "4b988464c1558aed",
+      "aimeat/src/mcp/agent-schedules.ts": "d35f0d5e66f3eeaa",
       "aimeat/src/services/scheduler.ts": "693d184ead6ac968",
       "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
     },
@@ -698,7 +698,7 @@
     },
     "node:aimeat-recurring-work": {
       "aimeat/src/services/schedule-gate.ts": "6f39d8b8560e1e2b",
-      "aimeat/src/mcp/agent-schedules.ts": "4b988464c1558aed",
+      "aimeat/src/mcp/agent-schedules.ts": "d35f0d5e66f3eeaa",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
       "aimeat/src/services/schedule-write.ts": "ab29be09929943f7"
     },

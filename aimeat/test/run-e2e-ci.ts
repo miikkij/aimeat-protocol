@@ -16,6 +16,7 @@
  *   2026-10-25 -- e2e-realtime-signed-in-only.ts joins the list (not the guard tier): the realtime upgrade on a signed-in-only node admits its own accounts only (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-backup-reader.ts joins the list (not the guard tier): the classification reader and the export trail on GET /v1/admin/backup (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-operator-trail.ts joins the list (not the guard tier): the operator trail on the identity and scheduler routes (secaudit2026oct22).
+ *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 40991 (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
@@ -1523,6 +1524,9 @@ const ALL_SUITES = [
     // Self-spawns its own node twice on one database, port 40987 (E2E_TASK_KEEP_PORT): an app grant
     // made before the update keeps a task's title and reason in the event record (secaudit 2026-10, v89).
     'test/e2e-account-events-task-keep.ts',
+    // Self-spawns its own node with AIMEAT_MCP_ENFORCE_SCOPES=false, port 40991 (E2E_MCP_WARN_ONLY_PORT):
+    // warn-only keeps the words no wildcard carries on the node MCP surface (secaudit2026oct22).
+    'test/e2e-mcp-warn-only-scopes.ts',
     // The realtime rooms and the WebSocket at /v1/realtime/ws: every route, every message type and
     // every refusal on the upgrade. Nothing had ever opened that socket.
     'test/e2e-realtime-rooms.ts',

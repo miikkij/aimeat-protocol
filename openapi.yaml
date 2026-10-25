@@ -7866,7 +7866,12 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: Pending requests for the authenticated owner.
+          description: |
+            Pending requests for the authenticated owner. Each request carries `reconnect` (true when
+            the owner already connected this app) and `key_changed` (true when the request carries
+            another key than the pinned one); a key change also carries `pinned_key_fingerprint` and
+            `key_fingerprint`, so the owner can see that approving replaces the key of a working
+            connection.
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{userCode}/approve:
@@ -7876,7 +7881,9 @@ paths:
       description: |
         The owner approves/denies a pending request, selecting the final scopes (validated against
         the node's `maxEcoScopes` ceiling) and the data-area allowlist. On approve the GEAI principal
-        is created (or re-approval rotates the pinned key) and the credential becomes issuable.
+        is created (or re-approval rotates the pinned key) and the credential becomes issuable. A
+        re-approval that changes the pinned key ends the sessions issued under the old key; one with
+        the same key keeps them.
       tags: [Ecosystem Apps]
       security:
         - BearerAuth: []
@@ -11820,7 +11827,9 @@ paths:
         '401':
           description: |
             No credential of either kind, or a foreign card that did not verify: `A2A_CARD_INVALID`,
-            `A2A_CARD_UNSIGNED`, `A2A_ASSERTION_*`, `A2A_KEY_NOT_PUBLISHED`, `A2A_KEY_CHANGED`.
+            `A2A_CARD_UNSIGNED`, `A2A_ASSERTION_*`, `A2A_KEY_NOT_PUBLISHED`, `A2A_KEY_CHANGED`, and
+            `A2A_LOCAL_IDENTITY` for a card whose gaii names no node or this node (an account here
+            uses its own credential).
         '403':
           description: The caller is a principal of another account
         '404':
@@ -24838,7 +24847,9 @@ paths:
         The PROVIDER delivers a task and is paid: the consumer is charged the per-task price, the provider is
         credited its cut, the platform rake is routed, the budget decremented — all ON DELIVERY. Body:
         `{ output, note?, ai_provenance?, ai_provenance_id? }`. A 402/429 (budget/rate) leaves the work
-        open + unpaid. The delivery claims the work before it settles, so of two deliveries at the same
+        open + unpaid. Work an agent on another node opened over A2A settles only through its own x402
+        payment: paid, it is delivered with no metering; unpaid, it answers 402 A2A_UNPAID and stays
+        open. The delivery claims the work before it settles, so of two deliveries at the same
         moment one settles and the other is 409 WORK_NOT_OPEN. Returns `{ work }`; a delivered work carries `ai_provenance_id` and the record
         itself under `ai_provenance` (`{ id, record, record_url }`), because the record is private and
         the buyer cannot resolve the id at `/v1/provenance/{id}`. An agent that declares nothing is
@@ -80170,7 +80181,7 @@ paths:
               required: [client_id, gaii, owner_token]
               properties:
                 client_id: { type: string }
-                client_name: { type: string, description: Falls back to the registered or published name. }
+                client_name: { type: string, description: 'Accepted and not used: the client is named by its registered name, or the name its Client ID Metadata Document publishes.' }
                 redirect_uri: { type: string, description: Must be one the client lists. Falls back to the client's first. }
                 state: { type: string }
                 gaii: { type: string, description: The agent the client will act as. }

@@ -8,6 +8,8 @@
  *   (mongodb methods/messaging.ts, work.ts, sessions.ts); mappers fold nullable columns back into the
  *   record shapes and jsonb columns (metadata / ruling / audit data / invite workspaces) round-trip.
  * @version-history
+ *   v1.2.0 — 2026-10-25 — transitionDisputeStatus: one conditional UPDATE on the status, so a dispute
+ *     is resolved once under concurrent calls (secaudit2026oct22).
  *   v1.1.1 — 2026-10-23 — getCodeInvitationByProvisionedOwner reads with LIMIT 1 (check:unbounded-lists).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: `AgentMessage.aiProvenanceId` round-trips
  *     (migration 0020), so the owner's client can render the label from the message itself.
@@ -167,6 +169,12 @@ export const disputeMethods = {
     if (Object.keys(data).length === 0) return this.getDispute(id);
     const rows = await this.db.updateTable('Dispute').set(data as never).where('disputeId', '=', id).returningAll().execute();
     return rows[0] ? toDispute(rows[0]) : null;
+  },
+  async transitionDisputeStatus(this: PostgresKyselyStorage, id: string, from: readonly string[], to: string, updatedAt: string): Promise<boolean> {
+    if (from.length === 0) return false;
+    const r = await this.db.updateTable('Dispute').set({ status: to, updatedAt: new Date(updatedAt) } as never)
+      .where('disputeId', '=', id).where('status', 'in', [...from]).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
   },
   async addDisputeAuditEntry(this: PostgresKyselyStorage, disputeId: string, entry: DisputeAuditEntry): Promise<DisputeAuditEntry> {
     await this.db.insertInto('DisputeAudit').values({

@@ -13,6 +13,9 @@
  * @structure registerWorkspaceRowTools(mcp, deps, caller)
  * @usage registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, scopes }, caller);
  * @version-history
+ *   2026-10-25 — aimeat_workspace_rows_read and aimeat_workspace_rows_stats ask organism:read or
+ *     organism:rows, as their REST twins do, and answer SCOPE_DENIED without either
+ *     (secaudit2026oct22, workspace-read-tools-missing-rest-scope-word).
  *   2026-10-22 — aimeat_workspace_rows_revisions and aimeat_workspace_rows_restore, on the delete's two
  *     words, and `revisions_kept` in the append answer (secaudit 2026-10, v80; developer ruling 2026-10-22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -74,6 +77,14 @@ export function registerWorkspaceRowTools(
         return { principal: session.principal, identity: writerGaii, owner: session.owner, roles: [...session.roles], scopes: session.scopes };
     };
 
+    /**
+     * Reading rows asks organism:read or organism:rows, the words GET .../workspace/rows/:space and
+     * its /stats ask (requireAnyScope). The catalog states only words that are all required, so the
+     * either-of rule sits here, where it holds in warn-only mode too (secaudit2026oct22).
+     */
+    const mayReadRows = (): boolean => scopeIsCovered(scopes, 'organism:read') || scopeIsCovered(scopes, 'organism:rows');
+    const READ_WORD_REFUSAL = 'SCOPE_DENIED: reading a row space needs the organism:read permission (or organism:rows). Ask the owner for it.';
+
     /** One place that renders a service refusal, so every row tool fails with the same sentence. */
     const rowFail = (err: unknown): TextResult => {
         if (err instanceof WorkspaceRowError) return fail(`${err.code}: ${err.message}`);
@@ -99,6 +110,7 @@ export function registerWorkspaceRowTools(
         inputSchema: zodShapeFor('aimeat_workspace_rows_read'),
         annotations: annotationsFor('aimeat_workspace_rows_read') },
         async ({ organism_id, ws, space, where, since, until, changed_since, limit, cursor, order }): Promise<TextResult> => {
+            if (!mayReadRows()) return fail(READ_WORD_REFUSAL);
             try {
                 const page = await readRows(rowDeps, rowCaller(), {
                     organismId: organism_id, wsId: ws, space,
@@ -117,6 +129,7 @@ export function registerWorkspaceRowTools(
         inputSchema: zodShapeFor('aimeat_workspace_rows_stats'),
         annotations: annotationsFor('aimeat_workspace_rows_stats') },
         async ({ organism_id, ws, space }): Promise<TextResult> => {
+            if (!mayReadRows()) return fail(READ_WORD_REFUSAL);
             try {
                 return ok({ stats: await spaceStats(rowDeps, rowCaller(), organism_id, ws, space) });
             } catch (err) { return rowFail(err); }

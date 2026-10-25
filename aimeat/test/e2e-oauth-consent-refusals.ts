@@ -30,12 +30,13 @@
  *   - Phase 3: app-grant PKCE and redirect_uri refusals at authorize and token
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-oauth-consent-refusals
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The token names the client by its registered name, not a posted client_name (secaudit2026oct22).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F01a-01, F21a-01, F21a-02).
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, type McpAgent } from './helpers/mcp-session.js';
-import { authorizeParams, mcpPkce } from './helpers/mcp-oauth-pkce.js';
+import { authorizeParams, mcpPkce, tokenParams } from './helpers/mcp-oauth-pkce.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const MCP_REDIRECT = 'https://client.example.test/oauth/callback';
@@ -190,6 +191,36 @@ await test('A client that registered no redirect_uris may use none: any redirect
     const r = await consent(bare, aliceAgent.gaii, alice.token, 'https://anywhere.example.test/cb');
     assert(r.status === 400 && r.body.error === 'invalid_request', `redirect on a client with none registered: ${r.status} ${short(r.body)}`);
     assert(!('code' in r.body) && !('redirect_url' in r.body), `code leaked: ${short(r.body)}`);
+});
+
+// secaudit2026oct22, mcp-oauth:consent-identity-from-request-not-verified-client. The consent page
+// reads client_name from its own query, which a link can set, and POST /v1/mcp/authorize-consent
+// preferred the posted name over the registered one; the token step stamped it as mcp_client.
+await test('The token names the client by its registered name, not by a client_name the consent request posted', async () => {
+    const reg = await json('/v1/mcp/register', {
+        method: 'POST', body: JSON.stringify({ client_name: `registered-${stamp}`, redirect_uris: [MCP_REDIRECT] }),
+    });
+    assert(reg.status === 201, `register: ${reg.status} ${short(reg.body)}`);
+    const p = mcpPkce(BASE);
+    const con = await json('/v1/mcp/authorize-consent', {
+        method: 'POST',
+        body: JSON.stringify({
+            client_id: reg.body.client_id, client_name: 'A Name The Link Chose', gaii: aliceAgent.gaii, owner_token: alice.token,
+            state: 'ocr', redirect_uri: MCP_REDIRECT, ...authorizeParams(p),
+        }),
+    });
+    assert(con.status === 200, `consent: ${con.status} ${short(con.body)}`);
+    const code = new URL(con.body.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            grant_type: 'authorization_code', code, client_id: reg.body.client_id, client_secret: reg.body.client_secret,
+            redirect_uri: MCP_REDIRECT, ...tokenParams(p),
+        }),
+    });
+    assert(tok.status === 200 && typeof tok.body.access_token === 'string', `token: ${tok.status} ${short(tok.body)}`);
+    const claims = JSON.parse(Buffer.from(tok.body.access_token.split('.')[1], 'base64url').toString('utf8'));
+    assert(claims.mcp_client === `registered-${stamp}`, `the token names the client ${JSON.stringify(claims.mcp_client)}`);
 });
 
 // ─── Phase 2 ───

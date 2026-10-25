@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-25 — aimeat_share_list declares memory:read, the word its REST twins ask (secaudit2026oct22, aimeat_share_list:missing-memory-read).
  *   2026-10-20 — aimeat_knowledge_list, aimeat_knowledge_get and aimeat_knowledge_links declare memory:read, as aimeat_memory_read does (secaudit 2026-10, v56).
  *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, lowering only (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
@@ -406,6 +407,8 @@ export const capabilitiesGroupsSkillsTools = [
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Shares', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The word GET /v1/shares and GET /v1/shares/incoming ask (secaudit2026oct22).
+        scope: 'memory:read',
         surfaces: ['admin'],
         input: {
             direction: { type: 'string', required: true, enum: ['outgoing', 'incoming'], description: 'Default outgoing.', zod: z.enum(['outgoing', 'incoming']).default('outgoing') },
