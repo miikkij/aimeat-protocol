@@ -50023,7 +50023,9 @@ paths:
         address with an optional :port, never a scheme, path, wildcard or list, and an empty string
         clears it; its host joins the fetch allowlist from the extension's next run on, and
         `network_hosts` in the answer lists every host it reaches now. A refused value changes nothing
-        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. MCP:
+        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. A key the node
+        owns (`emailPolicy`) is set only by the operator in person or the operator's agent holding
+        operator:admin; anyone else is refused 403 OPERATOR_REQUIRED and nothing is changed. MCP:
         aimeat_extension_config_set.
       tags: [Extensions]
       security:
@@ -50053,6 +50055,7 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: 'OPERATOR_REQUIRED: the body sets emailPolicy and the caller is not an operator caller.' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/extensions/{name}/unattended-reader:

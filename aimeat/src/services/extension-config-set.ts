@@ -22,6 +22,8 @@
  *   const out = await setExtensionConfig({ storage, config }, ext, { WAZUH_HOST: 'wazuh.example.com' });
  *   if (!out.ok) return refuse(out.status, out.code, out.message);
  * @version-history
+ *   2026-10-25 — A node-owned key (emailPolicy) is set only by an operator caller; others get 403
+ *     OPERATOR_REQUIRED, nothing written (secaudit2026oct22).
  *   v1.0.1 — 2026-10-09 — Secrets are encrypted bound to the extension's name (SecretBinding).
  *   v1.0.0 — 2026-10-09 — Initial.
  */
@@ -31,6 +33,7 @@ import { getExtSecretKeys, prepareSecretConfigForWrite } from './extension-secre
 import { getEncryptionKey } from './encryption.js';
 import { hostFieldsOf, parseHostFieldValue } from './extension-network-hosts.js';
 import { emitChange } from './event-bus.js';
+import { NODE_OWNED_CONFIG_KEYS } from './extension-manifest.js';
 
 export type ConfigSetOutcome =
     | { ok: true; record: ExtensionRecord; changed: string[] }
@@ -47,6 +50,12 @@ export function declaredConfigFields(ext: Pick<ExtensionRecord, 'config'>): stri
     return [...new Set([...plain, ...getExtSecretKeys(ext)])].sort();
 }
 
+/** Who is writing, as the route decided it. */
+export interface ConfigSetter {
+    /** isOperatorCaller(): the operator in person, or the operator's agent holding operator:admin. */
+    isOperator: boolean;
+}
+
 /**
  * Write `values` over the extension's stored config. The caller has already decided that the
  * principal may manage this extension (routes/extensions/permissions.ts).
@@ -55,11 +64,21 @@ export async function setExtensionConfig(
     deps: { storage: Storage; config: AimeatConfig },
     ext: ExtensionRecord,
     values: unknown,
+    /** Defaults to a caller that is not an operator, so a caller that forgets gets the safe answer. */
+    who: ConfigSetter = { isOperator: false },
 ): Promise<ConfigSetOutcome> {
     if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length === 0) {
         return refuse(400, 'INVALID_INPUT', 'config must be a non-empty object of field: value, e.g. { "WAZUH_HOST": "wazuh.example.com" }.');
     }
     const given = values as Record<string, unknown>;
+    // A key the node owns (emailPolicy) is the operator's grant. Managing the extension is not
+    // enough: an agent of the operator's account holding ext:write passes that check without
+    // operator:admin (secaudit2026oct22). The install paths strip it the same way (stripNodeOwnedConfig).
+    const nodeOwned = Object.keys(given).filter(k => NODE_OWNED_CONFIG_KEYS.includes(k));
+    if (nodeOwned.length && !who.isOperator) {
+        return refuse(403, 'OPERATOR_REQUIRED', `${nodeOwned.join(', ')} is set by the operator of this node. `
+            + 'Ask the operator to set it, or have them give the agent the operator:admin permission. Nothing was changed.');
+    }
     const declared = declaredConfigFields(ext);
     const unknown = Object.keys(given).filter(k => RESERVED_KEY.test(k) || !declared.includes(k));
     if (unknown.length) {

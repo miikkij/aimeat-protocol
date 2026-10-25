@@ -8,6 +8,7 @@
  * @structure registerExtensionConfigRoutes(router, config, storage)
  * @usage registerExtensionConfigRoutes(router, config, storage) in routes/extensions.ts
  * @version-history
+ *   2026-10-25 — The service is told whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial: the owner points a host field (manifest network.host_fields) at a
  *     new address without reinstalling.
  */
@@ -22,6 +23,7 @@ import { setExtensionConfig } from '../../services/extension-config-set.js';
 import { capabilitiesOfRecord } from '../../services/extension-capability-declaration.js';
 import { mayManageInstalledExt } from './permissions.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { isOperatorCaller } from '../../services/operator-override.js';
 
 export function registerExtensionConfigRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── PATCH /v1/extensions/:name/config — set config values of an installed extension ──
@@ -34,7 +36,8 @@ export function registerExtensionConfigRoutes(router: Router, config: AimeatConf
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
       }
-      const out = await setExtensionConfig({ storage, config }, ext, (req.body as { config?: unknown } | undefined)?.config);
+      const out = await setExtensionConfig({ storage, config }, ext, (req.body as { config?: unknown } | undefined)?.config,
+        { isOperator: await isOperatorCaller(storage, req.auth) });
       if (!out.ok) {
         res.status(out.status).json(error(config.nodeId, out.code, out.message));
         return;
