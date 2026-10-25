@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-25 -- e2e-sse-revocation.ts joins the list (not the guard tier): a live event stream ends when its credential is revoked (secaudit2026oct22).
  *   2026-10-25 -- e2e-realtime-signed-in-only.ts joins the list (not the guard tier): the realtime upgrade on a signed-in-only node admits its own accounts only (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-backup-reader.ts joins the list (not the guard tier): the classification reader and the export trail on GET /v1/admin/backup (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-operator-trail.ts joins the list (not the guard tier): the operator trail on the identity and scheduler routes (secaudit2026oct22).
@@ -873,6 +874,8 @@ const ALL_SUITES = [
     'test/e2e-admin-backup-reader.ts',
     // The realtime upgrade on a node set to signed-in content access admits its own accounts only.
     'test/e2e-realtime-signed-in-only.ts',
+    // A live event stream ends when the credential that opened it is revoked.
+    'test/e2e-sse-revocation.ts',
     'test/e2e-app-format-md.ts',
     // The account's own record, and the mount-order collision that made its window unreadable.
     'test/e2e-account-events.ts',
