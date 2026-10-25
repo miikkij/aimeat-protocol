@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-25 — aimeat_extension_install with update: true asks the manage rule as a code write (writesCode) (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
  *   2026-10-24 — aimeat_extension_invoke no longer hands the session's bearer to the run: ctx.buy runs
  *     the seller's action for the buying extension's GEAI (secaudit2026oct22,
@@ -394,7 +395,7 @@ export function registerExtensionsTools(
                 // installedBy as permission, so an imported or legacy record could be overwritten
                 // in place by any agent holding ext:write. canManageExtensionAs compares owners
                 // directly, which refuses an empty installer to everyone but an operator.
-                if (!(await canManageExtensionAs(storage, config, caller, existingExt.installedBy, { action: 'update', subject: name }))) {
+                if (!(await canManageExtensionAs(storage, config, caller, existingExt.installedBy, { action: 'update', subject: name, writesCode: true }))) {
                     return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy || 'an unknown installer'}" — only the installing owner may update it` }], isError: true };
                 }
             }

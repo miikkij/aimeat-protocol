@@ -24,6 +24,8 @@
  *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 40479.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-production-posture
  * @version-history
+ *   2026-10-25 — With install role operator, the account holder in person removes, switches off and
+ *     narrows an extension their agent installed; writing code stays with the install role (secaudit2026oct22).
  *   2026-10-16 — The first account is registered with the one-time setup code from the start log, and a
  *     first registration without it is refused (Jouni, 2026-10-16).
  *   2026-10-16 — The self-check names nothing: memory:delete in the shipped default agent scopes is no
@@ -37,6 +39,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 import { SHIPPED_DEFAULT_AGENT_SCOPES } from '../src/config.js';
 
 const PORT = 40479;
@@ -175,6 +178,40 @@ try {
         assert(r.status === 401 && r.body.error?.code === 'AUTH_REQUIRED', `nobody read the statistics: ${r.status} ${short(r.body)}`);
         const signed = await json('/v1/stats', { headers: { Authorization: `Bearer ${operator.token}` } });
         assert(signed.status === 200, `a signed-in caller was refused: ${signed.status} ${short(signed.body)}`);
+    });
+
+    // AIMEAT_EXT_INSTALL_ROLE=operator decides who writes extension code. Whether an agent of an
+    // ordinary account may install under it is the developer's open question, so the install half is
+    // asserted as it stands. The account holder in person manages what is in their account
+    // (secaudit2026oct22, permissions.ts:extInstallRole-owner-branch-only).
+    await test('with install role operator, the account holder in person manages an extension their agent installed', async () => {
+        const member = await registerOwner(BASE, `postmem${STAMP}`);
+        const asMember = { Authorization: `Bearer ${member.token}` };
+        const extName = `postext${STAMP}`;
+        const manifest = JSON.stringify({
+            metadata: { name: extName, version: '1.0.0', description: 'posture e2e', author: 'e2e' },
+            actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
+            limits: { timeout_ms: 5000, max_api_calls: 1 },
+        });
+        const scripts = { echo: 'export default async function(ctx, input){ return { ok: true }; }' };
+        const inPerson = await json('/v1/extensions', { method: 'POST', headers: asMember, body: JSON.stringify({ manifest, scripts }) });
+        assert(inPerson.status === 403, `the member in person installs nothing under install role operator: ${inPerson.status} ${short(inPerson.body)}`);
+
+        const agent = await makeAgent(BASE, member, ['ext:write', 'ext:invoke']);
+        const byAgent = await json('/v1/extensions', { method: 'POST', headers: { Authorization: `Bearer ${agent.token}` }, body: JSON.stringify({ manifest, scripts }) });
+        assert(byAgent.status === 201, `the agent's install (unchanged): ${byAgent.status} ${short(byAgent.body)}`);
+
+        const script = await json(`/v1/extensions/${extName}/actions/ping`, {
+            method: 'PATCH', headers: asMember, body: JSON.stringify({ scriptContent: 'export default async function(ctx, input){ return { ok: 2 }; }' }),
+        });
+        assert(script.status === 403, `writing code stays with the install role: ${script.status} ${short(script.body)}`);
+
+        const narrow = await json(`/v1/extensions/${extName}/unattended-reader`, { method: 'PATCH', headers: asMember, body: JSON.stringify({ authority: 'installer' }) });
+        assert(narrow.status === 200, `the member narrows the unattended reader: ${narrow.status} ${short(narrow.body)}`);
+        const off = await json(`/v1/extensions/${extName}/deactivate`, { method: 'POST', headers: asMember });
+        assert(off.status === 200, `the member switches it off: ${off.status} ${short(off.body)}`);
+        const gone = await json(`/v1/extensions/${extName}`, { method: 'DELETE', headers: asMember });
+        assert(gone.status === 200, `the member removes it: ${gone.status} ${short(gone.body)}`);
     });
 } finally {
     await stopNode();

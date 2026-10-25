@@ -5,6 +5,8 @@
  * @description Extension write/manage permission helpers — role/scope gates and ownership guard.
  *   Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — extInstallRole decides only the acts that write code for the account holder in
+ *     person: they manage every extension in their own account whatever the setting (secaudit2026oct22).
  *   v1.3.2 — 2026-10-05 — The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.3.1 — 2026-10-05 — ext:write is asked with scopeIsCovered (secaudit 2026-10, C3).
  *   v1.3.0 — 2026-10-05 — The sync canManageInstalledExt and canSeeExtensionInstance are gone: routes/extensions/instances.ts asks mayManageInstalledExt, and canSeeExtensionInstanceAs takes the caller's isOperatorCaller() answer instead of reading the operator role off the session (secaudit 2026-10, C2).
@@ -37,7 +39,13 @@ export interface ExtensionAct {
   action: string;
   /** The extension's name. */
   subject: string;
+  /** The act writes the extension's code (an install, a redeploy, an action script). 'install' and
+   *  'update-script' count without it; an in-place redeploy under 'update' sets it. */
+  writesCode?: boolean;
 }
+
+/** Does this act write code, which is what extInstallRole decides for the account holder in person? */
+const writesCode = (act: ExtensionAct): boolean => act.writesCode === true || act.action === 'install' || act.action === 'update-script';
 
 /** The caller of an Express request in the ExtensionCaller shape, or null without a session. */
 function callerOf(req: Request): ExtensionCaller | null {
@@ -47,10 +55,15 @@ function callerOf(req: Request): ExtensionCaller | null {
 }
 
 /** The installer half of the rule: the caller's account installed it and the caller holds the
- *  write permission (owner role where extInstallRole allows it, or the ext:write scope). */
-function installerMayManage(caller: ExtensionCaller, config: AimeatConfig, installedBy: string): boolean {
+ *  write permission (owner role where extInstallRole allows it, or the ext:write scope).
+ *
+ *  extInstallRole decides who writes code. It does not stop the account holder in person from
+ *  removing, switching off, configuring or narrowing an extension in their own account: with
+ *  'operator' an agent of theirs holding ext:write could install one, and the person was then the
+ *  one principal of the account refused to manage it (secaudit2026oct22). */
+function installerMayManage(caller: ExtensionCaller, config: AimeatConfig, installedBy: string, act: ExtensionAct): boolean {
   if (caller.owner !== installedBy) return false;
-  if (config.extInstallRole === 'owner' && isOwnerInPerson(caller)) return true;
+  if (isOwnerInPerson(caller) && (config.extInstallRole === 'owner' || !writesCode(act))) return true;
   return scopeIsCovered(caller.scopes, 'ext:write');
 }
 
@@ -101,7 +114,7 @@ export async function canManageExtensionAs(
   installedBy: string,
   act: ExtensionAct,
 ): Promise<boolean> {
-  if (installerMayManage(caller, config, installedBy)) return true;
+  if (installerMayManage(caller, config, installedBy, act)) return true;
   if (caller.owner === installedBy) return isOperatorCaller(storage, caller);
   return operatorOverride(storage, config, caller,
     { ownerOf: installedBy, area: 'extension', action: act.action, subject: act.subject });

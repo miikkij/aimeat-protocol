@@ -6,6 +6,7 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — PUT on an installed extension asks the manage rule as a code write (writesCode), so the install role still decides it (secaudit2026oct22).
  *   2026-10-25 — GET :name/versions answers created_by only to the installing account and the operator (secaudit2026oct22).
  *   2026-10-25 — PATCH :name/actions/:actionId keeps emailPolicy only for an operator caller, as PUT does (secaudit2026oct22).
  *   2026-10-21 — A changed action script drops the old-code first-use mark (services/extension-first-use-keep.ts).
@@ -243,7 +244,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
             'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
           return;
         }
-      } else if (!(await mayManageInstalledExt(req, config, storage, existing.installedBy, { action: 'update', subject: name }))) {
+      } else if (!(await mayManageInstalledExt(req, config, storage, existing.installedBy, { action: 'update', subject: name, writesCode: true }))) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
