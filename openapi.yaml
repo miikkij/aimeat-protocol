@@ -50080,10 +50080,13 @@ paths:
         caller other than the account holder in person or a principal holding secrets:manage is
         reached by ctx.fetch but does not count as a host the extension declares for a vault secret:
         the first use of an unbound secret toward it asks the owner on the allow page. A refused value changes nothing
-        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. A key the node
-        owns (`emailPolicy`) is set only by the operator in person or the operator's agent holding
-        operator:admin; anyone else is refused 403 OPERATOR_REQUIRED and nothing is changed. MCP:
-        aimeat_extension_config_set.
+        (400 INVALID_INPUT). The installing owner or an operator; requires ext:write. `emailPolicy:
+        "unrestricted"` (the extension may email any address) is the operator's grant: the operator in
+        person and the operator's agent holding operator:admin set it at once; anyone else asks, the
+        grant waits for an operator's Allow (the operators get the question with Allow and Don't allow),
+        and the answer carries `approval_request` (status awaiting_operator), 202 when nothing else in
+        the body changed. The asker hears the answer either way. Any other emailPolicy value narrows
+        and is set at once. MCP: aimeat_extension_config_set.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50105,14 +50108,22 @@ paths:
       responses:
         '200':
           description: >-
-            `data` is `{ name, changed: [field], config (secrets masked), network_hosts? }`.
+            `data` is `{ name, changed: [field], config (secrets masked), network_hosts?, approval_request?, warnings? }`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '202':
+          description: >-
+            The only change asked, emailPolicy "unrestricted", waits for an operator: `data.approval_request`
+            names the request (GET /v1/publish-requests/{id} reads its state).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: 'OPERATOR_REQUIRED: the body sets emailPolicy and the caller is not an operator caller.' }
+        '403': { description: 'SCOPE_DENIED: the caller does not hold ext:write.' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/extensions/{name}/unattended-reader:
@@ -50393,7 +50404,13 @@ paths:
         `version`, or leave it out and the node takes the next version not kept yet (1.1.0 becomes
         1.1.1). The answer carries `version` and `previous_version`, and the new version is kept.
         The same script again answers with the current version and `unchanged: true`. Only the
-        installing owner, an agent of theirs holding ext:write, or an operator may patch.
+        installing owner, an agent of theirs holding ext:write, or an operator may patch. The record
+        names who wrote the new code. When the extension held the operator's grant to email any
+        address (emailPolicy "unrestricted") and the caller is not an operator caller, the grant is
+        held back from the new code and the operators are asked to confirm it: the answer carries
+        `approval_request` (awaiting_operator), and until an operator allows it the extension emails
+        only the addresses the normal rules allow. POST and PUT /v1/extensions answer the same
+        `approval_request` when such a caller's manifest asks for the grant.
       tags: [Extensions]
       security:
         - BearerAuth: []

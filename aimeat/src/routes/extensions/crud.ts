@@ -6,6 +6,10 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — emailPolicy 'unrestricted' is asked of the operators instead of dropped: a script
+ *     PATCH by a caller that is not an operator caller holds the grant back from the new code and
+ *     files the question, and POST and PUT with a manifest asking for it file the question too; each
+ *     answers `approval_request` (secaudit2026oct22; Jouni, 2026-10-25).
  *   2026-10-25 — GET :name/versions answers created_by to every caller again: who wrote a version is
  *     public provenance (Jouni, 2026-10-25, transparency).
  *   2026-10-25 — PUT on an installed extension asks the manage rule as a code write (writesCode), so the install role still decides it (secaudit2026oct22).
@@ -40,9 +44,14 @@
  *   v1.8.0 — 2026-09-28 — PATCH :name/actions/:actionId refuses a script change on an extension a
  *                         managed package install owns, 409 MANAGED_BY_PACKAGE (services/packages/install/package-managed.ts).
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, ExtensionRecord } from '../../storage/interface.js';
+import { callerOf } from '../../middleware/caller.js';
+import { requesterOf } from '../../services/publish-requests/ask.js';
+import {
+  askOperatorsForEmailPolicy, grantsUnrestrictedEmail, manifestAsksUnrestrictedEmail, EMAIL_POLICY_KEY,
+} from '../../services/extension-email-policy-ask.js';
 import { requireAuth, requireScope, requireAnyScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
@@ -61,7 +70,7 @@ import {
   listVersions, isPinnableVersion, nextFreeVersion, keptVersionRefusal, versionExistsRefusal, extensionCodeOf,
   snapshotExtensionVersion,
 } from '../../services/component-versions.js';
-import { buildExtensionRecordFromManifest, NODE_OWNED_CONFIG_KEYS } from '../../services/extension-manifest.js';
+import { buildExtensionRecordFromManifest } from '../../services/extension-manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
@@ -80,6 +89,19 @@ function shownExtension<T extends { config?: Record<string, unknown> } | null | 
 }
 
 export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, scheduler?: Scheduler): void {
+  /**
+   * A manifest that asks for emailPolicy 'unrestricted' from a caller that is not an operator
+   * caller: the builder left the grant out, and the operators are asked (services/extension-email-
+   * policy-ask.ts). Answers what the route adds to its body: the pending question, or nothing.
+   */
+  const manifestGrantAsk = async (req: Request, manifestYaml: unknown, isOperator: boolean, written: ExtensionRecord, before: ExtensionRecord | null) => {
+    if (isOperator || !manifestAsksUnrestrictedEmail(manifestYaml) || grantsUnrestrictedEmail(written.config)) return {};
+    const asked = await askOperatorsForEmailPolicy({ storage, config }, written,
+      requesterOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app),
+      grantsUnrestrictedEmail(before?.config) ? 'code-changed' : 'asked');
+    return 'approval_request' in asked ? { approval_request: asked.approval_request } : { approval_warnings: asked.warnings };
+  };
+
   // ── GET /v1/extensions — List installed extensions ────────────
   router.get('/v1/extensions', optionalAuth(), async (req, res) => {
     try {
@@ -214,7 +236,10 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const created = written.record;
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
 
-      res.status(201).json(success(config.nodeId, { extension: shownExtension(created), ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
+      res.status(201).json(success(config.nodeId, {
+        extension: shownExtension(created), ...(built.warnings?.length ? { warnings: built.warnings } : {}),
+        ...await manifestGrantAsk(req, manifestYaml, isOperator, created, null),
+      }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
       ]));
@@ -285,7 +310,10 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, 'details' in written ? written.details : undefined));
         return;
       }
-      const warned = built.warnings?.length ? { warnings: built.warnings } : {};
+      const warned = {
+        ...(built.warnings?.length ? { warnings: built.warnings } : {}),
+        ...await manifestGrantAsk(req, manifestYaml, isOperator, written.record, existing ?? null),
+      };
 
       if (written.action === 'installed') {
         logger.info(`Extension installed via upsert: ${name}`, { version: written.record.version, by: req.auth!.owner });
@@ -512,12 +540,13 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       // Changed code falls under the first-use rules: the mark old code keeps goes with it
-      // (services/extension-first-use-keep.ts). The operator's emailPolicy grant stays only for code an
-      // operator caller wrote, as PUT rebuilds it through stripNodeOwnedConfig (secaudit2026oct22).
+      // (services/extension-first-use-keep.ts). The operator's grant to email any address was given
+      // to the earlier code: for code a caller that is not an operator caller wrote, it is held back
+      // and the operators are asked to confirm it (secaudit2026oct22; Jouni, 2026-10-25). Meanwhile
+      // the extension emails under the normal recipient rules.
       const keptConfig = { ...withoutFirstUseKeep(ext.config ?? {}) };
-      if (!(await isOperatorCaller(storage, req.auth))) {
-        for (const key of NODE_OWNED_CONFIG_KEYS) delete keptConfig[key];
-      }
+      const holdsGrant = !(await isOperatorCaller(storage, req.auth)) && grantsUnrestrictedEmail(keptConfig);
+      if (holdsGrant) delete keptConfig[EMAIL_POLICY_KEY];
       // The script is new code, so the record names who wrote it, as writeExtensionRecord and the ZIP
       // upload do on every code write: the unattended secret first use and file reach read it
       // (secaudit2026oct22). The same value the install routes stamp.
@@ -530,6 +559,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       logger.info(`Action script updated: ${name}/${actionId}`, { by: req.auth!.sub, sizeKb: sizeKb.toFixed(1), version });
+      const held = holdsGrant && updated
+        ? await askOperatorsForEmailPolicy({ storage, config }, updated, requesterOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app), 'code-changed')
+        : null;
 
       res.json(success(config.nodeId, {
         action: {
@@ -538,6 +570,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         },
         version,
         previous_version: ext.version,
+        ...(held && 'approval_request' in held ? { approval_request: held.approval_request } : {}),
+        ...(held && 'warnings' in held ? { warnings: held.warnings } : {}),
       }));
       emitChange('extensions');
     } catch (err) {

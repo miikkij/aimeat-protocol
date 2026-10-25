@@ -11,6 +11,9 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-25 — emailPolicy 'unrestricted' from a caller that is not an operator caller is asked of the
+ *     operators: aimeat_extension_config_set and aimeat_extension_install answer `approval_request`,
+ *     pending until an operator answers (secaudit2026oct22, the approval standard).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the agent may choose a secret's host (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_install with update: true asks the manage rule as a code write (writesCode) (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the caller is an operator caller: only one sets emailPolicy (secaudit2026oct22).
@@ -113,6 +116,10 @@ import { defineAppIam } from '../services/iam/define-app-iam.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { setExtensionConfig, mayChooseSecretHost } from '../services/extension-config-set.js';
+import { requesterOf } from '../services/publish-requests/ask.js';
+import {
+    askOperatorsForEmailPolicy, manifestAsksUnrestrictedEmail, grantsUnrestrictedEmail, type EmailPolicyAsk,
+} from '../services/extension-email-policy-ask.js';
 import { readAuthorityOf, readAuthorityPayload } from '../services/extension-read-authority.js';
 import { toolError } from './tool-error.js';
 
@@ -133,6 +140,8 @@ export function registerExtensionsTools(
     _getToken?: () => string | undefined,
 ): void {
     const agentGaii = getAgentGaii();
+    /** The session's caller object; tool bodies below name their own `caller` for the auth view. */
+    const sessionCaller = caller;
     /** The caller's owner GHII, the key the app listing decides visibility by. */
     const viewerGhii = () => { const o = localAccountName(agentGaii); return o ? `${o}@${config.nodeId}` : undefined; };
     /** The dependants of one extension, with the names of apps this caller may see. */
@@ -421,6 +430,12 @@ export function registerExtensionsTools(
                 logger.info(`Extension ${written.action} via MCP: ${result.name}`, {
                     version: result.version, by: record.installedBy, reinitialized: written.reinitialized,
                 });
+                // A manifest asking for emailPolicy 'unrestricted' from a caller that is not an
+                // operator caller: the grant was left out, and the operators are asked (services/extension-email-policy-ask.ts).
+                const emailAsk: EmailPolicyAsk | null = !isOperator && manifestAsksUnrestrictedEmail(manifestYaml) && !grantsUnrestrictedEmail(result.config)
+                    ? await askOperatorsForEmailPolicy({ storage, config }, result, requesterOf({ storage, config }, sessionCaller()),
+                        grantsUnrestrictedEmail(existingExt?.config) ? 'code-changed' : 'asked')
+                    : null;
 
                 // Optional immediate activation (skips the separate activate call). The shared
                 // activation registers the manifest's schedules and runs its @activate jobs, which
@@ -450,6 +465,8 @@ export function registerExtensionsTools(
                             // always returned these; an author installing through an agent learned
                             // nothing, so a stripped emailPolicy or a Math.random() went unmentioned.
                             ...(built.warnings?.length ? { warnings: built.warnings } : {}),
+                            ...(emailAsk && 'approval_request' in emailAsk ? { approval_request: emailAsk.approval_request } : {}),
+                            ...(emailAsk && 'warnings' in emailAsk ? { approval_warnings: emailAsk.warnings } : {}),
                         }, null, 2),
                     }],
                 };
@@ -532,6 +549,7 @@ export function registerExtensionsTools(
             const out = await setExtensionConfig({ storage, config }, ext, values, {
                 isOperator: await isOperatorCaller(storage, caller),
                 mayChooseSecretHosts: mayChooseSecretHost({ roles: caller.roles, scopes: caller.scopes, principal: agentGaii }),
+                asker: requesterOf({ storage, config }, sessionCaller()),
             });
             if (!out.ok) return { ...toolError(out.code, out.message) };
             const hosts = capabilitiesOfRecord(out.record).hosts;
@@ -539,6 +557,9 @@ export function registerExtensionsTools(
                 name, changed: out.changed,
                 config: maskSecretFields(out.record.config, getExtSecretKeys(out.record)),
                 ...(hosts ? { network_hosts: hosts } : {}),
+                // The emailPolicy grant asked of the operators, pending until one answers (services/extension-email-policy-ask.ts).
+                ...(out.approval_request ? { approval_request: out.approval_request } : {}),
+                ...(out.warnings ? { warnings: out.warnings } : {}),
             }, null, 2) }] };
         },
     );
