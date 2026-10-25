@@ -2,8 +2,8 @@
  * @file src/services/schedule-fire-refusal.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Whether an `extension` or `agent_task` schedule fires now, asked of its maker at every
- *   fire, and the sentence the owner reads when it does not.
+ * @description Whether an `extension`, `agent_task` or `connections-publish` schedule fires now, asked
+ *   of its maker at every fire, and the sentence the owner reads when it does not.
  *
  *   THE RULE (services/schedule-actor.ts). A schedule acts as its maker, the maker is looked up again
  *   at every fire, and a maker that is gone does not fire. A maker that is not the owner in person
@@ -28,6 +28,9 @@
  *   const refused = await scheduleFireRefusal(storage, job, { nodeId: config.nodeId, baseUrl: config.baseUrl });
  *   if (refused) throw new Error(refused);
  * @version-history
+ *   2026-10-25 — The connections-publish kind asks it too (connections:use), from
+ *     services/scheduler.ts executeConnectionsPublishJob (secaudit2026oct22). Its pre-2026-10-05 app
+ *     schedules keep firing as the account, as the other two kinds' do.
  *   v1.0.1 — 2026-10-21 — The refused maker is noted through agentSessionCaller, not a literal role.
  *   v1.0.0 — 2026-10-21 — Moved out of services/schedule-actor.ts (written there 2026-10-20), with
  *     the three keep-working rules above.
