@@ -67,7 +67,7 @@ function words(a: Agreement, ev: AgreementEvent, x: TellExtra, day: DayFn): { cp
   const cp = a.counterparty.name;
   switch (ev) {
     case 'sent': return {
-      cp: { subject: L(lang, 'Käsittelijäsopimus odottaa allekirjoitustasi', 'A data processing agreement waits for your signature'), lines: [
+      cp: { subject: L(lang, 'Käsittelysopimus odottaa allekirjoitustasi', 'A data processing agreement waits for your signature'), lines: [
         L(lang, `${opName} käsittelee henkilötietojanne palvelun tuottamiseksi. Laki vaatii siitä kirjallisen sopimuksen. Sopimus on EU-komission vakiomalli, ja siihen on täytetty palvelunne tiedot.`,
           `${opName} processes personal data on your behalf to provide the service. The law requires a written agreement for that. The agreement is the European Commission's standard model, filled in with your service's details.`),
         L(lang, 'Voit allekirjoittaa AIMEAT-tunnuksellasi, EU:n digitaalisella lompakolla, omalla allekirjoituspalvelullanne (esimerkiksi DocuSign) tai paperilla.',
@@ -75,7 +75,7 @@ function words(a: Agreement, ev: AgreementEvent, x: TellExtra, day: DayFn): { cp
       ] },
     };
     case 'reminder': return {
-      cp: { subject: L(lang, 'Muistutus: käsittelijäsopimus odottaa allekirjoitusta', 'Reminder: a data processing agreement waits for your signature'), lines: [
+      cp: { subject: L(lang, 'Muistutus: käsittelysopimus odottaa allekirjoitusta', 'Reminder: a data processing agreement waits for your signature'), lines: [
         L(lang, `Sopimus lähetettiin ${day(v.sentAt, lang)}, eikä sitä ole vielä allekirjoitettu.`, `The agreement was sent on ${day(v.sentAt, lang)} and is not signed yet.`),
       ] },
       ...(x.days && x.days >= 7 ? { op: { subject: L(lang, `${cp} ei ole allekirjoittanut ${x.days} päivässä`, `${cp} has not signed in ${x.days} days`), lines: [L(lang, 'Voit lähettää henkilökohtaisen viestin tai soittaa.', 'You can send a personal message or call.')] } } : {}),
@@ -92,7 +92,7 @@ function words(a: Agreement, ev: AgreementEvent, x: TellExtra, day: DayFn): { cp
       cp: { subject: L(lang, 'Allekirjoitettua kopiota ei voitu hyväksyä', 'The signed copy could not be accepted'), lines: [x.reason ?? '', L(lang, 'Voit allekirjoittaa uudelleen samasta linkistä.', 'You can sign again from the same link.')] },
     };
     case 'in-force': return {
-      cp: { subject: L(lang, 'Käsittelijäsopimus on voimassa', 'The data processing agreement is in force'), lines: [L(lang, `Sopimus on voimassa ${day(inForce(a)?.effectiveFrom, lang)} alkaen. Allekirjoitettu sopimus on liitteenä.`, `The agreement is in force from ${day(inForce(a)?.effectiveFrom, lang)}. The signed agreement is attached.`)] },
+      cp: { subject: L(lang, 'Käsittelysopimus on voimassa', 'The data processing agreement is in force'), lines: [L(lang, `Sopimus on voimassa ${day(inForce(a)?.effectiveFrom, lang)} alkaen. Allekirjoitettu sopimus on liitteenä.`, `The agreement is in force from ${day(inForce(a)?.effectiveFrom, lang)}. The signed agreement is attached.`)] },
       op: { subject: L(lang, `Sopimus ${cp}:n kanssa on voimassa`, `The agreement with ${cp} is in force`), lines: [L(lang, 'Valmis sopimus on liitteenä.', 'The finished agreement is attached.')] },
     };
     case 'notice': return {
@@ -117,7 +117,7 @@ function words(a: Agreement, ev: AgreementEvent, x: TellExtra, day: DayFn): { cp
       op: { subject: L(lang, `Loukkausilmoitus lähti: ${cp}`, `Breach notice sent: ${cp}`), lines: [x.breach?.title ?? ''] },
     };
     case 'ended': return {
-      cp: { subject: L(lang, 'Käsittelijäsopimus päättyy', 'The data processing agreement ends'), lines: [
+      cp: { subject: L(lang, 'Käsittelysopimus päättyy', 'The data processing agreement ends'), lines: [
         L(lang, `Sopimus päättyi ${day(a.endedAt, lang)}. Tiedot ${a.deletion?.choice === 'return' ? 'palautetaan' : 'poistetaan'} viimeistään ${day(a.deletion?.dueAt, lang)}, ja saatte siitä vahvistuksen.`,
           `The agreement ended on ${day(a.endedAt, lang)}. The data will be ${a.deletion?.choice === 'return' ? 'returned' : 'deleted'} by ${day(a.deletion?.dueAt, lang)}, and you will receive a confirmation.`),
       ] },

@@ -256,7 +256,7 @@ export async function sendOp(deps: Deps, caller: CallerContext, id: string, body
   if (deps.config.docsignEnabled) try {
     const owner = ownerGhiiOf(caller.auth, deps.config.nodeId)!;
     const rec = await createRequest({ storage: deps.storage, config: deps.config }, caller, {
-      title: `${cur.language === 'fi' ? 'Käsittelijäsopimus' : 'Data processing agreement'} ${cur.id} v${v.n}`,
+      title: `${cur.language === 'fi' ? 'Käsittelysopimus' : 'Data processing agreement'} ${cur.id} v${v.n}`,
       message: body.message ?? null,
       document: { sha256: documentHash(frozen.pdf), name: frozen.name, size: frozen.pdf.length, mediaType: 'application/pdf', source: { owner, key: `agreements/${frozen.name}` } },
       parties: [...new Set(parties)],
