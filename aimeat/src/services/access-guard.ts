@@ -17,6 +17,12 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.7.0 -- 2026-10-24 -- The guard derives the visitor fact from the reader identity itself
+ *     (namesAnotherNode, through localAccountOf): an identity of another node is a visitor whether or
+ *     not the caller passed `accessorFederated`, so the MCP file read, extension files, file
+ *     references, the AI read viewer, dangling references, the workspace gates and the permission
+ *     simulation refuse it the 'members' tier as the memory and /v1/pub reads do. Identities of this
+ *     node decide as before (secaudit2026oct22, members-tier-admits-federated-visitor).
  *   v1.6.1 -- 2026-10-24 -- The 'members' tier does not admit a visitor from another node
  *     (accessorFederated): it is decided by the consent layer as a private read is
  *     (secaudit2026oct22, members-tier-admits-federated-visitor).
@@ -46,9 +52,22 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
 import { isKeyShared } from './group-shares.js';
-import { parseGaiiLoose } from '../utils/gaii.js';
+import { parseGaiiLoose, localAccountOf, currentNodeId } from '../utils/gaii.js';
 import { isOrganismVisibilityWord } from '../utils/visibility-words.js';
 import { organismVisibilityAdmits } from './organism-visibility.js';
+
+/**
+ * Does this reader identity name a principal of ANOTHER node? A visitor is named by its home GHII
+ * (`alice@their-node`), and a route that composed `${owner}@${nodeId}` for it has
+ * `alice@their-node@this-node`; localAccountOf answers null for both, and an account name for every
+ * identity of this node (`alice`, `alice@this-node`, `bot#alice@this-node`, `eco:app#alice@this-node`).
+ * The anonymous reader and an empty identity are not visitors (the anonymous check is the caller's).
+ * Before the node id is registered at boot every identity reads as local, which is the old answer.
+ */
+function namesAnotherNode(identity: string): boolean {
+  if (!identity || identity === 'anonymous' || !currentNodeId()) return false;
+  return localAccountOf(identity) === null;
+}
 
 /**
  * Is `accessor` the HUMAN behind `resourceOwner`? True for `alice@n` reading something owned by
@@ -81,7 +100,8 @@ export interface AuthorizeReadArgs {
   accessorOwner?: string;
   action: 'read' | 'list' | 'search';
   /** The reader is a visitor from another node (isForeignPrincipal); refused for 'organism:<id>',
-   *  and for 'members' admitted only through a consent. */
+   *  and for 'members' admitted only through a share or a consent. Optional: the guard also derives
+   *  it from `accessorGaii` (namesAnotherNode), so a caller that leaves it out cannot admit a visitor. */
   accessorFederated?: boolean;
   /** A simulation (GET /v1/permissions/check): answer as a read would, and write no audit row. */
   noAudit?: boolean;
@@ -106,6 +126,9 @@ export async function authorizeRead(
   args: AuthorizeReadArgs,
 ): Promise<{ allowed: boolean; consentId?: string; reason?: string }> {
   const { ownerGaii, accessorGaii, resourceKey, visibility, groupId, action } = args;
+  // The visitor fact, from the caller's word or from the identity itself: every read path runs this
+  // guard, and a path that did not say the reader was a visitor admitted it to 'members' content.
+  const federated = args.accessorFederated === true || namesAnotherNode(accessorGaii);
 
   // Owner reading their OWN resource is always allowed. This is the foreign-read path
   // (GET /v1/pub) where the accessor happens to BE the owner — e.g. the author viewing
@@ -151,10 +174,10 @@ export async function authorizeRead(
   // accessor is a real authenticated principal (not the anonymous-mode shared
   // identity) BEFORE calling — this guard cannot tell anonymity from a GAII
   // string. Like public, allowed member reads are not audited.
-  // A visitor from another node (accessorFederated) is not an account of this node
+  // A visitor from another node (`federated` above) is not an account of this node
   // (services/audience.ts isNodeAccount), so the tier does not admit it; it goes on to the
   // consent layer below, which admits it only through a consent its owner gave.
-  if (visibility === 'members' && !args.accessorFederated) {
+  if (visibility === 'members' && !federated) {
     return { allowed: true, reason: 'members_data' };
   }
 
@@ -163,7 +186,7 @@ export async function authorizeRead(
   // another node (whose identity names no account here) and a non-member are refused, and the denial
   // is audited as a workspace denial is. Node-local; it never reaches the consent layer.
   if (isOrganismVisibilityWord(visibility)) {
-    if (await organismVisibilityAdmits(storage, visibility, { identity: accessorGaii, federated: args.accessorFederated })) {
+    if (await organismVisibilityAdmits(storage, visibility, { identity: accessorGaii, federated })) {
       return { allowed: true, reason: 'organism_member' };
     }
     if (!args.noAudit) await auditDataAccess(storage, null, ownerGaii, accessorGaii, resourceKey, action, false);
