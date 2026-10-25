@@ -7,6 +7,8 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.22.0 -- 2026-10-25 -- A connection request's Approve and Deny wait while an answer is on its way
+ *     (AgentConsent busyCode), so it cannot be answered twice.
  *   v4.21.0 -- 2026-10-16 -- The menu find opens one agent here, also while the page is already open
  *     (useOpenItem, js/open-item.js).
  *   v4.20.0 -- 2026-10-16 -- A failed fleet load shows the could-not-load note with Retry instead of "no
@@ -190,6 +192,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [scopesModal, setScopesModal] = useState(null);
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
+  /** The device code whose answer is on its way, so its card's buttons wait. */
+  const [consentBusy, setConsentBusy] = useState(null);
   // Section 03 stands open or closed the way this browser last left it; a new account sees it
   // open, because connecting an AI is the first thing to do here.
   const [connectOpen, setConnectOpen] = useState(() => loadFold(session?.owner, 'connect', true));
@@ -486,6 +490,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
   // Scopes come from the shared consent panel, which owns the preset choice — this stays the
   // approve action so the tab keeps its own toast, list update and reload.
   async function handleApprove(userCode, scopes) {
+    // One answer at a time per request: the card's buttons wait (AgentConsent busyCode).
+    if (consentBusy) return;
+    setConsentBusy(userCode);
     try {
       const resp = await apiPost('/v1/agents/verify', {
         user_code: userCode,
@@ -504,6 +511,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       swallowed('agents-tab: handleApprove', err);
       showToast(t('profile.agents.pendingRequests.approveError'), true);
     }
+    setConsentBusy(null);
   }
 
   function handleDeleteAgent(name) {
@@ -517,6 +525,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
   }
 
   async function handleDeny(userCode) {
+    if (consentBusy) return;
+    setConsentBusy(userCode);
     try {
       await apiPost('/v1/agents/verify', {
         user_code: userCode,
@@ -529,6 +539,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
     } catch (e) {
       showToast(e.message || 'Deny failed', true);
     }
+    setConsentBusy(null);
   }
 
   async function toggleFederate(agent) {
@@ -597,7 +608,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         ${/* The approval panel is a SHARED component (components/AgentConsent.js): the remake's home
               shows the same panel for the person's FIRST agent, and a copy here would drift from it.
               Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
-        <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} />
+        <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} busyCode=${consentBusy} />
         <${PageStart} id="agents" done=${agents.length > 0} action=${{ onClick: openNew }} />
         <${FigureStrip} items=${strip} />`}
       railTitle=${p('railTitle')}

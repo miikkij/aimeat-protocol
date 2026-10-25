@@ -11,6 +11,8 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.24.0 -- 2026-10-25 -- The open document reads again on the live event, so a pending section
+ *     decided elsewhere stops showing Approve and Reject; the two buttons wait while an answer is on its way.
  *   v1.23.0 -- 2026-10-02 -- The question marks that explain the automation fields: living.trust, living.activity_trigger (components/HelpTip.js).
  *   v1.22.2 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a template or instance title, a section name, an organism name or the charter YAML
@@ -65,7 +67,7 @@
  *   v1.0.0 — 2026-06-21 — Phase 0: template management + deploy + manual derive + render.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -109,6 +111,10 @@ export default function LivingTab({ session, showToast }) {
   const [deploying, setDeploying] = useState(null);  // { template, orgId, wsId, workspaces[] } | null
   const [opened, setOpened] = useState(null);        // readInstance result | null
   const [busy, setBusy] = useState(false);
+  /** The section whose pending answer is on its way (approve or reject), so its buttons wait. */
+  const [deciding, setDeciding] = useState(null);
+  /** The latest reopen(), for the live handler registered once. */
+  const reopenRef = useRef(async () => {});
   const [need, setNeed] = useState('');              // AI-author input
   const [authoring, setAuthoring] = useState(false);
   const [charterView, setCharterView] = useState(null); // null | 'readable' | 'yaml'
@@ -131,7 +137,8 @@ export default function LivingTab({ session, showToast }) {
     // no change domain at all, so there is no name to listen for. A filter would be a guess that
     // makes this tab MISS updates, which is worse than fetching once too often. The day living docs
     // announce themselves, this gains the domain they announce.
-    const handler = () => { if (session) loadAll(); };
+    // The open document reads again too, so a section decided elsewhere shows its result, not its buttons.
+    const handler = () => { if (session) { loadAll(); reopenRef.current(); } };
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -254,6 +261,7 @@ export default function LivingTab({ session, showToast }) {
   }
 
   async function reopen() { if (opened) await openInstance(opened.loc); }
+  reopenRef.current = reopen;
 
   async function togglePause() {
     if (!opened) return;
@@ -294,13 +302,18 @@ export default function LivingTab({ session, showToast }) {
     try { await living.deriveSlotFromSources(opened.loc, slotId, opened.sources); showToast(t('profile.living.composed')); await reopen(); }
     catch (e) { showToast(e.message || t('profile.error'), true); }
   }
+  // One answer at a time: the buttons are off while it is on its way, so a second press cannot follow.
   async function approveSlot(slotId) {
+    setDeciding(slotId);
     try { await living.approvePending(opened.loc, slotId, opened.pending?.[slotId]); showToast(t('profile.living.approved')); await reopen(); }
     catch (e) { showToast(e.message || t('profile.error'), true); }
+    finally { setDeciding(null); }
   }
   async function rejectSlot(slotId) {
+    setDeciding(slotId);
     try { await living.rejectPending(opened.loc, slotId); showToast(t('profile.living.rejected')); await reopen(); }
     catch (e) { showToast(e.message || t('profile.error'), true); }
+    finally { setDeciding(null); }
   }
   async function handleSaveSnapshot() {
     try { await living.saveSnapshot(opened.loc, opened.config, picked); showToast(t('profile.living.snapshotSaved')); }
@@ -459,8 +472,8 @@ export default function LivingTab({ session, showToast }) {
                 value=${der?.markdown || ''} onChange=${v => saveSlot(sec.slot, v)} />
               ${opened.pending?.[sec.slot] && html`
                 <${Box} tone="waiting" doors=${html`
-                  <${Action} small onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}<//>
-                  <${Action} small tone="danger" onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}<//>`}>
+                  <${Action} small disabled=${deciding === sec.slot} onClick=${() => approveSlot(sec.slot)}>${t('profile.living.approve')}<//>
+                  <${Action} small tone="danger" disabled=${deciding === sec.slot} onClick=${() => rejectSlot(sec.slot)}>${t('profile.living.reject')}<//>`}>
                   <${Note} kind="meta">⏳ ${t('profile.living.pendingTitle')}<//>
                   <${Box} tone="copy" scroll document><${Markdown} text=${opened.pending[sec.slot].markdown} /><//>
                 <//>`}

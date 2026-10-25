@@ -36,6 +36,8 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-25 — Storing a secret again or removing it closes the owner's notices about its waiting
+ *     questions: they say so and lose their buttons (services/notification-answers.ts; secaudit2026oct22).
  *   v1.4.0 — 2026-10-24 — A value from the extension's shared map that has no host yet is bound only
  *     when `sharedFirstUse()` allows it (the host is on the operator's allow_hosts, the extension
  *     declares it, or the operator makes the call in person); otherwise nothing is sent or bound and
@@ -69,6 +71,7 @@ import type { SecretApproval, SecretBinding, SecretRecord } from '../storage/typ
 import { createHmac } from 'node:crypto';
 import { encrypt, decrypt, getEncryptionKey } from './encryption.js';
 import { logger } from '../utils/logger.js';
+import { answerNotifications } from './notification-answers.js';
 
 /**
  * A secret name is an ADDRESS, not a label: it is typed into a header inside a document
@@ -245,7 +248,17 @@ export async function putOwnerSecret(
     hosts: host ? [host] : [],
     hostBinding: host ? { how: 'set', by: opts.by ?? ownerGhii, at: now } : null,
   });
+  await endSecretQuestions(storage, ownerGhii, name);
   return { ok: true, data: toSummary(stored) };
+}
+
+/**
+ * Storing a secret again or removing it ends the questions that waited on it (their approvals list is
+ * emptied with the value): the owner's notices about them say so and lose their buttons
+ * (services/notification-answers.ts; the ref is secret-approvals.ts secretQuestionRef).
+ */
+async function endSecretQuestions(storage: Storage, ownerGhii: string, name: string): Promise<void> {
+  await answerNotifications(storage, ownerGhii, { refPrefix: `secret-approval:${name}:` }, { outcome: 'outdated', by: null, at: new Date().toISOString() });
 }
 
 /**
@@ -322,6 +335,7 @@ export async function deleteOwnerSecret(
       message: `You hold no secret called ${name}.`,
     };
   }
+  await endSecretQuestions(storage, ownerGhii, name);
   return { ok: true };
 }
 

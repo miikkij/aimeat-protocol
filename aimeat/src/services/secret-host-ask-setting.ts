@@ -134,6 +134,8 @@ export async function changeSecretHostAsk(
       // An agent that may choose a secret's address anyway may switch the question off.
       approve_scope: SECRETS_MANAGE_SCOPE,
       i18n: { key: 'approval_secret_host_ask_off', vars: {} },
+      // The answered notice says where it is switched later: the Access page, section Secrets.
+      change: { link: '/v1/profile?tab=access#ac-secrets', key: 'approval_change.access_secrets' },
     },
   });
   if (!filed.ok) return { ok: false, status: filed.status, code: filed.code, message: filed.message };
