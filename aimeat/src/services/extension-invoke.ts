@@ -19,14 +19,17 @@
  *
  *   What stays with the surface: how a refusal is written (the paywall writes into the surface's
  *   responder, an HTTP response or a recorder), the request's pay token, internal pass and app-tool
- *   name, the caller's bearer (ctx.buy re-presents it to the node's own routes), and whether mail is
- *   available. The paywall function itself is passed in, so this service does not import the route
+ *   name, and whether mail is available. ctx.buy takes no credential of the caller: the seller's
+ *   action runs through this same sequence for the buying extension's own GEAI. The paywall function itself is passed in, so this service does not import the route
  *   module that holds it (dependency-cruiser services-do-not-import-routes).
  * @structure invokeExtensionAction · ExtensionInvokeCaller · ExtensionInvokeOutcome
  * @usage
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.3.0 -- 2026-10-24 -- ctx.buy no longer receives the caller's bearer; the `bearer` argument is
+ *     gone. The seller's action runs in-process for the buying extension's GEAI (services/
+ *     extension-purchase.ts; secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   v1.2.1 -- 2026-10-22 -- ctx.ai is told who wrote the code and who calls: the writer invoking its
  *     own extension starts jobs that read what it may read (ai-jobs/ext-capability.ts attendedReadAs;
  *     secaudit 2026-10, v75).
@@ -129,8 +132,6 @@ export async function invokeExtensionAction(args: {
   input: Record<string, unknown>;
   caller: ExtensionInvokeCaller;
   paywall: { res: PaywallResponder; payToken?: string; internalPass?: string; namedAppTool?: string };
-  /** The caller's bearer, which ctx.buy re-presents to the node's own routes. */
-  bearer?: string;
   correlationId?: string | null;
   /** The mail service; without one ctx.email answers false and logs why. */
   emailService?: EmailService;
@@ -283,7 +284,13 @@ export async function invokeExtensionAction(args: {
         return buyForExtension({
           config, storage, extName: ext.name, extOwner: ext.installedBy,
           appRef, tool, input: buyInput ?? {},
-          jwt: args.bearer ?? '',
+          // The seller's action runs in-process through this same sequence, for the buying
+          // extension's own GEAI; no session of this caller goes with it (secaudit2026oct22).
+          runSellerAction: (run) => invokeExtensionAction({
+            config, storage, enforcePaywall: args.enforcePaywall, emailService: args.emailService,
+            extRef: run.extRef, actionId: run.actionId, method: 'POST', input: run.input,
+            caller: run.caller, paywall: { res: run.res, internalPass: run.internalPass },
+          }),
           correlationId: args.correlationId ?? null,
         });
       },

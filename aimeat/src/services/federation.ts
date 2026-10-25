@@ -11,6 +11,9 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-24 — isPersonalNodeAgentOf; resolveGaii routes to a personal node only an entry that is
+ *     the anchoring owner's own agent on that node (secaudit2026oct22,
+ *     personal-anchor-agent-gaiis-claim-foreign-gaii).
  *   2026-10-19 — The service summary window's comment names 4.2.0, the release it now ends in.
  *   2026-10-16 — fetchServiceSummary: a peer of unknown version that refuses the unsigned service summary
  *     request with 401 is asked once more with the signed one, and from then on (until restart) gets the
@@ -158,6 +161,22 @@ export function peerCarriesAgents(peer: Pick<PeerInfo, 'status' | 'allowRouting'
     return peer.status === 'active' && (peer.allowRouting !== false || peer.allowMessaging !== false);
 }
 
+/** `agent#owner` or `agent#owner@node`, each part free of `#`, `@` and white space. */
+const PERSONAL_AGENT_RE = /^([^#@\s]+)#([^#@\s]+)(?:@([^#@\s]+))?$/;
+
+/**
+ * Whether `gaii` may be listed as an agent of the personal node `nodeId` anchored by `ownerName`:
+ * its owner part is that owner, and its node part, when it has one, is that personal node. The
+ * profile page asks for `name#owner`; the setup guide uses `name#owner@personal-node`. A GEAI is
+ * never a personal node's agent.
+ */
+export function isPersonalNodeAgentOf(gaii: string, ownerName: string, nodeId: string): boolean {
+    if (gaii.startsWith('eco:')) return false;
+    const m = PERSONAL_AGENT_RE.exec(gaii);
+    if (!m) return false;
+    return m[2] === ownerName && (m[3] === undefined || m[3] === nodeId);
+}
+
 /**
  * Resolve which node hosts a GAII. Checks local cache first, then local storage,
  * then falls back to asking peers.
@@ -185,10 +204,12 @@ export async function resolveGaii(
         return { nodeId: config.nodeId, nodeUrl: config.baseUrl, local: true };
     }
 
-    // 2b. Check personal nodes anchored to this operator
+    // 2b. Check personal nodes anchored to this operator. A listed entry counts only when it is the
+    // anchoring owner's own agent on that node: an anchor stored before POST /v1/personal/anchor
+    // checked the list can name another owner's identity, and work for it must not be queued there.
     const personalNodes = await storage.listPersonalNodes();
     for (const pn of personalNodes) {
-        if (pn.agentGaiis.includes(gaii)) {
+        if (pn.agentGaiis.includes(gaii) && isPersonalNodeAgentOf(gaii, pn.ownerName, pn.nodeId)) {
             pruneGaiiCache();
             gaiiCache.set(gaii, { nodeId: pn.nodeId, nodeUrl: config.baseUrl, expiresAt: Date.now() + CACHE_TTL_MS });
             return { nodeId: pn.nodeId, nodeUrl: config.baseUrl, local: false };

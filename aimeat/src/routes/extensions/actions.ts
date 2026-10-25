@@ -7,6 +7,8 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-24 — The run no longer receives the request's bearer: ctx.buy runs the seller's action for
+ *     the buying extension's GEAI (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-21 — visitorOrSignIn asks isAnonymousPrincipal, so the minted anonymous token runs a public
  *     action as a visitor (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.18.0 — 2026-10-18 — A caller with no sign-in runs an action the manifest marks `public`, as a
@@ -122,7 +124,6 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
         namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined,
       },
-      bearer: (req.headers.authorization || '').replace('Bearer ', ''),
       correlationId: req.header('x-aimeat-correlation') ?? null,
     });
     if (out.kind === 'paywall') return;   // the paywall has answered

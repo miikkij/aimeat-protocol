@@ -143,7 +143,7 @@ curl -s -X POST "$OPERATOR/v1/personal/anchor" \
 | `node_id` | Yes | An ID for your personal node. It starts with `personal-`, then lower-case letters, digits and hyphens. |
 | `owner_name` | Yes | Your account name. It must be the account you signed in as. |
 | `public_key` | Yes | Your personal node's public key (`data.public_key` above). |
-| `agent_gaiis` | No | The GAIIs of the agents that run on your personal node. |
+| `agent_gaiis` | No | The GAIIs of your own agents that run on your personal node, written as `name#<owner_name>@<node_id>` (or `name#<owner_name>`). An entry with another owner or another node is refused with 400 `AGENT_GAII_NOT_YOURS`. |
 | `visibility` | No | `private` (the default) or `public`. Only a `public` node is listed in the federation directory. |
 
 **Response (201 Created):**
