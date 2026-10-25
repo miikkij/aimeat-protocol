@@ -2,6 +2,30 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-25",
+      "kind": "feature",
+      "id": "2026-10-25-open-one-app-to-the-internet-on-a-closed-aimeat",
+      "highlight": false,
+      "audience": [
+        "operator",
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "Open one app to the internet on a closed AIMEAT",
+        "fi": "Avaa yksi sovellus internetiin suljetulla AIMEATilla"
+      },
+      "summary": {
+        "en": "On an AIMEAT for its own people only, open one page and its forms to everyone, with a reason and an end date.",
+        "fi": "Avaa vain omille käyttäjille suljetulla AIMEATilla yksi sivu lomakkeineen kaikille, syyn ja päättymispäivän kanssa."
+      },
+      "body": {
+        "en": "An AIMEAT that shows its content to its own signed-in people only can still open one app to everyone, for example a campaign page with a consent form. The rest stays closed. You give the reason and how long, and the forms the page names in <meta name=\"aimeat-intake\"> open with it. By default you ask and an operator approves; the operators can also let named people open on their own, or let everyone open and only hear of it. Every opening shows who asked, why, when, who approved and until when. The operators see all of them on the page Open to the internet, hear of every opening and every new version, and close any with one press. The page says at its end that it is open to everyone, and it closes itself at its end date after a reminder a week before. Your AI does the same from your chat.",
+        "fi": "AIMEAT, joka näyttää sisältönsä vain omille kirjautuneille käyttäjilleen, voi silti avata yhden sovelluksen kaikille, esimerkiksi kampanjasivun ja sen suostumuslomakkeen. Muu pysyy suljettuna. Sinä kerrot syyn ja keston, ja sivun mukana aukeavat ne lomakkeet, jotka sivu nimeää rivillä <meta name=\"aimeat-intake\">. Oletuksena sinä pyydät ja operaattori hyväksyy. Operaattorit voivat myös antaa nimetyille käyttäjille oikeuden avata itse, tai antaa kaikkien avata ja saada vain tiedon. Jokaisesta avauksesta näkyy, kuka pyysi, miksi, milloin, kuka hyväksyi ja mihin asti. Operaattorit näkevät kaikki avaukset sivulla Auki internetiin, saavat ilmoituksen jokaisesta avauksesta ja uudesta versiosta, ja sulkevat minkä tahansa yhdellä painalluksella. Sivun lopussa lukee, että se on auki kaikille, ja avaus sulkeutuu itse päättymispäivänä. Saat muistutuksen viikkoa ennen. Tekoälysi tekee saman chatistasi."
+      }
+    },
+    {
       "date": "2026-10-21",
       "kind": "feature",
       "id": "2026-10-21-talk-with-several-people-in-one-group",
