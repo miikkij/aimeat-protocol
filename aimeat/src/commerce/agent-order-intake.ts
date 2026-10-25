@@ -26,6 +26,8 @@
  * @structure ACS_STRIPE_VERSION · intakeAgentOrder · IntakeResult
  * @usage const r = await intakeAgentOrder(storage, config, ownerGhii, sessionObject, event.id);
  * @version-history
+ *   v1.2.0 — 2026-10-25 — A session Stripe reads back as not paid answers not_yet_paid and takes no
+ *     order; checkout.session.async_payment_succeeded takes it once paid (secaudit2026oct22).
  *   v1.1.0 — 2026-10-10 — The order key is claimed with createMemoryIfAbsent before the fulfilment
  *     tasks are created; a concurrent delivery answers already_taken (secaudit 2026-10-10 I1).
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
@@ -54,7 +56,7 @@ export const ACS_HANDLER_ID = 'com.stripe.acs';
 const orderKey = (id: string): string => `commerce.order.${id}`;
 
 export interface IntakeResult {
-  action: 'agent_order' | 'already_taken' | 'not_an_agent_order';
+  action: 'agent_order' | 'already_taken' | 'not_an_agent_order' | 'not_yet_paid';
   orderId?: string;
   taskIds?: string[];
 }
@@ -104,6 +106,14 @@ export async function intakeAgentOrder(
   const text = await readText(res, 1024 * 1024);
   if (!res.ok) throw new Error(`Stripe answered ${res.status} for the checkout session: ${text.slice(0, 200)}`);
   const full = JSON.parse(text) as Record<string, unknown>;
+  // Only money Stripe says arrived becomes an order (secaudit2026oct22). A delayed payment method
+  // completes the checkout as `unpaid`; Stripe then sends checkout.session.async_payment_succeeded
+  // for the same session, which comes back here, reads `paid` and takes the order through the same
+  // claim below, so either event creates it once. A session without the field is read as paid.
+  const paymentStatus = full.payment_status;
+  if (typeof paymentStatus === 'string' && paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+    return { action: 'not_yet_paid', orderId: stripeSessionId };
+  }
 
   const lines = (((full.line_items as { data?: unknown[] } | undefined)?.data) ?? []) as Array<Record<string, unknown>>;
   const items: Array<CheckoutLineItem & { sku: string }> = [];

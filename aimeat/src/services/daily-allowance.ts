@@ -14,10 +14,14 @@
  *
  *   ONE A DAY, BY THE LEDGER. The day's grant carries the tracking code `allowance-YYYY-MM-DD` (UTC),
  *   and a second grant on the same day finds it (findTransactionByTrackingCode) and adds nothing.
+ *   One person's grants run one after another on this node, so two requests at the same moment
+ *   cannot both pass that check.
  * @structure allowanceDayCode(now) · grantDailyAllowance(storage, config, ghii, amount?) ·
  *   runDailyAllowance(storage, config)
  * @usage const { credited, already } = await grantDailyAllowance(storage, config, ghii);
  * @version-history
+ *   v1.0.1 — 2026-10-25 — One person's grants run one at a time, so overlapping requests credit the
+ *     day once (secaudit2026oct22).
  *   v1.0.0 — 2026-10-15 — Initial (feature-list audit 135).
  */
 import { randomUUID } from 'node:crypto';
@@ -35,6 +39,24 @@ export function allowanceDayCode(now: Date = new Date()): string {
  */
 export async function grantDailyAllowance(
   storage: Storage, config: AimeatConfig, ghii: string, amount: number = config.dailyAllowance,
+): Promise<{ credited: number; already: boolean }> {
+  // The check, the credit and the ledger row are three storage calls. Two requests for one person
+  // that overlapped both passed the check and both credited (secaudit2026oct22), so the grants of one
+  // person run one after another on this node, as recordAiUsage does for the usage record.
+  let pending = grantsInFlight.get(storage);
+  if (!pending) { pending = new Map(); grantsInFlight.set(storage, pending); }
+  const previous = pending.get(ghii) ?? Promise.resolve();
+  const run = (): Promise<{ credited: number; already: boolean }> => grantOnce(storage, config, ghii, amount);
+  const next = previous.then(run, run);
+  pending.set(ghii, next);
+  try { return await next; } finally { if (pending.get(ghii) === next) pending.delete(ghii); }
+}
+
+/** The grants in flight, per storage and person, so they run one at a time. */
+const grantsInFlight = new WeakMap<Storage, Map<string, Promise<unknown>>>();
+
+async function grantOnce(
+  storage: Storage, config: AimeatConfig, ghii: string, amount: number,
 ): Promise<{ credited: number; already: boolean }> {
   const code = allowanceDayCode();
   if (await storage.findTransactionByTrackingCode(ghii, code, 'allowance')) return { credited: 0, already: true };

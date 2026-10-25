@@ -294,6 +294,57 @@ await test('One completion over HTTP completes as before, and a second one after
     assert(two.status === 200 && two.body.messages?.[0]?.code === 'checkout_closed', `again ${two.status} ${JSON.stringify(two.body.messages)}`);
 });
 
+// secaudit2026oct22: an unsigned request naming a checkout writes nothing under the seller before the
+// checkout is shown to exist for that platform, and the node's own UCP records do not use up the
+// seller's memory key limit.
+const idemKeysOfShop = async () => (await storage.listMemory(shop.ghii, { prefix: 'commerce.ucp.idem.' })).length;
+
+await test('PUT, complete and cancel on a checkout that does not exist, or is another platform\'s, write no Idempotency-Key record', async () => {
+    const before = await idemKeysOfShop();
+    const absent = `ucs_${Buffer.from(shop.name, 'utf8').toString('base64url')}_${randomBytes(16).toString('hex')}`;
+    const real = await json('/ucp/2026-08-25/checkout-sessions', { method: 'POST', headers: UCP_HEADERS,
+        body: JSON.stringify({ line_items: [{ item: { id: sku }, quantity: 1 }] }) });
+    assert(real.status === 201, `create ${real.status}`);
+    const other = { 'UCP-Agent': 'profile="https://other.races.example/.well-known/ucp"' };
+    const calls: Array<[string, string, Record<string, string>]> = [
+        ['PUT', `/ucp/2026-08-25/checkout-sessions/${absent}`, UCP_HEADERS],
+        ['POST', `/ucp/2026-08-25/checkout-sessions/${absent}/complete`, UCP_HEADERS],
+        ['POST', `/ucp/2026-08-25/checkout-sessions/${absent}/cancel`, UCP_HEADERS],
+        ['PUT', `/ucp/2026-08-25/checkout-sessions/${real.body.id}`, other],
+    ];
+    for (const [method, path, headers] of calls) {
+        const r = await json(path, { method, headers: { ...headers, 'Idempotency-Key': `probe-${randomBytes(8).toString('hex')}` }, body: JSON.stringify({ line_items: [{ item: { id: sku }, quantity: 1 }] }) });
+        assert(r.status === 404 && r.body.code === 'not_found', `${method} ${path}: ${r.status} ${JSON.stringify(r.body)}`);
+    }
+    assert(await idemKeysOfShop() === before, `records written under the seller: ${(await idemKeysOfShop()) - before}`);
+    // The designed use: the platform's own checkout, with a key, is answered and replayed as before.
+    const key = `races-${stamp}-${randomBytes(8).toString('hex')}`;
+    const put = () => json(`/ucp/2026-08-25/checkout-sessions/${real.body.id}`, { method: 'PUT', headers: { ...UCP_HEADERS, 'Idempotency-Key': key },
+        body: JSON.stringify({ line_items: [{ item: { id: sku }, quantity: 1 }], buyer: { email: 'pat@example.com' } }) });
+    const first = await put();
+    const second = await put();
+    // Key order is not kept by a PostgreSQL jsonb column, so the two answers are compared by content.
+    const canonical = (v: unknown): unknown => Array.isArray(v) ? v.map(canonical)
+        : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)).map(([k, x]) => [k, canonical(x)])) : v;
+    assert(first.status === 200 && second.status === 200 && JSON.stringify(canonical(first.body)) === JSON.stringify(canonical(second.body)),
+        `replayed: ${first.status} ${second.status} ${JSON.stringify(first.body).slice(0, 200)} / ${JSON.stringify(second.body).slice(0, 200)}`);
+});
+
+await test('The node\'s own UCP records do not count against the seller\'s memory key limit', async () => {
+    const all = (await storage.listMemory(shop.ghii)).length;
+    const ucp = (await storage.listMemory(shop.ghii, { prefix: 'commerce.ucp.idem.' })).length
+        + (await storage.listMemory(shop.ghii, { prefix: 'commerce.ucp.session.' })).length;
+    assert(ucp > 0, 'precondition: the shop has UCP records');
+    const limitBefore = config.memoryMaxKeysPerAgent;
+    config.memoryMaxKeysPerAgent = all - ucp + 1;   // room for one key of the owner's own, beside the UCP records
+    try {
+        const w = await json('/v1/memory', { method: 'POST', headers: auth(shop.token), body: JSON.stringify({ key: `notes.races${stamp}`, value: { a: 1 } }) });
+        assert(w.status === 200 || w.status === 201, `the owner's own write was refused: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    } finally {
+        config.memoryMaxKeysPerAgent = limitBefore;
+    }
+});
+
 // ── A subscription's renewal and its cancel ──────────────────────────────────────────────────
 
 const EXT = `racesubs${stamp}`;

@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.13.1 -- 2026-10-25 -- An app grant's call is checked against the owner's allowlist and per-app cap,
+ *     and recorded, under the app the grant names (opts.verifiedApp), not the body's app_id (secaudit2026oct22).
  *   v3.13.0 -- 2026-10-08 -- settleAiCall takes `media` (kind, IANA type, method, surface), so a
  *     speech, image or transcription record says what it is; text is stated for a text output.
  *   v3.12.0 -- 2026-10-08 -- A provider failure goes through providerFailureOf (./errors.ts): a
@@ -381,7 +383,10 @@ async function planAiCall(
   const prefs = (prefsRecord?.value as Record<string, unknown>) ?? {};
   const op: AiOp = opts.op ?? 'text';
   const roleModel = (role: ModelRole) => resolveModelFor(config, prefs, role);
-  assertAppAllowed(prefs, opts.appId, gaii);
+  // An app grant's call is the app the grant names, never a name in the body: the owner's allowlist,
+  // per-app cap and usage row key on it (the voiceAppId rule; secaudit2026oct22).
+  const appId = opts.verifiedApp ?? opts.appId;
+  assertAppAllowed(prefs, appId, gaii);
 
   const capability: AiCapability = opts.capability
     ?? OP_CAPABILITY[op] ?? (opts.hasImages ? 'vision' : 'text');
@@ -390,7 +395,7 @@ async function planAiCall(
     capability, caller: opts.caller ?? (opts.agent ? 'agent' : 'owner') as CallerClass,
     ...(opts.agent ? { agent: opts.agent } : {}),
     ...(opts.verifiedApp ? { verifiedApp: opts.verifiedApp } : {}),
-    ...(opts.appId ? { appId: opts.appId } : {}),
+    ...(appId ? { appId } : {}),
   };
   // The owner's providers (the legacy setting migrated on the first read), their routing and their
   // model policy. The legacy records were read above, so the migration reads nothing twice.
@@ -398,14 +403,14 @@ async function planAiCall(
     providersForOwner(storage, config, gaii, { settings: prefsRecord, key: apiKeyRecord }),
     readRouting(storage, gaii, opts.agent),
     loadPolicyDecision(storage, config, gaii, policyCtx),
-    appAiMetaOf(storage, gaii, opts.verifiedApp ?? opts.appId),
+    appAiMetaOf(storage, gaii, appId),
     opts.role || opts.modelRole ? readRoles(storage, gaii) : Promise.resolve(null),
   ]);
   // The app's meta orders the owner's candidates (prefer.*) and may ask for this machine only
   // (local.*); neither adds a provider or loosens a rule (plan 11, section 9).
   const appPrefer = appMeta?.prefer?.[capability];
   let requires = appMeta?.local?.includes(capability) ? { ...opts.requires, local: true } : opts.requires;
-  let rules = rulesFor({ capability, ...(opts.agent ? { agent: opts.agent } : {}), ...(opts.appId ? { app: opts.appId } : {}) }, routing);
+  let rules = rulesFor({ capability, ...(opts.agent ? { agent: opts.agent } : {}), ...(appId ? { app: appId } : {}) }, routing);
 
   // ── The role (services/ai/roles.ts), unless the call named its model or provider ──
   // A crew's modelRole is the built-in role of that name while it has a provider for the capability;
@@ -475,7 +480,7 @@ async function planAiCall(
   if (!route.candidates.length) throw refusalFor(route, op, capability, opRole ? roleModel(opRole) : textModel);
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
-  const dailyBudgetUsd = assertWithinBudget(usage, prefs, opts.appId, gaii);
+  const dailyBudgetUsd = assertWithinBudget(usage, prefs, appId, gaii);
   const overCap = await agentCapRefusal(storage, gaii, opts.agent);
   if (overCap) throw new AiCompletionError('AGENT_QUOTA_EXHAUSTED', 402, overCap);
 
@@ -492,7 +497,7 @@ async function planAiCall(
     usage, dailyBudgetUsd, model: first.model, degradedToFree: false,
     op, providerType: first.provider.type, policyChoseModel: false, allowedModels: policy.decision.allowed,
     target: first.target, capability, candidates: route.candidates, rejected: route.rejected,
-    chosenBy: route.chosenBy, allowFallback: route.allowFallback, rules,
+    chosenBy: route.chosenBy, allowFallback: route.allowFallback, rules, ...(opts.verifiedApp ? { appId: opts.verifiedApp } : {}),
     ...(role ? { role: { id: role.role.id, ...(role.binding ? { binding: role.binding } : {}), ...(role.declared?.params ? { params: role.declared.params } : {}) } } : {}),
   }, first);
 }
@@ -510,7 +515,7 @@ export async function recordFailedAttempts(
 ): Promise<void> {
   for (const f of failed) {
     await recordAiUsage(storage, gaii, plan.usage, {
-      costUsd: f.costUsd, tokens: 0, appId: call.appId, model: f.candidate.model, provider: f.candidate.provider.id,
+      costUsd: f.costUsd, tokens: 0, appId: plan.appId ?? call.appId, model: f.candidate.model, provider: f.candidate.provider.id,
       source: `${call.source}:failed-${f.error}`, apiKeyScope: f.candidate.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
     }, config);
     if (f.candidate.keyScope === 'node' && f.costUsd > 0) await debitAllowance(storage, config, gaii, f.costUsd);
@@ -562,6 +567,8 @@ export async function settleAiCall(
   plan: AiCallPlan,
   outcome: AiCallOutcome,
 ): Promise<AiCallSettlement> {
+  // The app the plan attributed the call to (an app grant's own app) wins over the caller's word.
+  if (plan.appId) outcome = { ...outcome, appId: plan.appId };
   const updated = await recordAiUsage(storage, gaii, plan.usage, {
     costUsd: outcome.costUsd, tokens: outcome.totalTokens, appId: outcome.appId,
     ...(outcome.units?.seconds !== undefined ? { audioSeconds: outcome.units.seconds } : {}),

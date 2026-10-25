@@ -9,6 +9,7 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-25 — countMemory takes excludePrefixes (secaudit2026oct22).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory: the TTL sweep as one DELETE (QA audit D4-01, E4-01). listAllMemory
  *     and listAllMemoryMeta take the TTL test, the order, the limit and the offset in SQL and the total
@@ -52,7 +53,7 @@ import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from
 import { likePrefix } from '../../../key-prefix.js';
 
 type ListOpts = { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter };
-type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter };
+type CountOpts = { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] };
 
 /** Annotation reader — the archived history keeps who/what changed a value (value._actor / _event). */
 function annotation(value: unknown, field: '_actor' | '_event'): string | null {
@@ -494,6 +495,7 @@ export const memoryMethods = {
     if (ownerGaiis.length === 0) return 0;
     let q = this.db.selectFrom('Memory').select(sql<number>`count(distinct "key")`.as('n')).where('ownerGaii', 'in', ownerGaiis);
     if (opts?.prefix) q = q.where('key', 'like', likePrefix(opts.prefix));
+    for (const p of opts?.excludePrefixes ?? []) q = q.where('key', 'not like', likePrefix(p));
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     q = applyArchive(q, opts?.archived);
     const r = await q.executeTakeFirst();

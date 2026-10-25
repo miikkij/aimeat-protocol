@@ -12,6 +12,8 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · RefundOutcome · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   2026-10-25 — CheckoutSessionRecord: refundedTrackingCodes and collectAttempt; collect takes
+ *     `attempt` (secaudit2026oct22).
  *   2026-10-16 — PaymentHandler.refund answers a RefundOutcome (refunded, not_possible, failed,
  *     nothing_captured) instead of nothing, so the buyer's message can say what the rail did (QA audit F5-01).
  *   2026-10-16 — CheckoutSessionRecord: status `completing` and collectedTrackingCode (QA audit S8-04);
@@ -192,6 +194,13 @@ export interface CheckoutSessionRecord {
   status: 'open' | 'completing' | 'completed' | 'cancelled' | 'expired';
   /** The collected payment's tracking code, written before fulfilment while the session is `completing`. */
   collectedTrackingCode?: string;
+  /**
+   * Tracking codes of payments refunded after a failed fulfilment of this checkout. A collect that
+   * answers one of them again (a card page read back, an idempotent replay) is not taken as payment.
+   */
+  refundedTrackingCodes?: string[];
+  /** How many collects of this checkout were refunded; a money rail keys a new charge on it. */
+  collectAttempt?: number;
   /** Buyer: bare owner name + owner GHII (the balance holder) + the acting principal for attribution. */
   buyerOwner: string;
   buyerGhii: string;
@@ -298,6 +307,11 @@ export interface PaymentHandler {
     instrument?: unknown;
     /** The session's seller — money handlers charge on the SELLER's own PSP credentials (psp). */
     seller?: { ghii: string; owner: string; psp?: unknown };
+    /**
+     * Set from 1 once an earlier collect of this checkout was refunded: a rail whose charge is keyed
+     * for idempotency puts it into the key, so the retry is a new charge, not the refunded one.
+     */
+    attempt?: number;
     /**
      * What the buyer is paying FOR, as the URL they were quoted at. Optional and additive: a
      * checkout session is the usual answer and the handler derives it from `reference`, so nothing

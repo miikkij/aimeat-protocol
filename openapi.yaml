@@ -19428,7 +19428,7 @@ paths:
                   type: integer
                 app_id:
                   type: string
-                  description: App/source attribution — enables the per-app allowlist + quota.
+                  description: App/source attribution — enables the per-app allowlist + quota. For an app grant the call is checked and recorded under the app the grant names, whatever this field says.
                 images:
                   type: array
                   description: >
@@ -20351,7 +20351,7 @@ paths:
                   description: Picture size, op image only.
                 app_id:
                   type: string
-                  description: App attribution — enables the per-app allowlist and the per-app quota.
+                  description: App attribution — enables the per-app allowlist and the per-app quota. For an app grant the job is checked and recorded under the app the grant names, whatever this field says.
                 on_done:
                   type: object
                   required: [extension, action]
@@ -31009,7 +31009,10 @@ paths:
         capability with the buyer's persisted input (result on session.fulfillment.results),
         unbound app-tools queue an agent TASK for the manifest agent or the app owner
         (session.fulfillment.taskIds) — writes the seller's order copy, and closes the session.
-        A fulfillment failure after a successful charge refunds and leaves the session open.
+        A fulfillment failure after a successful charge refunds and leaves the session open. A
+        retry whose payment is the one that was refunded (the same card page, or the same charge
+        answered again) is refused with 402 PAYMENT_REFUNDED; paying again completes it, and a card
+        retry after a refunded attempt is sent to Stripe as a new charge.
         One completion claims the session before anything is charged (status `completing`); a second
         completion of the same session while the first runs, or after it, answers 409 SESSION_NOT_OPEN
         and charges nothing. A refusal before the money stays moved puts the session back to `open`.
@@ -76528,7 +76531,7 @@ paths:
       operationId: stripeWebhookForSeller
       tags: [Finance]
       summary: Per-seller Stripe webhook → accounting vouchers
-      description: 'Verifies the Stripe v1 signature against the seller''s endpoint secret (set via PUT /v1/commerce/payout/stripe webhook_secret — every seller runs their own Stripe account). Books payment_intent.succeeded as an income voucher, or marks the matching invoice paid when metadata.aimeat_reference matches; charge.refunded as an expense voucher; payout.paid as a transfer voucher. Idempotent by event id. Unknown owners and unconfigured endpoints answer 404 identically.'
+      description: 'Verifies the Stripe v1 signature against the seller''s endpoint secret (set via PUT /v1/commerce/payout/stripe webhook_secret — every seller runs their own Stripe account). Books payment_intent.succeeded as an income voucher, or marks the matching invoice paid when metadata.aimeat_reference matches; charge.refunded as an expense voucher; payout.paid as a transfer voucher. checkout.session.completed for the node''s hosted card page finishes the AIMEAT checkout it was for; any other checkout.session.completed, or checkout.session.async_payment_succeeded, becomes an AI shopping agent''s order when a line names a product of the seller''s feed and Stripe reads the session as paid (an unpaid one answers action agent_order_not_yet_paid and takes no order). Idempotent by event id. Unknown owners and unconfigured endpoints answer 404 identically.'
       parameters: [{ name: owner, in: path, required: true, schema: { type: string } }]
       requestBody:
         required: true
@@ -78361,7 +78364,9 @@ paths:
       summary: One prompt package with the node's own values filled in
       description: >-
         The stored prompt for this id with the node URL, the owner name and the descriptions of the
-        active cortex extensions substituted in, so the text is ready to paste. The owner name comes
+        active cortex extensions the caller may see substituted in, so the text is ready to paste:
+        public and node-installed ones for everyone, plus the signed-in owner's own and, for the
+        operator, all of them; `cortex_extensions_available` counts the same set. The owner name comes
         from the caller's token when there is one, else from `?owner=`, else the word `user`. An
         inactive or unknown prompt answers 404. Public.
       tags: [Discovery]

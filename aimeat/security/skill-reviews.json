@@ -11,7 +11,7 @@
       "digest": "sha256:3191bf463992cd653fff6945"
     },
     "node:aimeat-decide": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/static/sdk-libs/decide/index.js",
         "aimeat/src/services/decide/service.ts",
@@ -19,7 +19,7 @@
         "aimeat/src/services/decide/settings.ts",
         "aimeat/src/services/app-decide-posture.ts"
       ],
-      "digest": "sha256:f369a092a477b0c6999f6f2a"
+      "digest": "sha256:c7dd45a5dd50c357ef0a96fa"
     },
     "node:aimeat-refinery": {
       "reviewedOn": "2026-10-18",
@@ -109,11 +109,11 @@
       "note": "The choices format is parsed and drawn by this file (moved from views/chat/parts.js on 2026-09-23)."
     },
     "node:aimeat-paying-for-the-ai": {
-      "reviewedOn": "2026-10-08",
+      "reviewedOn": "2026-10-25",
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:c21039590693b69a201dfc6a"
+      "digest": "sha256:f37f208c752748e60698c69d"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-10-16",
@@ -541,7 +541,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "f6c2d7e866accea2"
+      "aimeat/src/services/ai/completion.ts": "d8b51f691e0f9597"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
@@ -704,7 +704,7 @@
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
-      "aimeat/src/services/decide/service.ts": "fab650ae28f545a5",
+      "aimeat/src/services/decide/service.ts": "cfd5fda3153525d1",
       "aimeat/src/services/decide/limits.ts": "65c3e881405e3685",
       "aimeat/src/services/decide/settings.ts": "bb5b771bd7739ac0",
       "aimeat/src/services/app-decide-posture.ts": "65d4966f4b6ff7a8"

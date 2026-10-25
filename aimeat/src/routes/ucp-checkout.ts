@@ -22,6 +22,9 @@
  * @structure ucpCheckoutRouter
  * @usage router.use(ucpCheckoutRouter(config, storage)); // from commerceUcpRouter
  * @version-history
+ *   v1.0.2 — 2026-10-25 — PUT, complete and cancel answer 404 for a checkout that is absent or another
+ *     platform's before an Idempotency-Key is claimed, so they write nothing under the seller
+ *     (guestCheckoutExists; secaudit2026oct22).
  *   v1.0.1 — 2026-10-18 — The Idempotency-Key is claimed with a pending record written on the
  *     record's version before the request runs, so two requests with one key at the same moment run
  *     once; the other is 409 idempotency_conflict (wish-rahapolkujen-kilpatilanteet).
@@ -36,7 +39,7 @@ import { logger } from '../utils/logger.js';
 import {
   UCP_VERSION, UcpError, createGuestCheckout, readGuestCheckout, updateGuestCheckout, cancelGuestCheckout,
   completeGuestCheckout, sellerPaymentHandlers, toUcpCheckout, toUcpOrder, readUcpOrder, sellerOfSessionId, sellerOfLines,
-  type UcpGuestSession,
+  guestCheckoutExists, type UcpGuestSession,
 } from '../commerce/ucp-guest-checkout.js';
 import { parseUcpAgent, platformProfile } from '../services/ucp/platform-profile.js';
 import { verifyMessage } from '../services/ucp/http-signatures.js';
@@ -171,10 +174,22 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     } catch (e) { fail(res, e); }
   });
 
+  /**
+   * The same 404 the service answers for a checkout that is absent or another platform's, given
+   * before replay() claims an Idempotency-Key, so such a request writes nothing under the seller
+   * (secaudit2026oct22). True when the request was answered.
+   */
+  async function refusedAsAbsent(res: Response, id: string, profileUrl: string): Promise<boolean> {
+    if (await guestCheckoutExists(storage, config, id, profileUrl)) return false;
+    protocolError(res, 404, 'not_found', 'No such checkout.');
+    return true;
+  }
+
   router.put('/ucp/2026-08-25/checkout-sessions/:id', limit, async (req, res) => {
     const profileUrl = await platformOf(req, res, false);
     if (!profileUrl) return;
     const id = String(req.params.id);
+    if (await refusedAsAbsent(res, id, profileUrl)) return;
     const r = await replay(req, res, sellerOfSessionId(id, config), profileUrl);
     if (r.done) return;
     try {
@@ -187,6 +202,7 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     const profileUrl = await platformOf(req, res, false);
     if (!profileUrl) return;
     const id = String(req.params.id);
+    if (await refusedAsAbsent(res, id, profileUrl)) return;
     const r = await replay(req, res, sellerOfSessionId(id, config), profileUrl);
     if (r.done) return;
     try {
@@ -198,6 +214,7 @@ export function ucpCheckoutRouter(config: AimeatConfig, storage: Storage): Route
     const profileUrl = await platformOf(req, res, false);
     if (!profileUrl) return;
     const id = String(req.params.id);
+    if (await refusedAsAbsent(res, id, profileUrl)) return;
     const r = await replay(req, res, sellerOfSessionId(id, config), profileUrl);
     if (r.done) return;
     try {

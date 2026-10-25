@@ -131,6 +131,29 @@ describe('an old-layout install on first start', () => {
         expect(after).toEqual([]);
     });
 
+    it('a NEW identity of another owner gets the old file\'s node_url and never its runner or wake (secaudit2026oct22)', async () => {
+        oldLayoutHome(['alice'], { wake: { command: 'wake-alice.sh' } });
+        const { loadPerAgentConfig } = await loadModule();
+        const bob = loadPerAgentConfig('concierge', 'bob');
+        expect(bob?.node_url).toBe('http://old.example:1');
+        expect(bob?.runner).toBeUndefined();
+        expect(bob?.wake).toBeUndefined();
+        const written = yamlParse(readFileSync(newPath('concierge', 'bob'), 'utf-8')) as Record<string, unknown>;
+        expect(written.runner).toBeUndefined();
+        expect(written.wake).toBeUndefined();
+        // Alice's own file still migrates whole.
+        expect(loadPerAgentConfig('concierge', 'alice')?.runner?.command).toBe('echo');
+    });
+
+    it('an old file that names no owner keeps its runner only when no other owner holds that agent', async () => {
+        oldLayoutHome(['alice'], { owner: undefined });
+        const { loadPerAgentConfig } = await loadModule();
+        // Alice holds a token for `concierge`, so bob's new identity gets no runner from it.
+        expect(loadPerAgentConfig('concierge', 'bob')?.runner).toBeUndefined();
+        // Alice herself, the only owner holding it, gets it as before.
+        expect(loadPerAgentConfig('concierge', 'alice')?.runner?.command).toBe('echo');
+    });
+
     it('a half-finished migration completes on the next read rather than losing anything', async () => {
         oldLayoutHome(['alice']);
         // The interrupted state: the new directory exists, the file does not.

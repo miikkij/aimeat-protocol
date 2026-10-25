@@ -20,6 +20,10 @@
  * @structure STRIPE_HANDLER_ID · stripeIdempotencyKey · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   2026-10-25 — collect puts `attempt` into the charge's Idempotency-Key, so a retry after a refunded
+ *     attempt is a new charge (secaudit2026oct22).
+ *   2026-10-25 — A test-mode payment (livemode false) records no adult check (isStripeTestMode;
+ *     secaudit2026oct22).
  *   2026-10-18 — collect reads the paying card's funding type (expand latest_charge), and a credit card
  *     records the buyer as a verified adult (recordCreditCardAdult; Comicland v3 A-4). stripeApi and
  *     sellerKey are exported for the hosted Checkout handler (commerce/stripe-checkout.ts).
@@ -147,12 +151,28 @@ export function cardFundingOf(intent: Record<string, unknown> | null | undefined
 }
 
 /**
+ * Whether Stripe says a payment was made in test mode: the intent, its expanded latest_charge or the
+ * Checkout Session carries `livemode: false`. Only an explicit false counts, so an answer that leaves
+ * the field out is read as live (secaudit2026oct22).
+ */
+export function isStripeTestMode(...objects: Array<Record<string, unknown> | null | undefined>): boolean {
+  for (const o of objects) {
+    if (!o || typeof o !== 'object') continue;
+    if (o.livemode === false) return true;
+    const charge = o.latest_charge;
+    if (charge && typeof charge === 'object' && (charge as Record<string, unknown>).livemode === false) return true;
+  }
+  return false;
+}
+
+/**
  * A CREDIT card payment shows the buyer is an adult (Jouni's ruling, Comicland v3 A-4); a debit or a
- * prepaid card does not, because a minor can hold one. Never fails the payment it follows: the money
+ * prepaid card does not, because a minor can hold one. A test-mode payment does not either: no real
+ * card and no card holder took part (secaudit2026oct22). Never fails the payment it follows: the money
  * has moved, and a bookkeeping failure is logged.
  */
-export async function recordCreditCardAdult(storage: Storage, buyerGhii: string, funding: string | null): Promise<void> {
-  if (funding !== 'credit') return;
+export async function recordCreditCardAdult(storage: Storage, buyerGhii: string, funding: string | null, testMode = false): Promise<void> {
+  if (funding !== 'credit' || testMode) return;
   try {
     await recordAdult(storage, ownerGhiiOf(buyerGhii), 'credit-card');
   } catch (err) {
@@ -176,7 +196,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
     title: 'Card payment on the seller\'s own Stripe account',
     currencies: [...MONEY_CURRENCIES],
 
-    async collect(ctx, { buyerGhii, amount, currency, reference, instrument, seller, saveForLater }) {
+    async collect(ctx, { buyerGhii, amount, currency, reference, instrument, seller, saveForLater, attempt }) {
       if (typeof instrument !== 'string' || !instrument) {
         throw new PaymentError(
           'PAYMENT_INSTRUMENT_REQUIRED', 402,
@@ -192,7 +212,9 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       // Automatic renewal: the card is kept at Stripe for charges without the buyer present, on the
       // seller's own account. Stripe needs a customer to attach it to, and setup_future_usage tells the
       // bank at this first charge, with the buyer present, that later ones will come.
-      const chargeKey = stripeIdempotencyKey('checkout', reference, instrument);
+      // A retry after a refunded attempt is a new charge: Stripe answers a repeated key with the first
+      // (refunded) intent. A retry after a timeout keeps the key and gets the first charge's result.
+      const chargeKey = stripeIdempotencyKey('checkout', attempt ? `${reference}-r${attempt}` : reference, instrument);
       const customer = saveForLater
         ? String((await stripeApi(key, 'POST', 'customers', { description: `AIMEAT buyer, checkout ${reference}` }, undefined, `${chargeKey}-customer`)).id)
         : null;
@@ -220,7 +242,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }
-      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent));
+      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent), isStripeTestMode(intent));
       return { trackingCode: String(intent.id), ...(customer ? { saved: { customer, payment_method: instrument } } : {}) };
     },
 

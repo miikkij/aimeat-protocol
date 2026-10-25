@@ -14,6 +14,7 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-10-25 — countMemory takes excludePrefixes, keys left out of the count (secaudit2026oct22).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one read (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01). A prefix in every filter
  *     is a literal, case-sensitive string on both backends (QA audit D4-07).
@@ -208,7 +209,7 @@ export interface MemoryRepository {
    * (no values loaded/transferred), mirroring listOwnerScopeMemory's key-dedup. For stat displays
    * (e.g. "N Muistit") that need only the number, not the records.
    */
-  countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): Promise<number>;
+  countMemory(ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] }): Promise<number>;
   /**
    * Count the active memory records, across every owner, that carry a CORS list of their own
    * (allowedOrigins set and non-empty). One number for the operator's CORS page; nothing is loaded.

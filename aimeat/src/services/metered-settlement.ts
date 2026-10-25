@@ -25,6 +25,8 @@
  *   contract from opposite ends: the door calls one of them, never both.
  * @structure settleMeteredCharge · resolvePacingToll · chargePacing · SettlementResult · BeneficiaryAccrual
  * @version-history
+ *   v1.2.4 — 2026-10-25 — A pacing reversal credits the payer only the shares it took back, plus the
+ *     burned part; a share the provider or operator no longer holds is not credited (secaudit2026oct22).
  *   v1.2.3 — 2026-10-12 — The payer's rows name an initiator only when someone other than the payer
  *     made the call; a person's own use was counted on their wallet as "your agent did".
  *   v1.2.2 — 2026-10-11 — The provider's `pacing_earn` row names no initiator: the caller is another
@@ -173,12 +175,22 @@ export async function chargePacing(args: {
     reverse: async () => {
       if (reversed) return;
       reversed = true;
+      // The payer gets back what was taken back plus the burned part. A share the provider or the
+      // operator no longer holds stays with them, and the payer is not credited it: crediting the
+      // full amount regardless added morsels on every such reversal (secaudit2026oct22).
+      let refunded = 0;
+      let unrecovered = 0;
       await storage.transaction(async () => {
-        if (providerEarned > 0) await storage.debitBalance(providerGhii!, providerEarned);
-        if (fee > 0) await storage.debitBalance(operatorGhii!, fee);
-        await storage.creditBalance(from, amount);
-        await storage.addTransaction({ id: `pacing-refund-${randomUUID()}`, gaii: payerGhii, type: 'pacing_refund', amount, counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: initiator, timestamp: new Date().toISOString() });
+        if (providerEarned > 0 && !await storage.debitBalance(providerGhii!, providerEarned)) unrecovered += providerEarned;
+        if (fee > 0 && !await storage.debitBalance(operatorGhii!, fee)) unrecovered += fee;
+        refunded = amount - unrecovered;
+        if (refunded <= 0) return;
+        await storage.creditBalance(from, refunded);
+        await storage.addTransaction({ id: `pacing-refund-${randomUUID()}`, gaii: payerGhii, type: 'pacing_refund', amount: refunded, counterpartyGaii: providerGhii ?? undefined, trackingCode, initiatorGaii: initiator, timestamp: new Date().toISOString() });
       });
+      if (unrecovered > 0) {
+        logger.warn(`[metered-settlement] a pacing reversal refunded ${refunded} of ${amount} morsels: ${unrecovered} were no longer held by the provider or the operator`, { label, trackingCode });
+      }
       logger.warn(`[metered-settlement] reversed a ${amount}-morsel pacing charge (the use failed after the charge)`, { label });
     },
   };

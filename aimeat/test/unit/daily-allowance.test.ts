@@ -52,6 +52,16 @@ describe('the day\'s grant', () => {
     expect(rows[0]).toMatchObject({ amount: 50, trackingCode: allowanceDayCode() });
   });
 
+  it('is once a day when requests arrive at the same moment (secaudit2026oct22)', async () => {
+    const ghii = await person('eve', 0);
+    const outs = await Promise.all([1, 2, 3, 4].map(() => grantDailyAllowance(storage, config, ghii)));
+    expect(outs.filter(o => o.credited > 0)).toHaveLength(1);
+    expect(outs.filter(o => o.already)).toHaveLength(3);
+    expect(await balance('eve')).toBe(50);
+    const rows = (await storage.getTransactions(ghii, 10)).filter(t => t.type === 'allowance');
+    expect(rows).toHaveLength(1);
+  });
+
   it('stops at the cap', async () => {
     const ghii = await person('ben', 480);
     expect(await grantDailyAllowance(storage, config, ghii)).toEqual({ credited: 20, already: false });
