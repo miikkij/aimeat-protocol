@@ -6,6 +6,8 @@
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
  * @version-history
+ *   v1.2.2 — 2026-10-25 — A non-operator owner is refused POST /v1/admin/capabilities/aggregate with
+ *     403, so check:denial-coverage holds the route's operator check.
  *   v1.2.1 — 2026-10-23 — The operators from POST /v1/admin/setup/register get a password and sign in
  *     with it; POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-18 —An agent that lost capability:write is refused DELETE of its own capability with 403
@@ -969,6 +971,14 @@ await test('Non-operator B DOES still see the operator PUBLIC capability', async
     assert(status === 200, `list status ${status}`);
     const ids = (body.data?.capabilities ?? []).map((c: any) => c.id);
     assert(ids.includes(opPubCap), 'B must still see public caps (not over-restricted)');
+});
+
+await test('Non-operator B is refused the operator aggregation run', async () => {
+    const { status, body } = await json('/v1/admin/capabilities/aggregate', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${nonOpToken}` },
+    });
+    assert(status === 403, `aggregate by a non-operator expected 403, got ${status} ${JSON.stringify(body).slice(0, 200)}`);
 });
 
 await test('Cleanup B + operator caps', async () => {
