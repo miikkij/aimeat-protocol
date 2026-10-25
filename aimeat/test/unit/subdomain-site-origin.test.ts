@@ -48,6 +48,18 @@ describe('autoLabelCandidates', () => {
         expect(c).toHaveLength(52);
         expect(autoLabelCandidates('alice', 'x.html')[0]).toBe('app-x');
     });
+    it('trims leading and trailing dashes as before', () => {
+        expect(autoLabelCandidates('alice', '--Notes--.html').slice(0, 2)).toEqual(['notes', 'alice-notes']);
+        expect(autoLabelCandidates('-', '!!!.html').slice(0, 2)).toEqual(['app', 'app']);
+        expect(autoLabelCandidates('alice', 'a - b.html')[0]).toBe('a---b');
+    });
+    it('a filename made of a long run of dashes is answered in linear time (CodeQL js/polynomial-redos)', () => {
+        const filename = `a${'-'.repeat(40_000)}a.html`;
+        const started = performance.now();
+        const c = autoLabelCandidates('alice', filename);
+        expect(performance.now() - started).toBeLessThan(200);
+        expect(c[0]).toBe(`a${'-'.repeat(49)}`);
+    });
 });
 
 describe('classifySiteOrigin', () => {

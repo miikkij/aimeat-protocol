@@ -104,7 +104,7 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 463 npm packages that travel inside the `aimeat` package. Build and test
+The 462 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
@@ -570,7 +570,6 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [yargs](https://yargs.js.org/) | 15.4.1 | MIT |
 | [yauzl](https://github.com/thejoshwolfe/yauzl) | 3.4.0 | MIT |
 | [zip-stream](https://github.com/archiverjs/node-zip-stream) | 7.0.5 | MIT |
-| [zod](https://zod.dev) | 4.1.11 | MIT |
 | [zod](https://zod.dev) | 4.6.7 | MIT |
 
 ## Licence texts
@@ -12292,7 +12291,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### zod 4.1.11, zod 4.6.7
+### zod 4.6.7
 
 ```text
 MIT License

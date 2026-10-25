@@ -18,6 +18,7 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22): publisher labels leave the apex namespace.
  *     autoLabelCandidates moved unchanged out of routes/subdomains.ts ensureAppSubdomain.
+ *   v1.0.1 — 2026-10-25 — autoLabelCandidates trims dashes in linear time (CodeQL alerts 1763, 1764).
  */
 import type { AimeatConfig } from '../config.js';
 import type { SubdomainSiteRecord, SubdomainSiteOrigin } from '../storage/interface.js';
@@ -30,9 +31,21 @@ import { isNodeApexLabel } from './subdomain-node-labels.js';
  * says whether an older row's label could have come from it.
  */
 export function autoLabelCandidates(ownerBare: string, filename: string): string[] {
-  let base = filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+  let base = trimDashes(filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-')).slice(0, 50);
   if (base.length < 2) base = `app-${base}`.replace(/-+$/g, '').slice(0, 50);
-  return [base, `${ownerBare}-${base}`.replace(/^-+|-+$/g, '').slice(0, 63), ...Array.from({ length: 50 }, (_, i) => `${base}-${i + 2}`)];
+  return [base, trimDashes(`${ownerBare}-${base}`).slice(0, 63), ...Array.from({ length: 50 }, (_, i) => `${base}-${i + 2}`)];
+}
+
+/**
+ * Leading and trailing dashes removed, in one pass. The regex `/^-+|-+$/g` did the same in quadratic
+ * time on a long run of dashes inside a publisher-chosen filename (CodeQL js/polynomial-redos).
+ */
+function trimDashes(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s.charCodeAt(start) === 45) start++;
+  while (end > start && s.charCodeAt(end - 1) === 45) end--;
+  return s.slice(start, end);
 }
 
 /**
