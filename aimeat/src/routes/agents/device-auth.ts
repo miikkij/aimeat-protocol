@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-25 — A request that names an existing agent may carry `proof` (a signature by the agent's
+ *     current key; services/device-return-proof.ts): a verified one marks the request a proven return
+ *     (answered as return_proof, and as return_proven on GET /v1/agents/verify/info). POST
+ *     /v1/agents/verify approves an unproven one as a takeover, which records an account event, and
+ *     takes `end_other_sessions` to sign the agent's other sessions out (secaudit2026oct22,
+ *     unbound-reapproval-of-existing-agent).
  *   2026-10-25 — The email form of device-authorize is counted per network address
  *     (auth.device_authorize_email_max in 10 minutes, default 20; auth.device_authorize_email_limit
  *     turns it off), answered 429 RATE_LIMITED with the setting and the account-name form named; and
@@ -120,6 +126,7 @@ import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
 import { uncoveredScopes, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
+import { proofVerifies, markReturnProven, returnProven } from '../../services/device-return-proof.js';
 
 /**
  * Same-owner auto-approval eligibility: the request must be authenticated (never anonymous)
@@ -303,6 +310,11 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const targetGaii = buildGAII(agent_name, ownerName, config.nodeId);
     const existingTarget = await storage.getAgent(targetGaii);
     const targetScopes: string[] = existingTarget?.defaultScopes ?? [];
+    // An existing agent coming back proves it with a signature by its current key; the owner then
+    // sees a return, and otherwise a new device taking the agent over (services/device-return-proof.ts).
+    const returnProof = existingTarget && req.body?.proof !== undefined
+      ? await proofVerifies(existingTarget.publicKey, String(owner), agent_name, req.body.proof) : undefined;
+    if (returnProof) await markReturnProven(storage, `${ownerName}@${config.nodeId}`, userCode, targetGaii);
     const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
       // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'
@@ -376,6 +388,8 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       interval: 5,
       status: autoApproved ? 'approved' : 'pending',
       auto_approved: autoApproved,
+      // An existing agent's request: whether its proof of coming back verified (absent: none was sent).
+      ...(returnProof !== undefined ? { return_proof: returnProof ? 'verified' : 'not_verified' } : {}),
       user_instructions: autoApproved
         ? `Auto-approved (same-owner registration). Fetch your credentials now: POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } — the first poll returns your token.`
         : `Tell your owner to approve this request. They can find it in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.${autoApproveNote ? ` NOTE: ${autoApproveNote}` : ''}`,
@@ -552,6 +566,8 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       ...(isTheOwner ? { owner: request.ownerName } : {}),
       status: request.status,
       existing_agent: !!existing,
+      // An existing agent: proved it is coming back (a signature by its current key), or a new device is taking it over.
+      ...(existing ? { return_proven: await returnProven(storage, `${request.ownerName}@${config.nodeId}`, request.userCode, existing.gaii) } : {}),
       expires_in: Math.ceil(remainingMs / 1000),
     }));
   });
@@ -631,10 +647,17 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
+    // An existing agent's request that did not prove it is the agent coming back is a new device
+    // taking the agent over: the approval records an account event, and the owner may sign the
+    // agent's other sessions out with it (`end_other_sessions`; services/device-return-proof.ts).
+    const existingAgent = await storage.getAgent(buildGAII(request.agentName, request.ownerName, config.nodeId));
+    const takeover = !!existingAgent
+      && !(await returnProven(storage, `${request.ownerName}@${config.nodeId}`, request.userCode, existingAgent.gaii));
     const result = await approveDeviceAuth(
       config, storage, request, ownerPayload.owner, finalScopes,
       req.headers['user-agent'] as string | undefined,
-      Array.isArray(scopes),
+      Array.isArray(scopes), undefined,
+      { takeover, endOtherSessions: req.body?.end_other_sessions === true },
     );
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
@@ -646,6 +669,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       gaii: result.gaii,
       agent_name: request.agentName,
       existing_agent: result.existing,
+      ...(result.existing ? { takeover, other_sessions_ended: result.otherSessionsEnded } : {}),
     }));
   });
 }

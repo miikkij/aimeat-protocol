@@ -9,6 +9,9 @@
  *   NOTE: this file must be linked in spa.html after views/profile.css and before
  *   views/profile-poster.css, whose .pf .card still decides the card's padding and bottom margin.
  * @version-history
+ *   v1.1.0 — 2026-10-25 — .agent-consent-takeover and .agent-consent-endothers: the warning that a new
+ *     device is taking over an existing agent, and the offer to sign its other sessions out
+ *     (secaudit2026oct22).
  *   v1.0.0 — 2026-09-27 — Moved unchanged under the component's own names: from views/profile.css
  *     (.pf .agent-cta and its p, .pf .flex-row, .pf .text-caption, .pf .mb-1, .pf .mb-half, .pf .p-1,
  *     .pf .mt-1, .pf .pf-device-code, .agc-preset-desc, .agc-boundary), views/profile-poster.css (the
@@ -41,6 +44,14 @@
 .pf .agent-consent-card { margin-top: 1rem; }
 /* .pf-device-code: the code the agent showed. */
 .pf .agent-consent-code { font-size: 2rem; font-weight: 700; font-family: var(--font-mono); letter-spacing: .15em; }
+
+/* A new device taking over an existing agent: said plainly, in the warning colours, in both places. */
+.agent-consent-takeover {
+  margin: .5rem 0; padding: .6rem .75rem; line-height: 1.45; font-size: .9rem;
+  background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); border-radius: var(--radius-sm, 4px);
+}
+.agent-consent-endothers { display: flex; gap: .5rem; align-items: flex-start; margin-top: .75rem; font-size: .9rem; line-height: 1.4; }
+.agent-consent-endothers input { margin-top: .2rem; flex: none; }
 
 /* Both places (formerly unscoped in views/profile.css). */
 .agent-consent-preset-desc { margin: 0.35rem 0 0; line-height: 1.45; }

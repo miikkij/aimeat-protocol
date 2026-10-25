@@ -17,10 +17,14 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-reapproval
  * @version-history
+ *   v1.1.0 — 2026-10-25 — Phase 5: a return proved by the agent's key, and a new device taking the
+ *     agent over (secaudit2026oct22, unbound-reapproval-of-existing-agent).
  *   v1.0.0 — 2026-08-08 — Initial, with the fix.
  */
 
 import { registerOwner } from './helpers/owner-login.js';
+import { sign, generateKeyPair } from '../src/auth/keypair.js';
+import { returnProofMessage } from '../src/services/device-return-proof.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const owner = `rap${Date.now() % 100000}`;
@@ -298,6 +302,84 @@ await test('POSITIVE CONTROL: the real owner still approves the same pending req
     // everyone, which would make the whole device flow dead rather than safe.
     const r = await approve(pendingUserCode, ['memory:read']);
     assert(r.status === 200 && r.body.ok === true, `owner approve ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+// ── A return proved by the agent's key, and a new device taking the agent over ──
+//
+// device-authorize needs no credential, so a request naming an existing agent may come from anyone.
+// The agent coming back holds the key its last approval gave it and signs the request with it; a
+// request without that proof is shown to the owner as a new device taking the agent over, the
+// approval records an account event, and the owner may sign the agent's other sessions out
+// (secaudit2026oct22, unbound-reapproval-of-existing-agent). Nothing is refused either way.
+console.log('\nPhase 5: proven return and unproven takeover');
+
+/** The credential the last approval staged, as the device-token poll hands it out. */
+async function pollCredential(): Promise<{ token: string; privateKey: string }> {
+    const r = await json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: lastDeviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(r.status === 200, `device-token ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    return { token: (r.body.access_token ?? r.body.token) as string, privateKey: r.body.privateKey as string };
+}
+async function authorizeWithProof(privateKey: string): Promise<{ code: string; proof: string }> {
+    const signedAt = new Date().toISOString();
+    const signature = await sign(privateKey, returnProofMessage(owner, AGENT, signedAt));
+    const r = await json('/v1/agents/device-authorize', {
+        method: 'POST', body: JSON.stringify({ agent_name: AGENT, owner, proof: { signed_at: signedAt, signature } }),
+    });
+    assert(r.status === 200, `authorize ${r.status}: ${JSON.stringify(r.body.error)}`);
+    lastDeviceCode = r.body.data.device_code as string;
+    return { code: r.body.data.user_code as string, proof: r.body.data.return_proof as string };
+}
+const pendingRow = async (code: string) =>
+    ((await json('/v1/agents/device-authorize/pending', auth(ownerToken))).body.data.requests as any[]).find(r => r.user_code === code);
+const works = async (token: string) => (await json('/v1/memory?limit=1', auth(token))).status;
+let current = { token: '', privateKey: '' };
+
+await test('setup: the agent holds a token and the key of its last approval', async () => {
+    const r = await approve(await authorize());
+    assert(r.status === 200, `approve ${r.status}`);
+    current = await pollCredential();
+    assert(!!current.privateKey && (await works(current.token)) === 200, 'the agent works with its token');
+});
+
+await test('a request without proof is a takeover: the card is told, and the approval records it and may sign the agent out elsewhere', async () => {
+    const code = await authorize();
+    const row = await pendingRow(code);
+    assert(row?.existing_agent === true && row.return_proven === false, `pending row: ${JSON.stringify(row)}`);
+    assert((await json(`/v1/agents/verify/info/${code}`)).body.data.return_proven === false, 'the consent page is told too');
+    const r = await json('/v1/agents/verify', {
+        method: 'POST', body: JSON.stringify({ user_code: code, action: 'approve', owner_token: ownerToken, end_other_sessions: true }),
+    });
+    assert(r.status === 200 && r.body.data.takeover === true && r.body.data.other_sessions_ended === true, `approve: ${JSON.stringify(r.body.data)}`);
+    assert((await works(current.token)) === 401, 'the earlier token is signed out');
+    const next = await pollCredential();
+    assert((await works(next.token)) === 200, 'the new device works');
+    const events = (await json('/v1/account/events?limit=20', auth(ownerToken))).body.data.events as any[];
+    assert(events.some(e => e.kind === 'agent_device_takeover' && e.data?.name === AGENT), `the account event: ${JSON.stringify(events.map(e => e.kind))}`);
+    current = next;
+});
+
+await test('designed use: a return proved by the agent\'s key keeps "keep its access", records nothing, and signs nothing out', async () => {
+    const { code, proof } = await authorizeWithProof(current.privateKey);
+    assert(proof === 'verified', `return_proof: ${proof}`);
+    assert((await pendingRow(code))?.return_proven === true, 'the card sees a proven return');
+    const before = (await json('/v1/account/events?limit=50', auth(ownerToken))).body.data.events.filter((e: any) => e.kind === 'agent_device_takeover').length;
+    const r = await approve(code);
+    assert(r.status === 200 && r.body.data.takeover === false && r.body.data.other_sessions_ended === false, `approve: ${JSON.stringify(r.body.data)}`);
+    assert((await works(current.token)) === 200, 'the earlier token still works');
+    const after = (await json('/v1/account/events?limit=50', auth(ownerToken))).body.data.events.filter((e: any) => e.kind === 'agent_device_takeover').length;
+    assert(after === before, 'no takeover event for a proven return');
+    current = await pollCredential();
+});
+
+await test('a proof signed by another key does not verify, and the request is a takeover', async () => {
+    const other = await generateKeyPair();
+    const { code, proof } = await authorizeWithProof(other.privateKey);
+    assert(proof === 'not_verified', `return_proof: ${proof}`);
+    assert((await pendingRow(code))?.return_proven === false, 'unproven');
+    await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: code, action: 'deny', owner_token: ownerToken }) });
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

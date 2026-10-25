@@ -7,7 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
- *   2026-10-06 — aimeat_ai_policy_set and aimeat_ai_routing_set ask ai:use as well, the word the read
+ *   2026-10-25 — aimeat_ai_routing_set names rules.freeModelLastResort (secaudit2026oct22 follow-up).
+ *   2026-10-06 —aimeat_ai_policy_set and aimeat_ai_routing_set ask ai:use as well, the word the read
  *     they make when given nothing asks (secaudit 2026-10 follow-up, A4).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
@@ -106,7 +107,9 @@ export const aiModelTools = [
       + 'bound to exactly that change; show it to the owner. With the token: applies it. routing: { defaults?: '
       + '{ "<capability>": ["<provider id>", ...] } (first is the default, the rest are fallbacks), rules?: { fallback, '
       + 'maxAttempts (1-5), onlyTested, extendToPool, fallbackOn: [timeout, rate_limit, server_error, unavailable, auth], '
-      + 'fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd }, agent?: "<agent name>" to set that agent\'s '
+      + 'fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd, freeModelLastResort (true, false, or null for '
+      + 'the node\'s default: whether a call on the node\'s key that named no model gets the free model when the allowance '
+      + 'cannot pay for the normal model) }, agent?: "<agent name>" to set that agent\'s '
       + 'own defaults instead (an agent\'s record has no rules). A named capability\'s list replaces the old one.',
     input: {
       routing: { type: 'object', description: '{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name }. Omit to read.' },

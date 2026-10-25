@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.23.0 — 2026-10-25 — AppManifest gains `publishedBy`, the principal that published the version
+ *     (secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing). Inside the manifest
+ *     JSON, so no column on either backend.
  *   v1.22.0 — 2026-10-25 — SubdomainSiteRecord gains `heldSince`: the label of a removed app is held.
  *     Postgres 0117, SQLite safeAddColumn (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.21.0 — 2026-10-25 — SubdomainSiteRecord gains `origin` (SubdomainSiteOrigin): who chose the
@@ -178,6 +181,13 @@ export interface AppManifest {
    * write of the spec and copied forward by every publish.
    */
   designSpec?: { at: string; by: string; version: number; revision: number; bytes: number };
+  /**
+   * Who published this version: the principal of the publish (a GHII, a GAII or an `eco:` app).
+   * Public provenance. Absent on versions published before 2026-10-25. The owner's own app asks the
+   * owner before a version another account published gets a permission the owner's grant lacks
+   * (services/own-app-consent.ts).
+   */
+  publishedBy?: string;
   name: string;
   description: string;
   // Per-locale descriptions (BCP-47-ish keys, e.g. 'en', 'fi'), extensible to more languages.

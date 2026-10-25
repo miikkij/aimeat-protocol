@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-25 — The kind `subscription-price`: a renewal at a raised plan price waits for the buyer
+ *     (commerce/subscription-price-ask.ts; secaudit2026oct22).
  *   2026-10-25 — A settled request's notices show the answer and lose their buttons (closeQuestion,
  *     by the notices' ref `publish-request:<id>`; the developer's review of the sandbox).
  *   2026-10-25 — A request may ask something other than making a thing public (`approval`): the
@@ -93,7 +95,9 @@ export type PublishKind =
   // Approvals that make nothing public (`approval` on the request; services/approval-standard.ts):
   // an extension's emailPolicy grant (the operators answer), a crew model choice with its own
   // address set by an app, and switching off the owner's secret host question.
-  | 'extension-email-policy' | 'crew-model' | 'account-setting';
+  | 'extension-email-policy' | 'crew-model' | 'account-setting'
+  // A subscription renewal whose plan price went up since the buyer agreed (commerce/subscription-price-ask.ts).
+  | 'subscription-price';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

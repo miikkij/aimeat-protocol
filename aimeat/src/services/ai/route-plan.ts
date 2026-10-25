@@ -31,6 +31,10 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.9.0 — 2026-10-25 — The free model on the node's key is the last resort only: a degraded candidate
+ *     waits behind every other candidate, and the account's rule freeModelLastResort (null: the node's
+ *     ai.free_model_last_resort) can switch it off, so the call is refused with 402 and the price
+ *     (secaudit2026oct22 follow-up; Jouni, 2026-10-25).
  *   v1.8.0 — 2026-10-25 — A node-key candidate is priced before it runs from the prompt's size and the
  *     answer's length, at most ai.node_key_max_output_tokens, and a call that costs more than is left
  *     for the account (less its calls in flight) is a spent allowance: the free model for a text call
@@ -325,6 +329,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     rejected.push({ provider: p.id, title: p.title, reason, message, ...extra });
   let allowance: NodeKeyAnswer | null = null;
   const deferred: Array<{ candidate: AiCandidate; message: string }> = [];
+  const lastResort: AiCandidate[] = [];
 
   for (const [p, by, sameModelRef] of list) {
     if (candidates.length >= wanted) break;
@@ -421,13 +426,19 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       if (!allowance.mayPay || tooCostly) {
         const free = config.modelFreeFallback;
         const freeAllowed = input.op === 'text' && !!free && freeModelAllowed(input.policy, free, p.type);
-        if (freeAllowed && !input.requested) {
+        // The free model is the last resort, and the account's rule (or the node's default) may
+        // switch it off (Jouni, 2026-10-25).
+        const lastResortOn = rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false);
+        if (freeAllowed && !input.requested && lastResortOn) {
           model = free; degradedToFree = true;
         } else if (!(freeAllowed && model === free)) {
           const spent = tooCostly ? tooCostlyMessage(est!, room) : allowance.message;
           const message = input.op === 'text' && free && !input.requested && !freeAllowed
             ? `${spent ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
-            : (spent ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.');
+            : input.op === 'text' && free && !input.requested && !lastResortOn
+              ? `${spent ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.'} `
+                + 'The free model as the last resort is off for you; you can turn it on in your AI routing rules (freeModelLastResort).'
+              : (spent ?? 'Your allowance on this node is used up. Add more, or set your own key in your AI settings.');
           reject(p, 'allowance-spent', message, { error: new AiCompletionError('QUOTA_EXHAUSTED', 402, message) });
           continue;
         }
@@ -484,6 +495,9 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     // A call that names the provider (the owner's own test among them) reaches it whatever its health:
     // the caller asked for that one, and a test is how a refused key is found fixed. Otherwise a
     // failing capability waits behind the working ones.
+    // The free model on the node's key waits behind every candidate that answers with the model the
+    // call would have had: it is the last resort (Jouni, 2026-10-25).
+    if (degradedToFree) { lastResort.push(candidate); continue; }
     const skip = by === 'call-provider' ? null : skipReason(hk);
     if (skip) { deferred.push({ candidate, message: `${p.title}'s ${capability} is skipped: ${skip}.` }); continue; }
     candidates.push(candidate);
@@ -494,6 +508,14 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
   // for. A provider with a refused key fails again and says so, which is the refusal the owner needs.
   if (candidates.length === 0 && deferred.length) candidates.push(...deferred.slice(0, wanted).map(d => d.candidate));
   else for (const d of deferred) reject(d.candidate.provider, 'failing', d.message);
+  for (const c of lastResort) {
+    if (candidates.length >= wanted) break;
+    if (candidates.length && !candidates[0].provider.leaves && c.provider.leaves && !rules.fallbackMayLeaveMachine) {
+      reject(c.provider, 'leaves-machine', `${c.provider.title} is outside this machine, and your rules keep a fallback from a local provider on it.`);
+      continue;
+    }
+    candidates.push(c);
+  }
   return { candidates, rejected, chosenBy: candidates[0]?.chosenBy ?? chosenBy, allowFallback, ownerListed };
 }
 
