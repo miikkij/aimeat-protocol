@@ -84,8 +84,10 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       // a memory namespace of its own, so the count bounds what one install can multiply (lead 750).
       const maxInstances = config.extensionMaxInstances ?? 0;
       if (maxInstances > 0 && (await storage.listExtensionInstances(name)).length >= maxInstances) {
+        // The sentence names the setting as the Config tab labels it; its path is in `details`.
         res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
-          `"${name}" already has ${maxInstances} copies, the most this server allows one extension (the operator setting extensions.max_instances). Remove a copy you no longer use, or ask the operator to raise the setting.`));
+          `"${name}" already has ${maxInstances} copies, the most this server allows. Remove one you no longer use, or ask the operator to raise "Copies per extension".`,
+          undefined, { setting: 'extensions.max_instances', limit: maxInstances }));
         return;
       }
 
