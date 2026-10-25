@@ -515,7 +515,12 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       if (!(await isOperatorCaller(storage, req.auth))) {
         for (const key of NODE_OWNED_CONFIG_KEYS) delete keptConfig[key];
       }
-      const updated = await storage.updateExtension(name, { actions: updatedActions, version, config: keptConfig });
+      // The script is new code, so the record names who wrote it, as writeExtensionRecord and the ZIP
+      // upload do on every code write: the unattended secret first use and file reach read it
+      // (secaudit2026oct22). The same value the install routes stamp.
+      const updated = await storage.updateExtension(name, {
+        actions: updatedActions, version, config: keptConfig, installedByPrincipal: req.auth!.sub,
+      });
       if (updated) {
         await snapshotExtensionVersion(storage, updated, resolveIdentity(req.auth!, config.nodeId))
           .catch(err => logger.warn('PATCH action script: version not kept', { name, version, error: String(err) }));
