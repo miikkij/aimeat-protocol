@@ -17,6 +17,9 @@
  * @structure MailboxRow · YourTurn · FleetLine · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   2026-10-25: YourTurn shows the threads of the window the person chose (1 to 90 days or any time,
+ *     7 by default, kept in home.prefs.turnDays) and keeps its band when the window is empty, so the
+ *     choice stays reachable; YourTurn and Things carry a question mark on their heading (Jouni).
  *   2026-09-29: The "App published" badge opens /v1/appcat instead of /app-catalog.html (Jouni).
  *   2026-09-27: The playbook's two ways are the Loud and Action components, the same buttons (page
  *     group G9, a move).
@@ -80,6 +83,8 @@ import { NumberedIndex, IndexItem, IndexPanel } from '/components/NumberedIndex.
 import { InkFoot } from '/components/InkFoot.js';
 import { CheckItem } from '/components/CheckItem.js';
 import { Action, Loud } from '/components/Action.js';
+import { Select } from '/components/Select.js';
+import { HelpTip } from '/components/HelpTip.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -114,16 +119,41 @@ export function MailboxRow({ mail }) {
  * read-only elsewhere; putting them in a list titled "waiting for your answer" would be asking a
  * person to answer mail that is not addressed to them.
  */
-export function YourTurn({ threads, max }) {
-  const rows = (threads ?? []).slice(0, max ?? 5);
-  if (!rows.length) return null;
-  const hidden = (threads ?? []).length - rows.length;
+export function YourTurn({ threads, max, days, onDays }) {
+  const all = threads ?? [];
+  if (!all.length) return null;
+  const span = turnWindow(days);
+  const since = span > 0 ? Date.now() - span * 86400000 : 0;
+  const fresh = all.filter((r) => !since || (Date.parse(r.at || '') || 0) >= since);
+  const rows = fresh.slice(0, max ?? 5);
+  const hidden = fresh.length - rows.length;
+  const title = tr('home.turn.title', 'Waiting for your answer');
+  const label = tr('home.turn.daysLabel', 'Messages from');
+  // The band stays when the chosen window holds nothing, because the choice that emptied it is in
+  // the band: without it a person who picked "the last day" could never widen the window again.
   return html`
-    <${Band} title=${tr('home.turn.title', 'Waiting for your answer')}>
-      <${LineList}
-        rows=${rows.map((r) => ({ id: r.id, name: r.who, text: r.said, href: '/v1/profile?tab=messages' }))}
-        more=${hidden > 0 ? bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden) : null} />
+    <${Band} title=${html`${title} <${HelpTip} term="home.turn" label=${title} />`}>
+      <${NamedRow} label=${label}>
+        <${Select} fit=${true} line=${true} ariaLabel=${label} value=${String(span)}
+          onChange=${(v) => onDays?.(Number(v))}
+          options=${TURN_DAYS.map((d) => [String(d), tr(`home.turn.days.${d}`, d === 0 ? 'any time' : `the last ${d} days`)])} />
+      <//>
+      ${rows.length > 0
+        ? html`<${LineList}
+            rows=${rows.map((r) => ({ id: r.id, name: r.who, text: r.said, href: '/v1/profile?tab=messages' }))}
+            more=${hidden > 0 ? bigNumber(tr('home.turn.more', '{n} more are waiting'), '{n}', hidden) : null} />`
+        : html`<${QuietNote}>${tr('home.turn.noneFresh', 'Nobody is waiting for your answer in this time.')}<//>`}
     <//>`;
+}
+
+/** The windows the "waiting for your answer" band offers, in days; 0 is any time. */
+export const TURN_DAYS = [1, 3, 7, 14, 30, 90, 0];
+/** The window when the person has not chosen one. */
+const TURN_DAYS_DEFAULT = 7;
+
+/** The person's window, or the default when the stored value is not one the band offers. */
+export function turnWindow(days) {
+  return TURN_DAYS.includes(days) ? days : TURN_DAYS_DEFAULT;
 }
 
 /**
@@ -209,7 +239,7 @@ export function Things({ usage, orgs, packages, prefs, onStar, children }) {
   const starred = prefs?.stars ?? [];
   const explain = tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and, when you choose, other people to use.');
   return html`
-    <${Band} title=${tr('home.things.title', 'What you have made')}>
+    <${Band} title=${html`${tr('home.things.title', 'What you have made')} <${HelpTip} term="home.things" label=${tr('home.things.title', 'What you have made')} />`}>
       ${rows.length > 0 && html`
         <${NamedRow} label=${tr('home.things.assets', 'Assets')}>
           ${rows.map((r) => html`

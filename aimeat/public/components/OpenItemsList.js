@@ -26,6 +26,8 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.4.0 — 2026-10-25 — The heading carries a question mark that explains the list
+ *     (explain.home.openItems.*).
  *   v1.3.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so an
  *     item title or agent name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.3.0 — 2026-09-24 — The copy button and the two review buttons are the underlined action link
@@ -51,6 +53,7 @@ import { listOpenItems, switchOff } from '/js/services/open-items.js';
 import { reviewDecision } from '/js/services/decide.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { CardMenu } from '/components/CardMenu.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -127,6 +130,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
       <div class="open-items-head">
         <h3 class="open-items-title">
           ${tr('openItems.title', 'Open items')} <span class="poster-count poster-count--waiting open-items-count">${items.length}</span>
+          <${HelpTip} term="home.openItems" label=${tr('openItems.title', 'Open items')} />
         </h3>
         <${CopyButton}
           text=${prompt}

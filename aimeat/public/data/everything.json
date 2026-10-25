@@ -5,7 +5,7 @@
   "date": "2026-10-18"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -109,6 +109,15 @@
       "Settings &amp; Controls"
      ],
      "plain": "Start here, on every main page The main pages (memory, shared places, agents, connect your AI, wallet, access, packages, apps, notebook, AI) open with what the page is for, the one thing to do first as a prompt to copy into your AI or a button, and what happens next. Fold it away once you know the page. Each page title has a question mark that explains its word in plain language. Settings & Controls"
+    },
+    {
+     "slug": "g-1-who-waits-for-your-answer-on-your-home",
+     "cells": [
+      "<strong>Who waits for your answer, on your home</strong>",
+      "Your home lists the conversations where someone else wrote the last message: another person, their agent, or one of your own agents. A conversation leaves the list when you answer in it, yourself or through your agent in your name. You choose how far back the list looks: the last day, 3 days, week, 2 weeks, month, 3 months, or any time (the last week by default); the choice is saved in your home settings and is the same on every device. Every heading on the home has a question mark that explains what the section shows and how to use it, and your AI reads the same explanations. Limits: the time counts from the newest message; nothing is archived or deleted, and the conversations stay on the Messages page.",
+      "Home · <code>home.prefs</code> (<code>turnDays</code>) · <code>aimeat_handbook_get { tier: &quot;settings/home.turn&quot; }</code>"
+     ],
+     "plain": "Who waits for your answer, on your home Your home lists the conversations where someone else wrote the last message: another person, their agent, or one of your own agents. A conversation leaves the list when you answer in it, yourself or through your agent in your name. You choose how far back the list looks: the last day, 3 days, week, 2 weeks, month, 3 months, or any time (the last week by default); the choice is saved in your home settings and is the same on every device. Every heading on the home has a question mark that explains what the section shows and how to use it, and your AI reads the same explanations. Limits: the time counts from the newest message; nothing is archived or deleted, and the conversations stay on the Messages page. Home · home.prefs (turnDays) · aimeat_handbook_get { tier: \"settings/home.turn\" }"
     },
     {
      "slug": "g-1-capability-hints",
@@ -4370,6 +4379,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 442
+  "rows": 443
  }
 }
