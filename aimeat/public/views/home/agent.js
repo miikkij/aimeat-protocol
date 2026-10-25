@@ -23,6 +23,8 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.8.0 — 2026-10-25 — "Open work it takes": the agent's skills (its tags), which decide the goal
+ *     work it may take, with the question mark that explains open work (session cc-jouni-goals).
  *   v1.7.0 — 2026-10-19 — The page's title shows the agent's own picture (components/AgentAvatar.js) before its name, when the agent has set one.
  *   v1.6.0 — 2026-10-18 — "What it reaches" says, under the areas, when the agent may invite people
  *     and an invitation can create an account (organism:invite; wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
@@ -65,6 +67,7 @@ import { Fields, FormActions } from '/components/Field.js';
 import { TextArea } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
 import { Facts } from '/components/Facts.js';
+import { HelpLabel } from '/components/HelpTip.js';
 import { Action, Loud } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { PageSection } from '/components/PageSection.js';
@@ -258,6 +261,11 @@ export default function AgentView({ navigate }) {
         // its permissions (GET /v1/agents invites_people), so the line is never out of date.
         { k: p('reach', 'What it reaches'), v: areaLine(record.default_scopes ?? [], t),
           sub: (record.invites_people ?? invitesPeople(record.default_scopes ?? [])) ? invitesSentence(t) : undefined },
+        // Its skills are its tags: the open work of a goal it may take (services/goals/goals-agents.ts).
+        { k: html`<${HelpLabel} term="concept.open_work" label=${p('takes', 'Open work it takes')}>${p('takes', 'Open work it takes')}<//>`,
+          v: (record.tags ?? []).length ? record.tags.join(', ') : p('takesNone', 'None: it has no skills set'),
+          sub: p('takesSub', 'A goal\'s open work that asks for one of these skills.'),
+          action: html`<${Action} small href=${`/v1/profile?tab=agents&agent=${encodeURIComponent(name)}`}>${p('takesChange', 'Change')}<//>` },
         { k: p('goes', 'Where its work goes'),
           v: worker.work_goes_to ? placeWords(worker.work_goes_to) : p('goesOwn', 'The agent\'s own memory'),
           sub: worker.work_goes_to
