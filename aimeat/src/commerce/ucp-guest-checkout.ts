@@ -33,6 +33,9 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   v1.2.0 — 2026-10-25 — A line's total is its exact amount rounded once to cents, the checkout's
+ *     total is their sum, and completion charges exactly that sum (ucpTotalCents, ucpChargeMicros):
+ *     the platform was shown per-unit rounded totals and charged the exact total (secaudit2026oct22).
  *   v1.1.0 — 2026-10-18 — Written on the record's version (services/record-cas.ts): readGuestCheckout's
  *     lazy cancel decides on the stored checkout, onUcpTaskDone adds its line to the order as stored,
  *     and deliverOrderWebhook claims the pending record for one send (claimPending) and writes its
@@ -385,7 +388,7 @@ export async function completeGuestCheckout(
   } catch (e) {
     return failCompletion(storage, config, session, e instanceof UcpError ? e.code : 'item_unavailable', e instanceof Error ? e.message : 'An item is no longer sold.');
   }
-  const total = repriced.reduce((n, l) => n + l.unitPrice * l.quantity, 0);
+  const total = ucpChargeMicros(repriced);
   const handler = getPaymentHandler(STRIPE_HANDLER_ID);
   const psp = (await storage.getMemory(session.sellerGhii, 'commerce.psp'))?.value;
   if (!handler || !openPspSecret(config, (psp as { secretKey?: unknown } | undefined)?.secretKey)) {
@@ -486,6 +489,17 @@ export async function sellerPaymentHandlers(storage: Storage, config: AimeatConf
 }
 
 const cents = (micros: number): number => Math.round(micros / 10_000);
+/**
+ * One line's total in cents, rounded once over the line, and the checkout's total as their sum. The
+ * platform is shown these and the card is charged exactly their sum (ucpChargeMicros). Each unit was
+ * rounded to a cent before multiplying, while the charge rounded the exact total, so a price that is
+ * not a whole number of cents showed one amount and charged another (secaudit2026oct22). For a whole
+ * cent price both ways give the same number.
+ */
+const lineCents = (l: { unitPrice: number; quantity: number }): number => Math.round((l.unitPrice * l.quantity) / 10_000);
+export const ucpTotalCents = (lines: Array<{ unitPrice: number; quantity: number }>): number => lines.reduce((n, l) => n + lineCents(l), 0);
+/** The amount completion charges, in micro-units: the shown total, so the rail's rounding is exact. */
+export const ucpChargeMicros = (lines: Array<{ unitPrice: number; quantity: number }>): number => ucpTotalCents(lines) * 10_000;
 
 function linksOf(config: AimeatConfig): Array<{ type: string; url: string }> {
   const b = config.baseUrl.replace(/\/$/, '');
@@ -497,7 +511,7 @@ function linksOf(config: AimeatConfig): Array<{ type: string; url: string }> {
 
 /** The checkout as UCP 2026-08-25 shapes it. Amounts in minor units (cents). */
 export function toUcpCheckout(s: UcpGuestSession, config: AimeatConfig, handlers: Record<string, unknown[]>): Record<string, unknown> {
-  const subtotal = s.lines.reduce((n, l) => n + cents(l.unitPrice) * l.quantity, 0);
+  const subtotal = ucpTotalCents(s.lines);
   const messages: unknown[] = [];
   if (s.status === 'incomplete' && !s.buyer?.email) {
     messages.push({ type: 'error', code: 'missing', path: '$.buyer.email', content: 'The buyer\'s email is required: a digital product is delivered by email.', severity: 'recoverable' });
@@ -517,7 +531,7 @@ export function toUcpCheckout(s: UcpGuestSession, config: AimeatConfig, handlers
       id: l.id,
       item: { id: l.itemId, title: l.title, price: cents(l.unitPrice) },
       quantity: l.quantity,
-      totals: [{ type: 'subtotal', amount: cents(l.unitPrice) * l.quantity }, { type: 'total', amount: cents(l.unitPrice) * l.quantity }],
+      totals: [{ type: 'subtotal', amount: lineCents(l) }, { type: 'total', amount: lineCents(l) }],
     })),
     ...(s.buyer ? { buyer: s.buyer } : {}),
     totals: [{ type: 'subtotal', amount: subtotal }, { type: 'total', amount: subtotal }],
@@ -538,7 +552,7 @@ export function toUcpOrder(order: CheckoutSessionRecord, config: AimeatConfig): 
   const lines = order.items.map((item, i) => {
     const id = u.lineIds[i] ?? `li_${i + 1}`;
     const fulfilled = Math.min(item.quantity, u.fulfilled[id] ?? 0);
-    const total = cents(item.unitPrice) * item.quantity;
+    const total = lineCents(item);
     return {
       id,
       item: { id: u.itemIds?.[i] ?? `${item.kind}:${item.agent}:${item.offerId}`, title: item.title, price: cents(item.unitPrice) },
