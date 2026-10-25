@@ -16,12 +16,20 @@
  *   some of them behind so published apps never break. **Stale upstream** means nobody has released
  *   anything for a long time, which says something about the library rather than about us. A
  *   library can be either, both, or neither, so they are reported apart.
- * @structure registryInfo() → one npm metadata call per library; classify() → behind-ness and age;
- *   main() → a table, then the lines that need a person
+ *
+ *   THE NEWEST VERSION IN OUR LINE. A library a major behind can still have releases on the line we
+ *   pin (KaTeX 0.18.11 beside our 0.18.5 while upstream is on 0.19), and those land in place under
+ *   the same policy. Comparing only against `latest` printed such a library as "a major behind" and
+ *   hid the update that needed no decision, so each row also carries the newest stable release on
+ *   our own line.
+ * @structure registryInfo() → one npm metadata call per library; behindBy() and newestInLine() →
+ *   behind-ness against upstream and against our own line; main() → a table, then the lines that
+ *   need a person
  * @usage
- *   pnpm check:libs           # the table
- *   pnpm check:libs -- --json # for the security report
+ *   pnpm outdated:libs            # the table
+ *   pnpm outdated:libs -- --json  # for the security report
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The newest release on our own pinned line (`latestInLine`, `inLineBehind`); the usage lines name the real command.
  *   v1.0.0 — 2026-08-31 — Initial: age and behind-ness for every served browser library.
  */
 import { vendoredComponents, type Component } from './lib/license-inventory.js';
@@ -82,12 +90,45 @@ function behindBy(ours: string, latest: string): 'current' | 'patch' | 'minor' |
   return 'unknown';
 }
 
+/** Same line in the sense behindBy() uses: the same major, and below 1.0 the same minor. */
+function sameLine(a: number[], b: number[]): boolean {
+  return a[0] === b[0] && (a[0] !== 0 || a[1] === b[1]);
+}
+
+function compareParts(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * The newest stable release on the line we pin. Pre-releases are left out: a `-dev` or `-rc` is not
+ * something a major-pinned file takes in place. Our own version is the floor, so a version we serve
+ * that the registry no longer lists still answers "current".
+ */
+function newestInLine(ours: string, versions: string[]): string {
+  const o = parts(ours);
+  let best = ours;
+  for (const v of versions) {
+    if (!/^\d+\.\d+\.\d+$/.test(v)) continue;
+    const p = parts(v);
+    if (sameLine(o, p) && compareParts(p, parts(best)) > 0) best = v;
+  }
+  return best;
+}
+
 export interface LibRow {
   id: string;
   name: string;
   ours: string;
   latest: string;
   behind: string;
+  /** The newest stable release on the line we pin; equal to `ours` when nothing newer is there. */
+  latestInLine: string;
+  /** How far `ours` is behind `latestInLine`: 'patch' or 'minor' lands in place, 'current' means nothing to take. */
+  inLineBehind: string;
   /** Days since OUR version was published — how old the bytes we serve are. */
   ourAgeDays: number | null;
   /** Days since ANY release — whether upstream is still alive. */
@@ -113,10 +154,18 @@ export async function libFreshness(components: Component[]): Promise<LibRow[]> {
     if (info === null) {
       rows.push({
         id: c.id, name: parsed.name, ours: parsed.version, latest: '?', behind: 'unknown',
+        latestInLine: '?', inLineBehind: 'unknown',
         ourAgeDays: null, upstreamAgeDays: null, note: 'registry did not answer',
       });
       continue;
     }
+    // Two kinds of file never take a release in place, whatever the registry holds: a frozen one
+    // (kept unchanged for the apps that name it) and one whose path carries the full version
+    // (`ffmpeg-core@0.12.6/`, where even a patch ships as a new directory).
+    const pinnedExactly = (c.files ?? []).some(f => f.includes(`@${parsed.version}`));
+    const latestInLine = c.supersededBy || pinnedExactly
+      ? parsed.version
+      : newestInLine(parsed.version, Object.keys(info.time));
     rows.push({
       id: c.id,
       name: parsed.name,
@@ -125,6 +174,8 @@ export async function libFreshness(components: Component[]): Promise<LibRow[]> {
       // A file kept only so already-published apps keep working is behind ON PURPOSE. Printing it
       // as 'major' forever would train everyone to ignore the column that matters.
       behind: c.supersededBy ? 'frozen' : behindBy(parsed.version, info.latest),
+      latestInLine,
+      inLineBehind: behindBy(parsed.version, latestInLine),
       supersededBy: c.supersededBy,
       ourAgeDays: daysSince(info.time[parsed.version], now),
       upstreamAgeDays: daysSince(info.time[info.latest], now),
@@ -155,12 +206,13 @@ async function main(): Promise<void> {
   rows.sort((a, b) => (order[a.behind] ?? 9) - (order[b.behind] ?? 9) || (b.ourAgeDays ?? 0) - (a.ourAgeDays ?? 0));
 
   console.log('\nBrowser libraries served from /lib/ — nothing else looks at these\n');
-  console.log('  library                  we serve       latest         behind   our version   upstream');
-  console.log('  ' + '-'.repeat(88));
+  console.log('  library                  we serve       our line       latest         behind   our version   upstream');
+  console.log('  ' + '-'.repeat(103));
   for (const r of rows) {
     console.log(
       '  ' + r.name.padEnd(24) + ' '
       + r.ours.padEnd(14) + ' '
+      + (r.latestInLine === r.ours ? '=' : r.latestInLine).padEnd(14) + ' '
       + r.latest.padEnd(14) + ' '
       + r.behind.padEnd(8) + ' '
       + years(r.ourAgeDays).padEnd(13) + ' '
@@ -177,11 +229,17 @@ async function main(): Promise<void> {
   const stale = rows.filter(r => (r.upstreamAgeDays ?? 0) > STALE_DAYS);
   const frozen = rows.filter(r => r.behind === 'frozen');
   const ancient = rows.filter(r => (r.ourAgeDays ?? 0) > 365 * 2 && r.behind !== 'frozen');
+  const inPlace = rows.filter(r => r.inLineBehind === 'minor' || r.inLineBehind === 'patch');
 
-  console.log('\n  ' + '-'.repeat(88));
+  console.log('\n  ' + '-'.repeat(103));
   console.log(`  ${current.length} current · ${small.length} a minor or patch behind · ${majors.length} a major behind · ${frozen.length} frozen for published apps`);
   console.log(`  ${ancient.length} serving bytes more than two years old · ${stale.length} with no upstream release in ${Math.round(STALE_DAYS / 30)} months`);
-  console.log('\n  A major behind is a DECISION, not a defect: the major-pinned filename is the');
+  if (inPlace.length > 0) {
+    console.log(`\n  ${inPlace.length} can take a newer release on their own line, in place, with no decision:`);
+    for (const r of inPlace) console.log(`      ${r.name} ${r.ours} -> ${r.latestInLine}${r.behind === 'major' ? `  (upstream is on ${r.latest})` : ''}`);
+  }
+  console.log('\n  "our line" is the newest stable release on the line we pin ("=" when we serve it).');
+  console.log('  A major behind is a DECISION, not a defect: the major-pinned filename is the');
   console.log('  compatibility contract for every published app (public/lib/VENDORED.md). A minor or');
   console.log('  patch behind lands in place and is the cheap one to take.\n');
 }
