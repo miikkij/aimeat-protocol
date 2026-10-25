@@ -368,7 +368,9 @@ function rejectInto(cur: GoalRecord, workId: string, reason: string, access: Goa
   if (!work) throw new GoalError(404, 'NOT_FOUND', `No work ${workId} in this goal.`);
   if (work.status !== 'done') throw new GoalError(409, 'CONFLICT', 'Only a finished result can be asked again.');
   if (!reason) throw new GoalError(400, 'INVALID_INPUT', 'Say what was not good (reason): the next agent reads it.');
-  const retry = makeWork(cur, { title: work.title, description: work.description, agent: work.agent, wants: work.wants }, access.who, {
+  // The retry is done the way the work was: by the same named agent, as open work for the same
+  // skills, or by the node's model (a model work asked again stays the model's, not open work).
+  const retry = makeWork(cur, { title: work.title, description: work.description, agent: work.agent, wants: work.wants, runner: work.runner, model: work.model }, access.who, {
     hop: work.hop + 1, round: work.round, retryOf: work.id, reason, origin: { agent: work.claimedBy, work: work.id }, loop: work.loop,
   });
   const base = appendWorks(cur, [retry]);
@@ -430,7 +432,17 @@ export async function answerOp(deps: GoalDeps, caller: CallerContext, goalId: st
     if (w.humanKind === 'approve' && !rejected && w.held) {
       next = appendWorks(next, [makeWork(next, w.held, 'node', { hop: w.hop, loop: 0, round: w.round })]);
     }
-    if (w.humanKind === 'approve' && rejected && w.approveOf) next = rejectInto(next, w.approveOf, String(answer.reason ?? 'The owner did not approve it.'), access);
+    // A rejected approval asks again the result it approves: the work it names (approveOf), or, for a
+    // step a plan put after a work ("after"), the last finished work it waited for. The asked-again
+    // work gets an approval step of its own, so the person sees the new result before it counts.
+    const approved = w.approveOf ?? [...(w.after ?? [])].reverse().find(id => cur.works.find(x => x.id === id)?.status === 'done');
+    if (w.humanKind === 'approve' && rejected && approved) {
+      next = rejectInto(next, approved, String(answer.reason ?? 'The owner did not approve it.'), access);
+      const retry = [...next.works].reverse().find(x => x.retryOf === approved);
+      if (retry) {
+        next = appendWorks(next, [makeWork(next, { title: w.title, description: w.description, kind: 'human', humanKind: 'approve', after: [retry.id], final: w.final }, 'node', { approveOf: retry.id, hop: w.hop, round: w.round })]);
+      }
+    }
     if (w.final && !rejected && w.humanKind === 'approve') {
       next = { ...next, status: 'done', settledAt: now, log: [...next.log, logEntry(access.who, 'finished', 'The owner approved the result: the goal is done.')] };
     }
