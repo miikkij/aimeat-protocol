@@ -3,6 +3,8 @@
  * @description Real node, owner/app grants and local protocol peer: stream, speech, scope isolation,
  *   app attribution and concurrent accounting. No external provider calls or paid AI settings.
  * @version-history
+ *   2026-10-25 - /v1/ai/complete from an app grant is held to the owner's per-app cap and allowlist of
+ *     the app the grant names, whatever app_id the body sends (secaudit2026oct22).
  *   2026-10-19 - An app session sends its bare file name as app_id to speak, stream and transcribe and is
  *     answered 200; another app's file name, and the same file name under another owner, stay 403
  *     APP_ID_MISMATCH (wish-voice-routes-accept-the-app-s-own-file-name-as-app-id).
@@ -292,6 +294,37 @@ try {
     const after = await call('/v1/ai/usage', undefined, alice.token, 'GET');
     const prior = before.data.data.usage ?? before.data.data; const next = after.data.data.usage ?? after.data.data;
     assert(next.total_calls - prior.total_calls === 3, JSON.stringify({ prior, next }));
+  });
+  await test('The owner\'s per-app cap and allowlist apply to the app the grant names, whatever app_id says (secaudit2026oct22)', async () => {
+    const set = (body: Record<string, unknown>) => call('/v1/ai/settings', body, alice.token);
+    // The suite has used most of the account's AI call starts for this minute; one wait is enough.
+    const complete = async (body: Record<string, unknown>) => {
+      const first = await call('/v1/ai/complete', body, appToken);
+      if (first.status !== 429) return first;
+      await new Promise(r => setTimeout(r, ((first.data?.error?.details?.retry_after_sec as number | undefined) ?? 60) * 1000 + 500));
+      return call('/v1/ai/complete', body, appToken);
+    };
+    const capped = await set({ app_quotas: { voice: { daily_usd: 0 } } });
+    assert(capped.status === 200, capped.text);
+    const before = providerCalls;
+    try {
+      for (const named of ['someother', undefined]) {
+        const r = await complete({ prompt: 'hello', model: 'reply', ...(named ? { app_id: named } : {}) });
+        assert(r.status === 402 && r.data?.error?.code === 'APP_QUOTA_EXHAUSTED', `app_id=${named ?? '(none)'} passed the signed app's cap: ${r.status} ${r.text}`);
+      }
+      const listed = await set({ app_quotas: {}, app_allowlist: ['someother'] });
+      assert(listed.status === 200, listed.text);
+      const r = await complete({ prompt: 'hello', model: 'reply', app_id: 'someother' });
+      assert(r.status === 403 && r.data?.error?.code === 'APP_NOT_ALLOWED', `another app's name passed the allowlist: ${r.status} ${r.text}`);
+      assert(providerCalls === before, 'a refused call reached the provider');
+      // The designed use: the owner allows the app by its own name, and it calls with that name.
+      const allowed = await set({ app_allowlist: ['voice'] });
+      assert(allowed.status === 200, allowed.text);
+      const own = await complete({ prompt: 'hello', model: 'reply', app_id: 'voice' });
+      assert(own.status !== 402 && own.status !== 403 && providerCalls > before, `the app's own call was refused: ${own.status} ${own.text}`);
+    } finally {
+      await set({ app_quotas: {}, app_allowlist: null });
+    }
   });
 } finally { peer.closeAllConnections(); await new Promise<void>(resolve => peer.close(() => resolve())); }
 console.log(`\n${passed} passed, ${failed} failed`); process.exitCode = failed ? 1 : 0;

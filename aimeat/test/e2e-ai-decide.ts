@@ -63,6 +63,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 
 // Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
 const PORT = process.env.E2E_AI_DECIDE_PORT ?? '40436';
@@ -1243,6 +1244,42 @@ const QUESTIONS = {
     for (const action of ['get', 'stop', 'resume']) {
       const t = await mcpCall(scoped, 'aimeat_decide_run', { action, run_id: scopedRun });
       assert(t.result?.isError !== true && toolData(t)?.id === scopedRun, `MCP ${action} of its own run: ${toolText(t).slice(0, 200)}`);
+    }
+  });
+
+  // secaudit2026oct22: a run started by an agent reads the owner's records as that agent, so the
+  // clearance the owner gave it applies as it does on an AI job's input_keys. The run read them with
+  // the node's own reader, which no clearance limits.
+  await test('13h. an agent\'s clearance holds on a run\'s keys; the owner in person still decides the record', async () => {
+    const LABELLED = 'vis13.labelled.note';
+    const LABELLED_TEXT = 'merge-with-rival';
+    const config = (changes: unknown[]) => json('/v1/admin/config', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ changes }) });
+    const on = await config([{ path: 'classification.mode', value: 'all' }]);
+    assert(on.status === 200, `classification on: ${on.status} ${JSON.stringify(on.body.error)}`);
+    try {
+      await takeOffAudienceCaps(BASE, A.token);
+      const w = await putRecord(LABELLED, { plan: LABELLED_TEXT, topic: 'merger' }, 'owner');
+      assert(w.status === 201 || w.status === 200, `record: ${w.status} ${JSON.stringify(w.body.error)}`);
+      const l = await json('/v1/classification/label', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ kind: 'memory', key: LABELLED, label: 'luottamuksellinen' }) });
+      assert(l.status === 200 && l.body.data.applied === true, `label: ${l.status} ${JSON.stringify(l.body.error ?? l.body.data)}`);
+      const c = await json('/v1/agents/trustedbot/clearance', { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ clearance: 'sisainen' }) });
+      assert(c.status === 200 && c.body.data.clearance === 'sisainen', `clearance: ${c.status} ${JSON.stringify(c.body.error ?? c.body.data)}`);
+
+      const before = seen.length;
+      const r = await startRun(trusted, { keys: [LABELLED], fields: ['plan'] });
+      assert(r.status === 202, `start: ${r.status} ${JSON.stringify(r.body.error)}`);
+      const run = await settled(trusted, r.body.data.id);
+      const item = run?.results?.[LABELLED];
+      assert(item?.error && item.decision_id === undefined && item.values === undefined, `the agent's run decided a record above its clearance: ${JSON.stringify(item)}`);
+      assert(!JSON.stringify(seen.slice(before)).includes(LABELLED_TEXT), 'the record reached the decision model');
+
+      const mine = await startRun(A.token, { keys: [LABELLED], fields: ['plan'] });
+      assert(mine.status === 202, `owner start: ${mine.status}`);
+      const ownerRun13h = await settled(A.token, mine.body.data.id);
+      assert(typeof ownerRun13h?.results?.[LABELLED]?.decision_id === 'string', `owner: ${JSON.stringify(ownerRun13h?.results?.[LABELLED])}`);
+    } finally {
+      await json('/v1/agents/trustedbot/clearance', { method: 'PATCH', headers: auth(A.token), body: JSON.stringify({ clearance: null }) });
+      await config([{ path: 'classification.mode', value: 'off' }]);
     }
   });
 

@@ -28,6 +28,8 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.3.1 — 2026-10-25 — One account's allowance writes (starter grant, debit, grant) run one at a
+ *     time, so calls that settle at the same moment lose no debit (secaudit2026oct22).
  *   v1.3.0 — 2026-10-05 — nodeKeyStanding(): one answer to "may the node's key pay" for the AI planner
  *     and the decision service, with the operator's mode once an allowance is spent (refuse by
  *     default, or limits per account and per node per UTC day). debitAllowance counts the day's
@@ -100,8 +102,35 @@ function empty(): AllowanceRecord {
   return { granted_usd: 0, spent_usd: 0, free_granted: false, updated_at: new Date().toISOString() };
 }
 
+/**
+ * The allowance writes in flight, per storage and account. Every read-modify-write of one account's
+ * record (the starter grant, a debit, a grant) runs after the one before it on this node: two calls
+ * that settled at the same moment both started from the same spent_usd, and the second write
+ * discarded the first debit (secaudit2026oct22). Same pattern as recordAiUsage.
+ */
+const allowanceWrites = new WeakMap<Storage, Map<string, Promise<unknown>>>();
+
+async function oneAtATime<T>(storage: Storage, gaii: string, fn: () => Promise<T>): Promise<T> {
+  let pending = allowanceWrites.get(storage);
+  if (!pending) { pending = new Map(); allowanceWrites.set(storage, pending); }
+  const previous = pending.get(gaii) ?? Promise.resolve();
+  const next = previous.then(fn, fn);
+  pending.set(gaii, next);
+  try { return await next; } finally { if (pending.get(gaii) === next) pending.delete(gaii); }
+}
+
 /** Read the allowance, applying the node's free starter grant the first time it is asked for. */
 export async function readAllowance(
+  storage: Storage, config: AimeatConfig, gaii: string,
+): Promise<AllowanceRecord> {
+  const rec = (await storage.getMemory(gaii, allowanceKey(gaii)))?.value as AllowanceRecord | undefined;
+  const free = Number(config.chatFreeAllowanceUsd) || 0;
+  if (free > 0 && !(rec ?? empty()).free_granted) return oneAtATime(storage, gaii, () => readAllowanceInTurn(storage, config, gaii));
+  return rec ?? empty();
+}
+
+/** readAllowance for a caller already in the account's turn (oneAtATime): reads again and seeds. */
+async function readAllowanceInTurn(
   storage: Storage, config: AimeatConfig, gaii: string,
 ): Promise<AllowanceRecord> {
   const rec = (await storage.getMemory(gaii, allowanceKey(gaii)))?.value as AllowanceRecord | undefined;
@@ -264,16 +293,19 @@ export async function debitAllowance(
 ): Promise<AllowanceRecord | null> {
   if (!(costUsd > 0)) return null;
   try {
-    const rec = await readAllowance(storage, config, gaii);
     const today = utcDay();
-    const next: AllowanceRecord = {
-      ...rec,
-      spent_usd: rec.spent_usd + costUsd,
-      day: today,
-      day_spent_usd: (rec.day === today ? rec.day_spent_usd ?? 0 : 0) + costUsd,
-      updated_at: new Date().toISOString(),
-    };
-    await writeAllowance(storage, gaii, next);
+    const next = await oneAtATime(storage, gaii, async () => {
+      const rec = await readAllowanceInTurn(storage, config, gaii);
+      const out: AllowanceRecord = {
+        ...rec,
+        spent_usd: rec.spent_usd + costUsd,
+        day: today,
+        day_spent_usd: (rec.day === today ? rec.day_spent_usd ?? 0 : 0) + costUsd,
+        updated_at: new Date().toISOString(),
+      };
+      await writeAllowance(storage, gaii, out);
+      return out;
+    });
     // All accounts together, for the node-wide daily limit. Compare-and-swap, because every account
     // writes this one record.
     await updateSystem(storage, config.nodeId, NODE_DAY_KEY, parseNodeDay,
@@ -295,13 +327,16 @@ export async function grantAllowance(
   storage: Storage, config: AimeatConfig, gaii: string, usd: number, source: string,
 ): Promise<AllowanceRecord> {
   if (!(usd > 0)) throw new AiCompletionError('INVALID_BODY', 400, 'A grant must be a positive amount.');
-  const rec = await readAllowance(storage, config, gaii);
-  const next: AllowanceRecord = {
-    ...rec,
-    granted_usd: rec.granted_usd + usd,
-    updated_at: new Date().toISOString(),
-  };
-  await writeAllowance(storage, gaii, next);
+  const next = await oneAtATime(storage, gaii, async () => {
+    const rec = await readAllowanceInTurn(storage, config, gaii);
+    const out: AllowanceRecord = {
+      ...rec,
+      granted_usd: rec.granted_usd + usd,
+      updated_at: new Date().toISOString(),
+    };
+    await writeAllowance(storage, gaii, out);
+    return out;
+  });
   logger.info(`[allowance] gaii=${gaii} granted $${usd.toFixed(2)} (${source}); balance $${remainingOf(next).toFixed(2)}`);
   return next;
 }

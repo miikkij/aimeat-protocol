@@ -33,6 +33,11 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   v1.2.1 — 2026-10-25 — The per-seller limit of 500 counts open checkouts that have not run out of
+ *     time; every kept record counts toward a bound of 2000 (openCheckoutsOf; secaudit2026oct22).
+ *   v1.2.0 — 2026-10-25 — A line's total is its exact amount rounded once to cents, the checkout's
+ *     total is their sum, and completion charges exactly that sum (ucpTotalCents, ucpChargeMicros):
+ *     the platform was shown per-unit rounded totals and charged the exact total (secaudit2026oct22).
  *   v1.1.0 — 2026-10-18 — Written on the record's version (services/record-cas.ts): readGuestCheckout's
  *     lazy cancel decides on the stored checkout, onUcpTaskDone adds its line to the order as stored,
  *     and deliverOrderWebhook claims the pending record for one send (claimPending) and writes its
@@ -74,11 +79,14 @@ const OPEN_MS = 6 * 3_600_000;
 /** How long a checkout record is kept: open, then two days for idempotent replays. */
 const KEEP_HOURS = 54;
 const MAX_OPEN_PER_SELLER = 500;
+/** The most checkout records, open or closed, one seller keeps at a time: bounds what they can grow to. */
+const MAX_KEPT_PER_SELLER = 2_000;
 const MAX_LINES = 20;
 /** Webhook retries: a delivery that fails waits this long before the next try. Then it gives up. */
 const BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000, 2 * 3_600_000, 6 * 3_600_000, 12 * 3_600_000, 24 * 3_600_000];
 
-const sessionKey = (id: string): string => `commerce.ucp.session.${id}`;
+const SESSION_PREFIX = 'commerce.ucp.session.';
+const sessionKey = (id: string): string => `${SESSION_PREFIX}${id}`;
 const orderKey = (id: string): string => `commerce.order.${id}`;
 const pendingKey = (orderId: string): string => `commerce.ucp.pending.${orderId}`;
 
@@ -254,6 +262,24 @@ export async function sellerOfLines(storage: Storage, config: AimeatConfig, line
   }
 }
 
+/**
+ * How many of the seller's checkouts count toward MAX_OPEN_PER_SELLER: the open ones that have not
+ * run out of time. Canceled, completed and overdue checkouts are kept KEEP_HOURS for replays and
+ * counted as open until 2026-10-25, so closed checkouts alone stopped the seller's guest checkout
+ * (secaudit2026oct22). Every kept record still counts toward MAX_KEPT_PER_SELLER, which bounds what
+ * one seller's records can grow to. The values are read only once the kept records reach the open limit.
+ */
+async function openCheckoutsOf(storage: Storage, sellerGhii: string): Promise<number> {
+  const kept = await storage.countMemory([sellerGhii], { prefix: SESSION_PREFIX });
+  if (kept >= MAX_KEPT_PER_SELLER) return MAX_OPEN_PER_SELLER;
+  if (kept < MAX_OPEN_PER_SELLER) return kept;
+  const rows = await storage.listMemory(sellerGhii, { prefix: SESSION_PREFIX });
+  return rows.filter((r) => {
+    const s = r.value as unknown as UcpGuestSession;
+    return (s.status === 'incomplete' || s.status === 'ready_for_complete' || s.status === 'requires_escalation' || s.status === 'complete_in_progress') && !overdue(s);
+  }).length;
+}
+
 // ── The lifecycle ─────────────────────────────────────────────────────────────────────────────
 
 export async function createGuestCheckout(
@@ -261,10 +287,7 @@ export async function createGuestCheckout(
   args: { profileUrl: string; lineItems: UcpLineInput[]; buyer?: unknown },
 ): Promise<UcpGuestSession> {
   const { lines, sellerGhii, sellerOwner } = await priceLines(storage, config, args.lineItems);
-  const open = storage.listMemoryKeysByPrefix
-    ? (await storage.listMemoryKeysByPrefix('commerce.ucp.session.')).filter((r) => r.ownerGaii === sellerGhii).length
-    : 0;
-  if (open >= MAX_OPEN_PER_SELLER) throw new UcpError(429, 'rate_limited', 'This seller has too many open checkouts. Try again later.');
+  if (await openCheckoutsOf(storage, sellerGhii) >= MAX_OPEN_PER_SELLER) throw new UcpError(429, 'rate_limited', 'This seller has too many open checkouts. Try again later.');
   const now = nowIso();
   const buyer = cleanBuyer(args.buyer);
   const session: UcpGuestSession = {
@@ -277,6 +300,17 @@ export async function createGuestCheckout(
   await putRecord(storage, sellerGhii, sessionKey(session.id), session, KEEP_HOURS);
   recordCheckoutStage(storage, config, { sellerGhii, family: session.platformFamily, stage: 'created' });
   return session;
+}
+
+/**
+ * Whether this checkout exists and was created by this platform profile, with no write. The routes
+ * ask it before an Idempotency-Key is claimed, so a request naming a checkout that is absent or
+ * another platform's writes nothing under the seller (secaudit2026oct22).
+ */
+export async function guestCheckoutExists(storage: Storage, config: AimeatConfig, id: string, profileUrl: string): Promise<boolean> {
+  const seller = sellerOfSessionId(id, config);
+  const session = seller ? (await storage.getMemory(seller, sessionKey(id)))?.value as UcpGuestSession | undefined : undefined;
+  return !!session && session.platformProfile === profileUrl;
 }
 
 /** The checkout, for the platform that created it. A checkout past its time reads as canceled. */
@@ -385,7 +419,7 @@ export async function completeGuestCheckout(
   } catch (e) {
     return failCompletion(storage, config, session, e instanceof UcpError ? e.code : 'item_unavailable', e instanceof Error ? e.message : 'An item is no longer sold.');
   }
-  const total = repriced.reduce((n, l) => n + l.unitPrice * l.quantity, 0);
+  const total = ucpChargeMicros(repriced);
   const handler = getPaymentHandler(STRIPE_HANDLER_ID);
   const psp = (await storage.getMemory(session.sellerGhii, 'commerce.psp'))?.value;
   if (!handler || !openPspSecret(config, (psp as { secretKey?: unknown } | undefined)?.secretKey)) {
@@ -486,6 +520,17 @@ export async function sellerPaymentHandlers(storage: Storage, config: AimeatConf
 }
 
 const cents = (micros: number): number => Math.round(micros / 10_000);
+/**
+ * One line's total in cents, rounded once over the line, and the checkout's total as their sum. The
+ * platform is shown these and the card is charged exactly their sum (ucpChargeMicros). Each unit was
+ * rounded to a cent before multiplying, while the charge rounded the exact total, so a price that is
+ * not a whole number of cents showed one amount and charged another (secaudit2026oct22). For a whole
+ * cent price both ways give the same number.
+ */
+const lineCents = (l: { unitPrice: number; quantity: number }): number => Math.round((l.unitPrice * l.quantity) / 10_000);
+export const ucpTotalCents = (lines: Array<{ unitPrice: number; quantity: number }>): number => lines.reduce((n, l) => n + lineCents(l), 0);
+/** The amount completion charges, in micro-units: the shown total, so the rail's rounding is exact. */
+export const ucpChargeMicros = (lines: Array<{ unitPrice: number; quantity: number }>): number => ucpTotalCents(lines) * 10_000;
 
 function linksOf(config: AimeatConfig): Array<{ type: string; url: string }> {
   const b = config.baseUrl.replace(/\/$/, '');
@@ -497,7 +542,7 @@ function linksOf(config: AimeatConfig): Array<{ type: string; url: string }> {
 
 /** The checkout as UCP 2026-08-25 shapes it. Amounts in minor units (cents). */
 export function toUcpCheckout(s: UcpGuestSession, config: AimeatConfig, handlers: Record<string, unknown[]>): Record<string, unknown> {
-  const subtotal = s.lines.reduce((n, l) => n + cents(l.unitPrice) * l.quantity, 0);
+  const subtotal = ucpTotalCents(s.lines);
   const messages: unknown[] = [];
   if (s.status === 'incomplete' && !s.buyer?.email) {
     messages.push({ type: 'error', code: 'missing', path: '$.buyer.email', content: 'The buyer\'s email is required: a digital product is delivered by email.', severity: 'recoverable' });
@@ -517,7 +562,7 @@ export function toUcpCheckout(s: UcpGuestSession, config: AimeatConfig, handlers
       id: l.id,
       item: { id: l.itemId, title: l.title, price: cents(l.unitPrice) },
       quantity: l.quantity,
-      totals: [{ type: 'subtotal', amount: cents(l.unitPrice) * l.quantity }, { type: 'total', amount: cents(l.unitPrice) * l.quantity }],
+      totals: [{ type: 'subtotal', amount: lineCents(l) }, { type: 'total', amount: lineCents(l) }],
     })),
     ...(s.buyer ? { buyer: s.buyer } : {}),
     totals: [{ type: 'subtotal', amount: subtotal }, { type: 'total', amount: subtotal }],
@@ -538,7 +583,7 @@ export function toUcpOrder(order: CheckoutSessionRecord, config: AimeatConfig): 
   const lines = order.items.map((item, i) => {
     const id = u.lineIds[i] ?? `li_${i + 1}`;
     const fulfilled = Math.min(item.quantity, u.fulfilled[id] ?? 0);
-    const total = cents(item.unitPrice) * item.quantity;
+    const total = lineCents(item);
     return {
       id,
       item: { id: u.itemIds?.[i] ?? `${item.kind}:${item.agent}:${item.offerId}`, title: item.title, price: cents(item.unitPrice) },

@@ -28,6 +28,8 @@
  *   - Phase 10: an unused packages-only peer is removed after 30 days; a seller is kept (finding F)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-sale
  * @version-history
+ *   2026-10-25 — Phase 7: a payment refunded after a refused sale is not taken again when the buyer
+ *     retries with the same payment (402 PAYMENT_REFUNDED); paying again completes (secaudit2026oct22).
  *   2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   2026-10-18 —Phase 8: three sales and decisions fired at the same moment, each failing on the code
@@ -496,6 +498,30 @@ await test('A refused sale whose refund fails says the payment was not returned,
     assert(JSON.stringify(inbox.body.data?.messages ?? []).includes(id), `the operator is told: ${inbox.status} ${JSON.stringify(inbox.body).slice(0, 400)}`);
     const back = await S.json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyerToken) });
     assert(back.body.data?.session?.status === 'open', `the session stays open: ${JSON.stringify(back.body.data?.session?.status)}`);
+});
+
+// secaudit2026oct22: a payment refunded after a failed fulfilment is not accepted again for the same
+// checkout. Stripe answers the same PaymentIntent when a hosted card page is read back again, and an
+// idempotent replay of the same charge; the "replay" test instrument answers the same way.
+await test('A payment refunded after a failed sale is not taken again on a retry; paying again completes', async () => {
+    const wrongKey = { node_id: B.nodeId, url: B.baseUrl, public_key: (await generateKeyPair()).publicKey };
+    const { create, done } = await buy({ app: kit, input: { node: wrongKey } }, 'replay');
+    const id = create.body.data.session.id as string;
+    assert(done.status === 502 && /The payment was refunded\./.test(done.body.error?.message ?? ''), `refused and refunded: ${done.status} ${JSON.stringify(done.body)}`);
+    const fixed = await S.json(`/v1/commerce/checkout-sessions/${id}`, {
+        method: 'PATCH', headers: auth(buyerToken),
+        body: JSON.stringify({ items: [{ kind: 'package', agent: R.nodeId, app: kit, offer_id: 'buy', input: { node: await fakeNode('rr') } }] }),
+    });
+    assert(fixed.status === 200, `the buyer corrects the line: ${fixed.status} ${JSON.stringify(fixed.body)}`);
+    const complete = (instrument: string) => S.json(`/v1/commerce/checkout-sessions/${id}/complete`, {
+        method: 'POST', headers: auth(buyerToken), body: JSON.stringify({ payment: { handler: 'test.money', instrument } }),
+    });
+    const again = await complete('replay');
+    assert(again.status === 402 && again.body.error?.code === 'PAYMENT_REFUNDED', `the refunded payment was taken again: ${again.status} ${JSON.stringify(again.body)}`);
+    const open = await S.json(`/v1/commerce/checkout-sessions/${id}`, { headers: auth(buyerToken) });
+    assert(open.body.data?.session?.status === 'open', `the session stays open to pay again: ${JSON.stringify(open.body.data?.session?.status)}`);
+    const paid = await complete('card-ok');
+    assert(paid.status === 200 && paid.body.data?.session?.status === 'completed', `paying again completes: ${paid.status} ${JSON.stringify(paid.body)}`);
 });
 
 console.log('\nPhase 8 — An offer granted on approval');

@@ -274,3 +274,31 @@ describe('nodeKeyStanding: what the node\'s key does once an allowance is spent 
     storage.close?.();
   });
 });
+
+describe('calls that settle at the same moment (secaudit2026oct22)', () => {
+  it('count every debit once', async () => {
+    const storage = await freshStorage();
+    const config = cfg({ openrouterInstanceKey: 'sk-node' });
+    await grantAllowance(storage, config, GAII, 10, 'test');
+    await Promise.all(Array.from({ length: 20 }, () => debitAllowance(storage, config, GAII, 0.1)));
+    const rec = await readAllowance(storage, config, GAII);
+    expect(rec.spent_usd).toBeCloseTo(2.0, 6);
+    expect(rec.day_spent_usd).toBeCloseTo(2.0, 6);
+    storage.close?.();
+  });
+
+  it('keep a grant that lands among debits', async () => {
+    const storage = await freshStorage();
+    const config = cfg({ openrouterInstanceKey: 'sk-node' });
+    await grantAllowance(storage, config, GAII, 1, 'test');
+    await Promise.all([
+      debitAllowance(storage, config, GAII, 0.25),
+      grantAllowance(storage, config, GAII, 5, 'test'),
+      debitAllowance(storage, config, GAII, 0.25),
+    ]);
+    const rec = await readAllowance(storage, config, GAII);
+    expect(rec.granted_usd).toBeCloseTo(6, 6);
+    expect(rec.spent_usd).toBeCloseTo(0.5, 6);
+    storage.close?.();
+  });
+});

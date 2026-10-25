@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-25 — A refunded fulfilment failure keeps the payment's tracking code on the session; a retry whose collect answers it again is refused PAYMENT_REFUNDED, and the next collect carries `attempt` (session-claim.ts; secaudit2026oct22).
  *   2026-10-18 — getSession expires an overdue session on its version (session-claim.ts expireOverdueSession): of two reads at the same moment one writes it and counts the stage.
  *   2026-10-16 — meteredCoordinateOf moved to commerce/metered-coordinate.ts, unchanged, to keep this file under 800 lines.
  *   2026-10-16 — A failed fulfilment after the collect words the buyer's message from the refund's outcome: only a refund the rail confirmed says "refunded"; a payment taken and not returned (x402, a failed Stripe refund) says so, names the checkout reference, and is stored as `commerce.undelivered.{id}` under the seller, logged and told to the operator (QA audit F5-01, F7e-01, S8-05).
@@ -91,7 +92,7 @@ import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
-import { claimSessionForCompletion, releaseSessionClaim, recordCollected, invoiceRailRefusal, expireOverdueSession } from './session-claim.js';
+import { claimSessionForCompletion, releaseSessionClaim, releaseAfterRefund, refundedPaymentRefusal, recordCollected, invoiceRailRefusal, expireOverdueSession } from './session-claim.js';
 
 export { CommerceError } from './errors.js';
 // Moved to platform-fee.ts (2026-10-11); re-exported for the callers that import it from here.
@@ -613,8 +614,10 @@ async function completeSessionInner(
   let collected: { trackingCode: string; saved?: import('./types.js').SavedPayment };
   try {
     collected = handler && session.total > 0
-      ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller, ...(saveForLater ? { saveForLater } : {}) })
+      ? await handler.collect(ctx, { buyerGhii: session.buyerGhii, amount: session.total, currency: session.currency, reference: session.id, fee: totalFee, instrument, seller, ...(saveForLater ? { saveForLater } : {}), ...(session.collectAttempt ? { attempt: session.collectAttempt } : {}) })
       : { trackingCode: `comtx_free_${session.id}` };
+    const refundedAgain = refundedPaymentRefusal(session, collected.trackingCode);
+    if (refundedAgain) throw refundedAgain;   // a payment this checkout refunded earlier (secaudit2026oct22)
   } catch (err) {
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
@@ -663,7 +666,7 @@ async function completeSessionInner(
       : { outcome: 'nothing_captured' };
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
-    await releaseSessionClaim(storage, session, key);
+    await (refund.outcome === 'refunded' ? releaseAfterRefund(storage, session, key, collected.trackingCode) : releaseSessionClaim(storage, session, key));
     const e = err as { message?: string };
     if (handler && (refund.outcome === 'failed' || refund.outcome === 'not_possible')) {
       await recordUndeliveredPayment(ctx, {

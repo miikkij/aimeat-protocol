@@ -17,6 +17,7 @@
  *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   2026-10-25 — countMemory takes excludePrefixes (secaudit2026oct22).
  *   2026-10-16 — LIVE_SQL and deleteExpiredMemory (QA audit D4-01, E4-01, D4-05); key prefixes are GLOB
  *     patterns from storage/key-prefix.ts, literal and case-sensitive (QA audit D4-07).
  *   v2.1.1 — 2026-10-05 — The memory methods are in methods/memory.ts now (secaudit 2026-10, M8).
@@ -144,12 +145,13 @@ export function countMemoryWithOrigins(db: Database.Database): number {
   return row.c;
 }
 
-export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): number {
+export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter; excludePrefixes?: string[] }): number {
   if (ownerGaiis.length === 0) return 0;
   const placeholders = ownerGaiis.map(() => '?').join(',');
   let sql = `SELECT COUNT(DISTINCT key) AS c FROM memory WHERE ownerGaii IN (${placeholders})`;
   const params: unknown[] = [...ownerGaiis];
   if (opts?.prefix) { sql += ' AND key GLOB ?'; params.push(globPrefix(opts.prefix)); }
+  for (const p of opts?.excludePrefixes ?? []) { sql += ' AND key NOT GLOB ?'; params.push(globPrefix(p)); }
   if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
   sql += archivedSql(opts?.archived);
   // NB: does not subtract not-yet-pruned TTL-expired rows (a stat-display approximation); the

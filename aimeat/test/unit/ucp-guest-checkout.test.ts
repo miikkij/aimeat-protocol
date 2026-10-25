@@ -9,6 +9,9 @@
  * @version-history
  *   v1.0.0 — 2026-10-08 — Initial (AI visibility, layer E).
  *   v1.0.1 — 2026-10-11 — The stub sellable names its price `unitPrice` (was `priceMorsels`) and its pacing `tollMorsels`.
+ *   v1.1.0 — 2026-10-25 — A price that is not whole cents is shown and charged as the same total
+ *     (offer "tenth", 1.49 cents a unit; secaudit2026oct22). Canceled checkouts do not count toward
+ *     the seller's open limit; the fake storage answers countMemory and listMemory.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
@@ -32,7 +35,7 @@ vi.mock('../../src/commerce/sellable-resolvers.js', () => ({
   getSellableResolver: () => ({
     resolve: async (_s: unknown, _c: unknown, ref: { offer_id?: string }) => {
       if (ref.offer_id === 'gone') throw Object.assign(new Error('gone'), { code: 'OFFER_NOT_FOUND' });
-      return { kind: 'offer', agentGaii: 'vendor#shop@node-1', offerId: ref.offer_id, title: 'Audit', unitPrice: 19_990_000, tollMorsels: 0, sellerOwner: 'shop', sellerGhii: 'shop@node-1' };
+      return { kind: 'offer', agentGaii: 'vendor#shop@node-1', offerId: ref.offer_id, title: 'Audit', unitPrice: ref.offer_id === 'tenth' ? 14_900 : 19_990_000, tollMorsels: 0, sellerOwner: 'shop', sellerGhii: 'shop@node-1' };
     },
   }),
 }));
@@ -81,6 +84,8 @@ function fakeStorage() {
     setMemory: async (r: { ownerGaii: string; key: string; value: unknown }) => { put(r.ownerGaii, r.key, r.value); return r; },
     deleteMemory: async (o: string, k: string) => mem.delete(`${o}|${k}`),
     listMemoryKeysByPrefix: async (p: string) => [...mem.values()].filter((r) => r.key.startsWith(p)).map((r) => ({ ownerGaii: r.ownerGaii, key: r.key })),
+    countMemory: async (owners: string[], opts?: { prefix?: string }) => [...mem.values()].filter((r) => owners.includes(r.ownerGaii) && (!opts?.prefix || r.key.startsWith(opts.prefix))).length,
+    listMemory: async (o: string, opts?: { prefix?: string }) => [...mem.values()].filter((r) => r.ownerGaii === o && (!opts?.prefix || r.key.startsWith(opts.prefix))).map((r) => ({ ...r, value: structuredClone(r.value) })),
   };
 }
 const config = { baseUrl: 'https://shop.example', nodeId: 'node-1', commerceEnabled: true, encryptionKey: null, totpSecretEncryptionKey: null } as never;
@@ -142,6 +147,33 @@ describe('the UCP guest checkout', () => {
     expect(storage.mem.has(`shop@node-1|commerce.ucp.pending.${done.orderId}`)).toBe(false);
     await expect(g.completeGuestCheckout(storage as never, config, s.id, PLATFORM, {})).rejects.toMatchObject({ code: 'checkout_closed' });
   });
+
+  it('charges exactly the total the platform was shown, also for a price that is not whole cents (secaudit2026oct22)', async () => {
+    const storage = fakeStorage();
+    // 1.49 cents a unit, 100 units: the platform must be shown and charged the same 149 cents.
+    const s = await g.createGuestCheckout(storage as never, config, { profileUrl: PLATFORM, lineItems: [{ item: { id: 'offer:vendor#shop@node-1:tenth' }, quantity: 100 }], buyer: { email: 'pat@example.com' } });
+    const view = g.toUcpCheckout(s, config, {});
+    const shown = (view.totals as Array<{ type: string; amount: number }>).find((t) => t.type === 'total')!.amount;
+    expect((view.line_items as any[])[0].totals[1].amount).toBe(shown);
+    const done = await g.completeGuestCheckout(storage as never, config, s.id, PLATFORM, { instruments: [{ credential: { type: 'stripe_payment_token', token: 'spt_good12345' } }] });
+    expect(Math.round(charges[0]!.amount / 10_000)).toBe(shown);
+    expect(shown).toBe(149);
+    const order = await g.readUcpOrder(storage as never, config, done.orderId!, PLATFORM);
+    expect((g.toUcpOrder(order, config).totals as Array<{ amount: number }>)[1]!.amount).toBe(shown);
+    expect(order.receipt?.charged).toBe(charges[0]!.amount);
+  });
+
+  it('counts only open checkouts toward the seller\'s limit: closed ones do not stop a new create (secaudit2026oct22)', async () => {
+    const storage = fakeStorage();
+    const ids: string[] = [];
+    for (let i = 0; i < 500; i++) ids.push((await g.createGuestCheckout(storage as never, config, { profileUrl: PLATFORM, lineItems: line })).id);
+    // 500 open: the next one is refused, as designed.
+    await expect(g.createGuestCheckout(storage as never, config, { profileUrl: PLATFORM, lineItems: line })).rejects.toMatchObject({ code: 'rate_limited' });
+    for (const id of ids) await g.cancelGuestCheckout(storage as never, config, id, PLATFORM);
+    // All 500 canceled: their records are kept for replays, and a new checkout opens.
+    const next = await g.createGuestCheckout(storage as never, config, { profileUrl: 'https://gemini.google.com/.well-known/ucp', lineItems: line });
+    expect(next.status).toBe('incomplete');
+  }, 60_000);
 
   it('marks the line delivered when its task is done, and tries a failed webhook again when its wait is over', async () => {
     const storage = fakeStorage();

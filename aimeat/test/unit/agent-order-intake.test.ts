@@ -108,6 +108,34 @@ describe('intakeAgentOrder', () => {
     expect(order.fulfillment).toEqual({ taskIds: ['task-1'] });
   });
 
+  it('takes no order for a session Stripe says is not paid yet, and takes it once when it is paid (secaudit2026oct22)', async () => {
+    const storage = fakeStorage();
+    const line = { quantity: 1, price: { external_reference: feedIdOf(SKU), unit_amount: 1999 } };
+    stripeSession = { id: 'cs_test_late01', payment_status: 'unpaid', currency: 'usd', amount_total: 1999, line_items: { data: [line] } };
+    const early = await intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_late01' }, 'evt_completed');
+    expect(early.action).toBe('not_yet_paid');
+    expect(tasks).toHaveLength(0);
+    expect(purchases).toHaveLength(0);
+    expect(storage.mem.has(`${SELLER}|commerce.order.cs_test_late01`)).toBe(false);
+    // checkout.session.async_payment_succeeded for the same session: Stripe now reads it as paid.
+    stripeSession = { ...stripeSession, payment_status: 'paid' };
+    const paid = await intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_late01' }, 'evt_async_ok');
+    expect(paid).toMatchObject({ action: 'agent_order', orderId: 'cs_test_late01', taskIds: ['task-1'] });
+    const again = await intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_late01' }, 'evt_async_ok');
+    expect(again.action).toBe('already_taken');
+    expect(tasks).toHaveLength(1);
+    expect(purchases).toHaveLength(1);
+  });
+
+  it('takes a paid session, and one that needed no payment, at once', async () => {
+    const storage = fakeStorage();
+    const line = { quantity: 1, price: { external_reference: feedIdOf(SKU), unit_amount: 1999 } };
+    stripeSession = { id: 'cs_test_paid01', payment_status: 'paid', currency: 'usd', amount_total: 1999, line_items: { data: [line] } };
+    expect((await intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_paid01' }, 'evt_5')).action).toBe('agent_order');
+    stripeSession = { id: 'cs_test_free01', payment_status: 'no_payment_required', currency: 'usd', amount_total: 0, line_items: { data: [line] } };
+    expect((await intakeAgentOrder(storage as never, config, SELLER, { id: 'cs_test_free01' }, 'evt_6')).action).toBe('agent_order');
+  });
+
   it('leaves alone a checkout whose lines name no product of the feed, and an id that is not a session', async () => {
     const storage = fakeStorage();
     stripeSession = { id: 'cs_test_other1', currency: 'usd', amount_total: 500, line_items: { data: [{ quantity: 1, price: { external_reference: 'tshirt-42', unit_amount: 500 } }] } };

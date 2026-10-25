@@ -23,12 +23,21 @@
  *   const refusal = await memoryCeilingRefusal({ storage, config }, target, [{ key, value }]);
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   v1.0.1 — 2026-10-25 — The node's own UCP records under a seller (NODE_BOOKKEEPING_PREFIXES) are
+ *     left out of the owner's key count (secaudit2026oct22).
  *   v1.0.0 — 2026-08-11 — Extracted after the audit's own diff was checked for duplication: the same
  *     three ceilings existed in memory-write.ts and workspace-write-guards.ts.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { checkMemoryQuota, chargeOverage } from './quota.js';
+
+/**
+ * Key prefixes the node writes under an owner for parties with no account here, each record with
+ * its own expiry (commerce/ucp-guest-checkout.ts, routes/ucp-checkout.ts). They are left out of the
+ * owner's key count: an unsigned platform request must not fill the owner's own limit.
+ */
+const NODE_BOOKKEEPING_PREFIXES = ['commerce.ucp.idem.', 'commerce.ucp.session.'] as const;
 
 export interface CeilingRefusal {
     status: number;
@@ -92,7 +101,10 @@ export async function memoryCeilings(
     // An UPDATE never grows the key count, so the count is only taken when the set adds a key.
     let keyCount: number | undefined;
     if (newKeys > 0) {
-        keyCount = await storage.countMemory([targetGaii]);
+        // The node's own expiring UCP records under a seller (idempotency claims, guest checkouts)
+        // are written by the node for platforms with no account here, so they do not use up the
+        // owner's own key limit (secaudit2026oct22).
+        keyCount = await storage.countMemory([targetGaii], { excludePrefixes: [...NODE_BOOKKEEPING_PREFIXES] });
         if (keyCount + newKeys > config.memoryMaxKeysPerAgent) {
             // The remedy named here matters: "delete unused keys" sends someone who hit the wall
             // through one-key-per-small-fact off to delete data instead of fixing the shape that

@@ -30,10 +30,15 @@
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A renewal of a plan an agent bought (bought_by) is reserved against the
+ *     agent's daily limit right before the charge and released when the charge fails; a refusal tells
+ *     the owner once per period (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-5).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
+import { agentSessionCaller } from '../services/caller-context.js';
 import type { Sellable, SavedPayment } from './types.js';
 import type { SellableResolver } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
@@ -249,11 +254,24 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
   if (!handler?.chargeSaved) return { result: 'skipped', detail: `handler ${sub.kept_payment!.handler} cannot charge a kept card` };
   const sellerGhii = `${ext.installedBy}@${config.nodeId}`;
   const seller = { ghii: sellerGhii, owner: ext.installedBy, psp: (await storage.getMemory(sellerGhii, 'commerce.psp'))?.value ?? undefined };
+  // A plan an agent bought renews as that agent's purchase, held to the daily limit its owner set,
+  // checked and counted in one step right before the charge and given back when the charge fails, as
+  // the package renewal does (secaudit2026oct22).
+  const spend = { buyerGhii: sub.buyer_ghii, currency: plan.currency, total: plan.amount };
+  const agent = sub.bought_by ? agentSessionCaller(sub.bought_by, '', [], config.nodeId, storage).auth : null;
   let trackingCode: string;
   try {
-    trackingCode = (await handler.chargeSaved({ config, storage }, { amount: plan.amount, currency: plan.currency, reference, saved: sub.kept_payment!, seller })).trackingCode;
+    const refusal = await reserveAgentPurchase(storage, config, spend, agent);
+    if (refusal) throw refusal;
+    try {
+      trackingCode = (await handler.chargeSaved({ config, storage }, { amount: plan.amount, currency: plan.currency, reference, saved: sub.kept_payment!, seller })).trackingCode;
+    } catch (err) {
+      await releaseAgentPurchase(storage, spend, agent);
+      throw err;
+    }
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
+    const overLimit = err instanceof CommerceError && err.code.startsWith('PURCHASE_LIMIT_');
+    const reason = err instanceof CommerceError ? `${err.code}: ${err.message}` : err instanceof Error ? err.message : String(err);
     const told = sub.last_failure?.reason.startsWith(`[${sub.active_until}]`);
     await updateRecord(storage, sub.buyer_ghii, subKey(sub.ext, sub.plan), parseRecord, cur => ({
       ...(cur ?? sub), last_failure: { at: new Date().toISOString(), reason: `[${sub.active_until}] ${reason}` }, updated_at: new Date().toISOString(),
@@ -263,8 +281,10 @@ async function renewOne(storage: Storage, config: AimeatConfig, sub: Subscriptio
       await notify(storage, sub.buyer_ghii, {
         type: 'subscription_renewal_failed',
         title: `The renewal of ${plan.title} did not go through`,
-        body: `The card could not be charged (${reason}). The subscription ends on ${date} unless the payment goes through; this node tries again each day until then.`,
-        i18n: { key: 'subscription_renewal_failed', vars: { name: plan.title, date } },
+        body: overLimit
+          ? `The agent that bought this subscription may not spend this today (${reason}). The card was not charged. The subscription ends on ${date} unless you renew it yourself or raise the agent's limit; this node tries again each day until then.`
+          : `The card could not be charged (${reason}). The subscription ends on ${date} unless the payment goes through; this node tries again each day until then.`,
+        i18n: { key: overLimit ? 'subscription_renewal_agent_limit' : 'subscription_renewal_failed', vars: { name: plan.title, date } },
       });
       emitChange('notifications', sub.buyer_ghii);
     }
