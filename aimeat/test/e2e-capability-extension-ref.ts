@@ -16,6 +16,8 @@
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capability-extension-ref
  * @version-history
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22).
+ *   v1.1.0 — 2026-10-25 — Another account's capability over the caller's own extension is 403
+ *     EXTENSION_CAPABILITY_NOT_YOURS; the caller's own capability over it runs (secaudit2026oct22).
  */
 import { registerOwner } from './helpers/owner-login.js';
 
@@ -180,10 +182,53 @@ for (const [label, ref] of [['a plain ref', `ext:${extName}:echo`], ['a version-
     });
 }
 
+console.log('A capability over the caller\'s own extension');
+
+const ownExt = `capref-own-${suffix}`;
+const ownManifest = manifest.replace(`name: ${extName}`, `name: ${ownExt}`).replace(`author: ${registrantName}`, `author: ${callerName}`);
+
+await test('The caller installs and activates an extension of its own', async () => {
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(caller),
+        body: JSON.stringify({ manifest: ownManifest, scripts: { 'actions/echo.js': script } }),
+    });
+    assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body.error)}`);
+    const act = await json(`/v1/extensions/${ownExt}/activate`, { method: 'POST', headers: auth(caller) });
+    assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body.error)}`);
+});
+
+await test('Another account\'s capability over the caller\'s own extension does not run for the caller: 403', async () => {
+    const id = `capref-front-${suffix}`;
+    const created = await json('/v1/capabilities', {
+        method: 'POST', headers: auth(registrant), body: JSON.stringify(capBody(id, `ext:${ownExt}:echo`)),
+    });
+    assert(created.status === 201, `create: ${created.status} ${JSON.stringify(created.body.error)}`);
+    const inv = await json(`/v1/capabilities/${id}/invoke`, {
+        method: 'POST', headers: auth(caller), body: JSON.stringify({ input: { message: 'chosen by the registrant' } }),
+    });
+    assert(inv.status === 403 && inv.body.error?.code === 'EXTENSION_CAPABILITY_NOT_YOURS',
+        `expected 403 EXTENSION_CAPABILITY_NOT_YOURS, got ${inv.status} ${inv.body.error?.code ?? JSON.stringify(inv.body.data?.result)}`);
+});
+
+await test('The caller\'s own capability over its own extension runs', async () => {
+    const id = `capref-mine-${suffix}`;
+    const created = await json('/v1/capabilities', {
+        method: 'POST', headers: auth(caller), body: JSON.stringify(capBody(id, `ext:${ownExt}:echo`)),
+    });
+    assert(created.status === 201, `create: ${created.status} ${JSON.stringify(created.body.error)}`);
+    const inv = await json(`/v1/capabilities/${id}/invoke`, {
+        method: 'POST', headers: auth(caller), body: JSON.stringify({ input: { message: 'mine' } }),
+    });
+    assert(inv.status === 200 && inv.body.data?.result?.echoed === 'Echo: mine', `invoke ${inv.status}: ${JSON.stringify(inv.body.error ?? inv.body.data)}`);
+});
+
 await test('Cleanup', async () => {
-    for (const id of [`capref-put-${suffix}`, `capref-none-${suffix}`, `capref-dots-${suffix}`]) {
+    for (const id of [`capref-put-${suffix}`, `capref-none-${suffix}`, `capref-dots-${suffix}`, `capref-front-${suffix}`]) {
         await json(`/v1/capabilities/${id}`, { method: 'DELETE', headers: auth(registrant) });
     }
+    await json(`/v1/capabilities/capref-mine-${suffix}`, { method: 'DELETE', headers: auth(caller) });
+    await json(`/v1/extensions/${ownExt}/deactivate`, { method: 'POST', headers: auth(caller) });
+    await json(`/v1/extensions/${ownExt}`, { method: 'DELETE', headers: auth(caller) });
     await json(`/v1/extensions/${extName}/deactivate`, { method: 'POST', headers: auth(registrant) });
     const del = await json(`/v1/extensions/${extName}`, { method: 'DELETE', headers: auth(registrant) });
     assert(del.status === 200, `delete extension: ${del.status}`);

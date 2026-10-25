@@ -10,6 +10,9 @@
  * @version-history
  *   v0.1.0 — 2026-06-26 — Initial showroom for vendored-styling verification.
  *   v0.2.0 — 2026-06-26 — Comprehensive: every component of all 7 libraries.
+ *   v0.2.1 — 2026-10-25 — secaudit2026oct22: the node's own /cortex-bundled copy is loaded first,
+ *     /v1/cortex only when it is missing, so no other account's cortex under a bundled name runs on
+ *     the apex.
  */
 (function () {
   'use strict';
@@ -24,12 +27,15 @@
       document.head.appendChild(s);
     });
   }
+  // The node's own static copy first. /v1/cortex/<name> serves whichever active cortex holds the
+  // name, and on the apex that code would run beside the signed-in session; it is only the fallback,
+  // for the published single-file copy of this page on an origin that has no /cortex-bundled.
   function loadCortex(name) {
-    return loadScript('/v1/cortex/' + name + '/libs/' + name + '.js')
-      .then(function () { return { name: name, ok: true, via: 'v1/cortex' }; })
+    return loadScript('/cortex-bundled/' + name + '.js')
+      .then(function () { return { name: name, ok: true, via: 'cortex-bundled' }; })
       .catch(function () {
-        return loadScript('/cortex-bundled/' + name + '.js')
-          .then(function () { return { name: name, ok: true, via: 'cortex-bundled' }; })
+        return loadScript('/v1/cortex/' + name + '/libs/' + name + '.js')
+          .then(function () { return { name: name, ok: true, via: 'v1/cortex' }; })
           .catch(function () { return { name: name, ok: false, via: 'none' }; });
       });
   }

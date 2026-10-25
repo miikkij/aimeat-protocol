@@ -30,6 +30,13 @@
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — A chain that ends at an EU reference wallet test CA: trust source
  *     eudi-test-anchor, reason TEST_TRUST_ANCHOR, level unknown (wish-allekirjoitus-eudi-lompakolla).
+ *   v1.2.0 — 2026-10-25 — secaudit2026oct22: a SignedData with no SignerInfo (NO_SIGNER) or a
+ *     SignerInfo with no messageDigest (NO_MESSAGE_DIGEST) is invalid, and a check that established
+ *     neither integrity nor the signature is never valid by default.
+ *   v1.2.1 — 2026-10-25 — secaudit2026oct22: a signature or document timestamp proves the signing
+ *     time only when its authority is on a trusted list or chains to an operator anchor.
+ *   v1.2.2 — 2026-10-25 — secaudit2026oct22: the proven signing time goes to checkRevocation, which
+ *     uses an embedded good OCSP answer only when it was made at or after that time.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -46,6 +53,8 @@ export type Verdict = 'valid' | 'invalid' | 'indeterminate';
 export const REASONS = {
   BYTE_RANGE_MALFORMED: 'The signature field names byte ranges that do not fit the file, so it cannot be checked.',
   CMS_UNPARSABLE: 'The signature data could not be read.',
+  NO_SIGNER: 'The signature data names no signer, so there is no signature to check.',
+  NO_MESSAGE_DIGEST: 'The signature does not state the digest of the content it signs, so it is not bound to the document.',
   DIGEST_MISMATCH: 'The signed content has changed since it was signed.',
   SIGNATURE_INVALID: 'The signature does not verify with the key in the signer certificate.',
   SIGNER_CERT_MISSING: 'The signature does not carry the signer certificate.',
@@ -176,6 +185,8 @@ async function assess(
   const doubt = (r: Reason) => { reasons.push(r); if (verdict === 'valid') verdict = 'indeterminate'; };
 
   if (cms.problems.includes('CMS_UNPARSABLE') || cms.problems.includes('NOT_SIGNED_DATA')) fail('CMS_UNPARSABLE');
+  if (cms.problems.includes('NO_SIGNER')) fail('NO_SIGNER');
+  if (cms.problems.includes('NO_MESSAGE_DIGEST')) fail('NO_MESSAGE_DIGEST');
   if (cms.problems.includes('DIGEST_MISMATCH')) fail('DIGEST_MISMATCH');
   if (cms.problems.includes('SIGNATURE_INVALID')) fail('SIGNATURE_INVALID');
   if (cms.problems.includes('SIGNING_CERT_ATTR_MISMATCH')) fail('SIGNING_CERT_ATTR_MISMATCH');
@@ -183,6 +194,9 @@ async function assess(
   if (cms.problems.includes('SIGNER_CERT_MISSING')) doubt('SIGNER_CERT_MISSING');
   if (cms.problems.includes('MULTIPLE_SIGNERS')) reasons.push('MULTIPLE_SIGNERS');
   if (cms.problems.includes('WEAK_DIGEST')) doubt('WEAK_DIGEST');
+  // `valid` means intact and made with the key in the certificate. A check that established neither
+  // and was not mapped above is a failure, never a pass by default.
+  if (verdict === 'valid' && (!cms.integrity || !cms.signatureValid)) fail('SIGNATURE_INVALID');
 
   const signer = cms.signerCert ? safeRead(cms.signerCert) : null;
   if (signer && signer.keyUsage.length && !signer.keyUsage.includes('digitalSignature') && !signer.keyUsage.includes('nonRepudiation')) fail('KEY_USAGE');
@@ -198,14 +212,23 @@ async function assess(
     else if (ts.genTime) {
       signingTime = new Date(ts.genTime);
       timeSource = 'timestamp';
-      proven = true;
       const tsa = ts.tsaCert ? safeRead(ts.tsaCert) : null;
       tsaName = tsa ? holderLabel(tsa.subject) : null;
-      if (tsa && online) {
+      // The time counts as PROVEN only when a trusted authority vouches for it: a TSA on a trusted
+      // list, or one that chains to an operator anchor. A token from any other TSA is intact but is
+      // a time its maker states, so the rules for a claimed time apply (an expired or revoked
+      // certificate is then not excused by it). Offline, only an operator anchor can be checked.
+      if (tsa) {
         const tsaChain = await buildChain(config, tsa.der, ts.certificates, online);
-        const tsaTrust = await findIssuingService(config, tsaChain.certs, signingTime, ['TSA/QTST', 'TSA', 'CA/QC', 'CA/PKC']);
-        if (tsaTrust.match?.positiveAt) timeSource = tsaTrust.match.service.type === 'TSA/QTST' ? 'qualified-timestamp' : 'timestamp';
-        else if (!tsaChain.operatorAnchor) reasons.push('TIMESTAMP_UNTRUSTED');
+        const tsaTrust = online ? await findIssuingService(config, tsaChain.certs, signingTime, ['TSA/QTST', 'TSA', 'CA/QC', 'CA/PKC']) : null;
+        if (tsaTrust?.match?.positiveAt) {
+          timeSource = tsaTrust.match.service.type === 'TSA/QTST' ? 'qualified-timestamp' : 'timestamp';
+          proven = true;
+        } else if (tsaChain.operatorAnchor) {
+          proven = true;
+        } else if (online) {
+          reasons.push('TIMESTAMP_UNTRUSTED');
+        }
       }
     }
   }
@@ -265,7 +288,7 @@ async function assess(
       const rm = (await findIssuingService(config, rc.certs, new Date(), ['OCSP/QC', 'OCSP', 'CA/QC', 'CA/PKC'])).match;
       return !!rm?.positiveAt && rm.service.tspName === match.service.tspName;
     };
-    revocation = await checkRevocation(signer, issuer, { embeddedOcsp: cms.embeddedOcsp, online, trustResponder });
+    revocation = await checkRevocation(signer, issuer, { embeddedOcsp: cms.embeddedOcsp, online, trustResponder, provenTime: proven ? at : null });
     if (revocation.status === 'revoked') {
       const revokedAt = revocation.revokedAt ? Date.parse(revocation.revokedAt) : 0;
       if (proven && revokedAt > at.getTime()) reasons.push('REVOKED_AFTER_SIGNING');
@@ -423,7 +446,9 @@ export async function validatePdf(config: AimeatConfig, pdf: Buffer, opts: { onl
   const docTs = new Map<number, TimestampCheck>();
   for (const f of fields.filter((x) => x.isDocTimestamp && x.cms.length)) {
     const { report, ts } = await assessDocTimestamp(config, f, online);
-    docTs.set(f.index, ts);
+    // Only a document timestamp whose own authority is trusted proves when an earlier signature
+    // existed; an untrusted one is a time its maker states.
+    if (report.trust.trusted && report.verdict !== 'invalid') docTs.set(f.index, ts);
     signatures.push(report);
   }
   for (const f of fields) {

@@ -36,6 +36,7 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   2026-10-25 — POST /v1/provenance/embed answers 503 BUSY with Retry-After when every archive slot is in use (secaudit2026oct22, provenance-embed archive bound).
  *   2026-10-21 — callerOwner asks isAnonymousPrincipal: the token POST /v1/auth/anonymous mints carries
  *     no anonymous claim and was given the anonymous account's owner scope (secaudit 2026-10,
  *     anonymous-claim-not-signed).
@@ -321,7 +322,10 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
           digital_source_type: r.digitalSourceType, records: r.records, ...(r.pages !== undefined ? { pages: r.pages } : {}),
         }, [{ description: 'Download the marked file', method: 'GET', url: `/v1/storage/${r.storageKey.split('/').map(encodeURIComponent).join('/')}` }]));
       } catch (e) {
-        if (e instanceof EmbedError) return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        if (e instanceof EmbedError) {
+          if (e.status === 503) res.setHeader('Retry-After', '30');
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        }
         throw e;
       }
     });

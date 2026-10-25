@@ -10,11 +10,15 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-capabilities.js"></script>
  *   await AIMEAT.capabilities.list(); await AIMEAT.capabilities.invoke('id', input);
  * @version-history
+ *   v1.0.1 — 2026-10-25 — secaudit2026oct22: invoke() of a cortex capability loads a script only from
+ *     this node's /v1/cortex/<name>/libs/ for the cortex the record names (nodeCortexLibUrl), never
+ *     an address taken from the record's usage text.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-capabilities.ts (SDK-libs migration Phase 1).
  */
 import { makeSession } from '../_core/session.js';
 const { getSession, authFetch } = makeSession('aimeat-capabilities.js');
 import { attach } from '../_core/namespace.js';
+import { NODE_URL } from '../_core/config.js';
 
 // Cortex library cache (loaded libs stay in memory)
 const _loadedCortex = {};
@@ -28,6 +32,26 @@ async function loadCortexLib(url) {
     s.onerror = function () { reject(new Error('Failed to load: ' + url)); };
     document.head.appendChild(s);
   });
+}
+
+/**
+ * The address of a cortex library on THIS node for the cortex `ref` names ('cortex:<name>' or
+ * '<name>'), or null when `raw` is anything else: another origin, another cortex, or a path that is
+ * not /v1/cortex/<name>/libs/<file>.js. Exported for its unit test.
+ */
+export function nodeCortexLibUrl(raw, ref) {
+  var name = String(ref || '').replace(/^cortex:/, '');
+  if (!name || /[/\\?#]/.test(name)) return null;
+  var base = NODE_URL || location.href;
+  if (!URL.canParse(base) || !URL.canParse(String(raw), base)) return null;
+  var u = new URL(String(raw), base);
+  var nodeOrigin = new URL(base).origin;
+  if (u.origin !== nodeOrigin && u.origin !== location.origin) return null;
+  var prefix = '/v1/cortex/' + encodeURIComponent(name) + '/libs/';
+  if (u.pathname.indexOf(prefix) !== 0) return null;
+  var file = u.pathname.slice(prefix.length);
+  if (!/^[A-Za-z0-9._-]+\.m?js$/.test(file) || file.indexOf('..') !== -1) return null;
+  return u.origin + u.pathname;
 }
 
 const capabilities = {
@@ -71,10 +95,17 @@ const capabilities = {
     // Client-side cortex invoke
     if (cap.source && cap.source.type === 'cortex') {
       var usage = cap.usage || '';
-      // Try to load the cortex lib
+      // Load the cortex lib, but only from the node's own cortex route for the cortex the record
+      // names. The usage text is the record author's documentation; an address in it pointing
+      // anywhere else is never loaded into this app's page (secaudit2026oct22).
       var libMatch = usage.match(/loadScript\(['"]([^'"]+)['"]/);
       if (libMatch) {
-        await loadCortexLib(libMatch[1]);
+        var libUrl = nodeCortexLibUrl(libMatch[1], cap.source.ref);
+        if (!libUrl) {
+          throw new Error('This cortex capability names a library outside this node\'s cortex route for "'
+            + String(cap.source.ref || '') + '", so it was not loaded. Load the library yourself with loadScript() if you trust it.');
+        }
+        await loadCortexLib(libUrl);
       }
       // Find the export function
       if (cap.exports && cap.exports.length > 0) {

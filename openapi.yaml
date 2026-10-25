@@ -22142,7 +22142,9 @@ paths:
         '415':
           description: UNSUPPORTED_FORMAT - not a PNG, JPEG, PDF or ZIP
         '422':
-          description: UNREADABLE_FILE - the file's structure could not be read to mark it
+          description: UNREADABLE_FILE - the file's structure could not be read to mark it, or a ZIP unpacks to more than 50 times its stored size or 512 MB
+        '503':
+          description: BUSY - two archives are being marked already; try again after the Retry-After seconds
   /v1/provenance:
     post:
       operationId: aiProvenanceDeclare
@@ -29640,7 +29642,7 @@ paths:
     get:
       operationId: getDocsignRequest
       summary: One signing request, with every signature checked
-      description: Each check says whether the statement matches the request, the node seal verifies with this node's key, and the signer's own evidence (passkey assertion or key signature) verifies.
+      description: Each check says whether the statement matches the request, the node seal verifies with this node's key, and the signer's own evidence (passkey assertion or key signature) verifies, and `test` says whether it is a wallet signature from an EU reference-wallet test certificate (a test with no legal effect).
       tags: [Document signing]
       security:
         - BearerAuth: []
@@ -29902,7 +29904,7 @@ paths:
     post:
       operationId: postDocsignWalletResponse
       summary: Where a wallet posts the signed PDF or an error (public, by session and state)
-      description: A form with state and documentWithSignature (a JSON array of base64 PDFs), or state and error. The PDF must begin with the bytes that were sent, and its new signature must check out; it is then stored in the signer's files and sealed into the request. Answers redirect_uri.
+      description: A form with state and documentWithSignature (a JSON array of base64 PDFs), or state and error. The PDF must begin with the bytes that were sent, and its new signature must check out, with a certificate that is not revoked now (422 CERTIFICATE_REVOKED); it is then stored in the signer's files and sealed into the request. Answers redirect_uri.
       tags: [Document signing]
       security: []
       parameters:
@@ -29967,7 +29969,7 @@ paths:
     get:
       operationId: lookupDocsignByHash
       summary: Who signed this document on this node (public)
-      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with.
+      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with. Each signature carries `test`, true for a wallet signature whose certificate comes from an EU reference-wallet test CA (a test with no legal effect).
       tags: [Document signing]
       security: []
       parameters:
@@ -65549,6 +65551,10 @@ paths:
           description: >
             No such connection, or no such stored file. A connection belonging to someone else is
             this same 404.
+        '409':
+          description: >
+            DELEGATION_AMBIGUOUS - more than one channel has given this app_id the action, so the
+            delegated publish does not choose one.
         '502':
           description: >
             The provider refused. `REJECTED` is permanent and must not be retried; `PUBLISH_FAILED`
@@ -66487,6 +66493,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: No such connection.
+        '409':
+          description: DELEGATION_IN_USE - another channel already gives this app_id the same action; choose a different app_id.
     get:
       operationId: listConnectionDelegations
       summary: What has been delegated over a channel

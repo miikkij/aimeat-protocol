@@ -27,6 +27,8 @@
  *   verifySeal · evidenceHash · canonicalJson
  * @usage const challenge = intentChallenge(intent);
  * @version-history
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: SealedStatement.test, set only for a wallet signature
+ *     that chains to an EU reference-wallet test CA.
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Method eudi-wallet (wish-allekirjoitus-eudi-lompakolla).
  */
@@ -75,6 +77,12 @@ export interface SealedStatement {
   assurance: Assurance;
   /** SHA-256 of the canonical evidence (the passkey assertion or the key signature); null for session. */
   evidence: string | null;
+  /**
+   * Present, and true, only for a wallet signature whose certificate chains to an EU reference-wallet
+   * test CA: a test with no legal effect. Absent on every other statement, so the canonical JSON of a
+   * statement sealed before the field existed is unchanged and its seal still verifies.
+   */
+  test?: true;
 }
 
 export interface Seal {

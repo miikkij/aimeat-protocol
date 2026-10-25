@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.10.1 — 2026-10-25 — A fork into another account's catalogue leaves out the source owner's
+ *     named reviewer, its log, the legal pages and the data-map gap (secaudit2026oct22).
  *   v1.10.0 — 2026-10-23 — Deleting every version of an app deletes its compliance documents (plan
  *     doc-mvlftkh9zmc9).
  *   v1.9.0 — 2026-10-19 — The draft states its display version: stageAppDraft takes `version` (judged by
@@ -497,6 +499,21 @@ export async function forkApp(
   // an app they wrote. It also stops the obvious abuse: forking a well-ranked app fifty times and
   // having fifty indexed copies appear on the operator's domain without anyone approving one.
   delete forkedManifest.seo;
+  // The source owner's own statements do not travel to another account's fork: the named reviewer
+  // (a declaration only the account holder makes in person), its log, the legal pages and the
+  // data-map check's owner-only gap. On the fork they were served as the forker's declarations and
+  // carried forward by every later publish (secaudit2026oct22,
+  // app-lifecycle.ts:forkApp/manifest-spread-carries-owner-statements). A same-owner fork keeps
+  // them, as it did: the statements are that owner's own either way.
+  if (source.ownerGaii !== callerGhii) {
+    delete forkedManifest.authorship;
+    delete forkedManifest.authorshipLog;
+    delete forkedManifest.legal;
+    if (forkedManifest.dataMap?.gap) {
+      forkedManifest.dataMap = { ...forkedManifest.dataMap };
+      delete forkedManifest.dataMap.gap;
+    }
+  }
   // A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest spread above brings the
   // posture across, and this re-measures the observed half against the bytes actually being stored
   // while keeping what the source DECLARED — so the statement neither resets to silence nor becomes

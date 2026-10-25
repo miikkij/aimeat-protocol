@@ -29,6 +29,7 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-25 — An (app id, action) belongs to one channel: a delegation for a pair another channel holds is 409 DELEGATION_IN_USE, the 201 reads its own row back, and a delegated publish of a pair held on two channels is 409 DELEGATION_AMBIGUOUS (secaudit2026oct22, h50/connections-delegation-lookup-unscoped).
  *   2026-10-16 — POST /v1/connections/:id/read/:resource answers 403 READ_AS_OWNER_REQUIRED, with the MCP
  *     mail tools' sentence (readAsOwnerRefusal), when an agent reads its owner's mailbox without
  *     connections:read-as-owner; it answered 404 for a connection GET /v1/connections had listed (Jouni, 2026-10-16).
@@ -113,6 +114,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   /** Whose connections the caller may name or read (services/connections/access.ts connectionHoldersOf). */
   const holdersOf = (req: Request, purpose: 'name' | 'read'): string[] =>
     connectionHoldersOf(resolve(req), `${req.auth!.owner}@${config.nodeId}`, req.auth!.scopes, purpose);
+  /** The channels that hold a delegation for this app id and action. */
+  const delegationChannels = async (appId: string, action: string): Promise<Set<string>> =>
+    new Set((await storage.listDelegations()).filter(d => d.appId === appId && d.action === action).map(d => d.connectionId));
 
   /**
    * Build the service context, or explain why not. A missing encryption key is a hard stop rather
@@ -514,6 +518,14 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
     // The delegated path: an app acting over someone else's shared channel. Different gate, because
     // the interesting constraints (per-user cap, moderation, fixed parameters) live on a delegation.
+    // The delegation is found by app id and action, which channel owners type; a pair held on two
+    // channels (written before a second one was refused) publishes nowhere rather than through
+    // whichever row the store returns first (secaudit2026oct22, h50/connections-delegation-lookup-unscoped).
+    if ((await delegationChannels(appId, action)).size > 1) {
+      res.status(409).json(error(config.nodeId, 'DELEGATION_AMBIGUOUS',
+        `More than one channel has given app "${appId}" the action "${action}", so it is not clear which one to publish on. Ask the channel owners to give the app distinct ids.`));
+      return;
+    }
     let file: { bytes: Buffer; mimeType: string; name: string } | null = null;
     if (storageKey) {
       const stored = await storage.getStorageFile(principal, storageKey);
@@ -627,6 +639,15 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     // 'hold' is the default and stays the default: content published under the owner's name on
     // their own channel is exactly the case where a preview is worth the friction.
     const moderation: ModerationMode = req.body?.moderation === 'auto' ? 'auto' : 'hold';
+    // One (app id, action) belongs to one channel: the publish finds its delegation by that pair
+    // alone, so a second channel's delegation for it would make the publish land on either.
+    const held = await delegationChannels(appId, action);
+    held.delete(id);
+    if (held.size > 0) {
+      res.status(409).json(error(config.nodeId, 'DELEGATION_IN_USE',
+        `App id "${appId}" already has the action "${action}" on another channel. Give this app a different app id for your channel.`));
+      return;
+    }
     const now = new Date().toISOString();
 
     await storage.upsertDelegation({
@@ -641,7 +662,8 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       createdAt: now,
       updatedAt: now,
     });
-    const stored = await storage.findDelegation(appId, action);
+    // Read back from THIS channel's rows, never by the pair alone.
+    const stored = (await storage.listDelegations(id)).find(d => d.appId === appId && d.action === action);
     res.status(201).json(success(config.nodeId, { delegation: stored }));
   });
 

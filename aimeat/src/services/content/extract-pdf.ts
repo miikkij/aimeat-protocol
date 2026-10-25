@@ -22,11 +22,14 @@
  * @usage const { facts, text, errors } = await readPdfFacts(config, bytes, { online: false });
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: a PDF whose text and metadata streams decode past
+ *     256 MB is not handed to pdf.js (file-text/pdf-budget.ts); errors.pdfMeta says why.
  */
 import { getDocumentProxy } from 'unpdf';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
 import { extractFileText } from '../file-text/index.js';
+import { pdfDecodesWithin } from '../file-text/pdf-budget.js';
 import { validatePdf, type ValidationReport } from '../docsign/validate.js';
 import type { PdfFacts } from './types.js';
 
@@ -121,7 +124,13 @@ export async function readPdfFacts(config: AimeatConfig, bytes: Buffer, opts: { 
   const header = /^%PDF-(\d\.\d)/.exec(bytes.toString('latin1', 0, 16));
   if (header) facts.pdfVersion = header[1];
 
-  try {
+  // pdf.js inflates every stream it reads with no size limit, in this process. A PDF whose text and
+  // metadata streams decode past the budget is not handed to it: the facts say why, and the
+  // signature check, which reads the raw bytes, still runs.
+  const withinBudget = await pdfDecodesWithin(bytes);
+  if (!withinBudget) {
+    errors.pdfMeta = 'The PDF was not read: its content decodes to more than 256 MB.';
+  } else try {
     const doc = await getDocumentProxy(new Uint8Array(bytes));
     try {
       facts.pages = doc.numPages;
@@ -153,7 +162,7 @@ export async function readPdfFacts(config: AimeatConfig, bytes: Buffer, opts: { 
   }
 
   let text: string | null = null;
-  try {
+  if (withinBudget) try {
     const got = await extractFileText(bytes, 'application/pdf', 'file.pdf');
     // An empty text with a note is a scan (no text layer) or a read failure; the second one also
     // fails getDocumentProxy above, so errors.pdfMeta already carries it.

@@ -6,6 +6,10 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.9.1 - 2026-10-25 - The `extension` case refuses another account's capability over an extension
+ *     the CALLER installed (403 EXTENSION_CAPABILITY_NOT_YOURS), the rule the `mcp` case already has
+ *     (secaudit2026oct22, capability-invoke.ts:extension-source:caller-own-extension-fronted-by-another-owner).
+ *     Fronting another owner's extension and an owner's own capability are unchanged.
  *   v1.9.0 - 2026-10-24 - The `extension` case resolves the extension and the action its ref names
  *     before the loopback request, answers 404 EXTENSION_NOT_FOUND when either is missing or the ref
  *     does not follow ext:<name>[@<version>]:<action>, and builds the path from the encoded segments
@@ -210,6 +214,21 @@ export async function invokeCapability(
         throw Object.assign(
           new Error(`Cannot invoke "${capability.id}": its source ref "${capability.source.ref}" does not name an action of an installed extension.`),
           { statusCode: 404, code: 'EXTENSION_NOT_FOUND' },
+        );
+      }
+      // An extension the CALLER installed runs for the caller with the caller's own authority (the
+      // paywall is owner-free, the vault rules are those of the caller's own extension). Another
+      // account's capability over it would choose which of the caller's actions runs and, through an
+      // app-tool manifest's lockedInput, with which arguments. The same rule as the mcp case below:
+      // such a capability runs only for its own registrant's account. Fronting another owner's
+      // extension (the extension is a service other accounts call) and an owner's capability over
+      // their own extension are unchanged.
+      const callerOwnerGhii = registrantOwnerGhii(callerGhii, config.nodeId);
+      const installerOwner = resolved.ext.installedBy ? registrantOwnerGhii(resolved.ext.installedBy, config.nodeId) : '';
+      if (installerOwner === callerOwnerGhii && registrantOwnerGhii(capability.ownerGhii, config.nodeId) !== callerOwnerGhii) {
+        throw Object.assign(
+          new Error(`"${capability.name}" would run your own extension "${resolved.name}", and another account published it. Call your extension directly, or publish your own capability over it.`),
+          { statusCode: 403, code: 'EXTENSION_CAPABILITY_NOT_YOURS' },
         );
       }
       const extName = encodeURIComponent(segments.pinned);

@@ -21,6 +21,8 @@
  *   log line; runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its
  *   own per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.8.1 — 2026-10-25 — secaudit2026oct22: withHeadlessContext closes the browser after a deadline
+ *     (HEADLESS_DEADLINE_MS, 120 s, or opts.deadlineMs) and rejects with HeadlessDeadlineError.
  *   v1.8.0 — 2026-10-12 — ensureHeadlessBrowser(): a node with auto-capture on checks its browser at
  *     start, downloads the Chromium build its playwright-core names when that is what is missing
  *     (headless-browser-install.ts), and opens one incident on the Security page when the browser
@@ -304,13 +306,36 @@ export async function withHeadlessContext<T>(
   config: AimeatConfig,
   viewport: { width: number; height: number },
   fn: (ctx: { newPage(): Promise<unknown> }) => Promise<T>,
+  opts: { deadlineMs?: number } = {},
 ): Promise<T | null> {
   const browser = await launchBrowser();
   if (!browser) return null;
+  // The browser is closed by the deadline whatever the page does: an evaluate against a renderer
+  // whose main thread never yields has no timeout of its own, and closing the browser is what makes
+  // it reject. The callback's own promise is then settled by that rejection and is ignored here.
+  const ms = Math.max(1, opts.deadlineMs ?? HEADLESS_DEADLINE_MS);
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new HeadlessDeadlineError(ms)), ms);
+  });
   try {
-    return await fn(await guardedContext(browser, config, viewport));
+    const work = guardedContext<{ newPage(): Promise<unknown> }>(browser, config, viewport).then(fn);
+    // The work's own rejection, which follows the deadline's close; the race below has already answered.
+    work.catch((err: unknown) => { logger.debug('headless: work ended after its browser closed', { error: String(err) }); });
+    return await Promise.race([work, deadline]);
   } finally {
+    clearTimeout(timer);
     await browser.close();
+  }
+}
+
+/** How long one lent browser may stay open: page loads, settle waits and measurements included. */
+export const HEADLESS_DEADLINE_MS = 120_000;
+
+/** The browser was closed because the work in it did not finish within the deadline. */
+export class HeadlessDeadlineError extends Error {
+  constructor(public readonly deadlineMs: number) {
+    super(`the page did not finish within ${Math.round(deadlineMs / 1000)} seconds, so the browser was closed`);
   }
 }
 

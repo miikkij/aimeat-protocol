@@ -21,6 +21,9 @@
  * @structure TrustWorld · buildTrustWorld(baseUrl)
  * @usage const w = buildTrustWorld('http://127.0.0.1:31500'); w.files.get('/lotl.xml')
  * @version-history
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: `audit` documents (an untrusted signature timestamp, a
+ *     stale and a fresh embedded OCSP answer, no SignerInfo, no messageDigest) and the FI list
+ *     signer's key for a test that builds a list of its own.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F03b-04).
  */
 import { createHash, type KeyObject } from 'node:crypto';
@@ -45,6 +48,21 @@ export interface TrustWorld {
   /** When the qualified signature timestamp says the timestamped signature was made. */
   timestampAt: Date;
   revokedAt: Date;
+  /** Documents for the secaudit2026oct22 verdict cases (test/unit/docsign-verdict-rules.test.ts). */
+  audit: {
+    /** Signed by the late-revoked certificate with a timestamp from a TSA on no list, dated before the revocation. */
+    revokedAfterUntrustedTimestamp: Buffer;
+    /** Signed by the OCSP-revoked certificate, carrying a good OCSP answer from before the revocation. */
+    staleEmbeddedOcsp: Buffer;
+    /** A good certificate, a qualified signature timestamp, and a good OCSP answer made after it (PAdES-LT). */
+    freshEmbeddedOcspTimestamped: Buffer;
+    /** A SignedData with no SignerInfo. */
+    noSigner: Buffer;
+    /** A SignerInfo whose signed attributes have no messageDigest. */
+    noMessageDigest: Buffer;
+  };
+  /** The FI list's signer and the CA key, for a test that builds a list of its own. */
+  keys: { fiListSigner: { key: KeyObject; cert: Buffer } };
 }
 
 let serial = 0x10;
@@ -141,5 +159,21 @@ export function buildTrustWorld(baseUrl: string): TrustWorld {
       attachedContent,
     },
     timestampAt, revokedAt,
+    audit: (() => {
+      const selfTsaKey = newRsa();
+      const selfTsaName = name('Self-made TSA', 'Nobody', 'FI');
+      const selfTsaCert = makeCertX({ subject: selfTsaName, issuer: selfTsaName, publicKey: selfTsaKey.publicKey, signer: selfTsaKey.privateKey, ca: false, serial: nextSerial(), eku: [EKU_TIMESTAMPING] });
+      const untrustedStamp = (sig: Buffer) => timestampToken(sig, selfTsaCert, selfTsaKey.privateKey, [], timestampAt);
+      const staleGood = ocspResponse(revokedOcsp.cert, fiCa.cert, fiCa.key, { thisUpdate: new Date(now - 3 * 3600_000) });
+      const freshGood = ocspResponse(good.cert, fiCa.cert, fiCa.key);
+      return {
+        revokedAfterUntrustedTimestamp: signPdfAs('ETSI.CAdES.detached', lateRevoked.cert, lateRevoked.key, [fiCa.cert], 'Revoked after an untrusted timestamp', untrustedStamp),
+        staleEmbeddedOcsp: signPdfAs('ETSI.CAdES.detached', revokedOcsp.cert, revokedOcsp.key, [fiCa.cert], 'Stale embedded OCSP', undefined, { unsignedOcsp: [staleGood] }),
+        freshEmbeddedOcspTimestamped: signPdfAs('ETSI.CAdES.detached', good.cert, good.key, [fiCa.cert], 'Fresh embedded OCSP', stamp, { unsignedOcsp: [freshGood] }),
+        noSigner: signPdfAs('ETSI.CAdES.detached', good.cert, good.key, [fiCa.cert], 'No signer', undefined, { noSigner: true }),
+        noMessageDigest: signPdfAs('ETSI.CAdES.detached', good.cert, good.key, [fiCa.cert], 'No message digest', undefined, { noMessageDigest: true }),
+      };
+    })(),
+    keys: { fiListSigner: { key: fiListSigner.key, cert: fiListSigner.cert } },
   };
 }
