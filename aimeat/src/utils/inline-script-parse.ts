@@ -26,6 +26,8 @@
  *   selfTest();
  *   for (const s of extractInlineScripts(html)) parseSource(s.source, `<script #${s.index}>`, s.goal);
  * @version-history
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: extractInlineScripts scans forward in linear time and
+ *     stops at the first opening tag with no closing tag; the blocks it finds are unchanged.
  *   v1.0.0 — 2026-08-11 — Pure extraction from scripts/check-js-syntax.ts (v1.0.0, 2026-08-01) so
  *     the publish-time artifact check and the CLI parse by the SAME code. A second parser would be
  *     a second answer to "does this app's script compile", which is the drift this repo keeps
@@ -98,19 +100,37 @@ export function parseSource(source: string, filename: string, goal: ParseGoal = 
  */
 export function extractInlineScripts(html: string): Array<{ index: number; source: string; goal: ParseGoal }> {
   const out: Array<{ index: number; source: string; goal: ParseGoal }> = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
-  let m: RegExpExecArray | null;
+  // A forward scan, linear in the size of the HTML (secaudit2026oct22). It finds the same blocks as
+  // the expression /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi did, but stops at the first opening
+  // tag that has no `>` or no closing tag after it: no later tag has one either, and the browser
+  // reads the rest of the document as that script. The expression retried from every later opening
+  // tag and scanned to the end each time, so k unclosed tags in n characters cost k times n, on the
+  // event loop, at publish time.
+  const opener = /<script\b/gi;
+  const closer = /<\/script\s*>/gi;
   let n = 0;
-  while ((m = re.exec(html)) !== null) {
+  let from = 0;
+  for (;;) {
+    opener.lastIndex = from;
+    const open = opener.exec(html);
+    if (!open) break;
+    const attrsStart = open.index + open[0].length;
+    const tagEnd = html.indexOf('>', attrsStart);
+    if (tagEnd < 0) break;
+    closer.lastIndex = tagEnd + 1;
+    const close = closer.exec(html);
+    if (!close) break;
+    from = close.index + close[0].length;
     n += 1;
-    const attrs = m[1] ?? '';
+    const attrs = html.slice(attrsStart, tagEnd);
+    const body = html.slice(tagEnd + 1, close.index);
     if (/\bsrc\s*=/i.test(attrs)) continue;
     const type = /\btype\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1]?.toLowerCase();
     if (type && !/^(text\/javascript|application\/javascript|module)$/.test(type)) continue;
     // The block states its own goal. Parsing a `type="module"` body in script goal rejects its
     // `import` line and reports a syntax error for perfectly good code — a false failure, which is
     // the fastest way to teach people to ignore a checker.
-    out.push({ index: n, source: m[2] ?? '', goal: type === 'module' ? 'module' : 'script' });
+    out.push({ index: n, source: body, goal: type === 'module' ? 'module' : 'script' });
   }
   return out;
 }
