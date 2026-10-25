@@ -29621,7 +29621,7 @@ paths:
     get:
       operationId: getDocsignRequest
       summary: One signing request, with every signature checked
-      description: Each check says whether the statement matches the request, the node seal verifies with this node's key, and the signer's own evidence (passkey assertion or key signature) verifies.
+      description: Each check says whether the statement matches the request, the node seal verifies with this node's key, and the signer's own evidence (passkey assertion or key signature) verifies, and `test` says whether it is a wallet signature from an EU reference-wallet test certificate (a test with no legal effect).
       tags: [Document signing]
       security:
         - BearerAuth: []
@@ -29948,7 +29948,7 @@ paths:
     get:
       operationId: lookupDocsignByHash
       summary: Who signed this document on this node (public)
-      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with.
+      description: The signing requests for a document hash with the signatures given, each re-verified. Unsigned and cancelled requests and pending parties are not shown. Carries the node public key the seals verify with. Each signature carries `test`, true for a wallet signature whose certificate comes from an EU reference-wallet test CA (a test with no legal effect).
       tags: [Document signing]
       security: []
       parameters:
