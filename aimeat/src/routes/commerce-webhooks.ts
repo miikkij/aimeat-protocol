@@ -14,7 +14,9 @@
  *     is marked paid instead (which books the voucher WITH its VAT breakdown).
  *   - checkout.session.completed → an AI shopping agent's order through Stripe's Agentic
  *     Commerce Suite becomes an order and its fulfilment (commerce/agent-order-intake.ts) when
- *     a line names a product of this seller's feed; any other checkout is left alone.
+ *     a line names a product of this seller's feed and Stripe reads the session as paid; any other
+ *     checkout is left alone. checkout.session.async_payment_succeeded takes such an order once a
+ *     delayed payment method has paid.
  *   - charge.refunded → expense voucher for the refunded amount.
  *   - payout.paid → TRANSFER voucher (Stripe balance → bank account; not revenue).
  *   Everything else acks 200 without booking — Stripe retries on non-2xx, and an
@@ -29,6 +31,8 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-25 — An agent order is taken only when Stripe reads the session as paid, and
+ *     checkout.session.async_payment_succeeded takes a delayed one (secaudit2026oct22).
  *   2026-10-18 — checkout.session.completed for the node's hosted card page finishes the AIMEAT checkout
  *     it was for (commerce/stripe-checkout-complete.ts; Comicland v3 A-4).
  *   2026-10-16 — A delivery with a wrong or missing Stripe signature writes a warn line naming the seller
@@ -169,13 +173,17 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
         // back from Stripe itself, so nothing in this delivery is taken as proof.
         const r = await completeFromStripeCheckout(storage, config, ownerGhii, object);
         booked = { action: r };
-      } else if (event.type === 'checkout.session.completed') {
+      } else if (event.type === 'checkout.session.completed'
+        || (event.type === 'checkout.session.async_payment_succeeded' && typeof (object.metadata as Record<string, unknown> | undefined)?.aimeat_session !== 'string')) {
         // An AI shopping agent's order through Stripe's Agentic Commerce Suite becomes an order and
         // its fulfilment here (commerce/agent-order-intake.ts). Any other checkout is left alone;
-        // its money is booked by payment_intent.succeeded as before.
+        // its money is booked by payment_intent.succeeded as before. A delayed payment method
+        // completes the checkout unpaid (not_yet_paid, no order); async_payment_succeeded then takes
+        // the order once (secaudit2026oct22).
         const r = await intakeAgentOrder(storage, config, ownerGhii, object, event.id);
         if (r.action === 'agent_order') booked = { action: 'agent_order', orderId: r.orderId };
         else if (r.action === 'already_taken') booked = { action: 'agent_order_seen', orderId: r.orderId };
+        else if (r.action === 'not_yet_paid') booked = { action: 'agent_order_not_yet_paid', orderId: r.orderId };
       } else if (event.type === 'charge.refunded') {
         const amount = Number(object.amount_refunded ?? 0);
         const intentId = typeof object.payment_intent === 'string' ? object.payment_intent : null;
