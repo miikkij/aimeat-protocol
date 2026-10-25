@@ -11,6 +11,9 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-25 — Warn-only mode (AIMEAT_MCP_ENFORCE_SCOPES=false) still answers SCOPE_DENIED for a
+ *     word no wildcard carries, so the owner tools that have no check of their own keep their guard
+ *     (secaudit2026oct22, warn-only-drops-sole-gate-on-outside-wildcard-tools).
  *   2026-10-21 — createMcpServer's last flag is `stateless` (a 2026-07-28 request) and reaches the
  *     tool groups, so the chat surface's finder answers by era.
  *   2026-10-20 — The 2026-07-28 code path (mcp/modern-endpoint.ts) beside the sessions, routed by era
@@ -178,7 +181,7 @@ import { MCP_VIA_HEADER, parseVia, viaRefusal, runWithVia } from '../services/mc
 import { verifyJWT, type VerifiedToken } from '../auth/jwt.js';
 import { credentialRevoked } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
-import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { scopeIsCovered, isOutsideWildcard } from '../utils/scope-coverage.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { getSoftwareVersion } from '../utils/version.js';
 import { mcpRequestAuthority, withRequestPermission } from './request-authority.js';
@@ -361,9 +364,16 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // A call to a tool this request's permissions do not allow answers SCOPE_DENIED with the word
         // it needs and is noted for the owner, not "Tool X not found" (mcp/scope-denied-answer.ts).
         // Only under enforcement, and only for a tool this surface carries.
+        // Warn-only still refuses a word no wildcard carries: several owner tools (the vault, the
+        // access overview, the owner's mailbox) have no check of their own, and a gate that
+        // disappears with a logging switch is not one (secaudit2026oct22,
+        // warn-only-drops-sole-gate-on-outside-wildcard-tools).
         answerScopeDeniedTools(mcp, {
-            missingWords: (name) => (!enforce || (surfaceTools && !surfaceTools.has(name)))
-                ? [] : enforcedScopesForTool(name).filter((word) => !scopeIsCovered(scopes, word)),
+            missingWords: (name) => {
+                if (surfaceTools && !surfaceTools.has(name)) return [];
+                const missing = enforcedScopesForTool(name).filter((word) => !scopeIsCovered(scopes, word));
+                return enforce ? missing : missing.filter(isOutsideWildcard);
+            },
             principal: () => agentGaii,
             baseUrl: config.baseUrl,
         });
