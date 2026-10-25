@@ -64,14 +64,14 @@ function count(raw: string | undefined, fallback: number): number {
 export function runtimeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): RuntimeConfig {
   const level = (env.AIMEAT_LOG_LEVEL ?? env.LOG_LEVEL ?? 'info').trim().toLowerCase();
   return {
-    // A flush interval of 0 would spin; the buffers take at least one second.
-    usageBufferMs: Math.max(1000, count(env.AIMEAT_USAGE_BUFFER_MS, 15_000)),
+    // A flush interval of 0 would spin; the buffers take at least 100 ms (a test node runs 500).
+    usageBufferMs: Math.max(100, count(env.AIMEAT_USAGE_BUFFER_MS, 15_000)),
     usageHotDays: count(env.AIMEAT_USAGE_HOT_DAYS, 90),
     usageHourRollupDays: count(env.AIMEAT_USAGE_HOUR_ROLLUP_DAYS, 30),
     usageArchiveBatch: Math.max(1, count(env.AIMEAT_USAGE_ARCHIVE_BATCH, 2_000)),
     usageRollupBatch: Math.max(1, count(env.AIMEAT_USAGE_ROLLUP_BATCH, 5_000)),
     usageRollupPasses: Math.max(1, count(env.AIMEAT_USAGE_ROLLUP_PASSES, 20)),
-    tallyBufferMs: Math.max(1000, count(env.AIMEAT_TALLY_BUFFER_MS, 15_000)),
+    tallyBufferMs: Math.max(100, count(env.AIMEAT_TALLY_BUFFER_MS, 15_000)),
     logLevel: LOG_LEVELS.includes(level) ? level : 'info',
     trustProxy: (env.AIMEAT_TRUST_PROXY ?? '').trim(),
     nodeKeyPath: (env.AIMEAT_NODE_KEY_PATH ?? '').trim(),
