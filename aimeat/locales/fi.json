@@ -22621,6 +22621,8 @@
   "chat.starterWork": "Ota jotain harteiltani",
   "chat.starterWorkAsk": "Yksi asia listallani lipsuu jatkuvasti. Kysy siitä minulta, ja ehdota sitten yhtä asiaa jonka voisit ottaa hoitaaksesi.",
   "appGrant.updatedNotice": "Tämä sovellus on päivittynyt ja pyytää nyt jotain uutta. Hyväksy uudelleen, niin se toimii kuten ennenkin.",
+  "appGrant.publisherNotice": "Tämän version sovelluksestasi julkaisi {who}, jolle olet antanut oikeuden julkaista sen. Versio pyytää oikeuksia, joita et ole sille antanut. Ne on merkitty alla uusiksi. Mikään ei muutu, ennen kuin sallit ne.",
+  "appGrant.narrowedNotice": "Otit tältä sovellukselta itse pois oikeuksia. Se pyytää niitä nyt uudelleen, ja ne on merkitty alla uusiksi. Mikään ei muutu, ennen kuin sallit ne.",
   "complianceMine": {
     "title": "Oma tekoälykäyttösi ja sen kirjaukset",
     "desc": "Mitä sinä olet tehnyt täällä tekoälyllä, ja onko siitä kirjattu ylös mitään. Vain sinun omasi.",

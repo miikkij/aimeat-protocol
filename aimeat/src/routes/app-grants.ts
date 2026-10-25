@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-10-25 — The owner's own app asks the owner for the words the grant lacks when another account published the live version or the owner narrowed the grant by hand: the silent bridge answers consent_required (reason app_updated, `why`, `added`, `published_by`) and the request answers `published_by_other` so the consent page shows the screen (services/own-app-consent.ts; secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing). The portfolio ceiling moved unchanged to services/app-grant-portfolio.ts (line limit).
  *   2026-10-25 — The silent bridge reads the refresh cookie by the node's config (`__Host-aimeat_rt` on https; secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  *   2026-10-25 — A grant given to an earlier holder's app of the author's name counts as absent on the silent bridge, the code exchange and the refresh (services/app-grant-author.ts; secaudit2026oct22).
  *   v1.27.0 — 2026-10-25 — A redirect on the bare app host is the app's own path-form address, or the host's root in web_message mode, else 400 INVALID_REDIRECT_URI (secaudit2026oct22; Jouni, 2026-10-25).
@@ -144,7 +145,10 @@ import { resolveIdentity, localAccountName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
-import { PORTFOLIO_TARGET_PREFIX, appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
+import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
+import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app-grant-portfolio.js';
+import { ownAppConsentNeed } from '../services/own-app-consent.js';
+import { accountOf } from '../services/app-members.js';
 import { apexOrigin, frameRedirect, bareAppHostRedirectOk } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
@@ -156,7 +160,7 @@ import { logger } from '../utils/logger.js';
 
 import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
 import { isPackageApp } from '../services/packages/install/package-approvals.js';
-export { APP_GRANTABLE_SCOPES };
+export { APP_GRANTABLE_SCOPES, PORTFOLIO_GRANT_SCOPES };
 
 /**
  * Ordered locale-key candidates for one scope's consent sentence. The consent UI localizes
@@ -171,24 +175,6 @@ export function scopeDescriptionKeys(scope: string): string[] {
     `appGrant.scopeText.${family}.${perm}`,
     `profile.agents.scopeUi.scopeText.${family}.${perm}`,
   ];
-}
-
-/**
- * The most a token minted for a PORTFOLIO origin may carry.
- *
- * A portfolio origin exists for one job: the owner visiting their own published page sees their own
- * members-only content there without logging in a second time. Reading memory is all that takes, and
- * the node already publishes exactly this answer twice — `services/protected-resource.ts` returns
- * `scopes_supported: ['memory:read']` for a portfolio origin, and `routes/subdomains.ts` injects a
- * matching `<meta name="aimeat-scopes" content="memory:read">` into every portfolio it serves. Both
- * of those still write the word out inline; when either is next touched, import it from here, so the
- * ceiling has one home instead of three.
- */
-export const PORTFOLIO_GRANT_SCOPES: readonly string[] = ['memory:read'];
-
-/** Is this grant target a portfolio origin rather than a published app? */
-function isPortfolioTarget(target: string): boolean {
-  return target.startsWith(PORTFOLIO_TARGET_PREFIX);
 }
 
 /**
@@ -219,31 +205,6 @@ async function declaredScopesOf(storage: Storage, target: string): Promise<strin
   return declared.length ? declared : null;
 }
 
-/**
- * Trim a scope request down to what a portfolio origin may receive.
- *
- * AUDIT H-9. The silent bridge used to hand a portfolio whatever the PAGE asked for, and a portfolio
- * page writes that ask itself, twice over: the SDK reads the FIRST `<meta name="aimeat-scopes">`
- * while the node appends its own last, and a page can skip the SDK and build the /app-silent.html
- * iframe with any `?scope=` it likes. Portfolio HTML is served with `unsafe-inline`, so any script
- * that lands in a portfolio inherits that reach, and the inner fetch is apex-to-apex, so the
- * `Sec-Fetch-Site` caller check does not see it. The ceiling was the node's published answer already;
- * the bridge was the one door not reading it.
- *
- * A scope outside the ceiling is dropped rather than refused, and an empty result falls back to the
- * ceiling, so the members-only content the origin exists for keeps working either way.
- *
- * This NARROWS the escalation, it does not close it. A standing memory:read grant reaches the
- * owner's whole namespace, which is a lot of data, and a page holding that token can post it
- * anywhere `connect-src https:` allows. The root is the unconditional own-app branch in the silent
- * bridge, which hands any origin the owner happens to own whatever it asks for, and replacing that
- * with something the owner actually decides is a larger piece of work than this cap.
- */
-function capPortfolioScopes(requested: string[]): string[] {
-  const capped = requested.filter(s => PORTFOLIO_GRANT_SCOPES.includes(s));
-  return capped.length ? capped : [...PORTFOLIO_GRANT_SCOPES];
-}
-
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s
 const REQUEST_TTL_MS = 10 * 60_000; // pending authorize request awaiting consent: 10 min
 
@@ -264,6 +225,7 @@ interface PendingRequest {
   originBound: boolean; // redirect_uri verified to be THE per-app subdomain mapped to this app → own-app auto-approve eligible
   packageApp: boolean;  // a package installed this app: somebody else's code under the owner's name, never "own"
   prompt: '' | 'create'; // OIDC prompt=create: the app asked for the create-account form first
+  publishedByOther: string; // who published the live version when it is another account than the app's owner, else ''
   expiresAt: number;
 }
 
@@ -470,6 +432,9 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       appOrigin: rd.origin, scopes: withAllowance(requested, await appAllowanceWords(storage, app)), redirectUri, state, codeChallenge,
       codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
       packageApp, prompt: String(req.query.prompt ?? '') === 'create' ? 'create' : '',
+      // Another account published the live version: the consent page asks the owner for new words (services/own-app-consent.ts).
+      publishedByOther: typeof appRecord.manifest?.publishedBy === 'string' && accountOf(appRecord.manifest.publishedBy) !== accountOf(app.slice(0, slash))
+        ? appRecord.manifest.publishedBy : '',
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
@@ -502,6 +467,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       origin_bound: pending.originBound,
       // A package installed the app: the consent page shows the screen even to the app's owner.
       package_app: pending.packageApp,
+      published_by_other: pending.publishedByOther || null,
       // 'create' when the app asked for the create-account form (signIn({ register: true })).
       prompt: pending.prompt || null,
       scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s], description_keys: scopeDescriptionKeys(s) })),
@@ -675,7 +641,15 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const wanted = withAllowance(requested.length ? requested : (existing?.scopes ?? fallback), await appAllowanceWords(storage, grantTarget));
     const added = existing ? wanted.filter(s => !existing.scopes.includes(s)) : [];
     let scopes: string[];
-    if (isOwnApp) {
+    // The owner's own app asks the owner after all for words the grant lacks when another account
+    // published the live version or the owner narrowed the grant by hand (services/own-app-consent.ts).
+    const ownNeed = isOwnApp ? await ownAppConsentNeed(storage, owner, grantTarget, existing, wanted) : null;
+    if (ownNeed) {
+      return reply({
+        ok: false, error: 'consent_required', reason: 'app_updated', why: ownNeed.reason, app: grantTarget, app_name: grantName,
+        scope: wanted.join(' '), added: ownNeed.added.join(' '), ...(ownNeed.publisher ? { published_by: ownNeed.publisher } : {}),
+      });
+    } else if (isOwnApp) {
       scopes = wanted;
     } else if (!existing) {
       return reply({ ok: false, error: 'consent_required', app: grantTarget, app_name: grantName, scope: wanted.join(' ') });

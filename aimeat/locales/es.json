@@ -20517,6 +20517,8 @@
   "chat.starterWork": "Quítame algo de encima",
   "chat.starterWorkAsk": "Algo de mi lista se me escapa una y otra vez. Pregúntame por ello y luego propón una cosa de la que puedas encargarte.",
   "appGrant.updatedNotice": "Esta aplicación se ha actualizado y ahora pide algo nuevo. Apruébala de nuevo para seguir usándola.",
+  "appGrant.publisherNotice": "Esta versión de tu aplicación la publicó {who}, a quien le diste permiso para publicarla. Pide permisos que no le has dado, marcados como nuevos abajo. Nada cambia hasta que los permitas.",
+  "appGrant.narrowedNotice": "Le quitaste permisos a esta aplicación a mano. Ahora los pide otra vez, marcados como nuevos abajo. Nada cambia hasta que los permitas.",
   "complianceMine": {
     "title": "Tu propio uso de IA, y lo que se ha anotado sobre él",
     "desc": "Lo que tú has hecho con IA aquí, y si algo de eso quedó anotado. Solo lo tuyo.",

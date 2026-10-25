@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-25 — Every version's manifest names who published it (`publishedBy`), so the owner's own app asks the owner before a version another account published gets a permission the owner's grant lacks (services/own-app-consent.ts; secaudit2026oct22).
  *   2026-10-25 — The aimeat-intake declaration is read from the bytes (services/app-intake-forms.ts): a form the publisher does not manage refuses the publish, a form the code calls undeclared is a warning, and the forms go on the manifest. A new version of an app open to the internet is handed to services/internet-opening/. The input types (RequestedManifest, PublishAppInput, PublishAppRefusal) moved unchanged to app-publish-types.ts (line limit) and are re-exported.
  *   2026-10-22 — The delegated-settings check moved unchanged to app-publish-delegate.ts (line limit), which also refuses a developer of another account without the full right who adds the ?format=md declaration or changes which extension action it names (secaudit 2026-10, r54).
  *   2026-10-19 — A display version the caller states is refused when it breaks the one rule (services/app-display-version.ts); a carried one is not re-judged (wish-the-app-draft-tools-can-set-the-display-version).
@@ -402,6 +403,8 @@ export async function publishApp(
     tags: requested.tags ?? prev?.tags ?? [],
     authorDisplay: ownerName,
     usesCortex: requested.usesCortex ?? prev?.usesCortex ?? [],
+    // Who published this version, never carried forward (services/own-app-consent.ts).
+    publishedBy: callerGaii,
   };
   const descriptions = sanitizeDescriptions(requested.descriptions) ?? prev?.descriptions;
   if (descriptions) manifest.descriptions = descriptions;

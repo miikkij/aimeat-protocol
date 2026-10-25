@@ -10,6 +10,9 @@
  *   asserted in the same group, because that is the path every other app on the node still takes.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-dev-grant
  * @version-history
+ *   v1.5.0 — 2026-10-25 — The consent request names the builder who published the live version
+ *     (published_by_other), and the owner's own next version names nobody (secaudit2026oct22,
+ *     own-app-silent-ignores-publisher-and-owner-narrowing).
  *   v1.4.1 — 2026-10-11 — The delegate refusal is read for "pacing amount" (it asserted "price", the old
  *     morsel price model; a morsel is pacing, not a price).
  *   v1.4.0 — 2026-09-24 — A6-6: a builder's frame-token request is refused before any other check.
@@ -275,6 +278,23 @@ await test("a full right publishes INTO the owner's catalogue, not the builder's
     assert((after.body.data.versions as any[]).length === n + 1, "the OWNER's app gained the version");
     const mine = await json(`/v1/apps/${builder.name}/${APP}`, {});
     assert(mine.status === 404, `and nothing landed in the builder's own catalogue (got ${mine.status})`);
+});
+
+await test("the consent request names the builder who published the live version, and the owner's own next version clears it", async () => {
+    const ask = async () => {
+        const redirect = `${BASE}/v1/apps/${owner.name}/${APP}`;
+        const q = new URLSearchParams({ app: `${owner.name}/${APP}`, response_type: 'code', scope: 'memory:read', redirect_uri: redirect, code_challenge: 'x'.repeat(43), code_challenge_method: 'S256' });
+        const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+        const id = /req=([^&]+)/.exec(res.headers.get('location') ?? '')?.[1];
+        assert(res.status === 302 && !!id, `authorize ${res.status}`);
+        return (await json(`/v1/app-grants/request/${id}`)).body.data;
+    };
+    const byBuilder = await ask();
+    assert(typeof byBuilder.published_by_other === 'string' && byBuilder.published_by_other.startsWith(builder.name),
+        `the builder is named (got ${byBuilder.published_by_other})`);
+    const pub = await publish(owner.token, APP, 'v3 by the owner', { roadmap: 'The owner published this one.' });
+    assert(pub.status === 200 || pub.status === 201, `owner re-publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    assert((await ask()).published_by_other === null, 'the owner\'s own version names nobody');
 });
 
 await test("the builder writes the owner's draft through the path that names them", async () => {

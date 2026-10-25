@@ -22453,6 +22453,8 @@
   "chat.starterWork": "Take something off my plate",
   "chat.starterWorkAsk": "Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.",
   "appGrant.updatedNotice": "This app has been updated and now asks for something new. Approve it again to keep using it.",
+  "appGrant.publisherNotice": "This version of your app was published by {who}, who may publish it for you. It asks for permissions you have not given it, marked new below. Nothing changes until you allow them.",
+  "appGrant.narrowedNotice": "You took permissions away from this app by hand. It asks for them again, marked new below. Nothing changes until you allow them.",
   "complianceMine": {
     "title": "Your own AI use, and what has been written down about it",
     "desc": "What you have done with AI here, and whether any of it has been written down. Yours only.",

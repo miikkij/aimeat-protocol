@@ -9251,7 +9251,11 @@ paths:
         visitor something to recognise the app BY, never part of the authorization decision.
         `package_app` is true when a package installed the app: it is somebody else's code under
         the owner's name, so the consent page does not auto-approve it for its owner, and
-        authorize-consent never marks it own. `prompt` is `create` when the app asked for the
+        authorize-consent never marks it own. `published_by_other` names who published the app's
+        live version when that is another account than the app's owner (a developer the owner gave
+        the publisher or full right), else null: the consent page then shows the screen to the owner
+        for any scope the owner's grant lacks, as it does when the owner narrowed the grant by hand
+        (`scopes_fixed_at` on GET /v1/app-grants). `prompt` is `create` when the app asked for the
         create-account form, else null. Unguessable id; no auth.
       tags: [Auth]
       parameters:
@@ -9306,6 +9310,13 @@ paths:
         `invalid_scope` is answered before the session is read (one word outside GET
         /v1/app-grants/scopes refuses the whole list, whoever is signed in) and carries `app`
         (owner/filename), `app_name` and `unknown` (the ungrantable words, space-separated).
+
+        **The owner's own app asks after all** for the scopes its owner's grant lacks when another
+        account published its live version (a developer with the publisher or full right) or the
+        owner narrowed the grant by hand: `consent_required` with `reason: app_updated`, `why`
+        (`publisher_version` or `owner_narrowed`), `added` (the scopes asked for, space-separated)
+        and, for a version another account published, `published_by`. A version the owner or the
+        owner's agent published keeps signing in silently, new scopes included.
 
         **By name (`app`).** A page of the node that holds app code in an opaque-origin frame asks
         with `app=owner/filename` instead of `origin`, because the frame has no address of its own
