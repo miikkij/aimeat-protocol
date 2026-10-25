@@ -21,13 +21,15 @@
  * @structure embedProvenance · EMBED_LIMITS
  * @version-history
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-8).
+ *   v1.1.0 — 2026-10-25 — secaudit2026oct22: an archive marked while every slot is in use answers
+ *     503 BUSY instead of being unpacked (archive.ts archiveSlot).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { buildXmp, type EmbedFacts } from './xmp.js';
 import { markPng, markJpeg } from './raster.js';
 import { markPdf } from './pdf.js';
-import { markArchive } from './archive.js';
+import { markArchive, ArchiveBusyError } from './archive.js';
 import { toIptc, iptcComposite } from '../ai-provenance-adapters.js';
 import { recordUrlFor } from '../ai-provenance-marks.js';
 import { publiclyResolvableWithShares } from '../share-provenance.js';
@@ -110,6 +112,9 @@ export async function embedProvenance(
     else if (format === 'pdf') data = markPdf(file.data, { xmp, subject: facts.description, keywords: 'AI-generated, AI provenance', digitalSourceType, recordUrls: facts.records.map(r => r.url) });
     else ({ data, pages } = await markArchive(file.data, xmp, facts.description));
   } catch (err) {
+    if (err instanceof ArchiveBusyError) {
+      throw new EmbedError('BUSY', 503, 'The node is marking other archives right now. Try again in a minute.');
+    }
     throw new EmbedError('UNREADABLE_FILE', 422, `The ${format.toUpperCase()} could not be read to mark it: ${(err as Error).message}.`);
   }
 
