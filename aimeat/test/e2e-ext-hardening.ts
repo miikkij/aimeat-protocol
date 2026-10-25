@@ -759,6 +759,14 @@ async function run() {
     return ask.request_id as string;
   };
 
+  await test('an agent of the operator without ext:write cannot change the config at all (403)', async () => {
+    const reader = await makeAgent(BASE, seed, ['memory:read']);
+    const res = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(reader.token), body: JSON.stringify({ config: { greeting: 'x' } }),
+    });
+    assert(res.status === 403, `expected 403 without ext:write, got ${res.status}`);
+  });
+
   let askId = '';
   await test("the operator's agent without operator:admin ASKS for emailPolicy: 202, pending for the operators, nothing changed (Jouni, 2026-10-25)", async () => {
     askId = await agentAsks();

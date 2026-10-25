@@ -34,7 +34,8 @@
  * @version-history
  *   2026-10-25 — 22 to 26: the owner's "Ask me before my secret is sent to a new address for the first
  *     time": on by default, an agent switching it off asks the owner, off lets the agent's code and the
- *     host field it set choose the first host, and on again asks again (secaudit2026oct22).
+ *     host field it set choose the first host, and on again asks again; 27 the refusal without
+ *     memory:read, 28 the MCP tool aimeat_secret_host_ask (secaudit2026oct22).
  *   2026-10-25 — 18 to 21: a host field value set by an agent without secrets:manage does not choose
  *     the first host of the owner's unbound secret; one set by the owner or a secrets:manage agent does (secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, v58 and v59).
@@ -46,6 +47,7 @@
 
 import { createServer, type Server } from 'node:http';
 import { ownerSignIn } from './helpers/owner-login.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -557,6 +559,23 @@ await test('26. switching it back on is at once for the agent, and the agent-set
     assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:') && deliveries.length === 0, `not asked again: ${JSON.stringify(out)}`);
     const bad = await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(wildAgent.token), body: JSON.stringify({ on: 'no' }) });
     assert(bad.status === 400, `a value that is not true or false: ${bad.status}`);
+});
+
+await test('27. an agent without memory:read neither reads nor switches it (403)', async () => {
+    const narrow = await mintAgent(owner, 'sau-narrow', ['ext:invoke']);
+    const r = await json('/v1/ghii/me/secret-host-ask', { headers: auth(narrow.token) });
+    assert(r.status === 403, `read without memory:read: ${r.status}`);
+    const w = await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(narrow.token), body: JSON.stringify({ on: true }) });
+    assert(w.status === 403, `switch without memory:write: ${w.status}`);
+});
+
+await test('28. over MCP, aimeat_secret_host_ask reads the setting, and switching it off asks the owner', async () => {
+    const chat = await makeAgent(BASE, owner, ['*']);
+    const session = await openSession(BASE, chat.token, 'secret-host-ask');
+    const read = await callTool(session, 'aimeat_secret_host_ask', {});
+    assert(!read.isError && read.data?.setting?.on === true, `read: ${read.text}`);
+    const off = await callTool(session, 'aimeat_secret_host_ask', { on: false });
+    assert(!off.isError && off.data?.approval_request?.status === 'awaiting_owner' && off.data?.setting?.on === true, `off: ${off.text}`);
 });
 
 await stopReceiver();
