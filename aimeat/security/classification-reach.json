@@ -1221,6 +1221,25 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
+    "src/services/compliance-agreements.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: a data processing agreement is a record of system@<node>, never anyone's content; who reads it is decided in services/compliance-agreements-access.ts."
+    },
+    "src/services/compliance-agreements-ops.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF of a sent agreement version, which the node itself rendered and stored when the version was sent (pdfKey), handed back to the operator or the agreement's counterparty after services/compliance-agreements-access.ts decided they may read the agreement."
+    },
+    "src/services/compliance-agreements-sign.ts": {
+      "reads": {
+        "getStorageFile": 1
+      },
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF the node rendered for a version, compared byte for byte with a returned signed copy and attached to the in-force e-mail. A copy a person uploads is read through readOwnFile (docsign/files.ts), which applies the classification reader, and a scan goes to a model only after reader.useForAi()."
+    },
     "src/services/compliance-docs.ts": {
       "reads": {
         "getMemory": 1,
