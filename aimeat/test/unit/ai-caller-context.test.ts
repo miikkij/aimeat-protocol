@@ -11,6 +11,7 @@
  *       a run from before is its saver.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-caller-context.test.ts
  * @version-history
+ *   2026-10-25 — The stub answers getOwner (no account), which scheduleActor now asks (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AI-2 and AI-3).
  */
 import { describe, it, expect } from 'vitest';
@@ -32,6 +33,8 @@ function stubStorage(opts: { grants?: Record<string, { app: string; scopes: stri
     getAgent: async (gaii: string) => (opts.agents?.[gaii] ? { gaii, name: 'bot', defaultScopes: opts.agents[gaii] } : null),
     listPats: async () => [],
     getEcosystemApp: async () => null,
+    // scheduleActor asks whether the account is newer than the schedule (secaudit2026oct22); none here.
+    getOwner: async () => null,
   } as any;
 }
 
