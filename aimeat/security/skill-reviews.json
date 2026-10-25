@@ -460,13 +460,13 @@
       "digest": "sha256:e4aaa83addb7f75e5b29bd76"
     },
     "project:aimeat-design-language": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-24",
       "watches": [
         "aimeat/public/css/theme.css",
         "aimeat/public/css/poster.css",
         "aimeat/public/lib/aimeat-fonts.css"
       ],
-      "digest": "sha256:ae75bae3203e79fdc7cc2700"
+      "digest": "sha256:ecd2ea95b087c651f50c4117"
     },
     "project:aimeat-frontend-verify": {
       "reviewedOn": "2026-10-24",
@@ -672,8 +672,8 @@
       "aimeat/src/routes/app-templates.ts": "130c67847ddadf85"
     },
     "project:aimeat-design-language": {
-      "aimeat/public/css/theme.css": "d05be341732c8d00",
-      "aimeat/public/css/poster.css": "44445493904c9462",
+      "aimeat/public/css/theme.css": "ffbbc71080bb57ca",
+      "aimeat/public/css/poster.css": "3a32b3760fd32b41",
       "aimeat/public/lib/aimeat-fonts.css": "cff1b3fc1029b6c2"
     },
     "project:aimeat-frontend-verify": {

@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.19.1 — 2026-10-25 — OperatorConfig and OperatorType moved to config-types-operator.ts unchanged and re-exported (an import cycle through config-sealing.ts).
  *   v1.19.0 — 2026-10-20 — ContentClassConfig mixed in (config-content-class.ts): contentClassMode,
  *     ffprobePath, ffmpegPath.
  *   v1.17.3 — 2026-10-16 — LoadConfigOptions and LoadConfigResult moved to config-load-types.ts (pure extraction, max-file-lines).
@@ -97,53 +98,10 @@ export interface RateLimitsConfig {
 export type NodeType = 'full' | 'relay' | 'mirror' | 'personal';
 export type FederationRole = 'operator' | 'contributor' | 'standalone';
 
-/**
- * Operator info rendered into the public privacy policy at `/v1/privacy`.
- * AIMEAT is open-source self-hostable -- every node operator becomes the
- * data controller for their node and MUST identify themselves on the policy.
- * Defaults are deliberately empty so unconfigured deployments fail loudly
- * (503 on the privacy page) rather than silently shipping the upstream
- * author's information.
- */
-export type OperatorType = 'natural_person' | 'company' | 'organisation' | 'association';
-
-export interface OperatorConfig {
-  /** Legal name of the controller (person or org). */
-  name: string;
-  /** Controller type. Drives display strings ("a natural person" / "a company" ...). */
-  type: OperatorType;
-  /**
-   * Business/registration identifier of the controller (Finnish Y-tunnus "NNNNNNN-N", VAT id,
-   * company number — whatever the jurisdiction issues). Empty for a natural person. This is what
-   * makes a node a COMPANY node: an ODPS listing's dataHolder, an invoice and a contract all need
-   * the legal identity, and it belongs to whoever runs the node rather than to a separate object.
-   */
-  businessId: string;
-  /** Postal address. GDPR requires a contact address for the controller. */
-  address: string;
-  /** Country of operation (e.g. "Finland"). Used in international-transfers section. */
-  country: string;
-  /** Primary privacy contact email. */
-  email: string;
-  /** Security contact email. Falls back to `email` when empty. */
-  securityEmail: string;
-  /** Hosting provider name (e.g. "Scaleway SAS"). */
-  hostingName: string;
-  /** Optional URL of the hosting provider for the privacy-page link. */
-  hostingUrl: string;
-  /** Hosting jurisdiction (e.g. "France (EU/EEA)"). */
-  hostingLocation: string;
-  /** Name of the national data-protection supervisory authority. */
-  supervisoryName: string;
-  /** URL of the supervisory authority (e.g. https://tietosuoja.fi). */
-  supervisoryUrl: string;
-  /** Effective date of the privacy policy (YYYY-MM-DD). */
-  effectiveDate: string;
-  /** When the policy text was last edited (YYYY-MM-DD). Empty falls back to effectiveDate. */
-  policyUpdatedDate: string;
-  /** Privacy policy version string. */
-  policyVersion: string;
-}
+// The operator identity block lives in config-types-operator.ts since 2026-10-25, so the config
+// schema rows can name its keys without importing this file. Re-exported so every importer is unchanged.
+import type { OperatorConfig } from './config-types-operator.js';
+export type { OperatorConfig, OperatorType } from './config-types-operator.js';
 
 // The site links (the apps, the store and the people the public pages point at) live in
 // config-types-site-links.ts since 2026-08-28, when they took this file past 800 lines. Re-exported

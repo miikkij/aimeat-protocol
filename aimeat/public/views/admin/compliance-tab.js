@@ -74,6 +74,7 @@ import { swallowed } from '/js/swallowed.js';
 import { groupGaps, answerStats, classCounts } from './compliance-tab.gaps.js';
 import { RegisterSection, QuestionnaireSection, classWord } from './compliance-tab.register.js';
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
+import AgreementsSection from './compliance-agreements-section.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
 import SavedReports, { readableId } from './compliance-tab.saved.js';
 import { RecordsSection, RecordsGapsSection, RecordsPromptSection } from './compliance-tab.records.js';
@@ -463,6 +464,7 @@ export default function ComplianceTab(props) {
         ${browse ? html`<${RecordsBrowser} target=${browse} gaps=${report.processing?.gaps} onClose=${() => setBrowse(null)}
           onPrint=${(regs, title) => setPrintOnly({ registers: regs, title })}
           onChanged=${() => load(days)} />` : null}
+        <${AgreementsSection} num="11" onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
       <//>
       <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} only=${printOnly} />
     <//>

@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-24 — complianceAgreementsRouter: data processing agreements, their signing and notices (plan doc-mvmr4i2wdk0p).
  *   2026-10-23 — complianceDocsRouter: the records of processing and the documents beside them (plan doc-mvlftkh9zmc9).
  *   2026-10-18 — registerAudienceSettle(): a label that rises lowers content over its audience cap
  *     (plan doc-mvdipuyqraas, L3.4).
@@ -207,6 +208,7 @@ import { adminSchedulerRouter } from '../routes/admin-scheduler.js';
 import { adminComplianceRouter } from '../routes/admin-compliance.js';
 import { complianceRouter } from '../routes/compliance.js';
 import { complianceDocsRouter } from '../routes/compliance-docs.js';
+import { complianceAgreementsRouter } from '../routes/compliance-agreements.js';
 import { capabilitiesRouter } from '../routes/capabilities.js';
 import { adminCapabilitiesRouter } from '../routes/admin-capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
@@ -742,6 +744,10 @@ export async function mountRoutes(
   // The records of processing and the documents beside them, of the node, an organism and an app
   // (plan doc-mvlftkh9zmc9). The scope's own rule decides who reads and writes (compliance-docs-access.ts).
   app.use(complianceDocsRouter(config, storage));
+
+  // Data processing agreements (GDPR art. 28, plan doc-mvmr4i2wdk0p): the operator's agreements with
+  // its customers, their signing in four ways and the notices each step sends.
+  app.use(complianceAgreementsRouter(config, storage));
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));
