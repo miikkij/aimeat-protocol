@@ -21,6 +21,9 @@
  *     the one-time spend of an assertion under concurrent requests
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.22.1 -- 2026-10-25 -- The held-name record's holder_since is read with parseRecordedTime, the
+ *     helper the node itself uses: migration 0086 writes a zoneless UTC wall-clock string, which
+ *     Date.parse reads in the host's zone (secaudit2026oct22, the DST fold hour on a non-UTC host).
  *   v1.22.0 -- 2026-10-20 -- deleteAgent clears the grants made TO the agent on every provider: the
  *     consent whose recipient is its exact GAII (revoked), the organism and board that admit it, the
  *     sharing group that holds it and `registeredBy` on the agent it registered; a sibling's keep
@@ -112,6 +115,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, WorkRecord } from '../../src/storage/interface.js';
 import { runMigrations } from '../../src/storage/providers/postgres-kysely/migrate.js';
 import { spendAssertionIdentity } from '../../src/services/assertion-spend.js';
+import { parseRecordedTime } from '../../src/utils/recorded-time.js';
 import type { AimeatConfig } from '../../src/config.js';
 
 const SQLITE_PATH = `./test/.conformance-${process.pid}.db`;
@@ -1469,7 +1473,7 @@ describe('storage providers agree on what they do, not just on their signatures'
             const held = record?.held?.find((h: any) => h.name === holder);
             expect.soft(held, `${name}: the held name is not recorded with its counts`)
                 .toMatchObject({ holder_ghii: hGhii, actions: 1, work: 1, own_lines: 1, naming_lines: 3 });
-            expect.soft(Date.parse(held?.holder_since), `${name}: the record does not say since when the holder holds the name`).toBe(Date.parse(earlier));
+            expect.soft(parseRecordedTime(String(held?.holder_since ?? '')), `${name}: the record does not say since when the holder holds the name`).toBe(Date.parse(earlier));
             expect.soft((record?.held ?? []).some((h: any) => h.name === gone || h.name === keeper), `${name}: a name that was placed is recorded as held`).toBe(false);
             expect.soft((record?.untied ?? []).find((u: any) => u.value === stray), `${name}: the value nothing ties to a person is not recorded`).toEqual({ value: stray, lines: 1 });
             if (name !== 'sqlite') {
