@@ -10,6 +10,8 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   2026-10-25 — Phase 2 (secaudit2026oct22): a runnable /v1/apps request on the bare app host 301s to
+ *     the app's own origin instead of running on the shared host.
  *   2026-10-25 — Phase 14 (secaudit2026oct22): a publisher's auto-assigned label with an ordinary name
  *     serves at its app origin, and <label>.<apex> and <label>--draft.<apex> answer 302 there; the
  *     operator's own mapping still serves on the apex, and the operator decides a label's origin.
@@ -212,6 +214,14 @@ async function main() {
         await test('app-origin path form (bare app host) 302-redirects to the auto-assigned subdomain', async () => {
             const res = await onAppOrigin(`/${owner}/${filename}`, null);
             assert(res.status === 302, `expected 302, got ${res.status}`);
+            assert((res.header('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.header('location')}`);
+        });
+
+        // The bare app host is shared by every label-less app, whose restricted grants it separates by
+        // cookie path only, so no app runs there through the /v1/apps route (secaudit2026oct22).
+        await test('a runnable /v1/apps request on the bare app host moves to the app\'s own origin', async () => {
+            const res = await onAppOrigin(`/v1/apps/${owner}/${filename}?mode=inline`, null);
+            assert(res.status === 301, `expected 301, got ${res.status}${res.body.includes('app origin demo') ? ' with the app HTML on the shared host' : ''}`);
             assert((res.header('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.header('location')}`);
         });
 
