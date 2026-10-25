@@ -6,6 +6,7 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — GET :name/versions answers created_by only to the installing account and the operator (secaudit2026oct22).
  *   2026-10-25 — PATCH :name/actions/:actionId keeps emailPolicy only for an operator caller, as PUT does (secaudit2026oct22).
  *   2026-10-21 — A changed action script drops the old-code first-use mark (services/extension-first-use-keep.ts).
  *   2026-10-21 — The list and GET /v1/extensions/:name answer `uses_secrets` (services/extension-secret-uses.ts).
@@ -387,9 +388,16 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       return;
     }
     const versions = await listVersions(storage, 'extension', name);
+    // created_by is the principal that wrote each version, an agent's name included. Those names
+    // stay with the installing account and the operator, as GET /v1/extensions/:name keeps
+    // installedByPrincipal (secaudit2026oct22). Everyone keeps what pins a version.
+    const seesWriter = req.auth!.owner === ext.installedBy || await isOperatorCaller(storage, req.auth);
     res.json(success(config.nodeId, {
       name, current: ext.version,
-      versions: versions.map(v => ({ version: v.version, created_at: v.createdAt, created_by: v.createdBy, bytes: v.bytes, call_url: `/v1/ext/${encodeURIComponent(name)}@${v.version}/{action}` })),
+      versions: versions.map(v => ({
+        version: v.version, created_at: v.createdAt, ...(seesWriter ? { created_by: v.createdBy } : {}),
+        bytes: v.bytes, call_url: `/v1/ext/${encodeURIComponent(name)}@${v.version}/{action}`,
+      })),
       total: versions.length,
     }));
   });
