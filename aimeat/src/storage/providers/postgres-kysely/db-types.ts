@@ -85,6 +85,8 @@ export interface Agent {
   clearance: string | null;
   /** JSON list of the floor permissions the owner in person lets the agent start work with; null = none (migration 0115). */
   taskStartFloor: string | null;
+  /** ISO text: an agent credential issued before it is refused; a key rotation sets it (migration 0117). */
+  credentialsValidAfter: string | null;
   /** What code backs this agent, as its runtime reports it (AgentRuntimeSource). */
   runtimeSource: unknown | null;
   identityVersion: number | null;
@@ -1443,7 +1445,7 @@ export interface ComponentVersion {
   createdBy: string;
 }
 
-/** 0118: a bare extension or cortex name released by uninstall, and the account that held it. */
+/** 0119: a bare extension or cortex name released by uninstall, and the account that held it. */
 export interface ReleasedComponentName {
   kind: string;
   name: string;
@@ -2207,6 +2209,8 @@ export interface SubdomainSite {
   kind: string;
   /** 'operator' | 'publisher'; null until classified (migration 0116). */
   origin: string | null;
+  /** ISO time the app this label served went away; null while it is there (migration 0118). */
+  heldSince: string | null;
   subdomain: string;
   target: string;
   updatedAt: Generated<Timestamp>;

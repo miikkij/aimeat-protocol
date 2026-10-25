@@ -119,6 +119,7 @@
     "0115_task_start_floor.sql": "26097ba46fcebe83e24155329a726ce0c0346d3929e17f06ff8b18c4f8464ac8",
     "0116_subdomain_site_origin.sql": "0a4ecf826b04fbfc6d9ad443b54eed0e28836067f57b7ce23450cf8ed6bb94b6",
     "0117_agent_credentials_valid_after.sql": "422dbd04d3d189583d8d242ee8594466d8171f835e23cac7a2294905b856cc77",
-    "0118_released_component_names.sql": "8ba237191ee8c658578605d4b1163a6b4a3063b03fe554841f97cd4f5669859b"
+    "0118_subdomain_site_held_since.sql": "cff879af94fcf94453a75cdf831046a34bba8dafc7c48d65ef512e8c692709bc",
+    "0119_released_component_names.sql": "74aa275c721c6fb77230e88c508ce0ee76904dce7af75379d0f5e49a9c3ef282"
   }
 }

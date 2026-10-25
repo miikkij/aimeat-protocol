@@ -114,6 +114,10 @@ jobs:
 
     # Required by PyPI Trusted Publisher OIDC flow. The 'pypi' environment
     # name must match what was registered as the pending publisher on PyPI.
+    # Its deployment rule admits only `aimeat-crewai-v*` tags (Settings > Environments > pypi >
+    # Deployment branches and tags), so the OIDC identity PyPI trusts is minted for a release tag
+    # only, whatever a workflow file on a branch says (secaudit2026oct22,
+    # release-credentials-not-bound-to-release-ref).
     environment:
       name: pypi
       url: https://pypi.org/p/aimeat-crewai

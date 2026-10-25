@@ -26,8 +26,13 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   2026-10-25 — The emailPolicy notices are matched by the stored name `<owner>/<name>` (merge of the approval standard with the owner namespaces, secaudit2026oct22).
  *   2026-10-25 — Names live in the owner's namespace: capability ids and schedule ids carry the
  *     owner, and another account reads source by `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
+ *   2026-10-25 — 7 reworked to the developer's ruling: an agent of the operator without
+ *     operator:admin ASKS for emailPolicy 'unrestricted' (202, pending for the operators, answered
+ *     back on Don't allow and Allow), and a script it writes holds the grant back until an operator
+ *     confirms it for the new code; the operator in person acts at once (secaudit2026oct22).
  *   2026-10-25 — 7: an agent of the operator without operator:admin neither changes emailPolicy through
  *     the config route nor keeps the grant for a script it writes; the operator in person does both (secaudit2026oct22).
  *   v1.6.0 — 2026-10-20 — 3f: the WebMCP route refuses a manifest binding its owner does not own
@@ -733,6 +738,8 @@ async function run() {
   // operator holds without operator:admin.
   const opAgent = await makeAgent(BASE, seed, ['*']);
   const mailExt = `hardpolicy${Date.now()}`;
+  // The notices name the extension by its stored name, `<owner>/<name>` (services/component-address.ts).
+  const mailExtFull = `${seed.name}/${mailExt}`;
   await test('setup: the operator in person installs an extension whose config holds emailPolicy', async () => {
     assert(rolesOf(seed.token).includes('operator'), 'the seed owner must be the operator for this section');
     const res = await install(seed.token, mailExt, { emailPolicy: { default: 'restricted' }, greeting: { default: 'hi' } });
@@ -741,25 +748,80 @@ async function run() {
     assert(cfg.emailPolicy === 'restricted', `the operator's install keeps emailPolicy, got ${JSON.stringify(cfg.emailPolicy)}`);
   });
 
-  await test("the operator's agent without operator:admin cannot change emailPolicy through the config route", async () => {
+  /** The agent's own inbox thread for one request: the answers told back to it. */
+  const answers = async (requestId: string) => {
+    const r = await json(`/v1/agents/v2/messages?context_id=${encodeURIComponent(requestId)}`, { headers: auth(opAgent.token) });
+    assert(r.status === 200, `inbox ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return (r.body.data.messages as any[]).map(m => m.parts?.[1]?.data?.outcome);
+  };
+  /** Ask for the grant as the agent: 202, pending for the operators, nothing changed. */
+  const agentAsks = async (): Promise<string> => {
     const res = await json(`/v1/extensions/${mailExt}/config`, {
       method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }),
     });
-    assert(res.status === 403, `expected 403, got ${res.status} ${JSON.stringify(res.body?.error ?? res.body?.data)}`);
-    assert(String(res.body?.error?.message ?? '').includes('operator:admin'), `the refusal names operator:admin: ${res.body?.error?.message}`);
-    const cfg = await storedConfig(mailExt, seed.token);
-    assert(cfg.emailPolicy === 'restricted', `emailPolicy changed to ${JSON.stringify(cfg.emailPolicy)}`);
+    assert(res.status === 202, `expected 202, got ${res.status} ${JSON.stringify(res.body?.error ?? res.body?.data)}`);
+    const ask = res.body.data.approval_request;
+    assert(ask?.status === 'awaiting_operator' && ask.waiting_for === 'operators' && typeof ask.request_id === 'string'
+      && String(ask.next_step).includes('operators'), `not pending for the operators: ${JSON.stringify(ask)}`);
+    return ask.request_id as string;
+  };
+
+  await test('an agent of the operator without ext:write cannot change the config at all (403)', async () => {
+    const reader = await makeAgent(BASE, seed, ['memory:read']);
+    const res = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(reader.token), body: JSON.stringify({ config: { greeting: 'x' } }),
+    });
+    assert(res.status === 403, `expected 403 without ext:write, got ${res.status}`);
   });
 
-  await test('the same agent still sets an ordinary config field, and the operator in person still sets emailPolicy', async () => {
+  let askId = '';
+  await test("the operator's agent without operator:admin ASKS for emailPolicy: 202, pending for the operators, nothing changed (Jouni, 2026-10-25)", async () => {
+    askId = await agentAsks();
+    const cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === 'restricted', `emailPolicy changed to ${JSON.stringify(cfg.emailPolicy)} before an operator answered`);
+    const mine = await json(`/v1/publish-requests/${askId}`, { headers: auth(opAgent.token) });
+    assert(mine.status === 200 && mine.body.data.request.state === 'awaiting_operator' && mine.body.data.request.kind === 'extension-email-policy',
+      `the asker reads it pending: ${mine.status} ${JSON.stringify(mine.body?.data ?? mine.body?.error)}`);
+  });
+
+  await test('the operator hears it with what is checked and why, and Allow and Don\'t allow; the asking agent cannot answer it', async () => {
+    const n = await json('/v1/notifications', { headers: auth(seed.token) });
+    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'approval_request' && x.i18n?.vars?.extension === mailExtFull);
+    assert(!!notice && /any address/.test(notice.title) && /mail identity/.test(notice.body ?? ''), `no plain notice: ${JSON.stringify(notice)}`);
+    const ids = (notice.actions ?? []).map((a: any) => a.id).sort().join(',');
+    assert(ids === 'allow,deny', `actions ${ids}`);
+    const self = await json(`/v1/publish-requests/${askId}/decision`, { method: 'POST', headers: auth(opAgent.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(self.status === 403, `the asker answered its own question: ${self.status}`);
+  });
+
+  await test("Don't allow keeps the policy, and the agent is told", async () => {
+    const no = await json(`/v1/publish-requests/${askId}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'decline' }) });
+    assert(no.status === 200 && no.body.data.request.state === 'declined', `decline ${no.status}: ${JSON.stringify(no.body?.error ?? no.body?.data)}`);
+    assert((await storedConfig(mailExt, seed.token)).emailPolicy === 'restricted', 'the policy changed on a decline');
+    assert((await answers(askId)).includes('declined'), `the agent was not told the decline: ${JSON.stringify(await answers(askId))}`);
+  });
+
+  await test('Allow writes the grant, and the agent is told', async () => {
+    askId = await agentAsks();
+    const yes = await json(`/v1/publish-requests/${askId}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200 && yes.body.data.request.state === 'approved', `approve ${yes.status}: ${JSON.stringify(yes.body?.error ?? yes.body?.data)}`);
+    assert((await storedConfig(mailExt, seed.token)).emailPolicy === 'unrestricted', 'the grant was not written');
+    assert((await answers(askId)).includes('allowed'), `the agent was not told the Allow: ${JSON.stringify(await answers(askId))}`);
+  });
+
+  await test('the same agent still sets an ordinary config field at once, and the operator in person sets emailPolicy at once', async () => {
     const field = await json(`/v1/extensions/${mailExt}/config`, {
       method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ config: { greeting: 'hello' } }),
     });
     assert(field.status === 200, `agent field ${field.status}: ${JSON.stringify(field.body?.error)}`);
+    const narrow = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ config: { emailPolicy: 'restricted' } }),
+    });
+    assert(narrow.status === 200 && (await storedConfig(mailExt, seed.token)).emailPolicy === 'restricted', `operator narrow ${narrow.status}`);
     const op = await json(`/v1/extensions/${mailExt}/config`, {
       method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }),
     });
-    assert(op.status === 200, `operator ${op.status}: ${JSON.stringify(op.body?.error)}`);
+    assert(op.status === 200 && !op.body.data.approval_request, `operator ${op.status}: ${JSON.stringify(op.body?.error ?? op.body?.data)}`);
     const cfg = await storedConfig(mailExt, seed.token);
     assert(cfg.emailPolicy === 'unrestricted' && cfg.greeting === 'hello', `stored ${JSON.stringify(cfg)}`);
   });
@@ -773,14 +835,39 @@ async function run() {
     assert(cfg.emailPolicy === 'unrestricted', `the operator's own code change dropped the grant: ${JSON.stringify(cfg.emailPolicy)}`);
   });
 
-  await test("a script change by the operator's agent without operator:admin does not inherit the grant", async () => {
+  await test("a script change by the operator's agent without operator:admin holds the grant back until an operator confirms it for the new code", async () => {
     const res = await json(`/v1/extensions/${mailExt}/actions/ping`, {
       method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// agent edit` }),
     });
     assert(res.status === 200, `agent PATCH ${res.status}: ${JSON.stringify(res.body?.error)}`);
-    const cfg = await storedConfig(mailExt, seed.token);
-    assert(cfg.emailPolicy === undefined, `the agent's code inherited emailPolicy=${JSON.stringify(cfg.emailPolicy)}`);
+    const held = res.body.data.approval_request;
+    assert(held?.status === 'awaiting_operator', `the grant is not pending: ${JSON.stringify(res.body.data)}`);
+    let cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === undefined, `the agent's code inherited emailPolicy=${JSON.stringify(cfg.emailPolicy)} before an operator confirmed it`);
     assert(cfg.greeting === 'hello', 'the other config fields stay');
+    const n = await json('/v1/notifications', { headers: auth(seed.token) });
+    assert((n.body?.data?.notifications ?? []).some((x: any) => x.i18n?.key === 'approval_email_policy_code' && x.i18n?.vars?.extension === mailExtFull),
+      'the operator was not asked to confirm the grant for the new code');
+    const yes = await json(`/v1/publish-requests/${held.request_id}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `confirm ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    cfg = await storedConfig(mailExt, seed.token);
+    assert(cfg.emailPolicy === 'unrestricted', `the confirmed grant is not back: ${JSON.stringify(cfg.emailPolicy)}`);
+    assert((await answers(held.request_id)).includes('allowed'), 'the agent was not told');
+  });
+
+  await test('a confirmation of code that changed again since the question confirms nothing (outdated)', async () => {
+    const first = await json(`/v1/extensions/${mailExt}/actions/ping`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// agent edit 2` }),
+    });
+    const id = first.body?.data?.approval_request?.request_id;
+    assert(first.status === 200 && typeof id === 'string', `first ${first.status}: ${JSON.stringify(first.body?.data)}`);
+    const op = await json(`/v1/extensions/${mailExt}/actions/ping`, {
+      method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// operator edit 2` }),
+    });
+    assert(op.status === 200, `operator PATCH ${op.status}`);
+    const late = await json(`/v1/publish-requests/${id}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(late.status === 409 && late.body?.error?.code === 'OUTDATED', `expected 409 OUTDATED, got ${late.status} ${JSON.stringify(late.body?.error)}`);
+    assert((await storedConfig(mailExt, seed.token)).emailPolicy === undefined, 'a grant was written for code the operator did not see');
   });
 
   console.log(`\nExtension Hardening E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

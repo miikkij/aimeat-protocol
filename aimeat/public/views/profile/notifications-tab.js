@@ -10,6 +10,8 @@
  * @structure NotificationsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'notifications'.
  * @version-history
+ *   v2.4.0 — 2026-10-25 — An answered button marks its notice answered (notif.markAnswered), so the row
+ *     shows who decided what and when instead of its buttons (secaudit2026oct22).
  *   v2.3.0 — 2026-10-16 — A failed load of the inbox is drawn as one (itemsFailed: the could-not-load note
  *     with Retry), never as an empty inbox (QA audit F6-05, E7-04).
  *   v2.2.0 — 2026-09-25 — An inline action runs only when its button calls a door of this node's own
@@ -34,7 +36,7 @@ import { getNodeId } from '/js/services/auth.js';
 import * as notif from '/js/services/notifications.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState } from '/js/load-state.js';
-import { c, actionWord } from './notifications/frame.js';
+import { c } from './notifications/frame.js';
 import { renderCover } from './notifications/cover.js';
 
 const openTabEvent = (tabId) => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } }));
@@ -137,7 +139,14 @@ export default function NotificationsTab({ session, showToast }) {
     try {
       const r = await api(a.endpoint, { method: a.method || 'POST', body: a.body ? JSON.stringify(a.body) : undefined });
       const ok = !!(r && r.ok);
-      setResults(s => ({ ...s, [n.id]: { ok, msg: ok ? actionWord(a) : (r?.error?.message || c('action.failed')) } }));
+      // A decided question shows its answer and no button again (notif.markAnswered), also when the
+      // call says it was decided before; the live event then reloads every open list.
+      if (ok || notif.alreadyDecided(r)) {
+        await notif.markAnswered(n, a, !ok);
+        setResults(s => ({ ...s, [n.id]: undefined }));
+      } else {
+        setResults(s => ({ ...s, [n.id]: { ok, msg: r?.error?.message || c('action.failed') } }));
+      }
       await load({ showSpinner: false });
     } catch (e) { setResults(s => ({ ...s, [n.id]: { ok: false, msg: e?.message || c('action.failed') } })); }
     finally { setBusyId(null); }

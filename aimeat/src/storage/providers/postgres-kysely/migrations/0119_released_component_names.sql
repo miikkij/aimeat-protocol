@@ -1,4 +1,4 @@
--- 0118_released_component_names.sql
+-- 0119_released_component_names.sql
 --
 -- Extension and cortex names live in the owner's namespace (wish
 -- wish-cortex-and-extension-names-live-in-the-owner-s-namespace, secaudit2026oct22 leads 589 and

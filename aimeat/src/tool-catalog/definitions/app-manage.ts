@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-25 — subdomain_list and subdomain_delete say what a held address is and that deleting it
+ *     releases it (secaudit2026oct22, app-label-recycled-after-delete).
  *   2026-10-25 — subdomain_set takes `origin` (operator | publisher), the operator's decision
  *     on who a label belongs to (secaudit2026oct22).
  *   2026-10-18 — settings says it answers with publish_request when the node asks the owner first (V4).
@@ -300,11 +302,11 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     backup_export: { fields: F([], []), scope: 'app:write',
         summary: 'write a ZIP backup of all your apps to your private storage and answer its storage key (fetch it with aimeat_storage_download); restoring a backup is the owner\'s own act on the App Catalog page' },
     subdomain_list: { fields: F([], []), scope: 'operator:admin',
-        summary: 'operator: the subdomains this server serves apps or redirects on' },
+        summary: 'operator: the subdomains this server serves apps or redirects on; heldSince marks the address of a removed app, held for its owner' },
     subdomain_set: { fields: F(['subdomain'], ['target', 'subdomain_kind', 'enabled', 'origin']), scope: 'operator:admin',
         summary: 'operator: create or change one' },
     subdomain_delete: { fields: F(['subdomain'], []), scope: 'operator:admin',
-        summary: 'operator: remove one' },
+        summary: 'operator: remove one; on a held address this releases it, and another owner\'s app may then get it' },
 };
 
 export const APP_MANAGE_ACTION_NAMES = Object.keys(APP_MANAGE_ACTIONS);

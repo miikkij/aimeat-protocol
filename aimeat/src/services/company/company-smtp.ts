@@ -16,6 +16,11 @@
  * @structure setCompanySmtp · getCompanySmtpPublic · resolveCompanySender · sendAsCompany
  * @usage const sender = await resolveCompanySender(config, storage, sendingCompany.company);
  * @version-history
+ *   2026-10-25 — The SMTP host passes the outbound address rules at save and before each send
+ *     (smtp-host-check.ts): a private-network host only when the operator lists it in
+ *     email.company_smtp_private_hosts, loopback on a local node as before. The send connects to the
+ *     checked address with the host name kept for TLS, and a failure is told in fixed words by its
+ *     code, never with the remote end's first line (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.1 — 2026-10-05 — Addresses are checked with isValidEmail (utils/email-validator.ts), which
  *     also caps the length (secaudit 2026-10, M2).
  *   v1.1.0 — 2026-08-24 — resolveCompanySender no longer authorizes. Sending as a company is no
@@ -27,6 +32,8 @@
  *   v1.0.0 — 2026-08-07 — Per-company sending identity for the outbound door.
  */
 import { createTransport } from 'nodemailer';
+import { isIP } from 'node:net';
+import { checkSmtpHost } from './smtp-host-check.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CompanySmtpRecord, CompanySmtpPublic } from '../../models/company-smtp-schemas.js';
@@ -59,6 +66,9 @@ export async function setCompanySmtp(
 
   const host = (input.host ?? '').trim();
   if (!host || host.length > 253) throw new CompanyError('INVALID_SMTP', 400, 'host is required');
+  // A private-network host only when the operator listed it (services/company/smtp-host-check.ts).
+  const checked = await checkSmtpHost(host, config.companySmtpPrivateHosts);
+  if (!checked.ok) throw new CompanyError(checked.code, 400, checked.message);
   const fromAddress = (input.fromAddress ?? '').trim().toLowerCase();
   if (!isValidEmail(fromAddress)) throw new CompanyError('INVALID_SMTP', 400, 'fromAddress must be an email address');
   const port = input.port ?? 587;
@@ -110,6 +120,8 @@ export async function deleteCompanySmtp(storage: Storage, ownerGhii: string, com
 export interface CompanySender {
   smtp: CompanySmtpRecord;
   password: string | null;
+  /** The operator's list of private mail servers a company may use (config.companySmtpPrivateHosts). */
+  privateHosts: readonly string[];
 }
 
 /**
@@ -135,7 +147,25 @@ export async function resolveCompanySender(
     }
     password = decrypt(smtp.passwordEnc, key);
   }
-  return { smtp, password };
+  return { smtp, password, privateHosts: config.companySmtpPrivateHosts };
+}
+
+/**
+ * The reason a send failed, in fixed words by the error's code. The client's own message carries
+ * what the remote end said (nodemailer puts a refused greeting's first line in it), and that is
+ * never passed back: it read the first line of whatever service a host and port pointed at.
+ */
+function sendFailureText(err: unknown, host: string, port: number): string {
+  const e = (err ?? {}) as { code?: unknown; originalCode?: unknown; responseCode?: unknown };
+  const code = typeof e.code === 'string' ? e.code : 'ERROR';
+  const sys = typeof e.originalCode === 'string' ? ` ${e.originalCode}` : '';
+  const smtp = typeof e.responseCode === 'number' ? `, SMTP ${e.responseCode}` : '';
+  switch (code) {
+    case 'EAUTH': return `The company's mail server refused the sign-in (${code}${smtp}).`;
+    case 'EENVELOPE': return `The company's mail server refused the sender or the recipient (${code}${smtp}).`;
+    case 'EMESSAGE': return `The company's mail server did not take the message (${code}${smtp}).`;
+    default: return `The company's mail server ${host}:${port} did not accept the connection as a mail server (${code}${sys}${smtp}).`;
+  }
 }
 
 /**
@@ -151,10 +181,18 @@ export async function sendAsCompany(
   headers: Record<string, string> = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { smtp, password } = sender;
+  // Checked again at send: the operator's list may have changed, and a name may resolve elsewhere
+  // now. The connection goes to the address checked here, with the host name kept for TLS.
+  const checked = await checkSmtpHost(smtp.host, sender.privateHosts);
+  if (!checked.ok) return { ok: false, error: checked.message };
+  if (checked.address === null) {
+    return { ok: false, error: `The company's mail server ${smtp.host} could not be found (DNS).` };
+  }
   const transporter = createTransport({
-    host: smtp.host,
+    host: checked.address,
     port: smtp.port,
     secure: smtp.secure,
+    ...(isIP(smtp.host.replace(/^\[|\]$/g, '')) ? {} : { servername: smtp.host }),
     auth: smtp.username ? { user: smtp.username, pass: password ?? '' } : undefined,
   });
   try {
@@ -170,7 +208,7 @@ export async function sendAsCompany(
     return { ok: true };
   } catch (err) {
     logger.error(`Company SMTP send failed: ${subject}`, { error: (err as Error).message });
-    return { ok: false, error: (err as Error).message.slice(0, 200) };
+    return { ok: false, error: sendFailureText(err, smtp.host, smtp.port) };
   } finally {
     transporter.close();
   }

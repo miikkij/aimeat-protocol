@@ -23,6 +23,8 @@
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
+ *   v2.4.0 — 2026-10-25 — The switch "Ask me before my secret is sent to a new address for the first
+ *     time" (GET/PUT /v1/ghii/me/secret-host-ask; secaudit2026oct22, Jouni 2026-10-25).
  *   v2.3.0 — 2026-10-21 — A secret takes an address on add and on replace, and its panel sets, changes
  *     or removes the address without the value and withdraws what the person allowed an extension
  *     (PATCH /v1/secrets/:name, DELETE /v1/secrets/:name/approvals). It reloads on aimeat-live-update,
@@ -154,7 +156,26 @@ export default function AccessTab({ session, showToast }) {
     } catch (e) { swallowed('access-tab: mcp servers', e); setMcpCount(null); }
   }, []);
 
-  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets(), loadMcp()]); }, [load, loadSecrets, loadMcp]);
+  /** The account's "Ask me before my secret is sent to a new address"; null hides the switch. */
+  const [hostAsk, setHostAskState] = useState(null);
+  const loadHostAsk = useCallback(async () => {
+    try {
+      const r = await apiGet('/v1/ghii/me/secret-host-ask');
+      setHostAskState(r?.data?.setting ?? null);
+    } catch (e) { swallowed('access-tab: secret host ask', e); setHostAskState(null); }
+  }, []);
+  const setHostAsk = async (on) => {
+    setBusy('hostAsk');
+    try {
+      const r = await apiPut('/v1/ghii/me/secret-host-ask', { on });
+      if (r?.ok === false) throw r;
+      setHostAskState(r?.data?.setting ?? null);
+      toast(x(on ? 'secrets.hostAskOn' : 'secrets.hostAskOff'));
+    } catch (e) { toast(errText(e, x('secrets.hostAskFailed')), true); }
+    setBusy(false);
+  };
+
+  const loadAll = useCallback(async () => { await Promise.all([load(), loadSecrets(), loadMcp(), loadHostAsk()]); }, [load, loadSecrets, loadMcp, loadHostAsk]);
   useEffect(() => { loadAll(); }, [loadAll]);
   const loadRef = useRef(loadAll);
   loadRef.current = loadAll;
@@ -440,6 +461,7 @@ export default function AccessTab({ session, showToast }) {
     session, ov, failed, rows, basePackage, baseHolders, fed, filter, openKey, shownKeys, form, created, formMsg, spendDraft, fedInput, keyShown, busy,
     secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, hostDraft, mcpCount,
     setSecretForm, toggleSecretForm, openReplace, setReplaceValue, setHostDraft, writeSecret, deleteSecret, saveSecretHost, withdrawApproval,
+    hostAsk, setHostAsk,
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,
     load, setFilter, toggleKey, showMoreKeys, setSpendDraft, revokeKey, takeAway, setSpendCap, revokeUnused, signOutOthers, addPasskeyNow,
     toggleFedAll, addFedNode, removeFedNode, setFedInput, setKeyShown, setForm, toggleForm, toggleScope, clearCreated, createToken,

@@ -31,6 +31,9 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-25 -- A wallet signature's statement carries the certificate's subject and issuer, and the checks and the public lookup show them (secaudit2026oct22, lead 3924).
+ *   2026-10-25 -- A wallet signature's caveats (WalletEvidence.caveats) are sealed into its statement, and the checks and the public lookup carry them (secaudit2026oct22, lead 3895).
+ *   2026-10-25 -- verifyRecordSignatures and SignatureCheck moved unchanged to verify-signatures.ts (max-file-lines); exported from here as before.
  *   2026-10-25 — A wallet signature from an EU reference-wallet test certificate is sealed with test: true, and the signature checks and the public lookup carry `test` (secaudit2026oct22, records.ts:test-anchor-wallet-signature-sealed-without-test-mark).
  *   2026-10-24 — refuseVisitor also refuses the shared anonymous principal by identity (isAnonymousPrincipal), so the token POST /v1/auth/anonymous mints no longer creates, signs or starts a signature on a request (secaudit2026oct22, caller-context.ts:kindOf:anonymous-by-flag-only:docsign-refuseVisitor).
  *   2026-10-24 — readRequestRecord: the stored request for the node's own work, so a data processing agreement reads its signatures (plan doc-mvmr4i2wdk0p, D3.1).
@@ -51,7 +54,6 @@
  *     (secaudit 2026-10-10 I14); the signed PDF's hash is indexed after the seal succeeds (I15).
  */
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
-import { verifyAuthenticationResponse } from '@simplewebauthn/server';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
@@ -65,9 +67,10 @@ import { fileTarget } from '../classification/labels.js';
 import { logger } from '../../utils/logger.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import {
-  canonicalJson, intentChallenge, keyMessage, evidenceHash, sealStatement, verifySeal, sha256Hex,
-  type SignIntent, type SealedStatement, type Seal, type SignMethod, type Assurance,
+  canonicalJson, intentChallenge, keyMessage, evidenceHash, sealStatement, sha256Hex,
+  type SignIntent, type SealedStatement, type Seal, type SignMethod, type Assurance, type StatementCaveat,
 } from './statement.js';
+import { verifyRecordSignatures } from './verify-signatures.js';
 
 const NS = 'sys:docsign';
 const reqKey = (id: string) => `docsign.req.${id}`;
@@ -104,6 +107,10 @@ export interface WalletEvidence {
   validation: { verdict: string; level: string; reasons: string[]; trustSource: string | null; test: boolean };
   /** The certificate's holder name matches the signer's display name on this node; null when it cannot be told. */
   nameMatches: boolean | null;
+  /** What could not be established, sealed into the statement (statement.ts STATEMENT_CAVEATS). */
+  caveats?: StatementCaveat[];
+  /** Which name the certificate was matched with: the verified one, or the display name (eudi.ts walletNameBinding). */
+  nameBasis?: 'verified' | 'display-name';
 }
 
 export interface DocSignature {
@@ -513,6 +520,10 @@ async function sealInto(
     // A test-anchored wallet signature says so in what the node seals, so the checks and the public
     // lookup can say it too. Every other statement has no such field.
     ...(ev.wallet?.validation.test ? { test: true as const } : {}),
+    // What the node could not establish is sealed with the signature it qualifies (secaudit2026oct22).
+    ...(ev.wallet?.caveats?.length ? { caveats: ev.wallet.caveats } : {}),
+    // Whose certificate the node matched with the signer, so the seal and the lookup name it (lead 3924).
+    ...(ev.wallet ? { certificate: { subject: ev.wallet.certificate.subject, issuer: ev.wallet.certificate.issuer } } : {}),
   };
   const seal = await sealStatement(statement, nodeKey);
   rec.signatures[signer] = {
@@ -655,71 +666,10 @@ async function registeredKey(storage: Storage, identity: string): Promise<string
   return ghii ? (await storage.getOwner(ghii.username))?.publicKey ?? null : null;
 }
 
-// ── verification ──
+// ── verification: services/docsign/verify-signatures.ts (moved 2026-10-25, max-file-lines) ──
 
-export interface SignatureCheck {
-  signer: string;
-  signerName: string | null;
-  signedAt: string;
-  method: SignMethod;
-  assurance: Assurance;
-  /** The statement names this request and this document. */
-  consistent: boolean;
-  /** The node's seal verifies, with this node's current key. */
-  sealValid: boolean;
-  sealByThisNode: boolean;
-  /** The signer's own evidence verifies (passkey assertion or key signature); null for session. */
-  evidenceValid: boolean | null;
-  valid: boolean;
-  /** A wallet signature from an EU reference-wallet test certificate: a test with no legal effect. */
-  test: boolean;
-}
-
-export async function verifyRecordSignatures(ctx: DocsignCtx, rec: DocSignRecord): Promise<SignatureCheck[]> {
-  const nodeKey = await ctx.storage.getNodeKey();
-  const out: SignatureCheck[] = [];
-  for (const [signer, sig] of Object.entries(rec.signatures)) {
-    const st = sig.statement;
-    const consistent = st.request === rec.id && st.document.sha256 === rec.document.sha256 && st.signer === signer
-      && st.evidence === evidenceHash(sig.passkey ?? sig.key ?? sig.wallet ?? null);
-    const sealValid = await verifySeal(st, sig.seal);
-    const sealByThisNode = !!nodeKey && sig.seal.publicKey === nodeKey.publicKey;
-    let evidenceValid: boolean | null = null;
-    if (sig.key) {
-      evidenceValid = sig.key.message === keyMessage(rec.id, rec.document.sha256, signer)
-        // eslint-disable-next-line aimeat/no-silent-catch -- a stored key or signature that will not decode is evidence that does not verify: false is the answer
-        && await verifyEd25519(sig.key.publicKey, sig.key.message, sig.key.signature).catch(() => false);
-    } else if (sig.passkey) {
-      evidenceValid = await verifyPasskeyEvidence(ctx.config, rec, signer, sig.passkey);
-    }
-    out.push({
-      signer, signerName: st.signerName, signedAt: st.signedAt, method: st.method, assurance: st.assurance,
-      consistent, sealValid, sealByThisNode, evidenceValid,
-      valid: consistent && sealValid && sealByThisNode && evidenceValid !== false,
-      // The sealed mark, or for a statement sealed before the mark existed, the stored wallet evidence.
-      test: st.test === true || sig.wallet?.validation.test === true,
-    });
-  }
-  return out;
-}
-
-async function verifyPasskeyEvidence(config: AimeatConfig, rec: DocSignRecord, signer: string, ev: PasskeyEvidence): Promise<boolean> {
-  if (ev.intent.request !== rec.id || ev.intent.document !== rec.document.sha256 || ev.intent.signer !== signer) return false;
-  try {
-    const v = await verifyAuthenticationResponse({
-      response: ev.assertion as never,
-      expectedChallenge: Buffer.from(intentChallenge(ev.intent)).toString('base64url'),
-      expectedOrigin: ev.origin,
-      expectedRPID: config.passkeyRpId,
-      credential: { id: ev.credentialId, publicKey: new Uint8Array(Buffer.from(ev.publicKey, 'base64url')), counter: 0 },
-      requireUserVerification: true,
-    });
-    return v.verified;
-  } catch {
-    // eslint-disable-next-line aimeat/no-silent-catch -- the library throws for an assertion that does not verify (wrong challenge, origin, signature); false is that answer
-    return false;
-  }
-}
+export { verifyRecordSignatures };
+export type { SignatureCheck } from './verify-signatures.js';
 
 // ── public lookup ──
 
@@ -732,6 +682,10 @@ export interface PublicSignature {
   valid: boolean;
   /** A wallet signature from an EU reference-wallet test certificate: a test with no legal effect. */
   test: boolean;
+  /** What the node could not establish when it sealed the signature, as sealed; empty when nothing. */
+  caveats: StatementCaveat[];
+  /** A wallet signature's certificate subject and issuer, as sealed; null for other methods and older seals. */
+  certificate: { subject: string; issuer: string | null } | null;
 }
 
 export interface PublicRequestView {
@@ -751,7 +705,7 @@ export async function publicView(ctx: DocsignCtx, rec: DocSignRecord): Promise<P
     id: rec.id, title: rec.title, state: rec.state,
     document: { sha256: rec.document.sha256, name: rec.document.name, size: rec.document.size },
     createdAt: rec.createdAt, completedAt: rec.completedAt, partiesTotal: rec.parties.length,
-    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test })),
+    signatures: checks.map((c) => ({ signer: c.signer, signerName: c.signerName, signedAt: c.signedAt, method: c.method, assurance: c.assurance, valid: c.valid, test: c.test, caveats: c.caveats, certificate: c.certificate })),
   };
 }
 

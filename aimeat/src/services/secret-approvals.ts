@@ -28,6 +28,10 @@
  * @usage
  *   const url = await requestSecretApproval({ storage, config }, { ownerGhii, secret, extension, installer, host, why, requestedBy });
  * @version-history
+ *   v1.4.0 — 2026-10-25 — The owner's notice carries its question's ref, and Allow, Don't allow and a
+ *     withdrawal close it: the answer shows with where to change it, and the buttons go (closeQuestion).
+ *   v1.3.0 — 2026-10-25 — Allow and Don't allow tell the one whose call asked (approval-standard.ts
+ *     tellAsker): an agent on its inbox, anyone else in the bell (secaudit2026oct22, the approval standard).
  *   v1.2.0 — 2026-10-22 — The bell notice carries Don't allow beside Allow (the developer: a question
  *     with only Allow cannot be answered no).
  *   v1.1.0 — 2026-10-21 — An Allow pressed on a notice whose question no longer waits (the secret was
@@ -41,6 +45,7 @@ import { notify, type NotifyInput } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { declaredHostsFor, declaresHost, usesSecretsOf } from './extension-secret-uses.js';
 import { listOwnerSecrets, purposeText, type SecretSummary } from './owner-secrets.js';
+import { tellAsker, closeQuestion } from './approval-standard.js';
 import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -55,6 +60,16 @@ export interface ApprovalKey { extension: string; installer: string; host: strin
 
 const sameKey = (a: ApprovalKey, b: ApprovalKey) => a.extension === b.extension && a.installer === b.installer && a.host === b.host;
 const trimBase = (baseUrl: string) => baseUrl.replace(/\/+$/, '');
+
+/** The ref of the owner's notice about one question, so its answer closes the notice (services/notification-answers.ts). */
+export const secretQuestionRef = (secret: string, key: ApprovalKey) => `secret-approval:${secret}:${key.extension}:${key.installer}:${key.host}`;
+/** Where the owner changes a secret's approvals later: the Access page, section Secrets. */
+const SECRETS_PAGE = { link: '/v1/profile?tab=access#ac-secrets', key: 'approval_change.access_secrets' };
+
+/** Close the owner's notice about one question: the answer shows, the buttons go. */
+async function closeSecretQuestion(storage: Storage, ownerGhii: string, secret: string, key: ApprovalKey, outcome: 'allowed' | 'declined' | 'outdated', by: string | null): Promise<void> {
+    await closeQuestion({ storage }, { recipients: [ownerGhii], ref: secretQuestionRef(secret, key), outcome, decidedBy: by, change: SECRETS_PAGE });
+}
 
 /** The page where the owner answers. The page reads the facts from the node, never from this address. */
 export function secretAllowUrl(baseUrl: string, secret: string, extension: string, host: string): string {
@@ -90,9 +105,11 @@ function askNotice(baseUrl: string, secret: string, key: ApprovalKey, why: strin
     return {
         type: SECRET_USE_ASK_TYPE,
         title: `Extension ${key.extension} asks to use your secret ${secret}`,
-        body: `${key.extension}, installed by ${key.installer}, needs your secret ${secret} for ${key.host}${purpose}. Open this to see why, or answer here.`,
+        body: `${key.extension}, installed by ${key.installer}, needs your secret ${secret} for ${key.host}${purpose}. `
+            + 'Your secret has not gone to this address before, so you are asked first, and nothing was sent. Open this to see why, or answer here.',
         link: url.slice(url.indexOf('/v1/')),
         i18n: { key: SECRET_USE_ASK_TYPE, vars: { extension: key.extension, installer: key.installer, secret, host: key.host, why: why ?? '' } },
+        ref: secretQuestionRef(secret, key),
         // Both answers on the notice, as on the page: a question with only Allow cannot be answered no.
         actions: [{
             id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST',
@@ -206,8 +223,29 @@ export type ApprovalAnswer =
  * account that asked: a reinstall by someone else is a different question, and the old page must not
  * answer it.
  */
+/** Tell the one whose call asked how the owner answered (services/approval-standard.ts). */
+async function tellSecretAsker(
+    config: AimeatConfig | undefined, storage: Storage, ownerGhii: string, secret: string,
+    entry: SecretApproval | null, outcome: 'allowed' | 'declined', decidedBy: string,
+): Promise<void> {
+    if (!config || !entry?.requestedBy) return;
+    const what = `${entry.extension} sends ${secret} to ${entry.host}`;
+    await tellAsker({ storage, config }, {
+        accountGhii: ownerGhii, asker: entry.requestedBy, outcome, what, decidedBy,
+        contextId: `secret-approval:${secret}:${entry.extension}:${entry.host}`,
+        sentence: outcome === 'allowed'
+            ? `The owner allowed ${entry.extension} to send their secret ${secret} to ${entry.host}. Call it again; it goes through now.`
+            : `The owner did not allow ${entry.extension} to send their secret ${secret} to ${entry.host}. Nothing was sent. A later call asks the owner again.`,
+        data: { secret, extension: entry.extension, host: entry.host },
+        messageKind: 'secret-approval',
+        link: '/v1/profile?tab=access',
+    });
+}
+
 export async function approveSecretUse(
     storage: Storage, ownerGhii: string, secret: string, extension: string, host: string, approvedBy: string,
+    /** With the node's config, the one whose call asked is told (services/approval-standard.ts). */
+    config?: AimeatConfig,
 ): Promise<ApprovalAnswer> {
     const ext = await storage.getExtension(extension);
     let approved: SecretApproval | null = null;
@@ -226,17 +264,33 @@ export async function approveSecretUse(
         + 'still needs the secret, its next call asks you again.';
     if (!out) return { ok: false, status: 404, code: 'APPROVAL_NOT_FOUND', message: gone };
     if (!approved) return { ok: false, status: 404, code: 'APPROVAL_NOT_FOUND', message: gone };
-    if (out.changed) emitChange('secrets', ownerGhii);
+    if (out.changed) {
+        emitChange('secrets', ownerGhii);
+        await tellSecretAsker(config, storage, ownerGhii, secret, approved, 'allowed', approvedBy);
+    }
+    const done = approved as SecretApproval;
+    await closeSecretQuestion(storage, ownerGhii, secret, done, 'allowed', done.approvedBy ?? approvedBy);
     return { ok: true, approval: approved };
 }
 
-/** The owner says no to a waiting request: it is removed, and the next refused call asks again. */
-export async function declineSecretUse(storage: Storage, ownerGhii: string, secret: string, extension: string, host: string): Promise<boolean> {
+/** The owner says no to a waiting request: it is removed, the one who asked is told, and the next refused call asks again. */
+export async function declineSecretUse(
+    storage: Storage, ownerGhii: string, secret: string, extension: string, host: string,
+    /** With the node's config and who pressed, the one whose call asked is told. */
+    tell?: { config: AimeatConfig; by: string },
+): Promise<boolean> {
+    let dropped: SecretApproval | null = null;
     const out = await updateApprovals(storage, ownerGhii, secret, (list) => {
+        dropped = list.find(a => a.extension === extension && a.host === host && !a.approvedAt) ?? null;
         const next = list.filter(a => !(a.extension === extension && a.host === host && !a.approvedAt));
         return next.length === list.length ? null : next;
     });
-    if (out?.changed) emitChange('secrets', ownerGhii);
+    if (out?.changed) {
+        emitChange('secrets', ownerGhii);
+        await tellSecretAsker(tell?.config, storage, ownerGhii, secret, dropped, 'declined', tell?.by ?? ownerGhii);
+        const gone = dropped as SecretApproval | null;
+        if (gone) await closeSecretQuestion(storage, ownerGhii, secret, gone, 'declined', tell?.by ?? ownerGhii);
+    }
     return !!out?.changed;
 }
 
@@ -246,6 +300,10 @@ export async function withdrawSecretApproval(storage: Storage, ownerGhii: string
         const next = list.filter(a => !sameKey(a, key));
         return next.length === list.length ? null : next;
     });
-    if (out?.changed) emitChange('secrets', ownerGhii);
+    if (out?.changed) {
+        emitChange('secrets', ownerGhii);
+        // A question still waiting when it was dropped is answered "no" on its notice.
+        await closeSecretQuestion(storage, ownerGhii, secret, key, 'declined', ownerGhii);
+    }
     return !!out?.changed;
 }

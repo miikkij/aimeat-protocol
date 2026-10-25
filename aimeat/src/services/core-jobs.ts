@@ -11,6 +11,11 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-25 — held-label-release: the own addresses of removed apps are held, then released after
+ *     apps.held_label_days and past apps.held_labels_per_owner (services/held-app-labels.ts;
+ *     secaudit2026oct22, app-label-recycled-after-delete).
+ *   2026-10-25 — mcp-client-cleanup: MCP client registrations no sign-in used are deleted after
+ *     mcp.unused_client_days (services/mcp-client-cleanup.ts; secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-25 — The work expiry and the dispute timeout move the status with one conditional UPDATE
  *     (storage.transitionWorkStatus, transitionDisputeStatus) before any morsel moves, so a concurrent
  *     deliver, ruling or resolution moves the escrow or the refund once; runWorkTimeoutJob is exported
@@ -216,6 +221,17 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('device-auth-cleanup', async () => {
     const n = await storage.cleanupExpiredDeviceAuth();
     if (n > 0) logger.info(`[device-auth-cleanup] removed ${n} expired device authorization(s)`);
+  });
+  // MCP client registrations no sign-in used, past mcp.unused_client_days (services/mcp-client-cleanup.ts).
+  scheduler.registerCoreHandler('mcp-client-cleanup', async () => {
+    const { runMcpClientCleanup } = await import('./mcp-client-cleanup.js');
+    await runMcpClientCleanup(storage, config);
+  });
+  // The own addresses of removed apps: held for their owner, released by age and the per-owner limit
+  // (services/held-app-labels.ts).
+  scheduler.registerCoreHandler('held-label-release', async () => {
+    const { sweepHeldAppLabels } = await import('./held-app-labels.js');
+    await sweepHeldAppLabels(storage, config);
   });
   // Agent task stall detection + agent connectivity checks
   scheduler.registerCoreHandler('task-stall-detection', async () => {

@@ -27,6 +27,10 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.12.0 -- 2026-10-25 -- The call's size goes to prepareAiCall, so a call on the node's key is priced
+ *     before it runs; its estimate is held until the call is settled or failed, and its answer is at
+ *     most ai.node_key_max_output_tokens long (services/ai/node-key-hold.ts; secaudit2026oct22,
+ *     node-key-allowance-precheck-unbounded-call-cost). Calls on an own key are unchanged.
  *   v1.11.0 -- 2026-10-08 -- The answer names its AI-provenance record: a whole answer is settled before it is
  *     sent and carries AI-Disclosure, Link rel="ai-provenance" and X-AIMEAT-Provenance-Id; a stream ends
  *     with an SSE comment `: aimeat-provenance id=… record_url=…` after the provider's last frame.
@@ -84,6 +88,7 @@ import { retryAfterOf } from '../services/account-limits.js';
 import { chatCompletionRaw, listModels } from '../services/openrouter.js';
 import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
 import { runRoute } from '../services/ai/route-run.js';
+import { holdNodeKeyCandidates, nodeKeyOutputCap } from '../services/ai/node-key-hold.js';
 import { callCost } from '../services/ai/catalog/price.js';
 import type { CostSource } from '../services/ai/types.js';
 import { logger } from '../utils/logger.js';
@@ -193,6 +198,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         }
 
         let plan: AiCallPlan;
+        let held: { candidates: AiCallPlan['candidates']; release: () => void };
         try {
             // `model` is deliberately not passed through: see the file header. The node decides.
             // A role is the caller's word on WHAT the call is for, which the owner's roles turn into
@@ -200,15 +206,23 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             // before anything else happens. Never forwarded upstream: `upstream` below names its fields.
             const role = proxyRole(req);
             // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
+            // The call's size, so a call on the node's key is priced before it runs and its estimate
+            // held while it runs (services/ai/node-key-hold.ts; secaudit2026oct22): about four
+            // characters to a token, and the answer's length when the caller named one.
             plan = await prepareAiCall(storage, config, gaii, {
                 appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId), ...(role ? { role } : {}),
+                estimate: {
+                    promptTokens: Math.ceil(JSON.stringify(body.messages).length / 4),
+                    ...(typeof body.max_tokens === 'number' && body.max_tokens > 0 ? { maxTokens: Math.floor(body.max_tokens) } : {}),
+                },
             });
+            held = holdNodeKeyCandidates(gaii, plan.candidates);
         } catch (err) {
             sendError(res, config.nodeId, err);
             return;
         }
 
-        const upstream = {
+        const baseUpstream = {
             model: plan.model,
             messages: body.messages,
             ...(body.temperature !== undefined ? { temperature: body.temperature } : {}),
@@ -239,10 +253,13 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
         let answered: AiCallPlan;
         try {
             const run = await runRoute({
-                storage, gaii, capability: plan.capability, candidates: plan.candidates, chosenBy: plan.chosenBy,
+                storage, gaii, capability: plan.capability, candidates: held.candidates, chosenBy: plan.chosenBy,
                 allowFallback: plan.allowFallback, rules: plan.rules, signal: controller.signal,
                 ...(plan.noCreditModel ? { noCreditModel: plan.noCreditModel } : {}),
             }, async (c) => {
+                // On the node's key the answer is at most the operator's limit long (node-key-hold.ts).
+                const length = c.nodeKey ? nodeKeyOutputCap(config, body.max_tokens) : undefined;
+                const upstream = length !== undefined ? { ...baseUpstream, max_tokens: length } : baseUpstream;
                 // Through the openrouter service or the gateway, never straight out of this file:
                 // `pnpm check:llm-transport` holds that, because a second place speaking to a provider
                 // is a second place that can forget to meter. An Anthropic provider does not speak
@@ -273,6 +290,7 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             answered = planFor(plan, run.candidate);
             if (run.route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: 'llm-proxy', source: 'llm-proxy' });
         } catch (err) {
+            held.release();
             const e = err as { route?: { fellBack: boolean }; failed?: Parameters<typeof recordFailedAttempts>[4] };
             if (e.route?.fellBack && e.failed) await recordFailedAttempts(storage, config, gaii, plan, e.failed, { appId: 'llm-proxy', source: 'llm-proxy' });
             // The one status table every AI path uses (services/ai/errors.ts providerFailureOf).
@@ -311,6 +329,9 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             logger.warn(`[llm-proxy] ${gaii}: ${(err as Error).message}`);
             if (!res.headersSent) sendError(res, config.nodeId, err);
             else res.end();
+        } finally {
+            // The call is settled or failed: its estimate on the node's key is no longer held.
+            held.release();
         }
     });
 

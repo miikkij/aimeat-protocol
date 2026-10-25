@@ -224,9 +224,6 @@
     "src/services/compliance-monthly-job.ts": {
       "listOwners": 1
     },
-    "src/services/component-registrar.ts": {
-      "listSubdomainSites": 1
-    },
     "src/services/config-at-rest-rows.ts": {
       "getAllConfigValues": 1
     },

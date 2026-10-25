@@ -8,6 +8,8 @@
  *   2026-10-25 — `:name` is read through services/component-address.ts (`<owner>/<name>`, the alias of a
  *     bare record, a bare name read for the caller); the translations door reads no caller's own
  *     (owner namespaces wish, secaudit2026oct22).
+ *   v1.3.0 — 2026-10-25 — POST /v1/extensions/:name/instances answers 409 LIMIT_EXCEEDED past the operator
+ *     setting extensions.max_instances (no limit by default), naming the setting (secaudit2026oct22, lead 750).
  *   v1.2.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): ext:invoke on GET /v1/extensions/:name/instances, GET /v1/extensions/:name/instances/:instanceId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.1.0 — 2026-10-09 — Instance secrets are encrypted bound to their extension, instance and field
  *     (SecretBinding; secrets audit 2026-10-09, 1.1).
@@ -80,6 +82,16 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       if (existing) {
         res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS',
           `Instance "${id}" already exists for extension "${name}"`));
+        return;
+      }
+      // The operator's count per extension (extensions.max_instances, 0 is no limit). Each copy is
+      // a memory namespace of its own, so the count bounds what one install can multiply (lead 750).
+      const maxInstances = config.extensionMaxInstances ?? 0;
+      if (maxInstances > 0 && (await storage.listExtensionInstances(name)).length >= maxInstances) {
+        // The sentence names the setting as the Config tab labels it; its path is in `details`.
+        res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
+          `"${name}" already has ${maxInstances} copies, the most this server allows. Remove one you no longer use, or ask the operator to raise "Copies per extension".`,
+          undefined, { setting: 'extensions.max_instances', limit: maxInstances }));
         return;
       }
 

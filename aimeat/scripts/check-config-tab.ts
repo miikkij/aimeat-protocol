@@ -18,6 +18,7 @@
  * @structure main() · groups vs DOMAINS · names · dead locale keys · unread settings · list and number rows
  * @usage pnpm check:config-tab
  * @version-history
+ *   v1.0.2 — 2026-10-25 — security.allow_private_egress is read from the environment the loader normalises.
  *   v1.0.1 — 2026-10-12 — security.owner_key_login and ai.legacy_settings_routes are read through the
  *     version gate beside their config key (ownerKeyLoginAllowed, aiLegacySettingsRoutesAllowed).
  *   v1.0.0 — 2026-10-11 — Initial.
@@ -96,6 +97,7 @@ const READ_ANOTHER_WAY: Record<string, string> = {
   'decide.von_key': 'the provider reads AIMEAT_DECIDE_VON_KEY from the environment by name; the row shows whether it is set',
   'security.owner_key_login': 'routes/auth.ts reads it through ownerKeyLoginAllowed (config-security.ts), which also asks whether the running version removed the sign-in',
   'ai.legacy_settings_routes': 'routes/openrouter.ts reads it through aiLegacySettingsRoutesAllowed (config-ai-models.ts), which also asks whether the running version removed the routes',
+  'security.allow_private_egress': 'utils/blocked-ip.ts and services/decide/providers.ts read AIMEAT_ALLOW_PRIVATE_EGRESS at call time from the environment, which config.ts sets from the security profile at start; the row is immutable, so the two hold the same value',
 };
 const sources: string[] = [];
 const walk = (dir: string, skip: (rel: string) => boolean): void => {

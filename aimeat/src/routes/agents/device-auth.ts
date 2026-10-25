@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-25 — The email form of device-authorize is counted per network address
+ *     (auth.device_authorize_email_max in 10 minutes, default 20; auth.device_authorize_email_limit
+ *     turns it off), answered 429 RATE_LIMITED with the setting and the account-name form named; and
+ *     GET /v1/agents/verify/info names the owner only to that owner signed in in person
+ *     (secaudit2026oct22, device-authorize-email-owner-oracle).
  *   2026-10-25 — The ten-pending cap per owner refuses only requests that do not come from the owner:
  *     the owner's own request and one from an agent of the owner go through when strangers' rows fill
  *     it (secaudit2026oct22, pending-cap-per-owner-unauthenticated).
@@ -108,7 +113,8 @@ import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { validateAgentName, buildGAII, generateUserCode, localAccountName, isOwnerInPerson, mayActOnAgent } from '../../utils/gaii.js';
 import { verifyJWT } from '../../auth/jwt.js';
 import { credentialRevoked, optionalAuth } from '../../auth/middleware.js';
-import { rateLimit } from '../../middleware/rate-limit.js';
+import { rateLimit, ipRateKey } from '../../middleware/rate-limit.js';
+import { rateBuckets } from '../../services/rate-buckets.js';
 import { emitChange } from '../../services/event-bus.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
@@ -135,6 +141,9 @@ import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js
  * check already uses, because both are "this agent may not settle this on its own".
  */
 const APPROVER_SCOPE = 'agent:write';
+
+/** The email form of device-authorize, counted per network address in 10 minutes (per process, like every limiter). */
+const takeEmailForm = rateBuckets(10 * 60 * 1000);
 
 function autoApprovePrincipal(req: Request, owner: string): { kind: 'owner' | 'agent'; scopes: string[]; mayApprove: boolean } | null {
   const auth = req.auth;
@@ -174,6 +183,20 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // handle, so resolve up front, before rate-limit/auto-approval/GAII construction.
     let ownerName: string = owner;
     if (typeof owner === 'string' && owner.includes('@')) {
+      // The answer tells whether an address has an account here, and this route takes no credential,
+      // so the email form is counted per network address (auth.device_authorize_email_max in 10
+      // minutes, off with auth.device_authorize_email_limit). The account-name form is not counted.
+      if (config.deviceAuthEmailLimit) {
+        const counted = takeEmailForm(ipRateKey(req.ip ?? req.socket.remoteAddress), config.deviceAuthEmailMax);
+        if (!counted.ok) {
+          res.setHeader('Retry-After', counted.retryAfterSec);
+          res.status(429).json(error(config.nodeId, 'RATE_LIMITED',
+            `This network address has named ${config.deviceAuthEmailMax} accounts by email address in the last 10 minutes, the most this node allows `
+            + `(auth.device_authorize_email_max). Try again in ${counted.retryAfterSec} seconds, or name the account by its account name, which is not counted.`,
+            undefined, { retry_after_sec: counted.retryAfterSec, setting: 'auth.device_authorize_email_max' }));
+          return;
+        }
+      }
       const resolved = await resolveOwnerByVerifiedEmail(storage, owner);
       if (!resolved.ok) {
         const status = resolved.code === 'INVALID_EMAIL' ? 400 : resolved.code === 'AMBIGUOUS' ? 409 : 404;
@@ -513,12 +536,20 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const existing = await storage.getAgent(
       buildGAII(request.agentName, request.ownerName, config.nodeId));
 
+    // The account a request names, only to that account signed in in person. A code is all this
+    // endpoint asks for, and the email form of device-authorize resolves an address to the account,
+    // so naming it to anyone mapped an address to an account name (secaudit2026oct22). The consent
+    // page checks the owner through the owner's own pending list.
+    const caller = req.auth;
+    const isTheOwner = !!caller && !isAnonymousPrincipal(caller) && isOwnerInPerson(caller)
+      && localAccountName(caller.owner) === request.ownerName;
+
     res.json(success(config.nodeId, {
       user_code: request.userCode,
       agent_name: request.agentName,
       display_name: request.displayName,
       description: request.description,
-      owner: request.ownerName,
+      ...(isTheOwner ? { owner: request.ownerName } : {}),
       status: request.status,
       existing_agent: !!existing,
       expires_in: Math.ceil(remainingMs / 1000),

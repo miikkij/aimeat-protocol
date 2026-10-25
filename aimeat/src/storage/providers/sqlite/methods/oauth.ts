@@ -8,6 +8,8 @@
  * @structure oauthMethods
  * @usage Object.assign(SqliteStorage.prototype, oauthMethods) in ../index.ts
  * @version-history
+ *   2026-10-25 — deleteUnusedOAuthClients: a client registered before a cutoff that no refresh token
+ *     and no approval names is deleted (secaudit2026oct22, dcr-unbounded-client-records).
  *   v1.0.0 — 2026-10-05 — createOAuthClient, getOAuthClient, createOAuthRefreshToken, getOAuthRefreshToken,
  *     deleteOAuthRefreshToken, deleteOAuthRefreshTokensByGaii, createOAuthApproval, getOAuthApproval moved
  *     here from federation-oauth.ts so the file mirrors postgres-kysely/methods/oauth.ts (secaudit 2026-10,
@@ -44,6 +46,17 @@ export const oauthMethods = {
       redirectUris: JSON.parse(row.redirectUris as string),
       createdAt: row.createdAt as string,
     };
+  },
+
+  async deleteUnusedOAuthClients(this: SqliteStorage, createdBefore: string): Promise<number> {
+    // A client registered before the cutoff that no refresh token and no remembered approval names.
+    const result = this.db.prepare(
+      `DELETE FROM oauth_clients
+        WHERE createdAt < ?
+          AND NOT EXISTS (SELECT 1 FROM oauth_refresh_tokens t WHERE t.clientId = oauth_clients.clientId)
+          AND NOT EXISTS (SELECT 1 FROM oauth_approvals a WHERE a.clientId = oauth_clients.clientId)`
+    ).run(new Date(createdBefore).toISOString());
+    return result.changes;
   },
 
   // ── Refresh Tokens ──

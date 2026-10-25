@@ -26,8 +26,11 @@
  *   THE RECEIVER runs on 127.0.0.1 (the runner admits private egress) on E2E_SECRETS_APPROVALS_PORT,
  *   40675 by default.
  * @version-history
- *   v1.2.0 — 2026-10-25 — Every call, approval and comparison names an install by its stored name,
+ *   v1.2.2 — 2026-10-25 — 12b names both extensions by their stored names too (merge of the approval standard with the owner namespaces, secaudit2026oct22).
+ *   v1.2.1 — 2026-10-25 — Every call, approval and comparison names an install by its stored name,
  *     `<owner>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
+ *   v1.2.0 — 2026-10-25 — 12b: the agent whose call asked hears Allow and Don't allow on its inbox
+ *     (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-21 — Jouni's decisions: test 15, a host only on the owner's own living-hooks list
  *     asks once; tests 23 to 25, code installed before the update keeps the pre-audit first use, a
  *     redeploy ends that, and another account's code never gets it.
@@ -376,6 +379,29 @@ await test('12. withdrawing the approval stops it, and a declined request is gon
     const left = (await rowOf(owner.token, 'K_FOREIGN')).approvals;
     assert(!left.some((a: any) => a.host === RECEIVER_HOST), `the declined request stayed: ${JSON.stringify(left)}`);
     assert(left.some((a: any) => a.host === `localhost:${RECEIVER_PORT}` && !a.approvedAt), `the other host's request is gone: ${JSON.stringify(left)}`);
+});
+
+/** The answers on the agent's own inbox in one question's thread. */
+async function answersOn(token: string, contextId: string): Promise<any[]> {
+    const r = await json(`/v1/agents/v2/messages?context_id=${encodeURIComponent(contextId)}`, { headers: auth(token) });
+    assert(r.status === 200, `inbox ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return (r.body.data.messages as any[]).filter(m => m.metadata?.kind === 'secret-approval');
+}
+
+await test("12b. the agent whose call asked hears the owner's Allow and the owner's Don't allow (secaudit2026oct22, the approval standard)", async () => {
+    // Test 6: the chat agent's call through the agent's own code asked about K_AGENTCODE.
+    const allowCtx = `secret-approval:K_AGENTCODE:${full(AGENT_EXT)}:${RECEIVER_HOST}`;
+    const ok = await json('/v1/secrets/K_AGENTCODE/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(AGENT_EXT), host: RECEIVER_HOST }) });
+    assert(ok.status === 200, `approve: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+    const allowed = await answersOn(chatAgent.token, allowCtx);
+    assert(allowed.length === 1 && allowed[0].parts?.[1]?.data?.outcome === 'allowed'
+        && String(allowed[0].parts?.[0]?.text).includes('allowed'), `no Allow answer: ${JSON.stringify(allowed)}`);
+    // Test 5: the chat agent's call to an undeclared host asked about K_UNDECL.
+    const host = `localhost:${RECEIVER_PORT}`;
+    const no = await json('/v1/secrets/K_UNDECL/approvals/decline', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(OWN_EXT), host }) });
+    assert(no.status === 200 && no.body.data.declined === true, `decline: ${JSON.stringify(no.body)}`);
+    const declined = await answersOn(chatAgent.token, `secret-approval:K_UNDECL:${full(OWN_EXT)}:${host}`);
+    assert(declined.length === 1 && declined[0].parts?.[1]?.data?.outcome === 'declined', `no Don't allow answer: ${JSON.stringify(declined)}`);
 });
 
 await test("13. PATCH sets a secret's address without the value, refuses a bad one, and null removes it", async () => {

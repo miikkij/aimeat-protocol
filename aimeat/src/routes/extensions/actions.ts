@@ -11,6 +11,9 @@
  *     an encoded `<owner>/<name>`; the three-segment path is the instance form or the literal
  *     `<owner>/<name>/<action>`, read so a
  *     bare name never reaches another account's code (owner namespaces wish, secaudit2026oct22).
+ *   2026-10-25 — A run past the operator's run slots (extensions.run_slots, run_slots_per_account) is
+ *     answered 503 EXTENSION_RUNS_BUSY with Retry-After; a visitor's share is counted per client
+ *     address (services/extension-run-slots.ts; secaudit2026oct22, lead 817).
  *   2026-10-24 — The run no longer receives the request's bearer: ctx.buy runs the seller's action for
  *     the buying extension's GEAI (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-21 — visitorOrSignIn asks isAnonymousPrincipal, so the minted anonymous token runs a public
@@ -134,6 +137,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     });
     if (out.kind === 'paywall') return;   // the paywall has answered
     if (out.kind === 'refused') {
+      if (out.retryAfterSec) res.setHeader('Retry-After', String(out.retryAfterSec));
       const body = error(config.nodeId, out.code, out.message);
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;
@@ -180,9 +184,12 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       caller: { gaii: nobody, metered: nobody, owner: '', kind: 'anonymous', roles: [], scopes: [], appGrantId: null },
       paywall: { res },
       correlationId: req.header('x-aimeat-correlation') ?? null,
+      // A visitor has no account: its share of the run slots is counted per client address.
+      admission: { account: `visitor:${req.ip ?? 'unknown'}` },
     });
     if (out.kind === 'paywall') return;
     if (out.kind === 'refused') {
+      if (out.retryAfterSec) res.setHeader('Retry-After', String(out.retryAfterSec));
       const body = error(config.nodeId, out.code, out.message);
       res.status(out.status).json(out.keepMessage ? keepErrorMessage(body) : body);
       return;

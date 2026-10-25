@@ -12,6 +12,8 @@
  * @structure registerAdminSecurityTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminSecurityTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-25 -- aimeat_admin_incident_resolve decides an entry of an incident that names records to
+ *     act on ("clear" or "delete", or "keep") through the same services/incident-decisions.ts (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.3.0 — 2026-10-18 — aimeat_admin_incident_resolve decides one case of either kind through
@@ -67,7 +69,7 @@ export function registerAdminSecurityTools(
     async ({ id, name, resolution }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       if (name !== undefined || resolution !== undefined) {
-        if (!name || !resolution) return toolError('INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap.');
+        if (!name || !resolution) return toolError('INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear" or "delete") or "keep" for an entry.');
         const decided = await decideIncidentCase(config, storage, { incidentId: id, name, resolution, by: { principal: agentGaii, kind: 'ai' } });
         if (!decided.ok) return toolError(decided.code, decided.message);
         return text({ id, ...decided.data });

@@ -7,6 +7,7 @@
  *   CONFIG_FIELDS spreads these rows where they stood, so the Config tab lists them in the same order.
  * @structure SYSTEM2_AI_CONFIG_FIELDS
  * @version-history
+ *   2026-10-25 — ai.node_key_max_output_tokens (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.4.1 — 2026-10-12 — ai.legacy_settings_routes no longer names /v1/ai/settings, which stays in 4.0.0.
  *   v1.4.0 — 2026-10-12 — ai.legacy_settings_routes refuses `true` from 4.0.0, its removal (Core 2026-11 HTTP-08).
  *   v1.3.0 — 2026-10-05 — ai.node_key_when_spent, ai.node_key_account_daily_usd,
@@ -32,6 +33,7 @@ export const SYSTEM2_AI_CONFIG_FIELDS: ConfigFieldShape<keyof AiCapabilityConfig
   { key: 'aiNodeKeyWhenSpent', dotPath: 'ai.node_key_when_spent', envVar: 'AIMEAT_AI_NODE_KEY_WHEN_SPENT', type: 'string', ...oneOf('refuse', 'limits'), immutable: false, description: "What the node's key does when a person's allowance is spent: refuse (pays for nothing more, whatever model the call names) or limits (keeps paying up to the two daily limits)", range: 'refuse|limits' },
   { key: 'aiNodeKeyAccountDailyUsd', dotPath: 'ai.node_key_account_daily_usd', envVar: 'AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1000, immutable: false, description: "With limits: the most one account's calls may cost the node's key in one day (UTC), in USD", range: '0-1000' },
   { key: 'aiNodeKeyNodeDailyUsd', dotPath: 'ai.node_key_node_daily_usd', envVar: 'AIMEAT_AI_NODE_KEY_NODE_DAILY_USD', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 100000, immutable: false, description: "With limits: the most all accounts' calls together may cost the node's key in one day (UTC), in USD", range: '0-100000' },
+  { key: 'aiNodeKeyMaxOutputTokens', dotPath: 'ai.node_key_max_output_tokens', envVar: 'AIMEAT_AI_NODE_KEY_MAX_OUTPUT_TOKENS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: "The longest answer, in tokens, a call on the node's key may ask for; a call that names none or more gets this many, and the answer says when it was cut short. The call's price is estimated with it and held against what is left of the person's allowance before it runs. Calls on a person's or an agent's own key are not affected. 0 = no limit", range: '0-1000000' },
   // The two roles V5 adds (services/ai-model-defaults.ts), after the six in config-schema.ts. The
   // node's key pays for speech or embeddings only when the operator names the model here (J4).
   { key: 'modelDefaultTts', dotPath: 'ai.model_default_tts', envVar: 'AIMEAT_MODEL_DEFAULT_TTS', type: 'string', validate: () => true, immutable: false, description: 'Default model for speech (text to speech), when the owner has not set one. Empty: the server\'s own key makes no speech' },

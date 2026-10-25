@@ -22,6 +22,8 @@
  *   everything between the sandbox and safeFetch is the real code.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-fetch-echo-scrub.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-25 — The storage stub answers getMemory, which the first-use decision now asks
+ *     for the account's "ask before a new address" setting (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, item 10).
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
@@ -64,6 +66,9 @@ const storage = {
         return r?.hosts ?? [];
     },
     noteSecretUse: async () => undefined,
+    // The account's "ask before a new address" setting (services/secret-host-ask-setting.ts): none
+    // stored, so the node default applies.
+    getMemory: async () => null,
 } as unknown as Storage;
 
 /** The echo server: the request headers and body, back in the body and in response headers. */

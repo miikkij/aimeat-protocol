@@ -11,6 +11,8 @@
  *     approval (remembered-consent) create/get
  *
  * @version-history
+ *   2026-10-25 — deleteUnusedOAuthClients(createdBefore): the daily core job's sweep of dynamically
+ *     registered clients nobody uses (secaudit2026oct22, dcr-unbounded-client-records).
  *   v1.1.0 — 2026-09-09 — deleteOAuthClient, listOAuthClients, deleteOAuthRefreshTokensByClient,
  *     deleteOAuthApproval, deleteOAuthApprovalsByClient, deleteOAuthApprovalsByGaii and
  *     listOAuthApprovalsByOwner deleted: no caller outside the storage layer.
@@ -22,6 +24,11 @@ export interface OAuthRepository {
   // Clients
   createOAuthClient(client: OAuthClientRecord): Promise<void>;
   getOAuthClient(clientId: string): Promise<OAuthClientRecord | null>;
+  /**
+   * Delete every client registered before `createdBefore` (an ISO time) that no refresh token and no
+   * remembered approval names: a registration nobody finished or kept. Returns how many went.
+   */
+  deleteUnusedOAuthClients(createdBefore: string): Promise<number>;
 
   // Refresh tokens
   createOAuthRefreshToken(token: OAuthRefreshTokenRecord): Promise<void>;

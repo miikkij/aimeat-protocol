@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.9.0 — 2026-10-25 — A decided notice shows who decided what and when, and where to change it,
+ *     and no buttons; a button that answered marks its notice answered (secaudit2026oct22).
  *   v1.8.0 — 2026-09-26 — A link that names an agent (?tab=agents&agent=<name>) opens that agent's
  *     row.
  *   v1.7.0 — 2026-09-26 — A button that carries its own words (`i18n`) is said in the reader's
@@ -42,7 +44,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
-import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf } from '/js/services/notifications.js';
+import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf, markAnswered, alreadyDecided, answerTextOf, answerChangeOf } from '/js/services/notifications.js';
 import { ago } from '/js/format.js';
 const html = htm.bind(h);
 
@@ -200,9 +202,11 @@ export function NotificationBell({ t, onNavigate }) {
     if (a.confirm && !window.confirm(tr('notif.action.confirm', 'Are you sure?'))) return;
     setBusyKey(`${n.id}:${a.id}`);
     const r = await api(a.endpoint, { method: a.method || 'POST', body: a.body ? JSON.stringify(a.body) : undefined });
-    setBusyKey(null);
     const ok = !!(r && r.ok);
-    setResults(s => ({ ...s, [n.id]: { ok, msg: ok ? actionLabel(a) : (r && r.error && r.error.message) || tr('notif.action.failed', 'Action failed') } }));
+    // A decided question shows its answer and no button again, also when it was decided before.
+    if (ok || alreadyDecided(r)) await markAnswered(n, a, !ok);
+    setBusyKey(null);
+    setResults(s => ({ ...s, [n.id]: ok || alreadyDecided(r) ? undefined : { ok, msg: (r && r.error && r.error.message) || tr('notif.action.failed', 'Action failed') } }));
     load();
   };
 
@@ -245,7 +249,9 @@ export function NotificationBell({ t, onNavigate }) {
   };
 
   const renderItem = (n) => {
-    const actions = Array.isArray(n.actions) ? n.actions : [];
+    const decided = answerTextOf(n);
+    const change = decided ? answerChangeOf(n) : null;
+    const actions = decided ? [] : (Array.isArray(n.actions) ? n.actions : []);
     const res = results[n.id];
     const replyAction = actions.find(a => a.kind === 'reply');
     return html`
@@ -255,6 +261,8 @@ export function NotificationBell({ t, onNavigate }) {
           ${bodyOf(n) ? html`<div class="notif-item-body">${bodyOf(n)}</div>` : null}
           <div class="notif-item-time">${sourceName(n)} · ${relTime(n.createdAt)}</div>
         </button>
+        ${decided ? html`<div class="notif-result ok">${decided}</div>` : null}
+        ${change ? html`<div class="notif-actions"><button class="notif-action-btn poster-menu-row" onClick=${(e) => { e.stopPropagation(); setOpen(false); openNotificationLink(change.link, onNavigate); }}>${change.label}</button></div>` : null}
         ${actions.length ? html`<div class="notif-actions">${actions.map(a => renderAction(n, a))}</div>` : null}
         ${replyFor === n.id && replyAction ? html`
           <div class="notif-reply">

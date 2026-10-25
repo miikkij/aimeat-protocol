@@ -8,27 +8,32 @@
  *   its host calls at once without awaiting them.
  *
  *   FETCHES ARE QUEUED, NOT REFUSED. Many-source collectors start their fetches together, and they
- *   keep doing so: a run holds at most EXT_FETCH_INFLIGHT_BYTES of answer buffers in flight
- *   (slots = that budget divided by the run's per-answer ceiling, at least one), and a call past the
- *   slots waits for one to free. The wait ends with the run's own deadline or teardown signal. With
- *   the 4 MB default ceiling a run has 32 fetches in flight; with the 32 MB ceiling, 4.
+ *   keep doing so: a run holds at most the operator's in-flight budget of answer buffers
+ *   (extensions.fetch_inflight_mb, 128 MB by default; slots = that budget divided by the run's
+ *   per-answer ceiling, at least one), and a call past the slots waits for one to free. The wait ends
+ *   with the run's own deadline or teardown signal. With the defaults and the 4 MB ceiling a run has
+ *   32 fetches in flight; with the 32 MB ceiling, 4. A budget of 0 is no limit: every call starts at once.
  *
  *   A PUBLIC READ BY OWNER NAME LOADS ONE ROW. ctx.memory.getPublic with a bare owner name resolves
  *   through that owner's agents; it listed every record of every agent under the key as a prefix,
  *   values included (every record at all for an empty key), and then kept the exact key.
  *   agentRecordByKey finds the holder from metadata and reads that one record.
- * @structure EXT_FETCH_INFLIGHT_BYTES · createFetchGate(capBytes) · withFetchGate(gate, fetch) ·
+ * @structure EXT_FETCH_INFLIGHT_BYTES · createFetchGate(capBytes, budgetMb) · withFetchGate(gate, fetch) ·
  *   agentRecordByKey(storage, owner, key)
- * @usage const gate = createFetchGate(deps.capabilities.fetchMaxBytes);
+ * @usage const gate = createFetchGate(deps.capabilities.fetchMaxBytes, config.extensionFetchInflightMb);
  *   ctx.fetch = withFetchGate(gate, async (url, opts, host) => { ... });
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The in-flight budget is the operator setting extensions.fetch_inflight_mb
+ *     (createFetchGate's budgetMb), 0 being no limit; EXT_FETCH_INFLIGHT_BYTES stays as its default
+ *     (secaudit2026oct22, lead 782).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
+import { EXT_FETCH_INFLIGHT_MB_DEFAULT } from '../config-extension-load.js';
 
-/** The most answer bytes one run's fetches may hold in flight together. */
-export const EXT_FETCH_INFLIGHT_BYTES = 128 * 1024 * 1024;
+/** The most answer bytes one run's fetches may hold in flight together when the setting is absent. */
+export const EXT_FETCH_INFLIGHT_BYTES = EXT_FETCH_INFLIGHT_MB_DEFAULT * 1024 * 1024;
 
 export interface FetchGate {
     /** Fetches this run may have in flight at once. */
@@ -37,9 +42,15 @@ export interface FetchGate {
     acquire(signal?: AbortSignal): Promise<() => void>;
 }
 
-/** A FIFO gate sized so `slots` answers of `capBytes` (the run's per-answer ceiling) fit in EXT_FETCH_INFLIGHT_BYTES. */
-export function createFetchGate(capBytes: number = OUTBOUND_READ_MAX_BYTES): FetchGate {
-    const slots = Math.max(1, Math.floor(EXT_FETCH_INFLIGHT_BYTES / Math.max(1, capBytes)));
+/**
+ * A FIFO gate sized so `slots` answers of `capBytes` (the run's per-answer ceiling) fit in `budgetMb`
+ * megabytes (extensions.fetch_inflight_mb; EXT_FETCH_INFLIGHT_BYTES when absent). A budget of 0 is
+ * no limit: every call gets a slot at once.
+ */
+export function createFetchGate(capBytes: number = OUTBOUND_READ_MAX_BYTES, budgetMb?: number): FetchGate {
+    const budgetBytes = typeof budgetMb === 'number' && Number.isFinite(budgetMb) && budgetMb >= 0
+        ? budgetMb * 1024 * 1024 : EXT_FETCH_INFLIGHT_BYTES;
+    const slots = budgetBytes === 0 ? Number.POSITIVE_INFINITY : Math.max(1, Math.floor(budgetBytes / Math.max(1, capBytes)));
     let inFlight = 0;
     const waiting: Array<() => void> = [];
     const release = (): void => {

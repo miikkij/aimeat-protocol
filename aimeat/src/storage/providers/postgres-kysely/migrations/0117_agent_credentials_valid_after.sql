@@ -1,0 +1,19 @@
+-- 0117_agent_credentials_valid_after.sql
+--
+-- The instant before which an agent's credentials no longer count.
+--
+-- POST /v1/agents/:gaii/rekey rotates the agent's key because the old one may have leaked, and its
+-- answer says every token issued before it stops. Session rows reached the tokens that carry a
+-- session id; an MCP OAuth access token carries none, so it kept working on a new MCP session until it
+-- expired (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
+--
+--   "Agent"."credentialsValidAfter"   ISO-8601 UTC text, or NULL. An agent credential issued before
+--                                     it is refused on every request (auth/agent-alive.ts). NULL = no
+--                                     rotation yet, which is every existing agent, so nothing changes
+--                                     for them.
+--
+-- TEXT holding the ISO string the node wrote, read back unchanged, as the SQLite column is: the
+-- comparison is made in code (auth/credential-age.ts), never in SQL.
+--
+-- Mirrors the SQLite column added in schema-columns-agents.ts.
+ALTER TABLE "Agent" ADD COLUMN IF NOT EXISTS "credentialsValidAfter" TEXT;

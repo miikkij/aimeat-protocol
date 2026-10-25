@@ -13,6 +13,8 @@
  *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
  *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.13.2 — 2026-10-25 — decideWorkspaceAccess sends a role choice as `approve` with `role`; the
+ *     participants panel's Add as contributor and as viewer answered 400 and kept their buttons.
  *   v1.13.1 — 2026-10-18 — The share's access keeps 'organism' (the workspace's own members, V3.4), which it read as 'open'.
  *   v1.13.0 — 2026-10-16 — writeDraft takes the person's `aiProvenance` declaration.
  *   v1.12.0 — 2026-10-16 — The share carries `until`, its end dates.
@@ -470,8 +472,15 @@ export async function listWorkspaceRequests(orgId, ws) {
 }
 
 /** Approve or deny a member's access request to your workspace. decision: 'approve'|'deny'|'viewer'|'contributor'. */
+/**
+ * Approve or deny one access request. `decision` is 'approve' or 'deny'; the role words
+ * 'contributor' and 'viewer' mean approve with that role (the route takes { decision, role }; until
+ * 2026-10-25 the participants panel sent the role as the decision and every approval answered 400).
+ */
 export async function decideWorkspaceAccess(orgId, ws, requester, decision) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/decision`, { ws, requester, decision });
+  const role = decision === 'contributor' || decision === 'viewer' ? decision : undefined;
+  return apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access/decision`,
+    { ws, requester, decision: role ? 'approve' : decision, ...(role ? { role } : {}) });
 }
 
 /** Full access state for a workspace you manage: pending requests + current members with their roles. */

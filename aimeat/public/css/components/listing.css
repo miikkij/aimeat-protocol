@@ -12,6 +12,8 @@
  *   one and writes no grid of its own.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.33.0 — 2026-10-25 — when-who-name-doors stacks from 861 to 1320px too, where the page's rail
+ *     leaves its column too narrow for four columns (the developer's review of the Notifications page).
  *   v1.32.0 — 2026-10-19 — The Agents list's cut is name-kind-runs-access-last-doors: an agent's mode
  *     and platform tags stand in their own column before how it runs (Jouni, 2026-10-19).
  *   v1.31.2 — 2026-10-18 — item-kind-state-doors under 1180px: the kind keeps its longest word and the
@@ -517,6 +519,17 @@
   .listing--mark-name-tags-stats-doors > .listing-row > :nth-child(5) { grid-column: 3; border-bottom: 0; padding-bottom: .1rem; }
   .listing--check-name-desc { grid-template-columns: auto minmax(0, 1fr); }
   .listing--check-name-desc > .listing-row > :nth-child(3) { grid-column: 2; }
+}
+/* The notifications stand beside the page's rail up to 1320px, where their column is too narrow for
+   four columns: the What column fell to one word a line and the rows ran down beside the rail
+   (2026-10-25). There the rows stack as on a phone: when, then what, then the doors under it. */
+@media (min-width: 861px) and (max-width: 1320px) {
+  .listing--when-who-name-doors { grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: dense; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(1) { grid-column: 1; border-bottom: 0; padding-bottom: 0; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(1) b { display: inline; margin-right: .5rem; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(2) { display: none; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(3) { grid-column: 1 / -1; padding-top: .1rem; border-bottom: 0; padding-bottom: .4rem; }
+  .listing--when-who-name-doors > .listing-row > :nth-child(4) { grid-column: 1 / -1; padding-top: 0; white-space: normal; justify-content: flex-start; flex-wrap: wrap; }
 }
 /* App development's three pitfall lists: a state mark in its own column (a severity Status, a tier
    Tag) that keeps its own width, the pitfall, where it applies, the doors. On a phone the mark keeps

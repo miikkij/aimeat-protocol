@@ -49,6 +49,10 @@
  *   const vaultOwner = vaultOwnerForCall(deps.caller);
  *   resolveSecretForHeaders({ ..., ownerGhii: vaultOwner, firstUse: () => decideFirstUse({ ... }) });
  * @version-history
+ *   2026-10-25 — decideFirstUse reads the owner's "Ask me before my secret is sent to a new address
+ *     for the first time" (services/secret-host-ask-setting.ts, on unless switched off). On: code an
+ *     agent without secrets:manage wrote and a host field such an agent set ask the owner, as below.
+ *     Off: they bind with the owner's rights, as before the audit (secaudit2026oct22; Jouni, 2026-10-25).
  *   2026-10-25 — decideFirstUse: a host only an unvetted host field names binds only for the owner in
  *     person or a caller holding secrets:manage, never by the keep, a declaration or the code writer (secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, v58 and v59).
@@ -91,7 +95,8 @@ import { scopeIsCovered, SECRETS_MANAGE_SCOPE } from '../utils/scope-coverage.js
 import { saverAuthority } from './workflow/trigger-authority.js';
 import { declaredUse, declaresHost } from './extension-secret-uses.js';
 import { keepsPreAuditFirstUse } from './extension-first-use-keep.js';
-import { namesUnvettedHost } from './extension-network-hosts.js';
+import { namesUnvettedHost, HOST_FIELDS_UNVETTED_KEY } from './extension-network-hosts.js';
+import { secretHostAskOn } from './secret-host-ask-setting.js';
 import { askOperatorsAboutSharedHost, sharedFirstUseMessage } from './shared-secret-ask.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 
@@ -209,6 +214,12 @@ export async function secretRefusalText(
  */
 async function codeWriter(
     storage: Storage, config: AimeatConfig, extension: ExtensionCtx['extension'] | undefined, vaultOwnerGhii: string,
+    /**
+     * The owner's "Ask me before my secret is sent to a new address for the first time"
+     * (services/secret-host-ask-setting.ts). Off: code one of the owner's own agents or ecosystem
+     * apps wrote runs with the owner's rights here too, as everywhere else (Jouni, 2026-10-25).
+     */
+    askOn = true,
 ): Promise<{ trusted: boolean; by: string }> {
     const record = extension ? await storage.getExtension(extension.name) : null;
     const writer = (record?.installedByPrincipal ?? '').trim();
@@ -227,7 +238,8 @@ async function codeWriter(
     // The agent's or ecosystem app's scopes as they stand now: the owner may have narrowed or
     // removed it since it wrote the code.
     const now = await saverAuthority(storage, { kind: isGEAI(writer) ? 'ecosystem' : 'agent', id: writer });
-    return { trusted: !now.gone && scopeIsCovered(now.scopes, SECRETS_MANAGE_SCOPE), by: writer };
+    if (now.gone) return { trusted: false, by: writer };
+    return { trusted: !askOn || scopeIsCovered(now.scopes, SECRETS_MANAGE_SCOPE), by: writer };
 }
 
 /**
@@ -272,13 +284,19 @@ export async function decideFirstUse(deps: {
     // A host only an unvetted host field names (a value an agent without secrets:manage set) never
     // binds by the keep, a declaration or the code writer: only the owner in person or a caller
     // holding secrets:manage chooses it, below (secaudit2026oct22).
-    const unvettedHost = namesUnvettedHost(deps.extConfig, deps.host) && !declaresHost(deps.extConfig, deps.secretName, deps.host);
-    if (!unvettedHost && keepsPreAuditFirstUse(deps.extConfig)) return { allowed: true, by: caller.gaii };
+    // The owner's "Ask me before my secret is sent to a new address for the first time", on unless
+    // switched off (services/secret-host-ask-setting.ts). Off: code the owner's agent wrote, and an
+    // address such an agent set in a host field, choose the first host as before the audit; the
+    // record still names who wrote the code (Jouni, 2026-10-25).
+    const askOn = await secretHostAskOn(storage, config, vaultOwnerGhii);
+    const extConfig = askOn ? deps.extConfig : withoutUnvettedMark(deps.extConfig);
+    const unvettedHost = askOn && namesUnvettedHost(extConfig, deps.host) && !declaresHost(extConfig, deps.secretName, deps.host);
+    if (!unvettedHost && keepsPreAuditFirstUse(extConfig)) return { allowed: true, by: caller.gaii };
     // Declared: the extension says publicly that it sends this secret to this host, in `uses_secrets`
     // or in its `network:` hosts, matched by hostname unless a port is declared. A trusted code writer
     // made that declaration, so the first use binds whoever calls (2026-10-21).
-    if (declaresHost(deps.extConfig, deps.secretName, deps.host)) {
-        const writer = await codeWriter(storage, config, extension, vaultOwnerGhii);
+    if (declaresHost(extConfig, deps.secretName, deps.host)) {
+        const writer = await codeWriter(storage, config, extension, vaultOwnerGhii, askOn);
         if (writer.trusted) return { allowed: true, by: deps.unattended ? writer.by : caller.gaii };
     }
     const roles = caller.roles ?? [];
@@ -288,10 +306,24 @@ export async function decideFirstUse(deps: {
         return { allowed: true, by: caller.gaii };
     }
     if (scopeIsCovered(caller.scopes ?? [], SECRETS_MANAGE_SCOPE)) return { allowed: true, by: caller.gaii };
+    // The question switched off: code one of the owner's own agents wrote chose this address, and it
+    // binds with the owner's rights, attended or not.
+    if (!askOn) {
+        const writer = await codeWriter(storage, config, extension, vaultOwnerGhii, false);
+        if (writer.trusted && writer.by.includes('#')) return { allowed: true, by: deps.unattended ? writer.by : caller.gaii };
+    }
     if (!deps.unattended) return { allowed: false, by: caller.gaii };
     // Unattended: the code writer decides, except for a host the code writer did not choose.
-    const writer = await codeWriter(storage, config, extension, vaultOwnerGhii);
+    const writer = await codeWriter(storage, config, extension, vaultOwnerGhii, askOn);
     return { allowed: writer.trusted && !unvettedHost, by: writer.by };
+}
+
+/** The config without the unvetted mark: every host field value counts as declared again. */
+function withoutUnvettedMark(config: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+    if (!config || !(HOST_FIELDS_UNVETTED_KEY in config)) return config;
+    const out = { ...config };
+    delete out[HOST_FIELDS_UNVETTED_KEY];
+    return out;
 }
 
 /**

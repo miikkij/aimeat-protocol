@@ -28,6 +28,9 @@
  * @structure registerPermissionAllowRoutes(router, config, storage)
  * @usage registerPermissionAllowRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The agent is told what was allowed, and the notice shows the answer without
+ *     its buttons; the read answers `declined_at` per word, so the page shows a "no" given anywhere
+ *     (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-19 — The `agent` object carries the agent's `avatar` (services/agent-avatar.ts), null when it has none.
  *   v1.0.0 — 2026-10-17 — Initial (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
  */
@@ -42,6 +45,9 @@ import { emitChange } from '../../services/event-bus.js';
 import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
 import { isOneClickWord, agentPageUrl } from '../../services/permission-ask.js';
 import { announceScopes } from './announce-scopes.js';
+import { tellPermissionAnswer, closePermissionAsk } from '../../services/permission-ask-notice.js';
+import { readAgentAccess } from '../../services/agent-refusals.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
 import { logger } from '../../utils/logger.js';
 
@@ -75,9 +81,16 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
   const view = async (agent: AgentRecord, words: string[]) => {
     const held = agent.defaultScopes ?? [];
     const avatars = await readAvatarsOrEmpty(storage, [agent.gaii], logger.warn.bind(logger), 'GET /v1/agents/:name/allow');
+    // A word the person already said no to, on an open refusal: the page shows that answer and no
+    // buttons, wherever the "no" was given (the bell, the agent's card, this page).
+    const access = await readAgentAccess(storage, ownerGhiiOf(agent.gaii), agent.name, held).catch((err: unknown) => {
+      logger.warn('GET /v1/agents/:name/allow: the refusals could not be read; nothing reads as declined', { agent: agent.gaii, error: String(err) });
+      return { refusals: [] as Array<{ needed: string[]; declinedAt?: string }> };
+    });
+    const declinedAt = (w: string) => access.refusals.find((r) => r.declinedAt && r.needed.includes(w))?.declinedAt ?? null;
     return {
       agent: { name: agent.name, gaii: agent.gaii, display_name: agent.displayName || agent.name, avatar: avatars.get(agent.gaii) ?? null },
-      words: words.map((w) => ({ scope: w, held: scopeIsCovered(held, w), one_press: isOneClickWord(w) })),
+      words: words.map((w) => ({ scope: w, held: scopeIsCovered(held, w), one_press: isOneClickWord(w), declined_at: declinedAt(w) })),
       agent_page: agentPageUrl(config.baseUrl, agent.name),
     };
   };
@@ -119,7 +132,9 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     }
     const held = agent.defaultScopes ?? [];
     const added = words.filter((w) => !scopeIsCovered(held, w));
+    const by = callerOf(req, config.nodeId, storage).ownerGhii;
     if (added.length === 0) {
+      await closePermissionAsk({ storage, config }, agent, words, 'allowed', by);
       res.json(success(config.nodeId, { ...(await view(agent, words)), added: [] }));
       return;
     }
@@ -130,6 +145,9 @@ export function registerPermissionAllowRoutes(router: Router, config: AimeatConf
     }
     announceScopes(updated.gaii);
     emitChange('agents');
+    // The agent hears the answer, not only its token (services/approval-standard.ts).
+    await tellPermissionAnswer({ storage, config }, updated, added, 'allowed', by);
+    await closePermissionAsk({ storage, config }, updated, words, 'allowed', by);
     res.json(success(config.nodeId, { ...(await view(updated, words)), added }));
   });
 }

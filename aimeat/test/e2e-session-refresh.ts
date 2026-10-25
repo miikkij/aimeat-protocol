@@ -7,6 +7,9 @@
  *   the prev-token-after-grace reuse path is testable without a 60s wait.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-session-refresh
  * @version-history
+ *   2026-10-25 — Phase 8: an https request gets __Host-aimeat_rt (Path=/, Secure), a planted aimeat_rt
+ *     does not replace it, an old-name session moves on refresh, and two aimeat_rt are read as none
+ *     (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  *   2026-10-16 — The reuse replay leaves the account event session_token_reused on the owner's record
  *     (QA audit S1-02).
  *   2026-10-16 — Phase 6 asserts that an owner bearer (access token, owner-level access token, the
@@ -337,6 +340,62 @@ async function main() {
         assert(JSON.stringify(refreshed.roles) === JSON.stringify(['agent']), `refreshed agent roles should stay ['agent'], got ${JSON.stringify(refreshed.roles)}`);
         // Scope must also survive the refresh (no scope collapse either direction).
         assert(Array.isArray(refreshed.scopes) && refreshed.scopes.includes('memory:read'), `refreshed agent should retain its scope, got ${JSON.stringify(refreshed.scopes)}`);
+    });
+
+    console.log('\nPhase 8 — An https node uses __Host-aimeat_rt (secaudit2026oct22, refresh-cookie-unprefixed-first-match)');
+    // X-Forwarded-Proto: https is how the node learns a request reached it over https behind nginx;
+    // the cookie name and its Secure flag follow it (services/owner-session.ts cookieSecure).
+    const httpsCall = async (path: string, cookie: string | null, body?: any) => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Forwarded-Proto': 'https', 'X-AIMEAT-Refresh': '1' };
+        if (cookie) headers['Cookie'] = cookie;
+        const res = await fetch(`${BASE}${path}`, { method: 'POST', headers, body: body ? JSON.stringify(body) : undefined });
+        let data: any = null;
+        try { data = await res.json(); } catch { /* no body */ }
+        return { status: res.status, data, setCookies: setCookieHeaders(res) };
+    };
+    const hostRt = (setCookies: string[]) => {
+        for (const c of setCookies) {
+            const m = /^__Host-aimeat_rt=([^;]*)/.exec(c);
+            if (m && m[1]) return decodeURIComponent(m[1]);
+        }
+        return null;
+    };
+    let hostToken = '';
+    await test('an https sign-in sets __Host-aimeat_rt with Path=/ and Secure, and no aimeat_rt', async () => {
+        const r = await httpsCall('/v1/ghii/login', null, { username, password });
+        assert(r.status === 200 && r.data?.ok, `https login failed: ${r.status} ${r.data?.error?.message}`);
+        const set = r.setCookies.find(c => c.startsWith('__Host-aimeat_rt='));
+        assert(!!set, `expected __Host-aimeat_rt, got ${JSON.stringify(r.setCookies)}`);
+        assert(/;\s*Path=\/(;|$)/i.test(set!), `Path must be /, got ${set}`);
+        assert(/;\s*Secure/i.test(set!) && /;\s*HttpOnly/i.test(set!), `Secure and HttpOnly expected, got ${set}`);
+        assert(!/;\s*Domain=/i.test(set!), `host-only expected, got ${set}`);
+        assert(!r.setCookies.some(c => /^aimeat_rt=[^;]+/.test(c)), 'no aimeat_rt value may be set on https');
+        hostToken = hostRt(r.setCookies)!;
+    });
+
+    await test('an aimeat_rt another site wrote does not replace the __Host- session', async () => {
+        const planted = await login(otherUsername, otherPassword); // the other owner's own refresh token
+        const r = await httpsCall('/v1/auth/refresh', `aimeat_rt=${encodeURIComponent(planted.rt)}; __Host-aimeat_rt=${encodeURIComponent(hostToken)}`);
+        assert(r.status === 200 && r.data?.ok, `refresh failed: ${r.status} ${r.data?.error?.message}`);
+        assert(decodeJwt(r.data.data.token).owner === username, `the session must stay ${username}, got ${decodeJwt(r.data.data.token).owner}`);
+    });
+
+    await test('a session under the old name moves to __Host-aimeat_rt on its first https refresh', async () => {
+        const old = await login(username, password); // plain http: aimeat_rt
+        const r = await httpsCall('/v1/auth/refresh', `aimeat_rt=${encodeURIComponent(old.rt)}`);
+        assert(r.status === 200 && r.data?.ok, `refresh failed: ${r.status} ${r.data?.error?.message}`);
+        assert(!!hostRt(r.setCookies), `expected __Host-aimeat_rt, got ${JSON.stringify(r.setCookies)}`);
+        assert(r.setCookies.some(c => /^aimeat_rt=;/.test(c) && /Path=\/v1\/auth/i.test(c)), `the old name must be cleared, got ${JSON.stringify(r.setCookies)}`);
+    });
+
+    await test('two aimeat_rt cookies are read as none', async () => {
+        const a = await login(username, password);
+        const b = await login(otherUsername, otherPassword);
+        const res = await fetch(`${BASE}/v1/auth/refresh`, {
+            method: 'POST',
+            headers: { 'X-AIMEAT-Refresh': '1', Cookie: `aimeat_rt=${encodeURIComponent(b.rt)}; aimeat_rt=${encodeURIComponent(a.rt)}` },
+        });
+        assert(res.status === 401, `expected 401, got ${res.status}`);
     });
 
     console.log('\n─────────────────────────────────────');

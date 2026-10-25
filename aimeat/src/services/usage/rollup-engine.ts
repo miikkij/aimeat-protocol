@@ -23,6 +23,8 @@
  * @usage
  *   import { runUsageRollup } from './services/usage/rollup-engine.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The batch and the pass cap come from the config on each run (usage-settings.ts);
+ *     they were read from process.env at import, out of the admin Config tab's reach.
  *   v1.0.0 — 2026-08-14 — Initial: incremental, transactional fold over the llm and call streams.
  */
 import type {
@@ -30,11 +32,15 @@ import type {
 } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { cutsForStream, type UsageCut, type UsageDim } from './rollup-cuts.js';
+import { usageSettings } from './usage-settings.js';
 
-/** Raw rows per pass. Small enough that one transaction stays short, large enough to catch up. */
-const BATCH = Number(process.env.AIMEAT_USAGE_ROLLUP_BATCH) || 5_000;
-/** Passes per run, so one run is bounded even after a long outage. The next run continues. */
-const MAX_PASSES = Number(process.env.AIMEAT_USAGE_ROLLUP_PASSES) || 20;
+/**
+ * Raw rows per pass (usage.rollup_batch): small enough that one transaction stays short, large enough
+ * to catch up. Passes per run (usage.rollup_passes), so one run is bounded even after a long outage;
+ * the next run continues. Both are read from the config on each call (usage-settings.ts).
+ */
+const batchSize = (): number => usageSettings().usageRollupBatch;
+const maxPasses = (): number => usageSettings().usageRollupPasses;
 
 /**
  * The separator inside an in-memory grouping key. A dimension value can contain a space, a slash or
@@ -210,6 +216,7 @@ export async function pendingRollupDeltas(
   const lastTs = cursor?.lastTs ?? '';
   const lastId = cursor?.lastId ?? '';
 
+  const BATCH = batchSize();
   const raw = stream === 'call'
     ? await storage.listUsageCallsForFold({ lastTs, lastId, limit: BATCH })
     : await storage.listUsageEventsForFold({ lastTs, lastId, limit: BATCH });
@@ -229,6 +236,8 @@ async function foldStream(storage: Storage, stream: 'llm' | 'call'): Promise<Fol
   let lastTs = cursor?.lastTs ?? '';
   let lastId = cursor?.lastId ?? '';
   let rows = 0, deltas = 0, passes = 0;
+  const BATCH = batchSize();
+  const MAX_PASSES = maxPasses();
 
   for (; passes < MAX_PASSES; passes++) {
     const raw = stream === 'call'
@@ -275,7 +284,7 @@ export async function runUsageRollup(storage: Storage): Promise<FoldResult[]> {
           stream, rows: r.rows, deltas: r.deltas, passes: r.passes,
         });
       }
-      if (r.passes >= MAX_PASSES) {
+      if (r.passes >= maxPasses()) {
         // Not an error: the cap did its job. Worth saying, because it means the serving layer is
         // further behind than the run interval suggests and someone reading a chart should know.
         logger.warn('usage-rollup: hit the pass cap, still catching up', { stream, rows: r.rows });

@@ -4,6 +4,49 @@
     {
       "date": "2026-10-25",
       "kind": "feature",
+      "id": "2026-10-25-apps-answer-in-your-language-as-markdown",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "agent"
+      ],
+      "title": {
+        "en": "Apps answer in your language as markdown",
+        "fi": "Sovellukset vastaavat markdownina sinun kielelläsi"
+      },
+      "summary": {
+        "en": "Add &lang=es or any language to ?format=md, and an app that writes its own markdown answers in it.",
+        "fi": "Lisää ?format=md-osoitteeseen &lang=es tai muu kieli, niin oman markdowninsa tekevä sovellus vastaa sillä."
+      },
+      "body": {
+        "en": "An app that writes its own markdown page now gets the reader's language: add &lang=es (or any language) to ?format=md. The Experience Center uses it: English by default, Finnish and Spanish on request.",
+        "fi": "Sovellus, joka tekee oman markdown-sivunsa, saa nyt lukijan kielen: lisää ?format=md-osoitteeseen &lang=es tai muu kieli. Experience Center käyttää tätä: englanti oletuksena, suomi ja espanja pyynnöstä."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "feature",
+      "id": "2026-10-25-every-setting-on-the-config-page",
+      "highlight": false,
+      "audience": [
+        "operator"
+      ],
+      "title": {
+        "en": "Every setting on the Config page",
+        "fi": "Jokainen asetus Config-sivulla"
+      },
+      "summary": {
+        "en": "Every setting this server reads is on the admin Config page, saved in its database, and your AI can change it.",
+        "fi": "Jokainen palvelimen asetus näkyy Config-sivulla, tallentuu sen tietokantaan, ja tekoälysi voi muuttaa sitä."
+      },
+      "body": {
+        "en": "Every setting this server reads is now on the admin Config page and in your AI's reach. Most are saved in the server's own database; the ones read at start say they take effect at the next restart, and the few that decide who may reach what stay in the environment, shown but not changed here.",
+        "fi": "Jokainen asetus, jonka palvelin lukee, näkyy nyt ylläpitäjän Config-sivulla, ja tekoälysi voi lukea ja muuttaa niitä. Useimmat tallentuvat palvelimen omaan tietokantaan. Käynnistyksessä luettavat kertovat tulevansa voimaan seuraavassa uudelleenkäynnistyksessä. Ne harvat, jotka päättävät, kuka pääsee mihinkin, pysyvät ympäristössä: ne näkyvät sivulla, mutta niitä ei muuteta siellä."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "feature",
       "id": "2026-10-25-goals-for-your-agents",
       "highlight": true,
       "audience": [

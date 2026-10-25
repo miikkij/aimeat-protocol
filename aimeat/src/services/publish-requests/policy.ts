@@ -14,11 +14,13 @@
  *   A REQUEST IS DECIDABLE FOR SEVEN DAYS, AND FAILS CLOSED. An expiry that is missing or cannot be
  *   read counts as passed, so a damaged record can only be declined by time, never approved.
  * @structure PUBLISH_REQUEST_DAYS · PublishDecider · publishDecisionRefusal(decider, request, decision) ·
- *   publishRequestExpired(request, now)
+ *   approvalDecisionRefusal(decider, request, decision, isOperator) · publishRequestExpired(request, now)
  * @usage
  *   const refusal = publishDecisionRefusal(decider, request, 'approve');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   v1.1.0 — 2026-10-25 — approvalDecisionRefusal(): who answers a request that makes nothing public,
+ *     the operators' question included (secaudit2026oct22, the developer's approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
 import type { CallerContext } from '../caller-context.js';
@@ -61,6 +63,45 @@ export function publishDecisionRefusal(
   return {
     status: 403, code: 'SCOPE_DENIED',
     message: `Approving this makes something public, which takes "${PUBLISH_PUBLIC_SCOPE}", and you do not hold it. An agent cannot pass on more than it holds. ${OWNER_DECIDES_ON_THE_PAGE}`,
+  };
+}
+
+/**
+ * Who may answer a request that makes nothing public (its `approval`, services/approval-standard.ts).
+ * The operators' question: an operator caller (the operator in person, or the operator's agent
+ * holding operator:admin), never the one who asked. The owner's question: the owner in person; an
+ * agent of the owner that did not ask it, which approves only while it holds `approve_scope` (an
+ * approver cannot pass on more than it holds) and declines anything. Null when this decider may.
+ */
+export function approvalDecisionRefusal(
+  decider: PublishDecider,
+  request: { requested_by: { principal: string; sub: string }; approval: { approver: 'owner' | 'operators'; approve_scope?: string } },
+  decision: 'approve' | 'decline',
+  isOperator: boolean,
+): { status: 403; code: string; message: string } | null {
+  const me = [decider.principal, decider.auth.sub];
+  const own = me.includes(request.requested_by.principal) || me.includes(request.requested_by.sub);
+  if (request.approval.approver === 'operators') {
+    if (!isOperator) {
+      return {
+        status: 403, code: 'OPERATOR_DECIDES',
+        message: "An operator of this node answers this request. The operators have been told, and the one who asked hears the answer either way.",
+      };
+    }
+    if (own && decider.kind !== 'owner') {
+      return { status: 403, code: 'OWN_REQUEST', message: 'You asked for this, so you cannot answer it yourself. Another operator answers it.' };
+    }
+    return null;
+  }
+  if (decider.kind === 'owner') return null;
+  if (decider.kind !== 'agent') {
+    return { status: 403, code: 'ACCESS_DENIED', message: 'The account holder or one of their own agents answers this request. An app or a visitor may ask, not answer.' };
+  }
+  if (own) return { status: 403, code: 'OWN_REQUEST', message: `You asked for this, so you cannot ${decision} it yourself. ${OWNER_DECIDES_ON_THE_PAGE}` };
+  if (decision === 'decline' || !request.approval.approve_scope || decider.has(request.approval.approve_scope)) return null;
+  return {
+    status: 403, code: 'SCOPE_DENIED',
+    message: `Allowing this takes "${request.approval.approve_scope}", and you do not hold it. An agent cannot pass on more than it holds. ${OWNER_DECIDES_ON_THE_PAGE}`,
   };
 }
 

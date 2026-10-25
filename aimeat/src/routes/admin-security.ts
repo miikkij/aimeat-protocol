@@ -15,6 +15,8 @@
  *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one case)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.6.0 -- 2026-10-25 -- The resolve endpoint decides an entry of an incident that names records to
+ *     act on too: its action ("clear" or "delete") or "keep" (services/incident-entries.ts; secaudit2026oct22).
  *   v1.5.0 -- 2026-10-18 -- The resolve endpoint decides one case of either kind through
  *     services/incident-decisions.ts: a held name ("holder" / "previous") or an offered default
  *     audience cap ("apply" / "keep", plan doc-mvdipuyqraas, L5.1). A refused close or delete says why
@@ -93,14 +95,16 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
    *   and access tokens, 'previous' settles them as a previous holder's (the older app grants and
    *   access tokens deleted);
    * - a default audience cap the start offered (classification_default_caps): 'apply' puts the cap
-   *   on that classification in the node's policy, 'keep' leaves it without one. No content changes.
+   *   on that classification in the node's policy, 'keep' leaves it without one. No content changes;
+   * - an entry of an incident that names records to act on (services/incident-entries.ts): the
+   *   entry's action, 'clear' or 'delete', or 'keep'.
    * Such an incident closes with its last case. */
   router.post('/v1/admin/security/incidents/:id/resolve', requireAuth(), requireOperator(storage), async (req, res) => {
     const id = req.params.id as string;
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };
     if (body.name !== undefined || body.resolution !== undefined) {
       if (typeof body.name !== 'string' || body.name === '' || typeof body.resolution !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap.'));
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear" or "delete") or "keep" for an entry.'));
         return;
       }
       // An agent or an ecosystem app decides as an AI, anyone else as a person (the policy history says which).

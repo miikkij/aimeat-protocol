@@ -45,6 +45,9 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   2026-10-25 -- core:held-label-release is seeded and fires (app-label-recycled-after-delete).
+ *   2026-10-25 -- core:mcp-client-cleanup is seeded, fires, and keeps a registration made today
+ *     (secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-16 -- The node follows the run's backend: a database of its own beside the run's on
  *     PostgreSQL, a SQLite file on SQLite. It was SQLite on both (QA audit P1-02, D4-02). Two things
  *     only PostgreSQL showed: the seeding is read until it is done, and the nonce count is read under
@@ -309,7 +312,7 @@ async function run(): Promise<void> {
             'core:execution-log-prune', 'core:consent-audit-prune', 'core:classification-audit-prune', 'core:invitation-expiry',
             'core:mailbox-cleanup', 'core:consent-expiry', 'core:nonce-cleanup',
             'core:designbook-aging', 'core:capability-aggregation', 'core:dispute-timeout',
-            'core:mcp-onboarding-rescue', 'core:inactivity-nudge',
+            'core:mcp-onboarding-rescue', 'core:inactivity-nudge', 'core:mcp-client-cleanup', 'core:held-label-release',
         ];
         // The node seeds its jobs after it starts answering (background-jobs.ts does not await it), so
         // the list is read until the seeding is done. On PostgreSQL it ends seconds after the first
@@ -626,6 +629,32 @@ async function run(): Promise<void> {
         // five minutes in production: a live login round must survive the sweep. A comparison the
         // wrong way round here logs everybody out mid-authorization.
         assert(await nonceRows() === before, `a live authorization state was swept: ${before} → ${await nonceRows()}`);
+    });
+
+    await test('the MCP client cleanup keeps a registration made today (secaudit2026oct22)', async () => {
+        // The deleting branch (an old registration with no refresh token and no approval) is the unit
+        // test storage-conformance-lifecycle.test.ts, which can date a row. Here: the seeded job runs,
+        // and a client that registered minutes ago, as Claude does before its sign-in, keeps its row.
+        const clientRows = async (): Promise<number> => {
+            const r = await json('/v1/admin/storage-stats?limit=1', { headers: bearer(opToken) });
+            assert(r.status === 200, `storage stats: ${r.status} ${short(r.body)}`);
+            const counts = r.body.data.current.counts;
+            return (counts.oauth_clients ?? counts.OAuthClient) as number;
+        };
+        const reg = await json('/v1/mcp/register', {
+            method: 'POST',
+            body: JSON.stringify({ client_name: 'core-jobs client', redirect_uris: ['http://127.0.0.1:1/callback'] }),
+        });
+        assert(reg.status === 201, `register: ${reg.status} ${short(reg.body)}`);
+        const before = await clientRows();
+        assert(before >= 1, `the registration must be stored, got ${before}`);
+        await fire('core:mcp-client-cleanup');
+        assert(await clientRows() === before, `a registration made today was deleted: ${before} → ${await clientRows()}`);
+    });
+
+    await test('the held app address sweep runs (secaudit2026oct22)', async () => {
+        // What it releases and when is the unit test storage-conformance-lifecycle.test.ts, on both providers.
+        await fire('core:held-label-release');
     });
 
     // ── Phase 6 ───────────────────────────────────────────────────────────────

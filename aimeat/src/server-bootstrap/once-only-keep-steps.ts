@@ -21,6 +21,9 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-25 -- reportErasureLeftoverSchedulesOnce, last: the schedules older account erasures left are
+ *     named on the Security page, nothing changed (secaudit2026oct22; developer decision 2026-10-25;
+ *     services/erasure-leftover-schedules.ts).
  *   2026-10-25 -- reportAnonymousPrincipalRecordsOnce, last: what the shared anonymous agent wrote outside
  *     its namespace is named on the Security page, nothing changed (secaudit2026oct22; developer ruling
  *     2026-10-25; services/anonymous-principal-records.ts).
@@ -72,6 +75,7 @@ import { disableMalformedExtensionRefsOnce } from '../services/capability-extens
 import { classifySubdomainSiteOriginsOnce } from '../services/subdomain-site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
+import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -153,4 +157,8 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // named on the Security page, one entry per record, nothing changed (services/anonymous-principal-records.ts).
   await reportAnonymousPrincipalRecordsOnce(storage, config)
     .catch(err => logger.error('Failed to look for the records the shared anonymous agent wrote; the next boot tries again', { error: String(err) }));
+  // The schedules account erasures before 2026-10-25 left are named on the Security page, one entry
+  // per schedule, nothing changed (services/erasure-leftover-schedules.ts).
+  await reportErasureLeftoverSchedulesOnce(storage, config)
+    .catch(err => logger.error('Failed to look for the schedules older account erasures left; the next boot tries again', { error: String(err) }));
 }

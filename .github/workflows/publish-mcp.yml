@@ -55,8 +55,16 @@ jobs:
           AIMEAT_RELEASE_RED_REASON: ${{ inputs.red_reason }}
         run: node aimeat/scripts/release-ready.mjs --sha="$GITHUB_SHA" --require=ci.yml,e2e-full.yml
 
+  # THE aimeat.io REGISTRY KEY IS AN ENVIRONMENT SECRET (secaudit2026oct22,
+  # release-credentials-not-bound-to-release-ref). MCP_PRIVATE_KEY lives in the `mcp-registry`
+  # environment, whose deployment rule admits only `v*` tags, so a workflow file on a branch that
+  # names it is refused before any step runs, and a branch run of this file never reaches the key.
+  # A branch run proves nothing past the gate either way: its name is not a version, so the gate
+  # refuses it. A change to the publisher step is proven on the next v* tag.
   publish:
     needs: release-gate
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: mcp-registry
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-10-25 — ctx.email's comment: one recipient per message and the hourly allowance (secaudit2026oct22, lead 325).
  *   2026-10-18 — ctx.ai.result(jobId): the answer of a job this extension started, for its installer.
  *   2026-10-18 — ctx.caller.anonymous (a visitor on a public action), ctx.caller.adult (verified
  *     adult yes/no, method, time) and ctx.caller.subscriptions (Comicland v3 A-7, A-3, A-5).
@@ -354,6 +355,9 @@ export interface ExtensionCtx {
     /** Notify the caller's owner; with `to`, ANOTHER owner — delivered only when the target holds
      *  an active `extension_notify` consent for `ext:{name}` (see services/extension-notify.ts). */
     notify?(message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }): Promise<boolean>;
+    /** Send one message to ONE recipient (services/extension-email.ts): a `to` naming several is
+     *  refused with a thrown sentence, and a send past the account's hourly allowance
+     *  (extensions.email_per_hour) throws naming that setting. False when no tier allows it. */
     email?(to: string, subject: string, body: string): Promise<boolean>;
     // NOTE: the guest ctx also exposes two PURE helpers that need no host call and are therefore
     // implemented inside buildSandboxScript rather than here:

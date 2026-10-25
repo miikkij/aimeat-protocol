@@ -7,6 +7,8 @@
  *   rows where they stood, so the Config tab lists them in the same order.
  * @structure RATE_LIMIT_CONFIG_FIELDS
  * @version-history
+ *   v1.1.0 — 2026-10-25 — rate_limits.registration_invites and rate_limits.openrouter, which the loader
+ *     read with no row (check:config-coverage backlog).
  *   v1.0.0 — 2026-10-11 — Moved from config-schema.ts, unchanged.
  */
 // Typed by the keys alone, not AimeatConfig: config.ts reaches config-schema.ts, so importing the
@@ -14,7 +16,8 @@
 import type { ConfigFieldShape } from './config-field-def.js';
 
 type RateLimitKey = 'rlGlobal' | 'rlAuth' | 'rlWork' | 'rlMemory' | 'rlBoards' | 'rlOwners' | 'rlGhii'
-  | 'rlFlags' | 'rlAppeals' | 'rlAdminSetup' | 'rlFederation' | 'rlCatalogue' | 'rlAuthChallenge';
+  | 'rlFlags' | 'rlAppeals' | 'rlAdminSetup' | 'rlFederation' | 'rlCatalogue' | 'rlAuthChallenge'
+  | 'rlRegistrationInvites' | 'rlOpenrouter';
 
 export const RATE_LIMIT_CONFIG_FIELDS: ConfigFieldShape<RateLimitKey>[] = [
   // ── Rate Limits (mutable, per-endpoint with global fallback) ──
@@ -31,4 +34,7 @@ export const RATE_LIMIT_CONFIG_FIELDS: ConfigFieldShape<RateLimitKey>[] = [
   { key: 'rlFederation', dotPath: 'rate_limits.federation', envVar: 'AIMEAT_RL_FEDERATION', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Federation peering rate limit (req/s, default: global)', range: '1-10000' },
   { key: 'rlCatalogue', dotPath: 'rate_limits.catalogue', envVar: 'AIMEAT_RL_CATALOGUE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Catalogue search rate limit (req/s, default: global)', range: '1-10000' },
   { key: 'rlAuthChallenge', dotPath: 'rate_limits.auth_challenge', envVar: 'AIMEAT_RL_AUTH_CHALLENGE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Auth challenge rate limit (req/s, default: global)', range: '1-10000' },
+  // Windows other than one second: an hour for the invitation emails, a minute for the OpenRouter proxy.
+  { key: 'rlRegistrationInvites', dotPath: 'rate_limits.registration_invites', envVar: 'AIMEAT_RL_REGISTRATION_INVITES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Invitation emails an hour from the open registration endpoint (default 5). It sends mail to an address a stranger types, so keep it small', range: '1-1000' },
+  { key: 'rlOpenrouter', dotPath: 'rate_limits.openrouter', envVar: 'AIMEAT_RL_OPENROUTER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Requests a minute to the OpenRouter proxy (default 30)', range: '1-10000' },
 ];

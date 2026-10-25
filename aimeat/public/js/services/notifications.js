@@ -10,6 +10,9 @@
  *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   v1.3.0 — 2026-10-25 — A decided notice: markAnswered after a button ran, answerTextOf (who decided
+ *     what and when) and answerChangeOf (where to change it), read by the bell and the page alike
+ *     (secaudit2026oct22; the developer's review of the sandbox).
  *   v1.2.0 — 2026-09-26 — actionTextOf: a button that carries a locale key and variables is said in
  *     the reader's language, the way a title is.
  *   v1.1.0 — 2026-09-25 — isRunnableActionEndpoint: the bell, the Notifications page and a push
@@ -19,6 +22,7 @@
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+import { date as fmtDate, time as fmtTime } from '/js/format.js';
 
 /** The inbox: { notifications, unread, total }. opts: { limit (≤200), unread }. */
 export async function list(opts = {}) {
@@ -107,6 +111,44 @@ export function isRunnableActionEndpoint(endpoint) {
   }
   const url = new URL(endpoint, window.location.href);
   return url.origin === window.location.origin && url.pathname.startsWith('/v1/');
+}
+
+/* ── A question that was answered ──────────────────────────────────────────────────────────── */
+/**
+ * After a button's own call answered, tell the node, so the notice shows the answer and offers no
+ * button again, in the bell and on the Notifications page alike (POST /v1/notifications/:id/answered).
+ * `already`: the call said the question was decided before. Best-effort: the list reloads either way.
+ */
+export async function markAnswered(n, a, already = false) {
+  try { await apiPost(`/v1/notifications/${encodeURIComponent(n.id)}/answered`, { action: a.id, ...(already ? { already: true } : {}) }); }
+  catch (err) { swallowed('notifications: answered', err); }
+}
+/** Did a button's call answer that its question was decided already (409 ALREADY_DECIDED, 404 APPROVAL_NOT_FOUND, 410 EXPIRED)? */
+export const alreadyDecided = (r) => ['ALREADY_DECIDED', 'APPROVAL_NOT_FOUND', 'EXPIRED', 'OUTDATED'].includes(r?.error?.code);
+/** Who answered, as a person reads it: an agent by its name, an account by its name. */
+function answererName(by) {
+  if (!by) return '';
+  const s = String(by);
+  if (s.includes('#')) return s.slice(0, s.indexOf('#'));
+  return s.includes('@') ? s.slice(0, s.lastIndexOf('@')) : s;
+}
+/**
+ * The answer of a decided notice in one plain sentence in the reader's language: what was decided,
+ * by whom and when ("You allowed this on 25.10. at 18.31."). Null while the question still waits.
+ */
+export function answerTextOf(n) {
+  const a = n?.answered;
+  if (!a || !a.outcome) return null;
+  const vars = { who: answererName(a.by), date: fmtDate(a.at), time: fmtTime(a.at, { hour: '2-digit', minute: '2-digit' }) };
+  const timed = ['allowed', 'declined', 'done'].includes(a.outcome);
+  const key = timed ? `notiftext.answered.${a.outcome}_${a.by_you ? 'you' : 'other'}` : `notiftext.answered.${a.outcome}`;
+  return said(key, vars) || said('notiftext.answered.done_you', vars);
+}
+/** Where the person changes it later, when the notice names a place: { link, label }, or null. */
+export function answerChangeOf(n) {
+  const c = n?.answered?.change;
+  if (!c || typeof c.link !== 'string' || !c.link.startsWith('/v1/')) return null;
+  return { link: c.link, label: said(`notiftext.${c.key}`, {}) || said('notiftext.approval_change.default', {}) || c.link };
 }
 
 /* ── The words ─────────────────────────────────────────────────────────────────────────────── */

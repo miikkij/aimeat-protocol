@@ -26,6 +26,7 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.3.2 — 2026-10-25 — A decision row's two answers wait while one is on its way (no second press).
  *   v1.3.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text itself, so an
  *     item title or agent name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.3.0 — 2026-09-24 — The copy button and the two review buttons are the underlined action link
@@ -114,9 +115,13 @@ export function OpenItemsList({ maxAgeDays } = {}) {
 
   // The menu closes itself on the click, so there is no row-level busy state to show: the list
   // simply reloads under it.
+  // The row whose answer is on its way: its buttons wait, so a second press cannot follow the first.
+  const [acting, setActing] = useState(null);
   const act = useCallback(async (id, fn) => {
+    setActing(id);
     try { await fn(); await load(); }
     catch (e) { swallowed('OpenItemsList: act', e); }
+    finally { setActing(null); }
   }, [load]);
 
   // Nothing on the list → no block at all. See the file header.
@@ -165,11 +170,11 @@ export function OpenItemsList({ maxAgeDays } = {}) {
                  dead end: the only control was "Take it off", which records nothing. */''}
             ${i.kind === 'decision' && i.object?.type === 'ai-decision' && html`
               <div class="open-items-decide">
-                <button type="button" class="poster-action"
+                <button type="button" class="poster-action" disabled=${acting === i.id}
                   onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'confirmed'))}>
                   ${tr('openItems.decision.confirm', 'It was right')}
                 </button>
-                <button type="button" class="poster-action"
+                <button type="button" class="poster-action" disabled=${acting === i.id}
                   onClick=${() => act(i.id, () => reviewDecision(i.object.id, 'overridden'))}>
                   ${tr('openItems.decision.override', 'It was wrong')}
                 </button>

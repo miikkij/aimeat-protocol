@@ -15,6 +15,10 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.34.0 — 2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, and nodeLimitsDefaults() (config-node-limits.ts) (secaudit2026oct22).
+ *   v1.33.1 — 2026-10-25 — casdoorLinkDomains, entraLinkDomains and refreshCookieLegacyUntil read from the environment (secaudit2026oct22).
+ *   v1.33.0 — 2026-10-25 — extensionLoadDefaults() (config-extension-load.ts): the operator's limits on extension load (secaudit2026oct22).
+ *   v1.32.0 — 2026-10-25 — runtimeConfigFromEnv() and siteKvFromEnv() (config-runtime.ts): the usage meter, write tally, log level, proxy trust and key settings code read from process.env, and the site key-value pairs, which also take AIMEAT_SITE_KV as one JSON object.
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
  *     three settings for data processing agreements: AIMEAT_OPERATOR_DPO_CONTACT, _SIGNER_NAME, _SIGNER_ROLE.
  *   v1.30.0 — 2026-10-16 — A setting the node does not accept no longer refuses the start (except the few in REFUSE_ON_INVALID): loadConfig() sets it aside, builds the config on its default, logs one line per setting, drops it from the env/file/cli provenance and returns it as `settingFallbacks`, which the server records on the Security page (Jouni, decision 2026-10-16).
@@ -101,6 +105,7 @@ import { decideDefaults } from './config-decide.js';
 import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
 import { pagesDefaults } from './config-pages.js';
+import { nodeLimitsDefaults } from './config-node-limits.js';
 import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
@@ -111,6 +116,8 @@ import { themesDefaults } from './config-themes.js';
 import { federationDefaults } from './config-federation.js';
 import { accountSecurityDefaults } from './config-types-account-security.js';
 import { seoDefaults } from './config-site-presence.js';
+import { runtimeConfigFromEnv, siteKvFromEnv } from './config-runtime.js';
+import { extensionLoadDefaults } from './config-extension-load.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
 import { sealedKeysFromEnv } from './services/config-sealing.js';
@@ -286,6 +293,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     coHost: (process.env.AIMEAT_CO_HOST ?? deriveCoHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     ...pagesDefaults(),
+    ...runtimeConfigFromEnv(),
+    ...nodeLimitsDefaults(),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party
@@ -330,6 +339,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     refreshIdleDays: parseInt(process.env.AIMEAT_REFRESH_IDLE_DAYS ?? '30', 10),
     refreshAbsoluteDays: parseInt(process.env.AIMEAT_REFRESH_ABSOLUTE_DAYS ?? '90', 10),
     refreshGraceMs: parseInt(process.env.AIMEAT_REFRESH_GRACE_MS ?? '60000', 10),     // 60s
+    refreshCookieLegacyUntil: process.env.AIMEAT_REFRESH_COOKIE_LEGACY_UNTIL ?? '',
 
     welcomeBonus: parseInt(process.env.AIMEAT_WELCOME_BONUS ?? '100', 10),
     dailyAllowance: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE ?? '50', 10),
@@ -434,6 +444,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     testMoneyHandler: process.env.AIMEAT_TEST_MONEY_HANDLER === 'true',
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
+    personalNodeMaxPerOwner: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_PER_OWNER ?? '3', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),
     personalNodeHeartbeatIntervalMs: parseInt(process.env.AIMEAT_PERSONAL_HEARTBEAT_MS ?? '30000', 10),
     personalNodeOfflineThresholdMs: parseInt(process.env.AIMEAT_PERSONAL_OFFLINE_MS ?? '300000', 10),
@@ -550,10 +561,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     casdoorOAuthClientId: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_ID ?? '',
     casdoorOAuthClientSecret: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_SECRET ?? '',
     casdoorOAuthRedirectUri: process.env.AIMEAT_CASDOOR_OAUTH_REDIRECT_URI ?? '',
+    casdoorLinkDomains: process.env.AIMEAT_CASDOOR_LINK_DOMAINS ?? '',
     entraOAuthEnabled: process.env.AIMEAT_ENTRA_OAUTH_ENABLED === 'true',
     entraOAuthTenant: process.env.AIMEAT_ENTRA_OAUTH_TENANT ?? 'common',
     entraAllowedTenants: (process.env.AIMEAT_ENTRA_ALLOWED_TENANTS ?? '')
       .split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+    entraLinkDomains: process.env.AIMEAT_ENTRA_LINK_DOMAINS ?? '',
     entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
     entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
     entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',
@@ -592,11 +605,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     siteEnabled: process.env.AIMEAT_SITE_ENABLED !== 'false',
     siteMaxTemplateSizeKb: parseInt(process.env.AIMEAT_SITE_MAX_TEMPLATE_SIZE_KB ?? '512', 10),
     siteCacheTtlSeconds: parseInt(process.env.AIMEAT_SITE_CACHE_TTL_SECONDS ?? '60', 10),
-    siteKv: Object.fromEntries(
-      Object.entries(process.env)
-        .filter(([k]) => k.startsWith('AIMEAT_SITE_KV_'))
-        .map(([k, v]) => [k.replace('AIMEAT_SITE_KV_', '').toLowerCase(), v ?? ''])
-    ),
+    siteKv: siteKvFromEnv(),
     siteLbEnabled: process.env.AIMEAT_SITE_LB_ENABLED === 'true',
     siteLbOriginUrl: process.env.AIMEAT_SITE_LB_ORIGIN_URL ?? null,
     siteLbSyncIntervalMin: parseInt(process.env.AIMEAT_SITE_LB_SYNC_INTERVAL_MIN ?? '30', 10),
@@ -659,6 +668,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
+    ...extensionLoadDefaults(),
 
     // Prompt Calibrator
     calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',
