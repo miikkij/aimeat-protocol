@@ -41227,7 +41227,9 @@ paths:
         `casdoor` (`AIMEAT_CASDOOR_OAUTH_ENABLED`) and `entra` (Microsoft Entra ID,
         `AIMEAT_ENTRA_OAUTH_ENABLED`), each needing its client credentials; an operator may register
         others. Discover the enabled providers + start URLs via `GET /v1/auth/providers`. Returns
-        503 when the requested provider is not configured on this node.
+        503 when the requested provider is not configured on this node. On a node whose base URL is
+        https the response also sets the round's cookie (`aimeat_oauth_<hash>`, httpOnly,
+        SameSite=Lax, path = the callback), so only this browser can finish the round.
       tags: [GHII-Web]
       parameters:
         - name: provider
@@ -41273,7 +41275,9 @@ paths:
         user is NOT auto-created — the node stashes the verified identity in a short-lived signed
         cookie and redirects back with `?aimeat_signup=1`, and the SPA prompts for a one-time
         username choice (see `GET /v1/ghii/login/pending` + `POST /v1/ghii/login/{provider}/finalize`).
-        On any failure it redirects to `/?auth_error=<CODE>`.
+        On any failure it redirects to `/?auth_error=<CODE>`. A request without the round's cookie
+        from the start (the round was started in another browser) is refused with
+        `<PROVIDER>_OTHER_BROWSER` before the code is exchanged, on a node whose base URL is https.
       tags: [GHII-Web]
       parameters:
         - name: provider
@@ -41522,6 +41526,9 @@ paths:
         Redirects the browser to the connection's identity provider with a signed-in AuthnRequest.
         The post-login `redirect` query parameter is parked server-side under the RelayState.
         Gated on the runtime `sso.enabled` flag; a connection with no SAML configuration answers 404.
+        On a node whose base URL is https the response also sets the round's cookie
+        (`aimeat_oauth_<hash>`, httpOnly, SameSite=None, Secure, path = the ACS), so only this browser
+        can finish the round.
       tags: [SSO]
       parameters:
         - name: connectionId
@@ -41563,8 +41570,9 @@ paths:
         connection's membership after a correct code. A browser posts this form, so every refusal is a 302 to the
         front page with `?auth_error=<CODE>`, which opens the sign-in dialog with the reason:
         SAML_INVALID_RESPONSE when the Response did not validate (nothing was read or written),
-        ACCOUNT_DISABLED for a deactivated account, and SAML_MISSING_RESPONSE, SAML_NO_ASSERTION,
-        SAML_NO_SUBJECT or SAML_CALLBACK_FAILED otherwise.
+        ACCOUNT_DISABLED for a deactivated account, SAML_OTHER_BROWSER for a Response to a request
+        this node sent whose round this browser did not start (on a node whose base URL is https),
+        and SAML_MISSING_RESPONSE, SAML_NO_ASSERTION, SAML_NO_SUBJECT or SAML_CALLBACK_FAILED otherwise.
       tags: [SSO]
       parameters:
         - name: connectionId

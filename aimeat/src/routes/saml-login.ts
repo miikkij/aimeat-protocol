@@ -20,6 +20,11 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-10-25 — An SP-initiated round finishes only in the browser that started it: authorize sets the
+ *     round's cookie (SameSite=None; Secure, since the ACS is a cross-site form post) and stores its
+ *     hash and the AuthnRequest id, and the ACS answers ?auth_error=SAML_OTHER_BROWSER to a Response
+ *     whose round this request does not hold (middleware/login-round-binding.ts; secaudit2026oct22,
+ *     oidc-saml-login-round-not-browser-bound). IdP-initiated sign-in and a plain-http node are unchanged.
  *   2026-10-25 — The IdP's address counts as verified only when it is in the connection's domains, so a
  *     JIT account gets no verified address outside them (secaudit2026oct22,
  *     sso-new-account-email-verified-outside-connection-domains).
@@ -40,7 +45,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, SsoConnectionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { AccountDisabledError } from '../auth/jwt.js';
-import { samlForConnection } from '../services/saml-sp.js';
+import { inflateRawSync } from 'node:zlib';
+import { samlForConnection, spAcsUrl } from '../services/saml-sp.js';
+import { bindLoginRound, endLoginRound, loginRoundHeldBy, loginRoundsBound } from '../middleware/login-round-binding.js';
 import { ensureSsoMembership } from '../services/sso-membership.js';
 import { emailInConnectionDomains } from '../services/sso-connections.js';
 import {
@@ -92,8 +99,27 @@ function mapProfile(conn: SsoConnectionRecord, profile: Record<string, unknown>)
   return { sub: nameID, email, emailVerified: emailInConnectionDomains(conn, email), displayName };
 }
 
+/**
+ * The ID of the AuthnRequest in a redirect-binding authorize URL (deflated, base64 SAMLRequest), or
+ * '' when it cannot be read; the ACS then checks the round's cookie without the request id.
+ */
+function authnRequestId(url: string): string {
+  try {
+    const raw = new URL(url).searchParams.get('SAMLRequest');
+    if (!raw) return '';
+    const xml = inflateRawSync(Buffer.from(raw, 'base64')).toString('utf8');
+    return /\sID="([^"]+)"/.exec(xml)?.[1] ?? '';
+  } catch (err) {
+    logger.warn('SAML authorize: the AuthnRequest id could not be read from the authorize URL', { error: String(err) });
+    return '';
+  }
+}
+
 export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /** The ACS path as the browser posts to it: the round cookie's path. */
+  const spAcsPath = (id: string): string => new URL(spAcsUrl(config, id)).pathname;
 
   /** Resolve the connection behind a request, answering the shared refusals. Null = answered. */
   async function connectionFor(req: Request, res: Response): Promise<SsoConnectionRecord | null> {
@@ -119,16 +145,21 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
       const relayState = randomUUID();
       const url = await saml.getAuthorizeUrlAsync(relayState, undefined, {});
       // The nonce row carries the post-login redirect across the IdP round-trip; InResponseTo
-      // correlation is node-saml's own request-id cache.
+      // correlation is node-saml's own request-id cache. The row also names the request it answers
+      // (`nonce`) and the hash of this browser's round cookie (`payload`), which the ACS asks for
+      // (middleware/login-round-binding.ts; secaudit2026oct22, oidc-saml-login-round-not-browser-bound).
+      const ttlMs = config.nonceTtlSeconds * 1000;
+      const binding = bindLoginRound(req, res, config, relayState, spAcsPath(conn.id), ttlMs, 'none');
       await storage.createVerificationNonce({
         id: randomUUID(),
         owner: '',                       // login flow — no authenticated owner yet
         type: 'saml_login',
         state: relayState,
-        nonce: '',
+        nonce: authnRequestId(url),
         redirectUri: safeRedirectPath(req.query.redirect),
+        payload: binding,
         createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + config.nonceTtlSeconds * 1000).toISOString(),
+        expiresAt: new Date(Date.now() + ttlMs).toISOString(),
       });
       res.redirect(url);
     } catch (err) {
@@ -170,13 +201,26 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
         // already enforced InResponseTo accordingly).
         let postLoginPath = '/';
         const relayState = typeof req.body?.RelayState === 'string' ? req.body.RelayState : '';
-        if (relayState) {
-          const nonceRecord = await storage.getVerificationNonce(relayState);
-          if (nonceRecord && nonceRecord.type === 'saml_login' && new Date(nonceRecord.expiresAt) >= new Date()) {
-            postLoginPath = safeRedirectPath(nonceRecord.redirectUri);
+        const nonceRecord = relayState ? await storage.getVerificationNonce(relayState) : null;
+        const roundLive = !!nonceRecord && nonceRecord.type === 'saml_login' && new Date(nonceRecord.expiresAt) >= new Date();
+        // A Response to a request this node sent (InResponseTo) finishes only in the browser that
+        // started that round: the round's row must be the one the Response answers, and the request
+        // must carry the round's cookie (middleware/login-round-binding.ts; secaudit2026oct22,
+        // oidc-saml-login-round-not-browser-bound). IdP-initiated responses carry no InResponseTo and
+        // stay the connection's explicit opt-in.
+        const inResponseTo = typeof profileRaw.inResponseTo === 'string' ? profileRaw.inResponseTo : '';
+        if (inResponseTo && loginRoundsBound(config)) {
+          const held = roundLive && (!nonceRecord!.nonce || nonceRecord!.nonce === inResponseTo)
+            && loginRoundHeldBy(req, relayState, nonceRecord!.payload);
+          if (!held) {
+            logger.warn('SAML response refused: the round was started in another browser', { connection: conn.id });
+            fail('SAML_OTHER_BROWSER');
+            return;
           }
-          if (nonceRecord) await storage.deleteVerificationNonce(relayState);
+          endLoginRound(req, res, config, relayState, spAcsPath(conn.id), 'none');
         }
+        if (roundLive) postLoginPath = safeRedirectPath(nonceRecord!.redirectUri);
+        if (nonceRecord) await storage.deleteVerificationNonce(relayState);
 
         const mapped = mapProfile(conn, profileRaw);
         if (!mapped) { fail('SAML_NO_SUBJECT'); return; }
