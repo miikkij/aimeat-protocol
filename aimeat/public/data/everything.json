@@ -362,10 +362,10 @@
      "slug": "g-2-sign-in-with-google-microsoft-entra-id-or-casdoor",
      "cells": [
       "<strong>Sign in with Google, Microsoft Entra ID or Casdoor</strong> <span class=\"ev-mark showroom-slab--sun\">off</span>",
-      "One generic OpenID Connect path, switched on per provider.",
-      "<code>/v1/ghii/login/:provider</code>"
+      "One generic OpenID Connect path, switched on per provider. A first sign-in joins the existing account with the same verified address. For Casdoor and Entra that happens only inside the domains the operator trusts for that provider (Config tab, Identity, <code>auth.casdoor_link_domains</code> and <code>auth.entra_link_domains</code>; <code>*</code> trusts every domain); outside them the person chooses a username and confirms the address here. Limits: an empty Casdoor setting trusts no domain; an empty Entra setting trusts every domain behind one tenant and none behind several.",
+      "<code>/v1/ghii/login/:provider</code>, <code>PUT /v1/admin/config</code>"
      ],
-     "plain": "Sign in with Google, Microsoft Entra ID or Casdoor off One generic OpenID Connect path, switched on per provider. /v1/ghii/login/:provider"
+     "plain": "Sign in with Google, Microsoft Entra ID or Casdoor off One generic OpenID Connect path, switched on per provider. A first sign-in joins the existing account with the same verified address. For Casdoor and Entra that happens only inside the domains the operator trusts for that provider (Config tab, Identity, auth.casdoor_link_domains and auth.entra_link_domains; * trusts every domain); outside them the person chooses a username and confirms the address here. Limits: an empty Casdoor setting trusts no domain; an empty Entra setting trusts every domain behind one tenant and none behind several. /v1/ghii/login/:provider, PUT /v1/admin/config"
     },
     {
      "slug": "g-2-organisation-sign-in-saml-and-directory-sync-scim",
