@@ -22,6 +22,9 @@
  *     config (or synthesize one from the global config for legacy installs)
  *
  * @version-history
+ *   2026-10-25 — loadPerAgentConfig copies an old bare-name file's runner and wake only into the
+ *     identity of the owner who wrote it (the file names them, or names nobody and no other owner
+ *     holds the agent name); another owner's identity gets the rest (secaudit2026oct22).
  *   2026-10-15 — getConfigDir() reads AIMEAT_HOME on every call (the launch directory is still
  *     captured at load), so `aimeat connect client` stores the credential in the client's home
  *     even when this module was loaded before the home was set (feature-list audit #6).
@@ -48,11 +51,11 @@
  *                           serve.json instead of colliding. AIMEAT_HOME still
  *                           overrides; set it to ~/.aimeat for the old global mode.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveConnectorHome, prepareConnectorHome } from './home-dir.js';
 import { parse, stringify } from 'yaml';
-import { listAllTokens } from './keychain.js';
+import { listAllTokens, parseTokenFilename } from './keychain.js';
 import { listAllAgentKeys } from './agent-key.js';
 import { gaiiFromToken, isGaii } from './agent-gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -262,18 +265,41 @@ export function loadPerAgentConfig(agent: string, owner: string): AimeatPerAgent
   const legacy = readConfigFile(legacyPerAgentConfigPath(agent));
   if (!legacy) return null;
 
-  // The old file names an owner. When it names a DIFFERENT one, this file was shared, and the
-  // settings the other owner gets are not theirs — say so once, here, where it is discovered.
-  if (legacy.owner && legacy.owner !== owner) {
-    logger.warn('config: an old shared per-agent config was copied to a second owner; check its node_url and runner', {
-      agent, owner, wasWrittenBy: legacy.owner, from: legacyPerAgentConfigPath(agent),
+  // The commands this connector runs (runner, wake) are copied only into the identity of the owner
+  // who wrote the old file: the file names that owner, or it names nobody and no other owner holds
+  // a credential for this agent name. Another owner's identity, a new one included, gets the
+  // address and the poll interval and not one owner's commands for another owner's work
+  // (secaudit2026oct22).
+  const mine = legacy.owner ? legacy.owner === owner : !otherOwnerHoldsAgent(agent, owner);
+  const copied: AimeatPerAgentConfig = mine ? legacy : { ...legacy, runner: undefined, wake: undefined };
+  if (!mine) {
+    logger.warn('config: an old shared per-agent config was copied to another owner without its runner and wake; check its node_url', {
+      agent, owner, wasWrittenBy: legacy.owner ?? 'another owner', from: legacyPerAgentConfigPath(agent),
+      skipped: [legacy.runner ? 'runner' : '', legacy.wake ? 'wake' : ''].filter(Boolean),
     });
   }
-  savePerAgentConfig(agent, owner, legacy);
+  savePerAgentConfig(agent, owner, copied);
   logger.info('config: migrated a per-agent config to the per-owner layout', {
     agent, owner, from: legacyPerAgentConfigPath(agent), to: perAgentConfigPath(agent, owner),
   });
-  return readConfigFile(perAgentConfigPath(agent, owner)) ?? legacy;
+  return readConfigFile(perAgentConfigPath(agent, owner)) ?? copied;
+}
+
+/**
+ * Whether an owner other than `owner` holds a token or a key for this agent name in this home, from
+ * the credential file names alone (`{agent}@{owner}.token`, `{agent}@{owner}.key`).
+ */
+function otherOwnerHoldsAgent(agent: string, owner: string): boolean {
+  for (const [dir, ext] of [['tokens', '.token'], ['keys', '.key']] as const) {
+    const path = join(getConfigDir(), dir);
+    if (!existsSync(path)) continue;
+    for (const name of readdirSync(path)) {
+      if (!name.endsWith(ext)) continue;
+      const parsed = parseTokenFilename(`${name.slice(0, -ext.length)}.token`);
+      if (parsed && parsed.agent === agent && parsed.owner !== owner) return true;
+    }
+  }
+  return false;
 }
 
 /**
