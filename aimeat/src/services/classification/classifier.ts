@@ -44,6 +44,10 @@
  *   firstJsonObject()
  * @usage const out = await classifyText(deps, target, text);
  * @version-history
+ *   v2.1.0 — 2026-10-25 — secaudit2026oct22: classifyText spends an organism's rule time from the
+ *     budget of the account that holds it (budgetAccountOf, read once a minute per organism), and an
+ *     item whose rules a budget skipped goes to the queue for another rule pass (`deferred`; a queued
+ *     item deferred again is a retry with its try count).
  *   v2.0.3 — 2026-10-18 — A queued item's kind is any label kind now (containers, plan
  *     doc-mvdipuyqraas); onWrite still names content kinds only.
  *   v2.0.2 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
@@ -66,7 +70,7 @@ import { completeForOwner } from '../ai/completion.js';
 import { createScrubber } from '../decide/scrub.js';
 import { organismOwners } from '../organism-ownership.js';
 import type { ClassificationLabel, ClassificationPolicy } from './defaults.js';
-import { matchRules } from './detect.js';
+import { runRules } from './detect.js';
 import { ownerOfScope, scopeOrganism } from './policy.js';
 import { ClassificationError, setLabel, type LabelActor, type SetLabelResult } from './labels.js';
 import { activePolicies, systemReader } from './reader.js';
@@ -88,6 +92,8 @@ export interface ClassifyOutcome {
   /** With FAILED: the model call itself failed, so trying again later may work. */
   retry?: boolean;
   message?: string;
+  /** A time budget skipped a detection rule; the item waits in the queue for another rule pass. */
+  deferred?: boolean;
 }
 
 /** A piece of content waiting for the classifier. */
@@ -131,6 +137,27 @@ async function payerOf(deps: Deps, scope: string): Promise<string | null> {
   const org = await deps.storage.getOrganism(orgId);
   const first = org ? organismOwners(org)[0] : null;
   return first ? `${first}@${deps.config.nodeId}` : null;
+}
+
+/** An organism's account for the detection budget, kept a minute so a busy organism reads it once. */
+const budgetAccounts = new Map<string, { account: string | undefined; at: number }>();
+
+/**
+ * Whose minute of rule time an item spends (detect.ts runRules budgetKey): for an organism, the
+ * account that holds it, so the organisms of one account share one budget (secaudit2026oct22,
+ * node-regex-budget-starvation). Personal content needs no lookup: detect.ts keys it by its owner.
+ */
+async function budgetAccountOf(deps: Deps, scope: string): Promise<string | undefined> {
+  if (!scopeOrganism(scope)) return undefined;
+  const known = budgetAccounts.get(scope);
+  if (known && Date.now() - known.at < 60_000) return known.account;
+  const account = (await payerOf(deps, scope).catch((err: unknown) => {
+    logger.warn('[classification] organism holder unread; its rules spend the organism\'s own budget', { scope, error: String(err) });
+    return null;
+  })) ?? undefined;
+  if (budgetAccounts.size > 5000) budgetAccounts.clear();
+  budgetAccounts.set(scope, { account, at: Date.now() });
+  return account;
 }
 
 // ─── The node's own records, written by compare-and-swap (system-record.ts) ─────────────────────
@@ -333,7 +360,14 @@ export async function classifyText(
   if (!policy) return { by: 'none', skipped: 'OFF' };
   const out: ClassifyOutcome = { by: 'none' };
 
-  const hit = matchRules(policy, target, text);
+  const { hit, deferred } = runRules(policy, target, text, { budgetKey: await budgetAccountOf(deps, target.scope) });
+  // A budget skipped a rule: the item waits in the queue for a rule pass in a later minute instead of
+  // keeping its old label (secaudit2026oct22). From the queue it is matched again, by rules alone
+  // unless the policy sends this kind to the model on writes.
+  if (deferred) {
+    out.deferred = true;
+    if (opts.queueWhenCapped !== false) await enqueue(deps, target, { origin: 'write' });
+  }
   if (hit) {
     const result = await setLabel(deps, nodeActor(deps.config, target, 'rule'), target, { label: hit.label, reason: `detection rule ${hit.rules.join(', ')}` });
     out.by = 'rule';
@@ -399,6 +433,7 @@ async function judge(deps: Deps, textOf: (item: QueuedItem) => Promise<string | 
     const out = await classifyText(deps, target, text, { queueWhenCapped: false, policy, useModel });
     if (out.skipped === 'CAPPED') return { kind: 'capped', cap: out.cap ?? 'owner' };
     if (out.skipped === 'FAILED' && out.retry) return { kind: 'retry', reason: out.message ?? 'the model call failed' };
+    if (out.deferred) return { kind: 'retry', reason: 'the detection rules were over their time budget' };
     return { kind: 'done', judged: true };
   } catch (e) {
     return { kind: 'retry', reason: String((e as Error)?.message ?? e).slice(0, 300) };

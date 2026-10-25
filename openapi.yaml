@@ -33306,6 +33306,13 @@ paths:
         payment provider settings, decide keys) or a workspace share password. `data.omitted`
         lists the same in the response, so a restore knows what to set again. `data.version` is
         `1.3`.
+
+        The operator in person gets every other memory record. The operator's agent holding
+        `operator:admin` gets the records the classification reader lets it read, as on
+        GET /v1/admin/memory/{owner}/{key}: a record its clearance or the record's label keeps from
+        it stays out, and `data.withheld` lists each one as `{ owner, key }` (empty for the operator
+        in person). Each person whose entries the file holds reads an export line, with the count,
+        in their account feed (since 2026-10-25).
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -38760,7 +38767,11 @@ paths:
     post:
       operationId: mcpRegisterClient
       summary: Register MCP OAuth client
-      description: Dynamic client registration for MCP OAuth 2.1 flow.
+      description: |
+        Dynamic client registration for MCP OAuth 2.1 flow. No credential is needed, so each field
+        has a ceiling (since 2026-10-25): `client_name` is text of at most 200 characters,
+        `redirect_uris` holds at most 20 addresses of at most 2048 characters each, and the body is
+        read up to 64 kB.
       tags: [MCP]
       requestBody:
         required: true
@@ -38771,10 +38782,13 @@ paths:
               properties:
                 client_name:
                   type: string
+                  maxLength: 200
                 redirect_uris:
                   type: array
+                  maxItems: 20
                   items:
                     type: string
+                    maxLength: 2048
       responses:
         '201':
           description: The registered client, as a bare OAuth object (RFC 7591), not the AIMEAT envelope. `client_secret` is shown once.
@@ -38795,7 +38809,7 @@ paths:
                     type: array
                     items: { type: string, enum: [authorization_code, refresh_token] }
         '400':
-          description: invalid_request (no client_name), as a bare OAuth error object.
+          description: invalid_request (no client_name), invalid_client_metadata (a client_name that is not text or is too long) or invalid_redirect_uri (too many redirect_uris, or one that is not text or is too long), as a bare OAuth error object.
           content:
             application/json:
               schema:
@@ -73955,6 +73969,10 @@ paths:
         stream opened for one app emits `event: app` with
         `data: {"kind":"version","version":N}` or `data: {"kind":"draft"}` instead. `:keepalive`
         comments every 15s. Response is `text/event-stream`; 503 when the visitor streams are at their cap.
+        A signed-in stream ends with `event: revoked` when the node stops honouring the credential
+        its ticket was minted with (signed out, agent or app grant removed, account deactivated),
+        checked before a change frame and every 60 seconds; mint a new ticket with a live credential
+        to reconnect.
       parameters:
         - name: ticket
           in: query

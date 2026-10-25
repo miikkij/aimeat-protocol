@@ -12,6 +12,9 @@
  *   - Route groups: GHII users, notification templates, directory, push, genesis peering
  *
  * @version-history
+ *   v1.5.0 — 2026-10-25 — secaudit2026oct22: PUT /v1/admin/ghii/:ghii, DELETE …/email and DELETE
+ *     /v1/admin/ghii/:ghii write the operator trail (recordOperatorAction, area 'identity') when the
+ *     record is another person's; the level is stored with verificationMethod 'operator'.
  *   v1.4.1 — 2026-10-22 — PUT /v1/admin/ghii/:ghii answers with the list row (adminGhiiRow) instead of the
  *     stored identity row, which carried the password hash and second-factor material to the operator
  *     and an operator agent (secaudit2026oct22, put-admin-ghii:returns-stored-identity-row).
@@ -44,6 +47,8 @@ import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplat
 import type { TemplateId } from '../services/notification-templates.js';
 import { LOCALES } from '../i18n.js';
 import { msmHosts, msmActionIds } from '../services/msm-parser.js';
+import { recordOperatorAction } from '../services/operator-access-audit.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -109,6 +114,16 @@ export function adminFeaturesRouter(
         }));
     }));
 
+    // The operator trail for an act in another person's identity record: a line on their account feed
+    // and a usage row for the operator (services/operator-access-audit.ts). An act on the operator's
+    // own record writes none (secaudit2026oct22, operator-cross-account-writes).
+    const identityTrail = async (req: Request, ghii: string, action: string, data?: Record<string, string>): Promise<void> => {
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        await recordOperatorAction(storage, config, {
+            operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf: ghii, area: 'identity', action, ...(data ? { data } : {}),
+        });
+    };
+
     router.put('/v1/admin/ghii/:ghii', ...auth, handle(async (req, res) => {
         const ghii = param(req.params.ghii);
         const { verificationLevel } = req.body ?? {};
@@ -118,12 +133,14 @@ export function adminFeaturesRouter(
             return;
         }
 
-        const updated = await storage.updateGHII(ghii, { verificationLevel: verificationLevel as 0 | 1 | 2 | 3 });
+        // The level is recorded as the operator's: verificationMethod 'operator'.
+        const updated = await storage.updateGHII(ghii, { verificationLevel: verificationLevel as 0 | 1 | 2 | 3, verificationMethod: 'operator' });
         if (!updated) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
             return;
         }
 
+        await identityTrail(req, ghii, 'verification-level', { level: String(verificationLevel) });
         res.json(success(config.nodeId, { ghii_user: adminGhiiRow(updated) }));
         emitChange('features');
     }));
@@ -140,6 +157,7 @@ export function adminFeaturesRouter(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
             return;
         }
+        await identityTrail(req, ghii, 'email-clear');
         res.json(success(config.nodeId, { deleted: true, ghii }));
         emitChange('features');
     }));
@@ -151,6 +169,7 @@ export function adminFeaturesRouter(
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `GHII not found: ${ghii}`));
             return;
         }
+        await identityTrail(req, ghii, 'delete');
         res.json(success(config.nodeId, { deleted: true, ghii }));
         emitChange('features');
     }));

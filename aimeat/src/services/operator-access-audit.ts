@@ -31,6 +31,8 @@
  *     operatorGhii, actorGaii: operatorGhii, ownerOf: rec.ownerGaii, action: 'read', key: rec.key,
  *   });
  * @version-history
+ *   2026-10-25 — secaudit2026oct22: action 'export', written by GET /v1/admin/backup once per person
+ *     whose entries the backup holds, with their count.
  *   2026-10-16 — recordOperatorAction also writes an info log line; recordOperatorNodeAct(): the usage row
  *     and log line for an operator act on the node itself, which has no person to tell (a setting
  *     changed; QA audit E2-04, S1-02).
@@ -47,7 +49,7 @@ import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
 
 /** What the operator did, as the person's feed names it. */
-export type OperatorAccessAction = 'read' | 'search' | 'delete' | 'restore';
+export type OperatorAccessAction = 'read' | 'search' | 'delete' | 'restore' | 'export';
 
 export interface OperatorAccess {
   /** The operator's GHII: whose usage stream the row lands in. */

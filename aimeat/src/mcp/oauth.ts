@@ -12,6 +12,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.8.2 — 2026-10-25 — secaudit2026oct22: POST /v1/mcp/register refuses a client_name that is not
+ *     text or is over 200 characters, and more than 20 redirect_uris or one that is not text or is
+ *     over 2048 characters, before anything is stored; server.ts parses its body at 64 kB.
  *   v1.8.1 — 2026-10-22 — authorize and authorize-consent accept a registered loopback redirect on
  *     any port (RFC 8252 §7.3, mcp/oauth-redirect.ts). Claude Code's metadata document lists
  *     `http://localhost/callback` and sends an ephemeral port, so every Claude Code sign-in was
@@ -96,6 +99,13 @@ function hashToken(raw: string): string {
     return createHash('sha256').update(raw).digest('hex');
 }
 
+/** The longest client_name a registration may carry. */
+const DCR_MAX_NAME = 200;
+/** The most redirect_uris one registration may carry. */
+const DCR_MAX_REDIRECTS = 20;
+/** The longest one redirect URI may be. */
+const DCR_MAX_REDIRECT_LENGTH = 2048;
+
 /** Register the OAuth 2.1 endpoints on the MCP router. */
 export function registerOAuthRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
     // OAuth 2.1 — only auth codes are in-memory (short-lived, single-use)
@@ -111,8 +121,22 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             res.status(400).json({ error: 'invalid_request', error_description: 'client_name is required' });
             return;
         }
+        // Registration needs no credential and its rows stay, so each field has a ceiling no MCP
+        // client reaches (secaudit2026oct22, dcr-unbounded-client-records). Checked before the write.
+        if (typeof client_name !== 'string' || client_name.length > DCR_MAX_NAME) {
+            res.status(400).json({ error: 'invalid_client_metadata', error_description: `client_name must be text of at most ${DCR_MAX_NAME} characters.` });
+            return;
+        }
 
         const redirectUris = Array.isArray(redirect_uris) ? redirect_uris : [];
+        if (redirectUris.length > DCR_MAX_REDIRECTS
+            || redirectUris.some(u => typeof u !== 'string' || u.length > DCR_MAX_REDIRECT_LENGTH)) {
+            res.status(400).json({
+                error: 'invalid_redirect_uri',
+                error_description: `redirect_uris may hold at most ${DCR_MAX_REDIRECTS} addresses, each text of at most ${DCR_MAX_REDIRECT_LENGTH} characters.`,
+            });
+            return;
+        }
         const clientId = `mcp-client-${randomBytes(16).toString('hex')}`;
         const clientSecret = randomBytes(32).toString('hex');
 

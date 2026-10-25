@@ -14,12 +14,17 @@
  *   - GET execution-log: scheduled-job execution history
  *
  * @version-history
+ *   v1.2.0 — 2026-10-25 — secaudit2026oct22: trigger, PATCH and DELETE of another person's job write
+ *     the operator trail (recordOperatorAction, area 'schedule'); core jobs and the operator's own write none.
  *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { ScheduledJobRecord } from '../storage/types/organisms-federation.js';
+import { recordOperatorAction } from '../services/operator-access-audit.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireOperator } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -28,6 +33,29 @@ import { logger } from '../utils/logger.js';
 
 export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
   const router = Router();
+
+  /**
+   * The operator trail for an act on a person's job: a line on that person's account feed and a usage
+   * row for the operator (services/operator-access-audit.ts). The person is the job's ownerScope, or
+   * for an extension cron the account that installed the extension. A core job, and a job of the
+   * operator's own account, write none (secaudit2026oct22, operator-cross-account-writes).
+   */
+  const jobTrail = async (req: Request, job: ScheduledJobRecord, action: 'trigger' | 'update' | 'delete'): Promise<void> => {
+    let ownerOf = job.ownerScope ?? '';
+    if (!ownerOf && job.type === 'extension' && job.extensionName) {
+      const ext = await storage.getExtension(job.extensionName).catch((err: unknown) => {
+        logger.warn('admin-scheduler: extension unread, the operator trail names no account', { jobId: job.id, error: String(err) });
+        return null;
+      });
+      if (ext?.installedBy) ownerOf = `${ext.installedBy}@${config.nodeId}`;
+    }
+    if (!ownerOf) return;
+    const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+    await recordOperatorAction(storage, config, {
+      operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf, area: 'schedule', action,
+      subject: job.displayName ?? job.id,
+    });
+  };
 
   // ── GET /v1/admin/scheduler/jobs — List all scheduled jobs ────────
   router.get('/v1/admin/scheduler/jobs', requireAuth(), requireOperator(storage), async (req, res) => {
@@ -71,6 +99,8 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
         return;
       }
 
+      // Written before the run: the operator acted whether or not the job's own run succeeds.
+      await jobTrail(req, job, 'trigger');
       await scheduler.triggerNow(id);
       const updated = await storage.getScheduledJob(id);
 
@@ -103,6 +133,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
 
       const updated = await storage.updateScheduledJob(id, updates);
       await scheduler.reschedule(id);
+      await jobTrail(req, job, 'update');
 
       res.json(success(config.nodeId, { job: updated }));
       emitChange('scheduler');
@@ -124,6 +155,7 @@ export function adminSchedulerRouter(config: AimeatConfig, storage: Storage, sch
 
       scheduler.removeJob(id);
       await storage.deleteScheduledJob(id);
+      await jobTrail(req, job, 'delete');
 
       res.json(success(config.nodeId, { deleted: id }));
       emitChange('scheduler');
