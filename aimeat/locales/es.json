@@ -12009,6 +12009,8 @@
     "cfgDesc_extensions_namespace_max_mb": "Cuántos datos puede guardar la memoria de una extensión; cada copia cuenta por separado. Al pasar el límite se rechaza una clave nueva y una clave que ya existe se sigue actualizando. Es aparte de los límites de memoria de cada persona (predeterminado 0, sin límite).",
     "cfg_extensions_max_instances": "Copias por extensión",
     "cfgDesc_extensions_max_instances": "Cuántas copias (instancias) puede tener una extensión; al pasar el límite se rechaza una copia nueva (predeterminado 0, sin límite).",
+    "cfg_extensions_email_per_hour": "Correos de extensiones por cuenta por hora",
+    "cfgDesc_extensions_email_per_hour": "Cuántos correos pueden enviar en una hora las extensiones de una cuenta, todas juntas. Al pasar el límite se rechaza el envío hasta que cambia la hora (predeterminado 200, 0 es sin límite).",
     "cfg_features_capability_publishing": "Quién agrega capacidades",
     "cfgDesc_features_capability_publishing": "Quién puede agregar una capacidad al registro.",
     "cfgOpt_features_capability_publishing_disabled": "Solo el operador",
@@ -24355,6 +24357,17 @@
           "ex1": "0 (el valor predeterminado): una extensión puede tener cualquier número de copias.",
           "ex2": "20: un propietario puede conectar 20 cuentas con una extensión.",
           "tip": "Ponlo junto con Memoria por extensión: cada copia tiene su propia memoria, así que los dos juntos limitan cuánto puede guardar una extensión."
+        },
+        "email_per_hour": {
+          "title": "Correos de extensiones por cuenta por hora",
+          "short": "Cuántos correos pueden enviar en una hora con ctx.email las extensiones de una cuenta, todas juntas. Al pasar el límite se rechaza el siguiente envío hasta que cambia la hora. El valor predeterminado es 200; 0 es sin límite.",
+          "what": "Una extensión puede enviar correo con el remitente propio de este servidor: a la dirección verificada del propietario, a cualquiera a quien el propietario le permitió escribir, o a cualquiera cuando el operador lo permitió para esa extensión. Todo sale desde la dirección del servidor, así que la reputación del remitente es compartida por todas las cuentas, también la de los códigos y enlaces de inicio de sesión que las personas necesitan. Este límite cuenta los envíos de cada cuenta en periodos de una hora. Al pasarlo, el envío de la extensión se rechaza con un mensaje que nombra este ajuste y dice cuándo volver a intentarlo. Cada mensaje lleva un destinatario, así que una lista de destinatarios cuenta un envío por cada uno.",
+          "range": "Un número entero desde 0. El valor predeterminado es 200. Con 0 no hay límite.",
+          "low": "Menor: una extensión que por error envía correo en un bucle se detiene antes, y la dirección del servidor queda más protegida de ser marcada como spam.",
+          "high": "Mayor: un evento que escribe a sus participantes (una feria, una exposición, un curso) puede enviar más en una hora.",
+          "ex1": "200 (el valor predeterminado): las extensiones de una cuenta envían hasta 200 correos por hora.",
+          "ex2": "5000 durante la semana de una feria, y después de vuelta a 200.",
+          "tip": "Súbelo, o pon 0, para un evento que escribe a muchas personas a la vez, y revisa que tu servicio de correo acepte ese volumen."
         }
       },
       "morsel_policy": {

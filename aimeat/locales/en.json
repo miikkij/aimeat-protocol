@@ -13685,6 +13685,8 @@
     "cfgDesc_extensions_namespace_max_mb": "Most data one extension's memory may hold, each copy counted on its own. Past it a new key is refused and an existing key is still updated. Separate from people's own memory limits (default 0, no limit).",
     "cfg_extensions_max_instances": "Copies per extension",
     "cfgDesc_extensions_max_instances": "Most copies (instances) one extension may have; past it a new copy is refused (default 0, no limit).",
+    "cfg_extensions_email_per_hour": "Extension emails per account per hour",
+    "cfgDesc_extensions_email_per_hour": "Most emails one account's extensions may send in an hour, all its extensions together. Past it a send is refused until the hour turns (default 200, 0 is no limit).",
     "cfg_features_capability_publishing": "Who adds capabilities",
     "cfgDesc_features_capability_publishing": "Who may add a capability to the registry.",
     "cfgOpt_features_capability_publishing_disabled": "The operator only",
@@ -26559,6 +26561,17 @@
           "ex1": "0 (the default): an extension may have any number of copies.",
           "ex2": "20: an owner can connect 20 accounts through one extension.",
           "tip": "Set it together with Memory per extension: each copy has its own memory, so the two together bound what one extension can store."
+        },
+        "email_per_hour": {
+          "title": "Extension emails per account per hour",
+          "short": "How many emails one account's extensions may send in an hour with ctx.email, all its extensions together. Past it the next send is refused until the hour turns. The default is 200; 0 is no limit.",
+          "what": "An extension can send email through this server's own mail sender, to the owner's own verified address, to anyone the owner allowed it to email, or to anyone when the operator allowed that extension. All of it leaves from this server's address, so the server's sending reputation is shared by every account, including the codes and sign-in links people need. This allowance counts each account's sends in a one-hour window. Past it, the extension's send is refused with a message that names this setting and says when to try again. Each message names one recipient, so a list of recipients is one send each.",
+          "range": "A whole number from 0 up. The default is 200. 0 is no limit.",
+          "low": "Lower: an extension that mails by mistake in a loop stops sooner, and the server's address is safer from being marked as spam.",
+          "high": "Higher: an event that emails its participants (a fair, an expo, a course) can send more in one hour.",
+          "ex1": "200 (the default): an account's extensions send up to 200 emails an hour.",
+          "ex2": "5000 for the week of a fair, then back to 200.",
+          "tip": "Raise it, or set 0, for an event that mails many people at once, and check that your mail service accepts that volume."
         }
       },
       "morsel_policy": {

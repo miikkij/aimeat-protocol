@@ -33,6 +33,7 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.7.2 — 2026-10-25 — The newsletter row: ctx.email takes one recipient per call within the hourly allowance (secaudit2026oct22, lead 325).
  *   v1.7.1 — 2026-10-18 — The ctx.ai row says the extension reads the answer back, privately.
  *   v1.7.0 — 2026-10-14 — "What an app tool is": the permission organism:direct lets one agent
  *     write a closed space directly, the list of a closed space is changed only by the person in
@@ -250,7 +251,7 @@ permission to send, so the agent needs none.
 | Out | How |
 |---|---|
 | A reply from the person's own mailbox | The app sends through their connected Gmail or Outlook account when they approve (\`POST /v1/outbound/send\`; the send permission is a separate connection from the read permission) |
-| A notice, a reminder, a newsletter | The extension's \`ctx.email\`, within what the owner consented to |
+| A notice, a reminder, a newsletter | The extension's \`ctx.email\`, within what the owner consented to: one recipient per call, and by default at most 200 an hour for one account's extensions (the operator setting \`extensions.email_per_hour\`) |
 | A post to social media | The connected accounts, through a publishing workflow with an approval step |
 | An outside system | The extension's \`ctx.fetch\` to a declared host, or \`aimeat-webhook\` |
 | A calendar | The app's own calendar in a workspace; an ICS file from the app; and the event space as an ICS feed the person subscribes to once in their own calendar program (below) |
