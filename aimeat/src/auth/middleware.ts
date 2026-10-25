@@ -16,6 +16,10 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-10-25 — maybeSetPatBrowserSession sets the PAT session cookie only for a request this node's
+ *     own page or a navigation made (Sec-Fetch-Site none or same-origin, Origin absent or this node's);
+ *     a request another origin composed is still authenticated by the token and gets no cookie
+ *     (secaudit2026oct22, maybeSetPatBrowserSession-cross-origin-cookie-set).
  *   2026-10-20 — credentialRevoked and its four storage questions move unchanged to
  *     ./credential-revoked.ts (max-file-lines), re-exported here; there it asks a SEVENTH question
  *     (./visitor-peer.ts): a visitor's session counts only while its home peer is an active peer that
@@ -228,7 +232,8 @@ async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
  * PAT itself (once) so the webapp boots "logged in" via the cookie — like a normal login,
  * without re-sending the header on every request. The refresh endpoint validates the PAT
  * cookie on every refresh, so revoking the token takes effect immediately. Skipped for scoped
- * tokens, non-browsers, /v1/auth/* (which manage their own cookies), and when a cookie exists.
+ * tokens, non-browsers, /v1/auth/* (which manage their own cookies), a request another origin
+ * composed (requestMadeByThisOrigin), and when a cookie exists.
  */
 function maybeSetPatBrowserSession(req: Request, res: Response, rawToken: string, patAuth: VerifiedToken): void {
   const config = sessionConfig();
@@ -236,8 +241,26 @@ function maybeSetPatBrowserSession(req: Request, res: Response, rawToken: string
   if (!patAuth.roles.includes('owner')) return;
   if (req.path.startsWith('/v1/auth/')) return;
   if (!String(req.headers['user-agent'] || '').includes('Mozilla')) return;
+  if (!requestMadeByThisOrigin(req, config.baseUrl)) return;
   if (readRefreshCookie(req)) return;
   setRefreshCookie(req, res, config, rawToken);
+}
+
+/**
+ * Did this node's own page, or a navigation, make this request? The PAT session cookie is a sign-in,
+ * so another origin must not be able to cause it: a script on an app origin (same-site with the
+ * apex) could otherwise send its author's owner token with credentials and replace the visitor's
+ * apex session with the author's (secaudit2026oct22, maybeSetPatBrowserSession-cross-origin-cookie-set).
+ * Sec-Fetch-Site and Origin are set by the browser and a page script cannot change them. A request
+ * with neither (an older browser's navigation, a test harness) passes, as before.
+ */
+function requestMadeByThisOrigin(req: Request, baseUrl: string): boolean {
+  const site = req.headers['sec-fetch-site'];
+  if (typeof site === 'string' && site !== 'none' && site !== 'same-origin') return false;
+  const origin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
+  if (!origin) return true;
+  if (origin === `${req.protocol}://${req.get('host') ?? ''}`) return true;
+  return URL.canParse(baseUrl) && new URL(baseUrl).origin === origin;
 }
 
 // Extend Express Request with auth info

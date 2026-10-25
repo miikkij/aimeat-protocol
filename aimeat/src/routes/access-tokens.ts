@@ -11,6 +11,8 @@
  *   POST/GET/DELETE /v1/access/tokens (owner) + POST /v1/auth/token/exchange (token is the auth).
  * @usage app.use(accessTokensRouter(config, storage));
  * @version-history
+ * 2026-10-25 - The exchanged JWT carries the `pat` claim (the PAT's id), so revoking the PAT ends the
+ *   JWT at the next request instead of at its expiry (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  * v1.3.1 - 2026-10-05 - The node's scope ceiling is exceedsCeiling (utils/scope-coverage.ts; secaudit 2026-10, C3).
  * v1.3.0 - 2026-09-29 - The exchanged JWT carries the `via: 'pat'` claim, so classification reads it as
  *   an AI (TARGET-082 V4). Roles and scopes are unchanged.
@@ -198,6 +200,9 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
         // The mark the auth middleware sets on a raw PAT, carried into the JWT made from it, so
         // classification reads this session as an AI (reader-kind.ts). It grants nothing.
         via: 'pat',
+        // The PAT row this JWT stands on: credentialRevoked reads it on every request, so revoking
+        // the PAT ends this JWT at once (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
+        pat: r.patId,
       }, config.accessTtlSeconds);
 
       res.set('Cache-Control', 'no-store');

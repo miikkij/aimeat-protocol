@@ -18,6 +18,9 @@
  * @structure browserCanBind · issueRoundBinding · newRoundBinding · setRoundBinding · readRoundBinding · clearRoundBinding
  * @usage const bind = browserCanBind(req, caller.inPerson) ? issueRoundBinding(req, res, state, path, ttl) : null;
  * @version-history
+ *   2026-10-25 — setRoundBinding and clearRoundBinding take `sameSite` ('lax' by default; 'none', always
+ *     Secure, for the SAML ACS form post), for the sign-in rounds (./login-round-binding.ts;
+ *     secaudit2026oct22, oidc-saml-login-round-not-browser-bound).
  *   v1.1.0 — 2026-10-10 — newRoundBinding and setRoundBinding split the value from the cookie, so the
  *     approve route sets the cookie only after the round is bound (secaudit 2026-10-10 I6).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
@@ -65,12 +68,17 @@ export function newRoundBinding(): { value: string; hash: string } {
   return { value, hash: bindingHash(value) };
 }
 
-/** Set the binding cookie for `state` to `value`, scoped to `callbackPath` for `ttlMs`. */
+/**
+ * Set the binding cookie for `state` to `value`, scoped to `callbackPath` for `ttlMs`. `sameSite`
+ * 'none' is for a callback the provider reaches with a cross-site form POST (the SAML ACS), which a
+ * Lax cookie does not ride; browsers take None only with Secure, so it always carries Secure.
+ */
 export function setRoundBinding(
   req: Request, res: Response, state: string, callbackPath: string, ttlMs: number, value: string,
+  sameSite: 'lax' | 'none' = 'lax',
 ): void {
   res.cookie(cookieName(state), value, {
-    httpOnly: true, secure: cookieSecure(req), sameSite: 'lax', path: callbackPath, maxAge: ttlMs,
+    httpOnly: true, secure: sameSite === 'none' || cookieSecure(req), sameSite, path: callbackPath, maxAge: ttlMs,
   });
 }
 
@@ -94,6 +102,8 @@ export function readRoundBinding(req: Request, state: string): string {
 }
 
 /** Remove the round's cookie: the round is finished or refused either way. */
-export function clearRoundBinding(req: Request, res: Response, state: string, callbackPath: string): void {
-  res.clearCookie(cookieName(state), { httpOnly: true, secure: cookieSecure(req), sameSite: 'lax', path: callbackPath });
+export function clearRoundBinding(
+  req: Request, res: Response, state: string, callbackPath: string, sameSite: 'lax' | 'none' = 'lax',
+): void {
+  res.clearCookie(cookieName(state), { httpOnly: true, secure: sameSite === 'none' || cookieSecure(req), sameSite, path: callbackPath });
 }

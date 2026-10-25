@@ -15,6 +15,9 @@
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
+ *   2026-10-25 — Zoneless timestamps are UTC on any host: Date parameters are sent in UTC, a zoneless
+ *     value is read as UTC, and the session zone is UTC (./utc-timestamps.ts). A time written inside
+ *     the autumn fold hour had read back one hour early on a host east of UTC (secaudit2026oct22).
  *   v1.11.0 — 2026-10-16 — The pool has time limits (connection wait, statement, lock, idle in
  *     transaction) and logs a connection wait that hit its limit (QA audit E6-07); savepoint() for
  *     a tolerant step inside a transaction (QA audit E6-01).
@@ -39,6 +42,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import pg from 'pg';
 import { POOL_LIMITS, logPoolWaitTimeouts, type PoolLimits } from './pool-limits.js';
+import { UTC_SESSION_OPTIONS, useUtcInputDates, utcTypeParsers } from './utc-timestamps.js';
 import type { MemoryRecord, Storage } from '../../interface.js';
 import { ChunkedUploadStore } from '../../chunked-upload-store.js';
 import type { DB } from './db-types.js';
@@ -139,8 +143,13 @@ export class PostgresKyselyStorage {
     // STALLED one did not. connectionTimeoutMillis bounds the wait for a pooled connection, and the
     // three server settings bound one statement, one lock wait and a transaction left open while
     // idle. The values are generous on purpose: they end a stall, not a heavy export.
+    // Zoneless timestamps hold UTC wall time on any host (./utc-timestamps.ts): UTC on the way in,
+    // on the way out, and in the session.
+    useUtcInputDates();
     this.pool = new pg.Pool({
       connectionString,
+      options: UTC_SESSION_OPTIONS,
+      types: utcTypeParsers,
       max: limits.maxConnections,
       connectionTimeoutMillis: limits.connectionWaitMs,
       statement_timeout: limits.statementMs,

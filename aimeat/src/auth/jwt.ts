@@ -9,6 +9,9 @@
  * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT (+ asVisitor) / generateSessionId / tokenIdOf / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   2026-10-25 — The optional `pat` claim: the id of the personal access token a JWT was minted from.
+ *     issueJWT writes it and verifyJWT carries it, so credentialRevoked can end the JWT when the PAT
+ *     is revoked (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  *   v1.11.1 — 2026-10-20 — issueJWT says why it does not sign the `anonymous` claim: a signed claim
  *     would make requireAuth() refuse the minted anonymous token on the memory and storage routes that
  *     anonymous mode advertises. Routes for signed-in members ask isAnonymousPrincipal()
@@ -113,6 +116,10 @@ export interface JWTPayload {
    *  refresh cookie). A mark for classification only (services/classification/reader-kind.ts):
    *  it grants and removes nothing. */
   via?: 'pat';
+  /** The id of the personal access token this JWT was minted from (the exchange, the PAT-backed
+   *  refresh cookie). credentialRevoked reads the PAT row by it on every request, so revoking the PAT
+   *  ends the JWT at once (auth/credential-revoked.ts). */
+  pat?: string;
   /** When the owner approved the credential chain this token belongs to, in epoch seconds (the
    *  OIDC `auth_time` claim). Written on an ecosystem app's token at approval and carried across
    *  each refresh, so the chain ends a fixed time after the owner said yes (routes/eco-refresh.ts). */
@@ -175,6 +182,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.app_grant ? { app_grant: payload.app_grant } : {}),
     ...(payload.app ? { app: payload.app } : {}),
     ...(payload.via === 'pat' ? { via: 'pat' } : {}),
+    ...(payload.pat ? { pat: payload.pat } : {}),
     ...(typeof payload.auth_time === 'number' ? { auth_time: payload.auth_time } : {}),
     // `anonymous` is NOT written, on purpose (secaudit 2026-10, anonymous-claim-not-signed). The one
     // mint that sets it is POST /v1/auth/anonymous, and requireAuth() refuses every credential that
@@ -217,7 +225,8 @@ export interface VerifiedToken {
   app?: string;         // the app's own id ("owner/filename") for role-'app' tokens
   via?: 'pat';          // made from a personal access token: set by the auth middleware on a raw PAT
                         //   and read from the `via` claim of a JWT minted from one
-  authTime?: number;    // `auth_time`: when the owner approved this token's chain (ecosystem apps)
+  pat?: string;         // `pat`: the id of the personal access token a JWT was minted from
+  authTime?: number;   // `auth_time`: when the owner approved this token's chain (ecosystem apps)
   aud?: string | string[]; // `aud`: the resource the token is for (MCP OAuth tokens name the MCP endpoint)
 }
 
@@ -295,6 +304,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       app: payload.app as string | undefined,
       // Only the one known value is carried; anything else in the claim is not ours.
       ...(payload.via === 'pat' ? { via: 'pat' as const } : {}),
+      ...(typeof payload.pat === 'string' && payload.pat ? { pat: payload.pat } : {}),
       ...(typeof payload.auth_time === 'number' ? { authTime: payload.auth_time } : {}),
       // Carried as written; the MCP endpoint judges it (mcp/oauth-binding.ts mcpAudienceRefusal).
       ...(typeof payload.aud === 'string' || Array.isArray(payload.aud) ? { aud: payload.aud } : {}),
