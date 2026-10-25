@@ -13,6 +13,7 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   v1.2.0 — 2026-10-25 — companySmtpPrivateHosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — deviceAuthEmailLimit and deviceAuthEmailMax (secaudit2026oct22,
  *     device-authorize-email-owner-oracle).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22): mcpUnusedClientDays.
@@ -35,6 +36,14 @@ export interface NodeLimitsConfig {
   /** How many email-form requests one network address may make in 10 minutes while the limit is on.
    *  AIMEAT_DEVICE_AUTHORIZE_EMAIL_MAX, default 20 (the contacts lookup allowance per account). */
   deviceAuthEmailMax: number;
+  /**
+   * The mail servers a company may send through although they are on a private network: host names,
+   * addresses, or networks in CIDR form (`mail.internal`, `10.0.5.7`, `10.0.5.0/24`). A company's SMTP
+   * host outside public address space and outside this list is refused (services/company/
+   * smtp-host-check.ts). Loopback stays allowed on a node in local mode. AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS,
+   * comma separated, default empty.
+   */
+  companySmtpPrivateHosts: string[];
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -48,5 +57,6 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     mcpUnusedClientDays: wholeOr(env.AIMEAT_MCP_UNUSED_CLIENT_DAYS, 30),
     deviceAuthEmailLimit: env.AIMEAT_DEVICE_AUTHORIZE_EMAIL_LIMIT !== 'false',
     deviceAuthEmailMax: Math.max(1, wholeOr(env.AIMEAT_DEVICE_AUTHORIZE_EMAIL_MAX, 20)),
+    companySmtpPrivateHosts: (env.AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS ?? '').split(',').map(s => s.trim()).filter(Boolean),
   };
 }

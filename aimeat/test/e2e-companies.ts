@@ -7,6 +7,9 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   2026-10-25 — 15b: a private-network SMTP host is refused with the setting named and accepted once
+ *     the operator lists its network; 18b: a non-SMTP first line from the server is not passed back
+ *     (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.5.0 — 2026-08-31 — 8b: the server-side front-page reachability check (false for a host
  *     that resolves nowhere; somebody else's company id answers the uniform 404).
  *   v1.4.0 — 2026-08-23 — Phase 7: signing in at the company address. An app served as a company's
@@ -29,6 +32,7 @@
 // Run: cd aimeat && pnpm exec tsx test/e2e-companies.ts
 
 import { createHash } from 'node:crypto';
+import { createServer, type AddressInfo } from 'node:net';
 import * as ed from '@noble/ed25519';
 import { hostRequest } from './helpers/host-request.js';
 import { ownerSignIn } from './helpers/owner-login.js';
@@ -376,6 +380,31 @@ await test('15. a company stores its own SMTP settings and no read ever returns 
   assert(!JSON.stringify(get.body).includes('ei-koskaan-ulos'), 'the password leaked into a read response');
 });
 
+// secaudit2026oct22, sendAsCompany:smtp-host-address-class. A company's mail server on a private
+// network is refused unless the operator lists it (email.company_smtp_private_hosts); loopback stays
+// allowed on a local node (this test node runs in local mode, so 127.0.0.1 above is accepted).
+await test('15b. a private-network SMTP host is refused with the setting named, and accepted once the operator lists its network', async () => {
+  const put = (host: string) => json(`/v1/companies/${companyId}/smtp`, {
+    method: 'PUT', headers: authed(A.token),
+    body: JSON.stringify({ host, port: 25, from_address: 'laskutus@perustaja.fi' }),
+  });
+  const refused = await put('10.20.30.40');
+  assert(refused.status === 400 && refused.body.error?.code === 'SMTP_HOST_NOT_ALLOWED',
+    `a private address must be refused: ${refused.status} ${JSON.stringify(refused.body.error)}`);
+  assert(String(refused.body.error?.message).includes('email.company_smtp_private_hosts'), `the refusal names the setting: ${refused.body.error?.message}`);
+  const setList = (value: string[]) => json('/v1/admin/config', {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ changes: [{ path: 'email.company_smtp_private_hosts', value }] }),
+  });
+  const listed = await setList(['10.20.0.0/16']);
+  assert(listed.status === 200, `operator lists the network: ${listed.status} ${JSON.stringify(listed.body.error)}`);
+  try {
+    const ok = await put('10.20.30.40');
+    assert(ok.status === 200, `a listed private host is accepted: ${ok.status} ${JSON.stringify(ok.body.error)}`);
+  } finally {
+    await setList([]);
+  }
+});
+
 await test('16. updating the settings without a password keeps the stored one', async () => {
   const put = await json(`/v1/companies/${companyId}/smtp`, {
     method: 'PUT', headers: authed(A.token),
@@ -419,6 +448,30 @@ await test("18. a send as the company goes through the company's own server, not
   const err = String(sent.body.error.details?.reason ?? '');
   assert(err !== 'EMAIL_DISABLED', "the node's shared transport answered — the company sender was not used");
   assert(/ECONNREFUSED|connect|127\.0\.0\.1/i.test(err), `expected a connection error from the company server, got: ${err}`);
+});
+
+await test("18b. a server that answers with something other than an SMTP greeting: the send fails, and its first line is not passed back", async () => {
+  // A listener on loopback that is not a mail server. Its first line must never reach the caller:
+  // that would let a company's settings read the first line of any service the node can reach.
+  const BANNER = `NOT-SMTP-BANNER-${Date.now().toString(36)}`;
+  const server = createServer((sock) => { sock.write(`HTTP/1.1 400 ${BANNER}\r\n\r\n`); setTimeout(() => sock.destroy(), 200); });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+  const port = (server.address() as AddressInfo).port;
+  try {
+    const put = await json(`/v1/companies/${companyId}/smtp`, {
+      method: 'PUT', headers: authed(A.token),
+      body: JSON.stringify({ host: '127.0.0.1', port, secure: false, from_address: 'laskut@perustaja.fi' }),
+    });
+    assert(put.status === 200, `smtp save: ${put.status} ${JSON.stringify(put.body.error)}`);
+    const sent = await json('/v1/outbound/send', {
+      method: 'POST', headers: authed(A.token),
+      body: JSON.stringify({ contact_id: smtpContactId, kind: 'transactional', company_id: companyId, subject: 'Lasku 1003', body: 'Liitteenä lasku.' }),
+    });
+    assert(sent.status === 502 && sent.body.error?.code === 'SEND_FAILED', `expected 502 SEND_FAILED, got ${sent.status} ${JSON.stringify(sent.body)}`);
+    assert(!JSON.stringify(sent.body).includes(BANNER), `the remote server's first line reached the caller: ${JSON.stringify(sent.body.error)}`);
+  } finally {
+    server.close();
+  }
 });
 
 await test('19. removing the settings puts the company back on the shared sender', async () => {
