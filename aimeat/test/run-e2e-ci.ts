@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
  *   2026-10-24 -- e2e-cortex-board-ownership.ts joins the list (not the guard tier): a cortex activation answers 409 for a board id another account holds, and a deactivation deletes only the installing account's boards (secaudit2026oct22).
  *   2026-10-24 -- e2e-capability-extension-ref.ts joins the list (not the guard tier): an extension-backed capability's ref names an extension and an action, and invoke resolves both before its loopback request (secaudit2026oct22).
  *   2026-10-24 -- e2e-compliance-agreements.ts joins the list (not the guard tier): data processing agreements (plan doc-mvmr4i2wdk0p).
@@ -1444,6 +1445,7 @@ const ALL_SUITES = [
     'test/e2e-dm-read-as-owner.ts',
     'test/e2e-inbox-organize.ts',
     'test/e2e-federated-namesake.ts',
+    'test/e2e-federated-members-reads.ts',
     'test/e2e-federated-visitor-names.ts',
     'test/e2e-interactive-messages.ts',
     'test/e2e-broadcast.ts',
