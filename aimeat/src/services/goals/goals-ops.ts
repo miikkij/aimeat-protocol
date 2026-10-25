@@ -242,6 +242,9 @@ export async function attachOp(deps: GoalDeps, caller: CallerContext, id: string
 
 // ── Works ────────────────────────────────────────────────────────────────────────────────────────
 
+/** The keys of a works request that name the request, not the work (a flat work is read without them). */
+const REQUEST_KEYS = new Set(['action', 'goal_id', 'work_id', 'reason', 'work']);
+
 /** The work an agent most recently took in this goal: what its next work continues from. */
 function latestOf(goal: GoalRecord, agent: string): GoalWork | undefined {
   return [...goal.works].reverse().find(w => w.claimedBy === agent);
@@ -265,7 +268,9 @@ export async function workOp(deps: GoalDeps, caller: CallerContext, action: stri
       return { goal: goalView((await advanceGoal(deps, access.ownerGhii, goalId)) ?? changed) };
     }
     case 'add': case 'leave': {
-      const spec = parseWorkSpec(body.work ?? body);
+      // The work comes inside `work`, or flat beside the request's own keys, which are not the work's.
+      const flat = Object.fromEntries(Object.entries(body).filter(([k]) => !REQUEST_KEYS.has(k)));
+      const spec = parseWorkSpec(body.work ?? flat);
       const coordinatorMay = access.agent === goal.coordinator && goal.permissions.assign;
       const from = access.agent ? latestOf(goal, access.agent) : undefined;
       if (action === 'add' && !access.person && !coordinatorMay && caller.kind !== 'agent') throw new GoalError(403, 'FORBIDDEN', 'The owner or the goal\'s coordinator adds work.');
@@ -372,8 +377,12 @@ export async function answerOp(deps: GoalDeps, caller: CallerContext, goalId: st
   if (work.status !== 'open') throw new GoalError(409, 'CONFLICT', `The step is ${work.status}.`);
   if (!access.person) {
     const me = (await ownerAgents(deps, access.ownerName)).find(a => a.name === access.agent);
-    const asked = work.createdBy === access.who || goal.coordinator === access.agent;
-    if (me?.mode !== 'workstation' || asked) {
+    // The person's own AI writes the person's questions when it makes the goal for them, and answers
+    // them when the person tells it. What it may not do is answer as an agent that works in the goal:
+    // the coordinator, or an agent that took a work here and left the step while working.
+    const worksHere = goal.coordinator === access.agent || goal.works.some(w => w.claimedBy === access.agent);
+    const asked = worksHere && work.createdBy === access.who;
+    if (me?.mode !== 'workstation' || asked || goal.coordinator === access.agent) {
       throw new GoalError(403, 'FORBIDDEN', 'The owner answers this, in person or through their own AI in a conversation; the agent that asked may not answer itself.');
     }
   }

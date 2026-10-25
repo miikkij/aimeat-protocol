@@ -23,7 +23,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
-import { parseGAII } from '../../utils/gaii.js';
+import { parseGAII, localAccountOf } from '../../utils/gaii.js';
 import { emitChange } from '../event-bus.js';
 import { GOAL_PREFIX, GOAL_TAG, MAX_LOG, MAX_CHANGES, goalKey, type GoalRecord, type GoalLogEntry } from './goals-types.js';
 
@@ -104,10 +104,13 @@ export function logEntry(who: string, kind: GoalLogEntry['kind'], what: string, 
   return { at: new Date().toISOString(), who, kind, what, ...extra };
 }
 
-/** The account-local agent name of an agent principal of this owner, or null. */
+/**
+ * The account-local agent name of an agent principal of this owner, or null. The account is read with
+ * localAccountOf, so an agent of another node whose owner has the same local name is not this owner's.
+ */
 export function agentNameOf(principal: string, ownerName: string): string | null {
   const p = parseGAII(principal);
-  return p && p.owner === ownerName ? p.agent : null;
+  return p && localAccountOf(principal) === ownerName ? p.agent : null;
 }
 
 export interface GoalAccess {
