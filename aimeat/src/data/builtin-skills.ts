@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-25 -- aimeat-node-guide: an existing agent coming back proves it with `proof` on
+ *     device-authorize; without it the owner sees a takeover (secaudit2026oct22, lead 2150).
  *   2026-10-25 -- diagnose-a-workflow, step 7: a 402 on the node's key may be a call that costs more
  *     than is left; aimeat-node-guide: the email form of device-authorize is counted per network
  *     address (secaudit2026oct22).
@@ -324,6 +326,13 @@ Agents are never created implicitly. The paved path:
 4. To renew without a new approval, the agent signs \`gaii + timestamp\` with its key and calls
    \`POST /v1/auth/token\`. The node issues the scopes as the owner has them set at that moment,
    so narrowing them or removing the agent takes effect at once.
+
+An agent that already exists and comes back (its token expired) proves it in step 1 with the key
+its last approval gave it: \`proof: { signed_at, signature }\`, an Ed25519 signature over
+\`aimeat-device-return:v1\\n<owner>\\n<agent name>\\n<signed_at>\` made within five minutes
+(\`aimeat connect add\` does this). The owner then sees the agent coming back. Without that proof the
+owner sees a new device taking the agent over, the approval is recorded in the owner's account
+events, and the owner may sign the agent out everywhere else with it.
 
 Name the scopes the agent needs in step 1 (\`scopes\`): an agent that names none gets the node's
 default set, which cannot take work. The owner's agent card shows what was asked for beside what
@@ -679,6 +688,8 @@ metadata:
    set was reached, or the call would cost more than is left (the node prices a call before it
    runs, with the answer at most the operator's length limit); its message says which. The owner's
    own key, more allowance, or a shorter answer or a cheaper model for the last case, is the fix.
+   A step that named no model is answered by the free model instead only when the free model as the
+   last resort is on for the owner (\`free_model\` on \`GET /v1/ai/routing\`); off, it gets this 402 too.
    The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
    saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
    for that agent or app apply, and they can refuse a step that the owner's own call would pass.

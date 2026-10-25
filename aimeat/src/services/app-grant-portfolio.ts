@@ -10,7 +10,10 @@
  * @version-history
  *   v1.0.0 — 2026-10-25 — Moved from routes/app-grants.ts, unchanged (line limit; secaudit2026oct22).
  */
-import { PORTFOLIO_TARGET_PREFIX } from './app-origin-target.js';
+/** A portfolio target's prefix (services/app-origin-target.ts PORTFOLIO_TARGET_PREFIX). Spelled out,
+ *  not imported: that module reaches routes/subdomains.ts, which would make an import cycle through
+ *  routes/app-grants.ts (as services/app-grant-author.ts spells it for the same reason). */
+const PORTFOLIO_TARGET_PREFIX = 'portfolio:';
 
 /**
  * The most a token minted for a PORTFOLIO origin may carry.

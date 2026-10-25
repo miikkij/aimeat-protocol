@@ -1690,6 +1690,12 @@
       },
       "why": "Written 2026-10-25 (secaudit2026oct22, lead 3924), the node's own read: the record of the name an identity verification proved, under a service-owned key, read to keep its version when it is written again and read by the wallet seal to compare with the signing certificate. It is never shown to anyone and never sent to a model."
     },
+    "src/services/device-return-proof.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22, lead 2150), the node's own read: the service-owned mark (agent-device-return.<user code>) that a device request proved it is an existing agent coming back, read to tell the consent card a return from a takeover. It holds an agent id and a time, no content, and is never sent to a model."
+    },
     "src/services/cortex-seeder.ts": {
       "reads": {
         "listAllMemory": 1

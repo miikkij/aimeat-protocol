@@ -15,6 +15,7 @@
 import { type Request, type Response, type Router } from 'express';
 import type { Storage } from '../storage/interface.js';
 import { oauthConsentInfo } from '../services/oauth-consent-info.js';
+import { redirectUriRegistered } from './oauth-redirect.js';
 
 export function registerOAuthConsentInfo(router: Router, storage: Storage): void {
   router.get('/v1/mcp/consent-info', async (req: Request, res: Response) => {
@@ -25,7 +26,7 @@ export function registerOAuthConsentInfo(router: Router, storage: Storage): void
       res.status(400).json({ error: 'invalid_request', error_description: 'client_id is required' });
       return;
     }
-    const info = await oauthConsentInfo(storage, clientId, asked);
+    const info = await oauthConsentInfo(storage, clientId, asked, redirectUriRegistered);
     if (!info) {
       res.status(404).json({ error: 'invalid_client', error_description: 'This server does not know this client_id.' });
       return;
