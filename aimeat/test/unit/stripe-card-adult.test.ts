@@ -9,6 +9,8 @@
  *   amount and currency; a CREDIT card records the buyer as a verified adult and a debit or prepaid
  *   card does not, on both card paths (Jouni's ruling, Comicland v3 A-4).
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A test-mode credit card payment records no adult check, on both card
+ *     paths (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-4).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -127,6 +129,31 @@ describe('the direct card handler', () => {
   it('a debit card records nothing', async () => {
     answer = { id: 'pi_3', status: 'succeeded', latest_charge: { payment_method_details: { card: { funding: 'debit' } } } };
     await collect();
+    expect((await readAdult(storage, BUYER)).verified).toBe(false);
+  });
+  it('a test-mode credit card pays and records nothing (secaudit2026oct22)', async () => {
+    answer = { id: 'pi_4', status: 'succeeded', livemode: false, latest_charge: { livemode: false, payment_method_details: { card: { funding: 'credit' } } } };
+    const r = await collect();
+    expect(r.trackingCode).toBe('pi_4');
+    expect((await readAdult(storage, BUYER)).verified).toBe(false);
+  });
+  it('a live-mode credit card records the adult check', async () => {
+    answer = { id: 'pi_5', status: 'succeeded', livemode: true, latest_charge: { livemode: true, payment_method_details: { card: { funding: 'credit' } } } };
+    await collect();
+    expect((await readAdult(storage, BUYER)).method).toBe('credit-card');
+  });
+});
+
+describe('the hosted page handler in test mode', () => {
+  it('a test-mode credit card pays and records nothing (secaudit2026oct22)', async () => {
+    answer = paidSession('credit', {
+      livemode: false,
+      payment_intent: { id: 'pi_1', livemode: false, payment_method: 'pm_1', latest_charge: { livemode: false, payment_method_details: { card: { funding: 'credit' } } } },
+    });
+    const r = await stripeCheckoutHandler(config).collect({ config: config as never, storage }, {
+      buyerGhii: BUYER, amount: 4_990_000, currency: 'EUR', reference: 'chk_abc', fee: 0, instrument: 'cs_test_1', seller,
+    });
+    expect(r.trackingCode).toBe('pi_1');
     expect((await readAdult(storage, BUYER)).verified).toBe(false);
   });
 });
