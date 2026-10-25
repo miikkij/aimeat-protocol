@@ -13,8 +13,11 @@
  *   - errorsAsFields/contextFormat/maskSensitive: Winston formats for Error fields, context
  *     injection and field redaction
  *   - logger: the configured Winston logger (console transport, AIMEAT_LOG_LEVEL or LOG_LEVEL)
+ *   - setLogLevel(level): the running level, from node.log_level
  *
  * @version-history
+ *   2026-10-25 — setLogLevel(): node.log_level from the config sets the running level, so the admin
+ *     Config tab changes it without a restart. The environment still sets it for the first lines.
  *   2026-10-16 — An Error under any field is written as its name, message, stack and own fields, and
  *     its strings pass the credential redaction. The request context moved to utils/request-context.ts
  *     and errorFields() is in utils/error-fields.ts; both re-exported (QA audit E1-04, F5-07, S5-07,
@@ -127,6 +130,8 @@ export const logger = winston.createLogger({
   // AIMEAT_LOG_LEVEL is the name this project's own variables carry and the one every .env.test.*
   // has set since July; LOG_LEVEL was the only name read, so every E2E node logged at info while
   // its environment said error. Found 2026-09-08 by e2e-mail-connections. Both names work.
+  // This is the level from the first line on, before any config exists; once the config is built,
+  // node.log_level (config.logLevel, changeable on the admin Config tab) sets it (setLogLevel).
   level: process.env.AIMEAT_LOG_LEVEL ?? process.env.LOG_LEVEL ?? 'info',
   defaultMeta: { node_id: process.env.AIMEAT_NODE_ID || 'aimeat-local-001-dev' },
   format: winston.format.combine(
@@ -147,3 +152,10 @@ export const logger = winston.createLogger({
   ),
   transports: [new winston.transports.Console()],
 });
+
+const LEVELS = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
+
+/** Set the log level of the running process (node.log_level). An unknown level changes nothing. */
+export function setLogLevel(level: string): void {
+  if (LEVELS.includes(level) && logger.level !== level) logger.level = level;
+}

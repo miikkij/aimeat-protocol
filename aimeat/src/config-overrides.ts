@@ -14,6 +14,7 @@
  * @usage
  *   import { applyConfigOverrides } from './config.js';   // re-exported
  * @version-history
+ *   2026-10-25 — The running log level follows node.log_level after the stored values are applied.
  *   v1.2.0 — 2026-10-11 — The copy of the rate-limit settings into the limiter tiers moved to
  *     services/config-rate-limit-sync.ts, which the live write paths call too.
  *   v1.1.0 — 2026-10-09 — A secret row stored sealed is opened with the node key before it is applied,
@@ -33,7 +34,7 @@ import { isSealed } from './services/config-sealing.js';
 import { openStoredSetting } from './services/config-at-rest.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
 import type { Storage } from './storage/interface.js';
-import { logger } from './utils/logger.js';
+import { logger, setLogLevel } from './utils/logger.js';
 
 /**
  * Apply config overrides from database (called after storage is initialized).
@@ -93,6 +94,8 @@ export async function applyConfigOverrides(
   // Copy the rl* settings into the limiter tiers (services/config-rate-limit-sync.ts, shared with
   // the live write paths).
   syncRateLimitTiers(config);
+  // The running log level follows node.log_level, which a stored value may have just set.
+  setLogLevel(config.logLevel);
 
   if (applied.length > 0) provenance.markDatabase(applied);
   return { applied, skipped, sealed };

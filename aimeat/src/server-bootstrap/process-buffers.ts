@@ -18,6 +18,8 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-10-25 — The usage and tally buffers take their flush intervals from the config, and the usage
+ *     settings are bound (services/usage/usage-settings.ts), so the admin Config tab reaches them.
  *   2026-10-17 — initAgentRefusals gets the listener that asks the person when a refusal opens
  *     (services/permission-ask-notice.ts).
  *   2026-10-15 — flushProcessBuffers: the shutdown flush of the write buffers, moved from
@@ -43,6 +45,7 @@ import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
+import { bindUsageSettings } from '../services/usage/usage-settings.js';
 import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { initClassificationAudit } from '../services/classification/audit.js';
@@ -72,10 +75,13 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
 
   // The one write door for the usage call stream: every measured call, whichever surface it came
   // through, buffers here and flushes on an interval so a request never waits on a metrics write.
-  initUsageBuffer(storage);
+  // The flush intervals are read here once (usage.buffer_ms, usage.tally_buffer_ms: they take effect at
+  // the next start); the usage windows and batches are read from the bound config on each run.
+  bindUsageSettings(config);
+  initUsageBuffer(storage, config.usageBufferMs);
   // The write tally starts collecting here. It fills only from now on: the writer was never
   // recorded before this, so there is no history to seed it from.
-  initWriteTallyBuffer(storage);
+  initWriteTallyBuffer(storage, config.tallyBufferMs);
   // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
   // starts to hold its tasks (services/scope-use.ts). Like the tally, it fills only from now on.
   initScopeUse(storage);

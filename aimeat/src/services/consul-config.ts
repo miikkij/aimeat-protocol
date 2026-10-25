@@ -12,6 +12,7 @@
  *   - polling watcher hashes loadAll() output to detect and dispatch config changes
  *
  * @version-history
+ *   2026-10-25 — A log level Consul changed reaches the running logger (setLogLevel).
  *   v1.2.0 — 2026-08-31 — Talks to Consul's HTTP API directly instead of through the `consul`
  *     package, which npm marks "no longer supported" and for which upstream names no successor.
  *     Three calls were all it was used for. NOT safeFetch, and that is the reason this could not
@@ -32,7 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue, writeConfigField } from './config-schema.js';
 import { syncRateLimitTiers } from './config-rate-limit-sync.js';
 import { isSealed } from './config-sealing.js';
-import { logger } from '../utils/logger.js';
+import { logger, setLogLevel } from '../utils/logger.js';
 
 export interface ConsulConfigService {
   /** Load all config values from Consul KV (mutable only, raw strings) */
@@ -174,7 +175,8 @@ export function applyConsulValues(
       // eslint-disable-next-line aimeat/no-silent-catch -- not silent: the key is reported to the caller in the returned `skipped` list
     } catch { skipped.push(dotPath); }
   }
-  // A rate limit that Consul changed reaches the running limiters (config-rate-limit-sync.ts).
-  if (applied.length > 0) syncRateLimitTiers(config);
+  // A rate limit that Consul changed reaches the running limiters (config-rate-limit-sync.ts), and a
+  // log level the running logger.
+  if (applied.length > 0) { syncRateLimitTiers(config); setLogLevel(config.logLevel); }
   return { applied, skipped, sealed };
 }

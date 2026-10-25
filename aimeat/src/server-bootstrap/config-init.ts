@@ -12,6 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.11.0 — 2026-10-25 — The provenance registry is bound to the config (bindConfigProvenance), so
+ *     the MCP admin config tools read and mark the same sources the admin Config API does.
  *   v1.10.0 — 2026-10-18 — The default audience caps are settled once per node at start: a new node
  *     takes them, a node that ran before gets them offered on the Security page
  *     (services/classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1).
@@ -49,7 +51,7 @@ import type { AimeatConfig, HookName } from '../config.js';
 import { applyConfigOverrides } from '../config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import { instrumentStorage } from '../services/perf-trace.js';
-import { ConfigProvenance } from '../services/config-provenance.js';
+import { ConfigProvenance, bindConfigProvenance } from '../services/config-provenance.js';
 import { ALL_CONFIG_MAP, ENV_TO_DOT_PATH } from '../services/config-schema.js';
 import { createConsulConfigService, applyConsulValues } from '../services/consul-config.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
@@ -98,6 +100,8 @@ export async function initializeConfig(
   // Then apply any DB-persisted overrides (skipped for in-memory storage).
   const provenance = new ConfigProvenance();
   provenance.initDefaults(Object.keys(ALL_CONFIG_MAP));
+  // The MCP admin config tools hold the config and not this registry; they find it through the config.
+  bindConfigProvenance(config, provenance);
 
   if (configSources) {
     // Accurate provenance from loadConfig() — distinguishes env/file/cli

@@ -132,7 +132,7 @@ const DOMAINS = [
   { id: 'ai', groups: ['ai', 'decide', 'content_class', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
-  { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'features', 'packages'] },
+  { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
   { id: 'limits', groups: ['quota', 'rate_limits', 'boards', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },
   { id: 'integrations', groups: ['email', 'push', 'indexing', 'seo', 'cors', 'site', 'themes', 'apps', 'cookies', 'connections', 'visibility', 'geo'] },

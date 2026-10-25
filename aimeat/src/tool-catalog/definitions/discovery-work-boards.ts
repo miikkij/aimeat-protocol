@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-25 — aimeat_admin_config answers the whole Config list (section, q); aimeat_admin_config_set changes settings.
  *   2026-10-21 — aimeat_tools_find says that on MCP 2026-07-28 the list does not change and the found
  *     tools are called by name (one sentence added).
  *   2026-10-18 — aimeat_admin_incident_resolve decides an offered default audience cap too ("apply" /
@@ -371,13 +372,32 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_admin_config',
-        description: 'Operator-only. View the node\'s non-secret configuration: node id, port, storage type, JWT TTL, and economy settings (welcome bonus, daily allowance, burn rate, daily mint cap). On a node run by somebody else, also lists the settings that party set and this node cannot change, with their values. Returns an operator-role error for non-operators. Read-only — this tool does not change settings.',
+        description: 'Operator-only. Every node setting the admin Config page shows, the same list as GET /v1/admin/config: each one\'s value, type, range or choices, where the value comes from (default, env, file, consul, database or sealed), whether it can be changed here (`editable`), whether a saved value waits for the next start (`appliesAt: "restart"`, `restartPending`), and settings set by whoever runs this node (`sealed`). A secret shows only whether it is set (`<path>_configured`), and `set_path` when the operator may set it. The whole list is over four hundred settings: pass `section` (the first part of a path, such as ai, auth, packages) or `q` (text in a path or description) for the part you need. Change a setting with aimeat_admin_config_set. Returns an operator-role error for non-operators.',
         caller: 'operator',
         visibility: agentEverywhere,
         annotations: { title: 'Admin: Read Config', readOnlyHint: true },
         scope: 'operator:admin',
         surfaces: ['admin'],
-        input: {},
+        input: {
+            section: { type: 'string', description: 'Only settings whose path starts with this section, such as ai, auth, packages, security.' },
+            q: { type: 'string', description: 'Only settings whose path or description contains this text.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_config_set',
+        description: 'Operator-only. Change node settings, the same as saving on the admin Config page (PUT /v1/admin/config): each change is checked against the setting\'s type and range, stored in this node\'s database and applied. A setting with appliesAt "restart" is stored and takes effect when the node next starts. A secret is set on its set_path and is never answered back. A request that names a setting sealed by whoever runs this node, or that turns the classification switch off or from all to owner, is refused whole and changes nothing. Read the paths and current values with aimeat_admin_config first.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        // Not destructive: every change can be set back, and a saved value can be removed on the Config page.
+        annotations: { title: 'Admin: Change Config', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'operator:admin',
+        surfaces: ['admin'],
+        input: {
+            changes: { type: 'array', required: true, description: 'The settings to change: [{ path, value }], path as aimeat_admin_config names it (a secret by its set_path), value of the setting\'s type.', zod: z.array(z.object({
+                path: z.string().min(1).describe('The setting\'s path, such as packages.max_size_mb.'),
+                value: z.unknown().describe('The new value, of the setting\'s type: number, true or false, text, or a list.'),
+            })).min(1) },
+        },
     },
     {
         name: 'aimeat_admin_sso_list',
