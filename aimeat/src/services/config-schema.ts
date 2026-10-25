@@ -333,7 +333,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Personal Nodes (mutable) ──
   { key: 'personalNodesEnabled', dotPath: 'personal_nodes.enabled', envVar: 'AIMEAT_PERSONAL_NODES_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Personal node hosting enabled' },
   { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max personal node slots', range: '1-10000' },
-  { key: 'personalNodeMaxPerOwner', dotPath: 'personal_nodes.max_per_owner', envVar: 'AIMEAT_PERSONAL_NODE_MAX_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Personal nodes one owner may anchor here, so the shared slots stay open to every owner. 0 = no limit. Anchors that exist stay', range: '0-10000 (0 = no limit)' },
+  { key: 'personalNodeMaxPerOwner', dotPath: 'personal_nodes.max_per_owner', envVar: 'AIMEAT_PERSONAL_NODE_MAX_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Personal nodes one owner may anchor here, so the shared slots stay open to every owner. 0 = no limit. Anchors that exist stay', range: '0-10000' },
 
   // ── Match Notifications (Phase 1.6, mutable) ──
 

@@ -25,14 +25,40 @@
  *   await holdAppLabels(storage, ownerName, filename, config);       // when an app goes away
  *   scheduler.registerCoreHandler('held-label-release', () => sweepHeldAppLabels(storage, config));
  * @version-history
+ *   v1.0.1 — 2026-10-25 — The mappings are read a page at a time (listSubdomainSitesPage), and whether
+ *     an app is there is asked of storage here: a service does not import a route (check:deps).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, app-label-recycled-after-delete).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SubdomainSiteRecord } from '../storage/interface.js';
-import { resolveAppTarget } from '../routes/subdomain-app-gate.js';
+import { localAccountName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const PAGE = 500;
+
+/** Every mapping, read a bounded page at a time (listSubdomainSitesPage). */
+async function allSites(storage: Storage): Promise<SubdomainSiteRecord[]> {
+  const out: SubdomainSiteRecord[] = [];
+  for (let after: string | undefined; ;) {
+    const page = await storage.listSubdomainSitesPage({ ...(after ? { after } : {}), limit: PAGE });
+    out.push(...page);
+    if (page.length < PAGE) return out;
+    after = page[page.length - 1].subdomain;
+  }
+}
+
+/** Whether the app an app target ("owner/filename") names is published here: the owner part as an
+ *  account name, or as a full identity whose account part names it (the targets the label code writes). */
+async function appIsThere(storage: Storage, target: string): Promise<boolean> {
+  const slash = target.indexOf('/');
+  if (slash <= 0 || slash === target.length - 1) return false;
+  const owner = target.slice(0, slash);
+  const filename = target.slice(slash + 1);
+  if (await storage.getAppByOwnerName(owner, filename)) return true;
+  const bare = localAccountName(owner);
+  return bare !== owner && !!(await storage.getAppByOwnerName(bare, filename));
+}
 
 /** The owner part of an app target ("alice/notes.html" -> "alice"). */
 const ownerOfTarget = (target: string): string => target.slice(0, Math.max(0, target.indexOf('/')));
@@ -66,7 +92,7 @@ async function releaseOverLimit(storage: Storage, config: LimitConfig, held: Sub
 export async function holdAppLabels(storage: Storage, ownerBare: string, filename: string, config?: LimitConfig): Promise<string[]> {
   const target = `${ownerBare}/${filename}`;
   const now = new Date().toISOString();
-  const sites = await storage.listSubdomainSites();
+  const sites = await allSites(storage);
   for (const s of sites) {
     if (s.kind !== 'app' || s.target !== target || s.heldSince) continue;
     await storage.updateSubdomainSite(s.subdomain, { heldSince: now });
@@ -86,10 +112,9 @@ export async function sweepHeldAppLabels(storage: Storage, config: LimitConfig, 
   const nowIso = now.toISOString();
   const days = config.appHeldLabelDays;
   const cutoff = Number.isInteger(days) && days > 0 ? now.getTime() - days * DAY_MS : null;
-  for (const s of await storage.listSubdomainSites()) {
+  for (const s of await allSites(storage)) {
     if (s.kind !== 'app') continue;
-    const app = await resolveAppTarget(storage, s.target);
-    if (app) {
+    if (await appIsThere(storage, s.target)) {
       if (s.heldSince) { await storage.updateSubdomainSite(s.subdomain, { heldSince: null }); cleared.push(s.subdomain); }
       continue;
     }

@@ -113,7 +113,7 @@
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:f37f208c752748e60698c69d"
+      "digest": "sha256:4a81c275840fedb10a6936cb"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-10-16",
@@ -242,7 +242,7 @@
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:a871722f264db4c76cfaa63f"
+      "digest": "sha256:e4dd9c05c6c29234f6e20af2"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-18",
@@ -283,7 +283,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:d2c10b8dbb929d9a60891fd3"
+      "digest": "sha256:1d0a4b6ed8dedbc964f72db5"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-21",
@@ -441,7 +441,7 @@
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:32703ca216b37562476cc433"
+      "digest": "sha256:4d214bc660e4020bd9f2acee"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -541,7 +541,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "d8b51f691e0f9597"
+      "aimeat/src/services/ai/completion.ts": "4051eafcdc72ad61"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
@@ -617,7 +617,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "8b793a7cf0829469",
+      "aimeat/src/routes/agents/device-auth.ts": "ff40a80ffb22c9ae",
       "aimeat/src/routes/ghii/register-login.ts": "c60b76bc22aaea67",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -636,7 +636,7 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "8b793a7cf0829469",
+      "aimeat/src/routes/agents/device-auth.ts": "ff40a80ffb22c9ae",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
@@ -661,7 +661,7 @@
       "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
       "aimeat/src/mcp/agent-schedules.ts": "d35f0d5e66f3eeaa",
       "aimeat/src/services/scheduler.ts": "7fdaa8cc1343347d",
-      "aimeat/src/services/ai/route-plan.ts": "332ec0a3c395ce8f"
+      "aimeat/src/services/ai/route-plan.ts": "4cf8662cd968085b"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
