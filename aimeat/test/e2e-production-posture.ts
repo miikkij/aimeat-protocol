@@ -24,6 +24,9 @@
  *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 40479.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-production-posture
  * @version-history
+ *   2026-10-25 — With install role operator, an agent of another account installs nothing (REST,
+ *     upload URL, MCP) and is told the setting and the operator; the operator and the operator's
+ *     agent install as before (secaudit2026oct22 lead 128).
  *   2026-10-25 — With install role operator, the account holder in person removes, switches off and
  *     narrows an extension their agent installed; writing code stays with the install role (secaudit2026oct22).
  *   2026-10-16 — The first account is registered with the one-time setup code from the start log, and a
@@ -39,7 +42,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
-import { makeAgent } from './helpers/mcp-session.js';
+import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 import { SHIPPED_DEFAULT_AGENT_SCOPES } from '../src/config.js';
 
 const PORT = 40479;
@@ -180,31 +183,75 @@ try {
         assert(signed.status === 200, `a signed-in caller was refused: ${signed.status} ${short(signed.body)}`);
     });
 
-    // AIMEAT_EXT_INSTALL_ROLE=operator decides who writes extension code. Whether an agent of an
-    // ordinary account may install under it is the developer's open question, so the install half is
-    // asserted as it stands. The account holder in person manages what is in their account
-    // (secaudit2026oct22, permissions.ts:extInstallRole-owner-branch-only).
+    // AIMEAT_EXT_INSTALL_ROLE=operator decides who writes extension code: only the operator's account,
+    // in person or through its agents (Jouni, 2026-10-25, secaudit2026oct22 lead 128). The account
+    // holder in person manages what is in their account (secaudit2026oct22,
+    // permissions.ts:extInstallRole-owner-branch-only).
+    const extManifest = (name: string) => JSON.stringify({
+        metadata: { name, version: '1.0.0', description: 'posture e2e', author: 'e2e' },
+        actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
+        limits: { timeout_ms: 5000, max_api_calls: 1 },
+    });
+    const extScripts = { echo: 'export default async function(ctx, input){ return { ok: true }; }' };
+    const setInstallRole = (value: string) => json('/v1/admin/config', {
+        method: 'PUT', headers: { Authorization: `Bearer ${operator.token}` },
+        body: JSON.stringify({ changes: [{ path: 'extensions.install_role', value }] }),
+    });
+
+    await test('with install role operator, an agent of another account installs nothing, and the refusal names the setting and the operator', async () => {
+        const member = await registerOwner(BASE, `postmema${STAMP}`);
+        const agent = await makeAgent(BASE, member, ['ext:write', 'ext:invoke']);
+        const asAgent = { Authorization: `Bearer ${agent.token}` };
+        const byAgent = await json('/v1/extensions', { method: 'POST', headers: asAgent, body: JSON.stringify({ manifest: extManifest(`postexta${STAMP}`), scripts: extScripts }) });
+        assert(byAgent.status === 403, `the agent's install: ${byAgent.status} ${short(byAgent.body)}`);
+        const said = String(byAgent.body.error?.message ?? '');
+        assert(said.includes('AIMEAT_EXT_INSTALL_ROLE') && said.includes(operator.name), `the refusal names the setting and the operator: ${said}`);
+        const presigned = await json('/v1/extensions', { method: 'POST', headers: asAgent, body: JSON.stringify({ mode: 'presigned' }) });
+        assert(presigned.status === 403, `no upload URL either: ${presigned.status} ${short(presigned.body)}`);
+
+        const session = await openSession(BASE, agent.token, 'posture-install-role');
+        const viaMcp = await callTool(session, 'aimeat_extension_install', { manifest: extManifest(`postextb${STAMP}`), scripts: extScripts });
+        assert(viaMcp.isError && viaMcp.text.includes('AIMEAT_EXT_INSTALL_ROLE'), `MCP install: ${viaMcp.text.slice(0, 300)}`);
+        const mcpUpload = await callTool(session, 'aimeat_extension_install', {});
+        assert(mcpUpload.isError && mcpUpload.text.includes('AIMEAT_EXT_INSTALL_ROLE'), `MCP upload URL: ${mcpUpload.text.slice(0, 300)}`);
+    });
+
+    await test('with install role operator, the operator and the operator\'s agent install as before', async () => {
+        const own = await json('/v1/extensions', { method: 'POST', headers: { Authorization: `Bearer ${operator.token}` }, body: JSON.stringify({ manifest: extManifest(`postextc${STAMP}`), scripts: extScripts }) });
+        assert(own.status === 201, `the operator in person: ${own.status} ${short(own.body)}`);
+        const opAgent = await makeAgent(BASE, operator, ['ext:write', 'ext:invoke']);
+        const byOpAgent = await json('/v1/extensions', { method: 'POST', headers: { Authorization: `Bearer ${opAgent.token}` }, body: JSON.stringify({ manifest: extManifest(`postextd${STAMP}`), scripts: extScripts }) });
+        assert(byOpAgent.status === 201, `the operator's agent: ${byOpAgent.status} ${short(byOpAgent.body)}`);
+    });
+
     await test('with install role operator, the account holder in person manages an extension their agent installed', async () => {
         const member = await registerOwner(BASE, `postmem${STAMP}`);
         const asMember = { Authorization: `Bearer ${member.token}` };
         const extName = `postext${STAMP}`;
-        const manifest = JSON.stringify({
-            metadata: { name: extName, version: '1.0.0', description: 'posture e2e', author: 'e2e' },
-            actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
-            limits: { timeout_ms: 5000, max_api_calls: 1 },
-        });
-        const scripts = { echo: 'export default async function(ctx, input){ return { ok: true }; }' };
+        const manifest = extManifest(extName);
+        const scripts = extScripts;
         const inPerson = await json('/v1/extensions', { method: 'POST', headers: asMember, body: JSON.stringify({ manifest, scripts }) });
         assert(inPerson.status === 403, `the member in person installs nothing under install role operator: ${inPerson.status} ${short(inPerson.body)}`);
+        assert(String(inPerson.body.error?.message ?? '').includes('AIMEAT_EXT_INSTALL_ROLE'), `the member is told why: ${short(inPerson.body)}`);
 
+        // The extension arrives the way one installed before the operator chose the setting does.
         const agent = await makeAgent(BASE, member, ['ext:write', 'ext:invoke']);
+        const opened = await setInstallRole('owner');
+        assert(opened.status === 200, `install role owner: ${opened.status} ${short(opened.body)}`);
         const byAgent = await json('/v1/extensions', { method: 'POST', headers: { Authorization: `Bearer ${agent.token}` }, body: JSON.stringify({ manifest, scripts }) });
-        assert(byAgent.status === 201, `the agent's install (unchanged): ${byAgent.status} ${short(byAgent.body)}`);
+        const closed = await setInstallRole('operator');
+        assert(byAgent.status === 201, `the agent's install under install role owner: ${byAgent.status} ${short(byAgent.body)}`);
+        assert(closed.status === 200, `install role operator again: ${closed.status} ${short(closed.body)}`);
 
         const script = await json(`/v1/extensions/${extName}/actions/ping`, {
             method: 'PATCH', headers: asMember, body: JSON.stringify({ scriptContent: 'export default async function(ctx, input){ return { ok: 2 }; }' }),
         });
         assert(script.status === 403, `writing code stays with the install role: ${script.status} ${short(script.body)}`);
+        const agentScript = await json(`/v1/extensions/${extName}/actions/ping`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${agent.token}` }, body: JSON.stringify({ scriptContent: 'export default async function(ctx, input){ return { ok: 3 }; }' }),
+        });
+        assert(agentScript.status === 403 && String(agentScript.body.error?.message ?? '').includes('AIMEAT_EXT_INSTALL_ROLE'),
+            `the agent changes no script either, and is told why: ${agentScript.status} ${short(agentScript.body)}`);
 
         const narrow = await json(`/v1/extensions/${extName}/unattended-reader`, { method: 'PATCH', headers: asMember, body: JSON.stringify({ authority: 'installer' }) });
         assert(narrow.status === 200, `the member narrows the unattended reader: ${narrow.status} ${short(narrow.body)}`);

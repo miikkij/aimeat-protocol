@@ -257,7 +257,7 @@ else: not in the script, not in a return value. A buyer gets your action's resul
 **Limits**, all operator-configurable: 64 MB memory, 5000 ms CPU, 500 API calls per action, 256 kB of
 script per action, 20 extensions installed. A manifest may ask for less, never more.
 
-**Who may install:** the role in `AIMEAT_EXT_INSTALL_ROLE` (default `owner`), or a principal holding `ext:write`. An app running under an app
+**Who may install:** `AIMEAT_EXT_INSTALL_ROLE` decides. With the default `owner`, every account holder in person, and an agent holding `ext:write`. With `operator`, only the operator's account writes extension code: the operator in person and the operator's agents holding `ext:write`; another account's agent is refused an install, a redeploy and a script change, and the refusal names the setting and the operator. An app running under an app
 grant cannot: `ext:write` is deliberately outside the grantable scope vocabulary, because an
 extension outlives the grant that created it and can charge money in the owner's name. An app may
 *write* a manifest and hand it over; a human or an authorised agent installs it.

@@ -27,6 +27,9 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-25 — Section 10: with AIMEAT_EXT_INSTALL_ROLE=operator only the operator's account writes
+ *     extension code, its agents included; another account's agent holding ext:write is refused
+ *     (Jouni, 2026-10-25, secaudit2026oct22 lead 128).
  *   2026-10-25 — Section 9: a host field value counts as declared only when the owner in person or a
  *     secrets:manage principal set it (secaudit2026oct22).
  *   2026-10-24 — The ctx rules: a binary answer is read with `responseType: 'base64'` (jussil riistakartta).
@@ -296,7 +299,13 @@ Every action can carry two values, and they do different jobs:
 
 ## 10. Who may install
 
-The role in \`AIMEAT_EXT_INSTALL_ROLE\` (default \`owner\`), or a principal holding \`ext:write\`. An app
+\`AIMEAT_EXT_INSTALL_ROLE\` decides. With the default \`owner\`, every account holder installs in
+person, and an agent installs when it holds \`ext:write\`. With \`operator\`, only the operator's account
+writes extension code: the operator in person, and the operator's agents holding \`ext:write\`. Then
+another account, in person or through its agents, can neither install nor redeploy nor change an
+action script; the refusal names the setting and the operator, so tell the person to ask the
+operator (support@operators) to install it. They still switch off, configure and remove the
+extensions in their own account. An app
 under an app grant cannot: \`ext:write\` is outside the grantable scopes, because an extension is
 persistent code that outlives the grant and can charge in the owner's name. An app may write a
 manifest and hand it over; the person or an authorised agent installs it. The node caps code at

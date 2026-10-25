@@ -6,6 +6,8 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — An install, redeploy or script change the install role refuses says so, naming the
+ *     setting and the operator (installRoleRefusal; secaudit2026oct22 lead 128).
  *   2026-10-25 — GET :name answers installedByPrincipal again, the same writer GET :name/versions
  *     names: who wrote the code, including which agent, is public provenance (Jouni, 2026-10-25,
  *     secaudit2026oct22 lead 98). This undoes the v1.10.0 hiding.
@@ -66,7 +68,7 @@ import {
 } from '../../services/component-versions.js';
 import { buildExtensionRecordFromManifest, NODE_OWNED_CONFIG_KEYS } from '../../services/extension-manifest.js';
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
-import { hasExtWritePermission, mayManageInstalledExt } from './permissions.js';
+import { hasExtWritePermission, mayManageInstalledExt, extWriteRefusalText, codeWriteRefusalText } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
@@ -133,8 +135,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const isOperator = await isOperatorCaller(storage, req.auth);
 
       if (!(await hasExtWritePermission(req, config, storage))) {
-        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
-          'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', await extWriteRefusalText(req, config, storage)));
         return;
       }
 
@@ -244,12 +245,11 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // Permission: create mirrors POST (ext:write / install role); update requires ownership.
       if (!existing) {
         if (!(await hasExtWritePermission(req, config, storage))) {
-          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
-            'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
+          res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', await extWriteRefusalText(req, config, storage)));
           return;
         }
       } else if (!(await mayManageInstalledExt(req, config, storage, existing.installedBy, { action: 'update', subject: name, writesCode: true }))) {
-        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', await codeWriteRefusalText(req, config, storage, existing.installedBy)));
         return;
       }
       const isOperator = await isOperatorCaller(storage, req.auth);
@@ -452,7 +452,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // Allow operator always; the original owner (or one of their agents
       // carrying ext:write) only on their own installed extensions.
       if (!(await mayManageInstalledExt(req, config, storage, ext.installedBy, { action: 'update-script', subject: name }))) {
-        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', await codeWriteRefusalText(req, config, storage, ext.installedBy)));
         return;
       }
       // An action script is code; on an extension a managed package install owns it comes from the
