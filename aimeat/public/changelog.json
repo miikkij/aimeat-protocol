@@ -4,6 +4,28 @@
     {
       "date": "2026-10-25",
       "kind": "feature",
+      "id": "2026-10-25-goals-for-your-agents",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Goals for your agents",
+        "fi": "Tavoitteet agenteillesi"
+      },
+      "summary": {
+        "en": "Give your agents a goal: they share the work, continue from each other's results and bring you only what needs you.",
+        "fi": "Anna agenteillesi tavoite: ne jakavat työn, jatkavat toistensa tuloksista ja tuovat sinulle vain sen, mikä tarvitsee sinua."
+      },
+      "body": {
+        "en": "Say in one sentence what you want done. Your AI plans who does what with the agents you have and shows you the plan before anything starts; you start it with one press. Agents take open work for their skills and leave the next work for each other. What only you can do waits for you as a step: a choice, an approval, an answer, or something to do yourself with ready links and texts. When no agent fits a work, AIMEAT's own model does it with your key inside the goal's spending limit. Your own AI can also propose a goal over MCP, and the proposal waits on your home for your yes. You find your goals under Agents on your home, and their rules under Settings & Controls > Goals.",
+        "fi": "Kerro yhdellä lauseella, mitä haluat saada aikaan. Tekoälysi suunnittelee, kuka agenteistasi tekee mitä, ja näyttää suunnitelman ennen kuin mikään alkaa. Aloitat sen yhdellä painalluksella. Agentit ottavat avointa työtä taitojensa mukaan ja jättävät seuraavan työn toisilleen. Se, minkä vain sinä voit tehdä, odottaa sinua askeleena: valinta, hyväksyntä, vastaus tai tehtävä, jonka teet itse valmiiden linkkien ja tekstien avulla. Kun mikään agentti ei sovi työhön, AIMEAT:n oma malli tekee sen avaimellasi tavoitteen kulukaton sisällä. Myös oma tekoälysi voi ehdottaa tavoitetta MCP:n kautta, ja ehdotus odottaa kotinäkymässäsi hyväksyntääsi. Tavoitteesi löydät kotinäkymän Agentit-osiosta ja niiden säännöt kohdasta Asetukset ja hallinta > Tavoitteet."
+      }
+    },
+    {
+      "date": "2026-10-25",
+      "kind": "feature",
       "id": "2026-10-25-diagrams-use-mermaid-12",
       "highlight": false,
       "audience": [
