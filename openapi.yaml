@@ -4456,6 +4456,17 @@ components:
             `<label>--draft.<apex>` answer 302 there (404 when the node has no app origin). Null: a
             mapping from before this field that the node could not classify at start, served as
             before until the operator sets it (the Security page names each one).
+        heldSince:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            When the app this label served went away (a package removal or an app deletion). The
+            label is then held for that app's owner: no other owner's app gets it, and the owner gets
+            it back by publishing the same app again. The daily core job held-label-release releases it
+            after `apps.held_label_days` (default 90; 0 holds it until released), and an owner keeps at
+            most `apps.held_labels_per_owner` held labels (default 20; the one held longest goes
+            first). DELETE on the mapping releases it at once. Null while the app is there.
 
     CrewDef:
       type: object

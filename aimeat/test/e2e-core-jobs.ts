@@ -45,6 +45,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --import tsx test/e2e-core-jobs.ts
  * @version-history
+ *   2026-10-25 -- core:held-label-release is seeded and fires (app-label-recycled-after-delete).
  *   2026-10-25 -- core:mcp-client-cleanup is seeded, fires, and keeps a registration made today
  *     (secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-16 -- The node follows the run's backend: a database of its own beside the run's on
@@ -311,7 +312,7 @@ async function run(): Promise<void> {
             'core:execution-log-prune', 'core:consent-audit-prune', 'core:classification-audit-prune', 'core:invitation-expiry',
             'core:mailbox-cleanup', 'core:consent-expiry', 'core:nonce-cleanup',
             'core:designbook-aging', 'core:capability-aggregation', 'core:dispute-timeout',
-            'core:mcp-onboarding-rescue', 'core:inactivity-nudge', 'core:mcp-client-cleanup',
+            'core:mcp-onboarding-rescue', 'core:inactivity-nudge', 'core:mcp-client-cleanup', 'core:held-label-release',
         ];
         // The node seeds its jobs after it starts answering (background-jobs.ts does not await it), so
         // the list is read until the seeding is done. On PostgreSQL it ends seconds after the first
@@ -649,6 +650,11 @@ async function run(): Promise<void> {
         assert(before >= 1, `the registration must be stored, got ${before}`);
         await fire('core:mcp-client-cleanup');
         assert(await clientRows() === before, `a registration made today was deleted: ${before} → ${await clientRows()}`);
+    });
+
+    await test('the held app address sweep runs (secaudit2026oct22)', async () => {
+        // What it releases and when is the unit test storage-conformance-lifecycle.test.ts, on both providers.
+        await fire('core:held-label-release');
     });
 
     // ── Phase 6 ───────────────────────────────────────────────────────────────

@@ -858,6 +858,13 @@
       "refuseRestrictedWhy": "It cannot sit at its own web address. Serve it from the main site instead.",
       "deleteLead": "The address stops answering at once. The app itself stays published and is still reachable from the main site.",
       "deleteAppNote": "An app that is opened again is given an address of its own automatically, so deleting is not how you keep one off the web. Turning it off is.",
+      "markHeld": "held",
+      "heldSub": "The app is gone. Held for its owner since {date}, so no other owner's app gets this address.",
+      "filterHeld": "held",
+      "release": "Release",
+      "releaseTitle": "Release this address?",
+      "releaseLead": "This address is held because the app it served was removed. Its visitors may still have data saved in their browsers for this address. After you release it, the next app published with the same file name, also by another owner, can get this address and read that data.",
+      "releaseHint": "The owner gets the address back by publishing the same app again only while it is held.",
       "deleteTypeLabel": "Type the name to confirm",
       "deleteHint": "Anyone who linked to this address gets nothing after this.",
       "emptyTitle": "No addresses yet",
@@ -13353,6 +13360,8 @@
     "delete": "Delete",
     "themes": "Themes & Styles",
     "cfgDesc_apps_audit_keep_default": "How many of the newest entries each app's audit log keeps when its owner has set no limit. 0 keeps all and moves old ones to a yearly archive; any other number deletes the older entries",
+    "cfgDesc_apps_held_label_days": "Days a removed app's own address stays held for its owner, so no other owner's app is served where its visitors' browser data is. 0 holds it until you release it on the Subdomains page.",
+    "cfgDesc_apps_held_labels_per_owner": "The most held addresses of removed apps one owner keeps. Past it, the one held longest is released first. 0 means no limit.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Lifetime in seconds of the token an agent with its own key pair receives. When it runs out, the agent signs a new request and gets another",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "How long, in seconds, an offer to add or move agents stays usable after the owner presses the button. The connector must answer within this time, and the offer works once",
     "cfgDesc_auth_app_origin_sign_in_refuse": "Refuse sign-in and account creation from an app, so that an app never holds a person's own session. Off: each such attempt is written to the log and allowed. Turn it on when the log shows none.",
@@ -13409,6 +13418,8 @@
     "cfgDesc_decide_laya_key_configured": "Whether the bearer key of the built-in laya decision model is set. Read-only; the value itself is never shown.",
     "cfgDesc_decide_von_key_configured": "Whether the bearer key of the built-in von decision model is set. Read-only; the value itself is never shown.",
     "cfg_apps_audit_keep_default": "App audit log length",
+    "cfg_apps_held_label_days": "Removed app's address held (days)",
+    "cfg_apps_held_labels_per_owner": "Held addresses per owner",
     "cfg_auth_agent_v2_token_ttl_seconds": "Agent token lifetime (s)",
     "cfg_auth_app_origin_sign_in_refuse": "Refuse sign-in from an app",
     "cfg_auth_agent_enrolment_grant_ttl_seconds": "Agent enrolment offer lifetime (s)",
@@ -26291,6 +26302,26 @@
       }
     },
     "config": {
+      "apps": {
+        "held_label_days": {
+          "title": "Removed app's address held (days)",
+          "short": "How many days the own address of a removed app stays held for its owner. 0 holds it until you release it. The default is 90.",
+          "what": "Each app gets an address of its own, such as notes.apps.example.com. What the app's visitors saved in their browsers (the app's own data, a stored sign-in) belongs to that address. When the app is removed, by its owner or with its package, the address is held for the same owner: no other owner's app gets it, and the owner gets it back by publishing the same app again. A cleanup each day at 05:41 releases a held address after this many days; after that, the next app with the same file name can get it.",
+          "range": "A whole number of days, 0 or more. The default is 90. 0 holds it until you release it on the Subdomains page.",
+          "low": "Lower: an address is free for others sooner, and data the old app's visitors saved can be read by another owner's app sooner.",
+          "high": "Higher: the owner has longer to bring the app back, and the address stays unused longer.",
+          "tip": "Keep a few months. Browsers keep saved data until the visitor clears it, so a short hold protects little."
+        },
+        "held_labels_per_owner": {
+          "title": "Held addresses per owner",
+          "short": "The most held addresses of removed apps one owner keeps. 0 means no limit. The default is 20.",
+          "what": "Without a limit, one owner could take many addresses by publishing and removing apps. The daily cleanup keeps each owner to this number of held addresses and releases the one held longest first. An address of an app that is there is never counted.",
+          "range": "A whole number, 0 or more. The default is 20. 0 means no limit.",
+          "low": "Lower: fewer addresses are held for each owner, and old ones go sooner.",
+          "high": "Higher: an owner who removes many apps keeps all their addresses for the full hold.",
+          "tip": "20 covers an owner who tidies up a catalogue. Lower it if you see one owner hold many addresses on the Subdomains page."
+        }
+      },
       "email": {
         "company_smtp_private_hosts": {
           "title": "Companies' mail servers on a private network",

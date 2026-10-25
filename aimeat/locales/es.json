@@ -81,7 +81,14 @@
       "targetHintApp": "dueño/archivo.html",
       "targetHintRedirect": "https://ejemplo.com/ruta",
       "delete": "Eliminar",
-      "deleteTitle": "¿Eliminar esta dirección?"
+      "deleteTitle": "¿Eliminar esta dirección?",
+      "markHeld": "reservada",
+      "heldSub": "La aplicación ya no está. Reservada para su propietario desde el {date}, así que ninguna aplicación de otro propietario recibe esta dirección.",
+      "filterHeld": "reservadas",
+      "release": "Liberar",
+      "releaseTitle": "¿Liberar esta dirección?",
+      "releaseLead": "Esta dirección está reservada porque se quitó la aplicación que servía. Sus visitantes pueden tener todavía datos guardados en su navegador para esta dirección. Cuando la liberas, la siguiente aplicación publicada con el mismo nombre de archivo, también de otro propietario, puede recibir esta dirección y leer esos datos.",
+      "releaseHint": "El propietario recupera la dirección publicando de nuevo la misma aplicación solo mientras está reservada."
     },
     "apps": {
       "title": "Aplicaciones",
@@ -11611,6 +11618,8 @@
     "delete": "Eliminar",
     "themes": "Temas y estilos",
     "cfgDesc_apps_audit_keep_default": "Cuántas entradas recientes guarda el registro de auditoría de cada aplicación cuando su propietario no fijó un límite. 0 las guarda todas y pasa las viejas al archivo del año; cualquier otro número borra las más antiguas.",
+    "cfgDesc_apps_held_label_days": "Días que la dirección propia de una aplicación quitada sigue reservada para su propietario, para que ninguna aplicación de otro propietario se sirva donde están los datos de navegador de sus visitantes. 0 la reserva hasta que la liberes en la página de subdominios.",
+    "cfgDesc_apps_held_labels_per_owner": "Cuántas direcciones reservadas de aplicaciones quitadas puede tener un propietario. Al pasarlo, se libera primero la que lleva más tiempo reservada. 0 significa sin límite.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Vida en segundos del token que recibe un agente con su propio par de claves. Cuando vence, el agente firma una nueva solicitud y recibe otro.",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "Cuántos segundos sigue siendo válida una oferta para agregar o mover agentes después de que el propietario presiona el botón. El conector tiene que responder dentro de ese tiempo, y la oferta sirve una sola vez.",
     "cfgDesc_auth_app_origin_sign_in_refuse": "Impide iniciar sesión y crear cuentas desde una aplicación, para que una aplicación nunca tenga la sesión propia de una persona. Desactivado: cada intento se anota en el registro y se permite. Actívalo cuando el registro ya no muestre ninguno.",
@@ -11667,6 +11676,8 @@
     "cfgDesc_decide_laya_key_configured": "Si la clave bearer del modelo de decisión laya incorporado está configurada. Solo lectura; el valor nunca se muestra.",
     "cfgDesc_decide_von_key_configured": "Si la clave bearer del modelo de decisión von incorporado está configurada. Solo lectura; el valor nunca se muestra.",
     "cfg_apps_audit_keep_default": "Largo del registro de auditoría de una aplicación",
+    "cfg_apps_held_label_days": "Dirección de una aplicación quitada reservada (días)",
+    "cfg_apps_held_labels_per_owner": "Direcciones reservadas por propietario",
     "cfg_auth_agent_v2_token_ttl_seconds": "Vida del token del agente (s)",
     "cfg_auth_app_origin_sign_in_refuse": "Impedir iniciar sesión desde una aplicación",
     "cfg_auth_agent_enrolment_grant_ttl_seconds": "Vigencia de la oferta para agregar agentes (s)",
@@ -24021,6 +24032,26 @@
       }
     },
     "config": {
+      "apps": {
+        "held_label_days": {
+          "title": "Dirección de una aplicación quitada reservada (días)",
+          "short": "Cuántos días sigue reservada para su propietario la dirección propia de una aplicación quitada. 0 la reserva hasta que la liberes. El valor por defecto es 90.",
+          "what": "Cada aplicación tiene una dirección propia, como notes.apps.example.com. Lo que sus visitantes guardaron en el navegador (los datos de la aplicación, un inicio de sesión guardado) pertenece a esa dirección. Cuando se quita la aplicación, por su propietario o con su paquete, la dirección queda reservada para ese mismo propietario: ninguna aplicación de otro propietario la recibe, y el propietario la recupera publicando de nuevo la misma aplicación. Una limpieza diaria a las 05:41 libera la dirección reservada pasados estos días; después, la siguiente aplicación con el mismo nombre de archivo puede recibirla.",
+          "range": "Un número entero de días, 0 o más. El valor por defecto es 90. 0 la reserva hasta que la liberes en la página de subdominios.",
+          "low": "Menor: la dirección queda libre antes para otros, y la aplicación de otro propietario puede leer antes lo que guardaron los visitantes de la anterior.",
+          "high": "Mayor: el propietario tiene más tiempo para traer de vuelta la aplicación, y la dirección queda sin uso más tiempo.",
+          "tip": "Deja unos meses. El navegador guarda los datos hasta que el visitante los borra, así que una reserva corta protege poco."
+        },
+        "held_labels_per_owner": {
+          "title": "Direcciones reservadas por propietario",
+          "short": "Cuántas direcciones reservadas de aplicaciones quitadas puede tener un propietario. 0 significa sin límite. El valor por defecto es 20.",
+          "what": "Sin límite, un propietario podría quedarse con muchas direcciones publicando y quitando aplicaciones. La limpieza diaria deja a cada propietario con este número de direcciones reservadas y libera primero la que lleva más tiempo reservada. La dirección de una aplicación que existe no se cuenta nunca.",
+          "range": "Un número entero, 0 o más. El valor por defecto es 20. 0 significa sin límite.",
+          "low": "Menor: se reservan menos direcciones para cada propietario, y las viejas se liberan antes.",
+          "high": "Mayor: un propietario que quita muchas aplicaciones conserva todas sus direcciones durante toda la reserva.",
+          "tip": "20 basta para un propietario que ordena su catálogo. Bájalo si ves en la página de subdominios a un propietario con muchas direcciones."
+        }
+      },
       "email": {
         "company_smtp_private_hosts": {
           "title": "Servidores de correo de empresas en una red privada",

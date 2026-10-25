@@ -9,6 +9,8 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   v1.3.0 — 2026-10-25 — apps.held_label_days and apps.held_labels_per_owner (secaudit2026oct22,
+ *     app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — email.company_smtp_private_hosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — auth.device_authorize_email_limit and auth.device_authorize_email_max
  *     (secaudit2026oct22, device-authorize-email-owner-oracle).
@@ -32,4 +34,10 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'companySmtpPrivateHosts', dotPath: 'email.company_smtp_private_hosts', envVar: 'AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS', type: 'object', list: true,
     validate: v => Array.isArray(v) && v.every(s => typeof s === 'string' && s.trim() !== '' && !s.includes(',') && s.length <= 253), immutable: false,
     description: 'Mail servers on a private network that a company may send through: host names, addresses or networks (10.0.5.0/24), one per line (comma separated in the environment). Any other private address is refused. Empty: public mail servers only, and loopback on a local node' },
+  { key: 'appHeldLabelDays', dotPath: 'apps.held_label_days', envVar: 'AIMEAT_APP_HELD_LABEL_DAYS', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'Days a removed app\'s own address stays held for its owner, so no other owner\'s app is served where its visitors\' browser data is. Then the daily job releases it. 0 holds it until you release it on the Subdomains page',
+    range: '0-3650 (0 = until released)' },
+  { key: 'appHeldLabelsPerOwner', dotPath: 'apps.held_labels_per_owner', envVar: 'AIMEAT_APP_HELD_LABELS_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most held addresses of removed apps one owner keeps; past it the one held longest is released first. 0 = no limit',
+    range: '0-10000 (0 = no limit)' },
 ];

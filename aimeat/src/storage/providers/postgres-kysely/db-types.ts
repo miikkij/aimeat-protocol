@@ -2199,6 +2199,8 @@ export interface SubdomainSite {
   kind: string;
   /** 'operator' | 'publisher'; null until classified (migration 0116). */
   origin: string | null;
+  /** ISO time the app this label served went away; null while it is there (migration 0117). */
+  heldSince: string | null;
   subdomain: string;
   target: string;
   updatedAt: Generated<Timestamp>;
