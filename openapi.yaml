@@ -14056,7 +14056,13 @@ paths:
       summary: Rotate agent keys
       description: |
         Generate a new Ed25519 keypair for the agent. The old public key is
-        replaced and all previously issued JWTs are invalidated.
+        replaced and every credential issued to the agent before the rotation stops:
+        its session tokens, its connect tunnel, its open MCP sessions, and its MCP OAuth
+        grant. The MCP OAuth access tokens are refused from now on (the agent's
+        credentials-valid-after time), and its MCP OAuth refresh tokens are deleted, so each
+        AI connected as this agent (Claude, ChatGPT, Claude Code and others) asks the owner to
+        approve the connection once more the next time it connects. The answer says so in
+        `note`, with `mcp_reconsent: true` and the number of ended refresh tokens.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -14089,6 +14095,15 @@ paths:
                             description: New Ed25519 private key (hex). Store securely.
                           public_key:
                             type: string
+                          mcp_reconsent:
+                            type: boolean
+                            description: Always true. Each AI connected as this agent over MCP asks the owner to approve it once more.
+                          mcp_refresh_tokens_ended:
+                            type: integer
+                            description: How many MCP OAuth refresh tokens of the agent were deleted.
+                          note:
+                            type: string
+                            description: What happened and what the owner sees next, in plain words.
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':

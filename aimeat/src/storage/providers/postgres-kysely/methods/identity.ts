@@ -7,6 +7,8 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-25 — credentialsValidAfter on read (migration 0117); updateAgent passes it through
+ *     (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party made TO the
  *     agent end with it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
  *   2026-10-18 — setAgentScopesIf: one UPDATE conditional on the scope list that was read (check:atomic-writes, boot migrations).
@@ -91,6 +93,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     ...(r.stoppedAt ? { stoppedAt: r.stoppedAt, stoppedBy: r.stoppedBy ?? null } : {}),
     ...(r.clearance ? { clearance: r.clearance } : {}),
     ...(floorListOf(r.taskStartFloor) ? { taskStartFloor: floorListOf(r.taskStartFloor) } : {}),
+    ...(r.credentialsValidAfter ? { credentialsValidAfter: r.credentialsValidAfter } : {}),
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };

@@ -27,6 +27,8 @@
  * @structure agentGone(storage, verified) → boolean
  * @usage if (await agentGone(sessionStorage(), verified)) return true;
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A credential issued before the agent's credentialsValidAfter (set by a key
+ *     rotation) counts as gone too (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.0.0 — 2026-10-20 — Initial. The agent question in auth/middleware.ts credentialRevoked, in
  *     its own file because that one is at the 800-line ceiling.
  */
@@ -60,5 +62,11 @@ export async function agentGone(storage: Storage | null, verified: VerifiedToken
   if (parseGaiiLoose(verified.sub).agent === '') return false;
   const agent = await storage.getAgent(verified.sub);
   if (!agent) return true;
-  return madeAfter(agent.createdAt, tokenIssuedAt(verified));
+  const issued = tokenIssuedAt(verified);
+  if (madeAfter(agent.createdAt, issued)) return true;
+  // A key rotation ends every credential issued before it, the MCP OAuth access token among them,
+  // which carries no session row (routes/agents/rekey.ts; secaudit2026oct22,
+  // mcp-oauth:rekey-leaves-oauth-grant-live). Compared like createdAt: a time that cannot be read
+  // answers no.
+  return madeAfter(agent.credentialsValidAfter, issued);
 }

@@ -26,6 +26,10 @@
  *   (secaudit 2026-10, mcp-oauth:access-token-without-session-survives-agent-delete).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-token-revocation
  * @version-history
+ *   v1.4.0 — 2026-10-25 — A key rotation ends the MCP OAuth grant: the old bearer opens no new session
+ *     (and the open one answers 401, not 404), the refresh grant mints nothing, the answer says the
+ *     connected AIs ask for approval once more, and one new consent works (secaudit2026oct22,
+ *     mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.3.0 — 2026-10-20 — The MCP OAuth credential: the open session, a fresh initialize and the
  *     refresh grant all die with the agent; a key rotation cuts the open session; a second agent's
  *     session is untouched by either.
@@ -295,19 +299,59 @@ async function run() {
     // session rows for that — which again reaches nothing of an MCP OAuth token. The open transport
     // is now cut with the connect tunnel, so the client re-initializes instead of carrying on over a
     // socket whose bearer this node verified once, at the handshake.
+    let rotateCred: Awaited<ReturnType<typeof mcpOauthCredential>>;
+    let rekeyAnswer: any = null;
     await test('rotating an agent\'s key cuts its open MCP session', async () => {
         const cred = await mcpOauthCredential(o.ownerToken, mcpRotate.gaii);
+        rotateCred = cred;
         const session = await openMcpSession(cred.accessToken, 'mcprotate');
         const rekey = await json(`/v1/agents/${encodeURIComponent(mcpRotate.gaii)}/rekey`, {
             method: 'POST', headers: auth, body: '{}',
         });
         assert(rekey.status === 200, `rekey ${rekey.status}: ${JSON.stringify(rekey.body?.error)}`);
+        rekeyAnswer = rekey.body?.data;
         const r = await mcpCall(cred.accessToken, 'tools/call', { name: 'aimeat_memory_list', arguments: {} }, session);
-        assert(r.status === 404, `the rotated agent's open MCP session must be gone, got ${r.status}: ${JSON.stringify(r.body)}`);
+        // 401 since 2026-10-25: the bearer itself is refused before the session is looked up, because
+        // the rotation ends the MCP OAuth access token too (it answered 404, session gone, before).
+        assert(r.status === 401, `the rotated agent's open MCP session must be refused, got ${r.status}: ${JSON.stringify(r.body)}`);
         // And the agent standing next to it still holds its own session.
         const keeper = await mcpCall(keeperCred.accessToken, 'tools/call',
             { name: 'aimeat_memory_list', arguments: {} }, keeperSession);
         assert(keeper.status === 200, `a rekey must not touch another agent's MCP session, got ${keeper.status}`);
+    });
+
+    // The rotation is the owner's "my credentials may have leaked" act, so it ends the MCP OAuth grant
+    // itself: the access token minted before it opens no new session, and the refresh token is gone
+    // (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
+    await test('after a rekey the old MCP OAuth bearer cannot open a new session', async () => {
+        const r = await mcpCall(rotateCred.accessToken, 'initialize', {
+            protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'mcprotate-again', version: '1.0.0' },
+        });
+        assert(r.status === 401, `the bearer minted before the rekey must be refused, got ${r.status}: ${JSON.stringify(r.body)}`);
+    });
+
+    await test('after a rekey the refresh grant mints nothing', async () => {
+        const r = await json('/v1/mcp/token', {
+            method: 'POST',
+            body: JSON.stringify({
+                grant_type: 'refresh_token', refresh_token: rotateCred.refreshToken,
+                client_id: rotateCred.clientId, client_secret: rotateCred.clientSecret,
+            }),
+        });
+        assert(r.status === 400 && r.body.error === 'invalid_grant', `expected 400 invalid_grant, got ${r.status}: ${JSON.stringify(r.body)}`);
+    });
+
+    await test('the rekey answer tells the owner the connected AIs ask for consent once more', async () => {
+        assert(rekeyAnswer?.mcp_reconsent === true, `expected mcp_reconsent true, got ${JSON.stringify(rekeyAnswer)}`);
+        assert(rekeyAnswer?.mcp_refresh_tokens_ended === 1, `expected one ended refresh token, got ${JSON.stringify(rekeyAnswer)}`);
+        assert(/approve/i.test(String(rekeyAnswer?.note)), `the note must say the AIs ask for approval again, got ${JSON.stringify(rekeyAnswer?.note)}`);
+    });
+
+    await test('one new consent after the rekey connects the AI again', async () => {
+        const cred = await mcpOauthCredential(o.ownerToken, mcpRotate.gaii);
+        const session = await openMcpSession(cred.accessToken, 'mcprotate-reconsent');
+        const r = await mcpCall(cred.accessToken, 'tools/call', { name: 'aimeat_memory_list', arguments: {} }, session);
+        assert(r.status === 200 && r.body?.result?.isError !== true, `the new consent must work, got ${r.status}: ${JSON.stringify(r.body)}`);
     });
 
     // AUTH-11. The renewal checks the signature and its five-minute window; without spending it, the
