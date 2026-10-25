@@ -15,7 +15,8 @@
  * @version-history
  *   2026-10-25 — aimeat_admin_config answers the list GET /v1/admin/config answers (services/config-admin-view.ts),
  *     narrowed by `section` and `q`, in place of a flat twelve fields; the sealed settings are in it. New
- *     tool aimeat_admin_config_set changes settings through changeNodeSettings, PUT's function.
+ *     tool aimeat_admin_config_set changes settings through changeNodeSettings, PUT's function, as the
+ *     session's caller (core.ts passes it; register-all.ts builds it).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-19 — aimeat_admin_agents carries each agent's `avatar` (services/agent-avatar.ts), one batched read, as GET /v1/admin/agents does.
@@ -49,6 +50,7 @@ import { annotationsFor } from './annotations.js';
 import { hasSealedKeys, sealedView } from '../services/config-sealing.js';
 import { buildConfigView, changeNodeSettings } from '../services/config-admin-view.js';
 import { provenanceOf } from '../services/config-provenance.js';
+import type { CallerContext } from '../services/caller-context.js';
 import { toolError } from './tool-error.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintMorsels, morselsInCirculation } from '../services/morsel.js';
@@ -68,6 +70,8 @@ export function registerCoreAdminTools(
     _emitResourceListChanged: (agentGaii: string) => void,
     /** This session's granted scopes: the operator words are asked of them at call time. */
     scopes: readonly string[] = [],
+    /** The session's caller (register-all.ts), for the checks aimeat_admin_config_set shares with PUT. */
+    caller?: () => CallerContext,
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -197,12 +201,10 @@ export function registerCoreAdminTools(
             annotations: annotationsFor('aimeat_admin_config_set'),
         },
         async ({ changes }) => {
-            const name = await resolveOperatorAgentName(storage, agentGaii, scopes);
-            if (name === null) return notOperator;
+            if (!caller || !(await isOperator())) return notOperator;
             // PUT /v1/admin/config's function: sealed paths and the classification switch are refused
             // before anything is applied, and the change is written to the operator trail.
-            const r = await changeNodeSettings({ config, storage, provenance: provenanceOf(config) },
-                { sub: agentGaii, owner: name, roles: ['agent'], scopes: [...scopes] }, changes);
+            const r = await changeNodeSettings({ config, storage, provenance: provenanceOf(config) }, caller().auth, changes);
             if (!r.ok) return toolError(r.code, `${r.message}${r.details ? ` ${JSON.stringify(r.details)}` : ''}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ applied: r.applied, errors: r.errors, note: r.note }, null, 2) }] };
         },
