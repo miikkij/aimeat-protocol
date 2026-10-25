@@ -7,6 +7,9 @@
  *   recommended-agent matching, organism-name resolution). Extracted from ecosystem-tab.js to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-10-25 — areaSentence, initialTicks, chosenAreas: a waiting request's data areas in
+ *     plain words, ticked by default, and the ticked ones as the approve body's data_areas
+ *     (secaudit2026oct22, lead 2378).
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
  *   v1.1.0 — 2026-08-08 — Dropped knowledge:contribute and events:subscribe from the standard
  *     preset: nothing in src/ gates on either, so they were consent-screen text granting nothing.
@@ -123,4 +126,35 @@ export function resolveOrganismName(organism, orgs) {
   if (!organism) return '';
   const match = (orgs || []).find(o => o.id === organism || o.name === organism);
   return (match && (match.name || match.id)) || organism;
+}
+
+// ── A waiting request's data areas (ecosystem-tab.pending.js) ──────────────────────────────────
+const KNOWN_AREAS = ['memory', 'storage', 'knowledge', 'organisms'];
+
+/**
+ * One data area in plain words: what may be done, to what, and which of them.
+ * @param {{ area?: string, pattern?: string, rights?: string[] }} area
+ * @param {(key: string, vars?: Record<string, string>) => string} tr - the page's translate
+ */
+export function areaSentence(area, tr) {
+  const rights = Array.isArray(area?.rights) ? area.rights : [];
+  const r = rights.includes('read') && rights.includes('write') ? 'readWrite' : rights.includes('write') ? 'write' : 'read';
+  const name = KNOWN_AREAS.includes(String(area?.area))
+    ? tr(`profile.ecosystem.areaName.${area.area}`)
+    : tr('profile.ecosystem.areaName.other', { area: String(area?.area ?? '') });
+  const pattern = String(area?.pattern ?? '*');
+  const which = pattern === '*' ? tr('profile.ecosystem.areaAll') : tr('profile.ecosystem.areaPattern', { pattern });
+  return tr('profile.ecosystem.areaLine', { rights: tr(`profile.ecosystem.areaRights.${r}`), what: name, which });
+}
+
+/** Every requested area ticked: the app's own request is the default, as the API's is. */
+export function initialTicks(request) {
+  return (request?.requested_data_areas || []).map(() => true);
+}
+
+/** The areas the owner kept ticked, as the approve body's `data_areas`. Always an array. */
+export function chosenAreas(request, ticks) {
+  const areas = request?.requested_data_areas || [];
+  const on = Array.isArray(ticks) ? ticks : initialTicks(request);
+  return areas.filter((_, i) => on[i] !== false);
 }

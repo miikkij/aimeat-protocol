@@ -10,6 +10,7 @@
  * @structure EcosystemTab(default) — loadData, pending poll, connect panel, app cards, revoke modal
  * @usage Registered as a TABS entry in views/profile.js (id 'ecosystem').
  * @version-history
+ *   v3.23.0 -- 2026-10-25 -- A waiting request lists the data areas the app asked for, each with a tick, and the approval sends data_areas from the ticks; a reconnect and a key change are marked, with both key fingerprints (ecosystem-tab.pending.js; secaudit2026oct22, leads 2378 and 2415).
  *   v3.22.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the head is the SettingsPage (the count the tally Mark), the waiting requests the small attention note with a List (the grant level a Select that keeps its choice), the apps the List whose row opens its panel (a revoked app faded, main's .pf-eco-card-revoked), each part of the panel the heavy-ruled Split under its Sub-heading, the written data the Folds, the revoke dialog the Action, Loud and TextField. The empty part the panel drew between "ask in Claude" and the data (a bare heavy rule) goes. It writes no class.
  *   v3.21.0 -- 2026-09-26 -- A small heading over a group of fields, a card or a note is the Sub-heading (.sub-heading: small ink headline letters); the coral small capitals, the bold ink words and the coral headline letters go (a unification: Jouni's decision "Sub-heading").
  *   v3.20.0 -- 2026-09-26 -- A framed box is the Object box (.poster-box), the one that stands out (an opened row, the way to take first) its raised tone; a page rule keeps only its place (a unification: Jouni's decision "Box").
@@ -152,7 +153,8 @@ import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
 import { LoadingLine } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
-import { ECO_PRESETS } from './ecosystem-tab.helpers.js';
+import { ECO_PRESETS, initialTicks, chosenAreas } from './ecosystem-tab.helpers.js';
+import { EcoPendingAccess } from './ecosystem-tab.pending.js';
 import { EcoAutomationSection, EcoSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
 import { swallowed } from '/js/swallowed.js';
@@ -180,6 +182,7 @@ export default function EcosystemTab({ onStats, showToast }) {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);     // expanded geai
   const [presetByCode, setPresetByCode] = useState({}); // userCode → preset
+  const [ticksByCode, setTicksByCode] = useState({});   // userCode → one tick per requested data area
   const [revokeApp, setRevokeApp] = useState(null);   // app pending typed-name revoke
   const [revokeInput, setRevokeInput] = useState('');
   const [subForm, setSubForm] = useState({});         // app → { event }
@@ -244,8 +247,10 @@ export default function EcosystemTab({ onStats, showToast }) {
 
   async function onApprove(userCode) {
     const preset = presetByCode[userCode] || 'standard';
+    const request = pending.find(r => r.user_code === userCode);
     try {
-      await approve(userCode, { action: 'approve', scopes: ECO_PRESETS[preset] });
+      // data_areas from the owner's ticks, always as a list: a body without one grants the app's own.
+      await approve(userCode, { action: 'approve', scopes: ECO_PRESETS[preset], data_areas: chosenAreas(request, ticksByCode[userCode]) });
       showToast?.(t('profile.ecosystem.approved'), 'success');
       await loadData();
     } catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.approveError'), 'error'); }
@@ -309,6 +314,8 @@ export default function EcosystemTab({ onStats, showToast }) {
                       <//>`}
                     <${Note} kind="meta" inline>${t('profile.ecosystem.expiresIn', { n: Math.max(0, Math.round((r.expires_in || 0) / 60)) })}<//>
                   <//>
+                  <${EcoPendingAccess} request=${r} ticks=${ticksByCode[r.user_code]}
+                    onTick=${(i, v) => setTicksByCode(m => { const next = [...(m[r.user_code] || initialTicks(r))]; next[i] = v; return { ...m, [r.user_code]: next }; })} />
                 <//>
                 <${Doors}>
                   <${Label}>${t('profile.ecosystem.grantLevel')}<//>
