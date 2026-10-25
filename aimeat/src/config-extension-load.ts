@@ -5,7 +5,8 @@
  * @description The operator's settings for how much load extensions may put on this node: the answer
  *   bytes one run's ctx.fetch calls may hold in flight together, the bytes one extension namespace
  *   may hold, the number of instances one extension may have, and the ctx.email messages one
- *   account's extensions may send in an hour. Each is a row on the admin Config
+ *   account's extensions may send in an hour, and how many request-driven runs may be in progress
+ *   at once, on the node and per account. Each is a row on the admin Config
  *   tab (services/config-schema-extension-load.ts), read on every use, so a saved value applies to
  *   the next run. 0 is "no limit" on every one of them.
  *
@@ -16,6 +17,9 @@
  *   import { extensionLoadDefaults } from './config-extension-load.js';
  *   const config = { ...extensionLoadDefaults(), ... };
  * @version-history
+ *   v1.3.0 — 2026-10-25 — extensionRunSlots (AIMEAT_EXT_RUN_SLOTS, 64) and extensionRunSlotsPerAccount
+ *     (AIMEAT_EXT_RUN_SLOTS_PER_ACCOUNT, 16): the node-wide pool of request-driven runs and one account's
+ *     share (secaudit2026oct22, lead 817, decision A2-817 recommendation a).
  *   v1.2.0 — 2026-10-25 — extensionEmailPerHour (AIMEAT_EXT_EMAIL_PER_HOUR), 200 by default (secaudit2026oct22, lead 325).
  *   v1.1.0 — 2026-10-25 — extensionNamespaceMaxMb (AIMEAT_EXT_NAMESPACE_MAX_MB) and extensionMaxInstances
  *     (AIMEAT_EXT_MAX_INSTANCES), both no limit by default (secaudit2026oct22, lead 750).
@@ -45,7 +49,18 @@ export interface ExtensionLoadConfig {
    * whichever extension sends (services/extension-email.ts). 0: no limit. Default 200.
    */
   extensionEmailPerHour: number;
+  /**
+   * Extension runs started by a request (REST, MCP, a visitor) that may be in progress on this node at
+   * once; a run past it is answered 503 with Retry-After (services/extension-run-slots.ts). 0: no limit.
+   */
+  extensionRunSlots: number;
+  /** The share of those slots one account (or one visitor address) may hold at once. 0: no limit. */
+  extensionRunSlotsPerAccount: number;
 }
+
+/** Request-driven extension runs in progress on the node at once, and one account's share, by default. */
+export const EXT_RUN_SLOTS_DEFAULT = 64;
+export const EXT_RUN_SLOTS_PER_ACCOUNT_DEFAULT = 16;
 
 /** The ctx.email allowance per account and hour when nothing sets it. */
 export const EXT_EMAIL_PER_HOUR_DEFAULT = 200;
@@ -62,5 +77,7 @@ export function extensionLoadDefaults(): ExtensionLoadConfig {
     extensionNamespaceMaxMb: wholeFromEnv(process.env.AIMEAT_EXT_NAMESPACE_MAX_MB, 0),
     extensionMaxInstances: wholeFromEnv(process.env.AIMEAT_EXT_MAX_INSTANCES, 0),
     extensionEmailPerHour: wholeFromEnv(process.env.AIMEAT_EXT_EMAIL_PER_HOUR, EXT_EMAIL_PER_HOUR_DEFAULT),
+    extensionRunSlots: wholeFromEnv(process.env.AIMEAT_EXT_RUN_SLOTS, EXT_RUN_SLOTS_DEFAULT),
+    extensionRunSlotsPerAccount: wholeFromEnv(process.env.AIMEAT_EXT_RUN_SLOTS_PER_ACCOUNT, EXT_RUN_SLOTS_PER_ACCOUNT_DEFAULT),
   };
 }

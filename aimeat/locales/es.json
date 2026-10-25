@@ -12011,6 +12011,10 @@
     "cfgDesc_extensions_max_instances": "Cuántas copias (instancias) puede tener una extensión; al pasar el límite se rechaza una copia nueva (predeterminado 0, sin límite).",
     "cfg_extensions_email_per_hour": "Correos de extensiones por cuenta por hora",
     "cfgDesc_extensions_email_per_hour": "Cuántos correos pueden enviar en una hora las extensiones de una cuenta, todas juntas. Al pasar el límite se rechaza el envío hasta que cambia la hora (predeterminado 200, 0 es sin límite).",
+    "cfg_extensions_run_slots": "Ejecuciones de extensiones a la vez",
+    "cfgDesc_extensions_run_slots": "Cuántas ejecuciones de extensiones iniciadas por una llamada, un agente o un visitante pueden estar en curso a la vez en este servidor. Una ejecución que pasa el límite recibe \"ocupado, intenta de nuevo\" (predeterminado 64, 0 es sin límite).",
+    "cfg_extensions_run_slots_per_account": "Ejecuciones de extensiones a la vez por cuenta",
+    "cfgDesc_extensions_run_slots_per_account": "Cuántas de esas ejecuciones puede tener en curso a la vez una cuenta, con sus agentes y aplicaciones. Los visitantes sin cuenta cuentan por dirección (predeterminado 16, 0 es sin límite).",
     "cfg_features_capability_publishing": "Quién agrega capacidades",
     "cfgDesc_features_capability_publishing": "Quién puede agregar una capacidad al registro.",
     "cfgOpt_features_capability_publishing_disabled": "Solo el operador",
@@ -24368,6 +24372,28 @@
           "ex1": "200 (el valor predeterminado): las extensiones de una cuenta envían hasta 200 correos por hora.",
           "ex2": "5000 durante la semana de una feria, y después de vuelta a 200.",
           "tip": "Súbelo, o pon 0, para un evento que escribe a muchas personas a la vez, y revisa que tu servicio de correo acepte ese volumen."
+        },
+        "run_slots": {
+          "title": "Ejecuciones de extensiones a la vez",
+          "short": "Cuántas ejecuciones de extensiones iniciadas por una llamada, un agente o un visitante pueden estar en curso a la vez en este servidor. Una ejecución que pasa el límite recibe \"ocupado, intenta de nuevo en unos segundos\". El valor predeterminado es 64; 0 es sin límite.",
+          "what": "La acción de una extensión se ejecuta dentro del propio proceso de este servidor. Mientras corre, y mientras espera a un servicio externo, ocupa memoria, y una ejecución que calcula ocupa también el procesador del servidor. Sin límite, muchas ejecuciones a la vez pueden volver lento todo el servidor para todos. Este límite cuenta las ejecuciones que inician las llamadas, los agentes y los visitantes; las programadas tienen su propio grupo pequeño. Una ejecución que pasa el límite no se inicia: quien llama recibe la respuesta 503 con un Retry-After de pocos segundos y un mensaje que nombra este ajuste, y no se cobra nada.",
+          "range": "Un número entero desde 0. El valor predeterminado es 64. Con 0 no hay límite.",
+          "low": "Menor: el servidor sigue respondiendo bajo carga, y a quien llama se le pide reintentar antes.",
+          "high": "Mayor: caben más ejecuciones a la vez, y un servidor ocupado usa más memoria.",
+          "ex1": "64 (el valor predeterminado): hasta 64 ejecuciones a la vez en todo el servidor.",
+          "ex2": "200 en un servidor con mucha memoria que atiende un evento público.",
+          "tip": "Ponlo junto con Ejecuciones de extensiones a la vez por cuenta, para que una sola cuenta no ocupe todo el grupo."
+        },
+        "run_slots_per_account": {
+          "title": "Ejecuciones de extensiones a la vez por cuenta",
+          "short": "Cuántas de las ejecuciones de extensiones del servidor puede tener en curso a la vez una cuenta, con sus agentes y aplicaciones. Los visitantes sin cuenta cuentan por dirección. El valor predeterminado es 16; 0 es sin límite.",
+          "what": "Es la parte de una cuenta en Ejecuciones de extensiones a la vez. Un propietario y los agentes y aplicaciones que actúan por él comparten un mismo contador. Un visitante sin sesión no tiene cuenta, así que los visitantes cuentan por dirección de red. Una ejecución que pasa la parte recibe \"ocupado, intenta de nuevo en unos segundos\" (503 con Retry-After) y un mensaje que nombra este ajuste, y las demás cuentas siguen con sus ejecuciones.",
+          "range": "Un número entero desde 0. El valor predeterminado es 16. Con 0 no hay límite.",
+          "low": "Menor: una cuenta ocupada o un agente en bucle toma una parte menor del servidor.",
+          "high": "Mayor: una aplicación con muchos usuarios a la vez en una cuenta ejecuta más acciones juntas.",
+          "ex1": "16 (el valor predeterminado): una cuenta ejecuta hasta 16 acciones a la vez, y a la número 17 se le pide reintentar.",
+          "ex2": "0 en un servidor que usa una sola organización.",
+          "tip": "Mantenlo bastante por debajo de Ejecuciones de extensiones a la vez, para que una cuenta nunca llene todo el servidor."
         }
       },
       "morsel_policy": {

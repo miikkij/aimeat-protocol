@@ -8,13 +8,18 @@
  *     - extensions.namespace_max_mb: past the total, ctx.memory.set refuses a NEW key with a sentence
  *       naming the setting, while an existing key is still updated and read; 0 lifts it (lead 750);
  *     - extensions.max_instances: past the count, POST /v1/extensions/:name/instances answers 409
- *       LIMIT_EXCEEDED naming the setting; 0 lifts it (lead 750).
+ *       LIMIT_EXCEEDED naming the setting; 0 lifts it (lead 750);
+ *     - extensions.run_slots_per_account and extensions.run_slots: a request-driven run past one
+ *       account's share, or past the node's pool, is answered 503 EXTENSION_RUNS_BUSY with
+ *       Retry-After, naming the setting; another account keeps its own share; 0 lifts both (lead 817).
  *   The suite's first account is the operator; every setting it changes is put back at the end.
- *   FIRST FAIL: before the change, PUT /v1/admin/config answers 400 for both paths (unknown setting).
+ *   FIRST FAIL: before the change, PUT /v1/admin/config answers 400 for every path (unknown setting).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ext-operator-limits
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The run slots (secaudit2026oct22, lead 817).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, leads 750).
  */
+import http from 'node:http';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -51,12 +56,20 @@ const SCRIPTS = {
     var v = await ctx.memory.get(input.key);
     return { length: v ? v.text.length : -1 };
   }`,
+  // A run that stays in progress while it waits for a slow answer: the far side below holds it.
+  wait: `export default async function(ctx, input){
+    var r = await ctx.fetch('http://localhost:' + input.port + '/slow');
+    return { status: r.status };
+  }`,
 };
 const MANIFEST = JSON.stringify({
   metadata: { name: EXT, version: '1.0.0', description: 'operator limits e2e', author: 'e2e' },
+  capabilities: ['network'],
+  network: { hosts: ['localhost'] },
   actions: [
     { id: 'put', method: 'POST', path: '/put', script: 'put' },
     { id: 'get', method: 'POST', path: '/get', script: 'get' },
+    { id: 'wait', method: 'POST', path: '/wait', script: 'wait' },
   ],
   instances: { supported: true },
   limits: { timeout_ms: 5000, max_api_calls: 20 },
@@ -134,11 +147,70 @@ await test('extensions.max_instances 0 is no limit: the second copy is made', as
   assert(b.status === 201, `${b.status}: ${JSON.stringify(b.body?.error)}`);
 });
 
+// ── Request-driven runs: the node's pool and one account's share (lead 817) ──
+// A far side that holds each answer for 1.5 s, so a run stays in progress while the next request comes.
+// Far from the node's port, as the other extension suites keep theirs.
+const FAR_PORT = Number(new URL(BASE).port || '40251') + 247;
+const far = http.createServer((req, res) => {
+  setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('slow'); }, 1500);
+});
+await new Promise<void>(r => far.listen(FAR_PORT, () => r()));
+const waitRun = (token: string) => call('POST', `/v1/ext/${EXT}/wait`, token, { port: FAR_PORT });
+const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
+let other!: RegisteredOwner;
+
+await test('By default one account runs two waiting actions at once, and both answer', async () => {
+  other = await registerOwner(BASE, `oplimb${stamp}`);
+  const [a, b] = await Promise.all([waitRun(op.token), waitRun(op.token)]);
+  assert(a.status === 200 && b.status === 200, `both run: ${a.status} ${b.status} ${JSON.stringify(a.body?.error ?? b.body?.error)}`);
+});
+
+await test('FAILURE: with extensions.run_slots_per_account 1, the account\'s second run at once is answered 503 with Retry-After, naming the setting', async () => {
+  const s = await setSetting('extensions.run_slots_per_account', 1);
+  assert(s.status === 200, `PUT ${s.status}: ${JSON.stringify(s.body?.error ?? s.body?.data?.errors)}`);
+  const first = waitRun(op.token);
+  await pause(400);
+  const second = await waitRun(op.token);
+  assert(second.status === 503, `expected 503, got ${second.status}: ${JSON.stringify(second.body)}`);
+  assert(second.body?.error?.code === 'EXTENSION_RUNS_BUSY', `code ${second.body?.error?.code}`);
+  assert(Number(second.headers.get('retry-after')) > 0, `Retry-After: ${second.headers.get('retry-after')}`);
+  assert(String(second.body?.error?.message ?? '').includes('extensions.run_slots_per_account'), `names the setting: ${second.body?.error?.message}`);
+  // Another account has its own share while the first run is still waiting.
+  const theirs = await call('POST', `/v1/ext/${EXT}/get`, other.token, { key: 'big.one' });
+  assert(theirs.status === 200, `another account runs: ${theirs.status} ${JSON.stringify(theirs.body?.error)}`);
+  const done = await first;
+  assert(done.status === 200, `the first run finishes: ${done.status} ${JSON.stringify(done.body?.error)}`);
+  const again = await waitRun(op.token);
+  assert(again.status === 200, `after the first run the slot is free: ${again.status} ${JSON.stringify(again.body?.error)}`);
+});
+
+await test('FAILURE: with extensions.run_slots 1, another account is answered 503 naming the node\'s pool', async () => {
+  const s = await call('PUT', '/v1/admin/config', op.token, { changes: [
+    { path: 'extensions.run_slots_per_account', value: 0 }, { path: 'extensions.run_slots', value: 1 }] });
+  assert(s.status === 200, `PUT ${s.status}: ${JSON.stringify(s.body?.error ?? s.body?.data?.errors)}`);
+  const first = waitRun(op.token);
+  await pause(400);
+  const theirs = await call('POST', `/v1/ext/${EXT}/get`, other.token, { key: 'big.one' });
+  assert(theirs.status === 503, `expected 503, got ${theirs.status}: ${JSON.stringify(theirs.body)}`);
+  assert(String(theirs.body?.error?.message ?? '').includes('extensions.run_slots'), `names the setting: ${theirs.body?.error?.message}`);
+  assert((await first).status === 200, 'the run holding the slot finishes');
+});
+
+await test('extensions.run_slots 0 is no limit: two runs at once both answer', async () => {
+  const s = await setSetting('extensions.run_slots', 0);
+  assert(s.status === 200, `PUT ${s.status}: ${JSON.stringify(s.body?.error)}`);
+  const [a, b] = await Promise.all([waitRun(op.token), waitRun(other.token)]);
+  assert(a.status === 200 && b.status === 200, `both run: ${a.status} ${b.status}`);
+});
+
 await test('Cleanup: the settings go back to their defaults and the extension is removed', async () => {
-  for (const path of ['extensions.namespace_max_mb', 'extensions.max_instances']) {
+  await call('PUT', '/v1/admin/config', op.token, { changes: [
+    { path: 'extensions.run_slots', value: 64 }, { path: 'extensions.run_slots_per_account', value: 16 }] });
+  for (const path of ['extensions.namespace_max_mb', 'extensions.max_instances', 'extensions.run_slots', 'extensions.run_slots_per_account']) {
     await call('DELETE', `/v1/admin/config/${path}`, op.token);
   }
   await call('DELETE', `/v1/extensions/${EXT}`, op.token);
+  far.close();
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

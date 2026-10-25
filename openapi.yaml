@@ -50266,6 +50266,13 @@ paths:
         client address. A public action takes no price and no toll. Any other unsigned call answers
         401, whether or not the extension or the action exists.
 
+        Run slots: a run takes a slot of the node's pool of request-driven runs, within one account's
+        share (an owner's agents and apps share it; a visitor counts per client address). The pool
+        and the share are the operator settings `extensions.run_slots` (64) and
+        `extensions.run_slots_per_account` (16), 0 being no limit. When either is full the call is
+        answered at once with 503 `EXTENSION_RUNS_BUSY` and a `Retry-After` header, before anything is
+        charged; the message names the setting. Retry after that many seconds.
+
         Pacing and price (per action, optional; declared in the manifest): the extension owner always
         calls free. A non-owner owes (a) the pacing amount `tollMorsels` (else the node default),
         taken from the caller's owner: the burn rate's share burns and the rest goes to the extension
@@ -50340,7 +50347,14 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
-          description: Extension not active
+          description: >-
+            Extension not active (EXTENSION_INACTIVE), or the run slots are full
+            (EXTENSION_RUNS_BUSY, with Retry-After).
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying, sent with EXTENSION_RUNS_BUSY.
+              schema:
+                type: integer
           content:
             application/json:
               schema:
@@ -50359,7 +50373,7 @@ paths:
       x-aimeat-scope: { word: 'ext:invoke', enforcedIn: '4.0.0' }
       operationId: executeExtensionInstanceAction
       summary: Execute extension action on specific instance
-      description: Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}.
+      description: Invoke an action on a specific extension instance. An action the manifest marks `public` also answers a caller with no sign-in, as on POST /v1/ext/{extName}/{actionId}. The run slots apply as there (503 EXTENSION_RUNS_BUSY with Retry-After).
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50390,6 +50404,17 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+        '503':
+          description: The instance or extension is not active, or the run slots are full (EXTENSION_RUNS_BUSY, with Retry-After).
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying, sent with EXTENSION_RUNS_BUSY.
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/extensions/{name}/actions/{actionId}:
     get:

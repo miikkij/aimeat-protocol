@@ -13687,6 +13687,10 @@
     "cfgDesc_extensions_max_instances": "Most copies (instances) one extension may have; past it a new copy is refused (default 0, no limit).",
     "cfg_extensions_email_per_hour": "Extension emails per account per hour",
     "cfgDesc_extensions_email_per_hour": "Most emails one account's extensions may send in an hour, all its extensions together. Past it a send is refused until the hour turns (default 200, 0 is no limit).",
+    "cfg_extensions_run_slots": "Extension runs at once",
+    "cfgDesc_extensions_run_slots": "Extension runs started by a call, an agent or a visitor that may be in progress on this server at once. A run past it is answered \"busy, try again\" (default 64, 0 is no limit).",
+    "cfg_extensions_run_slots_per_account": "Extension runs at once per account",
+    "cfgDesc_extensions_run_slots_per_account": "How many of those runs one account, with its agents and apps, may have in progress at once. Visitors without an account count per address (default 16, 0 is no limit).",
     "cfg_features_capability_publishing": "Who adds capabilities",
     "cfgDesc_features_capability_publishing": "Who may add a capability to the registry.",
     "cfgOpt_features_capability_publishing_disabled": "The operator only",
@@ -26572,6 +26576,28 @@
           "ex1": "200 (the default): an account's extensions send up to 200 emails an hour.",
           "ex2": "5000 for the week of a fair, then back to 200.",
           "tip": "Raise it, or set 0, for an event that mails many people at once, and check that your mail service accepts that volume."
+        },
+        "run_slots": {
+          "title": "Extension runs at once",
+          "short": "How many extension runs started by a call, an agent or a visitor may be in progress on this server at the same time. A run past it is answered \"busy, try again in a few seconds\". The default is 64; 0 is no limit.",
+          "what": "An extension's action runs inside this server's own process. While it runs, and while it waits for an outside service, it holds memory, and a run that computes holds the server's processor too. Without a limit, many runs at once can slow the whole server for everyone. This limit counts the runs that calls, agents and visitors start; schedules have their own small pool. A run past it is not started: the caller gets the answer 503 with a Retry-After of a few seconds and a message that names this setting, and nothing is charged.",
+          "range": "A whole number from 0 up. The default is 64. 0 is no limit.",
+          "low": "Lower: the server stays responsive under load, and callers are asked to retry sooner.",
+          "high": "Higher: more runs fit at once, and a busy server uses more memory.",
+          "ex1": "64 (the default): up to 64 runs at once on the whole server.",
+          "ex2": "200 on a server with plenty of memory that serves a public event.",
+          "tip": "Set it with Extension runs at once per account, so that one account cannot take the whole pool."
+        },
+        "run_slots_per_account": {
+          "title": "Extension runs at once per account",
+          "short": "How many of the server's extension runs one account, with its agents and apps, may have in progress at the same time. Visitors without an account count per address. The default is 16; 0 is no limit.",
+          "what": "This is one account's share of Extension runs at once. An owner and the agents and apps acting for them share one count. A visitor who is not signed in has no account, so visitors count per network address. A run past the share is answered \"busy, try again in a few seconds\" (503 with Retry-After) with a message that names this setting, and other accounts still get their runs.",
+          "range": "A whole number from 0 up. The default is 16. 0 is no limit.",
+          "low": "Lower: one busy account or a looping agent takes a smaller part of the server.",
+          "high": "Higher: an app with many users at once on one account runs more actions together.",
+          "ex1": "16 (the default): an account runs up to 16 actions at once, and a 17th is asked to retry.",
+          "ex2": "0 on a server that one organisation uses alone.",
+          "tip": "Keep it well under Extension runs at once, so that one account never fills the whole server."
         }
       },
       "morsel_policy": {
