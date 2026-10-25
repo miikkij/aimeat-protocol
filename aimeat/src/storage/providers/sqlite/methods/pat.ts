@@ -8,6 +8,7 @@
  * @structure patMethods
  * @usage Object.assign(SqliteStorage.prototype, patMethods) in ../index.ts
  * @version-history
+ *   2026-10-25 — getPatById, revoked rows included (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  *   v1.0.0 — 2026-10-05 — mapPatRow, createPat, getPatByHash, listPats, revokePat, touchPat moved here from
  *     extensions-notify.ts so the file mirrors postgres-kysely/methods/pat.ts (secaudit 2026-10, M8).
  */
@@ -53,6 +54,11 @@ export const patMethods = {
     const row = this.db.prepare(
       'SELECT * FROM personal_access_tokens WHERE tokenHash = ? AND revoked = 0 LIMIT 1'
     ).get(tokenHash) as Record<string, unknown> | undefined;
+    return row ? this.mapPatRow(row) : null;
+  },
+
+  async getPatById(this: SqliteStorage, id: string): Promise<import('../../../../storage/repositories/pat.repository.js').PatRecord | null> {
+    const row = this.db.prepare('SELECT * FROM personal_access_tokens WHERE id = ? LIMIT 1').get(id) as Record<string, unknown> | undefined;
     return row ? this.mapPatRow(row) : null;
   },
 

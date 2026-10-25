@@ -10,6 +10,8 @@
  * @structure PatRecord shape; PatRepository interface (create/get-by-hash/list/revoke/touch).
  * @usage Implemented by each storage provider (SQLite, MongoDB) and composed into the Storage interface.
  * @version-history
+ * 2026-10-25 - getPatById: a JWT exchanged from a PAT names the PAT's id, and the credential check
+ *   reads the row by it on every request (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  * v1.0.0 - 2026-06-03 - Initial (plan 2026-06-03-agent-access-tokens).
  */
 
@@ -34,6 +36,8 @@ export interface PatRepository {
   createPat(pat: PatRecord): Promise<void>;
   /** Look up an active token by its SHA-256 hash (used on exchange). */
   getPatByHash(tokenHash: string): Promise<PatRecord | null>;
+  /** Look up a token by its public id, revoked or not (the per-request check of a JWT exchanged from it). */
+  getPatById(id: string): Promise<PatRecord | null>;
   /** List an owner's non-revoked tokens (never returns the raw token). */
   listPats(owner: string): Promise<PatRecord[]>;
   /** Revoke a token by id, scoped to its owner. Returns true if a token was revoked. */

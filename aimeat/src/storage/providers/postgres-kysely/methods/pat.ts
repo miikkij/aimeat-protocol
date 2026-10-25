@@ -5,6 +5,7 @@
  * @description Personal Access Token domain for the Postgres+Kysely backend (PersonalAccessToken table).
  *   The raw token is never stored — only its SHA-256 hash. Translated 1:1 from the Prisma provider.
  * @version-history
+ *   2026-10-25 — getPatById, revoked rows included (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  *   v1.1.0 -- 2026-09-06 -- Review item 5.2: listPats filters revoked tokens and orders newest
  *     first, as SQLite always has. The Access page listed every token ever revoked.
  *   v1.0.0 — 2026-07-15 — Phase 5: PAT on Postgres+Kysely.
@@ -35,6 +36,10 @@ export const patMethods = {
   },
   async getPatByHash(this: PostgresKyselyStorage, tokenHash: string): Promise<PatRecord | null> {
     const p = await this.db.selectFrom('PersonalAccessToken').selectAll().where('tokenHash', '=', tokenHash).where('revoked', '=', false).executeTakeFirst();
+    return p ? toPat(p) : null;
+  },
+  async getPatById(this: PostgresKyselyStorage, id: string): Promise<PatRecord | null> {
+    const p = await this.db.selectFrom('PersonalAccessToken').selectAll().where('id', '=', id).executeTakeFirst();
     return p ? toPat(p) : null;
   },
   // REVOKED TOKENS WERE IN THE LIST, on the production backend only. SQLite has filtered them and
