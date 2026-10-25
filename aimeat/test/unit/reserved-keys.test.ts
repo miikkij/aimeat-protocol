@@ -21,6 +21,7 @@
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-10-25 — `agent-goals.` makes twenty-seven: an owner's agent goals, written only by services/goals.
  *   v1.x — 2026-10-21 — `contentclass.` makes twenty-six: the content class settings, ontology and facts.
  *   v1.x — 2026-10-18 — `publish.requests.` makes twenty-five: a request to make something public.
  *   v1.x — 2026-10-11 — `agent-workplace.` makes twenty-four: where one agent's finished work is shared.
@@ -67,7 +68,7 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all twenty-six, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all twenty-seven, and a removal is a test failure rather than a silent regression', () => {
         // `messages.organize.` (2026-09-13): the owner's archive and rules for their Messages list.
         // The server composes the list with it, so an app that could write it could archive the
         // message warning the owner about that very app.
@@ -113,7 +114,7 @@ describe('the list holds every prefix the server reads and acts on', () => {
         // `contentclass.` (2026-10-21, content classes): the settings decide which steps spend the
         // owner's AI key, and the ontology what every extraction prompt asks for.
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['agent-workplace.', 'agents.connectors.', 'agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'contentclass.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'publish.requests.', 'signals.', 'workflows.'],
+            ['agent-goals.', 'agent-workplace.', 'agents.connectors.', 'agents.proposals.', 'ai-usage.', 'ai.apikey.', 'ai.jobs.', 'ai.policy.', 'ai.providers.', 'ai.roles.', 'ai.routing.', 'audit.', 'chat.', 'classification.policy.', 'commerce.', 'contentclass.', 'crews.llm.', 'decide.', 'finance.', 'messages.organize.', 'notifications.', 'openrouter.', 'packages.install-requests.', 'profile.', 'publish.requests.', 'signals.', 'workflows.'],
         );
     });
 
