@@ -20,6 +20,8 @@
  * @structure STRIPE_HANDLER_ID · stripeIdempotencyKey · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   2026-10-25 — collect puts `attempt` into the charge's Idempotency-Key, so a retry after a refunded
+ *     attempt is a new charge (secaudit2026oct22).
  *   2026-10-25 — A test-mode payment (livemode false) records no adult check (isStripeTestMode;
  *     secaudit2026oct22).
  *   2026-10-18 — collect reads the paying card's funding type (expand latest_charge), and a credit card
@@ -194,7 +196,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
     title: 'Card payment on the seller\'s own Stripe account',
     currencies: [...MONEY_CURRENCIES],
 
-    async collect(ctx, { buyerGhii, amount, currency, reference, instrument, seller, saveForLater }) {
+    async collect(ctx, { buyerGhii, amount, currency, reference, instrument, seller, saveForLater, attempt }) {
       if (typeof instrument !== 'string' || !instrument) {
         throw new PaymentError(
           'PAYMENT_INSTRUMENT_REQUIRED', 402,
@@ -210,7 +212,9 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       // Automatic renewal: the card is kept at Stripe for charges without the buyer present, on the
       // seller's own account. Stripe needs a customer to attach it to, and setup_future_usage tells the
       // bank at this first charge, with the buyer present, that later ones will come.
-      const chargeKey = stripeIdempotencyKey('checkout', reference, instrument);
+      // A retry after a refunded attempt is a new charge: Stripe answers a repeated key with the first
+      // (refunded) intent. A retry after a timeout keeps the key and gets the first charge's result.
+      const chargeKey = stripeIdempotencyKey('checkout', attempt ? `${reference}-r${attempt}` : reference, instrument);
       const customer = saveForLater
         ? String((await stripeApi(key, 'POST', 'customers', { description: `AIMEAT buyer, checkout ${reference}` }, undefined, `${chargeKey}-customer`)).id)
         : null;
