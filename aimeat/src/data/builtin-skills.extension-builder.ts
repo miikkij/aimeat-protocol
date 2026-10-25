@@ -27,6 +27,9 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-25 — Section 9: the owner's "Ask me before my secret is sent to a new address for the first
+ *     time" decides whether an agent's code and host field ask first; off, they use the owner's rights
+ *     (secaudit2026oct22). Read against crud.ts's emailPolicy change: the skill names no emailPolicy rule.
  *   2026-10-25 — Section 9: a host field value counts as declared only when the owner in person or a
  *     secrets:manage principal set it (secaudit2026oct22).
  *   2026-10-24 — The ctx rules: a binary answer is read with `responseType: 'base64'` (jussil riistakartta).
@@ -263,11 +266,15 @@ Every action can carry two values, and they do different jobs:
   \`network:\` block count as declared for every secret your scripts name. A \`host_fields\` value
   counts only when the owner in person or a principal holding \`secrets:manage\` set it: a value
   another agent set is still reached by \`ctx.fetch\`, and the first use of a secret with no host
-  toward it asks the owner.
+  toward it asks the owner. That question is the owner's setting "Ask me before my secret is sent to
+  a new address for the first time", on unless they switch it off (Access page, or
+  \`aimeat_secret_host_ask\`): with it off, code the owner's agent wrote and a host field such an
+  agent set choose the first host with the owner's rights.
 - Through the caller's own account's extension, a secret saved with no host is bound to the host of
   its first use. A first use to a host \`uses_secrets\` declares for that secret binds by itself,
   whoever calls (the owner's app, their chat agent, a schedule), when the extension's code was
-  written by the owner, through an app of theirs, or by an agent holding \`secrets:manage\` now.
+  written by the owner, through an app of theirs, or by an agent holding \`secrets:manage\` now (by any
+  agent of the owner while the owner's question above is switched off).
   Otherwise only the owner in person or a principal holding \`secrets:manage\` makes that first
   use; on a schedule, a workflow step or an \`on_done\` callback nobody is present, so the
   principal that wrote the extension's code is asked instead.
