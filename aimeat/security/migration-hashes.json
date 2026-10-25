@@ -116,6 +116,7 @@
     "0112_ecosystem_capability_approvals.sql": "b3fc80164fa9856a5590f3395db2410e7467f7b175e972f0de969232a136a40a",
     "0113_workspace_row_revisions.sql": "8fc3df1f2fb31c145ab92345096e8d987328be63dc4664c1bc6b129dc504597b",
     "0114_knowledge_link_owner.sql": "0eb30d092c158473754bbc35906393a75438b4c9a05dc34d5b0fa03390fa19c6",
-    "0115_task_start_floor.sql": "26097ba46fcebe83e24155329a726ce0c0346d3929e17f06ff8b18c4f8464ac8"
+    "0115_task_start_floor.sql": "26097ba46fcebe83e24155329a726ce0c0346d3929e17f06ff8b18c4f8464ac8",
+    "0116_subdomain_site_origin.sql": "0a4ecf826b04fbfc6d9ad443b54eed0e28836067f57b7ce23450cf8ed6bb94b6"
   }
 }
