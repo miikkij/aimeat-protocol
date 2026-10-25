@@ -20,6 +20,9 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-10-25 — The IdP's address counts as verified only when it is in the connection's domains, so a
+ *     JIT account gets no verified address outside them (secaudit2026oct22,
+ *     sso-new-account-email-verified-outside-connection-domains).
  *   2026-10-24 — The ACS sends a first sign-in that matches an account with two-step sign-in by address
  *     to the code step (startLinkSecondFactor); it had linked and opened the session on the address
  *     alone (secaudit2026oct22, external-login-skips-second-factor).
@@ -39,6 +42,7 @@ import { success, error } from '../middleware/envelope.js';
 import { AccountDisabledError } from '../auth/jwt.js';
 import { samlForConnection } from '../services/saml-sp.js';
 import { ensureSsoMembership } from '../services/sso-membership.js';
+import { emailInConnectionDomains } from '../services/sso-connections.js';
 import {
   mapExternalIdentity, finalizeExternalSignup, establishForGhii,
   signPendingToken, setPendingCookie,
@@ -81,8 +85,11 @@ function mapProfile(conn: SsoConnectionRecord, profile: Record<string, unknown>)
     ?? nameID;
 
   // The organisation's own IdP asserts the address, the same vouching a tenant-gated Entra OIDC
-  // login gives — that is what lets a provisioned or invited account link on first sign-in.
-  return { sub: nameID, email, emailVerified: !!email, displayName };
+  // login gives — that is what lets a provisioned or invited account link on first sign-in. It
+  // vouches for the connection's own domains only: an address outside them is carried to the
+  // username step but recorded on no new account as verified (secaudit2026oct22,
+  // sso-new-account-email-verified-outside-connection-domains). Linking is fenced the same way.
+  return { sub: nameID, email, emailVerified: emailInConnectionDomains(conn, email), displayName };
 }
 
 export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router {

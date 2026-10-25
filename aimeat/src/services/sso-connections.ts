@@ -12,6 +12,8 @@
  * @usage const r = await createSsoConnection(config, storage, input, 'operator-name');
  *        if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-25 — emailInConnectionDomains(): the one test of whether a connection vouches for an
+ *     address (secaudit2026oct22, sso-new-account-email-verified-outside-connection-domains).
  *   v1.0.0 — 2026-08-24 — Extracted from routes/admin-sso.ts when the MCP tools became the second
  *     caller (BR-04 phase 1's MCP batch).
  */
@@ -78,6 +80,17 @@ function normalizeDomains(raw: unknown): string[] | null {
     out.add(v);
   }
   return [...out];
+}
+
+/**
+ * Is this address in one of the connection's own domains? A connection's IdP and directory vouch for
+ * those addresses only: linking, adoption and the verified address of an account the connection
+ * creates all ask this (secaudit2026oct22, sso-new-account-email-verified-outside-connection-domains).
+ * A connection with no domains vouches for none.
+ */
+export function emailInConnectionDomains(conn: Pick<SsoConnectionRecord, 'domains'>, email: string | null | undefined): boolean {
+  const domain = email?.split('@')[1]?.trim().toLowerCase() ?? '';
+  return !!domain && conn.domains.includes(domain);
 }
 
 export interface SsoConnectionInput {

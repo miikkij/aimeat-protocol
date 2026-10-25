@@ -24,6 +24,9 @@
  *   normalizeEntraPatchBody() (the string-boolean shim, unit-tested in scim-entra-compat).
  * @usage declareScimResources(); // once, from routes/scim.ts
  * @version-history
+ *   2026-10-25 — A new account's address is recorded as verified only when it is in the connection's
+ *     domains; outside them the account is created without a verified address (secaudit2026oct22,
+ *     sso-new-account-email-verified-outside-connection-domains).
  *   v1.0.2 — 2026-10-16 — Both deactivation paths read the result: a credential step that failed is
  *     logged at warn, and a flag that did not land is an error rather than "deprovisioned" (QA audit E6-01).
  *   v1.0.1 — 2026-10-05 — The account's operator role is read with isOperatorAccount (secaudit 2026-10, C2).
@@ -38,6 +41,7 @@ import { provisionOwner, RegistrationClosedError, ProvisionEmailTakenError } fro
 import { deactivateOwner, reactivateOwner } from './owner-lifecycle.js';
 import { deriveUniqueUsername, emailHashOf } from './external-login.js';
 import { ensureSsoMembership } from './sso-membership.js';
+import { emailInConnectionDomains } from './sso-connections.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 
@@ -173,7 +177,11 @@ async function createUser(ctx: ScimContext, data: Record<string, unknown>): Prom
     via: 'provisioning',
     username,
     displayName,
-    verifiedEmail: email,   // the organisation's directory asserts the address
+    // The organisation's directory vouches for addresses in the connection's own domains only. An
+    // address outside them (a guest's webmail, another customer's domain) is not recorded as a
+    // verified binding, so it claims no invitation or contact and blocks nobody's sign-up
+    // (secaudit2026oct22, sso-new-account-email-verified-outside-connection-domains).
+    verifiedEmail: emailInConnectionDomains(ctx.conn, email) ? email : null,
     externalIdentities: {
       [userNameKey(ctx.conn)]: userName,
       [externalIdKey(ctx.conn)]: externalId ?? userName,
