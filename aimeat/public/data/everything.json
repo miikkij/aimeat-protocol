@@ -2888,10 +2888,10 @@
      "slug": "g-14-x402",
      "cells": [
       "<strong>x402</strong> <span class=\"ev-mark showroom-slab--sun\">off</span> <span class=\"ev-mark showroom-slab--sun\">testnet</span>",
-      "Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable.",
-      "<code>/.well-known/x402.json</code>"
+      "Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. When the payment service does not answer a settlement, it is not known whether the money moved: the buyer is told not to pay again yet, and the seller gets a record and a notice of the possible payment, with the payer's address and the proof's nonce, and the operator a message. Limits: checking such a payment with the payment service is done by hand for now.",
+      "<code>/.well-known/x402.json</code>, <code>commerce.possible.{checkout id}</code> (the seller's record), error <code>X402_SETTLE_UNKNOWN</code>"
      ],
-     "plain": "x402 off testnet Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. /.well-known/x402.json"
+     "plain": "x402 off testnet Non-custodial settlement in USDC or EURC on Base Sepolia by default; Base mainnet is configurable. When the payment service does not answer a settlement, it is not known whether the money moved: the buyer is told not to pay again yet, and the seller gets a record and a notice of the possible payment, with the payer's address and the proof's nonce, and the operator a message. Limits: checking such a payment with the payment service is done by hand for now. /.well-known/x402.json, commerce.possible.{checkout id} (the seller's record), error X402_SETTLE_UNKNOWN"
     },
     {
      "slug": "g-14-pay-by-card-on-stripe-s-own-page",

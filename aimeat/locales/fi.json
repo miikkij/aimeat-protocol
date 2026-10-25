@@ -10043,6 +10043,8 @@
   "notiftext.package_renewed.body": "Korttiasi veloitettiin {amount}, ja uusia versioita tulee vielä {days} päivän ajan.",
   "notiftext.payment_not_delivered.title": "Ostaja maksoi {amount}, mutta tilausta ei toimitettu",
   "notiftext.payment_not_delivered.body": "Tilausta ei voitu toimittaa, eikä maksu palannut ostajalle, joten raha on sinulla. Palauta maksu ostajalle tai toimita tilaus. Tilauksen tunniste: {session}.",
+  "notiftext.payment_possible.title": "Maksu {amount} on ehkä tullut",
+  "notiftext.payment_possible.body": "Maksupalvelu ei vastannut, kun ostaja maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Jos raha tuli, toimita tilaus tai palauta maksu. Tunniste: {reference}.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",

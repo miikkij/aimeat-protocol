@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-25 -- A collect whose x402 settlement outcome is unknown (PossiblePaymentError) is kept as a possible payment for the seller and the operator before the session opens again (commerce/possible-payment.ts; secaudit2026oct22, lead 4432).
  *   2026-10-25 — A refunded fulfilment failure keeps the payment's tracking code on the session; a retry whose collect answers it again is refused PAYMENT_REFUNDED, and the next collect carries `attempt` (session-claim.ts; secaudit2026oct22).
  *   2026-10-18 — getSession expires an overdue session on its version (session-claim.ts expireOverdueSession): of two reads at the same moment one writes it and counts the stage.
  *   2026-10-16 — meteredCoordinateOf moved to commerce/metered-coordinate.ts, unchanged, to keep this file under 800 lines.
@@ -73,6 +74,7 @@ import type { Storage } from '../storage/interface.js';
 import type { CheckoutSessionRecord, CheckoutLineItem, Sellable, PaymentContext, PaymentHandler, CheckoutAttribution, RefundOutcome } from './types.js';
 import { meteredCoordinateOf } from './metered-coordinate.js';
 import { refundCollected, refundSentence, recordUndeliveredPayment } from './undelivered-payment.js';
+import { PossiblePaymentError, recordPossiblePaymentOf } from './possible-payment.js';
 import { getPaymentHandler, listPaymentHandlers, LEGACY_MORSEL_HANDLER_ID } from './payment-handlers.js';
 import { chargePacing, pacingReceipt } from '../services/metered-settlement.js';
 import { insufficientMorselsMessage } from './pacing-pack.js';
@@ -619,6 +621,8 @@ async function completeSessionInner(
     const refundedAgain = refundedPaymentRefusal(session, collected.trackingCode);
     if (refundedAgain) throw refundedAgain;   // a payment this checkout refunded earlier (secaudit2026oct22)
   } catch (err) {
+    // Settled or not is unknown (x402 /settle did not answer): kept for the seller and the operator.
+    if (err instanceof PossiblePaymentError) await recordPossiblePaymentOf(ctx, session, handler?.id ?? '', err);
     await paced.reverse();
     await releaseAgentPurchase(storage, session, caller);
     await releaseSessionClaim(storage, session, key);

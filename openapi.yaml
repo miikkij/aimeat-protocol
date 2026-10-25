@@ -31083,6 +31083,14 @@ paths:
             payment taken and not returned names the checkout reference, is stored for the seller as
             `commerce.undelivered.{session id}`, and is told to the operator.
 
+            X402_SETTLE_UNKNOWN. The x402 facilitator did not answer the settlement (a timeout, a
+            network failure or a server error), so whether the stablecoin moved is not known. The
+            pacing went back and the session is open again. The message tells the buyer not to pay
+            again yet and names the checkout reference; the possible payment (payer address, proof
+            nonce, amount) is stored for the seller as `commerce.possible.{session id}`, the seller
+            is notified and the operator is told. Reconciling it with the facilitator is not done
+            here yet.
+
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:
     post:

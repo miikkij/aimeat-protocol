@@ -27,6 +27,10 @@
  * @structure X402_HANDLER_ID · x402PaymentHandler
  * @usage registerPaymentHandler(x402PaymentHandler(config, facilitator));
  * @version-history
+ *   2026-10-25 -- A /settle call that throws (timeout, network, non-2xx) is a possible payment, not a
+ *     refusal: collect throws PossiblePaymentError (X402_SETTLE_UNKNOWN) with the proof's nonce and
+ *     payer, which the checkout keeps for the seller and the operator (possible-payment.ts;
+ *     secaudit2026oct22, lead 4432).
  *   2026-10-16 — refund answers `not_possible` instead of returning nothing, and the header says what
  *     the session service really does after a failed fulfilment (QA audit F5-01, S8-05).
  *   Comment only — 2026-10-11 — The removed io.aimeat.morsels handler is no longer named: a morsel is
@@ -41,6 +45,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { PaymentHandler, PaymentContext } from './types.js';
 import { PaymentError } from './payment-handlers.js';
+import { PossiblePaymentError } from './possible-payment.js';
 import {
   getX402Network, getX402Asset, x402SettlementCurrencies, buildExactRequirements, extractPayTo,
   type X402Facilitator, type X402PaymentPayload,
@@ -102,7 +107,19 @@ export function x402PaymentHandler(config: AimeatConfig, facilitator: X402Facili
       if (!verified.isValid) {
         throw new PaymentError('X402_VERIFY_FAILED', 402, `x402 payment did not verify: ${verified.invalidReason ?? 'unknown reason'}`);
       }
-      const settled = await facilitator.settle(payload, requirements);
+      // A settle that throws (a timeout, a network failure, a non-2xx answer) has an UNKNOWN outcome:
+      // the transfer may have been sent. It is not a refusal, so it is not reported as one; the
+      // checkout keeps the possible payment for the seller and the operator (possible-payment.ts).
+      let settled: Awaited<ReturnType<typeof facilitator.settle>>;
+      try {
+        settled = await facilitator.settle(payload, requirements);
+      } catch (err) {
+        const auth = payload.payload.authorization;
+        throw new PossiblePaymentError(reference, {
+          nonce: auth.nonce, payer: auth.from ?? '', payTo, amountMicros: amount,
+          asset: asset.symbol, network: network.id, reason: err instanceof Error ? err.message : String(err),
+        });
+      }
       if (!settled.success) {
         // A reused nonce (replay) or an onchain error both land here — the buyer must sign a fresh proof.
         throw new PaymentError('X402_SETTLE_FAILED', 402, `x402 settlement failed (replay or onchain error): ${settled.errorReason ?? 'unknown reason'}`);

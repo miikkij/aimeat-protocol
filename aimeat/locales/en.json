@@ -10045,6 +10045,8 @@
   "notiftext.package_renewed.body": "Your card was charged {amount}, and new versions come for another {days} days.",
   "notiftext.payment_not_delivered.title": "A payment of {amount} was taken and the order was not delivered",
   "notiftext.payment_not_delivered.body": "The order could not be delivered and the payment did not go back to the buyer, so you hold it. Return the payment to the buyer or deliver the order. Checkout reference: {session}.",
+  "notiftext.payment_possible.title": "A payment of {amount} may have arrived",
+  "notiftext.payment_possible.body": "The payment service did not answer when a buyer paid you, so it is not known whether the money arrived. Check your payout address for a transfer from {payer}. If it arrived, deliver the order or return the payment. Reference: {reference}.",
   "notiftext.package_sale_request_approved.title": "Your request for {name} was approved",
   "notiftext.package_sale_request_approved.body": "The seller approved it. Open your Packages page to see what comes next.",
   "notiftext.package_sale_request_refused.title": "Your request for {name} was not approved",
