@@ -26,10 +26,13 @@
  *
  *   PostgreSQL needs pg_dump and pg_restore: on PATH, or in the folder PG_BIN names. Without them the
  *   PostgreSQL half is reported as SKIPPED (a line the runner counts as skipped, never as passed).
- *   CI's runner image carries the PostgreSQL 16 client, which matches the postgres:16 service.
+ *   CI's runner image carries the PostgreSQL 16 client, which matches the postgres:16 service; the
+ *   nightly sweep is pinned to ubuntu-24.04 for that reason (ubuntu-26.04's newer pg_dump writes a
+ *   `SET transaction_timeout` that a 16 server refuses on restore).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-backup-restore
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-backup-restore
  * @version-history
+ *   2026-10-25 — The header names the pin to ubuntu-24.04 (nightly red on ubuntu-26.04's pg_dump).
  *   2026-10-16 — Initial (QA audit P6-06).
  */
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
