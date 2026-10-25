@@ -14,8 +14,10 @@
  *   - NODE_APEX_LABELS            — the fixed names
  *   - isNodeApexLabel(label, cfg) — a fixed name, or the label of a configured node host
  *   - nodeLabelAppOrigin(cfg, label, originalUrl) — the per-app origin address for that label, or null
- * @usage import { isNodeApexLabel, nodeLabelAppOrigin } from './subdomain-node-labels.js';
+ * @usage import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
  * @version-history
+ *   v1.0.1 — 2026-10-25 — Moved unchanged from routes/ to services/: services/subdomain-sites.ts reads
+ *     it, and a service does not import a route (check:deps).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22, subdomains.ts app-label-served-on-apex-namespace).
  */
 import type { AimeatConfig } from '../config.js';

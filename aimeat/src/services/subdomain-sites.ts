@@ -22,7 +22,7 @@
  *   const out = await createSubdomainSite(storage, config, req.body ?? {}, resolveIdentity(req.auth!, config.nodeId));
  *   if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
  * @version-history
- *   v1.3.0 — 2026-10-24 — A node name (routes/subdomain-node-labels.ts: login, account, pay...) is
+ *   v1.3.0 — 2026-10-24 — A node name (services/subdomain-node-labels.ts: login, account, pay...) is
  *     refused as kind app on create, and a change of kind to app on one is refused; a redirect there
  *     is accepted, and an existing app row on one is kept (secaudit2026oct22).
  *   v1.2.0 — 2026-10-17 — An app that needs a sign-in may be mapped to an address: only a code or a
@@ -38,7 +38,7 @@ import {
   RESERVED_SUBDOMAINS, SUBDOMAIN_RE, resolveAppTarget, draftBaseLabel, DRAFT_LABEL_SUFFIX,
 } from '../routes/subdomains.js';
 import { appNeedsCodeOrPayment } from './app-access.js';
-import { isNodeApexLabel } from '../routes/subdomain-node-labels.js';
+import { isNodeApexLabel } from './subdomain-node-labels.js';
 
 /** A refusal, in the shape each door renders as its own error envelope. */
 export interface SubdomainRefusal {
@@ -61,7 +61,7 @@ function refuse(status: SubdomainRefusal['status'], code: SubdomainRefusal['code
   return { ok: false, status, code, message };
 }
 
-/** A node name (routes/subdomain-node-labels.ts) takes a redirect, never an app. */
+/** A node name (services/subdomain-node-labels.ts) takes a redirect, never an app. */
 function nodeLabelRefusal(subdomain: string): SubdomainRefusal {
   return refuse(400, 'RESERVED_SUBDOMAIN',
     `People read "${subdomain}" as this node's own page, so it can only be a redirect. Choose a different name for an app.`);

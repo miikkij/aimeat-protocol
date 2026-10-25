@@ -79,7 +79,11 @@ export function personalRouter(
       const notYours = (agent_gaiis ?? []).filter(g => !isPersonalNodeAgentOf(g, owner_name, node_id));
       if (notYours.length > 0) {
         res.status(400).json(error(config.nodeId, 'AGENT_GAII_NOT_YOURS',
-          `agent_gaiis lists only your own agents on this personal node, written as name#${owner_name} or name#${owner_name}@${node_id}. Not accepted: ${notYours.slice(0, 5).join(', ')}`));
+          'The list of agents can name only your own agents on this personal node. Remove the others and send the list again.',
+          undefined, {
+            not_accepted: notYours.slice(0, 5),
+            accepted_forms: [`<name>#${owner_name}`, `<name>#${owner_name}@${node_id}`],
+          }));
         return;
       }
 
