@@ -14,6 +14,7 @@
  *   v1.0.0 — 2026-09-02 — Initial: motion 13.1.1, anime.js 4.5.0, lenis 1.3.26 vendored under
  *     /lib/ for published apps and the Atelier kit (wish-atelier-motion-libraries-and-parts).
  *   v1.1.0 — 2026-09-03 — showcaseUrl on motion, anime and lenis: their Design Book sections.
+ *   v1.2.0 — 2026-10-25 — motion 13.5.1 and lenis 1.3.27, both in place.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -28,7 +29,7 @@ export const MOTION_PACKS: LibraryPack[] = [
     url: '/lib/motion@13.min.js',
     include: ['<script src="{{BASE_URL}}/lib/motion@13.min.js"></script>'],
     requires: [],
-    version: '13.1.1',
+    version: '13.5.1',
     majorPin: 'motion@13 (a future Motion 14 ships as motion@14.min.js, this file never changes)',
     license: 'MIT',
     sourceUrl: 'https://motion.dev',
@@ -70,10 +71,11 @@ export const MOTION_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '13.1.1', date: '2026-09-02', summary: 'Initial vendoring of motion 13.1.1 UMD at /lib/motion@13.min.js. The vanilla core of Framer Motion, so apps get springs, scroll-linked progress and enter-on-view without a framework. The @13 filename is the compatibility contract: a future Motion 14 ships as a NEW motion@14.min.js file and this one is never touched again.' },
+      { version: '13.5.1', date: '2026-10-25', summary: 'motion 13.1.1 -> 13.5.1 in place at /lib/motion@13.min.js. Nothing is removed from window.Motion and sixteen names are added; the seven documented here (animate, scroll, inView, stagger, spring, press, hover) behave as before. New: animate.addEffect for a custom animated value, a negative spring bounce that undershoots instead of overshooting, and a smaller, faster animate and scroll. Motion 14 (drag, animateLayout, grid stagger) is not on this node; it would ship as motion@14.min.js.' },
     ],
     tierHint: 'T1',
     interviewTriggers: ['liike', 'animaatio', 'animation', 'motion', 'spring', 'jousi', 'scroll', 'vieritys', 'parallax', 'transition', 'siirtymä'],
-    sizeEstimate: '~136KB',
+    sizeEstimate: '~141KB',
     status: 'preview',
     modelTier: 'frontier',
     apiCaveat: 'This is the VANILLA global Motion 13, not framer-motion and not React: no imports, no <motion.div>, no useAnimate. Call Motion.animate(el, keyframes, options), and springs are options ({ type: "spring", stiffness, damping }), not an easing string. The Motion One v10 `animate(el, {...}, { easing: "ease-out" })` form a model may remember is gone; the option is `ease`.',
@@ -155,7 +157,7 @@ export const MOTION_PACKS: LibraryPack[] = [
       '<script src="{{BASE_URL}}/lib/lenis@1.min.js"></script>',
     ],
     requires: [],
-    version: '1.3.26',
+    version: '1.3.27',
     majorPin: 'lenis@1 (a future Lenis 2 ships as lenis@2.min.js + lenis@2.css, these files never change)',
     license: 'MIT',
     sourceUrl: 'https://lenis.darkroom.engineering',
@@ -201,6 +203,7 @@ export const MOTION_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '1.3.26', date: '2026-09-02', summary: 'Initial vendoring of lenis 1.3.26 at /lib/lenis@1.min.js plus the required /lib/lenis@1.css. The @1 filenames are the compatibility contract: a future Lenis 2 ships as new files beside these. The one thing to know against older examples is that 1.x has autoRaf, so the hand-written requestAnimationFrame loop is not only unnecessary but harmful.' },
+      { version: '1.3.27', date: '2026-10-25', summary: 'lenis 1.3.26 -> 1.3.27 in place, same files and options. destroy() now removes the lenis class from <html> for good (it used to come back), and scrollTo() accepts an SVG element as its target.' },
     ],
     tierHint: 'T1',
     interviewTriggers: ['scroll', 'vieritys', 'smooth scroll', 'pehmeä vieritys', 'parallax', 'liike', 'motion', 'storytelling', 'landing'],

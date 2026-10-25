@@ -9,6 +9,7 @@
  * @structure CREATIVE_PACKS: LibraryPack[]
  * @usage Imported by ./vendored.ts only. Do not import directly.
  * @version-history
+ *   v1.3.0 — 2026-10-25 — p5 2.3.4 and pixi.js 8.22.0, both in place.
  *   v1.2.0 — 2026-09-03 — showcaseUrl on phaser4: the Design Book's Phaser page.
  *   v1.1.0 — 2026-09-02 — phaser4 points at aimeat-phaser as the paved path (wish-phaser4-design-
  *     book-page).
@@ -156,7 +157,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
     url: '/lib/p5@2.min.js',
     include: ['<script src="{{BASE_URL}}/lib/p5@2.min.js"></script>'],
     requires: [],
-    version: '2.3.2',
+    version: '2.3.4',
     majorPin: 'p5@2 (v1 stays at p5@1.min.js and is never touched again)',
     license: 'LGPL-2.1',
     sourceUrl: 'https://p5js.org',
@@ -183,6 +184,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '2.3.2', date: '2026-08-31', summary: 'Initial vendoring of p5 2.3.2 at /lib/p5@2.min.js, BESIDE p5@1.min.js rather than over it: the @1 file is the compatibility contract for every sketch already published and is never touched again. Preview until a demo template and an AEB run exist for it. The one breaking change to know is that preload() is gone and asset loading is awaited inside an async setup().' },
+      { version: '2.3.4', date: '2026-10-25', summary: 'p5 2.3.2 -> 2.3.4 in place at /lib/p5@2.min.js, same API. 2.3.3 adds a ceiling on the total pixels of a GIF that loadImage decodes (p5.MAX_GIF_PIXELS), so an oversized or hostile GIF is refused instead of freezing the tab, and fixes quaternion multiplication. 2.3.4 gives a clearer error message when a sketch still defines preload(), and corrects p5.VERSION and the type declarations.' },
     ],
     tierHint: 'T1',
     interviewTriggers: ['generative', 'creative', 'sketch', 'animation', 'particles', 'taide', 'animaatio'],
@@ -203,7 +205,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
       '<script src="{{BASE_URL}}/lib/pixi-unsafe-eval@8.min.js"></script>',
     ],
     requires: [],
-    version: '8.20.1',
+    version: '8.22.0',
     majorPin: 'pixi@8',
     license: 'MIT',
     sourceUrl: 'https://pixijs.com',
@@ -228,6 +230,7 @@ export const CREATIVE_PACKS: LibraryPack[] = [
     changelog: [
       { version: '8.20.1', date: '2026-07-16', summary: 'Initial vendoring of pixi.js 8.19.0 at /lib/pixi@8.min.js. v8 has a breaking API vs the v7 most examples show (async app.init, app.canvas, Graphics chain, Assets.load) — the pack doc carries the v8 idioms. A future v9 ships as a NEW pixi@9.min.js.' },
       { version: '8.20.1', date: '2026-07-17', summary: 'ADDED REQUIRED include: /lib/pixi-unsafe-eval@8.min.js (load after pixi). AEB-3 run aeb3-pixi-001 found PixiJS v8 cannot start under the published-app CSP (no unsafe-eval) without this companion — existing apps that load only pixi@8.min.js show a startup error and should add the second script tag.' },
+      { version: '8.22.0', date: '2026-10-25', summary: 'pixi.js 8.20.1 -> 8.22.0 in place, both files. Two behaviour changes an existing app may notice. Pressing Tab on a fresh page now activates the accessibility layer, as the documented default always said; an app that does not want that passes accessibilityOptions: { activateOnTab: false } to app.init. Matrix.decompose(), setFromMatrix(), reparentChild() and replaceChild() now turn a mirrored matrix into a rotation and a negative scale instead of a skew. New: a federated contextmenu event on containers (sprite.on("contextmenu", e => e.preventDefault())), and accessibleText on buttons. The v8 idioms in this doc are unchanged.' },
     ],
     demoTemplateId: 'comp-pixi-stage',
     tierHint: 'T1',

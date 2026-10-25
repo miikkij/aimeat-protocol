@@ -3,13 +3,15 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Renders a Mermaid diagram from its source text. Lazy-loads the vendored single-file
- *   Mermaid build (public/lib/mermaid/, MIT) only when a chart is first shown — it's ~3MB, so it
+ *   Mermaid 12 build (public/lib/mermaid@12/, MIT) only when a chart is first shown — it's ~5.5MB, so it
  *   must never be in the initial bundle. securityLevel:'strict' (no click handlers, sanitised). On
  *   any load/parse error it falls back to showing the raw source in a <pre> so nothing is lost.
  *   Its look is css/components/mermaid.css (.mermaid-diagram, .mermaid-fallback).
  * @structure Mermaid({ chart }) — chart is the Mermaid source string.
  * @usage import { Mermaid } from '/components/Mermaid.js';  html`<${Mermaid} chart=${src} />`
  * @version-history
+ *   v1.3.0 — 2026-10-25 — Loads Mermaid 12 from /lib/mermaid@12/ (ELK layout, new shapes); the
+ *     initialize options are unchanged and all still valid in 12.
  *   v1.2.0 — 2026-09-27 — Draws its own names: .mmd is .mermaid-diagram and .mmd-fallback is
  *     .mermaid-fallback; the rules moved with them out of css/views/profile.css into
  *     css/components/mermaid.css (a move). Not .mermaid: that is the name the Mermaid library itself
@@ -32,7 +34,7 @@ function loadMermaid() {
   if (_promise) return _promise;
   _promise = new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = '/lib/mermaid/mermaid.min.js' + (window.__B || '');
+    s.src = '/lib/mermaid@12/mermaid.min.js' + (window.__B || '');
     s.onload = () => {
       try {
         window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral', flowchart: { htmlLabels: false }, suppressErrorRendering: true });

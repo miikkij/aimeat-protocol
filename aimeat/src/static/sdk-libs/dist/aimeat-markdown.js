@@ -368,7 +368,7 @@
     if (_mermaidP) return _mermaidP;
     _mermaidP = new Promise(function(resolve, reject) {
       var s = document.createElement("script");
-      s.src = NODE_URL + "/lib/mermaid/mermaid.min.js";
+      s.src = NODE_URL + "/lib/mermaid@12/mermaid.min.js";
       s.onload = function() {
         try {
           window.mermaid.initialize({

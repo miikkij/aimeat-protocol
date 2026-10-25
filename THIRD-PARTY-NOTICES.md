@@ -35,9 +35,9 @@ WEAK COPYLEFT, and the one place on this node where that matters. p5 is served u
 
 Weak copyleft: your own code stays yours, but the library must remain replaceable and its complete source must be available. Modifying the library itself puts the changes under the LGPL.
 
-p5 2.x, served beside p5@1.min.js rather than over it. Still LGPL-2.1: the same three obligations as the v1 entry, and the source offer above is the exact 2.3.2 tarball.
+p5 2.x, served beside p5@1.min.js rather than over it. Still LGPL-2.1: the same three obligations as the v1 entry, and the source offer above is the exact 2.3.4 tarball.
 
-**Complete source of the exact version:** https://registry.npmjs.org/p5/-/p5-2.3.2.tgz
+**Complete source of the exact version:** https://registry.npmjs.org/p5/-/p5-2.3.4.tgz
 
 ### @ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly) — GPL-2.0-or-later
 
@@ -64,25 +64,26 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | Component | Version | Licence | Copyright | How it gets there | Obligation |
 |---|---|---|---|---|---|
 | [@tailwindcss/browser](https://tailwindcss.com) | 4.3.3 | MIT | Copyright (c) Tailwind Labs, Inc. | served by the node | notice only |
-| [daisyUI](https://daisyui.com) | 5.7.22 | MIT | Copyright (c) 2020 Pouya Saadeghi | served by the node | notice only |
-| [Chart.js](https://www.chartjs.org) | 4.5.1 | MIT | Copyright (c) 2014-2024 Chart.js Contributors | served by the node | notice only |
+| [daisyUI](https://daisyui.com) | 5.7.50 | MIT | Copyright (c) 2020 Pouya Saadeghi | served by the node | notice only |
+| [Chart.js](https://www.chartjs.org) | 4.6.1 | MIT | Copyright (c) 2014-2024 Chart.js Contributors | served by the node | notice only |
 | [D3](https://d3js.org) | 7.9.0 | ISC | Copyright 2010-2023 Mike Bostock | served by the node | notice only |
 | [Mermaid](https://mermaid.js.org) | 11.17.2 | MIT | Copyright (c) 2014 - 2022 Knut Sveidqvist | served by the node | notice only |
+| [Mermaid](https://mermaid.js.org) | 12.2.0 | MIT | Copyright (c) 2014 - 2022 Knut Sveidqvist | served by the node | notice only |
 | [three.js](https://threejs.org) | 0.128.0 (r128) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [three.js + example addons (OrbitControls, Sky, RGBELoader, GLTFLoader, RoomEnvironment, BufferGeometryUtils, SkeletonUtils)](https://threejs.org) | 0.185.1 (r185) | MIT | Copyright © 2010-2026 three.js authors | served by the node | notice only |
 | [Leaflet](https://leafletjs.com) | 1.9.4 | BSD-2-Clause | Copyright (c) 2010-2023, Volodymyr Agafonkin; Copyright (c) 2010-2011, CloudMade | served by the node | notice only |
 | [Proj4js](https://github.com/proj4js/proj4js) | 2.22.0 | MIT | Copyright (c) 2014, Mike Adair, Richard Greenwood, Didier Richard, Stephen Irons, Olivier Terral and Calvin Metcalf | served by the node | notice only |
 | [Proj4Leaflet](https://github.com/kartena/Proj4Leaflet) | 1.0.2 | BSD-2-Clause | Copyright (c) 2012, Kartena AB | served by the node | notice only |
-| [Motion](https://motion.dev) | 13.1.1 | MIT | Copyright (c) 2024 Motion B.V. (https://motion.dev) | served by the node | notice only |
+| [Motion](https://motion.dev) | 13.5.1 | MIT | Copyright (c) 2024 Motion B.V. (https://motion.dev) | served by the node | notice only |
 | [anime.js](https://animejs.com) | 4.5.0 | MIT | Copyright (c) 2025 Julian Garnier | served by the node | notice only |
-| [Lenis](https://lenis.darkroom.engineering) | 1.3.26 | MIT | Copyright (c) 2024 darkroom.engineering | served by the node | notice only |
+| [Lenis](https://lenis.darkroom.engineering) | 1.3.27 | MIT | Copyright (c) 2024 darkroom.engineering | served by the node | notice only |
 | [p5.js](https://p5js.org) | 1.11.13 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
-| [p5.js](https://p5js.org) | 2.3.2 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
-| [PixiJS](https://pixijs.com) | 8.20.1 | MIT | Copyright (c) 2013-2023 Mathew Groves, Chad Engler | served by the node | notice only |
+| [p5.js](https://p5js.org) | 2.3.4 | LGPL-2.1-only | Copyright (c) The Processing Foundation and the p5.js contributors | served by the node | **see below** |
+| [PixiJS](https://pixijs.com) | 8.22.0 | MIT | Copyright (c) 2013-2023 Mathew Groves, Chad Engler | served by the node | notice only |
 | [Phaser](https://phaser.io) | 3.90.0 | MIT | Copyright (c) 2024 Richard Davey, Phaser Studio Inc. | served by the node | notice only |
 | [Phaser](https://phaser.io) | 4.2.1 | MIT | Copyright (c) 2024 Richard Davey, Phaser Studio Inc. | served by the node | notice only |
 | [Drawflow](https://github.com/jerosoler/Drawflow) | 0.0.60 | MIT | Copyright (c) 2020 Jero Soler | served by the node | notice only |
-| [PDF.js (pdfjs-dist)](https://mozilla.github.io/pdf.js/) | 6.3.289 | Apache-2.0 | Copyright 2024 Mozilla Foundation | served by the node | notice only |
+| [PDF.js (pdfjs-dist)](https://mozilla.github.io/pdf.js/) | 6.4.299 | Apache-2.0 | Copyright 2024 Mozilla Foundation | served by the node | notice only |
 | [hls.js](https://github.com/video-dev/hls.js) | 1.7.3 | Apache-2.0 | Copyright (c) 2017 Dailymotion (http://www.dailymotion.com) | served by the node | notice only |
 | [DuckDB-Wasm](https://duckdb.org) | 1.32.0 | MIT | Copyright 2018-2025 Stichting DuckDB Foundation | served by the node | notice only |
 | [Apache Arrow (JS)](https://arrow.apache.org) | 17.0.0 | Apache-2.0 | Copyright 2016-2026 The Apache Software Foundation | served by the node | notice only |
@@ -90,17 +91,17 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.6 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.10 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [world-atlas (Natural Earth 110m country shapes)](https://github.com/topojson/world-atlas) | 2.0.2 | ISC | Copyright 2013-2019 Michael Bostock; the underlying Natural Earth data is in the public domain | served by the node | notice only |
-| [yaml](https://eemeli.org/yaml/) | 2.9.0 | ISC | Copyright Eemeli Aro <eemeli@gmail.com> | served by the node | notice only |
+| [yaml](https://eemeli.org/yaml/) | 2.9.1 | ISC | Copyright Eemeli Aro <eemeli@gmail.com> | served by the node | notice only |
 | [Preact](https://preactjs.com) | 10.29.8 | MIT | Copyright (c) 2015-present Jason Miller | served by the node | notice only |
 | [htm](https://github.com/developit/htm) | 3.1.1 | Apache-2.0 | Copyright (c) Jason Miller and the htm contributors | served by the node | notice only |
 | [minidenticons](https://github.com/laurentpayot/minidenticons) | 4.2.1 | MIT | Copyright (c) 2021 Laurent Payot | served by the node | notice only |
 | [Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader, Michroma](https://fonts.google.com) | see fonts/LICENSE.md | OFL-1.1 | see fonts/LICENSE.md for the copyright holder of each family | served by the node | notice only |
-| [KaTeX](https://katex.org) | 0.18.5 | MIT | Copyright (c) 2013-2020 Khan Academy and other contributors | served by the node | notice only |
+| [KaTeX](https://katex.org) | 0.19.1 | MIT | Copyright (c) 2013-2020 Khan Academy and other contributors | served by the node | notice only |
 | [AIMEAT (this project's own served libraries)](https://github.com/miikkij/aimeat-protocol) | see each file's @version-history header | MIT | Copyright (c) 2026 Jouni Miikki | served by the node | notice only |
 | [models.dev (model data)](https://models.dev) | 2026-09-28 | MIT | Copyright (c) 2025 models.dev | served by the node | notice only |
 | [LiteLLM model_prices_and_context_window.json (model data)](https://github.com/BerriAI/litellm) | 2026-09-28 | MIT | Copyright (c) 2023 Berri AI | served by the node | notice only |
 
-Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Earth 110m country shapes)** (The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.); **KaTeX** (The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file.); **models.dev (model data)** (Model capabilities, limits and prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json) and refreshed from the source by the node. Not served under /lib; listed here because the seed ships in the package.); **LiteLLM model_prices_and_context_window.json (model data)** (Image, speech and transcription prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json). The file lies outside the repository's enterprise/ directory, so its MIT licence applies. Not served under /lib; listed here because the seed ships in the package.)
+Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Earth 110m country shapes)** (The GEOMETRY is derived: the TopoJSON was projected to SVG path strings so the Atelier atlas component does not have to carry a projection library. The data itself is public domain (Natural Earth); the ISC notice covers the world-atlas packaging.); **yaml** (The one change is a first line `// @ts-nocheck` so the frontend type check skips a minified bundle. Until 2026-10-25 the file was an esm.sh bundle of 2.8.2, by its own banner, while this entry said 2.9.0, so every vulnerability scan asked about a version the node did not serve.); **KaTeX** (The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file.); **models.dev (model data)** (Model capabilities, limits and prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json) and refreshed from the source by the node. Not served under /lib; listed here because the seed ships in the package.); **LiteLLM model_prices_and_context_window.json (model data)** (Image, speech and transcription prices, normalized into the node's model catalogue seed (aimeat/src/data/ai-catalog/seed.json). The file lies outside the repository's enterprise/ directory, so its MIT licence applies. Not served under /lib; listed here because the seed ships in the package.)
 
 ## Production dependencies
 
@@ -3775,7 +3776,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### Chart.js 4.5.1
+### Chart.js 4.6.1
 
 ```text
 The MIT License (MIT)
@@ -4510,7 +4511,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### daisyUI 5.7.22
+### daisyUI 5.7.50
 
 ```text
 MIT License
@@ -7757,7 +7758,7 @@ FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TOR
 ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### KaTeX 0.18.5
+### KaTeX 0.19.1
 
 ```text
 The MIT License (MIT)
@@ -7879,7 +7880,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
-### Lenis 1.3.26
+### Lenis 1.3.27
 
 ```text
 The MIT License
@@ -8225,7 +8226,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### Mermaid 11.17.2
+### Mermaid 11.17.2, Mermaid 12.2.0
 
 ```text
 The MIT License (MIT)
@@ -8409,7 +8410,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### Motion 13.1.1
+### Motion 13.5.1
 
 ```text
 The MIT License (MIT)
@@ -8829,7 +8830,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### p5.js 1.11.13, p5.js 2.3.2
+### p5.js 1.11.13, p5.js 2.3.4
 
 ```text
 GNU LESSER GENERAL PUBLIC LICENSE
@@ -9396,7 +9397,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### PDF.js (pdfjs-dist) 6.3.289
+### PDF.js (pdfjs-dist) 6.4.299
 
 ```text
 Apache License
@@ -9739,7 +9740,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### PixiJS 8.20.1
+### PixiJS 8.22.0
 
 ```text
 The MIT License
@@ -12221,7 +12222,7 @@ TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
 ```
 
-### yaml 2.9.0, yaml 2.9.1
+### yaml 2.9.1, yaml 2.9.1
 
 ```text
 Copyright Eemeli Aro <eemeli@gmail.com>

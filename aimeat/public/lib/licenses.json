@@ -19,32 +19,32 @@
     {
       "id": "daisyui",
       "name": "daisyUI",
-      "version": "5.7.22",
+      "version": "5.7.50",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2020 Pouya Saadeghi",
       "homepage": "https://daisyui.com",
-      "source": "https://cdn.jsdelivr.net/npm/daisyui@5.7.22/daisyui.css",
+      "source": "https://cdn.jsdelivr.net/npm/daisyui@5.7.50/daisyui.css",
       "licenseFile": "LICENSES/daisyui.txt",
       "files": [
         "daisyui@5.css"
       ],
       "modified": false,
-      "purl": "pkg:npm/daisyui@5.7.22"
+      "purl": "pkg:npm/daisyui@5.7.50"
     },
     {
       "id": "chartjs",
       "name": "Chart.js",
-      "version": "4.5.1",
+      "version": "4.6.1",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2014-2024 Chart.js Contributors",
       "homepage": "https://www.chartjs.org",
-      "source": "https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js",
+      "source": "https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js",
       "licenseFile": "LICENSES/chartjs.txt",
       "files": [
         "chartjs@4.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/chart.js@4.5.1"
+      "purl": "pkg:npm/chart.js@4.6.1"
     },
     {
       "id": "d3",
@@ -74,7 +74,23 @@
         "mermaid/mermaid.min.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/mermaid@11.17.2"
+      "purl": "pkg:npm/mermaid@11.17.2",
+      "supersededBy": "mermaid12"
+    },
+    {
+      "id": "mermaid12",
+      "name": "Mermaid",
+      "version": "12.2.0",
+      "spdx": "MIT",
+      "copyright": "Copyright (c) 2014 - 2022 Knut Sveidqvist",
+      "homepage": "https://mermaid.js.org",
+      "source": "https://cdn.jsdelivr.net/npm/mermaid@12.2.0/dist/mermaid.min.js",
+      "licenseFile": "LICENSES/mermaid.txt",
+      "files": [
+        "mermaid@12/mermaid.min.js"
+      ],
+      "modified": false,
+      "purl": "pkg:npm/mermaid@12.2.0"
     },
     {
       "id": "three",
@@ -158,18 +174,18 @@
     {
       "id": "motion",
       "name": "Motion",
-      "version": "13.1.1",
+      "version": "13.5.1",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2024 Motion B.V. (https://motion.dev)",
       "homepage": "https://motion.dev",
-      "source": "https://cdn.jsdelivr.net/npm/motion@13.1.1/dist/motion.js",
+      "source": "https://cdn.jsdelivr.net/npm/motion@13.5.1/dist/motion.js",
       "licenseFile": "LICENSES/motion.txt",
       "files": [
         "motion@13.min.js"
       ],
       "modified": false,
       "note": "The vanilla-JavaScript core that Framer Motion is built on, by Matt Perry. The dist file is the UMD build and is already minified upstream; the @13 suffix is this node's compatibility pin, not an upstream filename.",
-      "purl": "pkg:npm/motion@13.1.1"
+      "purl": "pkg:npm/motion@13.5.1"
     },
     {
       "id": "anime",
@@ -189,11 +205,11 @@
     {
       "id": "lenis",
       "name": "Lenis",
-      "version": "1.3.26",
+      "version": "1.3.27",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2024 darkroom.engineering",
       "homepage": "https://lenis.darkroom.engineering",
-      "source": "https://cdn.jsdelivr.net/npm/lenis@1.3.26/dist/",
+      "source": "https://cdn.jsdelivr.net/npm/lenis@1.3.27/dist/",
       "licenseFile": "LICENSES/lenis.txt",
       "files": [
         "lenis@1.min.js",
@@ -201,7 +217,7 @@
       ],
       "modified": false,
       "note": "Both files are needed: the stylesheet carries the html.lenis rules without which the hijacked scroll container never gets its height.",
-      "purl": "pkg:npm/lenis@1.3.26"
+      "purl": "pkg:npm/lenis@1.3.27"
     },
     {
       "id": "p5",
@@ -224,35 +240,35 @@
     {
       "id": "p5v2",
       "name": "p5.js",
-      "version": "2.3.2",
+      "version": "2.3.4",
       "spdx": "LGPL-2.1-only",
       "copyright": "Copyright (c) The Processing Foundation and the p5.js contributors",
       "homepage": "https://p5js.org",
-      "source": "https://cdn.jsdelivr.net/npm/p5@2.3.2/lib/p5.min.js",
-      "sourceOffer": "https://registry.npmjs.org/p5/-/p5-2.3.2.tgz",
+      "source": "https://cdn.jsdelivr.net/npm/p5@2.3.4/lib/p5.min.js",
+      "sourceOffer": "https://registry.npmjs.org/p5/-/p5-2.3.4.tgz",
       "licenseFile": "LICENSES/p5.txt",
       "files": [
         "p5@2.min.js"
       ],
       "modified": false,
-      "note": "p5 2.x, served beside p5@1.min.js rather than over it. Still LGPL-2.1: the same three obligations as the v1 entry, and the source offer above is the exact 2.3.2 tarball.",
-      "purl": "pkg:npm/p5@2.3.2"
+      "note": "p5 2.x, served beside p5@1.min.js rather than over it. Still LGPL-2.1: the same three obligations as the v1 entry, and the source offer above is the exact 2.3.4 tarball.",
+      "purl": "pkg:npm/p5@2.3.4"
     },
     {
       "id": "pixijs",
       "name": "PixiJS",
-      "version": "8.20.1",
+      "version": "8.22.0",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2013-2023 Mathew Groves, Chad Engler",
       "homepage": "https://pixijs.com",
-      "source": "https://cdn.jsdelivr.net/npm/pixi.js@8.20.1/dist/",
+      "source": "https://cdn.jsdelivr.net/npm/pixi.js@8.22.0/dist/",
       "licenseFile": "LICENSES/pixijs.txt",
       "files": [
         "pixi@8.min.js",
         "pixi-unsafe-eval@8.min.js"
       ],
       "modified": false,
-      "purl": "pkg:npm/pixi.js@8.20.1"
+      "purl": "pkg:npm/pixi.js@8.22.0"
     },
     {
       "id": "phaser",
@@ -305,17 +321,17 @@
     {
       "id": "pdfjs",
       "name": "PDF.js (pdfjs-dist)",
-      "version": "6.3.289",
+      "version": "6.4.299",
       "spdx": "Apache-2.0",
       "copyright": "Copyright 2024 Mozilla Foundation",
       "homepage": "https://mozilla.github.io/pdf.js/",
-      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/build/",
+      "source": "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.4.299/build/",
       "licenseFile": "LICENSES/pdfjs.txt",
       "files": [
         "pdfjs@6/**"
       ],
       "modified": false,
-      "purl": "pkg:npm/pdfjs-dist@6.3.289"
+      "purl": "pkg:npm/pdfjs-dist@6.4.299"
     },
     {
       "id": "hls",
@@ -434,17 +450,18 @@
     {
       "id": "yaml",
       "name": "yaml",
-      "version": "2.9.0",
+      "version": "2.9.1",
       "spdx": "ISC",
       "copyright": "Copyright Eemeli Aro <eemeli@gmail.com>",
       "homepage": "https://eemeli.org/yaml/",
-      "source": "https://cdn.jsdelivr.net/npm/yaml@2",
+      "source": "https://cdn.jsdelivr.net/npm/yaml@2.9.1/+esm (jsDelivr's single-file ESM bundle of browser/index.js)",
       "licenseFile": "LICENSES/yaml.txt",
       "files": [
         "yaml.mjs"
       ],
-      "modified": false,
-      "purl": "pkg:npm/yaml@2.9.0"
+      "modified": true,
+      "purl": "pkg:npm/yaml@2.9.1",
+      "note": "The one change is a first line `// @ts-nocheck` so the frontend type check skips a minified bundle. Until 2026-10-25 the file was an esm.sh bundle of 2.8.2, by its own banner, while this entry said 2.9.0, so every vulnerability scan asked about a version the node did not serve."
     },
     {
       "id": "preact",
@@ -512,17 +529,17 @@
     {
       "id": "katex",
       "name": "KaTeX",
-      "version": "0.18.5",
+      "version": "0.19.1",
       "spdx": "MIT",
       "copyright": "Copyright (c) 2013-2020 Khan Academy and other contributors",
       "homepage": "https://katex.org",
-      "source": "npm katex@0.18.5 (dist/katex.min.js, dist/katex.min.css, dist/fonts/*.woff2)",
+      "source": "npm katex@0.19.1 (dist/katex.min.js, dist/katex.min.css, dist/fonts/*.woff2)",
       "licenseFile": "LICENSES/katex.txt",
       "files": [
         "katex@0/**"
       ],
       "modified": true,
-      "purl": "pkg:npm/katex@0.18.5",
+      "purl": "pkg:npm/katex@0.19.1",
       "note": "The stylesheet is the published one with the woff and ttf entries removed from each @font-face src, and only the twenty woff2 faces are carried: the other two formats are the pre-2015 fallbacks in the same src list, every browser this node serves takes woff2, and they weigh 876 kB to be requested by nobody. The repository publishes one MIT licence over the whole distribution, the fonts included, and carries no separate font licence file."
     },
     {
@@ -551,6 +568,7 @@
         "fonts.css",
         "live-updates.js",
         "mermaid/README.md",
+        "mermaid@12/README.md",
         "realtime.js",
         "samples/**"
       ],
