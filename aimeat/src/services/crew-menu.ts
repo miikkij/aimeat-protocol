@@ -37,7 +37,6 @@
  * @structure CrewMenu · crewMenu() · readLlmChoice() · ownerDefaultIsNode() · effectiveLlmChoice() · checkLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
- *   2026-10-25 — writeLlmChoice refuses a granted app, for a set and a clear: crews.llm.* is reserved from apps (secaudit2026oct22).
  *   v1.7.0 — 2026-10-13 — checkLlmChoice(): the check writeLlmChoice applies, on its own, for the
  *     approval of a proposed agent, which refuses a bad choice before it creates the agent.
  *   v1.6.0 — 2026-10-12 — The menu carries `features`, the names the runtime says it honours beyond
@@ -274,16 +273,6 @@ export async function checkLlmChoice(choice: unknown): Promise<{ ok: true; choic
 export async function writeLlmChoice(
   deps: Deps, caller: CrewCaller, agentName: string | null, choice: unknown,
 ): Promise<{ ok: true; key: string; cleared: boolean; warning?: string } | CrewRefusal> {
-  // crews.llm.* is reserved from a granted app (utils/reserved-keys.ts): a `model` choice names the
-  // address the owner's crew runtime sends its provider key to. The REST routes take memory:write,
-  // which a default app grant holds, so the refusal is here, for both the set and the clear
-  // (secaudit2026oct22). The owner in person and the owner's own agents write it as before.
-  if (caller.roles.includes('app')) {
-    return {
-      ok: false, status: 403, code: 'ACCESS_DENIED',
-      message: 'An app cannot choose the model your agents use. Set it on the Crew tab in Profile → Agents, or from your own AI connected over MCP.',
-    };
-  }
   const key = agentName ? llmKeyFor(agentName) : LLM_DEFAULT_KEY;
 
   if (choice === null || choice === undefined) {
