@@ -15,6 +15,8 @@
  * @structure owner + agent setup · agent publishes an app · four fetches · serve-time HTML
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-surfaces
  * @version-history
+ *   v1.5.0 — 2026-10-25 — The served value is the final W3C report's (`ai-autonomous`), once; an app
+ *     that declares its own meta gets no second meta and no `<html>` attribute from the node.
  *   v1.4.0 — 2026-10-08 — aiprov D18: a stored agent face is served with its own record, and the
  *     WebMCP listing with the tool manifest's, the app's only when the manifest carries none.
  *   v1.3.0 — 2026-09-29 — The marks share one row at the bottom-left: the label declares its width
@@ -254,14 +256,41 @@ const APP_HTML = [
         const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}?mode=inline`);
         assert(res.status === 200, `inline ${res.status}`);
         const html = await res.text();
-        assert(/<html[^>]*\sai-disclosure="autonomous"/i.test(html), 'the ai-disclosure attribute is not on <html>');
-        assert(html.includes('<meta name="ai-disclosure" content="autonomous">'), 'the meta tag is absent');
+        // The final W3C report's value (Final Community Group Report, 2026-10-09), and exactly one meta.
+        assert(/<html[^>]*\sai-disclosure="ai-autonomous"/i.test(html), 'the ai-disclosure attribute is not on <html>');
+        assert(html.includes('<meta name="ai-disclosure" content="ai-autonomous">'), 'the meta tag is absent');
+        assert(html.split('name="ai-disclosure"').length - 1 === 1, 'more than one ai-disclosure meta');
         assert(html.includes(`<link rel="ai-provenance" href="`), 'the link to the record is absent');
         assert(html.includes('application/ld+json'), 'the schema.org block is absent');
         assert(html.includes('trainedAlgorithmicMedia'), 'the JSON-LD carries no digitalSourceType');
         // The injector must not have landed inside the app's own JavaScript.
         assert(html.includes('const trap = "</" + "body>";'), 'the app script was corrupted by injection');
         assert((res.headers.get('ai-disclosure') ?? '').includes('mode=machine-generated'), 'header absent on the inline serve');
+    });
+
+    await test('An app that declares its own ai-disclosure meta is served with its words only', async () => {
+        // Under the W3C report the first meta in the head is the page default and a valid value on
+        // <html> overrides it, so the node adds neither; the record still travels as link and JSON-LD.
+        const ownFile = `provownmeta${Date.now()}.html`;
+        const ownMeta = '<meta name="ai-disclosure" content="human-only" />';
+        const ownHtml = APP_HTML.replace('<meta charset="utf-8">', `<meta charset="utf-8">${ownMeta}`);
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: auth(agent.token),
+            body: JSON.stringify({
+                filename: ownFile, mime_type: 'text/html',
+                content: Buffer.from(ownHtml, 'utf-8').toString('base64'),
+                name: 'Own declaration test', description: 'Declares its own AI disclosure.',
+            }),
+        });
+        assert(pub.status === 200 || pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+        const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(ownFile)}?mode=inline`);
+        assert(res.status === 200, `inline ${res.status}`);
+        const html = await res.text();
+        assert(html.split('name="ai-disclosure"').length - 1 === 1, 'the node added a second ai-disclosure meta');
+        assert(html.indexOf(ownMeta) > 0 && html.indexOf(ownMeta) < html.indexOf('</head>'), 'the app\'s own meta is not in its head as written');
+        assert(!/<html[^>]*\sai-disclosure=/i.test(html), 'the node put an ai-disclosure attribute on <html>');
+        assert(html.includes('<link rel="ai-provenance" href="'), 'the link to the record is absent');
+        assert(html.includes('application/ld+json'), 'the schema.org block is absent');
     });
 
     // ── TARGET-058 Phase 3: the VISIBLE label a person actually sees ──
