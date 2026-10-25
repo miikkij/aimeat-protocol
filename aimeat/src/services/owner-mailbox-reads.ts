@@ -38,6 +38,9 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.3.0 — 2026-10-25 — readOwnerOverview takes `compact`: each row's last message is cut to a
+ *     preview and each agent is its id and names. The Messages page renders nothing more, and on
+ *     aimeat.io the whole answer was 557 kB, 300 kB of it full message bodies and 218 kB agent records.
  *   v1.2.0 — 2026-10-21 — A group thread's `conversation` carries `invited` and `you_manage` (group chat).
  *   v1.1.0 — 2026-10-08 — readOwnerInbox and readOwnerThread take the config, and each message then
  *     carries its provenance record, not only the summary: a private message's record answers 404
@@ -53,6 +56,7 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { isForeignPrincipal, isSameOwner, localAccountName } from '../utils/gaii.js';
 import { createMessagingDbService, type OwnerConversation } from './db/messaging-db-service.js';
 import { createMessagesInboxService, type InboxOverview } from './db/messages-inbox-db-service.js';
+import type { AgentRecordView } from './agent-record-view.js';
 import { withMessageProvenance } from './message-provenance.js';
 import { readAgentDmThread } from './agent-dm-reads.js';
 import { isParticipant } from './conversation-group.js';
@@ -225,17 +229,39 @@ export async function readOwnerThread(
  * `conversationsTotal` says how many matched before the limit. Without either, the list is whole,
  * which is what the Messages page mounts. They exist for a chat: a busy mailbox is a hundred and
  * fifty threads, and an AI asked "what is waiting for me" needs the first few.
+ *
+ * `compact` is the shape a list renders: `lastMessage` cut to {@link OVERVIEW_PREVIEW_CHARS} and each
+ * agent reduced to its id and names. A reader that answers from the text itself (the MCP tool) leaves
+ * it off and gets the whole body.
  */
 export async function readOwnerOverview(
   storage: Storage,
   reader: MailboxReader,
-  opts: { unreadOnly?: boolean; limit?: number } = {},
-): Promise<InboxOverview & { conversationsTotal: number }> {
+  opts: { unreadOnly?: boolean; limit?: number; compact?: boolean } = {},
+): Promise<Omit<InboxOverview, 'agents'> & { agents: Array<AgentRecordView | AgentNames>; conversationsTotal: number }> {
   const data = await createMessagesInboxService(storage).overview(reader.ownerGhii, reader.ownerName, {
     inPerson: reader.kind === 'owner',
   });
   const matching = opts.unreadOnly ? data.conversations.filter(c => c.unread > 0) : data.conversations;
   const conversations = opts.limit ? matching.slice(0, opts.limit) : matching;
   noteDelegatedRead(reader, 'overview', { conversations: conversations.length });
-  return { ...data, conversations, conversationsTotal: matching.length };
+  if (!opts.compact) return { ...data, conversations, conversationsTotal: matching.length };
+  return {
+    ...data,
+    conversations: conversations.map(previewRow),
+    agents: data.agents.map((a): AgentNames => ({ gaii: a.gaii, name: a.name, displayName: a.displayName })),
+    conversationsTotal: matching.length,
+  };
+}
+
+/** An agent in a compact overview: what a recipient suggestion and a row label read. */
+export type AgentNames = Pick<AgentRecordView, 'gaii' | 'name' | 'displayName'>;
+
+/** How much of a conversation's last message a compact overview carries: more than a list row shows. */
+export const OVERVIEW_PREVIEW_CHARS = 200;
+
+function previewRow(c: OwnerConversation): OwnerConversation {
+  const chars = Array.from(c.lastMessage ?? '');
+  const lastMessage = chars.length > OVERVIEW_PREVIEW_CHARS ? `${chars.slice(0, OVERVIEW_PREVIEW_CHARS).join('')}…` : c.lastMessage;
+  return { ...c, lastMessage, ...(c.folded ? { folded: c.folded.map(previewRow) } : {}) };
 }

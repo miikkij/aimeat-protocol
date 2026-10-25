@@ -60248,6 +60248,14 @@ paths:
           required: false
           description: At most this many conversations, newest first (1-200). Omitted, the list is whole.
           schema: { type: integer, minimum: 1, maximum: 200 }
+        - name: compact
+          in: query
+          required: false
+          description: >-
+            The shape a list renders. Each conversation's `lastMessage` (and each folded row's) is cut
+            to 200 characters with a trailing ellipsis, and each entry of `agents` carries only `gaii`,
+            `name` and `displayName`. Omitted, bodies and agent records are whole.
+          schema: { type: boolean }
       responses:
         '200':
           description: Inbox overview
