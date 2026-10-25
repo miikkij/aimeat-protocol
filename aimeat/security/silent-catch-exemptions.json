@@ -201,9 +201,9 @@
       "count": 2,
       "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
     },
-    "src/services/docsign/records.ts": {
+    "src/services/docsign/verify-signatures.ts": {
       "count": 2,
-      "reason": "SEEDED 2026-10-16 from the directives in place that day, NOT RE-READ — each directive carries the reason its author wrote after `--` on its own line; this entry only records how many findings they suppress, so that adding one is a visible change."
+      "reason": "MOVED 2026-10-25 from src/services/docsign/records.ts with verifyRecordSignatures, unchanged (max-file-lines). Re-read: a stored key or signature that will not decode, and a passkey assertion the library throws on, are evidence that does not verify, so false is the answer in both."
     },
     "src/services/docsign/revocation.ts": {
       "count": 2,
