@@ -13,6 +13,10 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Backup reader — 2026-10-25 — GET /v1/admin/backup reads a delegated caller's memory records through
+ *     the classification reader and names what stayed behind in `withheld`; the operator in person gets
+ *     the whole file. Each person whose entries the file holds gets one export line in their account
+ *     feed (secaudit2026oct22, get-admin-backup:memory-values-without-reader-or-trail).
  *   Trust advisory sent — 2026-10-16 — POST /v1/admin/federation/trust-advisory sends the stored
  *     advisory to the active peers at once as a signed notice (services/federation-trust-notice.ts)
  *     and answers each peer's outcome; it said the advisory would be broadcast on the next sync cycle,
@@ -69,11 +73,12 @@ import type { PeerInfo } from '../services/federation.js';
 import { deriveTierFlags } from '../services/federation-tiers.js';
 import { performKeyExchange } from '../services/federation-helpers.js';
 import { logger } from '../utils/logger.js';
-import { recordOperatorAction } from '../services/operator-access-audit.js';
-import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { recordOperatorAction, recordOperatorAccess } from '../services/operator-access-audit.js';
+import { resolveIdentity, ownerGhiiOf, isOwnerInPerson } from '../utils/gaii.js';
+import { readerFor } from '../services/classification/reader.js';
 import type { VerifiedToken } from '../auth/jwt.js';
 import { ROOMS } from '../services/home-rooms.js';
-import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED } from '../services/admin-backup-projection.js';
+import { backupOwner, backupAgent, backupMemories, BACKUP_OMITTED, BACKUP_WITHHELD_NOTE, readableBackupMemories } from '../services/admin-backup-projection.js';
 import { restoreBackup } from '../services/admin-restore.js';
 import { presentWorkCost } from '../services/morsel.js';
 import { sendTrustNotice, type TrustAdvisoryType } from '../services/federation-trust-notice.js';
@@ -392,18 +397,39 @@ export function adminMonitoringRouter(
     });
 
     // GET /v1/admin/backup — export all data as JSON (operator only)
-    router.get('/v1/admin/backup', requireAuth(), requireOperator(storage), async (_req, res) => {
+    router.get('/v1/admin/backup', requireAuth(), requireOperator(storage), async (req, res) => {
         const owners = await storage.listOwners();
         const agents = await storage.listAgents();
         const actions = await storage.listActions();
         const boards = await storage.listBoards();
 
+        // The operator in person gets the whole file: it is what a restore loads. A delegated caller
+        // (the operator's agent holding operator:admin) reads the records through the classification
+        // reader, as GET /v1/admin/memory/:owner/:key does, and `withheld` names what stayed behind
+        // (secaudit2026oct22).
+        const reader = isOwnerInPerson(req.auth) ? null : readerFor({ storage, config }, req.auth);
+        const withheld: Array<{ owner: string; key: string }> = [];
+        const carried = new Map<string, number>();
+
         // Collect all memories and transactions per agent
         const agentData: Record<string, { memories: unknown[]; transactions: unknown[] }> = {};
         for (const a of agents) {
-            const memories = backupMemories(await storage.listMemory(a.gaii));
+            let memories = backupMemories(await storage.listMemory(a.gaii));
+            if (reader) {
+                const read = await readableBackupMemories(reader, memories);
+                memories = read.kept;
+                for (const key of read.withheld) withheld.push({ owner: a.gaii, key });
+            }
+            if (memories.length) carried.set(ownerGhiiOf(a.gaii), (carried.get(ownerGhiiOf(a.gaii)) ?? 0) + memories.length);
             const transactions = await storage.getTransactions(a.gaii, 100_000);
             agentData[a.gaii] = { memories, transactions };
+        }
+
+        // The operator trail: one export line for each person whose entries the file holds, with the
+        // count, before the answer (services/operator-access-audit.ts; the operator's own write none).
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        for (const [ownerOf, count] of carried) {
+            await recordOperatorAccess(storage, config, { operatorGhii: ownerGhiiOf(actorGaii), actorGaii, ownerOf, action: 'export', count });
         }
 
         // Owner and agent rows go through an allowlist (services/admin-backup-projection.ts): the
@@ -418,7 +444,8 @@ export function adminMonitoringRouter(
             actions,
             boards,
             agent_data: agentData,
-            omitted: BACKUP_OMITTED,
+            omitted: withheld.length ? [...BACKUP_OMITTED, BACKUP_WITHHELD_NOTE] : BACKUP_OMITTED,
+            withheld,
         }));
     });
 

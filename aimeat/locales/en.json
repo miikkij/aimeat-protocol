@@ -14736,6 +14736,7 @@
       "operatorSearchedEntries": "An operator's search showed parts of {count} of your entries.",
       "operatorDeletedEntry": "An operator deleted your entry {key}.",
       "operatorRestoredEntry": "An operator restored your entry {key}.",
+      "operatorExportedEntries": "An operator took a backup of this installation. It holds {count} of your entries.",
       "operatorInstalledSet": "An operator installed the install package {set} in your account: {packages} packages, and {apps} apps got permissions. You can see and change the permissions of your apps in your settings.",
       "operatorActed": "An operator made a change in your account ({area}: {action}).",
       "operatorAdminGrantedOne": "{name} got the permission to administer this installation because it had full access. You can take it away in the agent's settings.",
