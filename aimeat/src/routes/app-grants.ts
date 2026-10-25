@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-10-25 — A grant given to an earlier holder's app of the author's name counts as absent on the silent bridge, the code exchange and the refresh (services/app-grant-author.ts; secaudit2026oct22).
  *   v1.27.0 — 2026-10-25 — A redirect on the bare app host is the app's own path-form address, or the host's root in
  *     web_message mode, else 400 INVALID_REDIRECT_URI (secaudit2026oct22; Jouni, 2026-10-25).
  *   v1.26.0 — 2026-10-13 — An app's allowance from the move to 4.0 (services/app-scope-allowance.ts) counts as declared:
@@ -149,6 +150,7 @@ import { parseAppScopes } from '../services/protected-resource.js';
 import { heldOwnerAdded, narrowToDeclared } from '../services/app-grant-scopes.js';
 import { appAllowanceWords, withAllowance } from '../services/app-scope-allowance-store.js';
 import { hashGrantToken, upsertAppGrant, type GrantSpec } from '../services/app-grant-upsert.js';
+import { grantGivenToEarlierAuthor, liveAppGrantFor } from '../services/app-grant-author.js';
 import type { AppGrantRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
@@ -668,8 +670,8 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // by a flag its page adds (secaudit 2026-10 follow-up, A2).
     const unpublishedBytes = req.query.bytes === 'unpublished' || resolvedOrigin.unpublished === true;
     const isOwnApp = owner === grantOwner && !unpublishedBytes && !(await isPackageApp(storage, owner, grantTarget));
-    const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
-    const fallback = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
+    const existing = await liveAppGrantFor(storage, owner, grantTarget); // not one an earlier author's app got
+    const fallback =['memory:read', 'memory:write', 'storage:read', 'storage:write'];
     const wanted = withAllowance(requested.length ? requested : (existing?.scopes ?? fallback), await appAllowanceWords(storage, grantTarget));
     const added = existing ? wanted.filter(s => !existing.scopes.includes(s)) : [];
     let scopes: string[];
@@ -738,7 +740,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // access. One live grant per (owner, app) — a partial unique index enforces it in the DB too.
       const { grantId, rawRefresh, scopes } = await upsertGrant(
         { app: ac.app, appName: ac.appName, appOrigin: ac.appOrigin, owner: ac.owner, gaii: ac.gaii, scopes: ac.scopes, shown: ac.shown },
-        await storage.getAppGrantByOwnerAndApp(ac.owner, ac.app),
+        await liveAppGrantFor(storage, ac.owner, ac.app),
       );
       const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes, grantId, app: ac.app });
       // app + own: same metadata the silent bridge returns, so the SDK keeps the login pill's
@@ -756,7 +758,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       const grant = await storage.getAppGrantByRefreshHash(hashToken(raw));
       // A grant counts only while the account it was given by holds the owner name and is not newer
       // than the grant (auth/credential-age.ts): the refresh mints nothing for an earlier account's app.
-      if (!grant || grant.revoked || !grant.refreshTokenHash
+      if (!grant || grant.revoked || !grant.refreshTokenHash || await grantGivenToEarlierAuthor(storage, grant)
         || ownerRefuses(await storage.getOwner(grant.owner), recordIssuedAt(grant.createdAt))) {
         return res.status(401).json(error(config.nodeId, 'INVALID_GRANT', 'Grant revoked or refresh token invalid'));
       }
