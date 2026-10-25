@@ -43,6 +43,7 @@ const ReactionSchema = z.object({
     title: z.string().trim().min(1).max(TITLE_MAX), description: z.string().max(TEXT_MAX).optional(),
     agent: AgentName.optional(), wants: z.array(z.string().max(64)).max(10).optional(),
     kind: z.enum(['agent', 'human']).optional(), human_kind: z.enum(HUMAN_KINDS).optional(), final: z.boolean().optional(),
+    runner: z.enum(['model']).optional(), model: z.string().trim().min(1).max(200).optional(),
   }).strict(),
 }).strict();
 
@@ -75,10 +76,12 @@ export const GoalInputSchema = z.object({
   rounds: RoundsSchema.nullable().optional(),
   parent_goal_id: z.string().max(64).optional(),
   reason: z.string().max(TEXT_MAX).optional(),
+  /** The goal waits as a proposal for the owner's yes; nothing in it moves before that. */
+  propose: z.boolean().optional(),
 }).strict();
 export type GoalInput = z.infer<typeof GoalInputSchema>;
 
-export const GoalPatchSchema = GoalInputSchema.omit({ works: true, parent_goal_id: true }).partial().extend({
+export const GoalPatchSchema = GoalInputSchema.omit({ works: true, parent_goal_id: true, propose: true }).partial().extend({
   preview: z.boolean().optional(),
   /** For a goal with rounds: the change is for this round only. */
   this_round_only: z.boolean().optional(),
@@ -105,7 +108,11 @@ function reactionFrom(r: z.infer<typeof ReactionSchema>): GoalReaction {
   if (!r.when.works?.length && !r.when.wants) throw new GoalError(400, 'INVALID_INPUT', 'A reaction names the works it waits for (when.works) or a skill (when.wants).');
   return {
     id: newId('r'), when: r.when, firedRounds: [],
-    then: { title: r.then.title, description: r.then.description, agent: r.then.agent, wants: r.then.wants, kind: r.then.kind ?? (r.then.human_kind ? 'human' : 'agent'), humanKind: r.then.human_kind, final: r.then.final },
+    then: {
+      title: r.then.title, description: r.then.description, agent: r.then.agent, wants: r.then.wants,
+      kind: r.then.kind ?? (r.then.human_kind ? 'human' : 'agent'), humanKind: r.then.human_kind, final: r.then.final,
+      ...(r.then.runner ? { runner: r.then.runner } : {}), ...(r.then.model ? { model: r.then.model } : {}),
+    },
   };
 }
 
@@ -150,7 +157,7 @@ export function buildGoal(access: GoalAccess, input: GoalInput, now = new Date()
     type: GOAL_TAG, spec: GOAL_SPEC, id: newId('g'), owner: access.ownerName,
     statement, title: (input.title ?? statement.split(/[.!?\n]/)[0]).slice(0, TITLE_MAX),
     doneWhen: { kind: input.done_kind ?? (input.done_when ? 'human' : 'all-done'), text: input.done_when ?? '' },
-    status: 'active', mode, coordinator: input.coordinator ?? null,
+    status: input.propose ? 'proposed' : 'active', mode, coordinator: input.coordinator ?? null,
     substitute: input.substitute ?? 'node',
     permissions: permissionsFrom(input.permissions),
     participants: { agents: input.agents ?? [], skills: input.skills ?? [], anyAgent: input.any_agent ?? (!input.agents?.length && !input.skills?.length) },
@@ -185,7 +192,9 @@ export function buildGoal(access: GoalAccess, input: GoalInput, now = new Date()
   if (!goal.works.length && !rounds && mode === 'single') {
     goal = appendWorks(goal, [makeWork(goal, { title: goal.title, description: statement, wants: input.skills }, access.who, { round: 0 })]);
   }
-  goal.log.push(logEntry(access.who, 'created', `The goal was made${input.reason ? `: ${input.reason}` : '.'}`));
+  goal.log.push(logEntry(access.who, 'created', input.propose
+    ? `The goal was proposed and waits for the owner's yes${input.reason ? `: ${input.reason}` : '.'}`
+    : `The goal was made${input.reason ? `: ${input.reason}` : '.'}`));
   goal.changes.push({ v: 1, at: iso, who: access.who, what: 'made the goal', where: access.person ? 'person' : 'agent' });
   return goal;
 }

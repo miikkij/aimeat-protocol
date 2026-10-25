@@ -9,6 +9,7 @@
  * @structure goalSummary() · goalView() · waitingItems()
  * @usage res.json(success(nodeId, { goal: goalView(goal) }));
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A work shows its runner, model and job; a proposed goal waits as one item.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { NOBODY_MS } from './goals-advance.js';
@@ -23,7 +24,7 @@ function workView(w: GoalWork) {
     ...(w.links ? { links: w.links } : {}),
     ...(w.texts ? { texts: w.texts } : {}),
     ...(w.prompt ? { prompt: w.prompt } : {}),
-    agent: w.agent ?? null, wants: w.wants ?? [], status: w.status, hop: w.hop, loop: w.loop, round: w.round ?? 0,
+    agent: w.agent ?? null, wants: w.wants ?? [], runner: w.runner ?? null, model: w.model ?? null, job_id: w.jobId ?? null, status: w.status, hop: w.hop, loop: w.loop, round: w.round ?? 0,
     after: w.after ?? [], wait_until: w.waitUntil ?? null, final: !!w.final,
     task_id: w.taskId ?? null, claimed_by: w.claimedBy ?? null, claimed_at: w.claimedAt ?? null, deadline_at: w.deadlineAt ?? null,
     attempts: w.attempts, created_by: w.createdBy, created_at: w.createdAt, settled_at: w.settledAt ?? null,
@@ -76,9 +77,25 @@ export function goalView(goal: GoalRecord) {
   };
 }
 
+/** One thing that waits for the person: a step, open work nobody took, or a whole proposed goal. */
+export interface WaitingItem {
+  goal_id: string;
+  goal: string;
+  kind: 'step' | 'nobody_took' | 'proposal';
+  work: ReturnType<typeof workView> | null;
+  since: string;
+  statement?: string;
+  proposed_by?: string;
+  works?: number;
+}
+
 /** The steps in one goal that wait for the person, and the open work nobody took. */
-export function waitingItems(goal: GoalRecord) {
+export function waitingItems(goal: GoalRecord): WaitingItem[] {
   const now = Date.now();
+  // A proposal is one thing to decide: the whole goal, before any of its steps.
+  if (goal.status === 'proposed') {
+    return [{ goal_id: goal.id, goal: goal.title, kind: 'proposal' as const, work: null, statement: goal.statement, proposed_by: goal.createdBy, works: goal.works.length, since: goal.createdAt }];
+  }
   const steps = goal.works.filter(w => w.kind === 'human' && w.status === 'open').map(w => ({
     goal_id: goal.id, goal: goal.title, kind: 'step' as const, work: workView(w), since: w.notifiedAt ?? w.createdAt,
   }));

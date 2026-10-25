@@ -12,6 +12,8 @@
  * @structure SWEEP_MS · sweepGoals() · sweepOne() · scheduleGoalSweep()
  * @usage scheduleGoalSweep({ storage, config });   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The node's model works: settled when their job finishes (the finished-job
+ *     listener registered here) and checked each minute (checkModelWorks); a proposed goal waits.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { randomUUID } from 'node:crypto';
@@ -22,14 +24,17 @@ import { UNCHANGED } from '../record-cas.js';
 import { logEntry, parseGoal, updateGoal, type GoalDeps } from './goals-store.js';
 import { advanceGoal } from './goals-advance.js';
 import { startRound } from './goals-ops.js';
-import { GOAL_PREFIX, MAX_ATTEMPTS, goalSettled, type GoalRecord } from './goals-types.js';
+import { checkModelWorks, settleModelJob } from './goals-model.js';
+import { onAiJobFinished } from '../ai-jobs/finished-listeners.js';
+import { GOAL_PREFIX, MAX_ATTEMPTS, MODEL_TAKER, goalSettled, type GoalRecord } from './goals-types.js';
 
 export const SWEEP_MS = 60_000;
 
 /** Return taken works that stopped moving; answers the ids of the tasks to mark failed. */
 async function returnStuck(deps: GoalDeps, ownerGhii: string, goal: GoalRecord, now: number): Promise<void> {
   const stuck: Array<{ workId: string; taskId?: string }> = [];
-  for (const w of goal.works.filter(x => x.status === 'claimed')) {
+  // A work the node's model does has a job, not a task: checkModelWorks reads it.
+  for (const w of goal.works.filter(x => x.status === 'claimed' && x.claimedBy !== MODEL_TAKER)) {
     const limit = goal.limits.claimMinutes * 60_000;
     if (!w.taskId) {
       if (w.claimedAt && now - Date.parse(w.claimedAt) > limit) stuck.push({ workId: w.id });
@@ -73,7 +78,8 @@ async function returnStuck(deps: GoalDeps, ownerGhii: string, goal: GoalRecord, 
 
 /** One goal: expiry, a clock round, stuck work, and the move-on. */
 export async function sweepOne(deps: GoalDeps, ownerGhii: string, goal: GoalRecord, now = Date.now()): Promise<void> {
-  if (goalSettled(goal.status)) return;
+  // A proposal waits for the owner's yes: nothing in it moves, and it does not expire on its own.
+  if (goalSettled(goal.status) || goal.status === 'proposed') return;
   const ended = (goal.endsAt && Date.parse(goal.endsAt) <= now) || (goal.renewBy && Date.parse(goal.renewBy) <= now);
   if (ended) {
     await updateGoal(deps, ownerGhii, goal.id, cur => goalSettled(cur.status) ? UNCHANGED : ({
@@ -101,6 +107,7 @@ export async function sweepOne(deps: GoalDeps, ownerGhii: string, goal: GoalReco
     }
   }
   await returnStuck(deps, ownerGhii, goal, now);
+  await checkModelWorks(deps, ownerGhii, goal, now);
   await advanceGoal(deps, ownerGhii, goal.id);
 }
 
@@ -119,6 +126,11 @@ export async function sweepGoals(deps: GoalDeps): Promise<void> {
 }
 
 export function scheduleGoalSweep(deps: GoalDeps): void {
+  // A goal's model work settles the moment its job finishes; the sweep is only the fallback.
+  onAiJobFinished(async job => {
+    const settled = await settleModelJob(deps, job);
+    if (settled) await advanceGoal(deps, settled.ownerGhii, settled.goalId);
+  });
   const run = () => { sweepGoals(deps).catch(err => logger.warn('goal sweep failed', { error: String(err) })); };
   setTimeout(run, 30_000);
   setInterval(run, SWEEP_MS);

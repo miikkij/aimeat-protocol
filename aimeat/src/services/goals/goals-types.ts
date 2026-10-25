@@ -15,6 +15,9 @@
  * @structure GoalRecord · GoalWork · GoalLogEntry · limits and caps · goalKey() · trackingCode() · parseTrackingCode()
  * @usage import { type GoalRecord, goalKey } from './goals-types.js';
  * @version-history
+ *   v1.1.0 — 2026-10-25 — A work the node's model does (`runner: 'model'`, MODEL_TAKER, runKey,
+ *     resultsKey), and the status `proposed` for a goal the owner's AI proposed (Jouni, 2026-10-25:
+ *     the AI proposes, the person approves; with no agent or computer the node's model does the work).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 
@@ -49,7 +52,11 @@ export const RENEW_DAYS = 90;
 /** How many times a taken work may be returned to open work before it goes to the person. */
 export const MAX_ATTEMPTS = 2;
 
-export const GOAL_STATUSES = ['active', 'paused', 'done', 'stopped', 'expired'] as const;
+/**
+ * `proposed`: made by the owner's AI with `propose`, waiting for the owner's yes; nothing in it moves
+ * until the owner approves it (goals-ops.ts goalActionOp 'approve').
+ */
+export const GOAL_STATUSES = ['proposed', 'active', 'paused', 'done', 'stopped', 'expired'] as const;
 export type GoalStatus = typeof GOAL_STATUSES[number];
 
 /** Who carries the goal: one agent taking the whole thing, a coordinator agent, or a fixed plan. */
@@ -95,6 +102,18 @@ export interface GoalWork {
   prompt?: string;
   /** Named agent (account-local name), or absent for open work. */
   agent?: string;
+  /**
+   * 'model': the node's own model does the work as a background AI job with the owner's key
+   * (services/goals/goals-model.ts), when no agent or computer is needed or there is none. No agent
+   * takes it; it runs inside the goal's spending limit.
+   */
+  runner?: 'model';
+  /** For a model work: the model to use; absent, the owner's own default model. */
+  model?: string;
+  /** For a model work: the background job that does it. */
+  jobId?: string;
+  /** When the owner was told that a model work waits because the goal reached its spending limit. */
+  limitAt?: string;
   /** Skills an open work asks for; an agent whose tags hold one of them may take it. */
   wants?: string[];
   /** Agents that may not take this work: the one whose own result produced it. */
@@ -159,6 +178,8 @@ export interface WorkSpec {
   prompt?: string;
   agent?: string;
   wants?: string[];
+  runner?: 'model';
+  model?: string;
   after?: string[];
   waitUntil?: string;
   final?: boolean;
@@ -176,6 +197,8 @@ export interface GoalReaction {
     kind?: 'agent' | 'human';
     humanKind?: HumanKind;
     final?: boolean;
+    runner?: 'model';
+    model?: string;
   };
   firedRounds: number[];
 }
@@ -250,6 +273,21 @@ export interface GoalRecord {
 }
 
 export function goalKey(id: string): string { return `${GOAL_PREFIX}${id}`; }
+
+/** Who a model work is taken by, in `claimedBy` and the log. */
+export const MODEL_TAKER = 'model';
+/** Where a model work's job writes its answer, until the goal moves it into the goal's results record. */
+export const MODEL_RUN_PREFIX = 'goal-runs.';
+/** One record per goal holding the model works' whole answers (the work keeps the first TEXT_MAX characters). */
+export const RESULTS_PREFIX = 'goal-results.';
+/** How many answers a goal's results record keeps; the oldest go first. */
+export const MAX_RESULTS = 50;
+export function runKey(goalId: string, workId: string): string { return `${MODEL_RUN_PREFIX}${goalId}.${workId}`; }
+export function parseRunKey(key: string): { goalId: string; workId: string } | null {
+  const m = /^goal-runs\.([a-z0-9-]{4,64})\.([a-z0-9-]{2,64})$/.exec(key);
+  return m ? { goalId: m[1], workId: m[2] } : null;
+}
+export function resultsKey(goalId: string): string { return `${RESULTS_PREFIX}${goalId}`; }
 
 /** The code a goal's task carries in `workTrackingCode`. */
 export function trackingCode(goalId: string, workId: string): string { return `goal:${goalId}:${workId}`; }

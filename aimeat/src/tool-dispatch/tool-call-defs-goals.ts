@@ -40,13 +40,14 @@ export const goalCliTools: ConnectCliToolDefinition[] = [
       const id = () => requiredString(input, 'goal_id');
       switch (action) {
         case 'create': return client.post(BASE, body);
+        case 'propose': return client.post(BASE, { ...body, propose: true });
         case 'update': return client.patch(at(id()), body);
         case 'preview': return client.patch(at(id()), { ...body, preview: true });
         case 'attach': return client.post(`${at(id())}/material`, body);
         case 'delete': return client.delete(at(id()));
-        case 'pause': case 'resume': case 'stop': case 'done': case 'renew': case 'start_round':
+        case 'pause': case 'resume': case 'stop': case 'done': case 'renew': case 'start_round': case 'decline':
           return client.post(`${at(id())}/actions/${action}`, reason ? { reason } : {});
-        default: throw new Error('action is one of create, update, preview, pause, resume, stop, done, renew, start_round, attach, delete.');
+        default: throw new Error('action is one of propose, create, update, preview, pause, resume, stop, done, renew, start_round, attach, decline, delete.');
       }
     },
   },

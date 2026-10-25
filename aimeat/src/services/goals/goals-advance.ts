@@ -15,6 +15,8 @@
  * @structure OFFER_GRACE_MS · NOBODY_MS · computeAdvance() · advanceGoal()
  * @usage await advanceGoal(deps, ownerGhii, goalId);
  * @version-history
+ *   v1.1.0 — 2026-10-25 — An open work with `runner: 'model'` is started by the node's model
+ *     (goals-model.ts) inside the spending limit; a proposed goal does not move.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { logger } from '../../utils/logger.js';
@@ -26,6 +28,7 @@ import { LIVE_TASK_STATUSES } from '../../storage/types/agents-messaging.js';
 import { logEntry, readGoal, updateGoal, type GoalDeps } from './goals-store.js';
 import { isFree, mayTake, ownerAgents, type GoalAgent } from './goals-agents.js';
 import { claimWork, makeWork, appendWorks } from './goals-work.js';
+import { runModelWork } from './goals-model.js';
 import { goalSettled, trackingCode, workSettled, type GoalLogEntry, type GoalRecord, type GoalWork } from './goals-types.js';
 
 /** Offered open work waits this long for an agent to take it before the first free one is given it. */
@@ -38,6 +41,8 @@ const WAKE_KINDS: ReadonlySet<GoalLogEntry['kind']> = new Set(['done', 'failed',
 
 export interface AdvanceEffects {
   assign: Array<{ workId: string; agent: string }>;
+  /** Works the node's model starts (goals-model.ts runModelWork). */
+  run: string[];
   offer: Array<{ workId: string; agents: GoalAgent[] }>;
   notify: Array<{ title: string; body: string; workId?: string }>;
   wake: boolean;
@@ -47,8 +52,8 @@ function roundOf(goal: GoalRecord): number { return goal.rounds?.count ?? 0; }
 
 /** The goal as it should now be, and the effects to run once it is written. Pure. */
 export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<string>, now = Date.now()): { goal: GoalRecord; effects: AdvanceEffects } {
-  const effects: AdvanceEffects = { assign: [], offer: [], notify: [], wake: false };
-  if (goalSettled(goal.status) || goal.status === 'paused') return { goal, effects };
+  const effects: AdvanceEffects = { assign: [], run: [], offer: [], notify: [], wake: false };
+  if (goalSettled(goal.status) || goal.status === 'paused' || goal.status === 'proposed') return { goal, effects };
   let g: GoalRecord = { ...goal, works: goal.works.map(w => ({ ...w })), log: [...goal.log], reactions: goal.reactions.map(r => ({ ...r })) };
   const nowIso = new Date(now).toISOString();
   const byId = () => new Map(g.works.map(w => [w.id, w]));
@@ -75,7 +80,7 @@ export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<
       const last = matched[matched.length - 1];
       // `after` names every work the reaction waited for, so the next work's task carries all their
       // results (goals-work.ts taskBody), not only the last one's.
-      const spec = { title: r.then.title, description: r.then.description, kind: r.then.kind ?? 'agent', humanKind: r.then.humanKind, agent: r.then.agent, wants: r.then.wants, final: r.then.final, after: matched.map(w => w.id) };
+      const spec = { title: r.then.title, description: r.then.description, kind: r.then.kind ?? 'agent', humanKind: r.then.humanKind, agent: r.then.agent, wants: r.then.wants, runner: r.then.runner, model: r.then.model, final: r.then.final, after: matched.map(w => w.id) };
       if (hop > g.limits.hops && spec.kind === 'agent') {
         const step = makeWork(g, { title: `Continue: ${spec.title}?`, description: `The work has passed ${hop - 1} times from one result to the next, which is this goal's limit. Approve to let it continue once more.`, kind: 'human', humanKind: 'approve' }, 'node', { held: spec, hop, round });
         g = appendWorks(g, [step]);
@@ -91,6 +96,20 @@ export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<
   // 3. Open agent work: a named agent gets it; open work is offered, then given to the first free agent.
   for (const w of g.works) {
     if (w.status !== 'open' || w.kind !== 'agent') continue;
+    if (w.runner === 'model') {
+      // The node's model does it, inside the goal's spending limit; at the limit it waits for the owner.
+      if (!rulesRun) continue;
+      if (g.limits.usd !== null && g.spent.usd >= g.limits.usd) {
+        if (!w.limitAt) {
+          w.limitAt = nowIso;
+          g.log.push(logEntry('node', 'limit', `"${w.title}" waits: the goal has spent ${g.spent.usd.toFixed(2)} $ of its ${g.limits.usd} $.`, { workId: w.id }));
+          effects.notify.push({ title: `"${w.title}" waits for a higher spending limit`, body: `The goal has spent ${g.spent.usd.toFixed(2)} $ of its ${g.limits.usd} $. Raise the limit to let the model do it.`, workId: w.id });
+        }
+        continue;
+      }
+      effects.run.push(w.id);
+      continue;
+    }
     if (w.agent) {
       if (rulesRun && agents.some(a => a.name === w.agent && !a.stopped)) effects.assign.push({ workId: w.id, agent: w.agent });
       continue;
@@ -153,12 +172,12 @@ async function wakeLive(deps: GoalDeps, goal: GoalRecord): Promise<boolean> {
 /** Write what computeAdvance answers and run its effects. Safe to call after any change. */
 export async function advanceGoal(deps: GoalDeps, ownerGhii: string, goalId: string): Promise<GoalRecord | null> {
   const first = await readGoal(deps, ownerGhii, goalId);
-  if (!first || goalSettled(first.status)) return first;
+  if (!first || goalSettled(first.status) || first.status === 'proposed') return first;
   const agents = await ownerAgents(deps, first.owner);
   const free = new Set<string>();
   for (const a of agents) if (!a.stopped && await isFree(deps, a.gaii)) free.add(a.name);
 
-  let effects: AdvanceEffects = { assign: [], offer: [], notify: [], wake: false };
+  let effects: AdvanceEffects = { assign: [], run: [], offer: [], notify: [], wake: false };
   const goal = await updateGoal(deps, ownerGhii, goalId, cur => {
     const out = computeAdvance(cur, agents, free);
     effects = out.effects;
@@ -172,6 +191,7 @@ export async function advanceGoal(deps: GoalDeps, ownerGhii: string, goalId: str
       logger.info('goal: the node could not give a work to an agent', { goalId, workId: a.workId, agent: a.agent, error: String(err) });
     }
   }
+  for (const workId of effects.run) await runModelWork(deps, ownerGhii, goalId, workId);
   for (const o of effects.offer) {
     const work = goal.works.find(w => w.id === o.workId);
     for (const agent of o.agents) {

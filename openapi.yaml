@@ -23531,7 +23531,7 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - { name: status, in: query, required: false, schema: { type: string, enum: [running, active, paused, done, stopped, expired] } }
+        - { name: status, in: query, required: false, schema: { type: string, enum: [running, proposed, active, paused, done, stopped, expired] } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -23548,6 +23548,10 @@ paths:
         (human|check|all-done), mode (single|coordinator|plan), coordinator, substitute, permissions,
         agents, skills, any_agent, limits { usd, hops, tasks_per_day, fix_rounds, claim_minutes },
         ends_at, workplace, plan_workflow_id, works, reactions, rounds, parent_goal_id, reason.
+        A work with `runner: "model"` (and an optional `model`) is done by the node's own model as a
+        background job with the owner's key, inside the goal's spending limit; no agent takes it.
+        `propose: true` makes the goal wait as `proposed`: nothing in it moves until the owner in person
+        approves it (POST /v1/goals/{id}/actions/approve).
         The owner, or an agent of the owner holding `task:write`.
       security:
         - BearerAuth: []
@@ -23575,6 +23579,7 @@ paths:
                 rounds: { type: object, nullable: true }
                 parent_goal_id: { type: string }
                 reason: { type: string }
+                propose: { type: boolean, description: 'The goal waits as a proposal for the owner''s yes.' }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -23588,9 +23593,9 @@ paths:
       summary: What waits for the person across the goals
       tags: [Agent Goals]
       description: >
-        Every step of a running goal that waits for the person (choose, approve, answer, do, provide)
-        and every open work no agent took in fifteen minutes, newest first. The HOME "Waiting for you"
-        reads this. `task:read`.
+        Every step of a running goal that waits for the person (choose, approve, answer, do, provide),
+        every open work no agent took in fifteen minutes, and every proposed goal (kind "proposal"),
+        newest first. The HOME "Waiting for you" reads this. `task:read`.
       security:
         - BearerAuth: []
       responses:
@@ -23671,12 +23676,15 @@ paths:
   /v1/goals/{id}/actions/{action}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }
-      - { name: action, in: path, required: true, schema: { type: string, enum: [pause, resume, stop, done, renew, start_round] } }
+      - { name: action, in: path, required: true, schema: { type: string, enum: [approve, decline, pause, resume, stop, done, renew, start_round] } }
     post:
       operationId: goalAction
-      summary: Pause, resume, stop, finish, renew a goal, or start its round
+      summary: Approve or decline a proposed goal; pause, resume, stop, finish, renew a goal, or start its round
       tags: [Agent Goals]
       description: >
+        approve: the owner in person approves a proposed goal and it starts (an agent is refused 403);
+        decline: the owner, or the AI that proposed it, removes a proposed goal; a proposal refuses every
+        other action with 409.
         pause: agents save where they are and nothing new starts; resume; stop: running work finishes
         and nothing new starts; done: the goal is reached (the owner, or the coordinator when the goal
         is done by a check); renew: a round goal runs 90 more days; start_round: the round template's

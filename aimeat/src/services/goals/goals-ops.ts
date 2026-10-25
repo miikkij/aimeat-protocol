@@ -13,15 +13,22 @@
  *   of mode `workstation`: Claude, Codex, Cursor on the person's machine) when it is neither the goal's
  *   coordinator nor the agent that asked: the person said it to their AI, and the AI passes it on. An
  *   agent answering its own question would make the question mean nothing, so that is refused.
+ *
+ *   A PROPOSAL. A goal made with `propose` (the person's AI proposing it) waits as `proposed`: nothing
+ *   in it moves, its steps do not ask, no work is taken, until the owner in person approves it; the
+ *   owner, or the AI that proposed it, declines it, which removes it.
  * @structure listOp · getOp · waitingOp · createOp · patchOp · goalActionOp · attachOp · workOp · answerOp
  * @usage res.json(success(nodeId, await createOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.1.0 — 2026-10-25 — approve and decline for a proposed goal; a proposal refuses the other actions,
+ *     a take and an answer.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { randomUUID } from 'node:crypto';
 import type { CallerContext } from '../caller-context.js';
 import { emitDelivery } from '../event-bus.js';
 import { logger } from '../../utils/logger.js';
+import { UNCHANGED } from '../record-cas.js';
 import {
   GoalError, actsForOwner, createGoalRecord, goalAccess, listGoals, logEntry, newId, readGoal, updateGoal,
   type GoalAccess, type GoalDeps,
@@ -129,7 +136,7 @@ async function tellTasks(deps: GoalDeps, works: GoalWork[], message: string): Pr
   }
 }
 
-/** pause, resume, stop, done, renew, start_round, delete. */
+/** approve, decline (a proposed goal), pause, resume, stop, done, renew, start_round, delete. */
 export async function goalActionOp(deps: GoalDeps, caller: CallerContext, id: string, action: string, body: { reason?: unknown } = {}) {
   const access = goalAccess(caller, 'write');
   const goal = await mustRead(deps, access, id);
@@ -137,7 +144,26 @@ export async function goalActionOp(deps: GoalDeps, caller: CallerContext, id: st
   const byOwner = actsForOwner(access, goal);
   const now = new Date().toISOString();
   const who = access.person ? 'The owner' : access.agent ?? 'An agent';
+  if (goal.status === 'proposed' && action !== 'approve' && action !== 'decline') {
+    throw new GoalError(409, 'CONFLICT', 'This goal is a proposal: the owner approves or declines it first.');
+  }
   switch (action) {
+    case 'approve': {
+      // The yes is the person's own: an AI that proposed a goal does not approve it for them.
+      if (!access.person) throw new GoalError(403, 'FORBIDDEN', 'The owner approves a proposed goal, signed in themselves.');
+      if (goal.status !== 'proposed') throw new GoalError(409, 'CONFLICT', `The goal is ${goal.status}, not a proposal.`);
+      const changed = await updateGoal(deps, access.ownerGhii, id, cur => cur.status !== 'proposed' ? UNCHANGED : ({
+        ...cur, status: 'active',
+        log: [...cur.log, logEntry(access.who, 'changed', `The owner approved the proposed goal${reason ? `: ${reason}` : '.'}`)],
+      }));
+      return { goal: goalView((await advanceGoal(deps, access.ownerGhii, id)) ?? changed) };
+    }
+    case 'decline': {
+      if (goal.status !== 'proposed') throw new GoalError(409, 'CONFLICT', `The goal is ${goal.status}, not a proposal.`);
+      if (!access.person && goal.createdBy !== access.who) throw new GoalError(403, 'FORBIDDEN', 'The owner, or the AI that proposed it, declines a proposed goal.');
+      await deps.storage.deleteMemory(access.ownerGhii, goalKey(id), access.who);
+      return { deleted: id };
+    }
     case 'pause': case 'resume': case 'stop': {
       if (!byOwner) throw new GoalError(403, 'FORBIDDEN', 'The owner or the goal\'s coordinator pauses, resumes or stops a goal.');
       if (goalSettled(goal.status)) throw new GoalError(409, 'CONFLICT', `The goal is ${goal.status}.`);
@@ -193,7 +219,7 @@ export async function goalActionOp(deps: GoalDeps, caller: CallerContext, id: st
       return { deleted: id };
     }
     default:
-      throw new GoalError(400, 'INVALID_INPUT', 'action is one of pause, resume, stop, done, renew, start_round, delete.');
+      throw new GoalError(400, 'INVALID_INPUT', 'action is one of approve, decline, pause, resume, stop, done, renew, start_round, delete.');
   }
 }
 
@@ -375,6 +401,7 @@ export async function answerOp(deps: GoalDeps, caller: CallerContext, goalId: st
   if (!work) throw new GoalError(404, 'NOT_FOUND', `No work ${workId} in this goal.`);
   if (work.kind !== 'human') throw new GoalError(400, 'INVALID_INPUT', 'That work is an agent\'s; an agent completes it through its task.');
   if (work.status !== 'open') throw new GoalError(409, 'CONFLICT', `The step is ${work.status}.`);
+  if (goal.status === 'proposed') throw new GoalError(409, 'CONFLICT', 'This goal is a proposal: the owner approves it first.');
   if (!access.person) {
     const me = (await ownerAgents(deps, access.ownerName)).find(a => a.name === access.agent);
     // The person's own AI writes the person's questions when it makes the goal for them, and answers

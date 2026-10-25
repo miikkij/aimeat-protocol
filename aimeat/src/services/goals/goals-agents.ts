@@ -43,7 +43,7 @@ const norm = (s: string) => s.trim().toLowerCase();
 
 /** May this agent take this work in this goal? */
 export function mayTake(goal: GoalRecord, work: GoalWork, agent: GoalAgent): boolean {
-  if (agent.stopped || work.kind !== 'agent') return false;
+  if (agent.stopped || work.kind !== 'agent' || work.runner === 'model') return false;
   if (work.exclude?.includes(agent.name)) return false;
   if (work.agent) return work.agent === agent.name;
   const p = goal.participants;

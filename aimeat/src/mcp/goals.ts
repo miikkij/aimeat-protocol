@@ -66,12 +66,13 @@ export function registerGoalTools(mcp: McpServer, storage: Storage, config: Aime
     if (reason && !input.reason) input.reason = reason;
     switch (action) {
       case 'create': return createOp(deps, caller(), input);
+      case 'propose': return createOp(deps, caller(), { ...input, propose: true });
       case 'update': return patchOp(deps, caller(), id, input);
       case 'preview': return patchOp(deps, caller(), id, { ...input, preview: true });
       case 'attach': return attachOp(deps, caller(), id, input);
-      case 'pause': case 'resume': case 'stop': case 'done': case 'renew': case 'start_round': case 'delete':
+      case 'pause': case 'resume': case 'stop': case 'done': case 'renew': case 'start_round': case 'decline': case 'delete':
         return goalActionOp(deps, caller(), id, action, { reason });
-      default: throw new GoalError(400, 'INVALID_INPUT', 'action is one of create, update, preview, pause, resume, stop, done, renew, start_round, attach, delete.');
+      default: throw new GoalError(400, 'INVALID_INPUT', 'action is one of propose, create, update, preview, pause, resume, stop, done, renew, start_round, attach, decline, delete.');
     }
   }));
 

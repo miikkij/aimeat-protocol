@@ -38,7 +38,7 @@ import {
   answerOp, attachOp, createOp, getOp, goalActionOp, listOp, patchOp, waitingOp, workOp,
 } from '../services/goals/goals-ops.js';
 
-const GOAL_ACTIONS = new Set(['pause', 'resume', 'stop', 'done', 'renew', 'start_round']);
+const GOAL_ACTIONS = new Set(['approve', 'decline', 'pause', 'resume', 'stop', 'done', 'renew', 'start_round']);
 const WORK_ACTIONS = new Set(['claim', 'release', 'reroute', 'reject']);
 
 export function goalsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -86,7 +86,7 @@ export function goalsRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/goals/:id/actions/:action', ...write, async (req: Request, res: Response) => {
     const action = p(req, 'action');
     await send(res, async () => {
-      if (!GOAL_ACTIONS.has(action)) throw new GoalError(404, 'NOT_FOUND', 'action is one of pause, resume, stop, done, renew, start_round.');
+      if (!GOAL_ACTIONS.has(action)) throw new GoalError(404, 'NOT_FOUND', 'action is one of approve, decline, pause, resume, stop, done, renew, start_round.');
       return goalActionOp(deps, who(req), p(req, 'id'), action, body(req));
     });
   });
