@@ -4327,6 +4327,12 @@ components:
                 A row records `ext:<name>` as its writer.
         installedBy:
           type: string
+        installedByPrincipal:
+          type: string
+          description: |
+            The principal that wrote the current code: the account holder's name, or the GAII of the
+            agent that installed or last changed it. Public provenance, the same writer
+            GET /v1/extensions/{name}/versions names as `created_by`.
         installedAt:
           type: string
           format: date-time
@@ -49748,7 +49754,7 @@ paths:
         - { name: name, in: path, required: true, schema: { type: string } }
       responses:
         '200':
-          description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, lib_url), data.total
+          description: data.name, data.current, data.versions[] (version, created_at, created_by, bytes, lib_url), data.total. created_by is the principal that wrote the version (the account holder's name, or the agent's GAII).
         '404':
           description: No such cortex
 

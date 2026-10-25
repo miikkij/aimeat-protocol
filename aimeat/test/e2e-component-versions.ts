@@ -247,6 +247,23 @@ await test("the version list names the agent that wrote a version to every calle
     assert(top.created_by === agent.gaii, `another account sees which agent wrote the version: ${JSON.stringify(top)}`);
     assert(top.version === mine.body.data.versions[0].version && typeof top.created_at === 'string' && typeof top.call_url === 'string' && typeof top.bytes === 'number',
         `version, created_at, bytes and call_url stay for every caller: ${JSON.stringify(top)}`);
+
+    // The detail answers the same writer as the version list, to another account and to nobody signed in.
+    const detail = await json(`/v1/extensions/${EXT}`, auth(stranger));
+    assert(detail.status === 200 && detail.body.data.extension.installedByPrincipal === agent.gaii,
+        `another account sees the writer on the detail: ${JSON.stringify(detail.body.data?.extension?.installedByPrincipal)}`);
+    const anon = await json(`/v1/extensions/${EXT}`);
+    assert(anon.status === 200 && anon.body.data.extension.installedByPrincipal === agent.gaii,
+        `the detail names the writer without a sign-in: ${JSON.stringify(anon.body.data?.extension?.installedByPrincipal)}`);
+});
+
+await test('the cortex version list names the agent that wrote a version', async () => {
+    const agent = await makeAgent(BASE, { name: owner, token }, ['*']);
+    const put = await json(`/v1/cortex/${CORTEX}`, auth(agent.token, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('1.2.0'), libs: cortexLib('1.2.0') }) }));
+    assert(put.status === 200, `agent redeploy ${put.status}: ${says(put).slice(0, 200)}`);
+    const list = await json(`/v1/cortex/${CORTEX}/versions`, auth(token));
+    const top = list.body.data?.versions?.[0];
+    assert(list.status === 200 && top?.version === '1.2.0' && top.created_by === agent.gaii, `the writer of 1.2.0: ${JSON.stringify(top)}`);
 });
 
 // ── The versions list asks canSeeCortex like the detail read (secaudit2026oct22) ──
