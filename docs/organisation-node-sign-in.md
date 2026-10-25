@@ -320,7 +320,11 @@ ends within the request, and nothing new can be minted. Reactivation lets the pe
 without resurrecting the old credentials. The same state is behind the operator's manual
 Deactivate button on the Owners tab. A connection may only touch accounts it manages
 (`managedBy`), it can never deactivate an operator-role account, and it may ADOPT an existing
-account only when that account's locally verified email is in the connection's own domains.
+account only when that account's locally verified email is in the connection's own domains. The
+same fence holds for an account the connection creates, by SCIM or at a first SAML sign-in: its
+address is recorded as verified only when it is in the connection's domains. A guest whose address
+is elsewhere gets an account without a verified address, and confirms the address later the way any
+member does.
 
 Entra specifics worth knowing before the console: the SAML app is an *Enterprise application*
 (Identifier and Reply URL come from the connection's SP details), and the provisioning Tenant URL

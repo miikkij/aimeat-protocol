@@ -9,6 +9,8 @@
  *   booleans through deactivation and back, and the R13 operator refusal.
  * @usage cd aimeat && pnpm exec vitest run test/unit/scim-entra-compat.test.ts
  * @version-history
+ *   2026-10-25 — A new account's address is verified only when it is in the connection's domains
+ *     (secaudit2026oct22, sso-new-account-email-verified-outside-connection-domains).
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 3).
  */
 
@@ -157,6 +159,32 @@ describe('SCIM door with Entra-shaped requests', () => {
     const del = await req('DELETE', `/Users/${userId}`);
     expect(del.status).toBe(403);
     await storage.updateOwner(userId, { roles: ['owner'] });
+  });
+
+  // secaudit2026oct22 (sso-new-account-email-verified-outside-connection-domains): the directory
+  // vouches for addresses in the connection's own domains only.
+  it('a new account whose address is in the connection domains gets it as a verified address', async () => {
+    const r = await req('POST', '/Users', {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: 'Inside.Person@contoso.com',
+      emails: [{ value: 'inside.person@contoso.com', primary: true }],
+    });
+    expect(r.status).toBe(201);
+    const ghii = await storage.getGHIIByOwner(r.body.id);
+    expect(ghii?.emailVerifiedAt).toBeTruthy();
+    expect(ghii?.emailHash).toBe(createHash('sha256').update('inside.person@contoso.com').digest('hex'));
+  });
+
+  it('a new account whose address is OUTSIDE the connection domains is created without a verified address', async () => {
+    const r = await req('POST', '/Users', {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: 'Guest.Person@contoso.com',
+      emails: [{ value: 'guest.person@outside.example', primary: true }],
+    });
+    expect(r.status).toBe(201);
+    const ghii = await storage.getGHIIByOwner(r.body.id);
+    expect(ghii).not.toBeNull();
+    expect(ghii?.emailVerifiedAt).toBeFalsy();
+    expect(ghii?.emailHash).toBeFalsy();
+    expect(await storage.getGHIIByEmailHash(createHash('sha256').update('guest.person@outside.example').digest('hex'))).toBeNull();
   });
 
   it('DELETE deactivates — the account and its knowledge remain (R3)', async () => {

@@ -12,6 +12,8 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-10-25 — readRefreshCookie answers null for a value that is not valid percent-encoding; it threw
+ *     inside every caller (secaudit2026oct22, refresh-cookie-unprefixed-first-match, the decode half).
  *   2026-10-22 — endPersonSessionsAfterPasswordChange: a password reset ends every sign-in session of the
  *     person, a password change every one but the session it was made from; agents keep theirs
  *     (secaudit2026oct22, ghii/recovery.ts password-reset-keeps-owner-sessions).
@@ -61,7 +63,15 @@ export function readRefreshCookie(req: Request): string | null {
     const eq = part.indexOf('=');
     if (eq === -1) continue;
     if (part.slice(0, eq).trim() === REFRESH_COOKIE) {
-      return decodeURIComponent(part.slice(eq + 1).trim());
+      try {
+        return decodeURIComponent(part.slice(eq + 1).trim());
+      } catch {
+        // A value that is not valid percent-encoding is no token of ours. It threw inside every
+        // caller, so a cookie a same-site page wrote broke sign-in for that browser
+        // (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
+        logger.warn('owner-session: a refresh cookie could not be decoded and was ignored');
+        return null;
+      }
     }
   }
   return null;

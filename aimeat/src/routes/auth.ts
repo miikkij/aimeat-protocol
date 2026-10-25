@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-10-25 — The JWT minted from a PAT-backed refresh cookie carries the `pat` claim, so revoking the
+ *     PAT ends it at the next request (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  *   2026-10-21 — The bearer refresh asks isAnonymousPrincipal: the minted anonymous token carries no
  *     anonymous claim and was renewed as an agent session (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-16 — POST /v1/auth/refresh answers 403 OWNER_REFRESH_USES_COOKIE to an owner bearer (an
@@ -97,7 +99,7 @@ import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.
 import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
 import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { ANONYMOUS_SCOPES } from '../auth/anonymous-scopes.js';
-import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
+import { issueJWT, revokeToken, generateSessionId, verifyJWT } from '../auth/jwt.js';
 import { requireAuth, requireRole, requireOwnerPrincipal, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -116,6 +118,20 @@ const challenges = new Map<string, { challenge: string; expiresAt: number; owner
 
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /** The refresh answer for a session made from a personal access token: renew it at the exchange. */
+  const denyPatRenewal = (res: import('express').Response): void => {
+    res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+      'This session was made from an access token. Exchange the access token again to get a new session.',
+      undefined, { renew_at: '/v1/auth/token/exchange' }));
+  };
+
+  /** True when the Bearer is a JWT this node signed from a personal access token, live or not. */
+  const presentsPatJwt = async (authorization: string | undefined): Promise<boolean> => {
+    const bearer = authorization?.startsWith('Bearer ') ? authorization.slice(7) : '';
+    if (!bearer || bearer.startsWith(PAT_PREFIX)) return false;
+    return (await verifyJWT(bearer))?.via === 'pat';
+  };
 
   // GET /v1/security/overview — the Security tab mount in ONE call: GHII CORS + per-agent CORS (resolved
   // from the agent records + one shared GHII read + node default, replacing the GET /agents/:name/cors
@@ -447,6 +463,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
           ...(includeScopes ? { scopes: r.scopes } : {}),
           // Made from a PAT: classification reads it as an AI (reader-kind.ts). Grants nothing.
           via: 'pat',
+          // The PAT row it stands on, checked on every request (auth/credential-revoked.ts).
+          pat: r.patId,
         }, config.accessTtlSeconds);
         res.json(success(config.nodeId, {
           token: patToken,
@@ -472,6 +490,12 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     // (2) Bearer-based refresh (agents and ecosystem apps; an owner bearer is refused below).
+    // A JWT made from a PAT is sent to the exchange whether or not it still counts: one whose PAT was
+    // revoked is dead (credentialRevoked asks the PAT row), and its answer stays the one below.
+    if ((!req.auth || isAnonymousPrincipal(req.auth)) && await presentsPatJwt(req.headers.authorization)) {
+      denyPatRenewal(res);
+      return;
+    }
     if (!req.auth || isAnonymousPrincipal(req.auth)) {
       res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required'));
       return;
@@ -499,9 +523,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     // (POST /v1/auth/token/exchange) and the PAT-backed cookie branch above both call resolvePat,
     // which refuses a revoked, expired or orphaned PAT.
     if (req.auth.via === 'pat') {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-        'This session was made from an access token. Exchange the access token again to get a new session.',
-        undefined, { renew_at: '/v1/auth/token/exchange' }));
+      denyPatRenewal(res);
       return;
     }
 

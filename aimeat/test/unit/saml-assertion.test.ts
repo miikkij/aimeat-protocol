@@ -9,6 +9,8 @@
  *   account, the domain-fenced email link, and the username-choice step for a brand-new user.
  * @usage cd aimeat && pnpm exec vitest run test/unit/saml-assertion.test.ts
  * @version-history
+ *   2026-10-25 — A JIT account's address is verified only when it is in the connection's domains
+ *     (secaudit2026oct22, sso-new-account-email-verified-outside-connection-domains).
  *   2026-10-15 — The refusals expect a redirect with ?auth_error= instead of JSON 401, plus a
  *     deactivated-account case (feature-list audit #20, #22).
  *   v1.0.0 — 2026-08-24 — Initial (BR-04 phase 2).
@@ -139,6 +141,23 @@ describe('SAML organisation sign-in (saml-login router)', () => {
     expect(created).not.toBeNull();
     expect(created!.ownerName).toBe('ville');
     expect(created!.emailVerifiedAt).toBeTruthy();  // the organisation's IdP vouched for the address
+  });
+
+  // secaudit2026oct22 (sso-new-account-email-verified-outside-connection-domains): the organisation's
+  // IdP vouches for addresses in the connection's own domains only.
+  it('a brand-new user whose address is OUTSIDE the connection domains is created without a verified address', async () => {
+    const res = await spInitiated(CONN, { nameId: 'opaque-guest-1', email: 'guest@outside.example', displayName: 'Guest G' });
+    expect(res.status).toBe(302);
+    expect(res.location).toContain('aimeat_signup=1');
+    const pendingCookie = cookieFrom(res.setCookie, 'aimeat_pending_signup');
+    const fin = await rawPost(`${base}/v1/ghii/login/saml/${CONN}/finalize`, {}, {
+      cookie: pendingCookie!, json: JSON.stringify({ username: 'guestg' }),
+    });
+    expect(fin.status).toBe(200);
+    const created = await storage.getGHIIByExternalId(`saml:${CONN}`, 'opaque-guest-1');
+    expect(created).not.toBeNull();
+    expect(created!.emailVerifiedAt).toBeFalsy();
+    expect(created!.emailHash).toBeFalsy();
   });
 
   it('a returning user logs straight in with a session cookie', async () => {

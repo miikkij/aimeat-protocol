@@ -7,9 +7,12 @@
  *   endpoint, the WebSocket upgrade, the connect tunnel, device and OAuth approval), with the six
  *   storage questions it asks and the seventh, in-memory one about a visitor's home peer.
  * @structure credentialRevoked(token, verified) · sessionRevoked · standingAppGrant · accountRefuses ·
- *   ecosystemAppGone (the last four module-private)
+ *   patGone · ecosystemAppGone (the last five module-private)
  * @usage import { credentialRevoked } from './credential-revoked.js';   // re-exported by ./middleware.ts
  * @version-history
+ *   2026-10-25 — credentialRevoked asks an EIGHTH question (patGone): a JWT minted from a personal
+ *     access token counts only while that token is neither revoked nor expired. It named no PAT row,
+ *     so revoking the PAT reached nothing of it (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
  *   v1.1.0 — 2026-10-20 — credentialRevoked asks a SEVENTH question (./visitor-peer.ts
  *     visitorPeerRefuses): a visitor's session counts only while the peer that vouched for it is an
  *     active peer that this node's policy still lets sign people in. The visitor token carries no
@@ -42,8 +45,9 @@ async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
  * writing the owner's memory until it expired on its own. The owner is told otherwise in as many
  * words — locales/en.json `profile.apps.revokeConfirm`: "It loses access immediately."
  *
- * The other two credential families are already answered per request: a PAT is resolved from storage
- * on every call, and owner/agent sessions go through sessionRevoked(). This is the third family, and
+ * The other two credential families are already answered per request: a raw PAT is resolved from
+ * storage on every call and a JWT exchanged from one is answered by patGone(), and owner/agent
+ * sessions go through sessionRevoked(). This is the third family, and
  * it was the only one where the button and the behaviour disagreed.
  *
  * One keyed read per app-token request, uncached for the same reason sessionRevoked() is: the row is
@@ -85,6 +89,22 @@ async function accountRefuses(verified: VerifiedToken, grant: AppGrantRecord | n
  * later is a later connection that reuses the identity, and the older token is not its credential.
  * One keyed read per ecosystem request, uncached for the same reason as the checks above.
  */
+/**
+ * Is the personal access token this JWT was minted from gone? The exchange and the PAT-backed refresh
+ * cookie write the PAT's id into the `pat` claim; without it the JWT named no row, and revoking the
+ * PAT left it working until its own expiry, long enough for an owner-level one to mint a fresh PAT
+ * (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke). A row that is revoked, expired or missing
+ * ends it. The account question below covers a PAT whose account is gone. One keyed read per such
+ * request, uncached for the same reason as the checks beside it.
+ */
+async function patGone(verified: VerifiedToken): Promise<boolean> {
+  const storage = sessionStorage();
+  if (!verified.pat || !storage) return false;
+  const pat = await storage.getPatById(verified.pat);
+  if (!pat || pat.revoked) return true;
+  return !!pat.expiresAt && Date.now() >= Date.parse(pat.expiresAt);
+}
+
 async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
   const storage = sessionStorage();
   if (!verified.roles.includes('ecosystem') || !storage) return false;
@@ -94,12 +114,13 @@ async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
 }
 
 /**
- * Is this credential dead? Seven ways a JWT stops being one, and an endpoint that asks fewer than
- * seven questions is one the revoked keep opening:
+ * Is this credential dead? Eight ways a JWT stops being one, and an endpoint that asks fewer than
+ * eight questions is one the revoked keep opening:
  *   - the exact token was revoked          (POST /v1/auth/revoke)
  *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
  *   - its app grant was revoked            (the owner pressed Revoke on the app)
  *   - its ecosystem app is gone            (disconnected, or its account deleted)
+ *   - its personal access token is gone    (revoked, expired; the JWT was exchanged from it)
  *   - its agent is gone                    (deleted, or registered again under the released name)
  *   - the account it acts for refuses it   (deleted, deactivated as BR-04 asks, or newer than the
  *                                           credential because the name was registered again)
@@ -120,6 +141,7 @@ export async function credentialRevoked(token: string, verified: VerifiedToken):
   const grant = await standingAppGrant(verified);
   if (grant === false) return true;
   if (await ecosystemAppGone(verified)) return true;
+  if (await patGone(verified)) return true;
   // The agent question (./agent-alive.ts). It reads storage only for an agent-role credential, and
   // it is what ends an MCP OAuth access token, which carries no session row for the delete to reach.
   if (await agentGone(sessionStorage(), verified)) return true;
