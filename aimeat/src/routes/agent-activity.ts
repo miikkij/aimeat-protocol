@@ -41,7 +41,7 @@ import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { agentGaiiFromIdentifier, ownerGhiiOf, mayActOnAgent } from '../utils/gaii.js';
 import { readAgentAccess, refusalView, scopeRequestView, declineRefusals } from '../services/agent-refusals.js';
-import { tellPermissionAnswer } from '../services/permission-ask-notice.js';
+import { tellPermissionAnswer, closePermissionAsk } from '../services/permission-ask-notice.js';
 import { requireOwnerPrincipal } from '../auth/account-security.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
@@ -244,6 +244,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     // The agent hears the "no" as well as reading it on its refusals (services/approval-standard.ts).
     if (declined > 0) {
       await tellPermissionAnswer({ storage, config }, agent, (needed as string[] | undefined) ?? [], 'declined', `${req.auth!.owner}@${config.nodeId}`);
+      await closePermissionAsk({ storage, config }, agent, (needed as string[] | undefined) ?? [], 'declined', `${req.auth!.owner}@${config.nodeId}`);
     }
     res.json(success(config.nodeId, { agent: agentGaii, declined }, [
       { description: 'What is still refused', method: 'GET', url: `/v1/agents/${agentName}/refusals` },

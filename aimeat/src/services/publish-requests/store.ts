@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-25 — A settled request's notices show the answer and lose their buttons (closeQuestion,
+ *     by the notices' ref `publish-request:<id>`; the developer's review of the sandbox).
  *   2026-10-25 — A request may ask something other than making a thing public (`approval`): the
  *     kinds `extension-email-policy`, `crew-model` and `account-setting`. It names who answers (the
  *     owner, or the node's operators, who get the item and the notice with the account in the
@@ -65,7 +67,10 @@ import type { Storage } from '../../storage/interface.js';
 import { addItem, closeItem, getItem } from '../open-items.js';
 import { notify } from '../notify.js';
 import { emitChange } from '../event-bus.js';
-import { approverGhiis, tellAsker, type Approver, type ApprovalOutcome } from '../approval-standard.js';
+import { approverGhiis, closeQuestion, tellAsker, type Approver, type ApprovalOutcome } from '../approval-standard.js';
+
+/** The ref a request's notices carry, so its decision closes them (services/notification-answers.ts). */
+const questionRef = (id: string) => `publish-request:${id}`;
 import { stableStringify } from '../../utils/stable-json.js';
 import { serialByKey } from '../../utils/serial-by-key.js';
 import { logger } from '../../utils/logger.js';
@@ -115,6 +120,8 @@ export interface ApprovalAsk {
   why: string;
   /** The word an agent of the owner must hold to approve it. Absent: being the owner's agent is enough. */
   approve_scope?: string;
+  /** Where the person changes it later, shown on the answered notice: a page and its locale key under `notiftext.`. */
+  change?: { link: string; key: string };
   /** The approver notice's locale key under `notiftext.` and its variables (names, never sentences). */
   i18n: { key: string; vars: Record<string, string> };
 }
@@ -381,6 +388,7 @@ export async function filePublishRequest(
       body: `Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.`,
       link: '/v1/profile?tab=notifications',
       i18n: { key: 'publish_request', vars: { who, what: draft.name } },
+      ref: questionRef(request.id),
       actions: [
         { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve' }, style: 'primary' },
         { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline' }, style: 'default' },
@@ -433,6 +441,7 @@ async function announceApproval(ctx: PublishStoreCtx, ownerGhii: string, request
       body: `${words.why} If you allow it, it is in effect at once. If you do not, nothing changes. ${who} hears the answer either way.`,
       link: '/v1/profile?tab=notifications',
       i18n: { key: words.i18n.key, vars },
+      ref: questionRef(request.id),
       actions: [
         { id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline', ...account }, style: 'default', i18n: { key: 'approval_request.deny' } },
         { id: 'allow', label: 'Allow', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve', ...account }, style: 'primary', i18n: { key: 'approval_request.allow' } },
@@ -492,6 +501,14 @@ export async function settlePublishRequest(
       logger.warn('Publish request: could not close a list item', { owner: it.ghii, id: request.id, error: String(err) });
     }
   }
+
+  // The question's notices show the answer and lose their buttons, for whoever it went to
+  // (services/approval-standard.ts closeQuestion; the developer, 2026-10-25).
+  await closeQuestion(ctx, {
+    recipients: await approverGhiis(ctx, ownerGhii, waitingFor(request)),
+    ref: questionRef(request.id), outcome: outcomeOf(state), decidedBy: how.by,
+    ...(request.approval?.change ? { change: request.approval.change } : {}),
+  });
 
   // The one who asked hears the answer, Allow and Don't allow alike (services/approval-standard.ts).
   // A publish request asked by an app was told to the owner by the owner's own press, or by the

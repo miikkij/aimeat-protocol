@@ -100,6 +100,8 @@ export async function askOperatorsForEmailPolicy(
         approver: 'operators',
         asks: `let the extension ${ext.name} email any address`,
         why,
+        // The answered notice says where an operator changes it later: the extensions page of administration.
+        change: { link: '/v1/admin?tab=extensions', key: 'approval_change.extensions' },
         i18n: { key: reason === 'code-changed' ? 'approval_email_policy_code' : 'approval_email_policy', vars: { extension: ext.name, account: ext.installedBy } },
       },
     });

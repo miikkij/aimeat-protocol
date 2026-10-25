@@ -33,6 +33,8 @@
  *   const refusal = await ecosystemCallRefusal({ storage, config }, { capability, app, action, callerGhii, input });
  *   if (refusal) throw Object.assign(new Error(refusal.message), refusal);
  * @version-history
+ *   v1.3.0 — 2026-10-25 — The account holder's notice carries its question's ref, and Allow and Don't
+ *     allow close it: the answer shows and the buttons go (closeQuestion).
  *   v1.2.0 — 2026-10-25 — Allow and Don't allow tell the one whose call asked (approval-standard.ts
  *     tellAsker) (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-22 — The bell notice carries Don't allow beside Allow (the developer: a question
@@ -43,7 +45,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord, EcosystemAppRecord, EcoCapabilityApproval } from '../storage/interface.js';
 import { notify, type NotifyInput } from './notify.js';
 import { emitChange } from './event-bus.js';
-import { tellAsker } from './approval-standard.js';
+import { tellAsker, closeQuestion } from './approval-standard.js';
 import { localAccountName, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
@@ -117,6 +119,7 @@ function askNotice(baseUrl: string, app: string, entry: EcoCapabilityApproval): 
     body: `"${name}" from ${registrant} would like your outside app ${app} to run its action ${entry.action}. Open this to see what it sends, or answer here.`,
     link: url.slice(url.indexOf('/v1/')),
     i18n: { key: ECO_CAPABILITY_ASK_TYPE, vars: { registrant, app, action: entry.action, name } },
+    ref: ecoQuestionRef(app, entry.capability),
     // Both answers on the notice, as on the page: a question with only Allow cannot be answered no.
     actions: [{
       id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST',
@@ -254,6 +257,17 @@ export type EcoApprovalAnswer =
  * ask this app for the same action under the same registrant: a capability changed since it asked is
  * a different question, and the old page must not answer it.
  */
+/** The ref of the account holder's notice about one capability's question on one app. */
+const ecoQuestionRef = (app: string, capability: string) => `eco-capability-approval:${app}:${capability}`;
+
+/** Close the account holder's notice: the answer shows with where to change it, the buttons go. */
+async function closeEcoQuestion(storage: Storage, nodeId: string, ownerName: string, app: string, capability: string, outcome: 'allowed' | 'declined', by: string): Promise<void> {
+  await closeQuestion({ storage }, {
+    recipients: [ownerOf(ownerName, nodeId)], ref: ecoQuestionRef(app, capability), outcome, decidedBy: by,
+    change: { link: '/v1/profile?tab=ecosystem', key: 'approval_change.ecosystem' },
+  });
+}
+
 /** Tell the one whose call asked how the account holder answered (services/approval-standard.ts). */
 async function tellEcoAsker(
   config: AimeatConfig | undefined, storage: Storage, ownerName: string, app: string,
@@ -303,6 +317,7 @@ export async function approveEcoCapabilityUse(
     emitChange('ecosystem-apps', ownerOf(ownerName, nodeId));
     await tellEcoAsker(config, storage, ownerName, app, approved, 'allowed', approvedBy);
   }
+  await closeEcoQuestion(storage, nodeId, ownerName, app, capability, 'allowed', approvedBy);
   return { ok: true, approval: approved };
 }
 
@@ -321,6 +336,7 @@ export async function declineEcoCapabilityUse(
   if (out?.changed) {
     emitChange('ecosystem-apps', ownerOf(ownerName, nodeId));
     await tellEcoAsker(tell?.config, storage, ownerName, app, dropped, 'declined', tell?.by ?? ownerOf(ownerName, nodeId));
+    await closeEcoQuestion(storage, nodeId, ownerName, app, capability, 'declined', tell?.by ?? ownerOf(ownerName, nodeId));
   }
   return !!out?.changed;
 }

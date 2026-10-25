@@ -527,6 +527,36 @@ await test('23. the owner allows it: the question is off, and the agent is told'
     assert(s?.on === false && s.defaulted === false && s.set_by === wildAgent.gaii, `after Allow: ${JSON.stringify(s)}`);
     const inbox = await json(`/v1/agents/v2/messages?context_id=${encodeURIComponent(offRequest)}`, { headers: auth(owner.token) });
     assert((inbox.body?.data?.messages ?? []).some((m: any) => m.parts?.[1]?.data?.outcome === 'allowed'), 'the agent was not told');
+    // The owner's notice shows the answer, who and when, and where to change it, and no buttons.
+    const n = await json('/v1/notifications', { headers: auth(owner.token) });
+    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.ref === `publish-request:${offRequest}`);
+    assert(!!notice && (notice.actions ?? []).length === 0 && notice.answered?.outcome === 'allowed' && notice.answered?.by_you === true
+        && notice.answered?.change?.link === '/v1/profile?tab=access#ac-secrets', `the notice still asks: ${JSON.stringify(notice)}`);
+});
+
+await test('23b. a notice whose button ran is marked answered for the page; a session without memory:write is refused (403)', async () => {
+    const ask = await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(wildAgent.token), body: JSON.stringify({ on: false }) });
+    // Off already: nothing to ask. Switch on as the owner, then ask, so a fresh notice waits.
+    if (ask.status !== 202) {
+        await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ on: true }) });
+    }
+    const again = ask.status === 202 ? ask : await json('/v1/ghii/me/secret-host-ask', { method: 'PUT', headers: auth(wildAgent.token), body: JSON.stringify({ on: false }) });
+    assert(again.status === 202, `ask ${again.status}`);
+    const id = again.body.data.approval_request.request_id;
+    const n = await json('/v1/notifications', { headers: auth(owner.token) });
+    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.ref === `publish-request:${id}`);
+    assert(!!notice && notice.actions.length === 2, `no waiting notice: ${JSON.stringify(notice)}`);
+    const reader = await mintAgent(owner, 'sau-notifreader', ['memory:read']);
+    const refused = await json(`/v1/notifications/${notice.id}/answered`, { method: 'POST', headers: auth(reader.token), body: JSON.stringify({ action: 'deny' }) });
+    assert(refused.status === 403, `without memory:write: ${refused.status}`);
+    const bad = await json(`/v1/notifications/${notice.id}/answered`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ action: 'nope' }) });
+    assert(bad.status === 400, `a button the notice does not carry: ${bad.status}`);
+    const ok = await json(`/v1/notifications/${notice.id}/answered`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ action: 'deny' }) });
+    assert(ok.status === 200 && ok.body.data.answered.outcome === 'declined', `answered ${ok.status} ${JSON.stringify(ok.body)}`);
+    const after = (await json('/v1/notifications', { headers: auth(owner.token) })).body.data.notifications.find((x: any) => x.id === notice.id);
+    assert(after.actions.length === 0 && after.answered.outcome === 'declined', `still asks: ${JSON.stringify(after)}`);
+    // Leave the question decided so the tests below start from the switch as 23 left it.
+    await json(`/v1/publish-requests/${id}/decision`, { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ decision: 'approve' }) });
 });
 
 const UNATT_WILD_OFF = `sau-unwildoff-${STAMP}`;
