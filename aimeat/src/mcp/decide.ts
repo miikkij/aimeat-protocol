@@ -91,8 +91,11 @@ export function registerDecideTools(
   const runCaller = (appId?: string): DecideCaller => {
     const session = sessionCaller?.();
     // The session is this agent's: its run reads the owner's records as the agent, so its clearance
-    // applies (secaudit2026oct22). Without a session caller it holds no scopes.
-    return { ...caller(appId), readsAll: session ? readsAsOwner(session) : false, readerAs: { roles: ['agent'], scopes: session?.scopes ?? [] } };
+    // applies (secaudit2026oct22). Without a session caller it holds no role and no scope.
+    return {
+      ...caller(appId), readsAll: session ? readsAsOwner(session) : false,
+      readerAs: { roles: session?.roles ?? [], scopes: session?.scopes ?? [] },
+    };
   };
 
   // ── aimeat_decide ──

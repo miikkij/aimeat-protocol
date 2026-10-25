@@ -114,10 +114,11 @@
     },
     "src/commerce/ucp-guest-checkout.ts": {
       "reads": {
-        "getMemory": 7,
-        "listMemoryKeysByPrefix": 2
+        "getMemory": 8,
+        "listMemory": 1,
+        "listMemoryKeysByPrefix": 1
       },
-      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the UCP guest checkout's own records under the seller (commerce.ucp.session.*, commerce.order.*, commerce.ucp.pending.*) and the sealed selling key (commerce.psp) for the seller's own Stripe charge; the key listing only counts open checkouts and finds webhooks that wait. No content."
+      "why": "Reviewed 2026-10-08 (AI visibility, layer E), the node's own read: the UCP guest checkout's own records under the seller (commerce.ucp.session.*, commerce.order.*, commerce.ucp.pending.*) and the sealed selling key (commerce.psp) for the seller's own Stripe charge; the key listing finds webhooks that wait. Since 2026-10-25 (secaudit2026oct22) the per-seller limit reads the seller's own session records to count only the open checkouts, and guestCheckoutExists reads the session to check that the checkout exists and belongs to the calling platform before an idempotency record is written. No content."
     },
     "src/commerce/x402.ts": {
       "reads": {
@@ -804,9 +805,9 @@
     },
     "src/services/ai-allowance.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The AI allowance counter. The third read (2026-10-25, secaudit2026oct22) is the same counter, read once outside the per-account queue so a read that needs no starter grant does not wait in it."
     },
     "src/services/ai-image.ts": {
       "reads": {
@@ -1665,10 +1666,35 @@
     "src/services/extension-ctx.ts": {
       "reads": {
         "getMemory": 6,
-        "listMemory": 1,
-        "listMemoryForOwners": 1
+        "listMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
+    },
+    "src/services/extension-host-bounds.ts": {
+      "reads": {
+        "listMemoryMetaForOwners": 1,
+        "getMemory": 1
+      },
+      "why": "Moved from extension-ctx.ts on 2026-10-25 (secaudit2026oct22): getPublic by a bare owner name finds which of the owner's agents holds the key from metadata and reads that one record; the record goes back to getPublic in extension-ctx.ts, which lets it leave only through the caller's presentation, as before."
+    },
+    "src/services/anonymous-principal-records.ts": {
+      "reads": {
+        "listMemory": 1,
+        "listStorageFiles": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step lists the shared anonymous account's skill manifests and data-package files to name them in one Security page incident for the operator. No value or file content is read or shown."
+    },
+    "src/services/cortex-seeder.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUNDLED_CORTEX_NAME_HELD incident twice. No content."
+    },
+    "src/services/share-search-reindex.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step reads each workspace share record and writes it back unchanged under its owner, so its search text is rebuilt without the masked fields. Nothing is shown to anyone."
     },
     "src/services/extension-files.ts": {
       "reads": {
