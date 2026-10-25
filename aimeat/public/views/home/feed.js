@@ -11,6 +11,7 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-25: The heading carries a question mark that explains the feed (explain.home.feed.*).
  *   2026-10-25: memory_accessed_by_operator with action export: an operator's backup holds this many of
  *     your entries (secaudit2026oct22).
  *   2026-10-16: password_changed (reset, changed or set) under access, session_token_reused under trouble,
@@ -59,6 +60,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ago } from '/js/format.js';
 import { Timeline, TimelineRow } from '/components/Timeline.js';
+import { HelpTip } from '/components/HelpTip.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -324,7 +326,7 @@ export function HomeFeed({ items, band }) {
   // The card is a glance, not an archive. The door to everything only appears when there IS more
   // than a glance: a "see all" under six rows offers a page that shows the same six.
   return html`
-    <${Timeline} title=${tr('home.feed.title', 'What has happened')} band=${!!band}
+    <${Timeline} title=${html`${tr('home.feed.title', 'What has happened')} <${HelpTip} term="home.feed" label=${tr('home.feed.title', 'What has happened')} />`} band=${!!band}
       quiet=${quiet ? { href: '/v1/chat', text: tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.') } : null}
       more=${shown.length > CARD_ROWS ? { href: '/v1/home?history=1', text: tr('home.feed.seeAll', 'See everything that has happened') } : null}>
       ${shown.slice(0, CARD_ROWS).map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}

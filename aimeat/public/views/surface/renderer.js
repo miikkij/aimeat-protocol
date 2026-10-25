@@ -25,6 +25,8 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} />`
  * @version-history
+ *   2026-10-25: A group's named heading carries a question mark when the locale explains it
+ *     (helpTermOf: `x.title` is explained under `explain.x.*`).
  *   2026-10-16: The layout read's `freeform_provenance` reaches each block as `provenance` (state
  *     `freeformProvenance`), so a passage shows the AI label it owes.
  *   2026-09-23: Composed from the shared parts in css/parts.css and css/parts-steps.css (class names by role, values moved from views/home.css unchanged; UI consolidation slice 1).
@@ -40,6 +42,8 @@ import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { BLOCKS } from '/views/surface/block-map.js';
 import { Band } from '/components/Band.js';
+import { HelpTip } from '/components/HelpTip.js';
+import { explainOf } from '/components/ExplainDialog.js';
 
 /** Resolved components, by block id. Identity has to be stable across renders. */
 const resolved = new Map();
@@ -139,6 +143,18 @@ function titleOf(block, locale) {
   return '';
 }
 
+/**
+ * The explanation behind a group's named heading: `home.playbooks.title` is explained under
+ * `explain.home.playbooks.*`. A heading the operator wrote, or a named one with no explanation in
+ * this language, gets no question mark, because the dialog would have nothing true to say about it.
+ */
+function helpTermOf(block) {
+  const key = block?.props?.titleKey;
+  if (typeof key !== 'string' || !key.endsWith('.title') || block?.titles) return null;
+  const term = key.slice(0, -'.title'.length);
+  return explainOf(term, 'short') ? term : null;
+}
+
 function Block({ block, ctx, freeform, freeformProvenance, locale }) {
   const [, bump] = useState(0);
   const Cmp = componentFor(block.id, () => bump(n => n + 1));
@@ -170,8 +186,9 @@ export function SurfaceRenderer({ layout, ctx = {}, freeform = {}, freeformProve
     if (Array.isArray(block.children)) {
       const kids = block.children.filter(c => !c.hidden);
       const heading = titleOf(block, locale);
+      const term = helpTermOf(block);
       return html`
-        <${Band} tight=${true} title=${heading} key=${block.key}>
+        <${Band} tight=${true} title=${heading && term ? html`${heading} <${HelpTip} term=${term} label=${heading} />` : heading} key=${block.key}>
           ${kids.map(child => html`<${Block} key=${child.key} block=${child} ctx=${ctx} freeform=${freeform} freeformProvenance=${freeformProvenance} locale=${locale} />`)}
         <//>`;
     }
