@@ -19920,7 +19920,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits.
+          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }.
           content:
             application/json:
               schema:
@@ -20117,7 +20117,11 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.routing { defaults, rules, agent_defaults? }, data.providers (id, type, capabilities).
+          description: >
+            data.routing { defaults, rules, agent_defaults? }, data.providers (id, type, capabilities),
+            data.free_model { available, model, node_default, in_effect }: whether the node's key has a
+            free model, the operator's default for it as the last resort (ai.free_model_last_resort),
+            and what applies to this account now.
           content:
             application/json:
               schema:
@@ -20131,7 +20135,10 @@ paths:
         `defaults` lists provider ids per capability, first is the default and the rest are fallbacks;
         a capability named replaces its list. `rules` (the owner's alone): fallback, maxAttempts (1-5),
         onlyTested, extendToPool, poolOrder, fallbackOn (timeout, rate_limit, server_error,
-        unavailable, auth), fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd. `agent`
+        unavailable, auth), fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd,
+        freeModelLastResort (true, false, or null for the node's default: whether a text call on the
+        node's key that named no model gets the free model when what is left of the allowance cannot
+        pay for the normal model and no other provider can answer; false refuses it with 402). `agent`
         sets that agent's own defaults instead. The owner applies at once; an agent holding
         `memory:write-reserved` gets a proposal with a `confirm_token` bound to the exact change; an
         app is refused.

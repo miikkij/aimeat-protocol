@@ -27,6 +27,8 @@
  *     GET    /v1/ai/routing
  *     PUT    /v1/ai/routing
  * @version-history
+ *   v1.2.0 — 2026-10-25 — GET /v1/ai/routing carries free_model, the free model as the last resort on the
+ *     node's key and what applies to this account (secaudit2026oct22 follow-up).
  *   v1.1.0 — 2026-10-05 — The AI call limit is counted per account in the service, so the MCP tools share it (secaudit 2026-10, C5).
  *   v1.0.0 — 2026-09-28 — Initial (V3 of the System 2 plan).
  */
@@ -145,7 +147,7 @@ export function aiProvidersRouter(config: AimeatConfig, storage: Storage): Route
     try {
       const { payer, agent } = aiPayerOf(owner(req));
       const v = await aiProvidersView(storage, config, payer, agent);
-      res.json(success(config.nodeId, { routing: v.routing, providers: v.providers.map(p => ({ id: p.id, type: p.type, capabilities: p.capabilities })) }, [
+      res.json(success(config.nodeId, { routing: v.routing, free_model: v.free_model, providers: v.providers.map(p => ({ id: p.id, type: p.type, capabilities: p.capabilities })) }, [
         { description: 'Change the routing (the owner, or an agent proposing)', method: 'PUT', url: '/v1/ai/routing' },
       ]));
     } catch (e) { fail(res, e); }

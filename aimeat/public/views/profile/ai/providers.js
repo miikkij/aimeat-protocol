@@ -13,6 +13,8 @@
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.7.0 — 2026-10-25 — The routing rules end with the free model as the last resort on the server's
+ *     key (freeModelRow): the server's default, on or off for this account (secaudit2026oct22 follow-up).
  *   v1.6.0 — 2026-10-02 — With "Only tested providers" on, a capability's routing row says which provider
  *     in its list the node skips until it is tested (an owner's, on, never tested: untestedIn), with Test
  *     now beside it (pv.testNow, the same test as the providers' rows). With the rule off, nothing.
@@ -347,6 +349,23 @@ function classifierRow(cc, pv, e, textServers) {
   return { key: 'classifier', k: named('ai.content_classifier', x('cc.name')), v, missing: !e, sub: fix, subTone: 'notice' };
 }
 
+/**
+ * The free model as the last resort on the server's key: shown only where the server has a key and a
+ * free model for it. The value is the account's own word (on, off) or the server's default (null,
+ * the select's empty value), and the line under it says what applies now.
+ */
+function freeModelRow(fm, r, e, pv) {
+  if (!fm?.available) return null;
+  const nodeWord = x(fm.node_default ? 'rt.freeNodeOn' : 'rt.freeNodeOff');
+  const value = r.freeModelLastResort === true ? 'on' : r.freeModelLastResort === false ? 'off' : '';
+  const v = e
+    ? html`<${Select} fit ariaLabel=${x('rt.free')} value=${value}
+        onChange=${(val) => pv.setRule({ freeModelLastResort: val === 'on' ? true : val === 'off' ? false : null })}
+        options=${[['', x('rt.freeDefault', { node: nodeWord })], ['on', x('rt.freeOn')], ['off', x('rt.freeOff')]]} />`
+    : (value === 'on' ? x('rt.freeOn') : value === 'off' ? x('rt.freeOff') : x('rt.freeDefault', { node: nodeWord }));
+  return { key: 'free', k: named('ai.free_model_last_resort', x('rt.free')), v, sub: x(fm.in_effect ? 'rt.freeSubOn' : 'rt.freeSubOff', { model: fm.model || '' }) };
+}
+
 export function secRouting(ctx, num) {
   const pv = ctx.pv;
   if (!pv.view) return null;
@@ -388,6 +407,7 @@ export function secRouting(ctx, num) {
     { k: x('rt.voice'), v: e ? html`<${Check} inline checked=${!!r.speechVoiceMayChange} onChange=${(v) => pv.setRule({ speechVoiceMayChange: v })}>${x('rt.voiceOn')}<//>` : (r.speechVoiceMayChange ? x('yes') : x('no')), sub: x('rt.voiceSub') },
     { key: 'cost', k: named('ai.max_cost_per_call', x('rt.cost')), v: e ? html`<${TextField} type="number" size="short" min="0" step="0.01" value=${r.maxCostPerCallUsd ?? ''} placeholder=${x('rt.costNone')} ariaLabel=${x('rt.cost')} onInput=${(v) => pv.setRule({ maxCostPerCallUsd: v })} />`
       : (r.maxCostPerCallUsd != null ? `$${r.maxCostPerCallUsd}` : x('rt.costNone')), missing: !e && r.maxCostPerCallUsd == null },
+    freeModelRow(pv.view.free_model, r, e, pv),
   ];
   return html`
     <${PageSection} id="ai-routing" num=${num} title=${x('rt.title')} count=${x('rt.count', { n: set, total: CAPS.length })}>
