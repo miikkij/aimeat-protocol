@@ -35,6 +35,8 @@
  *     neither integrity nor the signature is never valid by default.
  *   v1.2.1 — 2026-10-25 — secaudit2026oct22: a signature or document timestamp proves the signing
  *     time only when its authority is on a trusted list or chains to an operator anchor.
+ *   v1.2.2 — 2026-10-25 — secaudit2026oct22: the proven signing time goes to checkRevocation, which
+ *     uses an embedded good OCSP answer only when it was made at or after that time.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -286,7 +288,7 @@ async function assess(
       const rm = (await findIssuingService(config, rc.certs, new Date(), ['OCSP/QC', 'OCSP', 'CA/QC', 'CA/PKC'])).match;
       return !!rm?.positiveAt && rm.service.tspName === match.service.tspName;
     };
-    revocation = await checkRevocation(signer, issuer, { embeddedOcsp: cms.embeddedOcsp, online, trustResponder });
+    revocation = await checkRevocation(signer, issuer, { embeddedOcsp: cms.embeddedOcsp, online, trustResponder, provenTime: proven ? at : null });
     if (revocation.status === 'revoked') {
       const revokedAt = revocation.revokedAt ? Date.parse(revocation.revokedAt) : 0;
       if (proven && revokedAt > at.getTime()) reasons.push('REVOKED_AFTER_SIGNING');
