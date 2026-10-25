@@ -69103,9 +69103,13 @@ paths:
         An incident that names records to act on lists them as `entries` (`id`, `kind`, `where`,
         `what`, `action`, `status`, and once decided `decidedAt`, `decidedBy`, `done`). The start step
         of type `anonymous_principal_records` names what the shared anonymous agent wrote before its
-        token was refused there. With `{ name: <entry id>, resolution }` this endpoint decides one
+        token was refused there. The start step of type `erasure_leftover_schedules` names the
+        schedules that account erasures before 2026-10-25 left: a schedule whose `ownerScope` names an
+        account no one holds now, or an account registered after the schedule was made; the entry id
+        is the schedule id. With `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
-        none) or `delete` (the skill or the data package is deleted with its files), or `keep`
+        none) or `delete` (the skill or the data package is deleted with its files, the schedule is
+        removed from the scheduler and from storage), or `keep`
         (nothing changes). Deciding an entry again answers 409. The incident resolves itself with its
         last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
