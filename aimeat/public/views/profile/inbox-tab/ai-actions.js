@@ -5,7 +5,7 @@
  * @description Builds the config objects behind the Inbox thread-head AI actions, so InboxTab's handlers
  *   stay one-liners (and the file stays under max-file-lines). Two families:
  *     - Reply with AI (TARGET-031): buildConversationReplyProps / buildMessageReplyProps → { title, build }
- *       for ReplyWithAiPopover (build(mode) → copy/mcp prompt).
+ *       for ReplyWithAiPopover (build() → the MCP prompt).
  *     - Conversation → Notebook: buildConversationNotebookProps → { title, promptText, runServerSummary,
  *       parkConversation } for ConversationToNotebookPopover. runServerSummary calls /v1/ai/complete on the
  *       owner's own OpenRouter key (vision-aware, up to 8 images) and returns { content, provenance };
@@ -22,6 +22,7 @@
  *   v1.0.0 — 2026-07-19 — Initial: extracted the Reply-with-AI + Conversation→Notebook assembly from inbox-tab.js.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: runServerSummary returns { content, provenance } so the
  *     popover can state that a model wrote the draft and link the record.
+ *   v1.2.0 — 2026-10-25 — build() takes no mode: the reply prompt is MCP only.
  */
 import { api } from '/js/api.js';
 import { t } from '/js/i18n.js';
@@ -29,16 +30,16 @@ import { parkConversationToNotebook } from '/js/services/notebook.js';
 import { buildConversationReplyPrompt, buildMessageReplyPrompt, buildConversationSummaryPrompt } from '/js/services/messages-ai-prompts.js';
 import { attachKind } from './helpers.js';
 
-/** Reply-with-AI props for the whole open conversation (ReplyWithAiPopover: build(mode) → prompt). */
+/** Reply-with-AI props for the whole open conversation (ReplyWithAiPopover: build() → prompt). */
 export function buildConversationReplyProps({ activeConv, thread, peerName, peerDisplayName }) {
   const src = { peerGhii: activeConv.peerGhii, subject: activeConv.subject, conversationId: activeConv.conversationId, thread, peerName };
-  return { title: `${t('inbox.ai.replyTo')} ${peerDisplayName}`, build: (mode) => buildConversationReplyPrompt(src, mode) };
+  return { title: `${t('inbox.ai.replyTo')} ${peerDisplayName}`, build: () => buildConversationReplyPrompt(src) };
 }
 
 /** Reply-with-AI props scoped to one message the user pointed at. */
 export function buildMessageReplyProps({ activeConv, msg, peerName }) {
   const src = { peerGhii: activeConv.peerGhii, subject: activeConv.subject, conversationId: activeConv.conversationId, message: msg, peerName };
-  return { title: t('inbox.ai.replyToMessage'), build: (mode) => buildMessageReplyPrompt(src, mode) };
+  return { title: t('inbox.ai.replyToMessage'), build: () => buildMessageReplyPrompt(src) };
 }
 
 /** Every image attachment across the loaded thread, resolved to a viewable url (urlMap is keyed

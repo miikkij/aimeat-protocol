@@ -44,6 +44,9 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.11.1 — 2026-10-25 — markDocumentElement finds the `<html>` tag with findDocumentElement
+ *     (utils/html-document-element.ts), which skips comments: Lifecycle Central's opening comment
+ *     held a `<html>`, and the attribute was written into the comment.
  *   v1.11.0 — 2026-10-25 — aiDisclosureParts takes the author's document: when its head declares its
  *     own `ai-disclosure` meta, the node adds no meta and no `<html>` attribute, and a value that
  *     differs from the record is logged once (services/ai-disclosure-author.ts). The values are the
@@ -109,6 +112,7 @@ import { authorDisclosure, traceAuthorDisclosure } from './ai-disclosure-author.
 export type { ServedSurface };
 import { createT, type Locale } from '../i18n.js';
 import { escapeHtml } from '../utils/html-escape.js';
+import { findDocumentElement } from '../utils/html-document-element.js';
 
 /** A record ready to be served, with the URL a third party resolves it at. */
 export interface ServedProvenance {
@@ -371,20 +375,21 @@ function jsonLd(p: ServedProvenance, reviewedBy?: string, locale: Locale = 'en')
 /**
  * Put the `ai-disclosure` attribute on the document element.
  *
- * Anchored deliberately narrowly: only an `<html …>` tag inside the first 512 characters, only when
- * the attribute is not already there, and only one replacement. A published app is a single-file
+ * Anchored deliberately narrowly: only an `<html …>` tag that starts inside the first 512
+ * characters, outside any comment or raw-text element (findDocumentElement), only when the
+ * attribute is not already there, and only one replacement. A published app is a single-file
  * document whose own JavaScript very often contains the literal strings `</body>` and `<html>`, and
- * a badge injected by a naive first-match replace once landed inside app JS and killed the app. An
+ * a badge injected by a naive first-match replace once landed inside app JS and killed the app; a
+ * `<html>` written in an app's opening comment once took this attribute instead of the real tag. An
  * unmarked document is a much smaller problem than a broken one, so this returns the input unchanged
  * whenever it is not certain.
  */
 export function markDocumentElement(text: string, value: string): string {
-  const head = text.slice(0, 512);
-  const m = /<html(\s[^>]*)?>/i.exec(head);
-  if (!m) return text;
-  if (/\sai-disclosure\s*=/i.test(m[0])) return text;
-  const replaced = `<html${m[1] ?? ''} ai-disclosure="${esc(value)}">`;
-  return text.slice(0, m.index) + replaced + text.slice(m.index + m[0].length);
+  const el = findDocumentElement(text);
+  if (!el) return text;
+  if (/\sai-disclosure\s*=/i.test(el.attrs)) return text;
+  const replaced = `<html${el.attrs} ai-disclosure="${esc(value)}">`;
+  return text.slice(0, el.start) + replaced + text.slice(el.end);
 }
 
 /**

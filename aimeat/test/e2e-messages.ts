@@ -6,6 +6,8 @@
 //   the defect that answered `delivered` for an agent nobody had created. What they assert is unchanged.
 // v1.2.0 -- 2026-10-10 -- S4c: a workspace file the sender's agent holds is refused at the copy step into
 //   a support thread, with classification on (secaudit 2026-10-10 I9).
+// v1.3.0 -- 2026-10-25 -- 20c: GET /v1/messages/overview?compact=true cuts the last message to a preview
+//   and each agent to its names; without it both are whole.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -386,6 +388,30 @@ await test('20b. overview.peerNames maps every conversation peer to its display 
         assert(c.peerGhii in names, `peerNames covers peer ${c.peerGhii}`);
     }
     assert(names[bob.ghii] === dn, `peerNames[bob] resolves the display name (got "${names[bob.ghii]}")`);
+});
+
+await test('20c. overview?compact=true cuts the last message to a preview and each agent to its names', async () => {
+    const long = `${'Long body '.repeat(50)}end`;
+    const sent = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: bob.ghii, body: long, subject: `Compact ${stamp}` }),
+    });
+    assert(sent.status === 201, `send long ${sent.status}`);
+    const convId = sent.body.data.message.conversationId;
+    const auth = { headers: { Authorization: `Bearer ${alice.token}` } };
+    const [full, compact] = await Promise.all([json('/v1/messages/overview', auth), json('/v1/messages/overview?compact=true', auth)]);
+    assert(full.status === 200 && compact.status === 200, `overview ${full.status} / compact ${compact.status}`);
+    const fullRow = full.body.data.conversations.find((c: any) => c.conversationId === convId);
+    const compactRow = compact.body.data.conversations.find((c: any) => c.conversationId === convId);
+    assert(fullRow?.lastMessage === long, 'without compact the last message is whole');
+    assert(compactRow?.lastMessage === `${long.slice(0, 200)}…`, `compact preview is the first 200 characters and an ellipsis, got ${compactRow?.lastMessage?.length} chars`);
+    assert(compact.body.data.conversations.length === full.body.data.conversations.length, 'compact keeps every conversation');
+    // Alice made 'myagent' in test 17, so the agent list is not empty here.
+    assert(compact.body.data.agents.length > 0 && compact.body.data.agents.length === full.body.data.agents.length, 'compact keeps every agent');
+    for (const a of compact.body.data.agents) {
+        assert(Object.keys(a).every(k => ['gaii', 'name', 'displayName'].includes(k)) && !!a.gaii, `compact agent carries its id and names only: ${JSON.stringify(a)}`);
+    }
+    assert('publicKey' in full.body.data.agents[0], 'without compact the agent record is whole');
 });
 
 await test('21. /v1/messages/overview requires an owner session (agent/anon rejected)', async () => {

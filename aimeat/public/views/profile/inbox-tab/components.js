@@ -9,6 +9,9 @@
  *   re-exported from here; the composer is the Composer component's message tone
  *   (components/Composer.js, tone="message"). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.32.0 -- 2026-10-25 -- ReplyWithAiPopover is MCP only: no "Copy prompt" tab. It reads the AIs
+ *     connected over MCP (the MCP page's rows) and, with none, says so and opens the MCP page
+ *     (/v1/profile?tab=mcp) instead of a prompt (Jouni, 2026-10-25).
  *   2026-09-28 -- No emoji on the two notebook buttons (frontend rule: no emoji in the interface).
  *   v1.31.0 -- 2026-09-26 -- Written on components only (no class): the poll builder's questions are Boxes
  *     of TextFields and Checks; the command bar and fill and the schedule are the pane's strips
@@ -120,7 +123,11 @@ import { Stack, Row } from '/components/Layout.js';
 import { List, Row as ListRow, Name, Cell } from '/components/List.js';
 import { PaneStrip } from '/components/ConversationPane.js';
 import * as schedules from '/js/services/schedules.js';
-import { MODES } from '/js/services/messages-ai-prompts.js';
+import { listAgents, listChatInstances } from '/js/services/agents.js';
+import { getSession } from '/js/services/auth.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
+import { openTab } from '/components/Rail.js';
+import { buildRows as mcpRows } from '../mcp/frame.js';
 import { swallowed } from '/js/swallowed.js';
 // A message is the Message component, given its data in ./message-turn.js; the name stays reachable
 // from here for the pages that take it from this file. A picture of a person is the Avatar component
@@ -275,27 +282,46 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
 /** The ways of a popover as tabs (what the chosen one decides sits under the sun bar). */
 const modeTabs = (items, value, onSelect) => html`<${Tabs} kind="view" items=${items} value=${value} onSelect=${onSelect} />`;
 
-/* ── Reply with AI (TARGET-031) — hand the conversation (or one message) to the user's OWN AI chat so
- *    it can craft a reply WITH access to their AIMEAT (organisms, memory, workspaces, librarian). Two
- *    modes: COPY (paste into any AI chat, paste the reply back) and MCP (an AI with the AIMEAT MCP reads
- *    the thread via aimeat_dm_thread, researches, drafts, and sends via aimeat_dm_send after approval).
- *    `build(mode)` returns the prompt for the picked mode; the InboxTab supplies it per source. ── */
+/* ── Reply with AI (TARGET-031) — hand the conversation (or one message) to the user's OWN AI over MCP
+ *    so it can craft a reply WITH access to their AIMEAT (organisms, memory, workspaces, librarian): it
+ *    reads the thread with aimeat_dm_thread_as_owner, researches, drafts, and after approval sends with
+ *    aimeat_dm_send_as_owner. MCP only: the REST API serves the aimeat CLI, and an AI without MCP cannot
+ *    send as the owner (Jouni, 2026-10-25). The AIs connected over MCP are the MCP page's rows
+ *    (../mcp/frame.js buildRows); with none, the dialog says so and links that page instead of
+ *    showing a prompt nothing could run. `build()` returns the prompt; the InboxTab supplies it. ── */
 export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
-  const [mode, setMode] = useState(MODES.COPY);
-  const text = build(mode);
-  // The two ways are tabs; what the chosen one decides sits under a sun bar (the edge box).
+  const [hasMcpAi, setHasMcpAi] = useState(undefined);   // undefined while the first read runs
+  const text = build();
+  useEffect(() => {
+    let live = true;
+    const read = () => Promise.all([
+      listAgents(getSession()?.owner),
+      listChatInstances().catch((err) => { swallowed('inbox ReplyWithAiPopover: instances', err); return []; }),
+    ])
+      .then(([agents, instances]) => { if (live) setHasMcpAi(mcpRows(agents, instances).length > 0); })
+      // A failed read shows the prompt: the list is a guide here, never a lock.
+      .catch((err) => { swallowed('inbox ReplyWithAiPopover: agents', err); if (live) setHasMcpAi(true); });
+    read();
+    // An AI connected while the dialog is open turns it into the prompt without a reopen.
+    const off = onLiveUpdate(['agents', 'chat'], read);
+    return () => { live = false; off(); };
+  }, []);
+  // The profile reads ?tab= only on mount, so a link to /v1/profile?tab=mcp from inside the profile
+  // changes the address and nothing else; the in-profile route is the aimeat-open-tab event.
+  const toMcpPage = () => { onClose?.(); openTab('mcp'); };
+  const footer = hasMcpAi === false
+    ? html`<${Loud} control onClick=${toMcpPage}>${t('inbox.ai.connectMcp')}<//>`
+    : html`<${Loud} control disabled=${hasMcpAi === undefined} copy=${text} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
+        onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>`;
   return html`
-    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false}
-      footer=${html`<${Loud} control copy=${text} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
-        onCopied=${() => showToast?.(t('inbox.ai.copied'))}>${t('common.copy')}<//>`}>
-      <${Stack} gap="medium">
-        ${modeTabs([{ value: MODES.COPY, label: t('common.copyPrompt') }, { value: MODES.MCP, label: t('inbox.ai.modeMcp') }], mode, setMode)}
-        <${TabPanel} value=${mode}><${Box} tone="edge">
-          <${Stack} gap="medium">
-            <${Note}>${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}<//>
-            <${TextArea} readOnly rows=${14} value=${text} />
-          <//>
-        <//><//>
+    <${Modal} open=${true} onClose=${onClose} title=${title} size="lg" guard=${false} footer=${footer}>
+      <${Box} tone="edge">
+        ${hasMcpAi === false
+          ? html`<${Note}>${t('inbox.ai.noMcp')}<//>`
+          : html`<${Stack} gap="medium">
+              <${Note}>${t('inbox.ai.hintMcp')}<//>
+              <${TextArea} readOnly rows=${14} value=${text} />
+            <//>`}
       <//>
     <//>`;
 }
