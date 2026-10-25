@@ -29,7 +29,7 @@ import { TextField } from '/components/TextField.js';
 import { Loud } from '/components/Action.js';
 import { HelpTip } from '/components/HelpTip.js';
 import { listGoals, waitingGoals } from '/js/services/goals.js';
-import { StepCard, NobodyCard } from './goal-steps.js';
+import { StepCard, NobodyCard, ProposalCard } from './goal-steps.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const g = (key, fallback) => tr('home.goals.' + key, fallback);
@@ -86,9 +86,11 @@ export function GoalsPart({ navigate }) {
     <//>
     ${waiting.length > 0 && html`
       <${NamedRow} stack label=${g('waitingLabel', 'Your goals wait for you')}>
-        ${waiting.slice(0, 5).map((item) => item.kind === 'step'
-          ? html`<${StepCard} key=${item.goal_id + item.work.id} item=${item} showGoal onDone=${load} />`
-          : html`<${NobodyCard} key=${item.goal_id + item.work.id} item=${item} navigate=${navigate} />`)}
+        ${waiting.slice(0, 5).map((item) => item.kind === 'proposal'
+          ? html`<${ProposalCard} key=${item.goal_id} item=${item} navigate=${navigate} />`
+          : item.kind === 'step'
+            ? html`<${StepCard} key=${item.goal_id + item.work.id} item=${item} showGoal onDone=${load} />`
+            : html`<${NobodyCard} key=${item.goal_id + item.work.id} item=${item} navigate=${navigate} />`)}
       <//>`}`;
 }
 

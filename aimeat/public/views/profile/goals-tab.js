@@ -190,7 +190,8 @@ function GoalRules({ goal, agents, onSaved, confirm, showToast }) {
     <${PageSection} title=${g('chainTitle', 'The whole chain, work by work')}>
       <${DataTable} scroll headers=${[g('hWork', 'Work'), g('hLink', 'Link'), g('hLoop', 'Back and forth'), g('hWho', 'Who'), g('hState', 'State'), g('hCost', 'Cost')]}
         rows=${goal.works.map((w) => [
-          w.title, String(w.hop), String(w.loop), w.claimed_by ?? w.agent ?? (w.kind === 'human' ? g('you', 'you') : (w.wants ?? []).join(', ')),
+          w.title, String(w.hop), String(w.loop),
+          w.runner === 'model' ? g('modelName', 'AIMEAT\'s model') : w.claimed_by ?? w.agent ?? (w.kind === 'human' ? g('you', 'you') : (w.wants ?? []).join(', ')),
           w.status + (w.settled_at ? ` · ${ago(w.settled_at)}` : ''), w.cost_usd ? money(w.cost_usd) : '–',
         ])} />
       <${Actions}>
