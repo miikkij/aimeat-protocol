@@ -265,6 +265,18 @@ everywhere at once, and say so in the Changes section.
 | the short text that stands in for a picture | what a screen reader reads aloud in place of the picture; a model writes it, or the picture carries it already | alt text | vaihtoehtoinen teksti | texto alternativo |
 | a class or fields a model suggests adding | waits for the owner, or is approved at once, or a decision rule decides; approve and reject are the two answers | proposal (approve, reject) | ehdotus (hyväksyä, hylätä) | propuesta (aprobar, rechazar) |
 | the mark inside a file that it was made by AI | an IPTC DigitalSourceType or a C2PA manifest a program can read; the EU AI Act (article 50) asks for one. Not the visible AI label above | machine-readable AI mark | koneluettava tekoälymerkintä | marca de IA legible por máquina |
+| something the person wants done by their agents | the person's sentence, when it is done, when it ends and what it may spend; the agents share the work and hand results on | goal | tavoite | objetivo |
+| work given to nobody by name | offered to every agent whose tags hold the skill it asks for; the first to take it gets the task | open work | avoin työ | trabajo abierto |
+| what an agent does with open work | it claims it, and the claim gives it a task | take | ottaa | tomar |
+| the next work starting from a result | a reaction, or an agent leaving the next work, starts it with the earlier results in its task | follow-up | jatko | continuación |
+| a goal that checks on a schedule | it runs in rounds by the clock and acts only when its condition holds | watch | vahti | vigilancia |
+| how far work may pass on | the count of hand-overs from one result to the next before the next work waits for the owner's yes | chain length | ketjun pituus | longitud de la cadena |
+| one run of a repeating goal | each round starts its works again and keeps its own results | round | kierros | ronda |
+| a smaller goal inside a goal | made by the owner, the coordinator or an agent in the goal; it spends from its parent goal | subgoal | alitavoite | subobjetivo |
+| what was brought to a goal | files, records, links, texts and earlier results the owner or the agents added | material | aineisto | material |
+| two agents handing work to each other | a coder and a reviewer; it has its own limit, separate from the chain length | back and forth | edestakaisin | ida y vuelta |
+| the steps only the owner can take | choose, approve, answer, do it yourself, or give a file or a fact | waiting for you | odottaa sinua | te espera |
+| the agent that leads a goal | plans, hands out work, makes subgoals and asks the owner; any agent of the owner's, on any model | coordinator | koordinaattori | coordinador |
 
 ## Never translated, in any language
 
