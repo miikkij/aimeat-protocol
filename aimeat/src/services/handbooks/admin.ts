@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.21.0 -- 2026-10-25 -- A deactivated account's background work waits; incidents that name records
+ *     to clear, delete or keep (secaudit2026oct22).
  *   v1.20.0 -- 2026-10-25 -- Apps open to the internet on a closed node: the list, the decision, the trusted owners.
  *   v1.19.1 -- 2026-10-24 -- The records of processing: scope "all", and item_id with set (C7.7).
  *   v1.19.0 -- 2026-10-23 -- Security classes (the TL and NATO packs) and the records of processing (plan doc-mvlftkh9zmc9).
@@ -260,7 +262,17 @@ above is refused with SEALED_CONFIG.
 credential acting in its name (sessions, its agents' tokens, access keys, app permissions) stops
 immediately, the account and its knowledge remain, and \`aimeat_admin_owner_enable\` lets the
 person back in without resurrecting the old credentials. Never works on your own account. This is
-the manual offboarding door; a connected directory does the same automatically over SCIM.
+the manual offboarding door; a connected directory does the same automatically over SCIM. While the
+account is deactivated, its schedules, workflow triggers and unattended extension runs are skipped
+with a log line that names the deactivation; nothing is deleted, and they run again after enable.
+
+**Security incidents that name records (operator).** Some incidents list \`entries\`, each with an
+\`id\`, an \`action\` ("clear" or "delete") and a status: the records the shared anonymous agent wrote
+before its token was refused there (type \`anonymous_principal_records\`: its webhook, tags and
+capabilities, and the skills and data packages it published). Read them with
+\`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
+\`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
+the operator says. The incident is resolved with the last entry.
 
 ## Typical uses
 - Audit the node: \`aimeat_admin_statistics\` / \`aimeat_admin_stats\` / \`aimeat_admin_agents\` / \`aimeat_admin_config\`.

@@ -69099,6 +69099,15 @@ paths:
         it without one. No content changes either way: content already shown more widely keeps its
         level (the exposure report lists it). The incident closes with its last decision; resolving
         it before that answers 409.
+
+        An incident that names records to act on lists them as `entries` (`id`, `kind`, `where`,
+        `what`, `action`, `status`, and once decided `decidedAt`, `decidedBy`, `done`). The start step
+        of type `anonymous_principal_records` names what the shared anonymous agent wrote before its
+        token was refused there. With `{ name: <entry id>, resolution }` this endpoint decides one
+        entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
+        none) or `delete` (the skill or the data package is deleted with its files), or `keep`
+        (nothing changes). Deciding an entry again answers 409. The incident resolves itself with its
+        last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
         - BearerAuth: []
@@ -69114,8 +69123,8 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, description: 'An account name from the incident''s `names`, or a classification id from the incident''s `caps`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one).' }
+                name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear or delete, or keep.' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -69133,7 +69142,8 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete], description: With a name. }
+                          entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object
                             description: With a name. What the decision did; a counter that does not apply stays 0.

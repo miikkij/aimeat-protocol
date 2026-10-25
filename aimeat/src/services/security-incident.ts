@@ -23,6 +23,9 @@
  *   undecidedCases · undecidedMessage · SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.6.0 -- 2026-10-25 -- An incident can name records the operator acts on one by one (`entries`:
+ *     clear or delete, or keep; services/incident-entries.ts). An open entry does not stop a resolve
+ *     or a delete (secaudit2026oct22).
  *   v1.5.0 -- 2026-10-18 -- An incident can offer default audience caps (`caps`), one decision each
  *     (classification/default-caps.ts, plan doc-mvdipuyqraas, L5.1). Resolving or deleting it is
  *     refused with CONFLICT while a cap is undecided, as for a held name; the refusal carries its words.
@@ -101,6 +104,35 @@ export interface SecurityIncidentInput {
   setting?: IncidentSetting;
   /** Default audience caps offered to the operator, one decision each (classification/default-caps.ts). */
   caps?: IncidentCapOffer[];
+  /** Records the operator may act on one by one (services/incident-entries.ts). */
+  entries?: IncidentEntry[];
+}
+
+/**
+ * One record an incident names that the operator may act on (services/incident-entries.ts): the
+ * offered `action` ('clear' sets the named field back, 'delete' removes the record) or 'keep'. Unlike
+ * a held name or an offered cap, an open entry does not stop the incident from being resolved or
+ * deleted: resolving it keeps every entry still open as it is. The incident resolves itself when the
+ * last entry is decided.
+ */
+export interface IncidentEntry {
+  /** The entry's id within the incident: what the operator names as `name`. */
+  id: string;
+  /** What kind of record it is, e.g. 'agent_webhook' or 'schedule'. */
+  kind: string;
+  /** Where it is: the field, the memory or storage key, or the schedule id. */
+  where: string;
+  /** What it is, in one line (English, for the log and an AI). */
+  what: string;
+  /** The values the Security page puts into its own sentence for `kind`, in the reader's language. */
+  params?: Record<string, string | number>;
+  /** The action offered besides 'keep'. */
+  action: 'clear' | 'delete';
+  status: 'open' | 'done' | 'kept';
+  decidedAt?: string;
+  decidedBy?: string;
+  /** What the decision did, in one line. */
+  done?: string;
 }
 
 /**
@@ -155,6 +187,8 @@ export interface SecurityIncidentValue {
   setting?: IncidentSetting;
   /** Default audience caps offered to the operator, decided one by one; the incident closes with the last. */
   caps?: IncidentCapOffer[];
+  /** Records the operator may clear, delete or keep one by one; the incident resolves with the last. */
+  entries?: IncidentEntry[];
 }
 
 type IncidentRecord = Awaited<ReturnType<Storage['listAllMemory']>>['items'][number];
@@ -199,6 +233,7 @@ export async function recordSecurityIncident(
         ...(input.sources ? { sources: input.sources } : {}),
         ...(input.setting ? { setting: input.setting } : {}),
         ...(input.caps ? { caps: input.caps } : {}),
+        ...(input.entries ? { entries: input.entries } : {}),
       },
       visibility: 'private', tags: ['security'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });

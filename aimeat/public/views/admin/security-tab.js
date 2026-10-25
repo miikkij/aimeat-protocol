@@ -14,6 +14,8 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-25 -- decideEntry: a record an incident names is cleared or deleted after a confirmation
+ *     that names it, or kept with one press (secaudit2026oct22).
  *   2026-10-24 — The security classes (TL and NATO packs) after the classification section
  *     (security-tab.packs.js, plan doc-mvlftkh9zmc9 C7.5).
  *   2026-10-18 — An offered limit on who may see classified content is decided from its incident's
@@ -60,7 +62,7 @@ import { useConfirm } from '/components/Modal.js';
 import { getSecurityOverview, resolveSecurityIncident, deleteSecurityIncident, resolveHeldName } from '/js/services/admin.js';
 import { authHeaders } from '/js/services/auth.js';
 import { RefusalsSection, ipText } from './security-tab.refusals.js';
-import { HeldSection, IncidentsSection, AccountsSection, SettingsSection, AskAiSection, isHeldIncident } from './security-tab.sections.js';
+import { HeldSection, IncidentsSection, AccountsSection, SettingsSection, AskAiSection, isHeldIncident, entryLine } from './security-tab.sections.js';
 import { ClassificationSection } from './security-tab.classification.js';
 import { PacksSection } from './security-tab.packs.js';
 import { Section } from '/components/Section.js';
@@ -191,6 +193,16 @@ export default function SecurityTab(props) {
     try { await resolveHeldName(id, c.label, resolution); showOk(S('incidents.held.decided')); load(); }
     catch (e) { showErr((e && e.message) || t('common.error')); }
   };
+  // One record an incident names to act on: its action clears or deletes for good, so it asks first
+  // and names the record; Keep changes nothing and asks nothing.
+  const decideEntry = (id, e, resolution) => {
+    const run = async () => {
+      try { await resolveHeldName(id, e.id, resolution); showOk(S('incidents.held.decided')); load(); }
+      catch (err) { showErr((err && err.message) || t('common.error')); }
+    };
+    if (resolution === 'keep') return run();
+    return confirm(S(resolution === 'clear' ? 'incidents.entries.confirmClear' : 'incidents.entries.confirmDelete', { line: entryLine(e) }), run, { danger: true, title: S('title') });
+  };
   const downloadQuarantine = async (id) => {
     try {
       const res = await fetch(`/v1/admin/security/incidents/${encodeURIComponent(id)}/quarantine`, { headers: authHeaders() });
@@ -221,7 +233,7 @@ export default function SecurityTab(props) {
     <${Strip} ov=${ov} switchPage=${switchPage} />
     <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
     ${held.length ? html`<${HeldSection} items=${held} number=${n()} onResolve=${resolve} onDelete=${remove} onDecide=${decide} switchPage=${switchPage} />` : null}
-    <${IncidentsSection} items=${refused} number=${n()} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecideCap=${decideCap} />
+    <${IncidentsSection} items=${refused} number=${n()} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecideCap=${decideCap} onDecideEntry=${decideEntry} />
     <${Columns}>
       <${AccountsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
       <${SettingsSection} ov=${ov} number=${n()} switchPage=${switchPage} />

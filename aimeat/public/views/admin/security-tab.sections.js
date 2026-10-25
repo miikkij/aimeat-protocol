@@ -7,8 +7,12 @@
  *   kept (one row per incident, the one loud action on the open one), who holds the keys (rows in
  *   words with a button to the page that acts), the security settings (read as sentences, each with a
  *   button to Settings), and the paste for the operator's own AI.
- * @structure HeldSection · IncidentsSection (CapOffers) · AccountsSection · SettingsSection · AskAiSection · isHeldIncident
+ * @structure HeldSection · IncidentsSection (CapOffers, EntryActions) · AccountsSection · SettingsSection · AskAiSection ·
+ *   isHeldIncident · entryLine
  * @version-history
+ *   v2.6.0 -- 2026-10-25 -- An incident that names records to act on (`entries`) lists under its row
+ *     each record in words with two buttons, its action (Clear or Delete) and Keep as it is; Resolve
+ *     and Delete stay beside it, since resolving keeps the open records as they are (secaudit2026oct22).
  *   v2.5.0 — 2026-10-18 — An incident that offers the default limits on who may see classified content
  *     (classification_default_caps) lists under its row each classification with its limit in words
  *     and two buttons, Apply and Keep as it is; Resolve and Delete stand beside it only when every
@@ -197,6 +201,34 @@ function CapOffers({ i, onDecideCap }) {
 /** An incident whose offered limits are decided one by one. */
 const capsOf = (i) => (Array.isArray(i.caps) ? i.caps : []);
 
+/** An incident that names records to act on (services/incident-entries.ts), decided one by one. */
+const entriesOf = (i) => (Array.isArray(i.entries) ? i.entries : []);
+
+/** One record of such an incident in the page's language: its kind's sentence with its values. */
+export const entryLine = (e) => tOr('admin.security.incidents.entries.kind.' + e.kind, e.what, e.params || {});
+
+/**
+ * Under an incident that names records to act on: each record in words, and while it is open its
+ * offered action (Clear or Delete) and Keep as it is under it. The incident resolves with the last.
+ */
+function EntryActions({ i, onDecideEntry }) {
+  return html`
+    <${List} under dense keepCols cols="state-name-who-doors" rows=${entriesOf(i)} render=${(e) => {
+      const open = e.status === 'open';
+      return html`
+      <${Row} key=${e.id} below=${open ? html`
+        <${Actions} tight>
+          <${Action} small tone="danger" onClick=${() => onDecideEntry(i.id, e, e.action)}>${S('incidents.entries.' + (e.action === 'clear' ? 'clear' : 'delete'))}<//>
+          <${Action} small soft onClick=${() => onDecideEntry(i.id, e, 'keep')}>${S('incidents.entries.keep')}<//>
+        <//>` : undefined}>
+        <${Cell} line><${Mark} kind="status" tone=${open ? 'danger' : 'fine'}>${open ? S('incidents.held.toDecide') : S('incidents.entries.' + (e.status === 'kept' ? 'kept' : 'done'))}<//><//>
+        <${Name}>${entryLine(e)}<//>
+        <${Who}>${e.where}<//>
+        ${open ? null : html`<${Doors} />`}
+      <//>`;
+    }} />`;
+}
+
 const typeWord = (type) => tOr('admin.security.incidents.type.' + type, type);
 const sourceWord = (source) => source ? tOr('admin.security.incidents.source.' + source, source) : '';
 const whenLine = (i) => `${dt(i.createdAt)}${i.resolvedAt ? ' · ' + S('incidents.resolvedOn', { date: dt(i.resolvedAt) }) : ''}`;
@@ -233,7 +265,7 @@ export function HeldSection({ items, number, onResolve, onDelete, onDecide, swit
 }
 
 /** Section "Refused and kept": the incidents of refused uploads, whose bytes were kept when small enough. */
-export function IncidentsSection({ items, number, onResolve, onDelete, onPayload, onDecideCap }) {
+export function IncidentsSection({ items, number, onResolve, onDelete, onPayload, onDecideCap, onDecideEntry }) {
   const open = items.filter(i => i.status === 'open').length;
   const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
   return html`
@@ -248,10 +280,18 @@ export function IncidentsSection({ items, number, onResolve, onDelete, onPayload
           const caps = capsOf(i);
           const undecided = caps.filter(c => c.status === 'open').length;
           const capsLine = caps.length ? (undecided ? S('incidents.held.rowOpen', { n: num(undecided), total: num(caps.length) }) : S('incidents.caps.rowResolved')) : '';
+          // Records to act on: Resolve and Delete stay beside them, since resolving keeps the open ones.
+          const entries = entriesOf(i);
+          const entriesOpen = entries.filter(e => e.status === 'open').length;
+          const entriesLine = entries.length
+            ? `${entriesOpen ? S('incidents.held.rowOpen', { n: num(entriesOpen), total: num(entries.length) }) : S('incidents.entries.rowResolved')} ${tOr('admin.security.incidents.entries.lead.' + i.type, i.detail || '')}`
+            : '';
+          const below = caps.length ? html`<${CapOffers} i=${i} onDecideCap=${onDecideCap} />`
+            : entries.length ? html`<${EntryActions} i=${i} onDecideEntry=${onDecideEntry} />` : undefined;
           return html`
-          <${Row} key=${i.id} below=${caps.length ? html`<${CapOffers} i=${i} onDecideCap=${onDecideCap} />` : undefined}>
+          <${Row} key=${i.id} below=${below}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
-            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${caps.length ? `${capsLine} ${S('incidents.caps.lead')}` : i.detail || undefined}>${typeWord(i.type)}<//>
+            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${caps.length ? `${capsLine} ${S('incidents.caps.lead')}` : entriesLine || i.detail || undefined}>${typeWord(i.type)}<//>
             ${caps.length ? html`<${Who}>${sourceWord(i.source)}<//>` : html`
             <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
             <${When}>${whenLine(i)}<//>

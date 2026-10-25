@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-10-25 -- The aimeat_admin_incident_resolve comment names an incident's entries too ("clear" /
+ *     "delete" / "keep"; secaudit2026oct22); the handler is unchanged.
  *   2026-10-23 — The four compliance tools moved unchanged to tool-call-defs-compliance.ts (max-file-lines).
  *   2026-10-18 — The aimeat_admin_incident_resolve comment names the offered default audience caps too
  *     (plan doc-mvdipuyqraas, L5.1); the handler is unchanged.
@@ -452,7 +454,8 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         // With `name` and `resolution`: one case of an incident, a held name (rows, installs, app grants,
-        // access tokens) or an offered default audience cap ("apply" / "keep"); the route decides which.
+        // access tokens), an offered default audience cap ("apply" / "keep") or an entry of an incident
+        // that names records to act on ("clear" / "delete" / "keep"); the route decides which.
         name: 'aimeat_admin_incident_resolve',
         handler: ({ client }, input) => client.post(`/v1/admin/security/incidents/${encodeURIComponent(requiredString(input, 'id'))}/resolve`,
             input.name !== undefined || input.resolution !== undefined
