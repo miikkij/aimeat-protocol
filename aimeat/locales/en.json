@@ -11664,6 +11664,9 @@
     "cfg_morsel_policy_pacing_pack_currency": "Pacing pack: currency",
     "cfg_boards_public_per_owner_max": "Public boards per account",
     "cfg_auth_entra_allowed_tenants": "Allowed Entra tenants",
+    "cfg_auth_casdoor_link_domains": "Casdoor trusted domains",
+    "cfg_auth_entra_link_domains": "Entra trusted domains",
+    "cfg_auth_refresh_cookie_legacy_until": "Old sign-in cookie read until",
     "cfg_email_smtp_secure": "Implicit TLS",
     "cfg_email_smtp_reject_unauthorized": "Reject bad TLS certificates",
     "cfg_account_events_window": "Account event window",
@@ -11906,6 +11909,9 @@
     "cfgDesc_boards_public_per_owner_max": "Public notice boards one account may keep (system boards stay operator-only)",
     "cfgDesc_auth_jwt_ttl_seconds": "JWT token time-to-live in seconds",
     "cfgDesc_auth_entra_allowed_tenants": "Microsoft Entra tenant GUIDs allowed to sign in (comma-separated). Empty = the gate comes from AIMEAT_ENTRA_OAUTH_TENANT alone: a GUID there admits that one tenant, common/organizations admit any Microsoft account.",
+    "cfgDesc_auth_casdoor_link_domains": "Domains whose Casdoor addresses count as verified (comma-separated, * = every domain). Only such an address links a Casdoor sign-in to an existing account or becomes a new account's verified address. Empty = no domain.",
+    "cfgDesc_auth_entra_link_domains": "Domains whose Microsoft Entra addresses count as verified (comma-separated, * = every domain). Empty = every domain when one tenant may sign in, no domain when the allowed-tenants list names several.",
+    "cfgDesc_auth_refresh_cookie_legacy_until": "Last day (YYYY-MM-DD, UTC) an https server still reads the old sign-in cookie name aimeat_rt and moves the browser to __Host-aimeat_rt. Set to 30 days after the first start when empty. A past date: the old name is ignored now, and a browser that only has it signs in again.",
     "cfgDesc_features_extended_features_enabled": "Enable extended feature set",
     "cfgDesc_work_queue_max_pending": "Max pending work items per provider",
     "cfgDesc_work_webhook_max_retries": "Max webhook delivery retry attempts",
@@ -26803,6 +26809,33 @@
           "ex2": "900: 15 minutes, for a server that holds sensitive data.",
           "ex3": "86,400: one day, for a test server where renewals get in the way.",
           "tip": "Keep the default unless you have a reason. A shorter time is safer. A longer time is easier for programs that do not renew their token well."
+        },
+        "casdoor_link_domains": {
+          "title": "Casdoor trusted domains",
+          "short": "The email domains Casdoor may vouch for. Only an address in one of them counts as verified. Empty: no domain. *: every domain.",
+          "what": "When a person signs in with Casdoor for the first time, Casdoor sends their email address. If an account here already has the same verified address, the sign-in joins that account and the person is signed in to it. A new account gets the address as its verified address. Both happen only when the address's domain is on this list. Outside the list the address counts as unverified: the person chooses a new username, and the new account verifies its address here. Casdoor can let its users set an address without a confirmation code, so the list names the domains whose mailboxes your organisation controls. When Casdoor sends email_verified: false, the address is unverified on every domain. A change applies to the next sign-in.",
+          "range": "A comma-separated list of domains, for example corp.example, corp-group.example. * means every domain. Empty is the default and trusts no domain.",
+          "ex1": "corp.example: a member of staff with an address at corp.example joins their existing account on the first Casdoor sign-in.",
+          "ex2": "Empty: a Casdoor sign-in with no linked account always goes to the username choice.",
+          "tip": "List only domains whose mailboxes your organisation controls. Use * only when your Casdoor asks for a confirmation code on every address."
+        },
+        "entra_link_domains": {
+          "title": "Entra trusted domains",
+          "short": "The email domains Microsoft Entra may vouch for. Empty: every domain when one tenant may sign in, no domain when several may.",
+          "what": "When a person signs in with Microsoft for the first time, Entra sends their email address. If an account here already has the same verified address, the sign-in joins that account and the person is signed in to it. A new account gets the address as its verified address. Both happen only when the address counts as verified. With one tenant (your own organisation), every domain is trusted when this is empty. When the allowed tenants list names several organisations, the admin of each partner organisation sets its users' addresses, so with this empty no address counts as verified: list the domains that each approved organisation owns. A claim email_verified or xms_edov that says false makes the address unverified on every domain. When Microsoft sign-in has no tenant gate, no address counts as verified. A change applies to the next sign-in.",
+          "range": "A comma-separated list of domains. * means every domain. Empty is the default.",
+          "ex1": "Empty, one tenant: your own staff join their existing accounts on the first Microsoft sign-in.",
+          "ex2": "corp.example, partner.example with two allowed tenants: addresses at these two domains join existing accounts; an address at any other domain goes to the username choice.",
+          "tip": "With several allowed tenants, list each organisation's own domains. A domain on the list lets that tenant's admin sign in to an account here that has an address at that domain."
+        },
+        "refresh_cookie_legacy_until": {
+          "title": "Old sign-in cookie read until",
+          "short": "The last day this server still reads the browser's old sign-in cookie name. After it, a browser that has only the old cookie signs in again.",
+          "what": "A browser keeps a person signed in with a cookie. On an https server the cookie is now called __Host-aimeat_rt. The browser accepts a cookie of that name only from this server itself, so an app on its own address under this server cannot put a cookie of that name in the browser. Before, the cookie was called aimeat_rt, and an app could write a cookie of that name. Until the end of this day (UTC), the server still reads the old name. When it does, it gives the browser the new cookie and removes the old one, so a person who comes back in time stays signed in. After this day the old name is ignored. A server on plain http keeps the old name, because the new one needs https.",
+          "range": "A date, YYYY-MM-DD. When it is empty at a start, the server sets it to 30 days after that start and keeps it. A past date ignores the old name now.",
+          "ex1": "The date set at the first start: people who come back within 30 days stay signed in.",
+          "ex2": "Yesterday's date: the old name stops working now, and people who had only the old cookie sign in again.",
+          "tip": "Keep the date the server set. Set an earlier date when you want to close the old name sooner, for example when an app on this server may have written cookies."
         }
       },
       "totp": {

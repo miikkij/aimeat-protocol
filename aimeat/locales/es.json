@@ -10222,6 +10222,9 @@
     "cfg_morsel_policy_pacing_pack_currency": "Paquete de ritmo: moneda",
     "cfg_boards_public_per_owner_max": "Tablones públicos por cuenta",
     "cfg_auth_entra_allowed_tenants": "Inquilinos de Entra permitidos",
+    "cfg_auth_casdoor_link_domains": "Dominios de confianza de Casdoor",
+    "cfg_auth_entra_link_domains": "Dominios de confianza de Entra",
+    "cfg_auth_refresh_cookie_legacy_until": "Cookie de sesión anterior leída hasta",
     "cfg_email_smtp_secure": "TLS implícito",
     "cfg_email_smtp_reject_unauthorized": "Rechazar certificados TLS no válidos",
     "cfg_account_events_window": "Ventana de eventos de la cuenta",
@@ -10464,6 +10467,9 @@
     "cfgDesc_boards_public_per_owner_max": "Tablones públicos que una cuenta puede mantener (los del sistema quedan al operador).",
     "cfgDesc_auth_jwt_ttl_seconds": "Vida del token JWT en segundos.",
     "cfgDesc_auth_entra_allowed_tenants": "GUIDs de inquilinos de Microsoft Entra que pueden iniciar sesión (separados por comas). Vacío: la puerta la decide AIMEAT_ENTRA_OAUTH_TENANT por sí sola.",
+    "cfgDesc_auth_casdoor_link_domains": "Dominios cuyas direcciones de Casdoor cuentan como verificadas (separados por comas, * = todos). Solo una dirección así une un inicio de sesión con Casdoor a una cuenta existente o pasa a ser la dirección verificada de una cuenta nueva. Vacío: ninguno.",
+    "cfgDesc_auth_entra_link_domains": "Dominios cuyas direcciones de Microsoft Entra cuentan como verificadas (separados por comas, * = todos). Vacío: todos cuando puede entrar un solo inquilino, ninguno cuando la lista de inquilinos permitidos nombra varios.",
+    "cfgDesc_auth_refresh_cookie_legacy_until": "Último día (AAAA-MM-DD, UTC) en que un servidor https todavía lee el nombre anterior de la cookie de sesión, aimeat_rt, y pasa el navegador a __Host-aimeat_rt. Si está vacío, se fija 30 días después del primer arranque. Una fecha pasada: el nombre anterior se ignora desde ya, y un navegador que solo tiene esa cookie inicia sesión de nuevo.",
     "cfgDesc_features_extended_features_enabled": "Conjunto de funciones extendidas activado.",
     "cfgDesc_work_queue_max_pending": "Máximo de trabajos pendientes por proveedor.",
     "cfgDesc_work_webhook_max_retries": "Máximo de reintentos de entrega de webhooks.",
@@ -24599,6 +24605,33 @@
           "ex2": "900: 15 minutos, para un servidor con datos sensibles.",
           "ex3": "86 400: un día, para un servidor de pruebas donde las renovaciones estorban.",
           "tip": "Deja el valor predeterminado salvo que tengas un motivo. Un tiempo más corto es más seguro. Uno más largo facilita las cosas a los programas que no renuevan bien su token."
+        },
+        "casdoor_link_domains": {
+          "title": "Dominios de confianza de Casdoor",
+          "short": "Los dominios de correo que Casdoor puede respaldar. Solo una dirección de uno de ellos cuenta como verificada. Vacío: ninguno. *: todos.",
+          "what": "Cuando alguien inicia sesión con Casdoor por primera vez, Casdoor envía su dirección de correo. Si aquí ya hay una cuenta con la misma dirección verificada, el inicio de sesión se une a esa cuenta y la persona entra en ella. Una cuenta nueva recibe la dirección como verificada. Las dos cosas pasan solo cuando el dominio de la dirección está en esta lista. Fuera de la lista, la dirección cuenta como no verificada: la persona elige un nombre de usuario nuevo y la cuenta nueva verifica su dirección aquí. Casdoor puede dejar que sus usuarios pongan una dirección sin código de confirmación, así que la lista nombra los dominios cuyos buzones controla tu organización. Si Casdoor envía email_verified: false, la dirección queda sin verificar en cualquier dominio. Un cambio se aplica al siguiente inicio de sesión.",
+          "range": "Una lista de dominios separados por comas, por ejemplo corp.example, corp-group.example. * significa todos los dominios. El valor predeterminado es vacío y no confía en ningún dominio.",
+          "ex1": "corp.example: un empleado con una dirección en corp.example entra en su cuenta existente desde el primer inicio de sesión con Casdoor.",
+          "ex2": "Vacío: un inicio de sesión con Casdoor que no está vinculado a una cuenta siempre lleva a elegir un nombre de usuario.",
+          "tip": "Agrega solo dominios cuyos buzones controla tu organización. Usa * solo si tu Casdoor pide un código de confirmación para cada dirección."
+        },
+        "entra_link_domains": {
+          "title": "Dominios de confianza de Entra",
+          "short": "Los dominios de correo que Microsoft Entra puede respaldar. Vacío: todos cuando puede entrar un solo inquilino, ninguno cuando pueden entrar varios.",
+          "what": "Cuando alguien inicia sesión con Microsoft por primera vez, Entra envía su dirección de correo. Si aquí ya hay una cuenta con la misma dirección verificada, el inicio de sesión se une a esa cuenta y la persona entra en ella. Una cuenta nueva recibe la dirección como verificada. Las dos cosas pasan solo cuando la dirección cuenta como verificada. Con un solo inquilino (tu propia organización), un valor vacío confía en todos los dominios. Cuando la lista de inquilinos permitidos nombra varias organizaciones, el administrador de cada socio define las direcciones de sus usuarios; por eso, con este valor vacío, ninguna dirección cuenta como verificada. Agrega los dominios de cada organización aprobada. Si email_verified o xms_edov dicen false, la dirección queda sin verificar en cualquier dominio. Si el inicio de sesión con Microsoft no está limitado a inquilinos, ninguna dirección cuenta como verificada. Un cambio se aplica al siguiente inicio de sesión.",
+          "range": "Una lista de dominios separados por comas. * significa todos los dominios. El valor predeterminado es vacío.",
+          "ex1": "Vacío y un solo inquilino: tu personal entra en sus cuentas existentes desde el primer inicio de sesión con Microsoft.",
+          "ex2": "corp.example, partner.example con dos inquilinos permitidos: las direcciones de esos dos dominios se unen a cuentas existentes; una dirección de otro dominio lleva a elegir un nombre de usuario.",
+          "tip": "Con varios inquilinos permitidos, agrega los dominios propios de cada organización. Un dominio de la lista permite al administrador de ese inquilino entrar en las cuentas de aquí que tengan una dirección en ese dominio."
+        },
+        "refresh_cookie_legacy_until": {
+          "title": "Cookie de sesión anterior leída hasta",
+          "short": "El último día en que este servidor todavía lee el nombre anterior de la cookie de sesión del navegador. Después, un navegador que solo tiene la cookie anterior inicia sesión de nuevo.",
+          "what": "El navegador mantiene la sesión de una persona con una cookie. En un servidor https, la cookie ahora se llama __Host-aimeat_rt. El navegador acepta una cookie con ese nombre solo de este mismo servidor, así que una aplicación en su propia dirección bajo este servidor no puede ponerla en el navegador. Antes, la cookie se llamaba aimeat_rt, y una aplicación sí podía escribir una cookie con ese nombre. Hasta el final de este día (UTC), el servidor todavía lee el nombre anterior. Cuando lo lee, le da al navegador la cookie nueva y quita la anterior, así que quien vuelve a tiempo sigue con su sesión. Después de este día, el nombre anterior se ignora. Un servidor solo con http mantiene el nombre anterior, porque el nuevo necesita https.",
+          "range": "Una fecha, AAAA-MM-DD. Si está vacía al arrancar, el servidor la fija 30 días después de ese arranque y la guarda. Una fecha pasada ignora el nombre anterior desde ya.",
+          "ex1": "La fecha fijada en el primer arranque: quien vuelve dentro de 30 días sigue con su sesión.",
+          "ex2": "La fecha de ayer: el nombre anterior deja de funcionar ya, y quien solo tenía la cookie anterior inicia sesión de nuevo.",
+          "tip": "Deja la fecha que fijó el servidor. Pon una fecha anterior si quieres cerrar antes el nombre anterior, por ejemplo cuando una aplicación de este servidor pudo escribir cookies."
         }
       },
       "totp": {

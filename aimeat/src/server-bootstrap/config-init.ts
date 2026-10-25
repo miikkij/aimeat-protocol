@@ -12,6 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.11.1 — 2026-10-25 — The refresh cookie's migration window (auth.refresh_cookie_legacy_until) is
+ *     set once at start when no source gave it (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  *   v1.11.0 — 2026-10-25 — The provenance registry is bound to the config (bindConfigProvenance), so
  *     the MCP admin config tools read and mark the same sources the admin Config API does. The Consul
  *     watch leaves a row that applies at the next start out of the running config and marks it waiting.
@@ -61,6 +63,7 @@ import { initSessionAuth } from '../auth/middleware.js';
 import { settleStoredHookBindings, moveAccountNameHookBindings } from '../services/hooks-overview.js';
 import { openHeldNamesIncident, settleInstallsAtStart, settleCredentialsAtStart } from '../services/held-account-names.js';
 import { settleWorkspaceSchemasAtStart } from '../services/workspace-schema-relock.js';
+import { settleRefreshCookieWindowAtStart } from '../services/owner-session.js';
 import { settleSettingIncidentsAtStart } from '../services/config-setting-incidents.js';
 import { settleDefaultCapsAtStart } from '../services/classification/default-caps.js';
 import { bindAppAuditConfig } from '../services/app-audit-archive.js';
@@ -222,6 +225,9 @@ export async function initializeConfig(
   await settleDefaultCapsAtStart(config, storage);
   // The app audit log reads the operator's default limit from this config object, live.
   bindAppAuditConfig(config);
+  // The last day an https node reads the old refresh cookie name, set once when no source gave it,
+  // so a restart does not move it (services/owner-session.ts). Never throws.
+  await settleRefreshCookieWindowAtStart(config, storage);
 
   // Wire storage into token revocation system for persistent revocation, and into the session-aware
   // auth middleware (+ config for PAT browser cookies). Both are filed under this node's id and read

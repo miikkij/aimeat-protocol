@@ -79,7 +79,13 @@ an app's.
 - **Optional family markers.** A proxy may send `X-Subdomain: <label>` and `X-App-Origin`,
   `X-Portfolio-Origin` or `X-Co-Origin`. The node works without them, from `Host`. When they are sent,
   the node honours a marker only on a `Host` in that family and logs `subdomain: origin marker
-  dropped` for any other, so a client cannot claim one.
+  dropped` for any other, and it honours `X-Subdomain` only when it names the label of the `Host`
+  itself (`blog` for `blog.example.org`, `notes` for `notes.apps.example.org`) and logs
+  `subdomain: X-Subdomain dropped` for any other, so a client cannot claim either. There is no
+  setting for this. Set `X-Subdomain` from the server name the proxy routed on, never from the
+  client: nginx passes a client's header through unchanged unless the location sets it, so set it
+  (to the label, or to `""` on the node's own name) and set `X-Forwarded-Host ""` so a client's copy
+  is not passed either.
 - **WebSocket upgrades** on `/v1/realtime/ws`, `/v1/connect/tunnel` and `/v1/personal/tunnel`. Pass
   `Upgrade` and `Connection`, and give them a long read timeout. The node closes an upgrade on any
   other path.
@@ -111,6 +117,13 @@ names, paths, certificates and limits.
 ```nginx
 map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 
+# The label nginx routed on, taken from the server name, never from the client. Empty on the node's
+# own name and on the bare app host; an empty value is not sent.
+map $host $aimeat_label {
+    ~^(?<label>[a-z0-9-]+)\.apps\.example\.org$  $label;
+    default                                      "";
+}
+
 server {
     listen 443 ssl http2;
     server_name example.org apps.example.org *.apps.example.org;
@@ -126,6 +139,8 @@ server {
         proxy_set_header   Host              $host;            # verbatim, required
         proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Subdomain       $aimeat_label;     # from the server name, replaces a client's
+        proxy_set_header   X-Forwarded-Host  "";                # a client's copy is not passed
         proxy_set_header   Upgrade           $http_upgrade;     # WebSocket paths
         proxy_set_header   Connection        $connection_upgrade;
         proxy_read_timeout 3600s;                               # streams and tunnels

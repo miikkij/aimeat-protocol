@@ -8,6 +8,7 @@
  * @structure identityMethods
  * @usage Object.assign(SqliteStorage.prototype, identityMethods) in ../index.ts
  * @version-history
+ *   v1.8.0 — 2026-10-25 — credentialsValidAfter on update and read (migration 0117; secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   v1.7.0 — 2026-10-23 — taskStartFloor on create, update and read, a JSON list in TEXT (migration 0115).
  *   v1.6.0 — 2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party
  *     made TO the agent end with it (secaudit 2026-10, agent-delete:gaii-keyed-grants-outlive-agent).
@@ -348,7 +349,8 @@ export const identityMethods = {
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
        dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?,
        runMode = ?, runtimeSource = ?, identityVersion = ?, cardJws = ?, cardIssuedAt = ?, enrolledAt = ?,
-       mcpClient = ?, mcpLastSeen = ?, taskStart = ?, stoppedAt = ?, stoppedBy = ?, clearance = ?, taskStartFloor = ?
+       mcpClient = ?, mcpLastSeen = ?, taskStart = ?, stoppedAt = ?, stoppedBy = ?, clearance = ?, taskStartFloor = ?,
+       credentialsValidAfter = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -394,6 +396,7 @@ export const identityMethods = {
       updated.stoppedBy ?? null,
       updated.clearance ?? null,
       updated.taskStartFloor?.length ? JSON.stringify(updated.taskStartFloor) : null,
+      updated.credentialsValidAfter ?? null,
       gaii,
     );
     return updated;
@@ -495,6 +498,7 @@ export const identityMethods = {
     if (row.clearance) record.clearance = row.clearance as string;
     const floor = floorListOf(row.taskStartFloor);
     if (floor) record.taskStartFloor = floor;
+    if (row.credentialsValidAfter) record.credentialsValidAfter = row.credentialsValidAfter as string;
     return record;
   },
 
