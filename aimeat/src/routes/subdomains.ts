@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.35.1 — 2026-10-25 — injectAppScript and relaxAppCspMeta moved unchanged to routes/subdomain-app-html.ts (max-file-lines).
+ *   v1.35.0 — 2026-10-25 — serveApp gives an app a closed node opened to the internet the line that says
+ *     so (internetOpenMarkFor, services/internet-opening/).
  *   v1.34.0 — 2026-10-25 — SECURITY (secaudit2026oct22): a label a publish assigns is written with
  *     origin 'publisher' and, like a node name, is not served on the apex namespace: `<label>.<apex>`
  *     and `<label>--draft.<apex>` answer 302 to the app origin (404 without one). An operator's site
@@ -163,6 +166,7 @@ import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { appAiUse } from '../services/app-ai-use.js';
 import { appInfoMarkFor } from '../services/app-news.js';
+import { internetOpenMarkFor } from '../services/internet-opening/opening-mark.js';
 import { wantsWebmcpBridge } from '../utils/app-agent-discovery.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales, appHasIconImage } from '../services/app-seo.js';
 import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
@@ -189,6 +193,7 @@ import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain
 import { pageOriginRefused } from './page-open.js';
 import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
 import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
+import { relaxAppCspMeta } from './subdomain-app-html.js';
 import { apexServesSite, autoLabelCandidates } from '../services/subdomain-site-origin.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
@@ -263,58 +268,8 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
 // ./subdomain-app-gate.ts (moved unchanged at the line ceiling); re-exported for their importers.
 export { resolveAppTarget, resolveServableApp, appIsRestricted } from './subdomain-app-gate.js';
 
-/**
- * Inject a `<script src>` (the seamless-SSO shim) into HTML body bytes, returning a Buffer. Handles
- * a Node Buffer (SQLite), a Uint8Array (MongoDB/Prisma `Bytes`), or a string — decoding bytes as
- * UTF-8 first. (Using `String()` on a Uint8Array would stringify it to "60,33,..." byte values — the
- * bug this guards against.)
- */
-export function injectAppScript(data: Buffer | Uint8Array | string, src: string): Buffer {
-  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-  const tag = `<script src="${src}"></script>`;
-  let html: string;
-  if (/<\/head>/i.test(raw)) html = raw.replace(/<\/head>/i, tag + '</head>');
-  else if (/<body[^>]*>/i.test(raw)) html = raw.replace(/<body[^>]*>/i, (m) => m + tag);
-  else html = tag + raw;
-  return Buffer.from(html, 'utf-8');
-}
-
-/** Add `value` to a CSP directive's source list (deriving from default-src when the directive is
- *  absent), without duplicating it. Returns the new source-list array. */
-function cspEnsure(dirs: Map<string, string[]>, dir: string, value: string): void {
-  const base = dirs.get(dir) ?? dirs.get('default-src') ?? ["'self'"];
-  const vals = [...base];
-  if (!vals.includes(value)) vals.push(value);
-  dirs.set(dir, vals);
-}
-
-/**
- * If a published app's HTML carries its OWN `<meta http-equiv="Content-Security-Policy">`, ensure its
- * `frame-src` AND `connect-src` allow the apex origin. Otherwise a strict app-author CSP (e.g.
- * `default-src 'self'`) blocks the H-2 silent-SSO bridge (a hidden iframe → apex) and the apex grant
- * token exchange, so seamless sign-in silently fails. Only those two directives gain the apex; every
- * other protection the author set is preserved. Apps with no CSP meta are returned unchanged (the
- * response-header CSP governs them).
- */
-export function relaxAppCspMeta(data: Buffer | Uint8Array | string, apexOrigin: string): Buffer {
-  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-  if (!apexOrigin) return Buffer.from(raw, 'utf-8');
-  const out = raw.replace(/<meta\b[^>]*>/gi, (tag) => {
-    if (!/http-equiv\s*=\s*["']content-security-policy["']/i.test(tag)) return tag;
-    const cm = /content\s*=\s*(["'])([\s\S]*?)\1/i.exec(tag);
-    if (!cm) return tag;
-    const dirs = new Map<string, string[]>();
-    for (const part of cm[2].split(';').map((s) => s.trim()).filter(Boolean)) {
-      const [name, ...vals] = part.split(/\s+/);
-      dirs.set(name.toLowerCase(), vals);
-    }
-    cspEnsure(dirs, 'frame-src', apexOrigin);
-    cspEnsure(dirs, 'connect-src', apexOrigin);
-    const rebuilt = [...dirs.entries()].map(([n, v]) => (v.length ? `${n} ${v.join(' ')}` : n)).join('; ');
-    return tag.replace(cm[0], cm[0].replace(cm[2], rebuilt));
-  });
-  return Buffer.from(out, 'utf-8');
-}
+// injectAppScript and relaxAppCspMeta (the shim script and the author's CSP meta) live in
+// ./subdomain-app-html.ts, moved unchanged when this file hit the line ceiling.
 
 /**
  * Write a published app's HTML body with the app CSP + cache/security headers. For HTML apps the
@@ -397,6 +352,8 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
     let buf = applyServeMarks(relaxed, {
       aiUse: aiUse && visible ? { use: aiUse, locale: visible.locale } : undefined,
       info,
+      // An app a closed node opened to the internet says so at its end (services/internet-opening/).
+      internetOpen: internetOpenMarkFor(protect.config, app, visible?.locale),
       // This branch is inside a `text/html` test, so the media type is already settled and the
       // marks pass does not have to guess from a closing tag the author never had to write.
       isDocument: true,

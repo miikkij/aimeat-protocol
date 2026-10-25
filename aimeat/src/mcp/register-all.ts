@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-25 — registerInternetOpeningTools: an app opened to the internet on a closed node (six tools).
  *   2026-10-22 — registerDecideTools takes the session's caller, so a decision run reads and shows only what the session may read (secaudit 2026-10, v83, v84).
  *   2026-10-21 — registerAiImageTool takes the session's caller, for the publish gate on a public picture.
  *   2026-10-21 — ServerToolDeps.stateless reaches the chat surface's finder, which answers a
@@ -130,6 +131,7 @@ import { registerCortexTools } from './cortex.js';
 import { registerSeoTools } from './seo.js';
 import { registerVisibilityTools } from './visibility.js';
 import { registerExposureTools } from './exposure.js';
+import { registerInternetOpeningTools } from './internet-opening.js';
 import { registerDmGroupTools } from './dm-groups.js';
 import { registerPublishRequestTools } from './publish-requests.js';
 import { registerAccountRightsTools } from './account-rights.js';
@@ -267,6 +269,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     registerVisibilityTools(mcp, storage, config, caller);
     registerExposureTools(mcp, storage, config, caller);
+    registerInternetOpeningTools(mcp, storage, config, caller);
     registerPublishRequestTools(mcp, storage, config, caller);
     registerAccountRightsTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.

@@ -46,6 +46,10 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.8.1 — 2026-10-25 — aiDisclosureParts reads the author's document, so an app that declares its
+ *     own `ai-disclosure` meta gets no second meta and no `<html>` attribute from the node.
+ *   v1.8.0 — 2026-10-25 — `internetOpen`: the line at the end of an app a closed node opened to the
+ *     internet (utils/app-internet-open-badge.ts), in the same one splice as the other body marks.
  *   v1.7.0 — 2026-10-18 — `info`: the app-info mark (utils/app-info-badge.ts), after the "Use with your
  *     AI" mark, in the visitor's language; it counts as visible chrome for the reserve strip and its
  *     block loads public/js/app-news.js. A spec without it produces the same bytes.
@@ -86,6 +90,7 @@ import { findOpenTag, injectBeforeClosingTag } from '../utils/html-inject.js';
 import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
 import { AI_USE_MARK, aiUseBadgeSnippet, type AppAiUse } from '../utils/app-ai-use-badge.js';
 import { APP_INFO_MARK, appInfoBadgeSnippet } from '../utils/app-info-badge.js';
+import { INTERNET_OPEN_MARK, internetOpenSnippet, type InternetOpenBadgeSpec } from '../utils/app-internet-open-badge.js';
 import { formatForPerson } from './display-prefs.js';
 import type { AppNews } from './app-news.js';
 import { RESERVE_MARK, reserveSnippet } from '../utils/app-chrome-reserve.js';
@@ -239,6 +244,11 @@ export interface ServeMarksSpec {
    * the caller serves no visible chrome.
    */
   info?: { news: AppNews; tucked: boolean; moreUrl: string; locale: Locale };
+  /**
+   * The line that says the app is open to everyone on the internet, for an app a closed node opened
+   * (utils/app-internet-open-badge.ts, services/internet-opening/opening-mark.ts). Absent otherwise.
+   */
+  internetOpen?: InternetOpenBadgeSpec;
   /** The `<head>` metadata the app almost certainly has none of. */
   headMeta?: AppHeadSpec;
   /**
@@ -286,9 +296,10 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet());
     if (spec.aiUse && !text.includes(AI_USE_MARK)) parts.push(aiUseMarkup(spec.aiUse.use, spec.aiUse.locale));
     if (spec.info && !text.includes(APP_INFO_MARK)) parts.push(infoMarkup(spec.info));
+    if (spec.internetOpen && !text.includes(INTERNET_OPEN_MARK)) parts.push(internetOpenSnippet(spec.internetOpen));
     if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
       const { block, w3c } = aiDisclosureParts(spec.provenance,
-        spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined);
+        spec.visibleLabel ? { ...spec.visibleLabel, reviewedBy: spec.reviewedBy } : undefined, text);
       parts.push(block);
       // Before the head pass — see the file comment; this is what keeps a head-less document's
       // generated `<html>` element unmarked, as it has always been.

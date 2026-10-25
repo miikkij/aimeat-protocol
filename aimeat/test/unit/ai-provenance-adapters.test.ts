@@ -11,6 +11,8 @@
  *   - separate describes for the emitted IETF header form and the C2PA projection
  * @usage pnpm exec vitest run test/unit/ai-provenance-adapters.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The w3c column holds the final W3C report's values: human-only,
+ *     ai-assisted (also generated content a person reviewed), ai-autonomous.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import { describe, it, expect } from 'vitest';
@@ -47,7 +49,7 @@ const REVIEWED: AiHumanInvolvement[] = ['editorial-control', 'full-human'];
 const ROWS: Row[] = [
   ...ANY_INVOLVEMENT.map((human): Row => ({
     level: 'original', human,
-    iptc: undefined, w3c: 'none', ietfMode: 'none', icon: undefined,
+    iptc: undefined, w3c: 'human-only', ietfMode: 'none', icon: undefined,
   })),
   ...ANY_INVOLVEMENT.map((human): Row => ({
     level: 'assisted', human,
@@ -56,22 +58,22 @@ const ROWS: Row[] = [
   })),
   ...UNREVIEWED.map((human): Row => ({
     level: 'synthesized', human,
-    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'autonomous',
+    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-autonomous',
     ietfMode: 'machine-generated', icon: 'ai-generated',
   })),
   ...REVIEWED.map((human): Row => ({
     level: 'synthesized', human,
-    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-generated',
+    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-assisted',
     ietfMode: 'ai-originated', icon: 'ai-basic',
   })),
   ...UNREVIEWED.map((human): Row => ({
     level: 'ai-generated', human,
-    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'autonomous',
+    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-autonomous',
     ietfMode: 'machine-generated', icon: 'ai-generated',
   })),
   ...REVIEWED.map((human): Row => ({
     level: 'ai-generated', human,
-    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-generated',
+    iptc: `${IPTC}trainedAlgorithmicMedia`, w3c: 'ai-assisted',
     ietfMode: 'ai-originated', icon: 'ai-basic',
   })),
 ];

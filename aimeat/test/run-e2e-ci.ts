@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
  *   2026-10-24 -- e2e-cortex-board-ownership.ts joins the list (not the guard tier): a cortex activation answers 409 for a board id another account holds, and a deactivation deletes only the installing account's boards (secaudit2026oct22).
  *   2026-10-24 -- e2e-capability-extension-ref.ts joins the list (not the guard tier): an extension-backed capability's ref names an extension and an action, and invoke resolves both before its loopback request (secaudit2026oct22).
@@ -536,6 +537,8 @@ const ALL_SUITES = [
     'test/e2e-content-access-gate.ts',
     // Self-spawns its own signed-in-only node: what a signed-in browser sends without a credential.
     'test/e2e-content-access-browser.ts',
+    // Self-spawns its own signed-in-only node: one app and its forms opened to the internet, watched.
+    'test/e2e-app-internet-opening.ts',
     // Self-spawns its own node with the app origin and strict new-app defaults.
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.

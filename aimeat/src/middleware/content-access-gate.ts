@@ -36,9 +36,17 @@
  *   which hold no content; everything else there, the per-app documents included, answers 404. The
  *   page host serves only what a frame token names, and a token is minted only after the page's own
  *   gate, which in this mode admits accounts only.
- * @structure OPEN_ROUTES · isOpenRoute() · contentAccessGate(config)
+ *
+ *   THE WATCHED EXCEPTION. An app opened to the internet (services/internet-opening/) is served to
+ *   everyone with the forms it declares, on an operator's approval or by an owner the node lets open
+ *   on their own; who opened it, why and until when is recorded and listed for the operators.
+ * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.0 — 2026-10-25 — An app opened to the internet (services/internet-opening/) is the watched
+ *     exception: its apex read, its own origin's documents and the public intake routes of the forms
+ *     it declares pass. Its other data calls stay closed. The list of openings is in memory
+ *     (opening-registry.ts), so a node with none pays one map lookup.
  *   v1.3.0 — 2026-10-19 — Open: the node's own documents the showroom pages link to (site map, page
  *     mirrors, glossary, AI transparency statement, provenance schema, API reference page), the
  *     outbound connection callback and the live stream (its ticket is its credential). A signed-in
@@ -59,6 +67,11 @@ import type { AimeatConfig } from '../config.js';
 import { signedInOnly } from '../config-visibility.js';
 import { isNodeAccount } from '../services/audience.js';
 import { mirroredPages } from '../data/public-pages.js';
+import { localAccountName } from '../utils/gaii.js';
+import type { Storage } from '../storage/interface.js';
+import {
+  anyOpenings, isAppOpenToInternet, isOpenedIntakeRoute, isTargetOpenToInternet,
+} from '../services/internet-opening/opening-registry.js';
 import { error } from './envelope.js';
 
 /** `method` null matches every method. A path is matched whole, after its trailing slashes go. */
@@ -179,17 +192,40 @@ function appOpenRedirect(method: string, path: string, accept: string | undefine
   return `/v1/app-open?app=${encodeURIComponent(`${m[1]}/${m[2]}`)}`;
 }
 
-export function contentAccessGate(config: AimeatConfig): RequestHandler {
-  return (req, res, next) => {
+/** True for GET /v1/apps/:owner/:filename of an app opened to the internet. */
+function openedAppRead(method: string, path: string): boolean {
+  if ((method !== 'GET' && method !== 'HEAD') || !anyOpenings()) return false;
+  const m = APEX_APP_READ.exec(path);
+  return !!m && isAppOpenToInternet(localAccountName(m[1]), m[2]);
+}
+
+export function contentAccessGate(
+  config: AimeatConfig,
+  /** The storage, read late: the server builds it after it mounts this gate (server.ts). */
+  storageOf?: () => Pick<Storage, 'getSubdomainSite'> | null,
+): RequestHandler {
+  return async (req, res, next) => {
     if (!signedInOnly(config) || req.method === 'OPTIONS') return next();
     if (isNodeAccount(req.auth)) return next();
     if (req.pageOrigin) return next();   // the page host: a frame token names what it serves
+    // An app opened to the internet (services/internet-opening/) submits to the forms it declares,
+    // on the apex as the intake library calls them; the routes there apply their own guards.
+    if (isOpenedIntakeRoute(req.method, req.path)) return next();
     if (req.appOrigin || req.portfolioOrigin || req.coOrigin) {
       // The page itself goes to its route, which serves it only on a grant and sends a browser
       // without one to the open page (routes/subdomains.ts, routes/page-open.ts). A welcome page or
       // a company page has only `/`.
       const page = req.appOrigin ? APP_ORIGIN_PAGE.test(req.path) : req.path === '/';
       if (req.method === 'GET' && page) return next();
+      // The origin of an app opened to the internet also serves its own documents (the legal pages,
+      // llms.txt, the manifest) as on an open node. Its data calls under /v1/ stay closed. The
+      // origin's app is one keyed read, made only while some app is open.
+      const storage = storageOf?.();
+      if (req.appOrigin && storage && req.subdomain && anyOpenings()
+        && (req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/v1/')) {
+        const site = await storage.getSubdomainSite(req.subdomain);
+        if (site && site.enabled && site.kind === 'app' && isTargetOpenToInternet(site.target)) return next();
+      }
       // The page loads the served libraries and signs in from its own origin. Those routes hold no
       // content and are open on the apex too; the origin's own documents (llms.txt, AGENTS.md, the
       // legal pages) are outside /v1/ and stay closed.
@@ -198,6 +234,9 @@ export function contentAccessGate(config: AimeatConfig): RequestHandler {
       return;
     }
     if (isOpenRoute(req.method, req.path)) return next();
+    // The apex read of an app opened to the internet: the route serves it as on an open node
+    // (routes/apps/read.ts asks appAudience, which answers anyone for it).
+    if (openedAppRead(req.method, req.path)) return next();
     const openPage = appOpenRedirect(req.method, req.path, req.headers.accept);
     if (openPage) {
       res.setHeader('Cache-Control', 'no-store');

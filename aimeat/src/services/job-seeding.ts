@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-10-25 — Seed core:internet-opening-sweep (hourly at :12).
  *   2026-10-18 — Seed core:subscription-renewals (daily 05:19; Comicland v3 A-5).
  *   2026-10-15 — Seed core:gate-expiry (every 10 minutes; feature-list audit #59) and
  *     core:intake-thread-retention (hourly at :50; feature-list audit #64).
@@ -147,6 +148,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   // classification policy. Nightly at 03:35, on every node: until 2026-09-30 it ran inside
   // core:consent-audit-prune, which is seeded only with consent on.
   jobs.push({ id: 'core:classification-audit-prune', name: 'Classification Audit Prune', coreHandler: 'classification-audit-prune', cron: '35 3 * * *' });
+  // Apps open to the internet on a closed node (services/internet-opening/): an opening past its end
+  // closes, its owner is reminded a week before, a request nobody decided lapses. Hourly at :12, on
+  // every node; a node with no opening reads one key prefix and stops.
+  jobs.push({ id: 'core:internet-opening-sweep', name: 'Internet Opening Sweep', coreHandler: 'internet-opening-sweep', cron: '12 * * * *' });
 
   const now = new Date().toISOString();
   for (const def of jobs) {

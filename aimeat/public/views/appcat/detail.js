@@ -36,6 +36,8 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   v1.6.0 — 2026-10-25 — The section "Open to the internet" after Manage (sections/internet.js), on a
+ *     node that shows its content to its own accounts only.
  *   v1.5.0 — 2026-10-18 — The pencil into the About editor is the owner's only, and the back link names
  *     the view the app belongs to (Your apps, Building for others, Community): a visitor saw "← Your
  *     apps" and an edit pencil on somebody else's app. The view starts under the site's top bar
@@ -99,6 +101,7 @@ const SECTION_LOADERS = {
   roadmap: () => import('/views/appcat/sections/roadmap.js'),
   visitors: () => import('/views/appcat/sections/visitors.js'),
   manage: () => import('/views/appcat/sections/manage.js'),
+  internet: () => import('/views/appcat/sections/internet.js'),
   builders: () => import('/views/appcat/sections/builders.js'),
   skills: () => import('/views/appcat/sections/skills.js'),
   search: () => import('/views/appcat/sections/search.js'),

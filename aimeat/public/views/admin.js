@@ -6,6 +6,8 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.14.0 — 2026-10-25 — The page "Open to the internet" (internet-openings) after Security: the apps
+ *     a closed node opens to everyone, and the requests waiting for an operator.
  *   v1.13.1 — 2026-10-24 — The live stream reaches the tabs: each change is relayed as the window
  *     event 'aimeat-live-update' with its domains, as the profile page does. The tabs that listen for
  *     it never heard one on this page (found with the Compliance records dialog, C7.7).
@@ -54,6 +56,7 @@ import OverviewTab     from './admin/overview-tab.js';
 import EconomyTab      from './admin/economy-tab.js';
 import ConfigTab, { configLabel, configGroupLabel } from './admin/config-tab.js';
 import SecurityTab     from './admin/security-tab.js';
+import InternetOpeningsTab from './admin/internet-openings-tab.js';
 import ComplianceTab   from './admin/compliance-tab.js';
 import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
@@ -111,6 +114,7 @@ const NAV_GROUPS = [
     { id: 'economy',      key: 'dashboard.economy',    component: EconomyTab },
     { id: 'config',       key: 'dashboard.config',     component: ConfigTab },
     { id: 'security',     key: 'admin.security.title',  component: SecurityTab },
+    { id: 'internet-openings', key: 'admin.internetOpenings.title', component: InternetOpeningsTab },
     { id: 'compliance',   key: 'admin.compliance.title', component: ComplianceTab },
     { id: 'cors',         key: 'dashboard.cors',       component: CorsTab },
     { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },

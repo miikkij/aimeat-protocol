@@ -12,6 +12,8 @@
  *   import { visibilityDefaults } from './config-visibility.js';
  *   const config = { ...visibilityDefaults(), ... };
  * @version-history
+ *   v1.9.0 — 2026-10-25 — appInternetOpening and appInternetOpeningMaxDays: how one app is opened to
+ *     the internet on a closed node (services/internet-opening/).
  *   v1.8.1 — 2026-10-18 — Comment: contentAccess 'signed-in' stores a new public write at the signed-in level (V1.6).
  *   v1.8.0 — 2026-10-18 — The content starting levels (config-content-defaults.ts, plan V5) ride along: VisibilityConfig extends ContentDefaultsConfig.
  *   v1.7.0 — 2026-10-18 — publishGate: who asks the owner before making something public (V4).
@@ -85,7 +87,20 @@ export interface VisibilityConfig extends ContentDefaultsConfig {
    * needs the word too. The owner in person is never asked.
    */
   publishGate: PublishGate;
+  /**
+   * How an app is opened to the internet on a node with signed-in content access
+   * (services/internet-opening/): 'off' (nobody opens one), 'operator' (the default: the owner asks
+   * and an operator approves, except owners the operator trusts to open on their own) or 'self' (the
+   * owner opens it and the operators are told). Read only while `contentAccess` is 'signed-in'.
+   */
+  appInternetOpening: AppInternetOpening;
+  /** The longest an opening lasts before it closes itself, in days (default 90). */
+  appInternetOpeningMaxDays: number;
 }
+
+/** How an app is opened to the internet on a closed node. */
+export type AppInternetOpening = 'off' | 'operator' | 'self';
+export const APP_INTERNET_OPENING_VALUES: readonly AppInternetOpening[] = ['off', 'operator', 'self'];
 
 /** Who must ask the owner before making something public. */
 export type PublishGate = 'off' | 'agents' | 'agents-and-apps';
@@ -98,6 +113,12 @@ export const CONTENT_ACCESS_VALUES: readonly ContentAccess[] = ['open', 'signed-
 /** True when this node serves content to its own signed-in accounts only. */
 export function signedInOnly(config: { contentAccess?: ContentAccess }): boolean {
   return config.contentAccess === 'signed-in';
+}
+
+/** The longest opening in days: a whole number from 1 to 365, else 90. */
+function internetOpeningMaxDays(raw: string | undefined): number {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 365 ? n : 90;
 }
 
 export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): VisibilityConfig {
@@ -114,6 +135,9 @@ export function visibilityDefaults(env: NodeJS.ProcessEnv = process.env): Visibi
     appDefaultAccessCode: env.AIMEAT_APP_DEFAULT_ACCESS_CODE === 'true',
     publishGate: env.AIMEAT_PUBLISH_GATE === 'agents' || env.AIMEAT_PUBLISH_GATE === 'agents-and-apps'
       ? env.AIMEAT_PUBLISH_GATE : 'off',
+    appInternetOpening: env.AIMEAT_APP_INTERNET_OPENING === 'off' || env.AIMEAT_APP_INTERNET_OPENING === 'self'
+      ? env.AIMEAT_APP_INTERNET_OPENING : 'operator',
+    appInternetOpeningMaxDays: internetOpeningMaxDays(env.AIMEAT_APP_INTERNET_OPENING_MAX_DAYS),
     ...contentDefaults(env),
   };
 }

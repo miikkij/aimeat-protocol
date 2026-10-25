@@ -22,7 +22,7 @@
  *   `ai-basic` with an "origin unstated" alt. A missing record never reads as "a human wrote it".
  * @structure
  *   - toIptc            — IPTC digitalSourceType URI (also what C2PA carries)
- *   - toW3cHtml         — W3C CG `ai-disclosure` attribute value
+ *   - toW3cHtml         — W3C `ai-disclosure` value (Final Community Group Report, 2026-10-09)
  *   - toIetfHeader      — `AI-Disclosure` value, RFC 9651 structured field (draft-abaris-aicdh)
  *   - toEuIcon          — official EU icon stem + alt-text i18n key
  *   - toC2paAssertion   — C2PA action assertion, a strict projection of toIptc
@@ -30,6 +30,9 @@
  *   import { toIptc, toEuIcon } from './ai-provenance-adapters.js';
  *   const uri = toIptc(record);              // undefined = emit nothing
  * @version-history
+ *   v1.3.0 — 2026-10-25 — toW3cHtml() speaks the final W3C report: human-only | ai-assisted |
+ *     ai-autonomous. The draft words it used ('none', 'ai-generated', 'autonomous') are not values
+ *     of the report, so a page marked with them declared nothing.
  *   v1.2.0 — 2026-10-20 — fromIptc(): the reading direction, what a digital source type a file carries
  *     says about AI involvement, for the content class pipeline (services/content/provenance-read.ts).
  *   v1.1.0 — 2026-10-18 — iptcComposite(): the value for a work combined from several pieces, for
@@ -46,8 +49,15 @@ import {
 /** IPTC's controlled vocabulary lives under this namespace. */
 const IPTC_DIGITAL_SOURCE_TYPE = 'http://cv.iptc.org/newscodes/digitalsourcetype/';
 
-/** W3C Community Group `ai-disclosure` values (formed Feb 2026 — young, expect movement). */
-export type W3cAiDisclosure = 'none' | 'ai-assisted' | 'ai-generated' | 'autonomous';
+/**
+ * The `ai-disclosure` values of the W3C AI Content Disclosure report, a Final Community Group Report
+ * since 2026-10-09 (https://w3c-cg.github.io/ai-content-disclosure/). These three and no others; the
+ * report reads them ASCII case-insensitively and an unknown value declares nothing.
+ */
+export type W3cAiDisclosure = 'human-only' | 'ai-assisted' | 'ai-autonomous';
+
+/** The same three, for a reader that checks a value it did not produce (services/ai-disclosure-author.ts). */
+export const W3C_AI_DISCLOSURE_VALUES: readonly W3cAiDisclosure[] = ['human-only', 'ai-assisted', 'ai-autonomous'];
 
 /**
  * A reference to one of the official EU icons.
@@ -133,15 +143,21 @@ export function fromIptc(value: string): IptcAiVerdict {
 
 // ── W3C ─────────────────────────────────────────────────────────────────────────────────────────
 
-/** W3C `ai-disclosure` attribute value, or undefined to omit the attribute entirely. */
+/**
+ * W3C `ai-disclosure` value, or undefined to omit the attribute entirely.
+ *
+ * The final report has no separate value for reviewed generated content: `ai-assisted` is the one
+ * that requires human review, so generated content a person reviewed is `ai-assisted` and generated
+ * content nobody reviewed is `ai-autonomous`.
+ */
 export function toW3cHtml(input: MaybeAiProvenance): W3cAiDisclosure | undefined {
   const p = asKnownProvenance(input);
   if (!p) return undefined;
   switch (p.level) {
-    case 'original': return 'none';
+    case 'original': return 'human-only';
     case 'assisted': return 'ai-assisted';
     case 'synthesized':
-    case 'ai-generated': return reviewed(p) ? 'ai-generated' : 'autonomous';
+    case 'ai-generated': return reviewed(p) ? 'ai-assisted' : 'ai-autonomous';
   }
 }
 

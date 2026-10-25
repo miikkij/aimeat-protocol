@@ -38,6 +38,8 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.11.0 — 2026-10-25 — `internet.requested`, `internet.opened`, `internet.extended`, `internet.closed`: the
+ *     app opened to the internet on a closed node (services/internet-opening/).
  *   v1.10.0 — 2026-10-18 — `marks.info` and `marks.tucked`: the app-info mark and the row's starting state.
  *   v1.9.0 — 2026-10-17 — `access`: who may open the app changed (plan doc-mvcn6c7e4e5q V2.1).
  *   v1.8.0 — 2026-10-16 — recordAppAudit writes with compare-and-swap and retries on a version miss, so
@@ -103,7 +105,9 @@ export type AppAuditAction =
   | 'plan.changed' | 'roster.swept'
   // The permissions the app kept when the node moved to 4.0 (services/app-scope-allowance.ts), and
   // each word its owner took away.
-  | 'scope_allowance.kept' | 'scope_allowance.removed';
+  | 'scope_allowance.kept' | 'scope_allowance.removed'
+  // The app opened to the internet on a closed node, asked for, extended or closed (services/internet-opening/).
+  | 'internet.requested' | 'internet.opened' | 'internet.extended' | 'internet.closed';
 
 export interface AppAuditEntry {
   at: string;

@@ -5,7 +5,7 @@
   "date": "2026-10-18"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.1.2, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -650,6 +650,15 @@
      "plain": "A node for its own people only The operator can set the node to show its content to its own signed-in accounts only. Then nobody who is not signed in sees anything: every address outside sign-in, registration and the machine connections asks for a sign-in, every page (the front page included) shows a sign-in page instead and opens the page the person came for once they sign in, the steps of signing in (an invitation, an app's consent, opening an app or a page, allowing what an agent asked for) still work, apps open only after a sign-in, portfolio and company addresses do not answer, search engines are told to stay out, and a visitor signed in on another node is treated as a stranger. Something made public while the node is closed (a record, a file, a skill, a package, a knowledge package, a data package, a workspace link) is saved for the signed-in accounts instead, and the answer says so in one sentence, so opening the node later exposes nothing new by accident. What was public before keeps its setting, so switching back restores it. With a sign-in limited to your company (registration mode and the Microsoft tenant list) it is a company node. visibility.content_access (AIMEAT_CONTENT_ACCESS=signed-in), admin Config, content_access in GET /?format=json"
     },
     {
+     "slug": "g-4-one-app-open-to-the-internet-on-a-closed-node",
+     "cells": [
+      "<strong>One app open to the internet on a closed node</strong>",
+      "On a node for its own people only, you can still open one app to everyone, for example a campaign page with a consent form and a data-request form, while the rest of the node stays closed. You give the reason and how long; the page, its own documents and the intake forms it names in <code>&lt;meta name=&quot;aimeat-intake&quot;&gt;</code> open, and nothing else of yours does. The operator decides how: you ask and an operator approves (the default, and the operators can let named people open on their own), you open and the operators are told, or nobody opens. Every opening records who asked, why, when, who approved and until when, and lists every version since; the operators see all of them on one page, hear of every opening and every new version, and close any with one press. A form a new version adds waits for the operator. The app says at its end that it is open to everyone, search engines do not list it without the operator's separate approval, and it closes itself at its end date after a reminder a week before. Your agent opens it only with your approval where the node asks for it.",
+      "<code>visibility.app_internet_opening</code>, <code>visibility.app_internet_opening_max_days</code>, <code>/v1/apps/{owner}/{filename}/internet-opening</code>, <code>/v1/admin/internet-openings*</code>, <code>/v1/admin/internet-openers/*</code>, <code>aimeat_app_internet_*</code>, <code>aimeat_admin_internet_*</code>"
+     ],
+     "plain": "One app open to the internet on a closed node On a node for its own people only, you can still open one app to everyone, for example a campaign page with a consent form and a data-request form, while the rest of the node stays closed. You give the reason and how long; the page, its own documents and the intake forms it names in <meta name=\"aimeat-intake\"> open, and nothing else of yours does. The operator decides how: you ask and an operator approves (the default, and the operators can let named people open on their own), you open and the operators are told, or nobody opens. Every opening records who asked, why, when, who approved and until when, and lists every version since; the operators see all of them on one page, hear of every opening and every new version, and close any with one press. A form a new version adds waits for the operator. The app says at its end that it is open to everyone, search engines do not list it without the operator's separate approval, and it closes itself at its end date after a reminder a week before. Your agent opens it only with your approval where the node asks for it. visibility.app_internet_opening, visibility.app_internet_opening_max_days, /v1/apps/{owner}/{filename}/internet-opening, /v1/admin/internet-openings*, /v1/admin/internet-openers/*, aimeat_app_internet_*, aimeat_admin_internet_*"
+    },
+    {
      "slug": "g-4-nothing-goes-public-without-you",
      "cells": [
       "<strong>Nothing goes public without you</strong>",
@@ -671,10 +680,10 @@
      "slug": "g-4-app-grants",
      "cells": [
       "<strong>App grants</strong>",
-      "A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default).",
-      "<code>/v1/app-grants/*</code>"
+      "A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default). An app may ask for the marketplace words too: <code>exchange:read</code> shows your contracts, your work and who uses what you sell, <code>exchange:write</code> makes and ends contracts within the budget you set, posts needs and bids, delivers work and lists what you sell; spending under a contract still needs <code>contract:spend</code> with its own ceiling, and publishing tells the app which word its calls need.",
+      "<code>/v1/app-grants/*</code>, <code>aimeat-scopes</code>"
      ],
-     "plain": "App grants A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default). /v1/app-grants/*"
+     "plain": "App grants A published app gets a short, narrow, revocable token instead of your session. You can narrow it, cap the morsels it may use, or revoke it. A revoke ends its access at once; a narrowing reaches the app when its current token runs out (15 minutes by default). An app may ask for the marketplace words too: exchange:read shows your contracts, your work and who uses what you sell, exchange:write makes and ends contracts within the budget you set, posts needs and bids, delivers work and lists what you sell; spending under a contract still needs contract:spend with its own ceiling, and publishing tells the app which word its calls need. /v1/app-grants/*, aimeat-scopes"
     },
     {
      "slug": "g-4-sharing-groups-and-key-space-shares",
@@ -2493,10 +2502,10 @@
      "slug": "g-11-realtime-library",
      "cells": [
       "<strong>Realtime library</strong>",
-      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log; since 4.0.0 a connection that puts the sign-in token in its address is refused.",
-      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>/v1/ws/ticket</code>, <code>AIMEAT_TURN_SECRET</code>"
+      "Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock: it measures each peer's clock offset and calls a step ahead of time, through tempo changes. A message too big for the relay goes in parts and is joined before the app sees it, and bursts are paced under the relay's rate. The audio library plays a note at an exact time and into a named bus, so a band of players stays in time, with a limiter on the master. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log; since 4.0.0 a connection that puts the sign-in token in its address is refused.",
+      "<code>/lib/realtime.js</code>, <code>syncDoc</code>, <code>SharedClock</code>, <code>aimeat-audio</code> (<code>play(…, { when, destination })</code>, <code>bus()</code>), <code>/v1/realtime/rooms</code>, <code>/v1/realtime/ice-servers</code>, <code>/v1/ws/ticket</code>, <code>AIMEAT_TURN_SECRET</code>"
      ],
-     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log; since 4.0.0 a connection that puts the sign-in token in its address is refused. /lib/realtime.js, syncDoc, SharedClock, /v1/realtime/rooms, /v1/realtime/ice-servers, /v1/ws/ticket, AIMEAT_TURN_SECRET"
+     "plain": "Realtime library Let app users edit a shared Yjs document, exchange data over WebSocket or WebRTC connections, and coordinate timed behaviour with a shared network clock: it measures each peer's clock offset and calls a step ahead of time, through tempo changes. A message too big for the relay goes in parts and is joined before the app sees it, and bursts are paced under the relay's rate. The audio library plays a note at an exact time and into a named bus, so a band of players stays in time, with a limiter on the master. Realtime services must be enabled on the node. When two users need a relay server to reach each other, each signed-in user gets a relay credential of their own that expires after an hour; visitors and anonymous callers get none. A connection opens with a one-time ticket that lasts a minute, so the user's sign-in token never appears in a web address that a proxy server could log; since 4.0.0 a connection that puts the sign-in token in its address is refused. /lib/realtime.js, syncDoc, SharedClock, aimeat-audio (play(…, { when, destination }), bus()), /v1/realtime/rooms, /v1/realtime/ice-servers, /v1/ws/ticket, AIMEAT_TURN_SECRET"
     }
    ]
   },
@@ -2755,10 +2764,10 @@
      "slug": "g-13-realtime-rooms",
      "cells": [
       "<strong>Realtime rooms</strong>",
-      "Rooms for peer-to-peer sessions between browsers.",
-      "<code>/v1/realtime/rooms</code>"
+      "Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through <code>AIMEAT.live</code>, with no refresh, when the app holds <code>social:read</code>.",
+      "<code>/v1/realtime/rooms</code>, live domain <code>realtime-rooms</code>"
      ],
-     "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. /v1/realtime/rooms"
+     "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through AIMEAT.live, with no refresh, when the app holds social:read. /v1/realtime/rooms, live domain realtime-rooms"
     },
     {
      "slug": "g-13-moderation",
@@ -4325,6 +4334,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 437
+  "rows": 438
  }
 }

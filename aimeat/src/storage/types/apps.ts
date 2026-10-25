@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
- *   v1.20.0 — 2026-10-25 — SubdomainSiteRecord gains `origin` (SubdomainSiteOrigin): who chose the
+ *   v1.21.0 — 2026-10-25 — SubdomainSiteRecord gains `origin` (SubdomainSiteOrigin): who chose the
  *     label, the operator or a publish. Postgres 0116, SQLite safeAddColumn (secaudit2026oct22).
+ *   v1.20.0 — 2026-10-25 — AppManifest gains `intake`: the public forms a version submits to, read
+ *     from the bytes at publish. It lives in the manifest JSON, no migration.
  *   v1.19.0 — 2026-10-18 — AppMarks gains `info` and `tucked`; a draft's manifest may carry
  *     `draftNotice` (AppDraftNotice), what the draft is changing. Both live in JSON, no migration.
  *   v1.18.0 — 2026-10-17 — AppRecord gains `access`: who may open the app (absent anyone,
@@ -200,6 +202,13 @@ export interface AppManifest {
    * forward. The contract is what the set composer matches on.
    */
   workspaces?: Array<{ contract: string; name: string; manifest: Record<string, unknown>; schemas?: Record<string, Record<string, unknown>>; readme?: string }>;
+  /**
+   * The public intake forms this version submits to, read from its
+   * `<meta name="aimeat-intake" content="org/ws/formId ...">` at every publish and never carried
+   * forward (services/app-intake-forms.ts). An app opened to the internet on a closed node opens
+   * these forms with it (services/internet-opening/).
+   */
+  intake?: Array<{ org: string; ws: string; formId: string }>;
   /**
    * The app's PACING amount: the morsels taking the app once moves (POST /v1/app-store/purchase),
    * 0 or absent = unpaced. A morsel is pacing, never a price, and an app has no money price yet. A

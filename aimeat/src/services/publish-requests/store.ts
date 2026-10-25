@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-25 — The kind `internet-opening`: an agent or an app asks to open one app to the internet
+ *     on a closed node (services/internet-opening/opening-door.ts).
  *   2026-10-22 — settleRequestsForRemovedTarget(): a deleted user skill or an uninstalled cortex
  *     settles every request still waiting on it `outdated`, and `digest` binds a skill's or a
  *     cortex's content beside its version (secaudit 2026-10,
@@ -75,7 +77,9 @@ const ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 /** What kind of content a request makes public. Each has an applier in appliers.ts. */
 export type PublishKind =
   | 'memory' | 'file' | 'workspace-share' | 'app' | 'organism' | 'board' | 'skill'
-  | 'package' | 'knowledge' | 'datapackage' | 'portfolio' | 'company' | 'cortex' | 'consent';
+  | 'package' | 'knowledge' | 'datapackage' | 'portfolio' | 'company' | 'cortex' | 'consent'
+  // An app opened to the internet on a closed node, asked by an agent or an app (services/internet-opening/).
+  | 'internet-opening';
 
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
 

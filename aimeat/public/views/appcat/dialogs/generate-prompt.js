@@ -2,7 +2,12 @@
  * @file public/views/appcat/dialogs/generate-prompt.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The prompt the "Generate App with AI" dialog composes (features F154, F155), word for
+ * @description The prompts the "Generate App with AI" dialog and the front page's builder compose.
+ *   connectedPrompt is the one both lead with: a short prompt for an AI connected to this node over
+ *   MCP, which reads the Atelier build spec itself, interviews the owner, waits for a yes, and
+ *   publishes the app on the owner's account (the brief the front page's four prompt cards proved,
+ *   landing-v2-cards.js PREAMBLE). buildPrompt is the long one for an AI that cannot connect (Microsoft
+ *   365 Copilot, for one), and composes features F154, F155 word for
  *   word as the old catalogue's cortex.js buildPromptFromBuilder composed it. Atelier: "The app idea, in
  *   the owner's words: …" and the node's Atelier guide, plus the source under "## The app to improve"
  *   in improve mode; until the guide arrives, the line that says it is being fetched. Classic: the
@@ -10,9 +15,13 @@
  *   core text, or when the node has none the inline fallback; the source in improve mode; the starting
  *   template; the chosen capability packs with their include lines and their usage docs. The prompt's
  *   own words stay English on purpose: they tell the AI which language to talk and build in.
- * @structure buildPrompt(opts) · classicFallback(nodeUrl, isImprove) · PB_LANGS
- * @usage buildPrompt({ track, app, description, lang, core, coreAtelier, template, packs, atelierLoading })
+ * @structure connectedPrompt(opts) · buildPrompt(opts) · classicFallback(nodeUrl, isImprove) · PB_LANGS
+ * @usage connectedPrompt({ description, lang, app })
+ *        buildPrompt({ track, app, description, lang, core, coreAtelier, template, packs, atelierLoading })
  * @version-history
+ *   v1.1.0 — 2026-10-25 — connectedPrompt: the connected AI is the road for every new app, on the
+ *     Atelier track only; Classic stays for an AI that cannot connect and for improving a Classic app
+ *     (Jouni). buildPrompt is unchanged.
  *   v1.0.2 — 2026-09-29 — The publish walkthrough's first step opens /v1/appcat instead of
  *     /app-catalog.html (Jouni). The address only.
  *   v1.0.1 — 2026-09-28 — The aimeat-ai line says the user's own AI providers and capabilities() first
@@ -154,6 +163,52 @@ export function classicFallback(nodeUrl, isImprove) {
     prompt += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it from the public), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n';
   }
   return prompt;
+}
+
+/**
+ * The prompt for an AI connected to this node over MCP. Short on purpose: the AI reads the build
+ * spec, the skill and the pitfalls from the node itself, so nothing here can fall behind them.
+ * A new app is always Atelier. Improving an app follows the app's own track; somebody else's app is
+ * forked first, because only its owner can publish it.
+ * @param {{ description?: string, lang?: string, nodeUrl?: string,
+ *   app?: { name?: string, filename?: string, owner?: string, own?: boolean, track?: string,
+ *     html?: string }|null }} o
+ */
+export function connectedPrompt(o) {
+  const nodeUrl = o.nodeUrl || location.origin;
+  const host = nodeUrl.replace(/^https?:\/\//, '');
+  const pbLang = PB_LANGS[o.lang] || 'English';
+  const description = String(o.description || '').trim();
+  const app = o.app || null;
+  const atelier = !app || app.track === 'atelier';
+  const spec = atelier
+    ? 'the Atelier build spec (aimeat_handbook_get { tier: "build-app-atelier" }, then the parts it names) and the skill node:aimeat-app-builder-atelier with aimeat_skill_get'
+    : 'the build spec (aimeat_handbook_get { tier: "build-app" }) and the skill node:aimeat-app-builder with aimeat_skill_get';
+  const read = 'call aimeat_appdev_overview, read ' + spec + ', read aimeat_appdev_pitfall_list, and search the Design Book with aimeat_designbook_search for the parts you will use.';
+  const finish = 'run aimeat_app_manage with action "audit" and fix everything it names, take the screenshot (action "screenshot"), set the legal pages when the app keeps anything about people (action "legal"), ask me whether search engines may list it (action "seo"), and hand me the address.';
+  let p = 'You are connected to ' + host + ' over MCP as my AI. ';
+  if (!app) {
+    p += 'Build a new app with me and publish it on my account.\n\n';
+    p += 'Talk to me in ' + pbLang + '.\n\n';
+    p += 'Before you write a line: ' + read + ' Then do what the spec asks before any code: interview me, show me what you will build, and wait for my yes. Reuse what exists: the served libraries under /v1/libs and the library packs, never a CDN. The app must work on a phone first, in light and dark.\n\n';
+    p += 'When it is built: publish it with aimeat_app_publish, ' + finish + '\n\n';
+    p += 'THE APP: ' + (description || 'I have not described it yet. Ask me what to build.');
+    return p;
+  }
+  const name = app.name || app.filename || 'Untitled';
+  const where = app.owner && app.filename ? ' (' + app.owner + '/' + app.filename + ')' : '';
+  const onNode = !!(app.owner && app.filename);
+  if (onNode && app.own === false) {
+    p += 'Make a copy of the app "' + name + '"' + where + ' on my account with aimeat_app_fork, and change the copy.\n\n';
+  } else {
+    p += 'Change my app "' + name + '"' + where + ' and publish the new version.\n\n';
+  }
+  p += 'Talk to me in ' + pbLang + '.\n\n';
+  p += 'Before you change a line: ' + (onNode ? 'read the app with aimeat_app_get and its design spec (aimeat_app_manage action "spec"), ' : '') + read + ' Keep the app on its own track' + (atelier ? '' : ' unless I ask you to move it to Atelier') + '. If the change is not clear, ask me first, and wait for my yes before you publish.\n\n';
+  p += 'When it is done: publish it with aimeat_app_publish, ' + finish + ' Tell me in two lines what changed.\n\n';
+  p += 'THE CHANGE: ' + (description || 'I have not described it yet. Ask me what to change.');
+  if (!onNode && typeof app.html === 'string') p += '\n\n## The app\'s source\n' + app.html;
+  return p;
 }
 
 /**
