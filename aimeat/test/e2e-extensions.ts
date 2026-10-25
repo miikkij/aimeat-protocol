@@ -54,6 +54,11 @@ let agentToken = '';
 let agentPrivKey = '';
 let agentGaii = '';
 const ownerName = `extowner${Date.now()}`;
+// An install is stored in its owner's namespace (services/component-address.ts). The owner's own
+// action calls below keep the bare name; the management addresses name the owner, which is how
+// another account and a caller with no sign-in reach the same extension.
+const ECHO = encodeURIComponent(`${ownerName}/test-echo`);
+const MEMORY = encodeURIComponent(`${ownerName}/test-memory`);
 const agentName = 'extagent';
 
 console.log('\n=== AIMEAT Extension System E2E Test ===\n');
@@ -162,7 +167,7 @@ await test('POST /v1/extensions \u2014 install echo extension', async () => {
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(body.data?.extension?.name === 'test-echo', 'name matches');
+    assert(body.data?.extension?.name === `${ownerName}/test-echo`, `name matches: ${body.data?.extension?.name}`);
     assert(body.data?.extension?.version === '1.0.0', 'version matches');
     assert(body.data?.extension?.status === 'inactive', 'status is inactive after install');
 });
@@ -171,7 +176,7 @@ await test('GET /v1/extensions \u2014 echo appears in list', async () => {
     const { status, body } = await json('/v1/extensions');
     assert(status === 200, `status ${status}`);
     assert(body.ok === true, 'ok');
-    const echoExt = body.data.extensions.find((e: any) => e.name === 'test-echo');
+    const echoExt = body.data.extensions.find((e: any) => e.name === `${ownerName}/test-echo`);
     assert(echoExt, 'test-echo found in extensions list');
     assert(echoExt.status === 'inactive', 'status is inactive');
     assert(echoExt.actionCount === 1, 'has 1 action');
@@ -191,7 +196,7 @@ await test('POST /v1/ext/test-echo/echo \u2014 returns error while inactive', as
 });
 
 await test('POST /v1/extensions/test-echo/activate \u2014 activate extension', async () => {
-    const { status, body } = await json('/v1/extensions/test-echo/activate', {
+    const { status, body } = await json(`/v1/extensions/${ECHO}/activate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
@@ -200,7 +205,7 @@ await test('POST /v1/extensions/test-echo/activate \u2014 activate extension', a
 });
 
 await test('GET /v1/extensions/test-echo \u2014 verify status is active', async () => {
-    const { status, body } = await json('/v1/extensions/test-echo');
+    const { status, body } = await json(`/v1/extensions/${ECHO}`);
     assert(status === 200, `status ${status}`);
     assert(body.ok === true, 'ok');
     assert(body.data?.extension?.status === 'active', 'status is active');
@@ -215,19 +220,19 @@ await test('Second owner CANNOT deactivate/activate first owner\'s extension (40
     const otherName = `extother${Date.now()}`;
     const otherToken = (await registerOwner(BASE, otherName)).token;
 
-    const deact = await json('/v1/extensions/test-echo/deactivate', {
+    const deact = await json(`/v1/extensions/${ECHO}/deactivate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${otherToken}` },
     });
     assert(deact.status === 403, `deactivate status ${deact.status}: ${JSON.stringify(deact.body)}`);
 
-    const act = await json('/v1/extensions/test-echo/activate', {
+    const act = await json(`/v1/extensions/${ECHO}/activate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${otherToken}` },
     });
     assert(act.status === 403, `activate status ${act.status}: ${JSON.stringify(act.body)}`);
 
-    const chk = await json('/v1/extensions/test-echo');
+    const chk = await json(`/v1/extensions/${ECHO}`);
     assert(chk.body.data?.extension?.status === 'active', 'test-echo still active after blocked cross-owner calls');
 
     // UNINSTALL was not part of this test, and it is the one that takes the most with it. Every
@@ -235,11 +240,11 @@ await test('Second owner CANNOT deactivate/activate first owner\'s extension (40
     // DELETE /v1/extensions/:name leaves the suite green while a second owner uninstalls another
     // owner's extension — and uninstallExtension() takes its scheduled jobs, its `ext:{name}`
     // namespace and every instance namespace with it.
-    const del = await json('/v1/extensions/test-echo', {
+    const del = await json(`/v1/extensions/${ECHO}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${otherToken}` },
     });
     assert(del.status === 403, `a second owner uninstalled it: ${del.status} ${JSON.stringify(del.body)}`);
-    const afterDel = await json('/v1/extensions/test-echo');
+    const afterDel = await json(`/v1/extensions/${ECHO}`);
     assert(afterDel.body.data?.extension?.status === 'active', 'the refused uninstall removed it anyway');
 
     await json(`/v1/owners/${otherName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${otherToken}` } });
@@ -279,7 +284,7 @@ await test('An agent WITHOUT ext:write cannot install an extension', async () =>
         }),
     });
     assert(r.status === 403, `an agent without ext:write installed an extension: ${r.status} ${JSON.stringify(r.body)}`);
-    const chk = await json('/v1/extensions/agent-installed-echo');
+    const chk = await json(`/v1/extensions/${encodeURIComponent(`${ownerName}/agent-installed-echo`)}`);
     assert(chk.status === 404, `and it exists: ${chk.status}`);
 });
 
@@ -357,12 +362,12 @@ await test('POST /v1/extensions \u2014 install memory extension', async () => {
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(body.data?.extension?.name === 'test-memory', 'name matches');
+    assert(body.data?.extension?.name === `${ownerName}/test-memory`, `name matches: ${body.data?.extension?.name}`);
     assert(body.data?.extension?.status === 'inactive', 'status is inactive');
 });
 
 await test('POST /v1/extensions/test-memory/activate \u2014 activate memory extension', async () => {
-    const { status, body } = await json('/v1/extensions/test-memory/activate', {
+    const { status, body } = await json(`/v1/extensions/${MEMORY}/activate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
@@ -399,7 +404,7 @@ await test('POST /v1/ext/test-memory/retrieve \u2014 retrieve the stored value',
 console.log('Phase 5 \u2014 Deactivation + Uninstallation');
 
 await test('POST /v1/extensions/test-echo/deactivate \u2014 deactivate echo extension', async () => {
-    const { status, body } = await json('/v1/extensions/test-echo/deactivate', {
+    const { status, body } = await json(`/v1/extensions/${ECHO}/deactivate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
@@ -418,29 +423,29 @@ await test('POST /v1/ext/test-echo/echo \u2014 verify action fails after deactiv
 });
 
 await test('DELETE /v1/extensions/test-echo \u2014 uninstall echo extension', async () => {
-    const { status, body } = await json('/v1/extensions/test-echo', {
+    const { status, body } = await json(`/v1/extensions/${ECHO}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(body.data?.deleted === 'test-echo', 'deleted name matches');
+    assert(body.data?.deleted === `${ownerName}/test-echo`, `deleted name matches: ${body.data?.deleted}`);
 });
 
 await test('GET /v1/extensions/test-echo \u2014 verify 404 after uninstall', async () => {
-    const { status, body } = await json('/v1/extensions/test-echo');
+    const { status, body } = await json(`/v1/extensions/${ECHO}`);
     assert(status === 404, `expected 404, got ${status}`);
     assert(body.ok === false, 'not ok');
 });
 
 await test('DELETE /v1/extensions/test-memory \u2014 cleanup memory extension', async () => {
-    const { status, body } = await json('/v1/extensions/test-memory', {
+    const { status, body } = await json(`/v1/extensions/${MEMORY}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
-    assert(body.data?.deleted === 'test-memory', 'deleted name matches');
+    assert(body.data?.deleted === `${ownerName}/test-memory`, `deleted name matches: ${body.data?.deleted}`);
 });
 
 // ─── Phase 6: Wallet consume amount guard (CR-1 regression) ───

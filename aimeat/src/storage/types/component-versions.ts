@@ -7,8 +7,10 @@
  *   every app that loaded it at once. Now every install and update also stores a snapshot under
  *   (kind, name, version), and an address that pins a version (`name@1.2.0`) is served from the
  *   snapshot while the bare address keeps serving the latest.
- * @structure ComponentKind · ComponentVersionRecord · ComponentVersionSummary
+ * @structure ComponentKind · ComponentVersionRecord · ComponentVersionSummary · ReleasedComponentNameRecord
  * @version-history
+ *   2026-10-25 — ReleasedComponentNameRecord: a bare name released by uninstall and the account that
+ *     held it (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-09-03 — Initial (versions, slice 2; brief doc-mtkr34qa1dg1).
  */
 
@@ -36,4 +38,17 @@ export interface ComponentVersionSummary {
   bytes: number;
   createdAt: string;
   createdBy: string;
+}
+
+/**
+ * A bare extension or cortex name an uninstall released. Names are stored as `<owner>/<name>` since
+ * 2026-10-25; a bare name is one stored before that, or a shipped one. Only `holder` may install
+ * under the bare name again (services/component-address.ts).
+ */
+export interface ReleasedComponentNameRecord {
+  kind: ComponentKind;
+  name: string;
+  /** The account that held the name: an installedBy value (a bare account name, or `system@<node>`). */
+  holder: string;
+  releasedAt: string;
 }

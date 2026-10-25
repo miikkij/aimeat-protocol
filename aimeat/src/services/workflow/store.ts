@@ -70,12 +70,16 @@
  *     values, and keeps every step's state. workflow:read alone had served the owner's private field
  *     values out of any run of theirs (secaudit 2026-10, the run-read gap beside
  *     wf-preflight-skips-step-authority).
+ *   v1.20.0 — 2026-10-25 — An extension step names the owner's own extension through
+ *     services/component-address.ts, own first, as the run reads it (owner namespaces wish,
+ *     secaudit2026oct22).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ContentLabelTarget } from '../../storage/interface.js';
 import { buildGAII, parseGEAI } from '../../utils/gaii.js';
 import { isReservedServerKey, RESERVED_OWNER_KEY_PREFIXES, SERVER_WRITTEN_KEYS, SERVER_WRITTEN_KEY_PREFIXES } from '../../utils/reserved-keys.js';
 import { template } from './engine-util.js';
+import { findExtension } from '../component-address.js';
 import { triggerErrors, eventVarNames } from './workflow-event.js';
 import { missingStepScopes, stepScopeRefusal, saverFromCaller, WORKFLOW_AUTHORITY_VERSION, type WorkflowCaller } from './step-authority.js';
 import { shownRun, withoutObservedValues } from './run-redaction.js';
@@ -353,7 +357,8 @@ export async function validateWorkflow(
         // Refused at SAVE so the author is told while they are writing it rather than at 06:00 in a
         // run log. It is checked again at run time (services/extension-system-run.ts): `installedBy`
         // is decided at install, and a delete-and-reinstall by a different owner outlives this gate.
-        const ext = await storage.getExtension(a.extension);
+        // The owner's own first (services/component-address.ts), as the run reads it.
+        const ext = await findExtension(storage, a.extension, ownerName, 'manage');
         if (!ext || ext.installedBy !== ownerName) {
           // Same wording either way: which extensions exist is not a stranger's business.
           errors.push(`step "${step.id}": extension "${a.extension}" not found`);

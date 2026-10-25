@@ -51,6 +51,8 @@
  *     audit 2026-10-09, S1).
  *   v1.3.0 — 2026-10-08 — A speech capability may state the PCM its server sends (sampleRate,
  *     channels, sampleFormat), which the speech answer's `audio` block reports (aiprov plan, A4).
+ *   v1.4.1 — 2026-10-25 — An extension provider may name its extension `<owner>/<name>`, the stored
+ *     name since names live in the owner's namespace (secaudit2026oct22).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -210,8 +212,9 @@ function readSpeechPcm(v: Record<string, unknown>, c: AiCapability, entry: Provi
   }
 }
 
-/** An extension's name, as the extension manifest allows it (services/extension-manifest.ts). */
-const EXTENSION_NAME_RE = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
+/** An extension's name, as the extension manifest allows it (services/extension-manifest.ts), with
+ *  the optional `<owner>/` of a name in the owner's namespace (services/component-address.ts). */
+const EXTENSION_NAME_RE = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 
 const PROVIDER_TYPES = Object.keys(TYPE_CAPABILITIES) as AiAdapterType[];
 const ALL_CAPABILITIES: readonly AiCapability[] = ['text', 'vision', 'files', 'image', 'speech', 'transcription', 'embed'];

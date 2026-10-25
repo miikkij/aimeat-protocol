@@ -13,8 +13,8 @@
  *   the caller chose and a route the registrant chose (secaudit2026oct22,
  *   capability-invoke:extension-ref-unvalidated-in-loopback-url).
  *
- *   THE GRAMMAR. `ext:<name>[@<version>][:<action>]`. The name follows EXT_NAME_PATTERN, the rule
- *   every installed extension's name follows; the version is a pinnable version
+ *   THE GRAMMAR. `ext:<name>[@<version>][:<action>]`. The name follows EXT_ADDRESS_PATTERN, the rule
+ *   every installed extension's name follows (`<owner>/<name>` since 2026-10-25); the version is a pinnable version
  *   (services/component-versions.ts), the same pin `/v1/ext/<name>@<version>/…` accepts; the action
  *   follows EXT_ACTION_ID_PATTERN, the action id rule services/app-format-md.ts already declares.
  *   The action segment is optional at registration because a capability may be registered before
@@ -33,11 +33,14 @@
  *   const parsed = parseExtensionCapabilityRef('ext:weather@1.2.0:get');   // { name, pinned, action }
  *   await disableMalformedExtensionRefsOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The name may be `<owner>/<name>` (EXT_ADDRESS_PATTERN), and an installed
+ *     action is found through the address (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-10-24 — Initial (secaudit2026oct22).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
-import { EXT_NAME_PATTERN } from './extension-manifest.js';
+import { EXT_ADDRESS_PATTERN } from './extension-manifest.js';
+import { findExtension } from './component-address.js';
 import { splitPinnedName } from './component-versions.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
 import { recordSecurityIncident, securityOwner } from './security-incident.js';
@@ -67,7 +70,7 @@ export function parseExtensionCapabilityRef(ref: string): ParsedExtensionRef | n
   if (parts[0] !== 'ext' || parts.length < 2 || parts.length > 3) return null;
   const pinned = parts[1];
   const { name } = splitPinnedName(pinned);
-  if (!EXT_NAME_PATTERN.test(name)) return null;
+  if (!EXT_ADDRESS_PATTERN.test(name)) return null;
   // splitPinnedName leaves a segment whose `@` suffix is not a pinnable version whole, so the
   // name test above has already refused it.
   const action = parts.length === 3 ? parts[2] : null;
@@ -78,8 +81,9 @@ export function parseExtensionCapabilityRef(ref: string): ParsedExtensionRef | n
 /** The refusal message for a ref outside the grammar, or null when it follows it. */
 export function extensionRefRefusal(ref: string): string | null {
   if (parseExtensionCapabilityRef(ref)) return null;
-  return 'source.ref for source.type \'extension\' must be ext:<extension name>:<action id>: the name in lowercase '
-    + 'letters, digits and hyphens (optionally @<version>), the action id in letters, digits, hyphens and underscores';
+  return 'source.ref for source.type \'extension\' must be ext:<extension name>:<action id>: the name as the node '
+    + 'gave it (<owner>/<name>, or a bare name for an older one) in lowercase letters, digits and hyphens '
+    + '(optionally @<version>), the action id in letters, digits, hyphens and underscores';
 }
 
 /**
@@ -98,7 +102,7 @@ export function splitExtensionRef(ref: string): { pinned: string; action: string
 async function namesInstalledAction(storage: Storage, ref: string): Promise<boolean> {
   const segments = splitExtensionRef(ref);
   if (!segments) return false;
-  const ext = await storage.getExtension(splitPinnedName(segments.pinned).name);
+  const ext = await findExtension(storage, splitPinnedName(segments.pinned).name);
   return !!ext?.actions?.some(a => a.id === segments.action);
 }
 

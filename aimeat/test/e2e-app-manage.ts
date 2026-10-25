@@ -17,6 +17,8 @@
  *   - Phase 4: grants, backup, cost, bundled agents, subdomains, cortex source
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-manage
  * @version-history
+ *   2026-10-25 — 19 and 20: the cortex detail carries the full name and another owner's agent names
+ *     the cortex in full, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-19 — 24: aimeat_app_draft_save and aimeat_app_draft_publish set the display version that
  *     aimeat_app_manage versions shows, and refuse a bad one (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-16 — 5b, 6 and 6b: aimeat_app_get answers an unlisted or coded app only to the owner's and
@@ -377,6 +379,8 @@ await test('18. …and any other agent is refused the subdomains, on the tool an
 });
 
 const cxName = `amcx${Date.now()}`;
+/** The cortex's full name: it lives in A's namespace, so another owner's agent names it this way. */
+const cxFull = `${A.owner}/${cxName}`;
 const cxManifest = `apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
@@ -397,7 +401,7 @@ await test('19. aimeat_cortex_list reads one cortex in full, and its source for 
     const inst = await callTool(s, 'aimeat_cortex_install', { manifest: cxManifest, libs: { 'greeter.js': 'window.__am = 1;' } });
     assert(!inst.isError, `install: ${inst.text}`);
     const one = await callTool(s, 'aimeat_cortex_list', { name: cxName });
-    assert(!one.isError && one.data.name === cxName && Array.isArray(one.data.components) && !one.data.source, `detail: ${one.text.slice(0, 200)}`);
+    assert(!one.isError && one.data.name === cxFull && Array.isArray(one.data.components) && !one.data.source, `detail: ${one.text.slice(0, 200)}`);
     const src = await callTool(s, 'aimeat_cortex_list', { name: cxName, include_source: true });
     assert(!src.isError && src.data.source?.libs?.['greeter.js'] === 'window.__am = 1;', `source: ${src.text.slice(0, 300)}`);
 });
@@ -407,9 +411,9 @@ await test('20. …and refuses the source without cortex:write, and to another o
     assert(narrowSrc.isError && narrowSrc.text.startsWith('SCOPE_DENIED'), `without the word: ${narrowSrc.text}`);
     // A cortex another owner may see (public) refuses its source as FORBIDDEN; one they may not see
     // is NOT_FOUND on both reads, so probing names confirms nothing. Which one it is here is read first.
-    const seen = await callTool(sOther, 'aimeat_cortex_list', { name: cxName });
+    const seen = await callTool(sOther, 'aimeat_cortex_list', { name: cxFull });
     const expected = seen.isError ? 'NOT_FOUND' : 'FORBIDDEN';
-    const other = await callTool(sOther, 'aimeat_cortex_list', { name: cxName, include_source: true });
+    const other = await callTool(sOther, 'aimeat_cortex_list', { name: cxFull, include_source: true });
     assert(other.isError && other.text.startsWith(expected), `another owner, expected ${expected}: ${other.text}`);
     await callTool(s, 'aimeat_cortex_delete', { name: cxName });
 });

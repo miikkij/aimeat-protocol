@@ -18,6 +18,9 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.6 — 2026-10-25 — ADDITIVE: an install's name carries the account (`<account>/<name>`) and how
+ *     apps, other accounts, getPublic and consents name it; with install role operator only the
+ *     operator's account installs (owner namespaces wish and lead 128, secaudit2026oct22).
  *   v1.7.5 — 2026-10-24 — ADDITIVE: `ctx.fetch(url, { responseType: 'base64' })` reads a binary answer
  *     intact (jussil riistakartta, support thread 1ac0a199).
  *   v1.7.4 — 2026-10-22 — ADDITIVE: ctx.files.write and ctx.datapackage.publish say that a public write
@@ -602,7 +605,16 @@ function installSection(url: string): string {
     '',
     'Updating: `PUT /v1/extensions/{name}` replaces in place and keeps the name.',
     '',
-    '**Who may install.** The owner role, or a principal holding `ext:write`. An app running on its',
+    '**Its name carries your account.** The node stores what you install as `<account>/<metadata.name>`,',
+    'and the install answer gives that name. You keep calling and managing it by `metadata.name`. An app',
+    'other people use, another account, `getPublic` and a consent name it in full: the action at',
+    '`POST /v1/ext/{name}/{actionId}` with `{name}` written `<account>%2F<name>` (or `AIMEAT.data.action(\'<account>/<name>\', id)`), its',
+    'public memory at `ext:<account>/<name>`, and a consent with `data_pattern` `ext:<account>/<name>`.',
+    'Nobody else can install under your account, so a name you remove never goes to someone else. What',
+    'the node ships, and anything installed before 2026-10-25, keeps its bare name.',
+    '',
+    '**Who may install.** The owner role, or a principal holding `ext:write`. With',
+    '`AIMEAT_EXT_INSTALL_ROLE=operator` only the operator\'s account installs, its agents included. An app running on its',
     'own origin under an app grant CANNOT: `ext:write` is deliberately outside the grantable scope',
     'vocabulary, because an extension is persistent server-side code that outlives the grant that',
     'created it. So an app may write you this manifest, but a human or an authorised agent installs it.',

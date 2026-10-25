@@ -33,7 +33,9 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-living-hooks and e2e-connections use to put a real counterparty on the machine.
  * @version-history
- *   v1.3.1 — 2026-10-24 — The operator's own agent (no secrets:manage) makes the first use of a shared
+ *   2026-10-25 — The first use's hostBinding names the probe extension by its full name `<owner>/secret-probe`,
+ *     as names live in the owner's namespace (secaudit2026oct22).
+ *   v1.3.1 —2026-10-24 — The operator's own agent (no secrets:manage) makes the first use of a shared
  *     value toward a new host and it goes through, by Jouni's ruling of 2026-10-24 (secaudit2026oct22).
  *   v1.3.0 — 2026-10-24 — A second owner's first use of a value from the operator's shared map is
  *     refused, sends nothing and asks the operators once; after the operator adds the host to
@@ -781,7 +783,7 @@ await test('the list says who made the first use that bound a secret, and throug
     const row = (r.body.data?.secrets ?? []).find((s: any) => s.name === SECRET_NAME);
     assert(row?.hostBinding?.how === 'first-use', `hostBinding: ${JSON.stringify(row)}`);
     assert(row.hostBinding.by === owner.ghii, `the first use names its principal: ${JSON.stringify(row.hostBinding)}`);
-    assert(row.hostBinding.extension === 'secret-probe', `the first use names its extension: ${JSON.stringify(row.hostBinding)}`);
+    assert(row.hostBinding.extension === `${owner.name}/secret-probe`, `the first use names its extension: ${JSON.stringify(row.hostBinding)}`);
     assert(typeof row.hostBinding.at === 'string', `the first use names its time: ${JSON.stringify(row.hostBinding)}`);
 });
 

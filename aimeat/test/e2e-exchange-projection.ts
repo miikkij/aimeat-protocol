@@ -10,6 +10,8 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   2026-10-25 — The provider's extensions are `<provider>/<name>` in capability ids, offerings, labels
+ *     and calls; the provider's own tools keep the short name (owner namespaces wish, secaudit2026oct22).
  *   v1.6.0 — 2026-10-18 — BYPASS: the raw route's 402 to a stranger names only the money-priced
  *     product (`paid`), not the pacing-only `brief`. The test was stale, not the paywall: da1fc12cc
  *     (2026-10-17) made a pacing-only tool a free product on the raw route, and the assertion kept the
@@ -158,7 +160,11 @@ const consumer = await setupOwner('cn');
 
 const EXT = `xproj${Date.now()}`;
 const APP_ID = `proj-${Date.now()}.html`;
-const capId = `ext:${EXT}:free`;
+// The extension is stored as `<provider>/<name>` (services/component-address.ts): its capability id,
+// its offerings and a buyer's call name it so. The provider's own manifests may keep the short name.
+const EXT_FULL = `${provider.name}/${EXT}`;
+const capId = `ext:${EXT_FULL}:free`;
+const full = (name: string): string => `${provider.name}/${name}`;
 const IN_SCHEMA = { type: 'object', properties: { businessId: { type: 'string' } } };
 const OUT_SCHEMA = { type: 'object', properties: { echo: {}, caller: { type: 'string' } } };
 const TERMS = { derivatives: true, resale: false, attribution: true, note: 'e2e' };
@@ -411,7 +417,7 @@ await test('BYPASS: calling the backing extension action directly is NOT free on
   // /v1/ext/kaiku-signals/search and get the identical answer for nothing. Every priced app on the
   // node had that bypass beside its own front door — it is not a property of one extension.
   const stranger = await setupOwner('by');
-  const direct = await json(`/v1/ext/${EXT}/free`, {
+  const direct = await json(`/v1/ext/${encodeURIComponent(EXT_FULL)}/free`, {
     method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ businessId: '0101263-6' }),
   });
   assert(direct.status === 402, `a stranger must be charged, got ${direct.status}: ${JSON.stringify(direct.body).slice(0, 200)}`);
@@ -427,7 +433,7 @@ await test('BYPASS: calling the backing extension action directly is NOT free on
 });
 
 await test('BYPASS: the provider still calls their own extension free', async () => {
-  const own = await json(`/v1/ext/${EXT}/free`, {
+  const own = await json(`/v1/ext/${encodeURIComponent(EXT_FULL)}/free`, {
     method: 'POST', headers: auth(provider.token), body: JSON.stringify({ businessId: '0101263-6' }),
   });
   assert(own.status === 200, `owner-free survives, got ${own.status}: ${JSON.stringify(own.body?.error)}`);
@@ -444,7 +450,7 @@ await test('BYPASS: holding two products on one capability, the raw route settle
   // spelling, which billed whichever tool sorted first. Ambiguity now costs the least it could have
   // meant: a morsel right settles before a money one, and the other contract is not touched.
   const beforeBrief = await entOf('brief'), beforePaid = await entOf('paid');
-  const raw = await json(`/v1/ext/${EXT}/free`, {
+  const raw = await json(`/v1/ext/${encodeURIComponent(EXT_FULL)}/free`, {
     method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ businessId: '0101263-6' }),
   });
   assert(raw.status === 200, `the contract holder gets through, got ${raw.status}: ${JSON.stringify(raw.body?.error)}`);
@@ -462,7 +468,7 @@ await test('BYPASS: naming the product overrides the default, and only among pro
   // A caller who means the money product says so. The name is a request, not an instruction: it must
   // be a tool that really sells this action, and one they really contracted.
   const beforeBrief = await entOf('brief'), beforePaid = await entOf('paid');
-  const named = await json(`/v1/ext/${EXT}/free`, {
+  const named = await json(`/v1/ext/${encodeURIComponent(EXT_FULL)}/free`, {
     method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-app-tool': `${APP_ID}/paid` },
     body: JSON.stringify({ businessId: '0101263-6' }),
   });
@@ -473,7 +479,7 @@ await test('BYPASS: naming the product overrides the default, and only among pro
   assert(afterBrief.budget.calls === beforeBrief.budget.calls,
     `and the cheaper default stayed put: ${JSON.stringify(afterBrief.budget)}`);
   // A tool that does not sell this action is a bad request, never a fallback to guessing.
-  const bogus = await json(`/v1/ext/${EXT}/free`, {
+  const bogus = await json(`/v1/ext/${encodeURIComponent(EXT_FULL)}/free`, {
     method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-app-tool': `${APP_ID}/not-a-tool` },
     body: JSON.stringify({ businessId: '0101263-6' }),
   });
@@ -682,7 +688,7 @@ await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifes
   });
   assert(ins.status === 201 || ins.status === 200, `install ${ins.status}: ${JSON.stringify(ins.body?.error)}`);
   await json(`/v1/extensions/${EXT2}/activate`, { method: 'POST', headers: auth(provider.token) });
-  const listing = (await myOfferings(provider.token)).find((o: any) => o.ext === EXT2 && o.action === 'search');
+  const listing = (await myOfferings(provider.token)).find((o: any) => o.ext === full(EXT2) && o.action === 'search');
   assert(listing, 'the flagged action is listed');
   assert(listing.provenance?.legalBasis === 'CC BY 4.0 open data' && listing.provenance?.odpsVersion === '4.1',
     `manifest provenance reached the listing: ${JSON.stringify(listing.provenance)}`);
@@ -723,7 +729,7 @@ await test('MCP app_tools_publish lists a tool and the extension action it calls
   });
   assert(ins.status === 201, `a new extension installs with 201, got ${ins.status}: ${JSON.stringify(ins.body?.error)}`);
   await json(`/v1/extensions/${XDUP}/activate`, { method: 'POST', headers: auth(provider.token) });
-  const before = (await myOfferings(provider.token)).find(o => o.ext === XDUP && o.action === 'search' && o.state === 'listed');
+  const before = (await myOfferings(provider.token)).find(o => o.ext === full(XDUP) && o.action === 'search' && o.state === 'listed');
   assert(!!before, 'the flagged extension action is listed before the tool is published');
   dupActionId = before.offeringId;
 
@@ -746,10 +752,10 @@ await test('MCP app_tools_publish lists a tool and the extension action it calls
   assert(ex?.known === true, `the answer carries the projection's outcome: ${JSON.stringify(ex).slice(0, 300)}`);
   const listed = (ex.listed as any[]).find(l => l.label === `${DUP_APP}/find`);
   assert(!!listed && typeof listed.offeringId === 'string', `the listed tool is named with its offering: ${JSON.stringify(ex.listed)}`);
-  assert(!(ex.listed as any[]).some(l => l.label === `${XDUP}/search`), `the extension action is not listed beside it: ${JSON.stringify(ex.listed)}`);
+  assert(!(ex.listed as any[]).some(l => l.label === `${full(XDUP)}/search`), `the extension action is not listed beside it: ${JSON.stringify(ex.listed)}`);
   const skipped = ex.skipped as any[];
   assert(skipped.some(s => s.label === `${DUP_APP}/noout` && s.reason === 'SCHEMA_REQUIRED'), `the skipped tool is named with its reason: ${JSON.stringify(skipped)}`);
-  const dup = skipped.find(s => s.label === `${XDUP}/search`);
+  const dup = skipped.find(s => s.label === `${full(XDUP)}/search`);
   assert(dup?.reason === `DUPLICATE_OF ${DUP_APP}/find` && String(dup.message).includes('agreed price'),
     `the action is skipped as the tool's duplicate, with a sentence: ${JSON.stringify(skipped)}`);
   assert((ex.delisted as any[]).some(d => d.offeringId === dupActionId), `the action's listing is withdrawn, and said: ${JSON.stringify(ex.delisted)}`);
@@ -761,18 +767,18 @@ await test('MCP app_tools_publish lists a tool and the extension action it calls
   const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
   assert(dry.status === 200, `dry run ${dry.status}`);
   const changes = dry.body.data.changes as any[];
-  assert(changes.some(c => c.action === 'skipped' && c.label === `${XDUP}/search` && c.reason === `DUPLICATE_OF ${DUP_APP}/find`)
-    && !changes.some(c => String(c.reason).startsWith('ALSO_LISTED_AS') && (c.label === `${XDUP}/search` || c.label === `${DUP_APP}/find`)),
-    `a full reconcile agrees: ${JSON.stringify(changes.filter(c => c.label === `${XDUP}/search`))}`);
+  assert(changes.some(c => c.action === 'skipped' && c.label === `${full(XDUP)}/search` && c.reason === `DUPLICATE_OF ${DUP_APP}/find`)
+    && !changes.some(c => String(c.reason).startsWith('ALSO_LISTED_AS') && (c.label === `${full(XDUP)}/search` || c.label === `${DUP_APP}/find`)),
+    `a full reconcile agrees: ${JSON.stringify(changes.filter(c => c.label === `${full(XDUP)}/search`))}`);
 });
 
 await test('…and the contract signed on the withdrawn action keeps settling at its agreed price', async () => {
   const ent = async () => ((await json('/v1/exchange/entitlements', { headers: auth(consumer.token) })).body.data.entitlements as any[])
-    .find(e => e.ext === XDUP && e.action === 'search');
+    .find(e => e.ext === full(XDUP) && e.action === 'search');
   const was = await ent();
   assert(was?.state === 'active' && was.contract_ref === `offering:${dupActionId}`, `the contract is intact: ${JSON.stringify(was)}`);
   assertPacingRail(was, 3, 'price_per_call', 'the contract keeps its agreed 3');
-  const call = await json(`/v1/ext/${XDUP}/search`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'x' }) });
+  const call = await json(`/v1/ext/${encodeURIComponent(full(XDUP))}/search`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'x' }) });
   assert(call.status === 200, `the holder still gets through on the raw route, got ${call.status}: ${JSON.stringify(call.body?.error)}`);
   const now = await ent();
   assert(now.budget.calls === was.budget.calls + 1 && now.budget.spent_units === was.budget.spent_units + 3,
@@ -783,14 +789,14 @@ await test('A tool that fixes part of the input is a different product: the acti
   const r = await sellerMcp.call('aimeat_app_tools_publish', { app_id: DUP_APP, tools: DUP_TOOLS({ lockedInput: { businessId: 'budget' } }) });
   assert(!r.isError, `publish: ${r.text.slice(0, 300)}`);
   const ex = r.data.exchange;
-  assert((ex.listed as any[]).some(l => l.label === `${XDUP}/search` && l.offeringId === dupActionId),
+  assert((ex.listed as any[]).some(l => l.label === `${full(XDUP)}/search` && l.offeringId === dupActionId),
     `the action lists again under the SAME offering id: ${JSON.stringify(ex.listed)}`);
-  const w = (ex.warnings as any[]).find(x => x.label === `${DUP_APP}/find` && x.reason === `ALSO_LISTED_AS ${XDUP}/search`);
+  const w = (ex.warnings as any[]).find(x => x.label === `${DUP_APP}/find` && x.reason === `ALSO_LISTED_AS ${full(XDUP)}/search`);
   assert(!!w && String(w.message).includes('lockedInput') && w.otherListing?.offeringId === dupActionId, `the pair is named: ${JSON.stringify(ex.warnings)}`);
   const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
   const rows = (dry.body.data.changes as any[]).filter(c => c.action === 'warning' && String(c.reason).startsWith('ALSO_LISTED_AS'));
-  assert(rows.some(c => c.label === `${XDUP}/search` && c.reason === `ALSO_LISTED_AS ${DUP_APP}/find`)
-    && rows.some(c => c.label === `${DUP_APP}/find` && c.reason === `ALSO_LISTED_AS ${XDUP}/search`), `both sides are warned: ${JSON.stringify(rows)}`);
+  assert(rows.some(c => c.label === `${full(XDUP)}/search` && c.reason === `ALSO_LISTED_AS ${DUP_APP}/find`)
+    && rows.some(c => c.label === `${DUP_APP}/find` && c.reason === `ALSO_LISTED_AS ${full(XDUP)}/search`), `both sides are warned: ${JSON.stringify(rows)}`);
 });
 
 await test("Another owner's tool naming this owner's extension action takes nothing off this owner's market", async () => {
@@ -798,7 +804,8 @@ await test("Another owner's tool naming this owner's extension action takes noth
   const w = await json('/v1/memory', {
     method: 'POST', headers: auth(other.token),
     body: JSON.stringify({ key: `apps.theirs-${Date.now()}.html.tools`, visibility: 'public', value: { version: 1, tools: [
-      { name: 'grab', action_id: `ext:${XDUP}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 1, exchange: true, usageTerms: TERMS },
+      // Another account names the provider's extension in full (services/component-address.ts).
+      { name: 'grab', action_id: `ext:${full(XDUP)}:search`, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, tollMorsels: 1, exchange: true, usageTerms: TERMS },
     ] } }),
   });
   assert(w.status === 201, `their manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
@@ -806,8 +813,8 @@ await test("Another owner's tool naming this owner's extension action takes noth
   assert(byId.body.data.offering.state === 'listed', `still listed after a stranger's publish: ${byId.body.data.offering.state}`);
   // Nor does this owner's own full reconcile count a stranger's tool as the seller of their action.
   const dry = await json('/v1/exchange/reconcile', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true }) });
-  assert(!(dry.body.data.changes as any[]).some(c => c.label === `${XDUP}/search` && c.action === 'skipped'),
-    `the action is not skipped for a tool of another owner: ${JSON.stringify((dry.body.data.changes as any[]).filter(c => c.label === `${XDUP}/search`))}`);
+  assert(!(dry.body.data.changes as any[]).some(c => c.label === `${full(XDUP)}/search` && c.action === 'skipped'),
+    `the action is not skipped for a tool of another owner: ${JSON.stringify((dry.body.data.changes as any[]).filter(c => c.label === `${full(XDUP)}/search`))}`);
 });
 
 await test('ODPS_FIELD_TOO_LONG: a changed text past the cap is refused on every door, before anything is written', async () => {

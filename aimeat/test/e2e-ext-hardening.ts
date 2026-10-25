@@ -26,6 +26,8 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   2026-10-25 — Names live in the owner's namespace: capability ids and schedule ids carry the
+ *     owner, and another account reads source by `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — 7: an agent of the operator without operator:admin neither changes emailPolicy through
  *     the config route nor keeps the grant for a script it writes; the operator in person does both (secaudit2026oct22).
  *   v1.6.0 — 2026-10-20 — 3f: the WebMCP route refuses a manifest binding its owner does not own
@@ -266,7 +268,7 @@ async function run() {
     assert((survived as Record<string, unknown>).cron === '30 1 * * *',
       `it survived but was rewritten: ${JSON.stringify(survived)}`);
     // And the manifest's own is still there, replaced rather than skipped.
-    const declared = jobs.find(j => j.id === `ext:${name}:ping-scheduled`);
+    const declared = jobs.find(j => j.id === `ext:${ownerA.name}/${name}:ping-scheduled`);
     assert(!!declared,
       `the manifest's own schedule must still be registered: ${JSON.stringify(jobs.map(j => j.id))}`);
     // The manifest asked for Helsinki and the record can carry it, but the builder never read the
@@ -560,9 +562,10 @@ async function run() {
   const sellerExt = `h17seller${h17}`;      // ownerC's extension: a capability ownerC genuinely owns
   const buyerExt = `h17buyer${h17}`;        // ownerB's extension: hands ctx.buy whatever it is told
   const pacedExt = `h17paced${h17}`;        // ownerA's extension sold only by a free tool with a pacing amount
-  const victimCap = `ext:${victimExt}:ping`;
-  const sellerCap = `ext:${sellerExt}:ping`;
-  const pacedCap = `ext:${pacedExt}:ping`;
+  // A capability is keyed by the extension's stored name, which carries its owner (services/component-address.ts).
+  const victimCap = `ext:${ownerA.name}/${victimExt}:ping`;
+  const sellerCap = `ext:${ownerC.name}/${sellerExt}:ping`;
+  const pacedCap = `ext:${ownerA.name}/${pacedExt}:ping`;
   const appA = `h17a${h17}.html`;           // ownerA's own app, the legitimate seller of victimCap
   const appB = `h17b${h17}.html`;           // ownerB's forgery, aimed at the paywall
   const appC = `h17c${h17}.html`;           // ownerC's forgery, aimed at ctx.buy
@@ -710,7 +713,8 @@ async function run() {
     assert(mine.status === 200, `the installer must still read their own source, got ${mine.status}`);
     assert(typeof mine.body.data.action.scriptContent === 'string', 'own source should come back');
 
-    const theirs = await json(`/v1/extensions/${name}/actions/ping`, { headers: auth(ownerB.token) });
+    // Another account names the extension with its owner (services/component-address.ts).
+    const theirs = await json(`/v1/extensions/${encodeURIComponent(`${ownerA.name}/${name}`)}/actions/ping`, { headers: auth(ownerB.token) });
     assert(theirs.status === 403,
       `a stranger got ${theirs.status} on someone else's source; body ${JSON.stringify(theirs.body?.data ?? theirs.body?.error)}`);
   });

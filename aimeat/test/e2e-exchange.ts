@@ -9,6 +9,8 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.10.0 — 2026-10-25 — The provider's extension is `<provider>/<name>` in offerings, contracts,
+ *     calls and capability ids, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.9.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
  *     fixtures use the 4.0.0 form, which 3.x accepts too: the extension actions state `tollMorsels`, the
  *     app tools `tollMorsels`, the agent-work listing `toll_morsels`, and a need's budget is money. The
@@ -105,7 +107,9 @@ function assertPacingRail(x: any, amount: number, priceKey: 'basePrice' | 'price
   }
 }
 
-const EXT = `xchg${Date.now()}`;
+const EXT_SHORT = `xchg${Date.now()}`;
+/** The provider's extension by its stored name, `<provider>/<name>` (services/component-address.ts), set at setup. */
+let EXT = EXT_SHORT;
 const SCRIPTS = { echo: 'export default async function(ctx, input){ return { echo: input, caller: ctx.caller.owner }; }' };
 const manifest = (name: string) => JSON.stringify({
   metadata: { name, version: '1.0.0', description: 'exchange e2e provider', author: 'e2e' },
@@ -138,9 +142,11 @@ await test('Setup: provider installs a paced extension (tollMorsels); consumer r
   provider = await setupOwner('prov');
   consumer = await setupOwner('cons');
   appId = `${consumer.name}/exchangeapp`;
-  const inst = await json('/v1/extensions', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ manifest: manifest(EXT), scripts: SCRIPTS }) });
+  const inst = await json('/v1/extensions', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ manifest: manifest(EXT_SHORT), scripts: SCRIPTS }) });
   assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
-  const act = await json(`/v1/extensions/${EXT}/activate`, { method: 'POST', headers: auth(provider.token) });
+  EXT = `${provider.name}/${EXT_SHORT}`;
+  assert(inst.body.data.extension.name === EXT, `stored in the provider's namespace: ${inst.body.data.extension.name}`);
+  const act = await json(`/v1/extensions/${EXT_SHORT}/activate`, { method: 'POST', headers: auth(provider.token) });
   assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
 });
 
@@ -399,7 +405,7 @@ await test('Offering DETAIL exposes the I/O schema, call recipe, and usage stats
   const d = r.body.data;
   assert(d.offering?.offeringId === offeringId, 'detail returns the offering');
   assert(d.capability && typeof d.capability.output_schema === 'object', 'detail carries the action output schema');
-  assert(d.call_recipe?.method === 'POST' && d.call_recipe.url === `/v1/ext/${EXT}/validate`, `call recipe: ${JSON.stringify(d.call_recipe)}`);
+  assert(d.call_recipe?.method === 'POST' && d.call_recipe.url === `/v1/ext/${encodeURIComponent(EXT)}/validate`,`call recipe: ${JSON.stringify(d.call_recipe)}`);
   // 'validate' was consumed by the capped consumer (2 calls) + the bid buyer (1 call) → real usage across ≥2 consumers.
   assert(d.stats.totalCalls >= 3, `stats.totalCalls should reflect metered use, got ${d.stats.totalCalls}`);
   assert(d.stats.consumers >= 2, `stats.consumers should count distinct consumers, got ${d.stats.consumers}`);
@@ -1073,7 +1079,7 @@ await test('The ODPS document carries the AIMEAT truth: pricing, licence rights,
   assert(p.dataHolder.legalName === 'Overscale Solutions Oy', `provider-declared data holder wins: ${JSON.stringify(p.dataHolder)}`);
   assert(p.SLA.declarative[0].dimensions.length === 2 && p.dataQuality.declarative[0].dimensions[0].dimension === 'accuracy',
     'SLA + data-quality commitments projected');
-  assert(String(p.dataAccess.default.accessURL).endsWith(`/v1/ext/${EXT}/validate`) && p.dataAccess.mcp.format === 'MCP',
+  assert(String(p.dataAccess.default.accessURL).endsWith(`/v1/ext/${encodeURIComponent(EXT)}/validate`) && p.dataAccess.mcp.format === 'MCP',
     `data access ports: ${JSON.stringify(Object.keys(p.dataAccess))}`);
   // v4.1: access-port and gateway labels are language maps, not bare strings.
   assert(p.dataAccess.default.name.en === 'Metered AIMEAT call', `access name should be a language map: ${JSON.stringify(p.dataAccess.default.name)}`);

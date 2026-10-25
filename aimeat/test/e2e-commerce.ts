@@ -8,6 +8,9 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   2026-10-25 — 20: the signed-out capability read names the echo capability by its full id
+ *     `ext:<seller>/<short>:echo`; the seller's own tool manifest keeps the bare binding, as names live in
+ *     the owner's namespace (secaudit2026oct22).
  *   2026-10-20 — 27b: a PRIVATE app-tool manifest is not sold, at session creation or at completion
  *     (secaudit 2026-10, sellable-resolvers.ts:appToolSellableResolver:private-manifest-sold).
  *   2026-10-16 — 37c: PUT /v1/commerce/payout/invoice without a credential is refused (QA audit W29).
@@ -447,7 +450,11 @@ const extName = `apptoolext${Date.now().toString(36)}`;
 // Dotted appId on purpose: published filenames carry ".html", and the feed's manifest-key match
 // must survive dots (regression: the phase-A [^.]+ pattern silently skipped every real app).
 const appId = 'demoapp.html';
+/** The binding as the seller writes it in their own tool manifest: the bare short name, which the
+ *  node resolves to the seller's own extension. */
 const echoCapId = `ext:${extName}:echo`;
+/** The capability id the node registers for it: the extension's full name `<seller>/<short>`. */
+const echoCapFull = () => `ext:${seller.name}/${extName}:echo`;
 let appRef = '';
 
 await test('20. Setup: seller installs an echo extension + declares the apps.{appId}.tools manifest', async () => {
@@ -493,10 +500,10 @@ limits:
     assert(install.status === 201 || install.status === 200, `ext install ${install.status}: ${JSON.stringify(install.body.error)}`);
     const act = await json(`/v1/extensions/${extName}/activate`, { method: 'POST', headers: auth(seller.token) });
     assert(act.status === 200, `ext activate ${act.status}: ${JSON.stringify(act.body.error)}`);
-    // Capability aggregation (operator action) registers ext:{name}:echo in the capability registry.
+    // Capability aggregation (operator action) registers ext:{seller}/{name}:echo in the capability registry.
     const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(op.token) });
     assert(agg.status === 200, `aggregate ${agg.status}: ${JSON.stringify(agg.body.error)}`);
-    const cap = await json(`/v1/capabilities/${encodeURIComponent(echoCapId)}`);
+    const cap = await json(`/v1/capabilities/${encodeURIComponent(echoCapFull())}`);
     assert(cap.status === 200 && cap.body.data?.callable === true, `capability ${cap.status}: ${JSON.stringify(cap.body.error ?? cap.body.data)}`);
 
     // The tool manifest: PUBLIC memory record apps.{appId}.tools under the seller GHII.

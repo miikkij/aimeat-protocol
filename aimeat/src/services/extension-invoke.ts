@@ -27,6 +27,9 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.4.0 -- 2026-10-25 -- extRef may be `<owner>/<name>`; a bare name is the bare record, else the
+ *     caller's own extension of that name (services/component-address.ts; owner namespaces wish,
+ *     secaudit2026oct22).
  *   v1.3.0 -- 2026-10-24 -- ctx.buy no longer receives the caller's bearer; the `bearer` argument is
  *     gone. The seller's action runs in-process for the buying extension's GEAI (services/
  *     extension-purchase.ts; secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
@@ -121,7 +124,7 @@ export async function invokeExtensionAction(args: {
   storage: Storage;
   /** routes/extensions/paywall.ts enforcePaywall, passed in by the surface. */
   enforcePaywall: typeof EnforcePaywall;
-  /** `name` or `name@version`. */
+  /** `name`, `<owner>/<name>`, either with `@version`. */
   extRef: string;
   /** Run against this instance of the extension: its own config and namespace `ext:{name}.{id}`. */
   instanceId?: string;
@@ -137,7 +140,8 @@ export async function invokeExtensionAction(args: {
   emailService?: EmailService;
 }): Promise<ExtensionInvokeOutcome> {
   const { config, storage, caller, instanceId, actionId } = args;
-  const resolved = await resolveExtensionForCall(storage, args.extRef);
+  // A bare name is the bare record, else the caller's own extension of that name (services/component-address.ts).
+  const resolved = await resolveExtensionForCall(storage, args.extRef, caller.kind === 'anonymous' ? null : caller.owner);
   const extName = resolved.name;
   // The caller's organism workspace, when the manifest declares it. Declared before the run so a
   // failure can tell a workspace refusal from a script error.

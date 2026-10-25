@@ -13,6 +13,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
+ *   v1.8.2 — 2026-10-25 — action() takes `owner/name/instanceId`: the owner's name travels as one
+ *     encoded segment (owner namespaces wish, secaudit2026oct22).
  *   v1.8.1 — 2026-10-19 — appConfig() and the public record read go through _core/public-fetch.js, so
  *     they work for a signed-in person on a node that shows its content to its own accounts only.
  *   v1.8.0 — 2026-10-18 — action(ext, actionId, input): an extension action as the signed-in person,
@@ -479,7 +481,8 @@ const data = {
    * `public: true` answers (any other throws with code UNAUTHORIZED). A visitor's run reads and never
    * writes, so a reader page can list a catalogue or open a free episode for anyone. A refusal throws
    * with the node's `code` (EXTENSION_ERROR, EXTENSION_INACTIVE, RATE_LIMITED, …).
-   * @param {string} ext The extension's name, or `name/instanceId` for one copy of it.
+   * @param {string} ext The extension's name as the node gave it (`owner/name` for one installed since
+   *   2026-10-25, a bare `name` for a shipped or older one), with `/instanceId` for one copy of it.
    * @param {string} actionId
    * @param {object} [input]
    * @returns {Promise<any>}
@@ -500,7 +503,11 @@ const data = {
   },
 
   async action(ext, actionId, input) {
-    const path = '/v1/ext/' + String(ext).split('/').map(encodeURIComponent).join('/') + '/' + encodeURIComponent(actionId);
+    // `name`, `name/instanceId`, `owner/name`, or `owner/name/instanceId`. With three parts the
+    // owner's name travels as one encoded segment, so the node reads it as one extension.
+    const parts = String(ext).split('/');
+    const segments = parts.length === 3 ? [parts[0] + '/' + parts[1], parts[2]] : parts;
+    const path = '/v1/ext/' + segments.map(encodeURIComponent).join('/') + '/' + encodeURIComponent(actionId);
     const opts = { method: 'POST', body: JSON.stringify(input || {}) };
     const auth = window.AIMEAT && window.AIMEAT.auth;
     const signedIn = !!(auth && auth.getSession && auth.getSession());

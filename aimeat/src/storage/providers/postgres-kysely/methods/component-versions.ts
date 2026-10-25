@@ -6,15 +6,20 @@
  *   (repositories/component-version.repository.ts). Table "ComponentVersion" (migration 0066);
  *   the snapshot is jsonb.
  * @structure componentVersionMethods — saveComponentVersion · listComponentVersions ·
- *   getComponentVersion · deleteComponentVersions
+ *   getComponentVersion · deleteComponentVersions · recordReleasedComponentName ·
+ *   getReleasedComponentName · deleteReleasedComponentName
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The released bare names, table "ReleasedComponentName" (migration 0118;
+ *     owner namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-09-24 — saveComponentVersion keeps a version once (ON CONFLICT DO NOTHING) and
  *     answers whether it stored this one. ON CONFLICT DO UPDATE let a re-publish replace the snapshot
  *     a pinned address serves (secaudit 2026-09, A6-7).
  *   v1.0.0 — 2026-09-03 — Initial (versions, slice 2).
  */
 import type { PostgresKyselyStorage } from '../index.js';
-import type { ComponentKind, ComponentVersionRecord, ComponentVersionSummary } from '../../../types/component-versions.js';
+import type {
+  ComponentKind, ComponentVersionRecord, ComponentVersionSummary, ReleasedComponentNameRecord,
+} from '../../../types/component-versions.js';
 import { jsonb } from '../helpers.js';
 
 const iso = (v: Date | string) => (v instanceof Date ? v.toISOString() : String(v));
@@ -49,5 +54,24 @@ export const componentVersionMethods = {
   async deleteComponentVersions(this: PostgresKyselyStorage, kind: ComponentKind, name: string): Promise<number> {
     const r = await this.db.deleteFrom('ComponentVersion').where('kind', '=', kind).where('name', '=', name).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
+  },
+
+  async recordReleasedComponentName(this: PostgresKyselyStorage, record: ReleasedComponentNameRecord): Promise<void> {
+    const releasedAt = new Date(record.releasedAt);
+    await this.db.insertInto('ReleasedComponentName')
+      .values({ kind: record.kind, name: record.name, holder: record.holder, releasedAt })
+      .onConflict(oc => oc.columns(['kind', 'name']).doUpdateSet({ holder: record.holder, releasedAt }))
+      .execute();
+  },
+
+  async getReleasedComponentName(this: PostgresKyselyStorage, kind: ComponentKind, name: string): Promise<ReleasedComponentNameRecord | null> {
+    const r = await this.db.selectFrom('ReleasedComponentName').selectAll()
+      .where('kind', '=', kind).where('name', '=', name).executeTakeFirst();
+    return r ? { kind: r.kind as ComponentKind, name: r.name, holder: r.holder, releasedAt: iso(r.releasedAt) } : null;
+  },
+
+  async deleteReleasedComponentName(this: PostgresKyselyStorage, kind: ComponentKind, name: string): Promise<boolean> {
+    const r = await this.db.deleteFrom('ReleasedComponentName').where('kind', '=', kind).where('name', '=', name).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
   },
 };

@@ -32,6 +32,8 @@
  *   THE RECEIVER runs on 127.0.0.1, which the runner admits with AIMEAT_ALLOW_PRIVATE_EGRESS=true,
  *   on E2E_SECRETS_AUTHORITY_PORT (40674 by default).
  * @version-history
+ *   2026-10-25 — The owner and the owner's agents call the stranger's extension by its full name
+ *     `<stranger>/<short>`, and the refusal and the binding name it so, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-25 — 18 to 21: a host field value set by an agent without secrets:manage does not choose
  *     the first host of the owner's unbound secret; one set by the owner or a secrets:manage agent does (secaudit2026oct22).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, v58 and v59).
@@ -168,7 +170,7 @@ async function installProbe(token: string, name: string, path = '/fixed', secret
 /** Invoke `probe` of `ext` as `token`: the script's own report of what ctx.fetch answered. `path`
  *  is on the receiver, or a whole URL when it starts with http. */
 async function probe(ext: string, token: string, path: string, secret: string): Promise<{ status: number; failed: string | null }> {
-    const r = await json(`/v1/ext/${ext}/probe`, {
+    const r = await json(`/v1/ext/${encodeURIComponent(ext)}/probe`, {
         method: 'POST', headers: auth(token),
         body: JSON.stringify({ url: path.startsWith('http') ? path : `${RECEIVER}${path}`, headers: { 'X-Api-Key': `{{secret:${secret}}}` } }),
     });
@@ -197,10 +199,12 @@ const managerAgent = await mintAgent(owner, 'sau-manager', ['ext:write', 'ext:in
 // ── v58: another owner's extension never reads the caller's vault ─────────────────────────────
 console.log("\n-- v58: another owner's extension --");
 const AUTHOR_EXT = `sau-author-${STAMP}`;
+/** The stranger's extension as every other account names it: in the stranger's namespace. */
+const AUTHOR_FULL = `${stranger.name}/${AUTHOR_EXT}`;
 
 await test("1. the stranger installs an extension of their own, which anyone may invoke", async () => {
     await installProbe(stranger.token, AUTHOR_EXT);
-    const r = await json(`/v1/extensions/${AUTHOR_EXT}`, { headers: auth(owner.token) });
+    const r = await json(`/v1/extensions/${encodeURIComponent(AUTHOR_FULL)}`, { headers: auth(owner.token) });
     assert(JSON.stringify(r.body).includes(`"installedBy":"${stranger.name}"`), `installer: ${JSON.stringify(r.body?.data ?? r.body)}`);
 });
 
@@ -210,9 +214,9 @@ await test("2. THE LEAK: the stranger's extension cannot choose where the caller
     // The address was chosen by another account's code, so no caller's standing makes it theirs.
     for (const caller of [owner.token, wildAgent.token, managerAgent.token]) {
         deliveries.length = 0;
-        const out = await probe(AUTHOR_EXT, caller, '/author-collects', 'V58_UNBOUND');
+        const out = await probe(AUTHOR_FULL, caller, '/author-collects', 'V58_UNBOUND');
         assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:'), `not refused: ${JSON.stringify(out)}`);
-        assert(out.failed.includes(`"${AUTHOR_EXT}"`) && out.failed.includes(stranger.name) && out.failed.includes(RECEIVER_BOUND)
+        assert(out.failed.includes(`"${AUTHOR_FULL}"`) &&out.failed.includes(stranger.name) && out.failed.includes(RECEIVER_BOUND)
             && out.failed.includes('V58_UNBOUND') && out.failed.includes('Access page'),
             `the refusal does not name the extension, its installer, the host and what to do: ${out.failed}`);
         assert(!out.failed.includes('zz-v58-unbound-zz'), 'the refusal carries the value');
@@ -227,7 +231,7 @@ await test("2. THE LEAK: the stranger's extension cannot choose where the caller
 // hold a secret by this name, with no address yet" is information about the caller's own vault, and
 // the useful answer tells them what to do about it. Neither refusal carries a value.
 await test('3. a name the caller does not hold is refused as unknown, and neither refusal carries a value', async () => {
-    const unheld = await probe(AUTHOR_EXT, owner.token, '/author-collects', 'V58_NEVER_SET');
+    const unheld = await probe(AUTHOR_FULL, owner.token, '/author-collects', 'V58_NEVER_SET');
     assert(typeof unheld.failed === 'string' && unheld.failed.startsWith('SECRET_UNKNOWN:') && unheld.failed.includes('V58_NEVER_SET'),
         `unheld: ${JSON.stringify(unheld)}`);
     assert(!unheld.failed.includes('zz-'), `the refusal carries a value: ${unheld.failed}`);
@@ -237,7 +241,7 @@ await test("4. BRING YOUR OWN KEY: the caller's secret with a host is sent throu
     await storeSecret(owner.token, 'V58_BOUND', 'zz-v58-bound-zz', RECEIVER_BOUND);
     for (const [caller, path] of [[owner.token, '/byok-owner'], [wildAgent.token, '/byok-agent']] as const) {
         deliveries.length = 0;
-        const out = await probe(AUTHOR_EXT, caller, path, 'V58_BOUND');
+        const out = await probe(AUTHOR_FULL, caller, path, 'V58_BOUND');
         assert(out.failed === null, `refused: ${out.failed}`);
         assert(arrived(path)[0]?.headers['x-api-key'] === 'zz-v58-bound-zz', `the receiver got: ${JSON.stringify(arrived(path))}`);
     }
@@ -248,7 +252,7 @@ await test("4. BRING YOUR OWN KEY: the caller's secret with a host is sent throu
 await test("5. …and never to another host the stranger's script names", async () => {
     for (const caller of [owner.token, wildAgent.token]) {
         deliveries.length = 0;
-        const out = await probe(AUTHOR_EXT, caller, `http://localhost:${RECEIVER_PORT}/elsewhere`, 'V58_BOUND');
+        const out = await probe(AUTHOR_FULL, caller, `http://localhost:${RECEIVER_PORT}/elsewhere`, 'V58_BOUND');
         assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:') && out.failed.includes(RECEIVER_BOUND),
             `not refused: ${JSON.stringify(out)}`);
         assert(!out.failed.includes('zz-v58-bound-zz'), 'the refusal carries the value');
@@ -263,7 +267,7 @@ await test("6. the stranger's own extension still resolves the stranger's own va
     assert(out.failed === null, `refused: ${out.failed}`);
     assert(arrived('/own')[0]?.headers['x-api-key'] === 'zz-v58-strangers-own-zz', `the receiver got: ${JSON.stringify(arrived('/own'))}`);
     const row = await rowOf(stranger.token, 'V58_OWN');
-    assert(row?.hostBinding?.by === stranger.ghii && row.hostBinding.extension === AUTHOR_EXT, `binding: ${JSON.stringify(row)}`);
+    assert(row?.hostBinding?.by === stranger.ghii && row.hostBinding.extension === AUTHOR_FULL, `binding: ${JSON.stringify(row)}`);
 });
 
 await test('7. living-hooks, as the node ships it, still fills a header from any owner\'s own vault', async () => {

@@ -20,6 +20,7 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-25 — aimeat_commerce_beneficiary_splits withdraws a split on the owner's own extension by its short name too (withdrawSplit, secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — aimeat_commerce_invoice_set sets the owner's invoice credit for items delivered at
@@ -107,8 +108,8 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION, MORSEL_PRICE_FIELDS_R
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
-import { deleteSplit, listSplitsByProvider } from '../commerce/beneficiary-split.js';
-import { declareSplit } from '../commerce/beneficiary-split-declare.js';
+import { listSplitsByProvider } from '../commerce/beneficiary-split.js';
+import { declareSplit, withdrawSplit } from '../commerce/beneficiary-split-declare.js';
 import { listBeneficiaryEntries, listBeneficiaryObligations, totalsOf } from '../commerce/beneficiary-book.js';
 import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
@@ -560,7 +561,7 @@ export function registerCommerceTools(
         async ({ remove_ext, remove_action }) => {
             if (remove_ext || remove_action) {
                 if (!remove_ext || !remove_action) return fail('INVALID_INPUT: withdrawing needs both remove_ext and remove_action');
-                const removed = await deleteSplit(storage, ownerGhii, remove_ext, remove_action);
+                const removed = await withdrawSplit(storage, ownerGhii, remove_ext, remove_action);
                 if (!removed) return fail('NOT_FOUND: you have no split declared on that coordinate');
                 return ok({
                     removed: true,

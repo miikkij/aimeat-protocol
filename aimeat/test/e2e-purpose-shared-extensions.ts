@@ -20,6 +20,9 @@
  *   40821 by default.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-purpose-shared-extensions
  * @version-history
+ *   2026-10-25 -- A secret's `usedBy` is read for the full name `<author>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
+ *   v1.1.0 -- 2026-10-25 -- Another account calls the author's extension by `<author>/<name>`, the
+ *     address an install carries since names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 -- 2026-10-21 -- Initial (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -57,8 +60,10 @@ const MANIFEST = JSON.stringify({
     limits: { timeout_ms: 5000, max_api_calls: 3 },
 }, null, 2);
 
+// Another account calls the author's extension by its full name, `<author>/<name>` (services/component-address.ts).
+const extAddr = () => encodeURIComponent(`${author.name}/${EXT}`);
 const call = (token: string, action: string, input: Record<string, unknown>, headers: Record<string, string> = {}) =>
-    json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: { ...auth(token), ...headers }, body: JSON.stringify(input) });
+    json(`/v1/ext/${extAddr()}/${action}`, { method: 'POST', headers: { ...auth(token), ...headers }, body: JSON.stringify(input) });
 const balance = async (token: string) => Number((await json('/v1/wallet', { headers: auth(token) })).body?.data?.balance ?? NaN);
 const secretRow = async (token: string, name: string) =>
     ((await json('/v1/secrets', { headers: auth(token) })).body?.data?.secrets ?? []).find((s: any) => s.name === name);
@@ -71,7 +76,7 @@ const callerAgent = await makeAgent(BASE, caller, ['ext:invoke']);
 
 await h.test('1. The author shares an extension whose source states which key it uses, where it sends it and why', async () => {
     await installExtension(author.token, EXT, MANIFEST, SCRIPTS);
-    const shown = await json(`/v1/extensions/${EXT}`);
+    const shown = await json(`/v1/extensions/${extAddr()}`);
     const uses = shown.body?.data?.extension?.uses_secrets ?? [];
     assert(uses.some((u: any) => u.name === 'SHOP_KEY' && u.hosts[0] === receiver.host && u.why === WHY), `uses_secrets is public: ${JSON.stringify(uses)}`);
 });
@@ -94,7 +99,7 @@ await h.test('4. The money path: the refusal says how to pay, the caller pays at
     assert(refused.status === 402 && /checkout/.test(refused.body?.error?.message ?? ''), `the 402 names the checkout: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
     const open = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(caller.token),
-        body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: EXT, tool: 'paid' }] }),
+        body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: `${author.name}/${EXT}`, tool: 'paid' }] }),
     });
     assert(open.status === 201, `checkout ${open.status} ${JSON.stringify(open.body?.error)} (the run needs AIMEAT_TEST_MONEY_HANDLER=true)`);
     const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
@@ -124,9 +129,9 @@ await h.test('6. A key stored without an address: the first call asks the caller
     assert(said.startsWith('SECRET_HOST:') && said.includes('/v1/secret-allow?'), `the first call asks, naming the allow page: ${JSON.stringify(asked.body)}`);
     assert(receiver.deliveries.length === 0, 'nothing was sent before the caller answered');
     // The press is the key owner's own: their AI is told to ask them, it does not press for them.
-    const byAgent = await json('/v1/secrets/SHOP_KEY_NEW/approvals', { method: 'POST', headers: auth(callerAgent.token), body: JSON.stringify({ extension: EXT, host: receiver.host }) });
+    const byAgent = await json('/v1/secrets/SHOP_KEY_NEW/approvals', { method: 'POST', headers: auth(callerAgent.token), body: JSON.stringify({ extension: `${author.name}/${EXT}`, host: receiver.host }) });
     assert(byAgent.status === 403, `the caller's agent pressed Allow: ${byAgent.status}`);
-    const allow = await json('/v1/secrets/SHOP_KEY_NEW/approvals', { method: 'POST', headers: auth(caller.token), body: JSON.stringify({ extension: EXT, host: receiver.host }) });
+    const allow = await json('/v1/secrets/SHOP_KEY_NEW/approvals', { method: 'POST', headers: auth(caller.token), body: JSON.stringify({ extension: `${author.name}/${EXT}`, host: receiver.host }) });
     assert(allow.status === 200, `the one press: ${allow.status} ${JSON.stringify(allow.body?.error)}`);
     const again = await call(caller.token, 'byok', { url: `${receiver.url}/first`, secret: 'SHOP_KEY_NEW' });
     assert(again.status === 200 && again.body.data.failed === null, `after the press: ${JSON.stringify(again.body?.data ?? again.body?.error)}`);
@@ -143,9 +148,11 @@ await h.test('7. The author never sees the caller\'s key: not in their vault, no
     assert(typeof own.body?.data?.failed === 'string' && receiver.deliveries.every(d => d.key !== B_KEY),
         `the author's own call reached B's key: ${JSON.stringify(own.body?.data)} ${JSON.stringify(receiver.deliveries)}`);
     // The use is stamped after the call returns, so the list is read until it shows it.
+    // `usedBy` names the extension by its full name, `<author>/<name>`.
+    const extFull = `${author.name}/${EXT}`;
     let row = await secretRow(caller.token, 'SHOP_KEY');
-    for (let i = 0; i < 20 && !row?.usedBy?.includes(EXT); i++) { await sleep(100); row = await secretRow(caller.token, 'SHOP_KEY'); }
-    assert(row && !JSON.stringify(row).includes(B_KEY) && row.usedBy.includes(EXT), `B's own list shows the use and never the value: ${JSON.stringify(row)}`);
+    for (let i = 0; i < 20 && !row?.usedBy?.includes(extFull); i++) { await sleep(100); row = await secretRow(caller.token, 'SHOP_KEY'); }
+    assert(row && !JSON.stringify(row).includes(B_KEY) && row.usedBy.includes(extFull), `B's own list shows the use and never the value: ${JSON.stringify(row)}`);
 });
 
 await receiver.stop();

@@ -8,6 +8,8 @@
  *   free (non-commercial) public call; refund-on-throw; and install-time C1/no-mint validation.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-paywall.ts
  * @version-history
+ *   v1.5.0 — 2026-10-25 — Calls, checkouts and MCP invokes name the extension by `<owner>/<name>`, as
+ *     another account names it since names live in the owner's namespace (secaudit2026oct22).
  *   v1.4.0 — 2026-10-12 — Node 4.0.0 refuses `commercial.payMorsels` (MORSEL_PRICE_REMOVED), so the shared
  *     extension states `tollMorsels` (the unaffordable action at the per-call ceiling of 100, which the
  *     old 9 999 was clamped to). The case whose subject is the 3.x figure installs its own extension and
@@ -65,6 +67,9 @@ async function balance(token: string): Promise<number> {
 console.log('\n=== AIMEAT Extension Paywall E2E (rm-commercial-raw-calls) ===\n');
 
 const EXT = `paywall${Date.now()}`;
+/** The extension's full name, how another account calls it (services/component-address.ts). */
+const extFull = (): string => `${owner.name}/${EXT}`;
+const extAddr = (): string => encodeURIComponent(extFull());
 const SCRIPTS = {
   echo: 'export default async function(ctx, input){ return { echo: input, caller: ctx.caller.owner }; }',
   boom: 'export default async function(ctx, input){ throw new Error("boom after payment"); }',
@@ -104,7 +109,7 @@ await test('Setup: two owners; owner installs + activates the priced extension',
 });
 
 const invoke = (token: string, action: string) =>
-  json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify({ hi: 1 }) });
+  json(`/v1/ext/${extAddr()}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify({ hi: 1 }) });
 
 await test('Owner calls a PAID action free (owner-free, no charge)', async () => {
   const before = await balance(owner.token);
@@ -148,7 +153,7 @@ await test('Cross-owner call with a 3.x morsel figure = pacing on 3.x (caller de
   const burn = await burnOf(5);
   const cb = await balance(caller.token);
   const ob = await balance(owner.token);
-  const r = await json(`/v1/ext/${LEGACY}/paidcall`, { method: 'POST', headers: auth(caller.token), body: JSON.stringify({ hi: 1 }) });
+  const r = await json(`/v1/ext/${encodeURIComponent(`${owner.name}/${LEGACY}`)}/paidcall`, { method: 'POST', headers: auth(caller.token), body: JSON.stringify({ hi: 1 }) });
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(await balance(caller.token) === cb - 5, 'caller debited the 5 morsels of pacing');
   assert(await balance(owner.token) === ob + 5 - burn, `owner credited 5 less the burn of ${burn}`);
@@ -193,7 +198,7 @@ if (!moneyEnabled) {
   let payToken = '';
   await test('Money chain: settle ext-call checkout (EUR) → one-time token minted', async () => {
     const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(caller.token),
-      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: EXT, tool: 'moneycall' }] }) });
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: extFull(), tool: 'moneycall' }] }) });
     assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
     const s = open.body.data.session;
     assert(s.total === 500000 && s.currency === 'EUR', `quote: ${JSON.stringify(s)}`);
@@ -205,13 +210,13 @@ if (!moneyEnabled) {
 
   await test('Money chain: retry the raw call WITH the token → 200 (money off-ledger, morsels unchanged)', async () => {
     const cb = await balance(caller.token);
-    const r = await json(`/v1/ext/${EXT}/moneycall`, { method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': payToken }, body: JSON.stringify({ hi: 1 }) });
+    const r = await json(`/v1/ext/${extAddr()}/moneycall`, { method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': payToken }, body: JSON.stringify({ hi: 1 }) });
     assert(r.status === 200, `expected 200 with token, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(await balance(caller.token) === cb, 'money settles off-ledger — morsels unchanged');
   });
 
   await test('Money chain: REPLAY the same token → 402 (single-use)', async () => {
-    const r = await json(`/v1/ext/${EXT}/moneycall`, { method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': payToken }, body: JSON.stringify({ hi: 1 }) });
+    const r = await json(`/v1/ext/${extAddr()}/moneycall`, { method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': payToken }, body: JSON.stringify({ hi: 1 }) });
     assert(r.status === 402, `expected 402 on replay, got ${r.status}`);
   });
 
@@ -225,7 +230,7 @@ if (!moneyEnabled) {
   const buyToken = async (): Promise<string> => {
     const open = await json('/v1/commerce/checkout-sessions', {
       method: 'POST', headers: auth(caller.token),
-      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: EXT, tool: 'moneycall' }] }),
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: extFull(), tool: 'moneycall' }] }),
     });
     assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
     const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
@@ -238,7 +243,7 @@ if (!moneyEnabled) {
 
   await test('Money chain: a token bought for one action does not pay for another', async () => {
     const t = await buyToken();
-    const wrongAction = await json(`/v1/ext/${EXT}/moneycall2`, {
+    const wrongAction = await json(`/v1/ext/${extAddr()}/moneycall2`, {
       method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
     });
     assert(wrongAction.status === 402, `a moneycall token paid for moneycall2: ${wrongAction.status}`);
@@ -249,14 +254,14 @@ if (!moneyEnabled) {
     // able to spend somebody else's purchase.
     const t = await buyToken();
     const third = await setupOwner('third');
-    const wrongBuyer = await json(`/v1/ext/${EXT}/moneycall`, {
+    const wrongBuyer = await json(`/v1/ext/${extAddr()}/moneycall`, {
       method: 'POST', headers: { ...auth(third.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
     });
     assert(wrongBuyer.status === 402, `another owner spent the caller's token: ${wrongBuyer.status}`);
     // Secrets audit 2026-10-09, S-3: the refused attempt must not burn the buyer's purchase. The
     // token was deleted before the buyer was compared, so whoever held the string destroyed the
     // call the buyer had paid for, and this spend answered 402.
-    const stillGood = await json(`/v1/ext/${EXT}/moneycall`, {
+    const stillGood = await json(`/v1/ext/${extAddr()}/moneycall`, {
       method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
     });
     assert(stillGood.status === 200, `the buyer could not spend their token after another owner tried it: ${stillGood.status}`);
@@ -277,7 +282,7 @@ if (!moneyEnabled) {
   await test('Money chain: and a token IS good for what it was bought for (the control)', async () => {
     // Without this the two refusals above are satisfied by a token that never worked at all.
     const t = await buyToken();
-    const right = await json(`/v1/ext/${EXT}/moneycall`, {
+    const right = await json(`/v1/ext/${extAddr()}/moneycall`, {
       method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
     });
     assert(right.status === 200, `a freshly bought token did not pay for its own action: ${right.status}`);
@@ -401,7 +406,7 @@ await test('MCP: a paid action whose script throws refunds the caller, as the HT
   const cb = await balance(caller.token);
   const ob = await balance(owner.token);
 
-  const r = await s.call('aimeat_extension_invoke', { extension_name: EXT, action_id: 'paidthrow', input: {} });
+  const r = await s.call('aimeat_extension_invoke', { extension_name: extFull(), action_id: 'paidthrow', input: {} });
   assert(r.isError, `the throwing action must report failure, got: ${r.text.slice(0, 200)}`);
 
   assert(await balance(caller.token) === cb,
@@ -413,7 +418,7 @@ await test('MCP: a paid action whose script throws refunds the caller, as the HT
 await test('MCP: the same action delivering DOES charge, so the refund above is not a free call', async () => {
   const s = await mcpSessionFor(caller.token, caller.name, 'pwbot2');
   const cb = await balance(caller.token);
-  const r = await s.call('aimeat_extension_invoke', { extension_name: EXT, action_id: 'paidcall', input: {} });
+  const r = await s.call('aimeat_extension_invoke', { extension_name: extFull(), action_id: 'paidcall', input: {} });
   assert(!r.isError, `the paid action should succeed: ${r.text.slice(0, 200)}`);
   assert(await balance(caller.token) < cb,
     'a delivered paid call must cost the caller — otherwise the refund test proves nothing');

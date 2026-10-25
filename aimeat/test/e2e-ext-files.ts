@@ -10,6 +10,8 @@
  *   the result, return only the new key — no base64 in the arguments or the result.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-files.ts
  * @version-history
+ *   2026-10-25 — Another owner and a signed-out caller name the extension by its full name, and the
+ *     write prefix is ext/<installer>/<name>/, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.1.0 — 2026-09-04 — The HTTP door, not the sandbox's answer. This suite was already
  *     cross-owner, and its refusals are result objects — `{ ok: false }` — because the caller is
  *     inside an extension and there is nothing to send a status to. That is the right shape there
@@ -98,8 +100,11 @@ await test('Setup: an owner with a stored file, a second owner, and the extensio
   assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
 });
 
+// The stored name is `<installer>/<short>`. The installer calls it by the short name; anybody else
+// names the full one (services/component-address.ts).
+const extFull = () => `${owner.name}/${EXT}`;
 const invoke = (token: string, action: string, body: unknown) =>
-  json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
+  json(`/v1/ext/${token === owner.token ? EXT : encodeURIComponent(extFull())}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
 
 await test('The sandbox has a files API at all', async () => {
   const r = await invoke(owner.token, 'probe', {});
@@ -113,7 +118,7 @@ await test('Round trip: reference in, reference out, no bytes in the arguments',
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const out = r.body.data;
   assert(out.read.size === Buffer.from(SOURCE_B64, 'base64').length, `read the real size, got ${out.read.size}`);
-  assert(out.wrote.key === `ext/${EXT}/derived.bin`, `wrote under the reserved prefix, got ${out.wrote.key}`);
+  assert(out.wrote.key === `ext/${extFull()}/derived.bin`,`wrote under the reserved prefix, got ${out.wrote.key}`);
   assert(out.wrote.gaii === owner.gaii, `the result belongs to the caller, got ${out.wrote.gaii}`);
   wroteKey = out.wrote.key;
 });
@@ -130,7 +135,7 @@ await test('A write cannot escape the ext/{name}/ prefix', async () => {
   const r = await invoke(owner.token, 'transform', { ref: SOURCE_KEY, out: '../../escape.bin' });
   assert(r.status === 200, `status ${r.status}`);
   const key = r.body.data.wrote.key as string;
-  assert(key.startsWith(`ext/${EXT}/`), `stayed inside its own prefix, got ${key}`);
+  assert(key.startsWith(`ext/${extFull()}/`),`stayed inside its own prefix, got ${key}`);
 });
 
 await test('A read is authorized AS THE CALLER: another owner\'s private file is refused', async () => {
@@ -165,7 +170,7 @@ await test('A missing reference answers null rather than throwing', async () => 
 // questions the sandbox cannot answer, because they are decided before it runs.
 
 await test('An unauthenticated caller cannot invoke the extension at all', async () => {
-  const r = await json(`/v1/ext/${EXT}/probe`, { method: 'POST', body: JSON.stringify({}) });
+  const r = await json(`/v1/ext/${encodeURIComponent(extFull())}/probe`, { method: 'POST', body: JSON.stringify({}) });
   assert(r.status === 401, `expected 401, got ${r.status}`);
 });
 
@@ -177,6 +182,14 @@ await test('Another owner cannot read the source file through the storage door e
   // this owner holds a file at that exact path.
   const r = await json(`/v1/storage/${SOURCE_KEY}`, { headers: auth(other.token) });
   assert(r.status === 404, `expected 404, got ${r.status}`);
+});
+
+await test('Another owner who names the extension in full cannot uninstall it', async () => {
+  // The full name reaches the owner's record, and the owner check refuses the act on it.
+  const r = await json(`/v1/extensions/${encodeURIComponent(extFull())}`, { method: 'DELETE', headers: auth(other.token) });
+  assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const still = await json(`/v1/extensions/${encodeURIComponent(extFull())}`, { headers: auth(owner.token) });
+  assert(still.status === 200, `the extension is still installed: ${still.status}`);
 });
 
 await test('POSITIVE CONTROL: the owner still invokes and still reads their own file', async () => {

@@ -1443,6 +1443,14 @@ export interface ComponentVersion {
   createdBy: string;
 }
 
+/** 0118: a bare extension or cortex name released by uninstall, and the account that held it. */
+export interface ReleasedComponentName {
+  kind: string;
+  name: string;
+  holder: string;
+  releasedAt: Generated<Timestamp>;
+}
+
 export interface Passkey {
   id: string;
   ghii: string;
@@ -2436,6 +2444,7 @@ export interface DB {
   ExtensionInstance: ExtensionInstance;
   DependencyEdge: DependencyEdge;
   ComponentVersion: ComponentVersion;
+  ReleasedComponentName: ReleasedComponentName;
   FederationPeer: FederationPeer;
   FinanceCounter: FinanceCounter;
   FinanceFiscalYear: FinanceFiscalYear;

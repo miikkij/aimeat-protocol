@@ -9,6 +9,10 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.7.0 — 2026-10-25 — Names live in the owner's namespace (services/component-address.ts): the
+ *     address names the caller's own cortex (or `<owner>/<name>` as written), and a new one lands in
+ *     the installer's namespace or on a bare name they released (owner namespaces wish,
+ *     secaudit2026oct22).
  *   v1.6.4 — 2026-10-25 — A kept version records the acting principal (caller.gaii, an agent's GAII
  *     when an agent wrote it) as its writer, as an extension version does: who wrote a version is
  *     public provenance (Jouni, 2026-10-25, secaudit2026oct22 lead 98).
@@ -57,6 +61,9 @@ import {
   snapshotCortexVersion, keptVersionRefusal, cortexCodeOf, cortexLibsAfterDeploy,
 } from '../../services/component-versions.js';
 import { logger } from '../../utils/logger.js';
+import {
+  findCortex, ownComponent, placeCortexInstall, settleReclaimed, splitComponentAddress, shortNameOf,
+} from '../../services/component-address.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
 export type CortexUpsertResult =
@@ -137,12 +144,12 @@ export async function upsertCortex(
     });
   }
   const parsed = result.extension;
-  const name = input.name ?? parsed.name;
+  const address = input.name ?? parsed.name;
 
-  // The manifest's name identifies the resource — it must match the URL.
-  if (parsed.name !== name) {
+  // The manifest's name identifies the resource — it must match the URL (either may carry the owner).
+  if (shortNameOf(parsed.name) !== shortNameOf(address)) {
     return upsertRefusal(400, 'NAME_MISMATCH',
-      `Manifest metadata.name "${parsed.name}" does not match URL name "${name}"`);
+      `Manifest metadata.name "${parsed.name}" does not match URL name "${address}"`);
   }
 
   // Namespace ownership check (operators can use any namespace)
@@ -151,7 +158,30 @@ export async function upsertCortex(
       `This add-on is filed under "${parsed.namespace}", which belongs to somebody else. File it under "${ownerName}" or under "community" instead.`);
   }
 
-  const existing = await storage.getCortexExtension(name);
+  // Which record the address names (services/component-address.ts): `<owner>/<name>` as written (or
+  // the alias of a bare record its holder holds); a bare name is the caller's own of that name, or for
+  // a door that lets an operator replace another's, a bare record another account holds, as before.
+  let existing = splitComponentAddress(address)
+    ? await findCortex(storage, address)
+    : (await ownComponent(n => storage.getCortexExtension(n), ownerName, address))
+      ?? (mayReplaceOthers ? await storage.getCortexExtension(address) : null);
+  const target = input.name ? splitComponentAddress(input.name) : null;
+  if (!existing && target && target.owner !== ownerName) {
+    // The URL names another account's namespace, where only that account creates a name.
+    return upsertRefusal(403, 'NAMESPACE_DENIED',
+      `"${input.name}" is in the namespace of the account "${target.owner}". Install it under your own name, "${ownerName}/${target.name}".`);
+  }
+  if (!existing) {
+    // A new cortex lands in the installer's namespace, or on a bare name they released.
+    const placed = await placeCortexInstall(storage, ownerName, parsed);
+    if (placed.warning) (result.warnings ??= []).push(placed.warning);
+    if (placed.takenByOther) {
+      return upsertRefusal(409, 'CONFLICT', `"${parsed.name}" is held by a cortex another account installed before names carried their owner. Give yours another name.`);
+    }
+    existing = placed.existing;
+  }
+  const name = existing ? existing.name : parsed.name;
+  parsed.name = name;
 
   // ── CREATE branch — brand-new cortex, so the node's ceiling applies. It used to say "mirrors
   // POST" and then write the check out again; a mirror kept in step by hand is not a mirror.
@@ -180,6 +210,7 @@ export async function upsertCortex(
       }
       throw e;
     }
+    await settleReclaimed(storage, 'cortex', record.name);
     for (const [filename, content] of Object.entries(newLibs)) {
       await storage.setCortexLibFile(name, filename, content);
     }

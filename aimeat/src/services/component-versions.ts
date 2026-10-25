@@ -23,6 +23,10 @@
  *   const r = await resolveExtensionForCall(storage, 'btc-price-data@1.2.0');
  *   const refusal = await keptVersionRefusal(storage, 'extension', name, record.version, extensionCodeOf(record));
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The resolvers read the address through services/component-address.ts:
+ *     `<owner>/<name>`, the alias of a bare record, and for a call a bare name (the bare record, else
+ *     the caller's own);
+ *     the answer's `name` is the stored name (owner namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-09-24 — A kept version is immutable (secaudit 2026-09, A6-7). Saving an existing
  *     (kind, name, version) replaced its snapshot, and a pinned call at the live version ran the live
  *     record, so a redeploy or an action PATCH under an unchanged version changed what every caller
@@ -34,6 +38,7 @@
 import type { Storage, ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import type { ComponentKind, ComponentVersionSummary } from '../storage/types/component-versions.js';
 import { stableStringify } from '../utils/stable-json.js';
+import { findExtension, findCortex } from './component-address.js';
 
 /** A version an address can pin: a digit first, then letters, digits, dots, plus and minus. */
 const PINNABLE_VERSION = /^[0-9][A-Za-z0-9.+-]*$/;
@@ -184,10 +189,14 @@ export type ExtensionCallResolution =
  * snapshot at all, which a record older than kept versions can have, falls back to the live record,
  * and only at the live version.
  */
-export async function resolveExtensionForCall(storage: Storage, raw: string): Promise<ExtensionCallResolution> {
-  const { name, version } = splitPinnedName(raw);
-  const live = await storage.getExtension(name);
-  if (!live) return { ok: false, name, reason: 'extension', pinned: version };
+export async function resolveExtensionForCall(storage: Storage, raw: string, callerOwner?: string | null): Promise<ExtensionCallResolution> {
+  const { name: address, version } = splitPinnedName(raw);
+  // The address names the record (services/component-address.ts): `<owner>/<name>`, the alias of a
+  // bare record its holder holds, or a bare name (the bare record, else the caller's own). Everything after uses the
+  // stored name, which is the extension's memory namespace and the key of its kept versions.
+  const live = await findExtension(storage, address, callerOwner);
+  if (!live) return { ok: false, name: address, reason: 'extension', pinned: version };
+  const name = live.name;
   if (!version) return { ok: true, ext: live, name, pinned: version };
   const kept = await storage.getComponentVersion('extension', name, version);
   if (!kept) {
@@ -210,9 +219,11 @@ export async function resolveExtensionForCall(storage: Storage, raw: string): Pr
 export async function resolveCortexLib(storage: Storage, raw: string, libFile: string): Promise<
   { ok: true; content: string; name: string; pinned: string | null } | { ok: false; name: string; reason: 'cortex' | 'inactive' | 'version' | 'file' }
 > {
-  const { name, version } = splitPinnedName(raw);
-  const live = await storage.getCortexExtension(name);
-  if (!live) return { ok: false, name, reason: 'cortex' };
+  const { name: address, version } = splitPinnedName(raw);
+  // Served without a sign-in, so only the stored name and the holder's alias count, never a caller's own.
+  const live = await findCortex(storage, address);
+  if (!live) return { ok: false, name: address, reason: 'cortex' };
+  const name = live.name;
   if (live.status !== 'active') return { ok: false, name, reason: 'inactive' };
   const kept = version ? await storage.getComponentVersion('cortex', name, version) : null;
   if (!version || (!kept && version === live.version)) {

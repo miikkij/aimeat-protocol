@@ -17,6 +17,9 @@
  *   FIRST FAIL: against the tree before this change the 8 MB manifest installs with the limit
  *   dropped, so the guide fails with 4 MB on both extensions, and the gzip bytes are read as text.
  * @version-history
+ *   2026-10-25 — The signed-out call and the other owner's update name the extension by its full
+ *     name (PUT, 403), and the other owner's own install lands under their name, as names live in
+ *     the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial (wish-tv-opas-ilmaisstreameille-ja-oma-tv-kalenteri).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-fetch-gunzip
@@ -149,11 +152,16 @@ await test('Without the flag the gzip bytes are not inflated', async () => {
 // are the credential and the record: nobody calls it signed out, and another owner cannot move its
 // ceiling by re-installing under the same name.
 await test('Signed out, the action is refused; another owner cannot re-install it and move its ceiling', async () => {
-    const anon = await json(`/v1/ext/${EXT_WIDE}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'guide.xml.gz' }) });
+    // The stored name is `<installer>/<short>`: anybody but A names the full one.
+    const wideFull = `${A.name}/${EXT_WIDE}`;
+    const anon = await json(`/v1/ext/${encodeURIComponent(wideFull)}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'guide.xml.gz' }) });
     assert(anon.status === 401, `signed out: expected 401, got ${anon.status}: ${JSON.stringify(anon.body?.error)}`);
     const X = await setupOwner('x');
-    const take = await json('/v1/extensions', { method: 'POST', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS, update: true }) });
-    assert(take.status >= 400, `other owner update: expected a refusal, got ${take.status}`);
+    const take = await json(`/v1/extensions/${encodeURIComponent(wideFull)}`, { method: 'PUT', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS }) });
+    assert(take.status === 403, `other owner update: expected 403, got ${take.status}: ${JSON.stringify(take.body?.error)}`);
+    // The same short name installed by X is X's own extension, under X's name.
+    const own = await json('/v1/extensions', { method: 'POST', headers: auth(X.token), body: JSON.stringify({ manifest: manifestFor(EXT_WIDE, { limits: { fetch_max_mb: 32 } }), scripts: SCRIPTS }) });
+    assert(own.status === 201 && own.body.data?.extension?.name === `${X.name}/${EXT_WIDE}`, `other owner's own install: ${own.status} ${JSON.stringify(own.body?.data?.extension?.name ?? own.body?.error)}`);
     const rec = await json(`/v1/extensions/${EXT_WIDE}`, { headers: auth(A.token) });
     const limits = rec.body.data?.extension?.limits ?? rec.body.data?.limits;
     assert(limits?.fetchMaxBytes === 8 * MB, `ceiling after the other owner's attempt: ${JSON.stringify(limits)}`);

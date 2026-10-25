@@ -21,6 +21,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-format-md
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Case 3 names the first owner's extension in full, and a bare name from another
+ *     account names nothing of the first owner's (owner namespaces wish, secaudit2026oct22).
  *   v1.1.1 — 2026-10-22 — Case 8b: the developer of another account is refused with a 403
  *     (check:denial-coverage).
  *   v1.1.0 — 2026-10-22 — Cases 7 to 16: a delegated developer and the ?format=md declaration (secaudit 2026-10, r54).
@@ -120,9 +122,13 @@ await test('2. an anonymous ?format=md gets the action\'s markdown with the affo
 });
 
 await test('3. FAILURE: another owner cannot name the first owner\'s extension', async () => {
-    const r = await publish(b.token, 'borrowed-md.html', page(meta(`/v1/ext/${EXT}/render`)));
+    // Named with its owner, as another account names it (services/component-address.ts).
+    const r = await publish(b.token, 'borrowed-md.html', page(meta(`/v1/ext/${encodeURIComponent(`${a.name}/${EXT}`)}/render`)));
     assert(r.status === 422 && r.body.error?.code === 'APP_FORMAT_MD_INVALID', `${r.status} ${JSON.stringify(r.body.error)}`);
     assert(/another owner/.test(r.body.error.message), `says why: ${r.body.error.message}`);
+    // A bare name in another account's app names that account's own, which it does not have.
+    const bare = await publish(b.token, 'borrowed-bare-md.html', page(meta(`/v1/ext/${EXT}/render`)));
+    assert(bare.status === 422 && /not installed/.test(bare.body.error?.message ?? ''), `bare: ${bare.status} ${JSON.stringify(bare.body.error)}`);
 });
 
 await test('4. FAILURE: an action the extension does not have is refused', async () => {

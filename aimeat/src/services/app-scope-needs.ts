@@ -31,6 +31,8 @@
  *   const libs = await loadLibs(cortexLibRefs(html));
  *   const { missing } = undeclaredScopeNeeds(html, libs);
  * @version-history
+ *   v1.3.1 — 2026-10-25 — cortexLibRefs reads `/v1/cortex/<owner>/<name>/libs/<file>` too, the address of
+ *     a cortex installed since names carry their owner (owner namespaces wish, secaudit2026oct22).
  *   v1.3.0 — 2026-10-23 — A marketplace call (exchangeNeeds): reading a person's contracts, work,
  *     proposals or consumers needs exchange:read, every write exchange:write, a free-access grant
  *     exchange:grant; offerings, open needs, bids and the info document stay public. The two words
@@ -253,10 +255,12 @@ export function cortexLibRefs(html: string): Array<{ name: string; file: string;
   const out = new Map<string, { name: string; file: string; path: string }>();
   // Both parts are bounded: an unbounded file part runs to the end of the text from every
   // `/v1/cortex/` before it fails, which is quadratic on a page that repeats the prefix.
-  for (const m of html.matchAll(/\/v1\/cortex\/([^/'"\x60\s?#]{1,128})\/libs\/([^'"\x60\s?#)]{1,256}\.js)/g)) {
-    const name = decodeURIComponent(m[1]);
-    const file = decodeURIComponent(m[2]);
-    out.set(`${name}/${file}`, { name, file, path: `/v1/cortex/${m[1]}/libs/${m[2]}` });
+  // A cortex installed since 2026-10-25 is named `<owner>/<name>` and loads from two segments
+  // (services/component-address.ts cortexLibPath); the optional first group is the owner.
+  for (const m of html.matchAll(/\/v1\/cortex\/(?:([a-z0-9][a-z0-9-]{0,62}[a-z0-9])\/)?([^/'"\x60\s?#]{1,128})\/libs\/([^'"\x60\s?#)]{1,256}\.js)/g)) {
+    const name = (m[1] ? `${m[1]}/` : '') + decodeURIComponent(m[2]);
+    const file = decodeURIComponent(m[3]);
+    out.set(`${name}/${file}`, { name, file, path: `/v1/cortex/${m[1] ? `${m[1]}/` : ''}${m[2]}/libs/${m[3]}` });
   }
   return [...out.values()];
 }

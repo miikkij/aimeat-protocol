@@ -9,12 +9,15 @@
  * @structure CortexReadRefusal · cortexDetail · cortexSource
  * @usage const out = await cortexDetail(storage, config, caller, name); if (!out.ok) …
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The name is read through services/component-address.ts: the detail like a
+ *     call, the source (an owner's export) the caller's own first (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { canSeeCortex, type CortexCaller } from './cortex-lifecycle.js';
 import { listVersions } from './component-versions.js';
+import { findCortex } from './component-address.js';
 
 export interface CortexReadRefusal { ok: false; status: 403 | 404; code: 'NOT_FOUND' | 'FORBIDDEN'; message: string }
 
@@ -26,10 +29,12 @@ export async function cortexDetail(
     storage: Storage, config: Pick<AimeatConfig, 'nodeId'>,
     caller: Pick<CortexCaller, 'ownerName' | 'isOperator'>, name: string,
 ): Promise<{ ok: true; data: Record<string, unknown>; status: string } | CortexReadRefusal> {
-    const ext = await storage.getCortexExtension(name);
+    // `<owner>/<name>`, the alias of a bare record, or a bare name: the bare record, then the caller's own.
+    const ext = await findCortex(storage, name, caller.ownerName);
     if (!ext || !canSeeCortex(caller, ext, config.nodeId)) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `Cortex extension not found: ${name}` };
     }
+    name = ext.name;
     return {
         ok: true,
         status: ext.status,
@@ -73,8 +78,9 @@ export async function cortexDetail(
 export async function cortexSource(
     storage: Storage, caller: Pick<CortexCaller, 'ownerName' | 'isOperator'>, name: string,
 ): Promise<{ ok: true; data: { name: string; status: string; manifest: unknown; libs: Record<string, string> } } | CortexReadRefusal> {
-    const ext = await storage.getCortexExtension(name);
+    const ext = await findCortex(storage, name, caller.ownerName, 'manage');
     if (!ext) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Cortex extension not found: ${name}` };
+    name = ext.name;
     if (ext.installedBy !== caller.ownerName && !caller.isOperator) {
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Not your extension' };
     }

@@ -18,6 +18,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-25 — aimeat_exchange_bid names the bidder's own extension through services/component-address.ts (own first) and keeps its stored name (owner namespaces wish, secaudit2026oct22).
+ *     The legacy aimeat_exchange_accept finds the extension the same way and keys the contract by the stored name; the offering's call recipe encodes that name as one path segment and names the invoke tool's `extension_name` field.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   v1.6.1 — 2026-10-13 — aimeat_exchange_offering_get states an ext action's toll through
@@ -71,6 +73,7 @@ import {
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_FIELDS_REMOVED_IN } from '../config-pacing.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
+import { findExtension, addressSegment } from '../services/component-address.js';
 
 function ownerOf(gaii: string): string {
     return localAccountName(gaii);
@@ -192,10 +195,10 @@ export function registerExchangeTools(
                 } : null,
                 call_recipe: {
                     method: 'POST',
-                    url: `/v1/ext/${o.ext}/${o.action}`,
+                    url: `/v1/ext/${addressSegment(o.ext)}/${o.action}`,
                     auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
                     note: 'Each call is metered + charged to your budget at the provider price; the provider’s own upstream keys stay server-side.',
-                    mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
+                    mcp: `aimeat_extension_invoke { "extension_name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
                 },
                 stats,
                 ...provenance,
@@ -238,7 +241,7 @@ export function registerExchangeTools(
             // Legacy: accept a raw ext-action directly.
             if (!ext || !action) return fail('BAD_REQUEST: pass offering_id, or both ext and action');
             const contractRef = contract_ref || `mcp:${randomUUID()}`;
-            const extRec = await storage.getExtension(ext);
+            const extRec = await findExtension(storage, ext, owner);
             if (!extRec) return fail(`NOT_FOUND: extension "${ext}" not found`);
             const act = extRec.actions.find(a => a.id === action);
             if (!act) return fail(`NOT_FOUND: action "${action}" not found on "${ext}"`);
@@ -255,9 +258,10 @@ export function registerExchangeTools(
             const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
             // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.
-            const existing = await readContractForCall(storage, consumerGaii, ext, action);
+            // Keyed by the stored name, which is the name a settled call carries.
+            const existing = await readContractForCall(storage, consumerGaii, extRec.name, action);
             const ent = await createEntitlement(storage, {
-                consumerGaii, appId: app_id ?? null, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
+                consumerGaii, appId: app_id ?? null, providerGhii, ext: extRec.name, action, capabilityLabel: `${extRec.name}/${action}`,
                 unit, pricePerCall, currency, pricing, capUnits, contractRef, tollMorsels: priced.tollMorsels,
                 createdBy: owner, carrySpend: existing,
             });
@@ -361,8 +365,10 @@ export function registerExchangeTools(
             const n = await getNeed(storage, need_id);
             if (!n) return fail(`NOT_FOUND: no such need "${need_id}"`);
             if (n.state !== 'open') return fail(`NEED_CLOSED: need is ${n.state}`);
-            const extRec = await storage.getExtension(ext);
+            // The bidder's own first (services/component-address.ts); the bid keeps the stored name.
+            const extRec = await findExtension(storage, ext, owner, 'manage');
             if (!extRec || extRec.installedBy !== owner) return fail('FORBIDDEN: bid only with an action your extension owns');
+            ext = extRec.name;
             if (!extRec.actions.find(a => a.id === action)) return fail(`NOT_FOUND: action "${action}" not found on "${ext}"`);
             const bid: Bid = {
                 bidId: newBidId(), needId: n.needId,

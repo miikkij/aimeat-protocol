@@ -91,10 +91,6 @@
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "4ae7df6e656cdb35"
     },
-    "test/e2e-commerce-own-tools.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "69a05224d5619e15"
-    },
     "test/e2e-app-tool-money-prices.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "19d6f996cb4ff8ae"
@@ -106,14 +102,6 @@
     "test/e2e-calibrator.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "de36d0ed38114392"
-    },
-    "test/e2e-ext-files.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "765fd1689c5b4298"
-    },
-    "test/e2e-extension-fetch-gunzip.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "1b72f3b6c3ac226a"
     },
     "test/e2e-mcp-sse-parity.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
@@ -142,10 +130,6 @@
     "test/e2e-appdev-pitfalls.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "de743458c06904ab"
-    },
-    "test/e2e-dependency-map.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "874c84c948aca23b"
     },
     "test/e2e-wallet-page.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",

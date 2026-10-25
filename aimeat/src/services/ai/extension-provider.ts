@@ -17,6 +17,8 @@
  *   fallback price.
  * @structure CAPABILITY_OP · assertOwnExtensionProvider() · extensionRunner()
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The provider's extension is the owner's own first, found through
+ *     services/component-address.ts (owner namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-10-08 — An operation the manifest does not list is the node's 400 INVALID_PROVIDER,
  *     not a provider status that a caller would answer as 502 (aiprov plan, A8).
  *   v1.0.0 — 2026-09-28 — Initial (V6 of the System 2 plan).
@@ -29,6 +31,7 @@ import type { AiCapability, AiOp, ExtensionOpRunner } from './types.js';
 import type { AiProvider } from './providers.js';
 import { aiProviderDeclarationOf, type ExtensionAiProviderDeclaration } from '../extension-ai-provider-declaration.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { findExtension } from '../component-address.js';
 
 /** The action op a capability is served by. */
 export const CAPABILITY_OP: Record<AiCapability, AiOp> = {
@@ -47,7 +50,8 @@ function reachableHosts(config: AimeatConfig, decl: ExtensionAiProviderDeclarati
  */
 export async function assertOwnExtensionProvider(storage: Storage, config: AimeatConfig, ownerGhii: string, p: AiProvider): Promise<void> {
   const name = p.extension ?? '';
-  const ext = name ? await storage.getExtension(name) : null;
+  // The owner's own first (services/component-address.ts), as the unattended run reads it.
+  const ext = name ? await findExtension(storage, name, localAccountName(ownerGhii), 'manage') : null;
   if (!ext) throw new AiCompletionError('EXTENSION_NOT_FOUND', 404, `No extension '${name}' is installed on this node. Install it first.`);
   if (ext.installedBy !== localAccountName(ownerGhii)) {
     throw new AiCompletionError('FORBIDDEN', 403, `The extension '${name}' is not yours: an AI provider can only be an extension you installed.`);
@@ -103,7 +107,7 @@ export function extensionRunner(
 ): ExtensionOpRunner {
   return async (op, input, signal) => {
     const name = p.extension ?? '';
-    const ext = await storage.getExtension(name);
+    const ext = await findExtension(storage, name, localAccountName(ownerGhii), 'manage');
     const decl = ext ? aiProviderDeclarationOf(ext) : null;
     if (!ext || !decl) throw Object.assign(new Error(`The extension '${name}' is gone or no longer declares provides.ai_provider.`), { status: 503 });
     // The node's own refusal (the manifest does not list the operation), never a provider status.

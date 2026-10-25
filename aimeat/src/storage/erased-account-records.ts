@@ -30,6 +30,9 @@
  * @usage
  *   for (const rule of ERASED_ACCOUNT_RECORDS) { … rule.pg or rule.sqlite, rule.column, rule.action }
  * @version-history
+ *   v1.2.0 — 2026-10-25 — ReleasedComponentName.holder, pseudonymised: the next holder of an account
+ *     name does not inherit the bare extension and cortex names the erased account released (owner
+ *     namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-10-22 — WorkspaceRow.updatedBy and the three writer columns of WorkspaceRowRevision,
  *     pseudonymised like WorkspaceRow.createdBy (secaudit 2026-10, v80).
  *   v1.0.0 — 2026-10-14 — Initial: the 28 relations left "required" (QA audit 2026-10-14, K3).
@@ -90,6 +93,9 @@ export const ERASED_ACCOUNT_RECORDS: readonly ErasedAccountRecordRule[] = [
   // Shared published resources: the creator's identity must not pass to the next holder of the name.
   { pg: 'RealtimeRoom', sqlite: 'realtime_rooms', column: 'createdBy', action: 'pseudonymise' },
   { pg: 'SubdomainSite', sqlite: 'subdomain_sites', column: 'createdBy', action: 'pseudonymise' },
+  // A released bare extension or cortex name: only its holder reinstalls under it, so the next holder
+  // of the account name must not inherit it (services/component-address.ts).
+  { pg: 'ReleasedComponentName', sqlite: 'released_component_names', column: 'holder', action: 'pseudonymise' },
 ];
 
 /**

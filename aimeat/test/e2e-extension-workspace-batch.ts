@@ -21,6 +21,8 @@
  *   script throws a TypeError and the route answers 500 EXTENSION_ERROR. Each assertion that asserts
  *   the new capability is marked `// HOLE:`.
  * @version-history
+ *   2026-10-25 — B, C and their agents call the extension by its full name `<installer>/<short>`, and
+ *     the provenance pipeline names it, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.3.0 — 2026-10-12 — Every agent also holds ext:invoke, the word node 4.0.0 asks on POST
  *     /v1/ext/:name/:action (REST scope gates); without it each action was refused at the route and
  *     the memory:delete, CONSENT_REQUIRED and organism:write refusals were never reached.
@@ -127,8 +129,11 @@ let orgId = '';
 const WS = 'wscrm';
 const root = () => `organism.${orgId}.w.${WS}`;
 
+// The stored name is `<installer>/<short>` (services/component-address.ts). A and A's agents call it
+// by the short name; B, C and their agents by the full one.
+const extFull = () => `${A.name}/${EXT}`;
 const invoke = (action: string, token: string, input: Record<string, unknown> = {}) =>
-    json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify({ org: orgId, ws: WS, n: N, ...input }) });
+    json(`/v1/ext/${[A.token, aArchiveToken, aNoWriteToken].includes(token) ? EXT : encodeURIComponent(extFull())}/${action}`,{ method: 'POST', headers: auth(token), body: JSON.stringify({ org: orgId, ws: WS, n: N, ...input }) });
 
 /** How many published contacts B holds in the workspace. */
 async function publishedCount(): Promise<number> {
@@ -210,7 +215,7 @@ await test('Provenance: a written record names the extension and the action', as
     const prov = await json(`/v1/provenance/${pid}`, { headers: { ...auth(B.token), Accept: 'application/json' } });
     assert(prov.status === 200, `provenance ${prov.status}`);
     const p = prov.body.data.provenance ?? prov.body.data;
-    assert(p.generator?.pipeline === `ext.${EXT}.import_records`, `pipeline: ${JSON.stringify(p.generator)}`);
+    assert(p.generator?.pipeline === `ext.${extFull()}.import_records`, `pipeline: ${JSON.stringify(p.generator)}`);
     assert(p.level === 'ai-generated', `level: ${p.level}`);
 });
 

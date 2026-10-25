@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): install stores `<owner>/<name>` (or the owner's existing or released bare name), and every tool reads `name` as an address: the managing tools the caller's own first, get and invoke the bare record first (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_install asks the install rule before it hands out an upload URL, and a refusal by the install role names the setting and the operator (secaudit2026oct22 lead 128).
  *   2026-10-25 — aimeat_extension_get answers installed_by_principal, the principal that wrote the code, as the REST detail does (secaudit2026oct22 lead 98, transparency).
  *   2026-10-25 — aimeat_extension_config_set tells the service whether the agent may choose a secret's host (secaudit2026oct22).
@@ -101,6 +102,7 @@ import { localAccountName } from '../utils/gaii.js';
 import { invokeExtensionAction } from '../services/extension-invoke.js';
 import { capabilitiesOfRecord } from '../services/extension-capability-declaration.js';
 import { canManageExtensionAs, installRoleRefusal, type ExtensionCaller } from '../routes/extensions/permissions.js';
+import { findExtension, placeExtensionInstall } from '../services/component-address.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
@@ -177,7 +179,7 @@ export function registerExtensionsTools(
         { mimeType: 'application/json', description: 'Extension details and available actions' },
         async (uri, variables) => {
             const name = decodeURIComponent(variables.name as string);
-            const ext = await storage.getExtension(name);
+            const ext = await findExtension(storage, name, resolveCaller().owner);
             if (!ext) return { contents: [{ uri: uri.toString(), text: 'Extension not found' }] };
             return {
                 contents: [{
@@ -393,10 +395,19 @@ export function registerExtensionsTools(
             }
 
             const record = built.record;
-            const name = record.name;
             const scheduler = getActiveScheduler();
 
-            const existingExt = await storage.getExtension(name);
+            // The stored name lives in the installer's namespace (services/component-address.ts): the
+            // owner's own extension of this name if they have one, else `<owner>/<name>`, or a bare
+            // name they released and take back. An operator's update may still name a bare record
+            // another account holds, as before.
+            const shortName = record.name;
+            let { existing: existingExt } = await placeExtensionInstall(storage, callerOwner, record);
+            if (!existingExt && update && isOperator) {
+                const bare = await storage.getExtension(shortName);
+                if (bare) { existingExt = bare; record.name = bare.name; }
+            }
+            const name = record.name;
             if (existingExt && !update) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed — pass update: true to upsert it in place (activation status and its ext: memory are preserved), or delete + reinstall.` }], isError: true };
             }
@@ -477,8 +488,10 @@ export function registerExtensionsTools(
             inputSchema: zodShapeFor('aimeat_extension_activate'),
             annotations: annotationsFor('aimeat_extension_activate'),
         },
-        async ({ name }) => {
-            const ext = await storage.getExtension(name);
+        async ({ name: address }) => {
+            // `<owner>/<name>`, the alias of a bare record, or a bare name read for this caller (own first).
+            const ext = await findExtension(storage, address, resolveCaller().owner, 'manage');
+            const name = ext?.name ?? address;
             if (!ext) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
@@ -533,9 +546,10 @@ export function registerExtensionsTools(
             inputSchema: zodShapeFor('aimeat_extension_config_set'),
             annotations: annotationsFor('aimeat_extension_config_set'),
         },
-        async ({ name, config: values }) => {
-            const ext = await storage.getExtension(name);
+        async ({ name: address, config: values }) => {
             const caller = resolveCaller();
+            const ext = await findExtension(storage, address, caller.owner, 'manage');
+            const name = ext?.name ?? address;
             if (!ext || !(await canManageExtensionAs(storage, config, caller, ext.installedBy, { action: 'update', subject: name }))) {
                 return { ...toolError('NOT_FOUND', `Extension "${name}" not found`) };
             }
@@ -568,7 +582,7 @@ export function registerExtensionsTools(
         async ({ name }) => {
             // readAuthorityOf, not storage.getExtension: the service owns this question on both
             // surfaces, so neither reads the record for itself (pnpm check:shared-impl).
-            const found = await readAuthorityOf({ storage }, name);
+            const found = await readAuthorityOf({ storage }, name, resolveCaller().owner);
             if (!found || !(await canManageExtensionAs(storage, config, resolveCaller(), found.ext.installedBy, { action: 'read', subject: name }))) {
                 return { ...toolError('NOT_FOUND', `Extension "${name}" not found`) };
             }
@@ -585,8 +599,10 @@ export function registerExtensionsTools(
             inputSchema: zodShapeFor('aimeat_extension_deactivate'),
             annotations: annotationsFor('aimeat_extension_deactivate'),
         },
-        async ({ name }) => {
-            const ext = await storage.getExtension(name);
+        async ({ name: address }) => {
+            // `<owner>/<name>`, the alias of a bare record, or a bare name read for this caller (own first).
+            const ext = await findExtension(storage, address, resolveCaller().owner, 'manage');
+            const name = ext?.name ?? address;
             if (!ext) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
@@ -628,8 +644,10 @@ export function registerExtensionsTools(
             inputSchema: zodShapeFor('aimeat_extension_delete'),
             annotations: annotationsFor('aimeat_extension_delete'),
         },
-        async ({ name }) => {
-            const ext = await storage.getExtension(name);
+        async ({ name: address }) => {
+            // `<owner>/<name>`, the alias of a bare record, or a bare name read for this caller (own first).
+            const ext = await findExtension(storage, address, resolveCaller().owner, 'manage');
+            const name = ext?.name ?? address;
             if (!ext) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
@@ -673,8 +691,9 @@ export function registerExtensionsTools(
             inputSchema: zodShapeFor('aimeat_extension_get'),
             annotations: annotationsFor('aimeat_extension_get'),
         },
-        async ({ name, include_source }) => {
-            const ext = await storage.getExtension(name);
+        async ({ name: address, include_source }) => {
+            const ext = await findExtension(storage, address, resolveCaller().owner);
+            const name = ext?.name ?? address;
             if (!ext) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }

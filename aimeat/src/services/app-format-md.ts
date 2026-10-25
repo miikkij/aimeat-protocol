@@ -28,6 +28,9 @@
  *   formatMdDelegateRefusal(opts) · renderAppMarkdown(deps, app)
  * @usage const md = await renderAppMarkdown({ storage, config }, app); // string or null
  * @version-history
+ *   v1.2.0 — 2026-10-25 — The declaration may name `<owner>/<name>` (encoded as one path segment), and
+ *     the extension is found as the run finds it, the owner's own first (owner namespaces wish,
+ *     secaudit2026oct22).
  *   v1.1.0 — 2026-10-22 — formatMdDelegateRefusal(): a developer of another account may republish or
  *     remove the declaration the live version has, and only the full right may add one or change
  *     which extension or action it names (secaudit 2026-10, r54).
@@ -40,13 +43,15 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppRecord } from '../storage/types/apps.js';
 import { runExtensionActionAsSystem } from './extension-system-run.js';
+import { findExtension } from './component-address.js';
 import { logger } from '../utils/logger.js';
 
 export interface FormatMdDeclaration { extension: string; action: string }
 
 /** The same cap a stored agent face has (services/agent-face.ts AGENT_FACE_MAX_BYTES). */
 const MAX_BYTES = 256 * 1024;
-const NAME = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
+/** The extension's name, or `<owner>/<name>` as an install is named since 2026-10-25. */
+const NAME = /^(?:[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\/)?[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
 const ACTION = /^[A-Za-z0-9_-]{1,100}$/;
 
 /**
@@ -81,15 +86,18 @@ export function parseFormatMdMeta(html: string): FormatMdDeclaration | { error: 
   if (!m) return null;
   const content = /content\s*=\s*["']([^"']*)["']/i.exec(m[0])?.[1]?.trim() ?? '';
   const parts = /^\/v1\/ext\/([^/\s]+)\/([^/\s?#]+)$/.exec(content) ?? /^ext:([^:\s]+):([^:\s]+)$/.exec(content);
-  if (!parts || !NAME.test(parts[1]!) || !ACTION.test(parts[2]!)) {
+  // A namespaced name in a path is one encoded segment (`alice%2Fweather`).
+  const extension = parts ? parts[1]!.replace(/%2F/gi, '/') : '';
+  if (!parts || !NAME.test(extension) || !ACTION.test(parts[2]!)) {
     return { error: `aimeat-format-md must name an extension action as /v1/ext/<extension>/<action>; it says "${content.slice(0, 120)}"` };
   }
-  return { extension: parts[1]!, action: parts[2]! };
+  return { extension, action: parts[2]! };
 }
 
 /** Why the declaration cannot be used for this owner, or null when it can. */
 export async function formatMdRefusal(storage: Storage, ownerName: string, decl: FormatMdDeclaration): Promise<string | null> {
-  const ext = await storage.getExtension(decl.extension);
+  // The owner's own first, as the unattended run reads it (services/component-address.ts).
+  const ext = await findExtension(storage, decl.extension, ownerName, 'manage');
   if (!ext) return `the extension "${decl.extension}" is not installed on this node`;
   if (ext.installedBy !== ownerName) return `the extension "${decl.extension}" belongs to another owner; an app answers ?format=md only with its owner's own extension`;
   if (!ext.actions.some(a => a.id === decl.action)) {

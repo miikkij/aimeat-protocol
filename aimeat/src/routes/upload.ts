@@ -24,6 +24,9 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-25 — An extension ZIP lands in the installer's namespace, `<owner>/<name>`, or on the
+ *     owner's existing or released bare name; a cortex ZIP replaces the uploader's own cortex of that
+ *     name (services/component-address.ts; owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — An extension ZIP asks the install role at the PUT: with install role operator an
  *     account that is not the operator's is refused 403 INSUFFICIENT_ROLE, naming the setting and the
  *     operator (secaudit2026oct22 lead 128).
@@ -193,6 +196,7 @@ import { uploadPrincipalRefusal } from '../services/upload-principal.js';
 import { cortexAskedFields } from '../services/cortex-visibility.js';
 import { carryFirstUseKeep } from '../services/extension-first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
+import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component-address.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
@@ -483,7 +487,9 @@ async function handleExtensionUpload(
     const wantUpdate = meta.update === true;
     const wantActivate = meta.activate === true;
 
-    const existing = await storage.getExtension(record.name);
+    // The stored name lives in the installer's namespace (services/component-address.ts): the
+    // owner's own extension of this name, else `<owner>/<name>`, or a bare name they released.
+    const { existing } = await placeExtensionInstall(storage, ownerName, record);
     if (existing && !wantUpdate) {
         res.status(409).json({
             success: false, error: 'ALREADY_EXISTS',
@@ -590,6 +596,7 @@ async function handleExtensionUpload(
             record.activatedAt = new Date().toISOString();
         }
         saved = await storage.createExtension(record);
+        await settleReclaimed(storage, 'extension', saved.name);
     }
     // Kept like every other install and update, so `name@version` answers for what this door deployed.
     await snapshotExtensionVersion(storage, saved, sub)
@@ -660,7 +667,11 @@ async function handleCortexUpload(
         ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
     })) !== null;
 
-    const existing = await storage.getCortexExtension(incoming.name);
+    // The uploader's own cortex of this name (services/component-address.ts): `<owner>/<name>` as
+    // written, or for a bare manifest name the uploader's own of that name.
+    const existing = isNamespacedName(incoming.name)
+        ? await findCortex(storage, incoming.name)
+        : await ownComponent(n => storage.getCortexExtension(n), ownerName, incoming.name);
 
     // ── NEW NAME — services/cortex-lifecycle.ts, the same install POST /v1/cortex and the inline
     //    branch of aimeat_cortex_install run. It re-reads the manifest and applies the manifest and

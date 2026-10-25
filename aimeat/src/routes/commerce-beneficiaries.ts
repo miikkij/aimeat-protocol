@@ -21,6 +21,7 @@
  *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   2026-10-25 — DELETE /v1/commerce/beneficiary-splits reaches a split on the provider's own extension by its short name too (withdrawSplit), since the split is keyed `<owner>/<name>` (secaudit2026oct22).
  *   2026-10-16 — earnings and obligations total every entry and return the newest `limit` of them, with
  *     `total` beside `count`; the totals were sums of a window (QA audit S8-10).
  *   2026-10-16 — POST /v1/commerce/beneficiary-splits calls declareSplit and both split routes answer
@@ -37,8 +38,8 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperator, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
-import { deleteSplit, listSplitsByProvider } from '../commerce/beneficiary-split.js';
-import { declareSplit, splitView } from '../commerce/beneficiary-split-declare.js';
+import { listSplitsByProvider } from '../commerce/beneficiary-split.js';
+import { declareSplit, splitView, withdrawSplit } from '../commerce/beneficiary-split-declare.js';
 import {
   listBeneficiaryEntries, listBeneficiaryObligations, totalsOf, type BeneficiaryEntry,
 } from '../commerce/beneficiary-book.js';
@@ -115,7 +116,7 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
     if (!ext || !action) {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the coordinate: ?ext=&action='));
     }
-    const removed = await deleteSplit(storage, providerGhii, ext, action);
+    const removed = await withdrawSplit(storage, providerGhii, ext, action);
     if (!removed) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'You have no split declared on that coordinate'));
     return res.json(success(config.nodeId, {
       removed: true,

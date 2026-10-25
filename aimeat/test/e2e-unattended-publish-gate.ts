@@ -33,6 +33,8 @@
  *   - Phase 6 what exists at the update keeps working
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-unattended-publish-gate
  * @version-history
+ *   2026-10-25 — Extension file keys read `ext/<owner>/<short>/<file>` and the keep step keys the
+ *     extension by `<owner>/<short>`, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-22 — The agent is refused the approval of the request its own extension filed, with a 403
  *     (check:denial-coverage).
  *   2026-10-22 — Initial (secaudit 2026-10, v68 and v69).
@@ -200,6 +202,8 @@ async function approve(id: string): Promise<void> {
     assert(d.status === 200 && d.body.data?.request?.state === 'approved', `approve ${id}: ${d.status} ${short(d.body)}`);
 }
 const pkgUrl = (name: string) => `/v1/datapackages/${encodeURIComponent(ownerName)}/${name}`;
+/** An extension's full name in the owner's namespace: its file keys are `ext/<full>/<file>`. */
+const extFull = (short: string) => `${ownerName}/${short}`;
 
 console.log('\n=== Extensions and workflows meet the publish gate ===\n');
 console.log('Phase 1 — the node, the owner and two agents');
@@ -304,7 +308,7 @@ await test('the agent\'s public write through its extension is stored private an
     assert(out?.publishRequest?.status === 'awaiting_owner', `no waiting request: ${short(out)}`);
     fileUrl = out.url;
     assert(await anon(fileUrl) !== 200, `the file is readable anonymously: ${fileUrl}`);
-    const q = await waitingFor('file', `ext/${EXT}/probe.txt`);
+    const q = await waitingFor('file', `ext/${extFull(EXT)}/probe.txt`);
     assert(q && q.requested_by?.principal === agentGaii, `no file request naming the agent: ${short(await requests())}`);
     fileRequest = q.id;
 });
@@ -330,8 +334,8 @@ await test('the agent\'s extension on @activate: its file and package in the own
     for (let i = 0; i < 60 && !q; i++) { q = await waitingFor('datapackage', `${ACTEXT}-act`); if (!q) await sleep(250); }
     assert(q && q.requested_by?.principal === agentGaii, `no package request from the @activate run: ${short(await requests())}`);
     assert(await anon(pkgUrl(`${ACTEXT}-act`)) !== 200, 'the @activate package is public');
-    assert(await anon(`/v1/pub/${encodeURIComponent(ownerGhii)}/ext/${ACTEXT}/probe-activate.txt`) !== 200, 'the @activate file is public at the owner\'s address');
-    const f = await waitingFor('file', `ext/${ACTEXT}/probe-activate.txt`);
+    assert(await anon(`/v1/pub/${encodeURIComponent(ownerGhii)}/ext/${extFull(ACTEXT)}/probe-activate.txt`) !== 200, 'the @activate file is public at the owner\'s address');
+    const f = await waitingFor('file', `ext/${extFull(ACTEXT)}/probe-activate.txt`);
     assert(f && f.requested_by?.principal === agentGaii, `no file request from the @activate run: ${short(await requests())}`);
 });
 
@@ -340,7 +344,7 @@ await test('kept: the owner\'s own producer on @activate publishes public at onc
     let ok = false;
     for (let i = 0; i < 60 && !ok; i++) { ok = await anon(pkgUrl(`${OWNEXT}-act`)) === 200; if (!ok) await sleep(250); }
     assert(ok === true, 'the owner-installed producer\'s @activate package is not public');
-    assert(await anon(`/v1/pub/${encodeURIComponent(ownerGhii)}/ext/${OWNEXT}/probe-activate.txt`) === 200, 'its file is not public');
+    assert(await anon(`/v1/pub/${encodeURIComponent(ownerGhii)}/ext/${extFull(OWNEXT)}/probe-activate.txt`) === 200, 'its file is not public');
 });
 
 console.log('\nPhase 5 — workflows (v68)');
@@ -395,7 +399,7 @@ await test('the node restarts as if updated now: the agent-installed extension a
     ownerTok = await ownerToken(BASE, ownerName);
     agentTok = await agentToken(agentGaii, agentPrivate);
     const kept = await withStorage(async s => (await s.getMemory(`system@${NODE_ID}`, KEEP_STEP_KEY))?.value as any);
-    assert(kept?.kept && Object.hasOwn(kept.kept, OLDEXT), `the step did not keep ${OLDEXT}: ${short(kept)}`);
+    assert(kept?.kept && Object.hasOwn(kept.kept, extFull(OLDEXT)), `the step did not keep ${extFull(OLDEXT)}: ${short(kept)}`);
 });
 
 await test('kept: the agent-installed producer publishes public again, unattended, as before the update', async () => {

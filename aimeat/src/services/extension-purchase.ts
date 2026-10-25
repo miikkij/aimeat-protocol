@@ -24,6 +24,8 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.5.1 — 2026-10-25 — A tool's binding is read for the seller: their own extension by a bare name
+ *     is still theirs (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v1.5.0 — 2026-10-24 — The seller's extension action runs in-process for the buyer, the
  *     extension's GEAI on its owner's account, and no longer over the loopback HTTP hop with the
  *     bearer of the session the buying extension was serving (secaudit2026oct22,
@@ -53,6 +55,7 @@ import { authoriseMeteredCall } from './metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { logger } from '../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from './members-only.js';
+import { findBackingCapability } from './component-address.js';
 
 /**
  * The bare owner name behind any principal the capability registry stores. Extension-backed
@@ -189,7 +192,8 @@ export async function buyForExtension(args: {
   // Resolved BEFORE the settle, deliberately. Money that has to be given back is a worse answer
   // than money never taken, and a buyer told "no contract" about a tool whose binding is broken
   // goes off to take a contract that could never have worked.
-  const cap = await storage.getCapability(toolDef.action_id);
+  // The seller's own extension by a bare name is still theirs (services/component-address.ts).
+  const cap = await findBackingCapability(storage, toolDef.action_id, sellerOwner);
   if (!cap) {
     return { ok: false, code: 'CAPABILITY_NOT_FOUND', message: `Backing capability not found: ${toolDef.action_id}`, correlation };
   }
@@ -204,7 +208,7 @@ export async function buyForExtension(args: {
 
   // Who the app serves, before anything is charged (services/members-only.ts). The buying
   // extension acts for its owner, so the owner's membership is what is asked.
-  if (await membersOnlyRefusalForCapability(storage, toolDef.action_id, buyer)) {
+  if (await membersOnlyRefusalForCapability(storage, cap.id, buyer)) {
     return { ok: false, code: 'MEMBERS_ONLY', message: MEMBERS_ONLY_MESSAGE, correlation };
   }
 

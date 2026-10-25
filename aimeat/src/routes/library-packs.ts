@@ -18,6 +18,8 @@
  *   communityPackDetail() · libraryPackIds()
  * @usage app.use(libraryPacksRouter(config, storage)) from routes-loader.
  * @version-history
+ *   2026-10-25 — A community pack's url is built by cortexLibPath, so a cortex named `<owner>/<name>`
+ *     is served from its two segments (owner namespaces wish, secaudit2026oct22).
  *   v1.3.1 — 2026-09-26 — The proof ledger's writer is named with localAccountName (utils/gaii.ts),
  *     which keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -38,6 +40,7 @@
  *     (Library Acceleration Program, Phase 1).
  */
 import { Router } from 'express';
+import { cortexLibPath } from '../services/component-address.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -74,7 +77,7 @@ async function communityExtensions(storage: Storage): Promise<CortexExtensionRec
 /** Compact index entry for a community cortex — same field shape as the static index. */
 function communityIndexEntry(ext: CortexExtensionRecord, baseUrl: string) {
   const lib = ext.components.find(c => c.type === 'lib') as unknown as { filename: string };
-  const url = `/v1/cortex/${ext.name}/libs/${lib.filename}`;
+  const url = cortexLibPath(ext.name, lib.filename);
   return {
     id: ext.name,
     kind: 'cortex' as const,

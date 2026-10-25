@@ -42,6 +42,7 @@
  *   cd aimeat && pnpm check:identity-shortening --list   # every finding, allowed or not
  * @version-history
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, F-1 as a class).
+ *   v1.0.1 — 2026-10-25 — ALLOWED: component-address.ts takes a version pin off an extension name (secaudit2026oct22).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -287,6 +288,9 @@ export function compareWithAllowed(found: Map<string, Finding[]>, allowed: Recor
  * Each sentence says what the shortened value is and why no visitor's name can reach it.
  */
 export const ALLOWED: Record<string, Record<string, string>> = {
+  'src/services/component-address.ts': {
+    "raw.slice(0, at) ← raw.lastIndexOf('@')": 'Takes the version pin off an extension name (`weather@1.0.0` is `weather`), the form splitPinnedName in component-versions.ts reads; an extension name holds no identity.',
+  },
   // ── The connector CLI: it runs on the person's own machine, not on the node ──
   'src/cli/connect/auth.ts': {
     '/#([^@]+)@/': 'The connector reads its own account name out of the GAII the node it signed in to just issued; it runs on the person\'s machine, where no visitor reaches it.',

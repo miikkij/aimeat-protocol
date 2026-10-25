@@ -29,6 +29,8 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.2.4 — 2026-10-25 — An extension provider's view finds the owner's own extension first
+ *     (services/component-address.ts; owner namespaces wish, secaudit2026oct22).
  *   v1.2.3 — 2026-10-18 — deleteOwnerAiProvider's reset of the legacy address and persistHealth write
  *     onto the record as stored, on its version (updatePrivateRecord)
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -55,7 +57,8 @@ import { recordAccountEvent } from '../account-events.js';
 import { readAgentKey } from '../agent-ai-keys.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { logger } from '../../utils/logger.js';
-import { isValidAgentName } from '../../utils/gaii.js';
+import { isValidAgentName, localAccountName } from '../../utils/gaii.js';
+import { findExtension } from '../component-address.js';
 import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from '../ai-provider-common.js';
 import { AiCompletionError } from './errors.js';
 import { clearHealth } from './health.js';
@@ -477,7 +480,8 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   const views = await Promise.all([...owner, ...node].map(async (p) => {
     const v = withStatus(p);
     if (p.type !== 'extension' || !p.extension) return v;
-    const ext = await storage.getExtension(p.extension);
+    // The owner's own first (services/component-address.ts), as the provider's run reads it.
+    const ext = await findExtension(storage, p.extension, localAccountName(ownerGhii), 'manage');
     const decl = ext ? aiProviderDeclarationOf(ext) : null;
     return decl
       ? { ...v, data_statement: decl.dataStatement, extension_provider: { hosts: decl.hosts, ops: decl.ops, models: decl.models } }

@@ -27,6 +27,8 @@
  *   (16), and the owner can widen it back (17).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scheduled-ext-files
  * @version-history
+ *   2026-10-25 -- The extension's files carry its stored name, `ext/<owner>/<name>/` (owner namespaces
+ *     wish, secaudit2026oct22).
  *   2026-10-25 -- 27: an action-script PATCH records who wrote the code, agent or owner (secaudit2026oct22).
  *   v1.5.3 -- 2026-10-24 -- 23d prints the test's and the server's view of the kept schedule before and
  *     after its first fire, to tell an old read from an overwrite.
@@ -98,6 +100,8 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 console.log('\n=== Scheduled extension files E2E (TARGET-063 A2) ===\n');
 
 const EXT = `schedfiles${Date.now()}`;
+/** The stored name: the install lives in its owner's namespace (services/component-address.ts). */
+const extKey = (): string => `${owner.name}/${EXT}`;
 const OUT_KEY = 'rows.csv';
 const CSV = 'date,hits\n2026-08-15,42\n2026-08-14,37\n';
 
@@ -141,7 +145,7 @@ await test('1. Setup: owner installs and activates the producing extension', asy
 });
 
 await test('2. Baseline: invoked by a person, the sandbox already had files', async () => {
-  const r = await json(`/v1/ext/${EXT}/probe`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+  const r = await json(`/v1/ext/${extKey()}/probe`, { method: 'POST', headers: auth(owner.token), body: '{}' });
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.hasFiles === true, 'the REST road has always had ctx.files — this is the control');
 });
@@ -167,14 +171,14 @@ await test('4. THE FIX: a triggered run writes bytes into the INSTALLER\'s names
   assert(sched.lastRunResult === 'success', `run result ${sched.lastRunResult}: ${sched.lastRunError ?? ''}`);
 
   // The bytes exist, under the OWNER — not scheduler@node, which owns no storage at all.
-  const key = `ext/${EXT}/${OUT_KEY}`;
+  const key = `ext/${extKey()}/${OUT_KEY}`;
   const back = await json(`/v1/storage/${encodeURIComponent(key)}`, { headers: auth(owner.token) });
   assert(back.status === 200, `read back as owner ${back.status}: ${JSON.stringify(back.body?.error)}`);
   assert(back.body._raw === CSV, `content mismatch: ${JSON.stringify(back.body._raw ?? back.body).slice(0, 120)}`);
 });
 
 await test('5. …and the same bytes are at a permanent public address, no auth', async () => {
-  const key = `ext/${EXT}/${OUT_KEY}`;
+  const key = `ext/${extKey()}/${OUT_KEY}`;
   const url = `/v1/pub/${encodeURIComponent(owner.gaii)}/${key.split('/').map(encodeURIComponent).join('/')}`;
   const res = await fetch(`${BASE}${url}`);
   assert(res.status === 200, `anonymous read ${res.status}`);
@@ -208,7 +212,7 @@ await test('7. A scheduled write is charged to the installer, not to nobody', as
   // extension on a clock cannot fill the node for free under an identity with no account.
   const files = await json('/v1/storage', { headers: auth(owner.token) });
   assert(files.status === 200, `list ${files.status}`);
-  const produced = (files.body.data.files as Array<{ key: string; size: number }>).find(f => f.key === `ext/${EXT}/${OUT_KEY}`);
+  const produced = (files.body.data.files as Array<{ key: string; size: number }>).find(f => f.key === `ext/${extKey()}/${OUT_KEY}`);
   assert(!!produced, `the produced file is in the owner's own file list`);
   assert(produced!.size === CSV.length, `size ${produced!.size}`);
 });
@@ -235,7 +239,7 @@ await test('8. A stranger cannot read the private artefact a scheduled run produ
   assert(t.body.data.schedule.lastRunResult === 'success', `run ${t.body.data.schedule.lastRunError ?? ''}`);
 
   const other = await setupOwner('b');
-  const key = `ext/${EXT}/${privKey}`;
+  const key = `ext/${extKey()}/${privKey}`;
   const path = `/v1/pub/${encodeURIComponent(owner.gaii)}/${key.split('/').map(encodeURIComponent).join('/')}`;
   const denied = await json(path, { headers: auth(other.token) });
   assert(denied.status === 403, `a second owner must be refused, got ${denied.status}`);
@@ -499,7 +503,7 @@ await test('18. An extension the owner wrote in person reads the file whichever 
 // afterwards no longer runs the action. Test 4 above is the owner's own schedule, which is unchanged.
 
 const makerInput = (key: string) => ({ key, b64: Buffer.from(`made for ${key}`).toString('base64'), visibility: 'private' });
-const ownerFile = (key: string) => json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/${key}`)}`, { headers: auth(owner.token) });
+const ownerFile = (key: string) => json(`/v1/storage/${encodeURIComponent(`ext/${extKey()}/${key}`)}`, { headers: auth(owner.token) });
 const extSchedule = (key: string, name: string) => JSON.stringify({
   kind: 'extension', cron: '0 0 1 1 *', display_name: name, extension_name: EXT, action_id: 'produce', input: makerInput(key),
 });
@@ -511,7 +515,7 @@ const makerScheduleIds: string[] = [];
 await test('19. A task:write-only agent is refused putting an extension action on a clock (REST and MCP)', async () => {
   taskOnly = await makeAgent(BASE, owner, ['task:write', 'workflow:read', 'workflow:write']);
   // The control the finding rests on: the direct endpoint refuses this agent.
-  const direct = await json(`/v1/ext/${EXT}/produce`, { method: 'POST', headers: auth(taskOnly.token), body: JSON.stringify(makerInput('v52-direct.csv')) });
+  const direct = await json(`/v1/ext/${extKey()}/produce`, { method: 'POST', headers: auth(taskOnly.token), body: JSON.stringify(makerInput('v52-direct.csv')) });
   assert(direct.status === 403, `the direct invoke must refuse a task:write-only agent, got ${direct.status}`);
 
   const rest = await json('/v1/schedules', { method: 'POST', headers: auth(taskOnly.token), body: extSchedule('v52-rest.csv', 'v52-rest') });
@@ -563,7 +567,7 @@ await test('21. The task:write-only agent is refused editing and running that sc
 });
 
 await test('22. After the owner narrows the maker to drop ext:invoke, a fire does not run the action', async () => {
-  await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-ok.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
+  await json(`/v1/storage/${encodeURIComponent(`ext/${extKey()}/v52-ok.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
   assert((await ownerFile('v52-ok.csv')).status === 404, 'the file from test 20 is gone before the fire');
   const narrow = await json(`/v1/agents/${invoker.name}/scopes`, {
     method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ scopes: ['task:write', 'workflow:read', 'workflow:write'] }),
@@ -698,7 +702,7 @@ await test('23c. KEPT: an app\'s schedule from before 2026-10-05 runs as the acc
   const appId = await ownerExtSchedule('v52-revoked.csv', 'v52-revoked');
   await landed('give the schedule its grant', storage.updateScheduledJob(appId, { createdByAgent: true, createdByApp: grantId }));
   assert((await fire(appId)).lastRunResult === 'success', 'control: a live grant holding ext:invoke runs');
-  await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-revoked.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
+  await json(`/v1/storage/${encodeURIComponent(`ext/${extKey()}/v52-revoked.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
   await landed('revoke the grant', storage.updateAppGrant(grantId, { revoked: true }));
   const revoked = await fire(appId);
   assert(revoked.lastRunResult === 'error', `a revoked grant's schedule ran: ${revoked.lastRunResult}; ${makerSeen(revoked)}`);
@@ -748,7 +752,7 @@ await test('23d. KEPT: an app schedule made before the rule from a grant without
     assert(tk.status === 200 && typeof tk.body?.data?.access_token === 'string', `app token for ${grantId}: ${tk.status} ${JSON.stringify(tk.body?.error)}`);
     return tk.body.data.access_token as string;
   };
-  await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/v52-kept.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
+  await json(`/v1/storage/${encodeURIComponent(`ext/${extKey()}/v52-kept.csv`)}`, { method: 'DELETE', headers: auth(owner.token) });
   const keptApp = await appToken(narrowGrant);
   const runNow = await json(`/v1/schedules/${keptId}/trigger`, { method: 'POST', headers: auth(keptApp), body: '{}' });
   assert(runNow.status === 200 && runNow.body.data.schedule?.lastRunResult === 'success',

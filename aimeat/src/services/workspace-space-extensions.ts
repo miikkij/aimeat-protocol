@@ -46,6 +46,8 @@
  *   const r = await nameSpaceExtensions({ storage, config }, caller, { orgId, ws, space, add });
  *   if (isRefusal(r)) return res.status(r.status).json(error(config.nodeId, r.code, r.message, r.status, r.details));
  * @version-history
+ *   v1.1.0 — 2026-10-25 — An entry `<account>/<name>` names the account's own extension, stored as
+ *     `<account>/<name>` since names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-13 — Initial.
  */
 import { localAccountName } from '../utils/gaii.js';
@@ -53,6 +55,7 @@ import { validateMemoryWrite } from './schema-validator.js';
 import { emitChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { logger } from '../utils/logger.js';
+import { findExtension } from './component-address.js';
 import { archivedRefusal } from './workspace-write-guards.js';
 import {
     findWorkspaceRegistration, readWorkspaceMetaRecord, writeWorkspaceMetaRecord, isMemoryBackedSpace, isRowBackedSpace,
@@ -167,7 +170,9 @@ export async function nameSpaceExtensions(
         if (installer !== account) {
             return refusal(400, 'INVALID_INPUT', `${entry} names an extension of another account. A caller names only extensions its own account installed, written ${account}/name.`);
         }
-        const ext = await storage.getExtension(name);
+        // The account's own extension of that name: `<account>/<name>`, or a bare one it holds
+        // (services/component-address.ts).
+        const ext = await findExtension(storage, name, account, 'manage');
         if (!ext || localAccountName(ext.installedBy ?? '').toLowerCase() !== account) {
             return refusal(400, 'INVALID_INPUT', `${entry} is not an extension installed on this node by ${account}. Install it first, then name it.`);
         }

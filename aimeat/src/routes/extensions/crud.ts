@@ -6,6 +6,11 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): an install is
+ *     stored as `<owner>/<name>` (or the owner's existing or released bare name); `:name` takes
+ *     `<owner>/<name>` encoded as one segment, the alias of a bare record, or a bare name (the detail
+ *     and versions read the bare record first, the managing routes the caller's own); PUT creates only in the caller's own namespace (owner namespaces wish,
+ *     secaudit2026oct22).
  *   2026-10-25 — An install, redeploy or script change the install role refuses says so, naming the
  *     setting and the operator (installRoleRefusal; secaudit2026oct22 lead 128).
  *   2026-10-25 — GET :name answers installedByPrincipal again, the same writer GET :name/versions
@@ -73,6 +78,9 @@ import { isOperatorCaller } from '../../services/operator-override.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
+import {
+  findExtension, ownComponent, placeExtensionInstall, installNameFor, splitComponentAddress, shortNameOf, addressSegment,
+} from '../../services/component-address.js';
 
 /**
  * The record as a write door answers with it: secret config fields masked and the __secretKeys
@@ -190,11 +198,14 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
       const record = built.record;
-      const name = record.name;
 
+      // The stored name lives in the installer's namespace (services/component-address.ts): the
+      // owner's own extension of this name if they have one, else `<owner>/<name>`, or a bare name
+      // they released and take back.
       // POST never replaces an installed extension; PUT is the door for a redeploy. The check stays
       // here because the answer is this route's: a conflict, not an offer to upsert.
-      const existingExt = await storage.getExtension(name);
+      const { existing: existingExt } = await placeExtensionInstall(storage, req.auth!.owner, record);
+      const name = record.name;
       if (existingExt) {
         res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS',
           `Extension "${name}" is already installed`));
@@ -219,8 +230,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
 
       res.status(201).json(success(config.nodeId, { extension: shownExtension(created), ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
-        { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
-        { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
+        { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${addressSegment(created.name)}/activate` },
+        { description: 'View extension details', method: 'GET', url: `/v1/extensions/${addressSegment(created.name)}` },
+        { description: 'Run an action (the address apps call)', method: 'POST', url: `/v1/ext/${addressSegment(created.name)}/<actionId>` },
       ]));
     } catch (err) {
       logger.error('Failed to install extension', { error: (err as Error).message });
@@ -238,9 +250,23 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // a quota slot. Create requires ext:write (like POST); update requires owning the extension.
   router.put('/v1/extensions/:name', requireAuth(), validateBody(ExtensionInstallSchema, config.nodeId), async (req, res) => {
     try {
-      const name = req.params.name as string;
+      const address = req.params.name as string;
       const { manifest: manifestYaml, scripts } = req.body as { manifest?: string; scripts?: Record<string, string> };
-      const existing = await storage.getExtension(name);
+      // A write names the caller's own extension (services/component-address.ts): `<owner>/<name>`
+      // as written, or for a bare name the caller's own of that name. An operator's bare name may
+      // still name a bare record another account holds, as before.
+      const callerOwner = req.auth!.owner as string;
+      const target = splitComponentAddress(address);
+      const existing = target
+        ? await findExtension(storage, address)
+        : (await ownComponent(n => storage.getExtension(n), callerOwner, address))
+          ?? (await isOperatorCaller(storage, req.auth) ? await storage.getExtension(address) : null);
+      if (!existing && target && target.owner !== callerOwner) {
+        res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
+          `"${address}" is in the namespace of the account "${target.owner}". Install it under your own name, "${callerOwner}/${target.name}".`));
+        return;
+      }
+      let name = existing ? existing.name : address;
 
       // Permission: create mirrors POST (ext:write / install role); update requires ownership.
       if (!existing) {
@@ -267,12 +293,16 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
       const record = built.record;
 
-      // metadata.name identifies the resource — it must match the URL.
-      if (record.name !== name) {
+      // metadata.name identifies the resource — it must match the URL (the URL may carry the owner).
+      if (record.name !== shortNameOf(address)) {
         res.status(400).json(error(config.nodeId, 'NAME_MISMATCH',
-          `Manifest metadata.name "${record.name}" does not match URL name "${name}"`));
+          `Manifest metadata.name "${record.name}" does not match URL name "${address}"`));
         return;
       }
+      // The stored name: the existing record's, or for a new one the installer's namespace (or a bare
+      // name the installer released and takes back).
+      name = existing ? existing.name : (await installNameFor(storage, 'extension', callerOwner, record.name)).name;
+      record.name = name;
 
       // The whole write — the install ceilings on a create, the secret carry-forward, the no-op
       // shortcut, the in-place swap with its EXCHANGE re-projection and the re-initialisation of an
@@ -293,8 +323,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       if (written.action === 'installed') {
         logger.info(`Extension installed via upsert: ${name}`, { version: written.record.version, by: req.auth!.owner });
         res.status(201).json(success(config.nodeId, { extension: shownExtension(written.record), action: 'created', ...warned }, [
-          { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
-          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
+          { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${addressSegment(name)}/activate` },
+          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${addressSegment(name)}` },
         ]));
         return;
       }
@@ -302,15 +332,15 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // Identical derived bytes ⇒ 200 no-op, and nothing was re-run.
       if (written.action === 'unchanged') {
         res.json(success(config.nodeId, { extension: shownExtension(written.record), action: 'unchanged', message: 'Extension is already up to date' }, [
-          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
+          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${addressSegment(name)}` },
         ]));
         return;
       }
 
       logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized: written.reinitialized });
       res.json(success(config.nodeId, { extension: shownExtension(written.record), action: 'updated', reinitialized: written.reinitialized, ...warned }, [
-        { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
-        { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
+        { description: 'Execute an action', method: 'POST', url: `/v1/ext/${addressSegment(name)}/<actionId>` },
+        { description: 'View extension details', method: 'GET', url: `/v1/extensions/${addressSegment(name)}` },
       ]));
     } catch (err) {
       logger.error('Failed to upsert extension', { error: (err as Error).message });
@@ -321,8 +351,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // ── GET /v1/extensions/:name — Get extension detail ────────────
   router.get('/v1/extensions/:name', optionalAuth(), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -372,9 +402,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           })),
         },
       }, [
-        { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
-        { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${name}/deactivate` },
-        { description: 'Uninstall extension', method: 'DELETE', url: `/v1/extensions/${name}` },
+        { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${addressSegment(name)}/activate` },
+        { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${addressSegment(name)}/deactivate` },
+        { description: 'Uninstall extension', method: 'DELETE', url: `/v1/extensions/${addressSegment(name)}` },
       ]));
     } catch (err) {
       logger.error('Failed to get extension', { error: (err as Error).message });
@@ -384,8 +414,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
   // ── GET /v1/extensions/:name/versions — the kept versions, newest first ──
   router.get('/v1/extensions/:name/versions', requireAuth(), requireAnyScope('memory:read', 'app:write', 'cortex:write'), async (req, res) => {
-    const name = req.params.name as string;
-    const ext = await storage.getExtension(name);
+    const ext = await findExtension(storage, req.params.name as string, req.auth?.owner);
+    const name = ext?.name ?? (req.params.name as string);
     if (!ext) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
       return;
@@ -401,9 +431,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // ── GET /v1/extensions/:name/actions/:actionId — Get action script content ──
   router.get('/v1/extensions/:name/actions/:actionId', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
       const actionId = req.params.actionId as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -441,9 +471,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // ── PATCH /v1/extensions/:name/actions/:actionId — Update action script ──
   router.patch('/v1/extensions/:name/actions/:actionId', requireAuth(), async (req, res) => {
     try {
-      const name = req.params.name as string;
       const actionId = req.params.actionId as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -550,8 +580,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // ── DELETE /v1/extensions/:name — Uninstall extension ──────────
   router.delete('/v1/extensions/:name', requireAuth(), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -583,8 +613,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // Owner role bypasses scope checks; agents need 'ext:write' (or 'ext:*' / '*').
   router.post('/v1/extensions/:name/activate', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -606,8 +636,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       // Capability aggregation deferred to explicit admin trigger to avoid race conditions
       res.json(success(config.nodeId, { extension: shownExtension(updated) }, [
-        { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
-        { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${name}/deactivate` },
+        { description: 'Execute an action', method: 'POST', url: `/v1/ext/${addressSegment(name)}/<actionId>` },
+        { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${addressSegment(name)}/deactivate` },
       ]));
     } catch (err) {
       logger.error('Failed to activate extension', { error: (err as Error).message });
@@ -618,8 +648,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
   // ── POST /v1/extensions/:name/deactivate — Deactivate extension ──
   router.post('/v1/extensions/:name/deactivate', requireAuth(), requireScope('ext:write'), async (req, res) => {
     try {
-      const name = req.params.name as string;
-      const ext = await storage.getExtension(name);
+      const ext = await findExtension(storage, req.params.name as string, req.auth?.owner, 'manage');
+      const name = ext?.name ?? (req.params.name as string);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
         return;
@@ -638,7 +668,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       logger.info(`Extension deactivated: ${name}`, { by: req.auth!.sub });
 
       res.json(success(config.nodeId, { extension: shownExtension(updated) }, [
-        { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
+        { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${addressSegment(name)}/activate` },
       ]));
     } catch (err) {
       logger.error('Failed to deactivate extension', { error: (err as Error).message });
