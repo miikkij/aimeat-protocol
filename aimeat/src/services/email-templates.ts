@@ -9,6 +9,7 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-10-25 — textNotificationEmailHtml(): the notification template for text from anyone but the operator, escaped, with line breaks kept (secaudit2026oct22).
  *   2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   2026-09-30 — Export emailTemplateLang, so the organism invitation can answer which language its
  *     email went out in.
@@ -680,6 +681,11 @@ export function keyCredentialsEmailHtml(args: KeyCredentialsEmailArgs, locale?: 
   return { html, text };
 }
 
+/**
+ * The notification template with `subject` and `body` written as given into the HTML. Only for text
+ * the operator wrote (the group mail on the admin Email page) and the node's own fixed samples;
+ * text from anyone else goes through textNotificationEmailHtml.
+ */
 export function notificationEmailHtml(subject: string, body: string, locale?: string): { html: string; text: string } {
   const html = wrapHtml(subject, `
     <p>${body}</p>
@@ -693,6 +699,22 @@ export function notificationEmailHtml(subject: string, body: string, locale?: st
     `-- ${t(locale, 'footer')}`,
   ].join('\n');
 
+  return { html, text };
+}
+
+/**
+ * The notification template for plain text that a principal other than the node supplies: an
+ * extension's ctx.email subject and body, an automation report, a workflow's end mail. Both are
+ * escaped before they enter the node's branded HTML, and a line break in the body shows as one
+ * (secaudit2026oct22). The plain-text part is the text as written. EmailService.sendNotification
+ * renders through this.
+ */
+export function textNotificationEmailHtml(subject: string, body: string, locale?: string): { html: string; text: string } {
+  const bodyHtml = esc(body).replace(/\r?\n/g, '<br>');
+  const html = wrapHtml(esc(subject), `
+    <p>${bodyHtml}</p>
+  `, locale);
+  const text = [subject, '', body, '', `-- ${t(locale, 'footer')}`].join('\n');
   return { html, text };
 }
 
