@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-25 -- POST /v1/agents/:gaii/rekey moved to ./rekey.ts (max-file-lines), registered at the same place.
  *   2026-10-20 -- DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey close the agent's open MCP
  *     transports too (mcp/session-registry.ts), as they already close its connect tunnel, and the
  *     delete answers mcp_sessions_closed beside sessions_revoked (secaudit 2026-10,
@@ -92,6 +93,7 @@ import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
 import { getActiveConnectTunnelManager } from '../../services/connect-tunnel.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { announceScopes } from './announce-scopes.js';
+import { registerRekeyRoute } from './rekey.js';
 import { logger } from '../../utils/logger.js';
 import { presentMemories } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -317,49 +319,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner, via: 'import' });
   });
 
-  // POST /v1/agents/:gaii/rekey — Rotate agent keys (owner auth)
-  router.post('/v1/agents/:gaii/rekey', requireAuth(), requireRole('owner'), async (req, res) => {
-    const gaii = decodeURIComponent(req.params.gaii as string);
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${gaii}`));
-      return;
-    }
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only rekey your own agents'));
-      return;
-    }
-
-    const keyPair = await generateKeyPair();
-    await storage.updateAgent(gaii, { publicKey: keyPair.publicKey });
-    // The tokens issued before the rekey stop now. A key is rotated because the old one may have
-    // leaked, and the answer below, openapi.yaml and the feature list all say they are invalidated;
-    // they worked until they expired (feature-list audit row 34).
-    await storage.revokeSessionsByGaii(gaii);
-    // A tunnel verifies its bearer once, at upgrade, so a connector holding the old token kept its
-    // live socket after the rotation. It is cut here, as agent delete does, without a reason the
-    // connector would read as "forget this agent" (QA audit F03b-01).
-    try { getActiveConnectTunnelManager()?.closeForGaii(gaii, 'rekeyed'); } catch (err) { logger.warn('rekey: tunnel close failed', { gaii, error: String(err) }); }
-    // An open MCP session is the same shape of long-lived socket, and it was left standing: the
-    // transport verified its bearer once, at initialize. Closed here, so the client re-initializes
-    // with a credential this node reads again (mcp/session-registry.ts).
-    closeMcpSessionsForGaii(gaii);
-
-    // Extension hook: agent_rekey (fire-and-forget)
-    fireHook(config, storage, 'agent_rekey', { gaii, owner: agent.owner });
-
-    // SECURITY: Prevent caching of response containing private key
-    res.set('Cache-Control', 'no-store');
-    res.set('Pragma', 'no-cache');
-    res.json(success(config.nodeId, {
-      rekeyed: true,
-      gaii,
-      private_key: keyPair.privateKey,
-      public_key: keyPair.publicKey,
-      note: 'New keys generated. Store the private key securely. Old JWT tokens are invalidated.',
-    }));
-    emitChange('agents');
-  });
+  // POST /v1/agents/:gaii/rekey — Rotate agent keys (owner auth), in ./rekey.ts.
+  registerRekeyRoute(router, config, storage);
 
   // POST /v1/agents/:gaii/port — Port agent to another node (owner auth)
   // Sets a redirect pointer on this node + deducts porting fee

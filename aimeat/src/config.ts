@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.33.1 — 2026-10-25 — casdoorLinkDomains, entraLinkDomains and refreshCookieLegacyUntil read from the environment (secaudit2026oct22).
  *   v1.33.0 — 2026-10-25 — extensionLoadDefaults() (config-extension-load.ts): the operator's limits on extension load (secaudit2026oct22).
  *   v1.32.0 — 2026-10-25 — runtimeConfigFromEnv() and siteKvFromEnv() (config-runtime.ts): the usage meter, write tally, log level, proxy trust and key settings code read from process.env, and the site key-value pairs, which also take AIMEAT_SITE_KV as one JSON object.
  *   v1.31.0 — 2026-10-24 — The operator block is read by operatorFromEnv() (config-operator.ts, moved unchanged), with
@@ -335,6 +336,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     refreshIdleDays: parseInt(process.env.AIMEAT_REFRESH_IDLE_DAYS ?? '30', 10),
     refreshAbsoluteDays: parseInt(process.env.AIMEAT_REFRESH_ABSOLUTE_DAYS ?? '90', 10),
     refreshGraceMs: parseInt(process.env.AIMEAT_REFRESH_GRACE_MS ?? '60000', 10),     // 60s
+    refreshCookieLegacyUntil: process.env.AIMEAT_REFRESH_COOKIE_LEGACY_UNTIL ?? '',
 
     welcomeBonus: parseInt(process.env.AIMEAT_WELCOME_BONUS ?? '100', 10),
     dailyAllowance: parseInt(process.env.AIMEAT_DAILY_ALLOWANCE ?? '50', 10),
@@ -555,10 +557,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     casdoorOAuthClientId: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_ID ?? '',
     casdoorOAuthClientSecret: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_SECRET ?? '',
     casdoorOAuthRedirectUri: process.env.AIMEAT_CASDOOR_OAUTH_REDIRECT_URI ?? '',
+    casdoorLinkDomains: process.env.AIMEAT_CASDOOR_LINK_DOMAINS ?? '',
     entraOAuthEnabled: process.env.AIMEAT_ENTRA_OAUTH_ENABLED === 'true',
     entraOAuthTenant: process.env.AIMEAT_ENTRA_OAUTH_TENANT ?? 'common',
     entraAllowedTenants: (process.env.AIMEAT_ENTRA_ALLOWED_TENANTS ?? '')
       .split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
+    entraLinkDomains: process.env.AIMEAT_ENTRA_LINK_DOMAINS ?? '',
     entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
     entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
     entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',

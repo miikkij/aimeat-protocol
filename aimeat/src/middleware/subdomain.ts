@@ -8,8 +8,9 @@
  *              no such header). A hostname fallback covers dev setups where the
  *              header is absent but the Host matches `<sub>.<apex-host>`.
  *              The origin-family markers (`X-App-Origin`, `X-Portfolio-Origin`,
- *              `X-Co-Origin`) are honoured only on a Host in that family, so a
- *              client cannot claim one by sending the header.
+ *              `X-Co-Origin`) are honoured only on a Host in that family, and
+ *              `X-Subdomain` only when it names the Host's own label, so a
+ *              client cannot claim either by sending the header.
  * @structure subdomainMiddleware(config) — Express middleware factory.
  *   - hostOf(req) — the addressed host, port stripped, from the raw `Host` header
  *   - inFamily(host, parent) — host is `parent` or one label under it
@@ -17,6 +18,10 @@
  *   - labelFromHost(req) — leftmost label under app/portfolio/co/apex host
  * @usage app.use(subdomainMiddleware(config)); // before route mounting
  * @version-history
+ *   v1.7.0 — 2026-10-25 — secaudit2026oct22 (subdomain-label-from-client-headers): X-Subdomain counts only
+ *     when it equals the label the Host yields; one that differs is dropped and logged, and the label
+ *     and the family come from the Host alone. No setting: nginx sets the header from the server name
+ *     it routed on (docs/operations/production-deployment.md).
  *   v1.6.1 — 2026-10-25 — secaudit2026oct22: labelFromHost and the hostname fallback read the raw
  *     Host (hostOf), not req.hostname, which is the client's X-Forwarded-Host under 'trust proxy'.
  *   v1.6.0 — 2026-10-16 — `req.pageOrigin`: the page host (`config.pageHost`), one exact host read
@@ -205,7 +210,18 @@ export function subdomainMiddleware(config: AimeatConfig) {
     // its own family; one Host belongs to at most one family, so at most one of these is true, and
     // a request left with none of them drops to the hostname fallback below rather than being
     // pinned to the apex by the header it was not allowed to use.
-    const fromHeader = req.get('x-subdomain');
+    // X-Subdomain is honoured only when it names the label the Host yields, the same rule marked()
+    // applies to the family markers: nginx sets it from the server name it routed on, so on a request
+    // nginx made the two agree, and a header that disagrees is a client's claim. It is dropped and
+    // logged, and the label comes from the Host (secaudit2026oct22, subdomain-label-from-client-headers).
+    const hostLabel = labelFromHost(req);
+    const claimedLabel = (req.get('x-subdomain') ?? '').trim().toLowerCase();
+    const fromHeader = claimedLabel !== '' && claimedLabel === hostLabel;
+    if (claimedLabel && !fromHeader) {
+      logger.warn('subdomain: X-Subdomain dropped, it is not the label of its Host', {
+        claimed: claimedLabel.slice(0, 64), host: hostOf(req) || '(none)', path: req.path,
+      });
+    }
     const isApp = marked(req, 'x-app-origin', appHost);
     const isPortfolio = marked(req, 'x-portfolio-origin', portfolioHost);
     const isCo = marked(req, 'x-co-origin', coHost);
@@ -216,8 +232,9 @@ export function subdomainMiddleware(config: AimeatConfig) {
       // The proxy marks the HOST FAMILY on every location, but only some of them add the label.
       // `/.well-known/*` is one that does not, and reading the label as absent there made an app
       // origin describe itself as the bare app host — the whole family answering as one resource.
-      // The Host header carries what nginx already routed on, so it answers the same question.
-      req.subdomain = (fromHeader ? fromHeader.trim().toLowerCase() : null) ?? labelFromHost(req);
+      // The Host header carries what nginx already routed on, so it answers the same question, and
+      // an X-Subdomain that counted names the same label.
+      req.subdomain = hostLabel;
       return next();
     }
 
