@@ -3,6 +3,32 @@
   "entries": [
     {
       "date": "2026-10-25",
+      "kind": "fix",
+      "id": "2026-10-25-ai-disclosure-uses-the-final-w3c-values",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "AI disclosure uses the final W3C values",
+        "fi": "Tekoälymerkintä käyttää W3C:n lopullisia arvoja"
+      },
+      "summary": {
+        "en": "Apps state human-only, ai-assisted or ai-autonomous, as the final W3C report defines.",
+        "fi": "Sovellus kertoo arvon human-only, ai-assisted tai ai-autonomous, kuten W3C:n lopullinen raportti määrää."
+      },
+      "body": {
+        "en": "Apps now carry human-only, ai-assisted or ai-autonomous, the three values of the final W3C AI Content Disclosure report. The earlier words were not values of the report, so a page marked with them declared nothing. An app that states its own value keeps it, and the node adds no second one.",
+        "fi": "Sovellukset kertovat nyt arvon human-only, ai-assisted tai ai-autonomous. Ne ovat W3C:n lopullisen tekoälymerkintäraportin kolme arvoa. Aiemmat sanat eivät olleet raportin arvoja, joten niillä merkitty sivu ei kertonut mitään. Jos sovellus kertoo arvon itse, alusta käyttää sitä eikä lisää omaansa."
+      },
+      "impact": {
+        "en": "Nothing to do. An app that writes its own value should use one of the three words.",
+        "fi": "Sinun ei tarvitse tehdä mitään. Jos sovelluksesi kertoo arvon itse, käytä yhtä näistä kolmesta sanasta."
+      }
+    },
+    {
+      "date": "2026-10-25",
       "kind": "feature",
       "id": "2026-10-25-maps-in-finlands-own-projection",
       "highlight": false,
