@@ -858,6 +858,13 @@
       "refuseRestrictedWhy": "It cannot sit at its own web address. Serve it from the main site instead.",
       "deleteLead": "The address stops answering at once. The app itself stays published and is still reachable from the main site.",
       "deleteAppNote": "An app that is opened again is given an address of its own automatically, so deleting is not how you keep one off the web. Turning it off is.",
+      "markHeld": "held",
+      "heldSub": "The app is gone. Held for its owner since {date}, so no other owner's app gets this address.",
+      "filterHeld": "held",
+      "release": "Release",
+      "releaseTitle": "Release this address?",
+      "releaseLead": "This address is held because the app it served was removed. Its visitors may still have data saved in their browsers for this address. After you release it, the next app published with the same file name, also by another owner, can get this address and read that data.",
+      "releaseHint": "The owner gets the address back by publishing the same app again only while it is held.",
       "deleteTypeLabel": "Type the name to confirm",
       "deleteHint": "Anyone who linked to this address gets nothing after this.",
       "emptyTitle": "No addresses yet",
@@ -11713,6 +11720,7 @@
     "cfg_auth_refresh_cookie_legacy_until": "Old sign-in cookie read until",
     "cfg_email_smtp_secure": "Implicit TLS",
     "cfg_email_smtp_reject_unauthorized": "Reject bad TLS certificates",
+    "cfg_email_company_smtp_private_hosts": "Companies' mail servers on a private network",
     "cfg_account_events_window": "Account event window",
     "cfg_proactive_guidance_enabled": "Proactive guidance",
     "cfg_commerce_fee_mode": "Fee destination",
@@ -11831,6 +11839,7 @@
     "cfg_metrics_enabled": "Metrics endpoint",
     "cfg_metrics_access": "Metrics visibility",
     "cfg_mcp_session_idle_minutes": "MCP session idle limit",
+    "cfg_mcp_unused_client_days": "Unused client registrations (days)",
     "cfg_registration_mode": "Who may register",
     "cfg_scopes_default_agent_scopes": "Default agent scopes",
     "cfg_scopes_max_agent_scopes": "Available agent scopes",
@@ -11872,6 +11881,7 @@
     "cfg_ai_node_key_when_spent": "When the allowance is spent",
     "cfg_ai_node_key_account_daily_usd": "Daily cap per account",
     "cfg_ai_node_key_node_daily_usd": "Daily cap for all accounts",
+    "cfg_ai_node_key_max_output_tokens": "Longest answer on the server's key (tokens)",
     "cfg_ai_model_free_fallback": "Model after the allowance",
     "cfg_ai_model_default_chat": "Default chat model",
     "cfg_ai_model_default_reasoning": "Default reasoning model",
@@ -11952,6 +11962,8 @@
     "cfgDesc_morsel_policy_board_post_cost_per_kb": "More morsels of pacing for each KB of the post body",
     "cfgDesc_boards_public_per_owner_max": "Public notice boards one account may keep (system boards stay operator-only)",
     "cfgDesc_auth_jwt_ttl_seconds": "JWT token time-to-live in seconds",
+    "cfgDesc_auth_device_authorize_email_limit": "Count agent connections that name an account by its email address, per network address, so nobody can test many addresses for an account here. Off means no limit. The account name is never counted.",
+    "cfgDesc_auth_device_authorize_email_max": "How many agent connections that name an account by email one network address may start in 10 minutes while the limit is on.",
     "cfgDesc_auth_entra_allowed_tenants": "Microsoft Entra tenant GUIDs allowed to sign in (comma-separated). Empty = the gate comes from AIMEAT_ENTRA_OAUTH_TENANT alone: a GUID there admits that one tenant, common/organizations admit any Microsoft account.",
     "cfgDesc_auth_casdoor_link_domains": "Domains whose Casdoor addresses count as verified (comma-separated, * = every domain). Only such an address links a Casdoor sign-in to an existing account or becomes a new account's verified address. Empty = no domain.",
     "cfgDesc_auth_entra_link_domains": "Domains whose Microsoft Entra addresses count as verified (comma-separated, * = every domain). Empty = every domain when one tenant may sign in, no domain when the allowed-tenants list names several.",
@@ -11982,6 +11994,7 @@
     "cfgDesc_email_smtp_from": "SMTP From address",
     "cfgDesc_email_smtp_secure": "Use implicit TLS (port 465). Set false for STARTTLS (port 587).",
     "cfgDesc_email_smtp_reject_unauthorized": "Reject unauthorized TLS certificates. Set false for self-signed certs or STARTTLS.",
+    "cfgDesc_email_company_smtp_private_hosts": "Mail servers on a private network that a company may send through: names, addresses or networks such as 10.0.5.0/24, one per line. Any other private address is refused. Empty: public mail servers only.",
     "cfgDesc_consent_enabled": "Consent layer enabled",
     "cfgDesc_account_events_window": "Events kept in an account live \"what has happened\" window before the oldest are archived",
     "cfgDesc_consent_audit_retention_days": "Consent audit log retention in days",
@@ -12043,6 +12056,7 @@
     "cfgDesc_federation_sync_genesis_memory_cache_ttl_hours": "Genesis memory cache TTL in hours",
     "cfgDesc_personal_nodes_enabled": "Personal environment hosting enabled",
     "cfgDesc_personal_nodes_max_slots": "Max personal environment slots",
+    "cfgDesc_personal_nodes_max_per_owner": "How many of their own servers one owner may connect here, so the shared slots stay open to everyone. 0 means no limit. Servers that are connected already stay.",
     "cfgDesc_echat_anonymous": "Allow anonymous encrypted chat WebSocket connections",
     "cfgDesc_node_base_url": "Public base URL of this instance",
     "cfgDesc_node_dev_mode": "Development mode (localhost webhooks, credential reset preserves data)",
@@ -12135,6 +12149,7 @@
     "cfgDesc_metrics_enabled": "Enable Prometheus metrics endpoint",
     "cfgDesc_metrics_access": "Metrics endpoint visibility: public, authenticated, or operator",
     "cfgDesc_mcp_session_idle_minutes": "Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)",
+    "cfgDesc_mcp_unused_client_days": "An MCP client registration that no sign-in used is deleted after this many days. A client someone signed in with stays. 0 keeps every registration.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
     "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, one per line. Out of the box it may read and write its owner's memory, read the catalogue, read the workspaces of its owner's organisms and see its owner's other agents.",
     "cfgDesc_scopes_max_agent_scopes": "The most permissions an agent can be given, one per line (* = all).",
@@ -12181,6 +12196,7 @@
     "cfgDesc_ai_node_key_when_spent": "What the server's key does when a person's AI allowance is spent: it pays nothing more, whatever model a call names, or it keeps paying up to the two daily caps.",
     "cfgDesc_ai_node_key_account_daily_usd": "With limits: the most one account's calls may cost the server's key in one day (UTC), in US dollars.",
     "cfgDesc_ai_node_key_node_daily_usd": "With limits: the most all accounts' calls together may cost the server's key in one day (UTC), in US dollars.",
+    "cfgDesc_ai_node_key_max_output_tokens": "The longest answer a call on the server's key may ask for. Each call is priced with it before it runs and held against what is left of the allowance. 0 means no limit.",
     "cfgDesc_ai_model_free_fallback": "Model used when a person on the server's key has spent their allowance. Empty refuses instead of degrading",
     "cfgDesc_ai_model_default_chat": "Default chat model when the owner has not chosen one",
     "cfgDesc_ai_model_default_reasoning": "Default reasoning model when the owner has not chosen one",
@@ -12897,6 +12913,8 @@
     "cfg_morsel_policy_board_post_base_cost": "Board post pacing (base)",
     "cfg_morsel_policy_board_post_cost_per_kb": "Board post pacing per KB",
     "cfg_auth_jwt_ttl_seconds": "JWT TTL (seconds)",
+    "cfg_auth_device_authorize_email_limit": "Limit agent connections by email address",
+    "cfg_auth_device_authorize_email_max": "Agent connections by email per address (10 minutes)",
     "cfg_features_extended_features_enabled": "Extended Features",
     "cfg_work_queue_max_pending": "Max Pending Queue",
     "cfg_work_webhook_max_retries": "Webhook Max Retries",
@@ -12952,6 +12970,7 @@
     "cfg_cross_federation_sync_interval_hours": "Sync Interval (hours)",
     "cfg_personal_nodes_enabled": "Personal Nodes Enabled",
     "cfg_personal_nodes_max_slots": "Max Slots",
+    "cfg_personal_nodes_max_per_owner": "Slots per owner",
     "cfg_consul_enabled": "Consul Enabled",
     "cfg_consul_url": "Consul URL",
     "cfg_consul_prefix": "KV Prefix",
@@ -13428,6 +13447,8 @@
     "delete": "Delete",
     "themes": "Themes & Styles",
     "cfgDesc_apps_audit_keep_default": "How many of the newest entries each app's audit log keeps when its owner has set no limit. 0 keeps all and moves old ones to a yearly archive; any other number deletes the older entries",
+    "cfgDesc_apps_held_label_days": "Days a removed app's own address stays held for its owner, so no other owner's app is served where its visitors' browser data is. 0 holds it until you release it on the Subdomains page.",
+    "cfgDesc_apps_held_labels_per_owner": "The most held addresses of removed apps one owner keeps. Past it, the one held longest is released first. 0 means no limit.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Lifetime in seconds of the token an agent with its own key pair receives. When it runs out, the agent signs a new request and gets another",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "How long, in seconds, an offer to add or move agents stays usable after the owner presses the button. The connector must answer within this time, and the offer works once",
     "cfgDesc_auth_app_origin_sign_in_refuse": "Refuse sign-in and account creation from an app, so that an app never holds a person's own session. Off: each such attempt is written to the log and allowed. Turn it on when the log shows none.",
@@ -13484,6 +13505,8 @@
     "cfgDesc_decide_laya_key_configured": "Whether the bearer key of the built-in laya decision model is set. Read-only; the value itself is never shown.",
     "cfgDesc_decide_von_key_configured": "Whether the bearer key of the built-in von decision model is set. Read-only; the value itself is never shown.",
     "cfg_apps_audit_keep_default": "App audit log length",
+    "cfg_apps_held_label_days": "Removed app's address held (days)",
+    "cfg_apps_held_labels_per_owner": "Held addresses per owner",
     "cfg_auth_agent_v2_token_ttl_seconds": "Agent token lifetime (s)",
     "cfg_auth_app_origin_sign_in_refuse": "Refuse sign-in from an app",
     "cfg_auth_agent_enrolment_grant_ttl_seconds": "Agent enrolment offer lifetime (s)",
@@ -26688,6 +26711,61 @@
           "tip": "Keep it well under Extension runs at once, so that one account never fills the whole server."
         }
       },
+      "apps": {
+        "held_label_days": {
+          "title": "Removed app's address held (days)",
+          "short": "How many days the own address of a removed app stays held for its owner. 0 holds it until you release it. The default is 90.",
+          "what": "Each app gets an address of its own, such as notes.apps.example.com. What the app's visitors saved in their browsers (the app's own data, a stored sign-in) belongs to that address. When the app is removed, by its owner or with its package, the address is held for the same owner: no other owner's app gets it, and the owner gets it back by publishing the same app again. A cleanup each day at 05:41 releases a held address after this many days; after that, the next app with the same file name can get it.",
+          "range": "A whole number of days, 0 or more. The default is 90. 0 holds it until you release it on the Subdomains page.",
+          "low": "Lower: an address is free for others sooner, and data the old app's visitors saved can be read by another owner's app sooner.",
+          "high": "Higher: the owner has longer to bring the app back, and the address stays unused longer.",
+          "tip": "Keep a few months. Browsers keep saved data until the visitor clears it, so a short hold protects little."
+        },
+        "held_labels_per_owner": {
+          "title": "Held addresses per owner",
+          "short": "The most held addresses of removed apps one owner keeps. 0 means no limit. The default is 20.",
+          "what": "Without a limit, one owner could take many addresses by publishing and removing apps. The daily cleanup keeps each owner to this number of held addresses and releases the one held longest first. An address of an app that is there is never counted.",
+          "range": "A whole number, 0 or more. The default is 20. 0 means no limit.",
+          "low": "Lower: fewer addresses are held for each owner, and old ones go sooner.",
+          "high": "Higher: an owner who removes many apps keeps all their addresses for the full hold.",
+          "tip": "20 covers an owner who tidies up a catalogue. Lower it if you see one owner hold many addresses on the Subdomains page."
+        }
+      },
+      "email": {
+        "company_smtp_private_hosts": {
+          "title": "Companies' mail servers on a private network",
+          "short": "The mail servers on a private network that a company may send through. Empty means public mail servers only. Empty by default.",
+          "what": "A company on this server can send its mail through its own mail server, and this server opens that connection. A host that is not on the public internet (a private, link-local or reserved address) could be any service inside the network this server sees, so such a host is refused when the company's settings are saved, and checked again before each send. List here the mail servers on your own network that companies may use: a host name, an address, or a network such as 10.0.5.0/24. On a server in local mode, the machine's own address (loopback) stays allowed without a list.",
+          "range": "A list, one entry per line: host names, IPv4 or IPv6 addresses, or networks in CIDR form. Empty by default.",
+          "low": "Empty: companies send through public mail servers only.",
+          "high": "More entries: companies may also send through the listed servers inside your network.",
+          "ex1": "mail.internal: a company may use the mail server named mail.internal, whatever private address it has.",
+          "ex2": "10.0.5.0/24: a company may use any mail server in that network.",
+          "tip": "List only mail servers. A failed send never shows what the server answered, so a listed address that is not a mail server tells nothing about itself."
+        }
+      },
+      "mcp": {
+        "unused_client_days": {
+          "title": "Unused MCP client registrations (days)",
+          "short": "An MCP client registration that no sign-in used is deleted after this many days. 0 keeps every registration. The default is 30.",
+          "what": "An AI app such as Claude registers itself with this server before the person signs in, and anyone can make such a registration without an account. A registration that led to a sign-in stays, because that sign-in still points to it. A registration that never led to a sign-in would stay in the database for good, so a cleanup each night at 04:53 deletes one that is older than this number of days.",
+          "range": "A whole number of days, 0 or more. The default is 30. 0 keeps every registration.",
+          "low": "Lower: abandoned registrations go sooner. An app whose registration was deleted registers again before it signs in.",
+          "high": "Higher: abandoned registrations stay longer in the database.",
+          "tip": "Keep the default. A client that someone signed in with is never deleted, whatever the number."
+        }
+      },
+      "personal_nodes": {
+        "max_per_owner": {
+          "title": "Own servers per owner",
+          "short": "How many of their own servers one owner may connect to this server. 0 means no limit. The default is 3.",
+          "what": "This server has a number of slots for people's own servers (Max Slots), and every owner shares them. This limit stops one owner from taking all of them. An owner who has reached the limit is told the limit and how to free a slot: remove a server under Your own servers in the profile, or call DELETE /v1/personal/anchor/<id>. Servers that are connected already stay when you lower the limit; it decides only the next one.",
+          "range": "A whole number, 0 or more. The default is 3. 0 means no limit.",
+          "low": "1: each owner connects one own server, the one their tunnel uses.",
+          "high": "Higher: an owner can keep several own servers here, and fewer owners fit in the shared slots.",
+          "tip": "The tunnel of an owner serves one own server, so a small number is enough for almost everyone."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Burn rate (0–1)",
@@ -26845,6 +26923,25 @@
         }
       },
       "auth": {
+        "device_authorize_email_limit": {
+          "title": "Limit agent connections by email address",
+          "short": "When on, agent connections that name an account by its email address are counted per network address. Off means no limit. On by default.",
+          "what": "An agent that connects names the account it is for, by the account name or by the account's verified email address. The answer to the email form tells whether an address has an account on this server, and the request needs no sign-in. So the server counts the email form per network address, at most the number in the next setting in 10 minutes. A request past it is refused with a wait time and a hint to use the account name, which is never counted.",
+          "range": "On (the default) or off.",
+          "low": "Off: anybody can test any number of addresses for an account here, limited only by the general request limit.",
+          "high": "On: one network address can test only a few addresses in 10 minutes.",
+          "tip": "Keep it on. Turn it off only on a server whose accounts are all known to each other."
+        },
+        "device_authorize_email_max": {
+          "title": "Agent connections by email per address (10 minutes)",
+          "short": "How many agent connections that name an account by email one network address may start in 10 minutes. The default is 20.",
+          "what": "While the limit above is on, this is the number of email-form requests one network address may make in 10 minutes. The 21st request with the default is refused with 429 and the number of seconds to wait. An IPv6 address counts by its /64 network. The account-name form is not counted.",
+          "range": "A whole number from 1. The default is 20, the same as the contacts lookup allowance of one account.",
+          "low": "Lower: fewer addresses can be tested, and a team behind one office address reaches the limit sooner.",
+          "high": "Higher: more connections by email fit, and more addresses can be tested.",
+          "ex1": "20: a person who connects five agents by email in an hour never meets the limit.",
+          "tip": "Raise it if many people connect agents by email from one office address at the same time."
+        },
         "jwt_ttl_seconds": {
           "title": "JWT TTL (seconds)",
           "short": "How long a sign-in token stays valid, in seconds. A value from 60 to 86,400; the default is 3,600, one hour.",
@@ -26938,6 +27035,17 @@
           "ex2": "0: no calls after an allowance is used up, the same as refuse.",
           "ex3": "100: room for many people who each use their daily cap per account.",
           "tip": "Set this to the most you are ready to pay in one day."
+        },
+        "node_key_max_output_tokens": {
+          "title": "Longest answer on the server's key (tokens)",
+          "short": "The longest answer a call on the server's key may ask for, in tokens. 0 means no limit. The default is 32000.",
+          "what": "A call names its model and the length of its answer, and both decide its price. Before a call on the server's key runs, the server prices it from the length of the prompt and the answer's length with the model list, and holds that price against what is left of the person's allowance (or of the daily caps) while the call runs. A call that asks for a longer answer, or names none, gets this many tokens; its answer says when it was cut short. A call that would cost more than is left is refused with its price, or a text call that named no model gets the free model. Calls on a person's or an agent's own key are not affected.",
+          "range": "A whole number of tokens, 0 or more. The default is 32000, enough for a long document. 0 means no limit; a call that names no length is then priced at 1,024 tokens.",
+          "low": "Lower: each call is priced lower, so more calls fit in a small allowance, and long answers are cut short sooner.",
+          "high": "Higher: long answers fit, and each call holds more of the allowance while it runs.",
+          "ex1": "32000 with a model at 75 USD per million output tokens: a call holds about 2.40 USD while it runs.",
+          "ex2": "4000 with the same model: a call holds about 0.30 USD.",
+          "tip": "Keep it near the longest answer people really need. A person who needs more uses their own key, which this does not touch."
         }
       },
       "security": {

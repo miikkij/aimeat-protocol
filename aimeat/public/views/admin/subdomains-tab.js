@@ -15,6 +15,10 @@
  *   - Refusals: the four things the route answers no to, in its own words
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v3.1.0 -- 2026-10-25 -- A held address (its app was removed; services/held-app-labels.ts) carries the
+ *     mark "held" and a line that says since when and for whom, a "held" filter, and Release in place
+ *     of Delete, whose dialog says what releasing lets another owner's app read
+ *     (secaudit2026oct22, app-label-recycled-after-delete).
  *   v3.0.0 -- 2026-09-27 -- Library components only: Section, FigureStrip, SearchLine and the filter
  *     Tabs, the mappings as a List (the state Mark is the switch, the delete a danger Action), the
  *     form in TextField, Choice, Box and FormActions, the refusals as Readings, the dialog's footer as
@@ -166,6 +170,7 @@ export default function SubdomainsAdminTab() {
       if (filter === 'apps' && s.kind !== 'app') return false;
       if (filter === 'redirects' && s.kind !== 'redirect') return false;
       if (filter === 'off' && s.enabled) return false;
+      if (filter === 'held' && !s.heldSince) return false;
       if (!q) return true;
       return String(s.subdomain).toLowerCase().includes(q) || String(s.target).toLowerCase().includes(q);
     });
@@ -176,11 +181,13 @@ export default function SubdomainsAdminTab() {
     // where one person publishes everything, that column was the same 45 characters on every row.
     const mappedBy = ownerOf(s.createdBy);
     const foreign = s.kind === 'app' && mappedBy && targetOwnerOf(s.target) !== mappedBy;
+    // A held address: its app was removed, and it waits for its owner (services/held-app-labels.ts).
+    const held = !!s.heldSince;
     return html`
-      <${ListRow} key=${s.subdomain} faded=${!s.enabled} hover>
+      <${ListRow} key=${s.subdomain} faded=${!s.enabled || held} hover>
         <${Name} code href=${siteUrl(s.subdomain)} newTab
-          tag=${s.kind === 'redirect' ? S('markRedirect') : null}>${s.subdomain}<${Tinted} tone="dim">${apex}<//><//>
-        <${Who} sub=${foreign ? S('mappedBy', { who: mappedBy }) : null} warn>
+          tag=${held ? S('markHeld') : s.kind === 'redirect' ? S('markRedirect') : null}>${s.subdomain}<${Tinted} tone="dim">${apex}<//><//>
+        <${Who} sub=${held ? S('heldSub', { date: day(s.heldSince) }) : foreign ? S('mappedBy', { who: mappedBy }) : null} warn>
           <${Code}>${s.kind === 'app'
     ? html`<${Tinted} tone="dim">${targetOwnerOf(s.target)}/<//>${String(s.target).slice(targetOwnerOf(s.target).length + 1)}`
     : s.target}<//>
@@ -189,7 +196,7 @@ export default function SubdomainsAdminTab() {
         <${Doors}>
           <${Mark} tone=${s.enabled ? 'sun' : 'dim'} onClick=${() => toggleEnabled(s)}>${s.enabled ? S('stateOn') : S('stateOff')}<//>
           <${Action} small row tone="danger"
-            onClick=${() => setDeleting({ subdomain: s.subdomain, target: s.target, kind: s.kind, createdAt: s.createdAt, typed: '' })}>${S('delete')}<//>
+            onClick=${() => setDeleting({ subdomain: s.subdomain, target: s.target, kind: s.kind, createdAt: s.createdAt, held, typed: '' })}>${held ? S('release') : S('delete')}<//>
         <//>
       <//>`;
   };
@@ -227,6 +234,7 @@ export default function SubdomainsAdminTab() {
     { value: 'apps', label: S('filterApps') },
     { value: 'redirects', label: S('filterRedirects') },
     { value: 'off', label: S('filterOff') },
+    { value: 'held', label: S('filterHeld') },
   ]} />
           <//>
 
@@ -287,14 +295,17 @@ export default function SubdomainsAdminTab() {
         <//>
       `}
 
-      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${S('deleteTitle')}
+      <${Modal} open=${!!deleting} onClose=${() => setDeleting(null)} title=${deleting?.held ? S('releaseTitle') : S('deleteTitle')}
         footer=${deleting && html`
           <${Action} onClick=${() => setDeleting(null)}>${t('common.cancel')}<//>
-          <${Loud} control danger disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${S('delete')}<//>`}>
+          <${Loud} control danger disabled=${deleting.typed !== deleting.subdomain} onClick=${doDelete}>${deleting.held ? S('release') : S('delete')}<//>`}>
         ${deleting && html`
           <${Stack} gap="medium">
-            <${Note} kind="lead">${S('deleteLead')}<//>
-            ${deleting.kind === 'app' ? html`<${Note} kind="lead">${S('deleteAppNote')}<//>` : null}
+            ${deleting.held ? html`
+              <${Note} kind="lead">${S('releaseLead')}<//>
+              <${Note} kind="lead">${S('releaseHint')}<//>` : html`
+              <${Note} kind="lead">${S('deleteLead')}<//>
+              ${deleting.kind === 'app' ? html`<${Note} kind="lead">${S('deleteAppNote')}<//>` : null}`}
             <${Box} tone="dim">
               <${Code}>${deleting.subdomain}${apex}<//>
               <${Note} kind="meta" mono>${deleting.kind === 'app' ? S('previewServes', { target: deleting.target }) : S('previewRedirects', { target: deleting.target })} · ${dt(deleting.createdAt)}<//>

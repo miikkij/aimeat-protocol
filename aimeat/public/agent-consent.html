@@ -7,6 +7,9 @@
     scope model and the shared consent vocabulary, so its presets and sentences can never diverge
     from the SPA's AgentConsent panel again.
   @version-history
+    2026-10-25 — The owner check reads the signed-in owner's own pending list: /verify/info names
+        the owner only to that owner (secaudit2026oct22, device-authorize-email-owner-oracle). A
+        request missing from the list shows the owner-mismatch error, as before.
     v1.4.0 — 2026-10-22 — With no stored theme the page follows the OS preference, as the SPA does,
         instead of opening light. The ☀|☾ switch stays and its choice wins.
     v1.3.0 — 2026-08-29 — The page shows what the agent ASKED FOR and offers it as a choice,
@@ -249,33 +252,30 @@
     }
 
     /**
-     * What the agent asked for. Deliberately NOT read from /verify/info: that endpoint is
-     * unauthenticated and rate-limited against user-code enumeration, and it must never say what a
-     * request wants. The owner's own pending listing is the authenticated door, so this runs only
-     * once there is a session. An empty list on any failure — the page still works, it just cannot
-     * offer the "what it asked for" choice.
+     * The signed-in owner's own pending request for this code, from the owner's pending listing (the
+     * authenticated door). It answers two things /verify/info does not: whether the request is this
+     * owner's at all (/verify/info names the owner only to that owner, secaudit2026oct22), and what
+     * the agent asked for (/verify/info must never say what a request wants). `listed` is null when
+     * the list could not be read: the page then shows the consent without the "what it asked for"
+     * choice, and the approval itself is still refused for anyone but the owner.
      */
-    async function fetchRequestedScopes(userCode) {
+    async function fetchOwnRequest(userCode) {
       try {
         const jwt = session?.jwt || session?.token;
-        if (!jwt) return [];
+        if (!jwt) return { listed: null, scopes: [] };
         const r = await fetch('/v1/agents/device-authorize/pending', {
           headers: { Authorization: `Bearer ${jwt}` },
         });
         const d = await r.json();
-        if (!d.ok) return [];
+        if (!d.ok) return { listed: null, scopes: [] };
         const row = (d.data?.requests || []).find((x) => x.user_code === userCode);
-        return Array.isArray(row?.requested_scopes)
+        const scopes = Array.isArray(row?.requested_scopes)
           ? row.requested_scopes.filter((s) => typeof s === 'string') : [];
+        return { listed: !!row, scopes };
       } catch {
-        return [];
+        return { listed: null, scopes: [] };
       }
     }
-
-    const getOwnerName = () => {
-      const o = session?.owner;
-      return typeof o === 'string' ? o : o?.name || session?.username || '';
-    };
 
     function renderError(msg) {
       app.innerHTML = `<h1>${escHtml(t('title'))}</h1><p class="error-msg error-msg-spaced">${escHtml(msg)}</p>`;
@@ -551,16 +551,14 @@
         return;
       }
 
-      // Verify owner matches
-      const ownerName = getOwnerName();
-      if (requestInfo.owner && ownerName && requestInfo.owner !== ownerName) {
+      // Verify the owner matches: a pending request that is not in the signed-in owner's own list is
+      // somebody else's. The same list says what the agent asked for.
+      const own = await fetchOwnRequest(code);
+      if (own.listed === false) {
         renderError(t('errorOwnerMismatch'));
         return;
       }
-
-      // Only now, with a session and the owner confirmed, is there a door that may say what the
-      // agent asked for.
-      requestedScopes = await fetchRequestedScopes(code);
+      requestedScopes = own.scopes;
 
       renderConsent();
     }

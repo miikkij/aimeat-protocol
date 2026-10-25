@@ -15,6 +15,7 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   2026-10-25 — Removing an app component keeps its subdomain row as a held name (held-app-labels.ts) instead of deleting it, so no other owner's app gets the old origin (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.16.0 — 2026-10-20 — A memory component writes no `skills.` or `organism.` key: the raw setMemory below wrote the author's key verbatim under the installer's identity, so a package planted a workspace skill in an organism its installer is not a member of, and shadowed a node built-in skill (secaudit 2026-10; package-memory-component.ts v1.4.0 says why each prefix).
  *   v1.15.1 — 2026-10-18 — The app component's publish names no publish gate (`publishGate: null`): the install is the owner's act.
  *   v1.15.0 — 2026-10-13 — An extension component's actions are capability rows when its install answers (capability-aggregator.ts aggregateExtensionNow).
@@ -88,6 +89,7 @@ import { putProgramMap } from './data-map/data-map-access.js';
 import { installPackageAppTools } from './packages/install/package-app-tools.js';
 import { forgetDependencies, appRef } from './dependency-map.js';
 import { removeCortex } from './cortex-lifecycle.js';
+import { holdAppLabels } from './held-app-labels.js';
 import { odpsWriteRefusal, extensionOdpsKey } from './exchange-odps-write.js';
 import { memoryComponentEntries, reservedKeysInComponent, reservedComponentMessage } from './packages/install/package-memory-component.js';
 import { writeAppConfigValues, type AppConfigValues } from './app-config.js';
@@ -753,20 +755,15 @@ export async function deleteComponent(
         return await removeCortex(storage, ctx, { gaii: ctx.installedBy, identity: ownerGaii });
       }
       case 'app': {
-        // Three things are created for an app now that it goes through publishApp, and deleting the
-        // rows alone left two of them behind: a subdomain still pointing at a target that no longer
-        // exists, and dependency edges naming an app nobody can open. Both are visible in the
-        // rollback path, which is where a half-installed package ends up.
+        // Three things are created for an app now that it goes through publishApp: the rows, the
+        // dependency edges and the subdomain. The edges go with the rows; the subdomain row stays,
+        // held for this owner. Both are visible in the rollback path, where a half-installed package ends up.
         const ownerName = localAccountName(ownerGaii);
         await forgetDependencies(storage, 'app', appRef(ownerName, registeredAs));
 
-        const target = `${ownerName}/${registeredAs}`;
-        for (const site of await storage.listSubdomainSites()) {
-          if (site.kind === 'app' && site.target === target) {
-            await storage.deleteSubdomainSite(site.subdomain);
-          }
-        }
-
+        // The app's own address is held for this owner, not deleted: its visitors' browser data lives
+        // on that origin (services/held-app-labels.ts; secaudit2026oct22).
+        await holdAppLabels(storage, ownerName, registeredAs, pkg?.config);
         return await storage.deleteApp(ownerGaii, registeredAs);
       }
       case 'msm':

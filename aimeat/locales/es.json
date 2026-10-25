@@ -81,7 +81,14 @@
       "targetHintApp": "dueño/archivo.html",
       "targetHintRedirect": "https://ejemplo.com/ruta",
       "delete": "Eliminar",
-      "deleteTitle": "¿Eliminar esta dirección?"
+      "deleteTitle": "¿Eliminar esta dirección?",
+      "markHeld": "reservada",
+      "heldSub": "La aplicación ya no está. Reservada para su propietario desde el {date}, así que ninguna aplicación de otro propietario recibe esta dirección.",
+      "filterHeld": "reservadas",
+      "release": "Liberar",
+      "releaseTitle": "¿Liberar esta dirección?",
+      "releaseLead": "Esta dirección está reservada porque se quitó la aplicación que servía. Sus visitantes pueden tener todavía datos guardados en su navegador para esta dirección. Cuando la liberas, la siguiente aplicación publicada con el mismo nombre de archivo, también de otro propietario, puede recibir esta dirección y leer esos datos.",
+      "releaseHint": "El propietario recupera la dirección publicando de nuevo la misma aplicación solo mientras está reservada."
     },
     "apps": {
       "title": "Aplicaciones",
@@ -10271,6 +10278,7 @@
     "cfg_auth_refresh_cookie_legacy_until": "Cookie de sesión anterior leída hasta",
     "cfg_email_smtp_secure": "TLS implícito",
     "cfg_email_smtp_reject_unauthorized": "Rechazar certificados TLS no válidos",
+    "cfg_email_company_smtp_private_hosts": "Servidores de correo de empresas en una red privada",
     "cfg_account_events_window": "Ventana de eventos de la cuenta",
     "cfg_proactive_guidance_enabled": "Orientación proactiva",
     "cfg_commerce_fee_mode": "Destino de la comisión",
@@ -10389,6 +10397,7 @@
     "cfg_metrics_enabled": "Punto de métricas",
     "cfg_metrics_access": "Visibilidad de métricas",
     "cfg_mcp_session_idle_minutes": "Inactividad máxima de sesión MCP",
+    "cfg_mcp_unused_client_days": "Registros de clientes sin uso (días)",
     "cfg_registration_mode": "Quién puede registrarse",
     "cfg_scopes_default_agent_scopes": "Ámbitos de agente predeterminados",
     "cfg_scopes_max_agent_scopes": "Ámbitos de agente disponibles",
@@ -10430,6 +10439,7 @@
     "cfg_ai_node_key_when_spent": "Cuando se agota el saldo de IA",
     "cfg_ai_node_key_account_daily_usd": "Límite diario por cuenta",
     "cfg_ai_node_key_node_daily_usd": "Límite diario para todas las cuentas",
+    "cfg_ai_node_key_max_output_tokens": "Respuesta más larga con la clave del servidor (tokens)",
     "cfg_ai_model_free_fallback": "Modelo tras agotar el crédito",
     "cfg_ai_model_default_chat": "Modelo de chat predeterminado",
     "cfg_ai_model_default_reasoning": "Modelo de razonamiento predeterminado",
@@ -10510,6 +10520,8 @@
     "cfgDesc_morsel_policy_board_post_cost_per_kb": "Morsels de ritmo adicionales por cada KB del cuerpo.",
     "cfgDesc_boards_public_per_owner_max": "Tablones públicos que una cuenta puede mantener (los del sistema quedan al operador).",
     "cfgDesc_auth_jwt_ttl_seconds": "Vida del token JWT en segundos.",
+    "cfgDesc_auth_device_authorize_email_limit": "Cuenta por dirección de red las conexiones de agentes que nombran una cuenta por su correo electrónico, para que nadie pueda probar muchas direcciones y saber si tienen cuenta aquí. Desactivado significa sin límite. El nombre de la cuenta no se cuenta nunca.",
+    "cfgDesc_auth_device_authorize_email_max": "Cuántas conexiones de agentes que nombran una cuenta por correo puede iniciar una dirección de red en 10 minutos mientras el límite está activo.",
     "cfgDesc_auth_entra_allowed_tenants": "GUIDs de inquilinos de Microsoft Entra que pueden iniciar sesión (separados por comas). Vacío: la puerta la decide AIMEAT_ENTRA_OAUTH_TENANT por sí sola.",
     "cfgDesc_auth_casdoor_link_domains": "Dominios cuyas direcciones de Casdoor cuentan como verificadas (separados por comas, * = todos). Solo una dirección así une un inicio de sesión con Casdoor a una cuenta existente o pasa a ser la dirección verificada de una cuenta nueva. Vacío: ninguno.",
     "cfgDesc_auth_entra_link_domains": "Dominios cuyas direcciones de Microsoft Entra cuentan como verificadas (separados por comas, * = todos). Vacío: todos cuando puede entrar un solo inquilino, ninguno cuando la lista de inquilinos permitidos nombra varios.",
@@ -10540,6 +10552,7 @@
     "cfgDesc_email_smtp_from": "Dirección From del correo saliente.",
     "cfgDesc_email_smtp_secure": "TLS implícito (puerto 465). Desactivado = STARTTLS (587).",
     "cfgDesc_email_smtp_reject_unauthorized": "Rechazar certificados TLS no válidos. Desactívalo para certificados autofirmados o STARTTLS.",
+    "cfgDesc_email_company_smtp_private_hosts": "Servidores de correo en una red privada por los que una empresa puede enviar: nombres, direcciones o redes como 10.0.5.0/24, uno por línea. Cualquier otra dirección privada se rechaza. Vacío: solo servidores de correo públicos.",
     "cfgDesc_consent_enabled": "Capa de consentimiento activada.",
     "cfgDesc_account_events_window": "Eventos que guarda la ventana \"qué ha pasado\" de la cuenta antes de archivar los más viejos.",
     "cfgDesc_consent_audit_retention_days": "Retención del registro de consentimiento en días.",
@@ -10601,6 +10614,7 @@
     "cfgDesc_federation_sync_genesis_memory_cache_ttl_hours": "Vida de la caché de memoria genesis en horas.",
     "cfgDesc_personal_nodes_enabled": "Alojamiento de entornos personales activado.",
     "cfgDesc_personal_nodes_max_slots": "Máximo de plazas personales.",
+    "cfgDesc_personal_nodes_max_per_owner": "Cuántos servidores propios puede conectar aquí un mismo propietario, para que las plazas compartidas sigan abiertas a todos. 0 significa sin límite. Los servidores ya conectados se mantienen.",
     "cfgDesc_echat_anonymous": "Permitir conexiones WebSocket anónimas al chat cifrado.",
     "cfgDesc_node_base_url": "URL base pública de esta instancia.",
     "cfgDesc_node_dev_mode": "Modo de desarrollo (webhooks en localhost; restablecer credenciales conserva los datos).",
@@ -10693,6 +10707,7 @@
     "cfgDesc_metrics_enabled": "Punto de métricas Prometheus activado.",
     "cfgDesc_metrics_access": "Visibilidad de las métricas: public, authenticated u operator.",
     "cfgDesc_mcp_session_idle_minutes": "Cerrar una sesión MCP tras estos minutos sin solicitudes (se admiten fracciones; un cliente cerrado se reinicializa).",
+    "cfgDesc_mcp_unused_client_days": "Un registro de cliente MCP con el que nadie inició sesión se borra pasados estos días. Un cliente con el que alguien inició sesión se conserva. 0 conserva todos los registros.",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación — sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
     "cfgDesc_scopes_default_agent_scopes": "Los permisos que recibe un agente cuando nadie elige ninguno, uno por línea. De serie puede leer y escribir la memoria de su dueño, leer el catálogo, leer los espacios de trabajo de los organismos de su dueño y ver los demás agentes de su dueño.",
     "cfgDesc_scopes_max_agent_scopes": "Los permisos que como máximo puede recibir un agente, uno por línea (* = todos).",
@@ -10739,6 +10754,7 @@
     "cfgDesc_ai_node_key_when_spent": "Qué hace la clave del servidor cuando se agota el saldo de IA de una persona: ya no paga nada, pida la llamada el modelo que pida, o sigue pagando hasta los dos límites diarios.",
     "cfgDesc_ai_node_key_account_daily_usd": "Con limits: lo máximo que las llamadas de una cuenta pueden costar a la clave del servidor en un día (UTC), en dólares.",
     "cfgDesc_ai_node_key_node_daily_usd": "Con limits: lo máximo que las llamadas de todas las cuentas juntas pueden costar a la clave del servidor en un día (UTC), en dólares.",
+    "cfgDesc_ai_node_key_max_output_tokens": "La respuesta más larga que puede pedir una llamada con la clave del servidor. Cada llamada se calcula con ella antes de correr y su precio se reserva de lo que queda del saldo. 0 significa sin límite.",
     "cfgDesc_ai_model_free_fallback": "Modelo usado cuando una persona en la clave del servidor agotó su crédito. Vacío rechaza en vez de degradar.",
     "cfgDesc_ai_model_default_chat": "Modelo de chat por defecto cuando el propietario no ha elegido uno.",
     "cfgDesc_ai_model_default_reasoning": "Modelo de razonamiento por defecto cuando el propietario no ha elegido uno.",
@@ -11455,6 +11471,8 @@
     "cfg_morsel_policy_board_post_base_cost": "Ritmo base de una publicación en un tablero",
     "cfg_morsel_policy_board_post_cost_per_kb": "Ritmo por KB de una publicación en un tablero",
     "cfg_auth_jwt_ttl_seconds": "TTL del JWT (segundos)",
+    "cfg_auth_device_authorize_email_limit": "Limitar conexiones de agentes por correo",
+    "cfg_auth_device_authorize_email_max": "Conexiones de agentes por correo por dirección (10 minutos)",
     "cfg_features_extended_features_enabled": "Funciones ampliadas",
     "cfg_work_queue_max_pending": "Máximo en la cola de espera",
     "cfg_work_webhook_max_retries": "Reintentos máximos del webhook",
@@ -11510,6 +11528,7 @@
     "cfg_cross_federation_sync_interval_hours": "Intervalo de sincronización (horas)",
     "cfg_personal_nodes_enabled": "Nodos personales activados",
     "cfg_personal_nodes_max_slots": "Plazas máximas",
+    "cfg_personal_nodes_max_per_owner": "Plazas por propietario",
     "cfg_consul_enabled": "Consul activado",
     "cfg_consul_url": "URL de Consul",
     "cfg_consul_prefix": "Prefijo del KV",
@@ -11752,6 +11771,8 @@
     "delete": "Eliminar",
     "themes": "Temas y estilos",
     "cfgDesc_apps_audit_keep_default": "Cuántas entradas recientes guarda el registro de auditoría de cada aplicación cuando su propietario no fijó un límite. 0 las guarda todas y pasa las viejas al archivo del año; cualquier otro número borra las más antiguas.",
+    "cfgDesc_apps_held_label_days": "Días que la dirección propia de una aplicación quitada sigue reservada para su propietario, para que ninguna aplicación de otro propietario se sirva donde están los datos de navegador de sus visitantes. 0 la reserva hasta que la liberes en la página de subdominios.",
+    "cfgDesc_apps_held_labels_per_owner": "Cuántas direcciones reservadas de aplicaciones quitadas puede tener un propietario. Al pasarlo, se libera primero la que lleva más tiempo reservada. 0 significa sin límite.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Vida en segundos del token que recibe un agente con su propio par de claves. Cuando vence, el agente firma una nueva solicitud y recibe otro.",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "Cuántos segundos sigue siendo válida una oferta para agregar o mover agentes después de que el propietario presiona el botón. El conector tiene que responder dentro de ese tiempo, y la oferta sirve una sola vez.",
     "cfgDesc_auth_app_origin_sign_in_refuse": "Impide iniciar sesión y crear cuentas desde una aplicación, para que una aplicación nunca tenga la sesión propia de una persona. Desactivado: cada intento se anota en el registro y se permite. Actívalo cuando el registro ya no muestre ninguno.",
@@ -11808,6 +11829,8 @@
     "cfgDesc_decide_laya_key_configured": "Si la clave bearer del modelo de decisión laya incorporado está configurada. Solo lectura; el valor nunca se muestra.",
     "cfgDesc_decide_von_key_configured": "Si la clave bearer del modelo de decisión von incorporado está configurada. Solo lectura; el valor nunca se muestra.",
     "cfg_apps_audit_keep_default": "Largo del registro de auditoría de una aplicación",
+    "cfg_apps_held_label_days": "Dirección de una aplicación quitada reservada (días)",
+    "cfg_apps_held_labels_per_owner": "Direcciones reservadas por propietario",
     "cfg_auth_agent_v2_token_ttl_seconds": "Vida del token del agente (s)",
     "cfg_auth_app_origin_sign_in_refuse": "Impedir iniciar sesión desde una aplicación",
     "cfg_auth_agent_enrolment_grant_ttl_seconds": "Vigencia de la oferta para agregar agentes (s)",
@@ -24484,6 +24507,61 @@
           "tip": "Mantenlo bastante por debajo de Ejecuciones de extensiones a la vez, para que una cuenta nunca llene todo el servidor."
         }
       },
+      "apps": {
+        "held_label_days": {
+          "title": "Dirección de una aplicación quitada reservada (días)",
+          "short": "Cuántos días sigue reservada para su propietario la dirección propia de una aplicación quitada. 0 la reserva hasta que la liberes. El valor por defecto es 90.",
+          "what": "Cada aplicación tiene una dirección propia, como notes.apps.example.com. Lo que sus visitantes guardaron en el navegador (los datos de la aplicación, un inicio de sesión guardado) pertenece a esa dirección. Cuando se quita la aplicación, por su propietario o con su paquete, la dirección queda reservada para ese mismo propietario: ninguna aplicación de otro propietario la recibe, y el propietario la recupera publicando de nuevo la misma aplicación. Una limpieza diaria a las 05:41 libera la dirección reservada pasados estos días; después, la siguiente aplicación con el mismo nombre de archivo puede recibirla.",
+          "range": "Un número entero de días, 0 o más. El valor por defecto es 90. 0 la reserva hasta que la liberes en la página de subdominios.",
+          "low": "Menor: la dirección queda libre antes para otros, y la aplicación de otro propietario puede leer antes lo que guardaron los visitantes de la anterior.",
+          "high": "Mayor: el propietario tiene más tiempo para traer de vuelta la aplicación, y la dirección queda sin uso más tiempo.",
+          "tip": "Deja unos meses. El navegador guarda los datos hasta que el visitante los borra, así que una reserva corta protege poco."
+        },
+        "held_labels_per_owner": {
+          "title": "Direcciones reservadas por propietario",
+          "short": "Cuántas direcciones reservadas de aplicaciones quitadas puede tener un propietario. 0 significa sin límite. El valor por defecto es 20.",
+          "what": "Sin límite, un propietario podría quedarse con muchas direcciones publicando y quitando aplicaciones. La limpieza diaria deja a cada propietario con este número de direcciones reservadas y libera primero la que lleva más tiempo reservada. La dirección de una aplicación que existe no se cuenta nunca.",
+          "range": "Un número entero, 0 o más. El valor por defecto es 20. 0 significa sin límite.",
+          "low": "Menor: se reservan menos direcciones para cada propietario, y las viejas se liberan antes.",
+          "high": "Mayor: un propietario que quita muchas aplicaciones conserva todas sus direcciones durante toda la reserva.",
+          "tip": "20 basta para un propietario que ordena su catálogo. Bájalo si ves en la página de subdominios a un propietario con muchas direcciones."
+        }
+      },
+      "email": {
+        "company_smtp_private_hosts": {
+          "title": "Servidores de correo de empresas en una red privada",
+          "short": "Los servidores de correo en una red privada por los que una empresa puede enviar. Vacío significa solo servidores de correo públicos. Vacío por defecto.",
+          "what": "Una empresa de este servidor puede enviar su correo por su propio servidor de correo, y este servidor abre esa conexión. Un servidor que no está en internet pública (una dirección privada, de enlace local o reservada) podría ser cualquier servicio dentro de la red que ve este servidor, así que se rechaza al guardar los ajustes de la empresa y se comprueba de nuevo antes de cada envío. Pon aquí los servidores de correo de tu propia red que las empresas pueden usar: un nombre, una dirección o una red como 10.0.5.0/24. En un servidor en modo local, la dirección de la propia máquina (loopback) sigue permitida sin lista.",
+          "range": "Una lista, una entrada por línea: nombres, direcciones IPv4 o IPv6, o redes en forma CIDR. Vacía por defecto.",
+          "low": "Vacía: las empresas envían solo por servidores de correo públicos.",
+          "high": "Más entradas: las empresas también pueden enviar por los servidores de la lista dentro de tu red.",
+          "ex1": "mail.internal: una empresa puede usar el servidor de correo llamado mail.internal, tenga la dirección privada que tenga.",
+          "ex2": "10.0.5.0/24: una empresa puede usar cualquier servidor de correo de esa red.",
+          "tip": "Pon solo servidores de correo. Un envío fallido nunca muestra lo que respondió el servidor, así que una dirección de la lista que no es un servidor de correo no dice nada de sí misma."
+        }
+      },
+      "mcp": {
+        "unused_client_days": {
+          "title": "Registros de clientes MCP sin uso (días)",
+          "short": "Un registro de cliente MCP con el que nadie inició sesión se borra pasados estos días. 0 conserva todos los registros. El valor por defecto es 30.",
+          "what": "Una aplicación de IA, como Claude, se registra en este servidor antes de que la persona inicie sesión, y cualquiera puede hacer ese registro sin cuenta. Un registro con el que alguien inició sesión se conserva, porque ese inicio de sesión todavía remite a él. Un registro con el que nunca se inició sesión se quedaría en la base de datos para siempre, así que una limpieza cada noche a las 04:53 borra el que tenga más días que este número.",
+          "range": "Un número entero de días, 0 o más. El valor por defecto es 30. 0 conserva todos los registros.",
+          "low": "Menor: los registros abandonados se van antes. Una aplicación cuyo registro se borró se registra de nuevo antes de iniciar sesión.",
+          "high": "Mayor: los registros abandonados se quedan más tiempo en la base de datos.",
+          "tip": "Deja el valor por defecto. Un cliente con el que alguien inició sesión no se borra nunca, sea cual sea el número."
+        }
+      },
+      "personal_nodes": {
+        "max_per_owner": {
+          "title": "Servidores propios por propietario",
+          "short": "Cuántos servidores propios puede conectar un mismo propietario a este servidor. 0 significa sin límite. El valor por defecto es 3.",
+          "what": "Este servidor tiene un número de plazas para los servidores propios de las personas (Plazas máximas), y todos los propietarios las comparten. Este límite impide que un solo propietario las ocupe todas. A un propietario que llega al límite se le indica el límite y cómo liberar una plaza: quitar un servidor en Tus propios servidores, en su perfil, o llamar a DELETE /v1/personal/anchor/<id>. Los servidores ya conectados se mantienen si bajas el límite; solo decide el siguiente.",
+          "range": "Un número entero, 0 o más. El valor por defecto es 3. 0 significa sin límite.",
+          "low": "1: cada propietario conecta un servidor propio, el que usa su túnel.",
+          "high": "Mayor: un propietario puede tener aquí varios servidores propios, y caben menos propietarios en las plazas compartidas.",
+          "tip": "El túnel de un propietario sirve a un solo servidor propio, así que un número pequeño basta a casi todos."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Ritmo de quemado",
@@ -24641,6 +24719,25 @@
         }
       },
       "auth": {
+        "device_authorize_email_limit": {
+          "title": "Limitar conexiones de agentes por correo",
+          "short": "Activado, las conexiones de agentes que nombran una cuenta por su correo se cuentan por dirección de red. Desactivado significa sin límite. Activado por defecto.",
+          "what": "Un agente que se conecta nombra la cuenta para la que es, por el nombre de la cuenta o por su correo verificado. La respuesta a la forma con correo dice si una dirección tiene cuenta en este servidor, y la solicitud no pide iniciar sesión. Por eso el servidor cuenta la forma con correo por dirección de red, como mucho el número del ajuste siguiente en 10 minutos. Una solicitud que lo supera se rechaza con el tiempo de espera y la sugerencia de usar el nombre de la cuenta, que no se cuenta nunca.",
+          "range": "Activado (por defecto) o desactivado.",
+          "low": "Desactivado: cualquiera puede probar cuantas direcciones quiera para saber si tienen cuenta aquí; solo lo limita el límite general de solicitudes.",
+          "high": "Activado: una dirección de red solo puede probar unas pocas direcciones en 10 minutos.",
+          "tip": "Déjalo activado. Desactívalo solo en un servidor cuyas cuentas se conocen todas entre sí."
+        },
+        "device_authorize_email_max": {
+          "title": "Conexiones de agentes por correo por dirección (10 minutos)",
+          "short": "Cuántas conexiones de agentes que nombran una cuenta por correo puede iniciar una dirección de red en 10 minutos. El valor por defecto es 20.",
+          "what": "Mientras el límite de arriba está activo, este es el número de solicitudes con correo que una dirección de red puede hacer en 10 minutos. Con el valor por defecto, la solicitud 21 se rechaza con 429 y los segundos que hay que esperar. Una dirección IPv6 cuenta por su red /64. La forma con el nombre de la cuenta no se cuenta.",
+          "range": "Un número entero desde 1. El valor por defecto es 20, igual que el límite de búsquedas de contactos de una cuenta.",
+          "low": "Menor: se pueden probar menos direcciones, y un equipo detrás de la dirección de una oficina llega antes al límite.",
+          "high": "Mayor: caben más conexiones por correo, y se pueden probar más direcciones.",
+          "ex1": "20: una persona que conecta cinco agentes por correo en una hora nunca llega al límite.",
+          "tip": "Súbelo si mucha gente conecta agentes por correo desde la dirección de una misma oficina a la vez."
+        },
         "jwt_ttl_seconds": {
           "title": "TTL del JWT (segundos)",
           "short": "Cuánto tiempo vale un token de acceso, en segundos. Un valor de 60 a 86 400; el predeterminado es 3600, una hora.",
@@ -24734,6 +24831,17 @@
           "ex2": "0: ninguna llamada después de agotar el saldo, lo mismo que refuse.",
           "ex3": "100: margen para muchas personas que agotan cada una su límite diario por cuenta.",
           "tip": "Pon aquí lo máximo que estás dispuesto a pagar en un día."
+        },
+        "node_key_max_output_tokens": {
+          "title": "Respuesta más larga con la clave del servidor (tokens)",
+          "short": "La respuesta más larga que puede pedir una llamada con la clave del servidor, en tokens. 0 significa sin límite. El valor por defecto es 32000.",
+          "what": "Una llamada nombra su modelo y el largo de su respuesta, y ambos deciden su precio. Antes de que corra una llamada con la clave del servidor, el servidor le pone precio a partir del largo de la petición y del largo de la respuesta con el catálogo de modelos, y reserva ese precio de lo que queda del saldo de IA de la persona (o de los límites diarios) mientras la llamada corre. Una llamada que pide una respuesta más larga, o no nombra ninguna, recibe este número de tokens, y su respuesta dice si se cortó. Una llamada que costaría más de lo que queda se rechaza con su precio, o una llamada de texto que no nombró modelo recibe el modelo gratuito. No afecta a las llamadas con la clave propia de una persona o de un agente.",
+          "range": "Un número entero de tokens, 0 o más. El valor por defecto es 32000, suficiente para un documento largo. 0 significa sin límite; una llamada que no nombra largo se calcula entonces con 1.024 tokens.",
+          "low": "Menor: cada llamada tiene un precio menor, así que caben más llamadas en un saldo pequeño, y las respuestas largas se cortan antes.",
+          "high": "Mayor: caben respuestas largas, y cada llamada reserva más saldo mientras corre.",
+          "ex1": "32000 con un modelo a 75 USD por millón de tokens de salida: una llamada reserva unos 2,40 USD mientras corre.",
+          "ex2": "4000 con el mismo modelo: una llamada reserva unos 0,30 USD.",
+          "tip": "Mantenlo cerca de la respuesta más larga que la gente necesita de verdad. Quien necesite más usa su propia clave, que esto no toca."
         }
       },
       "security": {

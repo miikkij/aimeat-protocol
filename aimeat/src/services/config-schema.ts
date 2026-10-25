@@ -12,6 +12,9 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-25 — personal_nodes.max_per_owner (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, 0 = no
+ *     limit; secaudit2026oct22, personal-anchor-no-per-owner-slot-limit). The node limits rows
+ *     (config-schema-node-limits.ts) are spread after the MCP rows.
  *   2026-10-25 — security.secret_host_ask_default (AIMEAT_SECRET_HOST_ASK_DEFAULT), mutable, default on (secaudit2026oct22).
  *   2026-10-25 — The extension load rows (config-schema-extension-load.ts), spread last (secaudit2026oct22).
  *   2026-10-25 — Every AIMEAT_* setting the node reads has a row (check:config-coverage now reads all of
@@ -145,6 +148,7 @@ import { RUNTIME_CONFIG_FIELDS } from './config-schema-runtime.js';
 import { ACCESS_CONFIG_FIELDS } from './config-schema-access.js';
 import { FEATURE_CONFIG_FIELDS } from './config-schema-features.js';
 import { EXTENSION_LOAD_CONFIG_FIELDS } from './config-schema-extension-load.js';
+import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -355,6 +359,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Personal Nodes (mutable) ──
   { key: 'personalNodesEnabled', dotPath: 'personal_nodes.enabled', envVar: 'AIMEAT_PERSONAL_NODES_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Personal node hosting enabled' },
   { key: 'personalNodeMaxSlots', dotPath: 'personal_nodes.max_slots', envVar: 'AIMEAT_PERSONAL_NODE_MAX_SLOTS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max personal node slots', range: '1-10000' },
+  { key: 'personalNodeMaxPerOwner', dotPath: 'personal_nodes.max_per_owner', envVar: 'AIMEAT_PERSONAL_NODE_MAX_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Personal nodes one owner may anchor here, so the shared slots stay open to every owner. 0 = no limit. Anchors that exist stay', range: '0-10000' },
 
   // ── Match Notifications (Phase 1.6, mutable) ──
 
@@ -519,6 +524,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── MCP sessions (mutable) ──
   { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
   { key: 'mcpSessionSweepMs', dotPath: 'mcp.session_sweep_ms', envVar: 'AIMEAT_MCP_SESSION_SWEEP_MS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 250 && (v as number) <= 600000, immutable: false, applies: 'restart', description: 'How often the idle sweep looks for sessions to close, in milliseconds (read at boot)', range: '250-600000' },
+  // The limits on what one account takes of what the node shares (config-schema-node-limits.ts).
+  ...NODE_LIMITS_CONFIG_FIELDS,
 
   // ── Registration (mutable) ──
   { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', ...oneOf('open', 'oauth', 'invite', 'closed'), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },

@@ -858,6 +858,13 @@
       "refuseRestrictedWhy": "Se ei voi olla omassa verkko-osoitteessaan. Tarjoile se pääsivustolta.",
       "deleteLead": "Osoite lakkaa vastaamasta heti. Sovellus itse pysyy julkaistuna ja on yhä saatavilla pääsivustolta.",
       "deleteAppNote": "Kun sovellus avataan uudestaan, se saa oman osoitteen automaattisesti. Poisto ei siis pidä sovellusta poissa verkosta, mutta pois päältä kytkeminen pitää.",
+      "markHeld": "varattu",
+      "heldSub": "Sovellus on poistettu. Osoite on varattu sen omistajalle {date} alkaen, joten kenenkään muun sovellus ei saa sitä.",
+      "filterHeld": "varatut",
+      "release": "Vapauta",
+      "releaseTitle": "Vapautetaanko tämä osoite?",
+      "releaseLead": "Osoite on varattu, koska sovellus, jota se palveli, poistettiin. Sen käyttäjien selaimissa voi yhä olla tähän osoitteeseen tallennettua tietoa. Kun vapautat osoitteen, seuraava samalla tiedostonimellä julkaistu sovellus voi saada sen, myös toisen omistajan sovellus, ja lukea sen tiedon.",
+      "releaseHint": "Omistaja saa osoitteen takaisin julkaisemalla saman sovelluksen uudelleen vain niin kauan kuin osoite on varattu.",
       "deleteTypeLabel": "Vahvista kirjoittamalla nimi",
       "deleteHint": "Jokainen, joka on linkittänyt tähän osoitteeseen, saa tämän jälkeen tyhjää.",
       "emptyTitle": "Ei osoitteita vielä",
@@ -11885,6 +11892,7 @@
     "cfg_auth_refresh_cookie_legacy_until": "Vanha kirjautumiseväste luetaan asti",
     "cfg_email_smtp_secure": "Suora TLS",
     "cfg_email_smtp_reject_unauthorized": "Hylkää kelvottomat TLS-varmenteet",
+    "cfg_email_company_smtp_private_hosts": "Yritysten postipalvelimet sisäverkossa",
     "cfg_account_events_window": "Tilitapahtumien ikkuna",
     "cfg_proactive_guidance_enabled": "Oma-aloitteinen opastus",
     "cfg_commerce_fee_mode": "Palkkion kohde",
@@ -12003,6 +12011,7 @@
     "cfg_metrics_enabled": "Mittaripääte",
     "cfg_metrics_access": "Mittarien näkyvyys",
     "cfg_mcp_session_idle_minutes": "MCP-session jouten-raja",
+    "cfg_mcp_unused_client_days": "Käyttämättömät asiakasrekisteröinnit (päivää)",
     "cfg_registration_mode": "Kuka saa rekisteröityä",
     "cfg_scopes_default_agent_scopes": "Agentin oletusoikeudet",
     "cfg_scopes_max_agent_scopes": "Tarjolla olevat agenttioikeudet",
@@ -12044,6 +12053,7 @@
     "cfg_ai_node_key_when_spent": "Kun tekoälysaldo on käytetty",
     "cfg_ai_node_key_account_daily_usd": "Päiväraja tiliä kohden",
     "cfg_ai_node_key_node_daily_usd": "Päiväraja kaikille tileille",
+    "cfg_ai_node_key_max_output_tokens": "Pisin vastaus palvelimen avaimella (tokeneina)",
     "cfg_ai_model_free_fallback": "Malli saldon jälkeen",
     "cfg_ai_model_default_chat": "Chatin oletusmalli",
     "cfg_ai_model_default_reasoning": "Päättelyn oletusmalli",
@@ -12124,6 +12134,8 @@
     "cfgDesc_morsel_policy_board_post_cost_per_kb": "Lisää murusia tahdistukseen jokaista viestin rungon kilotavua kohden.",
     "cfgDesc_boards_public_per_owner_max": "Montako julkista ilmoitustaulua yksi tili voi pitää (järjestelmätaulut pysyvät operaattorilla).",
     "cfgDesc_auth_jwt_ttl_seconds": "JWT-tunnuksen elinaika sekunteina.",
+    "cfgDesc_auth_device_authorize_email_limit": "Laske verkko-osoitteittain agenttiyhteydet, jotka nimeävät tilin sähköpostiosoitteella. Näin kukaan ei voi kokeilla monia osoitteita ja selvittää, onko niillä tili täällä. Pois päältä tarkoittaa, että rajaa ei ole. Tilin nimeä ei lasketa koskaan.",
+    "cfgDesc_auth_device_authorize_email_max": "Kuinka monta agenttiyhteyttä, joka nimeää tilin sähköpostiosoitteella, yksi verkko-osoite voi aloittaa 10 minuutissa, kun raja on päällä.",
     "cfgDesc_auth_entra_allowed_tenants": "Microsoft Entra -vuokraajat, jotka saavat kirjautua (pilkuin eroteltuina GUID:eina). Tyhjä: portti tulee AIMEAT_ENTRA_OAUTH_TENANT-arvosta yksinään.",
     "cfgDesc_auth_casdoor_link_domains": "Verkkotunnukset, joiden Casdoor-osoitteet lasketaan vahvistetuiksi (pilkuin eroteltuina, * = kaikki). Vain tällainen osoite liittää Casdoor-kirjautumisen olemassa olevaan tiliin tai tulee uuden tilin vahvistetuksi osoitteeksi. Tyhjä: ei mikään.",
     "cfgDesc_auth_entra_link_domains": "Verkkotunnukset, joiden Microsoft Entra -osoitteet lasketaan vahvistetuiksi (pilkuin eroteltuina, * = kaikki). Tyhjä: kaikki, kun yksi vuokraaja saa kirjautua, eikä mikään, kun sallittuja vuokraajia on useampi.",
@@ -12154,6 +12166,7 @@
     "cfgDesc_email_smtp_from": "Lähtevän postin From-osoite.",
     "cfgDesc_email_smtp_secure": "Suora TLS (portti 465). Pois = STARTTLS (portti 587).",
     "cfgDesc_email_smtp_reject_unauthorized": "Hylkää kelvottomat TLS-varmenteet. Pois itse allekirjoitetuille varmenteille tai STARTTLS:lle.",
+    "cfgDesc_email_company_smtp_private_hosts": "Sisäverkon postipalvelimet, joiden kautta yritys voi lähettää: nimet, osoitteet tai verkot, kuten 10.0.5.0/24, yksi riviä kohden. Muut sisäverkon osoitteet torjutaan. Tyhjä: vain julkiset postipalvelimet.",
     "cfgDesc_consent_enabled": "Suostumuskerros käytössä.",
     "cfgDesc_account_events_window": "Montako tapahtumaa tilin \"mitä on tapahtunut\" -ikkuna pitää ennen vanhimpien arkistointia.",
     "cfgDesc_consent_audit_retention_days": "Suostumuslokin säilytysaika päivinä.",
@@ -12215,6 +12228,7 @@
     "cfgDesc_federation_sync_genesis_memory_cache_ttl_hours": "Genesis-muistivälimuistin elinaika tunteina.",
     "cfgDesc_personal_nodes_enabled": "Henkilökohtaisten ympäristöjen isännöinti käytössä.",
     "cfgDesc_personal_nodes_max_slots": "Henkilökohtaisten paikkojen katto.",
+    "cfgDesc_personal_nodes_max_per_owner": "Kuinka monta omaa palvelinta yksi omistaja voi liittää tänne. Näin yhteiset paikat riittävät kaikille. 0 tarkoittaa, että rajaa ei ole. Jo liitetyt palvelimet säilyvät.",
     "cfgDesc_echat_anonymous": "Salli anonyymit salatun chatin WebSocket-yhteydet.",
     "cfgDesc_node_base_url": "Tämän instanssin julkinen perusosoite.",
     "cfgDesc_node_dev_mode": "Kehitystila (localhost-webhookit; tunnusten nollaus säilyttää datan).",
@@ -12307,6 +12321,7 @@
     "cfgDesc_metrics_enabled": "Prometheus-mittaripääte käytössä.",
     "cfgDesc_metrics_access": "Mittaripäätteen näkyvyys: public, authenticated tai operator.",
     "cfgDesc_mcp_session_idle_minutes": "Sulje MCP-sessio, kun pyyntöjä ei ole tullut näin moneen minuuttiin (murto-osat sallittu; suljettu asiakas alustaa itsensä uudelleen).",
+    "cfgDesc_mcp_unused_client_days": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. Rekisteröinti, jolla joku on kirjautunut, säilyy. 0 säilyttää kaikki rekisteröinnit.",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
     "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Yksi oikeus rivillä. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia, lukea omistajansa organismien työtiloja ja nähdä omistajansa muut agentit.",
     "cfgDesc_scopes_max_agent_scopes": "Oikeudet, joita agentille voi enintään antaa, yksi rivillä (* = kaikki).",
@@ -12353,6 +12368,7 @@
     "cfgDesc_ai_node_key_when_spent": "Mitä palvelimen avain tekee, kun henkilön tekoälysaldo on käytetty: avain ei maksa enää mitään, mitä mallia kutsu pyytääkin, tai avain maksaa edelleen kahteen päivärajaan asti.",
     "cfgDesc_ai_node_key_account_daily_usd": "Kun valinta on limits: enintään näin paljon yhden tilin kutsut saavat maksaa palvelimen avaimella yhden päivän (UTC) aikana, dollareina.",
     "cfgDesc_ai_node_key_node_daily_usd": "Kun valinta on limits: enintään näin paljon kaikkien tilien kutsut yhteensä saavat maksaa palvelimen avaimella yhden päivän (UTC) aikana, dollareina.",
+    "cfgDesc_ai_node_key_max_output_tokens": "Pisin vastaus, jota palvelimen avaimella tehty kutsu voi pyytää. Jokainen kutsu hinnoitellaan sen mukaan ennen käynnistystä, ja hinta varataan jäljellä olevasta saldosta. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_ai_model_free_fallback": "Malli, jota käytetään, kun palvelimen avainta käyttävä henkilö on kuluttanut saldonsa. Jos tämä on tyhjä, vastauksia ei saldon loputtua enää anneta sen sijaan, että siirryttäisiin heikompaan malliin.",
     "cfgDesc_ai_model_default_chat": "Chatin oletusmalli, kun omistaja ei ole valinnut omaansa.",
     "cfgDesc_ai_model_default_reasoning": "Päättelyn oletusmalli, kun omistaja ei ole valinnut omaansa.",
@@ -13069,6 +13085,8 @@
     "cfg_morsel_policy_board_post_base_cost": "Tauluviestin tahdistus (perus)",
     "cfg_morsel_policy_board_post_cost_per_kb": "Tauluviestin tahdistus kilotavua kohden",
     "cfg_auth_jwt_ttl_seconds": "JWT-elinaika (sekuntia)",
+    "cfg_auth_device_authorize_email_limit": "Rajoita agenttiyhteyksiä sähköpostiosoitteella",
+    "cfg_auth_device_authorize_email_max": "Agenttiyhteydet sähköpostilla verkko-osoitetta kohden (10 min)",
     "cfg_features_extended_features_enabled": "Laajennetut ominaisuudet",
     "cfg_work_queue_max_pending": "Maks. odottavat",
     "cfg_work_webhook_max_retries": "Webhook-uudelleenyritykset",
@@ -13124,6 +13142,7 @@
     "cfg_cross_federation_sync_interval_hours": "Synkronointiväli (tuntia)",
     "cfg_personal_nodes_enabled": "Henkilökohtaiset ympäristöt käytössä",
     "cfg_personal_nodes_max_slots": "Maks. paikat",
+    "cfg_personal_nodes_max_per_owner": "Paikat omistajaa kohden",
     "cfg_consul_enabled": "Consul käytössä",
     "cfg_consul_url": "Consul-osoite",
     "cfg_consul_prefix": "KV-etuliite",
@@ -13600,6 +13619,8 @@
     "delete": "Poista",
     "themes": "Teemat ja tyylit",
     "cfgDesc_apps_audit_keep_default": "Montako uusinta merkintää kunkin sovelluksen auditointiloki säilyttää, kun omistaja ei ole asettanut omaa rajaa. 0 säilyttää kaikki ja siirtää vanhat vuoden arkistoon; muu luku poistaa vanhemmat merkinnät.",
+    "cfgDesc_apps_held_label_days": "Montako päivää poistetun sovelluksen oma osoite pysyy varattuna sen omistajalle. Näin kenenkään muun sovellusta ei näytetä osoitteessa, jossa sen käyttäjien selaintiedot ovat. 0 pitää osoitteen varattuna, kunnes vapautat sen Alidomainit-sivulla.",
+    "cfgDesc_apps_held_labels_per_owner": "Montako poistettujen sovellusten varattua osoitetta yksi omistaja voi pitää. Kun raja ylittyy, pisimpään varattuna ollut vapautetaan ensin. 0 tarkoittaa, että rajaa ei ole.",
     "cfgDesc_auth_agent_v2_token_ttl_seconds": "Kuinka monta sekuntia omalla avainparilla tunnistautuvan agentin token on voimassa. Kun se vanhenee, agentti allekirjoittaa uuden pyynnön ja saa uuden tokenin.",
     "cfgDesc_auth_agent_enrolment_grant_ttl_seconds": "Kuinka monta sekuntia agenttien lisäys- tai siirtotarjous on voimassa sen jälkeen, kun omistaja painaa painiketta. Liittimen on vastattava tämän ajan kuluessa, ja tarjous toimii kerran.",
     "cfgDesc_auth_app_origin_sign_in_refuse": "Estää kirjautumisen ja tilin luomisen sovelluksesta, jotta sovellus ei koskaan saa ihmisen omaa istuntoa. Pois päältä: jokainen tällainen yritys kirjataan lokiin ja sallitaan. Kytke tämä päälle, kun lokissa ei enää näy yrityksiä.",
@@ -13656,6 +13677,8 @@
     "cfgDesc_decide_laya_key_configured": "Onko valmiin laya-päätösmallin bearer-avain asetettu. Vain luku; itse arvoa ei näytetä koskaan.",
     "cfgDesc_decide_von_key_configured": "Onko valmiin von-päätösmallin bearer-avain asetettu. Vain luku; itse arvoa ei näytetä koskaan.",
     "cfg_apps_audit_keep_default": "Sovelluksen auditointilokin pituus",
+    "cfg_apps_held_label_days": "Poistetun sovelluksen osoite varattuna (päivää)",
+    "cfg_apps_held_labels_per_owner": "Varatut osoitteet omistajaa kohden",
     "cfg_auth_agent_v2_token_ttl_seconds": "Agentin tokenin voimassaolo (s)",
     "cfg_auth_app_origin_sign_in_refuse": "Estä kirjautuminen sovelluksesta",
     "cfg_auth_agent_enrolment_grant_ttl_seconds": "Agentin lisäystarjouksen voimassaolo (s)",
@@ -26841,6 +26864,61 @@
           "tip": "Pidä tämä selvästi pienempänä kuin koko palvelimen raja, jotta yksi tili ei koskaan täytä koko palvelinta."
         }
       },
+      "apps": {
+        "held_label_days": {
+          "title": "Poistetun sovelluksen osoite varattuna (päivää)",
+          "short": "Montako päivää poistetun sovelluksen oma osoite pysyy varattuna sen omistajalle. 0 pitää sen varattuna, kunnes vapautat sen. Oletus on 90.",
+          "what": "Jokainen sovellus saa oman osoitteen, kuten notes.apps.example.com. Se, mitä sovelluksen käyttäjät tallensivat selaimiinsa (sovelluksen omat tiedot, tallennettu kirjautuminen), kuuluu tälle osoitteelle. Kun omistaja poistaa sovelluksen tai sovellus poistuu paketin mukana, osoite varataan samalle omistajalle: kenenkään muun sovellus ei saa sitä, ja omistaja saa sen takaisin julkaisemalla saman sovelluksen uudelleen. Siivous vapauttaa varatun osoitteen joka päivä klo 5.41, kun tämä määrä päiviä on kulunut. Sen jälkeen seuraava samalla tiedostonimellä julkaistu sovellus voi saada sen.",
+          "range": "Kokonaisluku päivinä, vähintään 0. Oletus on 90. 0 pitää osoitteen varattuna, kunnes vapautat sen Alidomainit-sivulla.",
+          "low": "Pienempi: osoite vapautuu muille nopeammin, ja toisen omistajan sovellus voi lukea vanhan sovelluksen käyttäjien tallentamat tiedot aiemmin.",
+          "high": "Suurempi: omistajalla on pidempään aikaa tuoda sovellus takaisin, ja osoite on pidempään käyttämättä.",
+          "tip": "Pidä muutama kuukausi. Selain säilyttää tallennetut tiedot, kunnes käyttäjä tyhjentää ne, joten lyhyt varaus suojaa vähän."
+        },
+        "held_labels_per_owner": {
+          "title": "Varatut osoitteet omistajaa kohden",
+          "short": "Montako poistettujen sovellusten varattua osoitetta yksi omistaja voi pitää. 0 tarkoittaa, että rajaa ei ole. Oletus on 20.",
+          "what": "Ilman rajaa yksi omistaja voisi viedä monta osoitetta julkaisemalla ja poistamalla sovelluksia. Päivittäinen siivous pitää kunkin omistajan varatut osoitteet tässä määrässä ja vapauttaa ensin sen, joka on ollut varattuna pisimpään. Olemassa olevan sovelluksen osoitetta ei lasketa koskaan.",
+          "range": "Kokonaisluku, vähintään 0. Oletus on 20. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "Pienempi: kullekin omistajalle varataan vähemmän osoitteita, ja vanhat vapautuvat nopeammin.",
+          "high": "Suurempi: omistaja, joka poistaa monta sovellusta, pitää kaikki osoitteensa koko varauksen ajan.",
+          "tip": "20 riittää omistajalle, joka siivoaa sovellusluetteloaan. Laske lukua, jos näet Alidomainit-sivulla yhden omistajan pitävän monta osoitetta."
+        }
+      },
+      "email": {
+        "company_smtp_private_hosts": {
+          "title": "Yritysten postipalvelimet sisäverkossa",
+          "short": "Sisäverkon postipalvelimet, joiden kautta yritys voi lähettää postia. Tyhjä tarkoittaa, että vain julkiset postipalvelimet käyvät. Oletuksena tyhjä.",
+          "what": "Tämän palvelimen yritys voi lähettää postinsa oman postipalvelimensa kautta, ja tämä palvelin avaa yhteyden. Palvelin, joka ei ole julkisessa internetissä (sisäverkon, paikallisen linkin tai varattu osoite), voi olla mikä tahansa palvelu siinä verkossa, jonka tämä palvelin näkee. Siksi sellainen palvelin torjutaan, kun yrityksen asetukset tallennetaan, ja se tarkistetaan uudelleen ennen jokaista lähetystä. Luettele tässä oman verkkosi postipalvelimet, joita yritykset saavat käyttää: palvelimen nimi, osoite tai verkko, kuten 10.0.5.0/24. Paikallisessa tilassa palvelimen oma osoite (loopback) on sallittu ilman luetteloa.",
+          "range": "Luettelo, yksi kohta riviä kohden: palvelinten nimiä, IPv4- tai IPv6-osoitteita tai verkkoja CIDR-muodossa. Oletuksena tyhjä.",
+          "low": "Tyhjä: yritykset lähettävät vain julkisten postipalvelinten kautta.",
+          "high": "Enemmän kohtia: yritykset voivat lähettää myös luetteloitujen sisäverkon palvelinten kautta.",
+          "ex1": "mail.internal: yritys voi käyttää postipalvelinta nimeltä mail.internal, oli sen sisäverkon osoite mikä tahansa.",
+          "ex2": "10.0.5.0/24: yritys voi käyttää mitä tahansa postipalvelinta tässä verkossa.",
+          "tip": "Luettele vain postipalvelimia. Epäonnistunut lähetys ei koskaan näytä palvelimen vastausta, joten luetteloitu osoite, joka ei ole postipalvelin, ei kerro itsestään mitään."
+        }
+      },
+      "mcp": {
+        "unused_client_days": {
+          "title": "Käyttämättömät MCP-rekisteröinnit (päivää)",
+          "short": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. 0 säilyttää kaikki rekisteröinnit. Oletus on 30.",
+          "what": "Tekoälysovellus, kuten Claude, rekisteröityy tälle palvelimelle ennen kuin ihminen kirjautuu sisään. Kuka tahansa voi tehdä rekisteröinnin ilman tiliä. Rekisteröinti, jolla on kirjauduttu sisään, säilyy, koska kirjautuminen viittaa siihen yhä. Rekisteröinti, jolla ei koskaan kirjauduttu, jäisi tietokantaan pysyvästi. Siksi siivous poistaa joka yö klo 4.53 sellaisen rekisteröinnin, joka on vanhempi kuin tämä päivien määrä.",
+          "range": "Kokonaisluku päivinä, vähintään 0. Oletus on 30. 0 säilyttää kaikki rekisteröinnit.",
+          "low": "Pienempi: hylätyt rekisteröinnit poistuvat nopeammin. Sovellus, jonka rekisteröinti poistettiin, rekisteröityy uudelleen ennen kirjautumista.",
+          "high": "Suurempi: hylätyt rekisteröinnit pysyvät tietokannassa pidempään.",
+          "tip": "Pidä oletus. Asiakasta, jolla joku on kirjautunut, ei poisteta koskaan, olipa luku mikä tahansa."
+        }
+      },
+      "personal_nodes": {
+        "max_per_owner": {
+          "title": "Omat palvelimet omistajaa kohden",
+          "short": "Kuinka monta omaa palvelinta yksi omistaja voi liittää tähän palvelimeen. 0 tarkoittaa, että rajaa ei ole. Oletus on 3.",
+          "what": "Tällä palvelimella on tietty määrä paikkoja ihmisten omille palvelimille (Maks. paikat), ja kaikki omistajat jakavat ne. Tämä raja estää yhtä omistajaa viemästä niitä kaikkia. Kun omistaja on rajalla, hänelle kerrotaan raja ja tapa vapauttaa paikka: hän poistaa palvelimen profiilin kohdassa Omat palvelimet tai kutsuu DELETE /v1/personal/anchor/<tunniste>. Jo liitetyt palvelimet säilyvät, kun lasket rajaa. Raja koskee vain seuraavaa palvelinta.",
+          "range": "Kokonaisluku, vähintään 0. Oletus on 3. 0 tarkoittaa, että rajaa ei ole.",
+          "low": "1: jokainen omistaja liittää yhden oman palvelimen, sen jota hänen tunnelinsa käyttää.",
+          "high": "Suurempi: omistaja voi pitää täällä useita omia palvelimia, ja yhteisiin paikkoihin mahtuu vähemmän omistajia.",
+          "tip": "Omistajan tunneli palvelee yhtä omaa palvelinta, joten pieni luku riittää lähes kaikille."
+        }
+      },
       "morsel_policy": {
         "burn_rate": {
           "title": "Polttoosuus",
@@ -26998,6 +27076,25 @@
         }
       },
       "auth": {
+        "device_authorize_email_limit": {
+          "title": "Rajoita agenttiyhteyksiä sähköpostiosoitteella",
+          "short": "Kun asetus on päällä, agenttiyhteydet, jotka nimeävät tilin sähköpostiosoitteella, lasketaan verkko-osoitteittain. Pois päältä tarkoittaa, että rajaa ei ole. Oletuksena päällä.",
+          "what": "Kun agentti muodostaa yhteyden, se nimeää tilin, jota yhteys koskee: tilin nimellä tai tilin vahvistetulla sähköpostiosoitteella. Vastaus sähköpostimuotoon kertoo, onko osoitteella tili tällä palvelimella, eikä pyyntö vaadi kirjautumista. Siksi palvelin laskee sähköpostimuodon verkko-osoitteittain, enintään seuraavan asetuksen määrän 10 minuutissa. Sen ylittävä pyyntö torjutaan. Vastaus kertoo odotusajan ja neuvoo käyttämään tilin nimeä, jota ei lasketa koskaan.",
+          "range": "Päällä (oletus) tai pois.",
+          "low": "Pois: kuka tahansa voi kokeilla rajattomasti osoitteita ja selvittää, onko niillä tili täällä. Vain yleinen pyyntöraja rajoittaa.",
+          "high": "Päällä: yksi verkko-osoite voi kokeilla vain muutamaa osoitetta 10 minuutissa.",
+          "tip": "Pidä päällä. Ota pois vain palvelimella, jonka kaikki tilit tuntevat toisensa."
+        },
+        "device_authorize_email_max": {
+          "title": "Agenttiyhteydet sähköpostilla verkko-osoitetta kohden (10 min)",
+          "short": "Kuinka monta agenttiyhteyttä, joka nimeää tilin sähköpostiosoitteella, yksi verkko-osoite voi aloittaa 10 minuutissa. Oletus on 20.",
+          "what": "Kun yllä oleva raja on päällä, tämä on sähköpostimuotoisten pyyntöjen määrä, jonka yksi verkko-osoite voi tehdä 10 minuutissa. Oletuksella 21. pyyntö torjutaan koodilla 429, ja vastaus kertoo, montako sekuntia pitää odottaa. IPv6-osoite lasketaan /64-verkkonsa mukaan. Tilin nimellä tehtyjä pyyntöjä ei lasketa.",
+          "range": "Kokonaisluku, vähintään 1. Oletus on 20, sama kuin yhden tilin yhteystietohaun raja.",
+          "low": "Pienempi: osoitteita voi kokeilla vähemmän, ja saman toimiston osoitteen takana oleva tiimi tulee rajalle nopeammin.",
+          "high": "Suurempi: sähköpostilla voi muodostaa enemmän yhteyksiä, ja osoitteita voi kokeilla enemmän.",
+          "ex1": "20: ihminen, joka yhdistää tunnissa viisi agenttia sähköpostilla, ei tule koskaan rajalle.",
+          "tip": "Nosta lukua, jos moni yhdistää agentteja sähköpostilla samasta toimiston osoitteesta samaan aikaan."
+        },
         "jwt_ttl_seconds": {
           "title": "JWT-elinaika (sekuntia)",
           "short": "Kuinka kauan kirjautumisen token on voimassa, sekunteina. Arvo väliltä 60–86 400, oletus 3 600 eli tunti.",
@@ -27091,6 +27188,17 @@
           "ex2": "0: ei kutsuja sen jälkeen, kun saldo on käytetty, sama kuin refuse.",
           "ex3": "100: tilaa monelle ihmiselle, joista jokainen käyttää tilikohtaisen päivärajansa.",
           "tip": "Aseta tähän suurin summa, jonka olet valmis maksamaan yhdessä päivässä."
+        },
+        "node_key_max_output_tokens": {
+          "title": "Pisin vastaus palvelimen avaimella (tokeneina)",
+          "short": "Pisin vastaus, jota palvelimen avaimella tehty kutsu voi pyytää, tokeneina. 0 tarkoittaa, että rajaa ei ole. Oletus on 32000.",
+          "what": "Kutsu nimeää mallinsa ja vastauksensa pituuden, ja ne ratkaisevat sen hinnan. Ennen kuin palvelimen avaimella tehty kutsu käynnistyy, palvelin hinnoittelee sen kehotteen pituuden ja vastauksen pituuden perusteella malliluettelosta. Kutsun ajan palvelin varaa hinnan siitä, mitä ihmisen tekoälysaldosta (tai päivärajoista) on jäljellä. Kutsu, joka pyytää pidempää vastausta tai ei nimeä pituutta, saa tämän määrän tokeneita, ja vastaus kertoo, jos se katkesi. Kutsu, joka maksaisi enemmän kuin on jäljellä, torjutaan, ja vastaus kertoo hinnan. Tekstikutsu, joka ei nimennyt mallia, saa sen sijaan maksuttoman mallin. Tämä ei koske kutsuja, jotka tehdään ihmisen tai agentin omalla avaimella.",
+          "range": "Kokonaisluku tokeneina, vähintään 0. Oletus on 32000, mikä riittää pitkään asiakirjaan. 0 tarkoittaa, että rajaa ei ole. Silloin kutsu, joka ei nimeä pituutta, hinnoitellaan 1 024 tokenin mukaan.",
+          "low": "Pienempi: kukin kutsu hinnoitellaan halvemmaksi, joten pieneen saldoon mahtuu enemmän kutsuja, ja pitkät vastaukset katkeavat aiemmin.",
+          "high": "Suurempi: pitkät vastaukset mahtuvat, ja kukin kutsu varaa käynnin ajaksi enemmän saldoa.",
+          "ex1": "32000 mallilla, jonka vastaus maksaa 75 dollaria miljoonalta tokenilta: kutsu varaa noin 2,40 dollaria käynnin ajaksi.",
+          "ex2": "4000 samalla mallilla: kutsu varaa noin 0,30 dollaria.",
+          "tip": "Pidä luku lähellä pisintä vastausta, jota ihmiset oikeasti tarvitsevat. Joka tarvitsee enemmän, käyttää omaa avaintaan, jota tämä ei koske."
         }
       },
       "security": {

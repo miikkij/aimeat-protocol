@@ -13,6 +13,9 @@
  *   - notifications: GET/PATCH preferences with channel/cooldown/quiet-hours/type validation
  *
  * @version-history
+ *   2026-10-25 — POST /v1/personal/anchor refuses an owner's anchor past personal_nodes.max_per_owner
+ *     (default 3, 0 = no limit) with 409 PERSONAL_NODE_LIMIT, naming the limit and the delete call that
+ *     frees a slot; anchors that exist stay (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
  *   2026-10-24 — POST /v1/personal/anchor refuses an agent_gaiis entry that is not the anchoring
  *     owner's own agent on that personal node, 400 AGENT_GAII_NOT_YOURS (secaudit2026oct22,
  *     personal-anchor-agent-gaiis-claim-foreign-gaii).
@@ -94,8 +97,25 @@ export function personalRouter(
         return;
       }
 
-      // Check slot availability
+      // Check slot availability. The slots are shared by every owner of this node, so one owner
+      // holds at most personalNodeMaxPerOwner of them (0 = no limit). Anchors that already exist
+      // are not touched; the limit decides only the next one (secaudit2026oct22).
       const allNodes = await storage.listPersonalNodes();
+      const perOwner = config.personalNodeMaxPerOwner;
+      const ownNodes = allNodes.filter(n => n.ownerName === owner_name);
+      if (perOwner > 0 && ownNodes.length >= perOwner) {
+        res.status(409).json(error(config.nodeId, 'PERSONAL_NODE_LIMIT',
+          `You already connect ${ownNodes.length} of your own servers here, and one owner may connect ${perOwner} on this server. `
+          + 'To free a slot, remove one you no longer use under Your own servers in your profile, or with DELETE /v1/personal/anchor/<id>. '
+          + 'The operator sets the limit (personal_nodes.max_per_owner).',
+          undefined, {
+            limit: perOwner,
+            your_nodes: ownNodes.slice(0, 20).map(n => n.nodeId),
+            free_a_slot: 'DELETE /v1/personal/anchor/:nodeId',
+            setting: 'personal_nodes.max_per_owner',
+          }));
+        return;
+      }
       if (allNodes.length >= config.personalNodeMaxSlots) {
         res.status(503).json(error(config.nodeId, 'CAPACITY_FULL', `This operator already runs ${config.personalNodeMaxSlots} personal nodes, which is the limit here. Ask them to free one.`));
         return;
