@@ -10,6 +10,7 @@
  * @structure TRANSLATIONS[lang][packId] = { title?, description }
  * @usage import { TRANSLATIONS } from './library-packs/translations.js'; (getLibraryPackIndex(lang))
  * @version-history
+ *   v1.5.1 - 2026-10-25 - The mermaid pack's Finnish and Spanish descriptions name v12.
  *   v1.5.0 - 2026-10-25 - proj4leaflet in Finnish and Spanish.
  *   v1.4.0 - 2026-10-05 - aimeat-validate in Finnish and Spanish.
  *   v1.3.0 - 2026-10-01 - aimeat-intake and aimeat-connect in Finnish and Spanish, now that they have packs.
@@ -80,7 +81,7 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     'ffmpeg-core': { title: 'Videon ja äänen koodaus (ffmpeg.wasm)', description: 'FFmpeg 5.1.4 WebAssemblyna tältä palvelimelta: muunna, leikkaa, yhdistä, erota ääni, tee kuvasarjasta MP4, kokonaan selaimessa ilman latausta palvelimelle. Ainoa tapa, jolla sovellus voi tuottaa videotiedoston, jonka käyttäjä saa pitää.' },
     'duckdb-wasm': { title: 'SQL julkaistuun aineistoon selaimessa (DuckDB-Wasm)', description: 'DuckDB WebAssemblyna tältä palvelimelta, Apache Arrow mukana. Ajaa oikeaa SQL:ää CSV- tai Parquet-tiedostoon sen julkisessa osoitteessa ja kirjoittaa Parquetia takaisin, joten sovellus voi kysellä kahdensadantuhannen rivin aineistoa ja viedä sellaisen ilman palvelinta ja ilman että käyttäjä lataa mitään ensin.' },
     d3: { title: 'd3 (tiedon visualisointi)', description: 'D3 v7 (window.d3) tältä palvelimelta: vapaamuotoinen visualisointityökalu kaavioihin, joita Atelierin kaavioperhe ei piirrä: omat hierarkiat, voima-asettelut, karttaprojektiot, räätälöidyt akselit ja siirtymät.' },
-    mermaid: { title: 'Mermaid-kaaviot', description: 'Mermaid v11 (window.mermaid) tältä palvelimelta: vuo-, sekvenssi-, luokka- ja tilakaaviot, gantt ja miellekartat tekstimäärittelyistä.' },
+    mermaid: { title: 'Mermaid-kaaviot', description: 'Mermaid v12 (window.mermaid) tältä palvelimelta: vuo-, sekvenssi-, luokka- ja tilakaaviot, gantt ja miellekartat tekstimäärittelyistä.' },
     three: { title: 'three.js (3D)', description: 'three.js r128 (window.THREE) tältä palvelimelta: WebGL-3D geometrioineen, materiaaleineen, valoineen ja kameroineen, OrbitControls-tyylinen ohjaus. Vuoden 2021 rajapinta.' },
     'three-world': { title: 'three-world (uusi three.js lisäosineen)', description: 'Uusi three.js (r185) OrbitControlsin, taivaan ja HDR-latauksen kanssa yhtenä tavallisena skriptinä (window.THREE, lisäosat THREE.Addons): näyttävät 3D-näkymät ja maailmat, ACES-sävykartta, laskennalliset tai HDR-taivaat, instansointi.' },
     p5: { title: 'p5.js (luova koodaus)', description: 'p5.js v1 (window.p5) tältä palvelimelta: generatiivinen taide, vuorovaikutteiset luonnokset, partikkelit ja yksinkertaiset animaatiot setup()/draw()-mallilla.' },
@@ -152,7 +153,7 @@ export const TRANSLATIONS: Record<string, Record<string, { title?: string; descr
     'ffmpeg-core': { title: 'Codificación de vídeo y audio (ffmpeg.wasm)', description: 'FFmpeg 5.1.4 compilado a WebAssembly desde este servidor: transcodifica, corta, une, extrae el audio, convierte una secuencia de fotogramas en MP4, todo en el navegador sin subir nada. La única forma en que una app produce un archivo de vídeo que el usuario puede quedarse.' },
     'duckdb-wasm': { title: 'SQL sobre un conjunto de datos publicado, en el navegador (DuckDB-Wasm)', description: 'DuckDB compilado a WebAssembly desde este servidor, con Apache Arrow incluido. Ejecuta SQL real contra un CSV o Parquet en su dirección pública y escribe Parquet de vuelta, así una app consulta un conjunto de doscientas mil filas y exporta uno sin servidor y sin que el usuario descargue nada antes.' },
     d3: { title: 'd3 (visualización de datos)', description: 'D3 v7 (window.d3) desde este servidor: la herramienta libre de visualización para los gráficos que la familia de gráficos de Atelier no dibuja: jerarquías propias, disposiciones de fuerza, proyecciones geográficas, ejes a medida y transiciones.' },
-    mermaid: { title: 'Diagramas Mermaid', description: 'Mermaid v11 (window.mermaid) desde este servidor: diagramas de flujo, secuencia, clases y estados, gantt y mapas mentales a partir de texto.' },
+    mermaid: { title: 'Diagramas Mermaid', description: 'Mermaid v12 (window.mermaid) desde este servidor: diagramas de flujo, secuencia, clases y estados, gantt y mapas mentales a partir de texto.' },
     three: { title: 'three.js (3D)', description: 'three.js r128 (window.THREE) desde este servidor: escenas 3D WebGL con geometría, materiales, luces, cámaras e interacción al estilo OrbitControls. Interfaz de 2021.' },
     'three-world': { title: 'three-world (three.js moderno con complementos)', description: 'three.js moderno (r185) con OrbitControls, cielo y carga HDR como un solo script clásico (window.THREE, complementos en THREE.Addons): escenas y mundos 3D con acabado, mapeo tonal ACES, cielos procedurales o HDR, instanciado.' },
     p5: { title: 'p5.js (código creativo)', description: 'p5.js v1 (window.p5) desde este servidor: arte generativo, bocetos interactivos, partículas y animaciones sencillas con el modelo setup()/draw().' },
