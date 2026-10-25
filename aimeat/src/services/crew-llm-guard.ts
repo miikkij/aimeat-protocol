@@ -25,9 +25,11 @@
  *   runtime applies the same rules when it reads a choice, which also covers a record saved before
  *   this guard existed.
  * @structure KEY_ENV_RULE · EXACT_KEY_ENV_NAMES · keyEnvProblem() · crewAddressProblem() ·
- *   crewChoiceProblem()
+ *   crewChoiceProblem() · choiceAddresses()
  * @usage const problem = await crewChoiceProblem(choice.provider); if (problem) refuse(problem);
  * @version-history
+ *   v1.1.0 — 2026-10-25 — choiceAddresses(): the addresses a provider block names, read the way the
+ *     check reads them, for the owner's approval of an address an app set (secaudit2026oct22).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { validateOutboundUrl } from '../utils/url-validator.js';
@@ -82,4 +84,19 @@ export async function crewChoiceProblem(provider: unknown, depth = 0): Promise<s
     }
   }
   return null;
+}
+
+/**
+ * Every address a provider block names (base_url, api_base, endpoint, url), at any depth the check
+ * walks: where the crew runtime would send its key. Empty when the block names none and the runtime
+ * uses its provider's own address.
+ */
+export function choiceAddresses(provider: unknown, depth = 0): string[] {
+  if (depth > 4 || !provider || typeof provider !== 'object') return [];
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(provider as Record<string, unknown>)) {
+    if (ADDRESS_FIELD.test(k) && typeof v === 'string' && v.trim()) out.push(v.trim());
+    else if (v && typeof v === 'object') out.push(...choiceAddresses(v, depth + 1));
+  }
+  return [...new Set(out)];
 }

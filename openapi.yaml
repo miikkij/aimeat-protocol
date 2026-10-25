@@ -62989,6 +62989,13 @@ paths:
         variable (a name ending in `_API_KEY` that does not start with `AIMEAT_`, or `NVIDIA_KEY`),
         and every address in the provider must be public https; anything else is refused with
         `UNSAFE_CHOICE`, because the crew sends that variable's value to that address.
+
+        The owner and the owner's agents set any choice at once. An app grant or an ecosystem app sets
+        a `node` or `profile` choice, a `model` choice that names no address of its own, or a clear at
+        once too; a `model` choice that names its own address (base_url, api_base, endpoint or url)
+        waits for the owner's one-press approval, because the crew sends the owner's key there: 202
+        with `approval_request` (awaiting_owner, the approve_url), the crew keeps the model it has, the
+        owner's Allow writes exactly that choice, and the app's account hears the answer either way.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -63010,6 +63017,11 @@ paths:
                   nullable: true
                   description: The choice, or null to clear it and fall back to the owner's default.
       responses:
+        '202':
+          description: An app named a model's own address; it waits for the owner (`data.approval_request`), and nothing changed yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '200':
           description: Stored, or cleared
           content:
@@ -63039,7 +63051,8 @@ paths:
         this too, because a crew that states its need is stating it about itself.
 
         `{"choice": null}` clears it, and routing falls back to the `llm_providers.json` on whatever
-        machine runs the agent.
+        machine runs the agent. A `model` choice with its own address set by an app waits for the
+        owner's approval, as on the per-agent route (202 `approval_request`). Requires memory:write.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -63054,6 +63067,12 @@ paths:
                   type: object
                   nullable: true
       responses:
+        '202':
+          description: An app named a model's own address; it waits for the owner (`data.approval_request`), and nothing changed yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { description: 'SCOPE_DENIED: the caller does not hold memory:write.' }
         '200':
           description: Stored, or cleared
           content:

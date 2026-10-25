@@ -37,6 +37,9 @@
  * @structure CrewMenu · crewMenu() · readLlmChoice() · ownerDefaultIsNode() · effectiveLlmChoice() · checkLlmChoice() · writeLlmChoice()
  * @usage const menu = await crewMenu(deps, caller, 'news-watcher');
  * @version-history
+ *   v1.8.0 — 2026-10-25 — writeLlmChoice: an app grant sets a choice again; a model choice that names
+ *     its own address, set by an app, waits for the owner's approval and answers `approval_request`
+ *     (services/crew-model-ask.ts; secaudit2026oct22, lead 228 reworked).
  *   v1.7.0 — 2026-10-13 — checkLlmChoice(): the check writeLlmChoice applies, on its own, for the
  *     approval of a proposed agent, which refuses a bad choice before it creates the agent.
  *   v1.6.0 — 2026-10-12 — The menu carries `features`, the names the runtime says it honours beyond
@@ -70,6 +73,14 @@ import { isAllowed, parseModelRef } from './ai/policy.js';
 import { canonicalModelKey } from './ai/catalog/equivalence.js';
 import { AiCompletionError } from './ai/errors.js';
 import { crewChoiceProblem } from './crew-llm-guard.js';
+import { askOwnerForCrewModel, needsOwnerForChoice, type CrewModelAsk } from './crew-model-ask.js';
+import type { PublishRequester } from './publish-requests/store.js';
+
+/** What a choice an app made adds to the answer when it waits for the owner. */
+type CrewModelAskFields = {
+  approval_request: Extract<CrewModelAsk, { approval_request: unknown }>['approval_request'];
+  warnings: Extract<CrewModelAsk, { warnings: unknown }>['warnings'];
+};
 import { prepareAiCall } from './ai/completion.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import type { AgentRecord } from '../storage/types/identity.js';
@@ -272,7 +283,9 @@ export async function checkLlmChoice(choice: unknown): Promise<{ ok: true; choic
  */
 export async function writeLlmChoice(
   deps: Deps, caller: CrewCaller, agentName: string | null, choice: unknown,
-): Promise<{ ok: true; key: string; cleared: boolean; warning?: string } | CrewRefusal> {
+  /** Who asks when an app's choice waits for the owner: the app, as the route names it (requesterOf). */
+  asker?: PublishRequester,
+): Promise<{ ok: true; key: string; cleared: boolean; warning?: string } & Partial<CrewModelAskFields> | CrewRefusal> {
   const key = agentName ? llmKeyFor(agentName) : LLM_DEFAULT_KEY;
 
   if (choice === null || choice === undefined) {
@@ -284,6 +297,17 @@ export async function writeLlmChoice(
   const checked = await checkLlmChoice(choice);
   if (!checked.ok) return checked;
   const valid = checked.choice;
+
+  // A model address an app chose: the crew would send the owner's key there, so the owner allows it
+  // first and the crew keeps its model meanwhile (services/crew-model-ask.ts; secaudit2026oct22).
+  if (needsOwnerForChoice(caller.roles, valid)) {
+    const asked = await askOwnerForCrewModel({ storage: deps.storage, config: deps.config }, {
+      owner: caller.owner, agentName, key, choice: valid,
+      requester: asker ?? { principal: caller.principal, kind: 'app', sub: caller.principal },
+    });
+    logger.info('LLM choice asked of the owner', { event: 'crew.llm_asked', owner: caller.owner, key });
+    return { ok: true, key, cleared: false, ...asked };
+  }
 
   const ownerGhii = `${caller.owner}@${deps.config.nodeId}`;
   const out = await writeMemoryRecord({ storage: deps.storage, config: deps.config }, {
