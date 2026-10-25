@@ -14,6 +14,9 @@
  * @structure sseRouter(config, storage) -> Router
  * @usage app.use(sseRouter(config, storage)); client: EventSource('/v1/events?ticket=...')
  * @version-history
+ *   2026-10-25 -- The 15 s keepalive is `event: alive` instead of a comment line, so the page sees it:
+ *     a tab that holds a browser's shared stream relays it, and a tab that stops hearing it takes the
+ *     stream over (public/lib/live-updates.js). Nothing else in the stream changes.
  *   2026-10-21 -- The ticket's audience asks isAnonymousPrincipal, so the minted anonymous token gets no
  *     member-audience events (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.8.0 -- 2026-10-18 -- A workspace's own domain, `workspace:<organismId>/<ws>`
@@ -261,10 +264,13 @@ export function sseRouter(config: AimeatConfig, storage: Storage): Router {
     res.write(`event: hello\ndata: ${JSON.stringify({ build: BUILD_ID })}\n\n`);
     flush();
 
-    // Keepalive comment. 15s keeps the connection under the read timeout of common proxies
-    // (which is where a silent 30s gap gets a stream killed) at negligible cost.
+    // Keepalive. 15s keeps the connection under the read timeout of common proxies (which is where a
+    // silent 30s gap gets a stream killed) at negligible cost. It is a named event, not a comment,
+    // because the page has to SEE it: the tab holding a browser's shared stream relays it to the
+    // other tabs, and a tab that stops hearing it takes the stream over (public/lib/live-updates.js).
+    // An EventSource with no 'alive' listener ignores it.
     const keepalive = setInterval(() => {
-      res.write(':keepalive\n\n');
+      res.write('event: alive\ndata: {}\n\n');
       flush();
     }, 15_000);
 
