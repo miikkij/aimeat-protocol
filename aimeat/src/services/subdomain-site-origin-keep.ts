@@ -22,7 +22,7 @@
  *   auto-assign never makes, and a createdBy an account erasure replaced. These stay null, served on
  *   the apex as before, and become ONE incident on the Security page with the decision named:
  *   PATCH /v1/admin/subdomains/{label} with origin 'publisher' (app origin only) or 'operator' (apex
- *   too), or aimeat_app_manage subdomain_set with subdomain_origin.
+ *   too), or aimeat_app_manage subdomain_set with origin.
  *
  *   WHERE. The step's record is SUBDOMAIN_SITE_ORIGIN_STEP_KEY under `system@<nodeId>`:
  *   { at, operator, publisher, unclassified }. It runs before the node serves
@@ -30,6 +30,8 @@
  * @structure SUBDOMAIN_SITE_ORIGIN_STEP_KEY · classifySubdomainSiteOriginsOnce(storage, config)
  * @usage await classifySubdomainSiteOriginsOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   v1.1.0 — 2026-10-25 — The rows are read in pages of PAGE (listSubdomainSitesPage), and an owner's
+ *     operator role per owner the rows name (getOwner), instead of two whole-table reads (check:unbounded-lists).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import type { AimeatConfig } from '../config.js';
@@ -46,6 +48,15 @@ export const SUBDOMAIN_SITE_ORIGIN_STEP_KEY = 'migrations.secaudit2026oct22.subd
 /** How many unclassified labels the incident names one by one. */
 const INCIDENT_ROWS = 100;
 
+/** How many rows one read takes. */
+const PAGE = 200;
+
+/** The owner an app row's target names (`<owner>/<filename>`), or null for a redirect or a malformed target. */
+function targetOwner(site: { kind: string; target: string }): string | null {
+  const slash = site.target.indexOf('/');
+  return site.kind === 'app' && slash > 0 ? site.target.slice(0, slash) : null;
+}
+
 interface Outcome { operator: number; publisher: number; unclassified: string[] }
 
 /**
@@ -60,16 +71,28 @@ export async function classifySubdomainSiteOriginsOnce(
   if (!claim) return null;
   try {
     const out: Outcome = { operator: 0, publisher: 0, unclassified: [] };
-    const sites = (await storage.listSubdomainSites()).filter(s => !s.origin);
-    if (sites.length) {
-      const operators = new Set((await storage.listOwners()).filter(isOperatorAccount).map(o => o.name));
-      for (const site of sites) {
-        const origin = classifySiteOrigin(site, config.nodeId, name => operators.has(name));
+    // Whether an account is an operator, read once per distinct account the rows name.
+    const operatorOf = new Map<string, boolean>();
+    const isOperator = async (name: string): Promise<boolean> => {
+      if (!operatorOf.has(name)) operatorOf.set(name, isOperatorAccount(await storage.getOwner(name)));
+      return operatorOf.get(name)!;
+    };
+    // The table a bounded page at a time, in label order; a write sets only `origin`, so the keyset holds.
+    let after: string | undefined;
+    for (;;) {
+      const page = await storage.listSubdomainSitesPage({ after, limit: PAGE });
+      if (!page.length) break;
+      after = page[page.length - 1]!.subdomain;
+      for (const site of page.filter(s => !s.origin)) {
+        const owner = targetOwner(site);
+        const ownerIsOperator = owner ? await isOperator(owner) : false;
+        const origin = classifySiteOrigin(site, config.nodeId, () => ownerIsOperator);
         if (!origin) { out.unclassified.push(site.subdomain); continue; }
         // updatedAt is kept: the row's content did not change.
         await storage.updateSubdomainSite(site.subdomain, { origin, updatedAt: site.updatedAt });
         out[origin] += 1;
       }
+      if (page.length < PAGE) break;
     }
     if (out.unclassified.length) {
       const shown = out.unclassified.slice(0, INCIDENT_ROWS).join(', ');
@@ -84,7 +107,7 @@ export async function classifySubdomainSiteOriginsOnce(
           + 'They are served as before, at <label>.<apex> and at <label>.<app host>. A label a publish gave an app is from now on served only at '
           + '<label>.<app host>, because the node\'s own pages and sign-in answer on <label>.<apex>. Decide each one: '
           + 'PATCH /v1/admin/subdomains/{label} with {"origin":"publisher"} to serve it only at its app address, or {"origin":"operator"} '
-          + 'to keep it at <label>.<apex> too (aimeat_app_manage subdomain_set with subdomain_origin does the same). Then resolve this incident.',
+          + 'to keep it at <label>.<apex> too (aimeat_app_manage subdomain_set with origin does the same). Then resolve this incident.',
       });
     }
     await claim.finish({ at: new Date().toISOString(), operator: out.operator, publisher: out.publisher, unclassified: out.unclassified });

@@ -104,6 +104,17 @@ describe('classifySubdomainSiteOriginsOnce', () => {
         expect((await listSecurityIncidents(storage, config)).items.filter(i => i.type === 'subdomain_site_origin')).toHaveLength(1);
     });
 
+    it('reads past one page of rows', async () => {
+        for (let i = 0; i < 205; i++) await storage.createSubdomainSite(row(`notes-${i + 2}`, 'alice/notes.html', `alice@${NODE}`));
+        await storage.createSubdomainSite(row('zz-shop', 'alice/notes.html', `op@${NODE}`));
+        const out = await classifySubdomainSiteOriginsOnce(storage, config);
+        // notes-2 .. notes-51 are auto-assign labels; notes-52 and up are not, so they stay undecided.
+        expect(out?.publisher).toBe(50);
+        expect(out?.unclassified).toHaveLength(155);
+        expect(out?.operator).toBe(1);
+        expect((await storage.getSubdomainSite('zz-shop'))?.origin).toBe('operator');
+    });
+
     it('opens no incident when every row is classified', async () => {
         await storage.createSubdomainSite(row('notes', 'alice/notes.html', `alice@${NODE}`));
         expect(await classifySubdomainSiteOriginsOnce(storage, config)).toEqual({ operator: 0, publisher: 1, unclassified: [] });
