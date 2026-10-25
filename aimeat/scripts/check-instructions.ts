@@ -56,8 +56,10 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * comes with its URL, which holds in every session.
  * Raised to 41,000 on 2026-10-18, at Jouni's request, for the rule that live data arrives as an event
  * over the existing SSE stream and never by polling, which holds in every session.
+ * Raised to 41,200 on 2026-10-25 for Jouni's ruling that a session's sandbox gets his OpenRouter test
+ * key and model without asking ("I gave the key exactly for this"), which holds in every session.
  */
-const CEILING_BYTES = 41_000;
+const CEILING_BYTES = 41_200;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })
