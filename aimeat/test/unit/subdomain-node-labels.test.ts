@@ -1,6 +1,6 @@
 /**
  * @file subdomain-node-labels.test.ts
- * @description The node's own apex labels (src/routes/subdomain-node-labels.ts): which single-label
+ * @description The node's own apex labels (src/services/subdomain-node-labels.ts): which single-label
  *   names a published app never gets and the apex never serves as an app, and where the apex sends
  *   an app row that already holds one (its per-app origin) (secaudit2026oct22).
  * @usage cd aimeat && pnpm exec vitest run test/unit/subdomain-node-labels.test.ts
@@ -8,7 +8,7 @@
  *   v1.0.0 — 2026-10-24 — Created (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
-import { isNodeApexLabel, nodeLabelAppOrigin } from '../../src/routes/subdomain-node-labels.js';
+import { isNodeApexLabel, nodeLabelAppOrigin } from '../../src/services/subdomain-node-labels.js';
 
 const PROD = { baseUrl: 'https://aimeat.io', appHost: 'apps.aimeat.io', portfolioHost: 'portfolio.aimeat.io', coHost: 'co.aimeat.io', pageHost: 'pages.aimeat.io' };
 

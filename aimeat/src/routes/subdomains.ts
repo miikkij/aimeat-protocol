@@ -15,7 +15,7 @@
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
  *   v1.33.0 — 2026-10-24 — SECURITY (secaudit2026oct22): a node name (login, account, pay..., and the
- *     label of a configured node host; routes/subdomain-node-labels.ts) is never auto-assigned as an
+ *     label of a configured node host; services/subdomain-node-labels.ts) is never auto-assigned as an
  *     app's label, and on the apex namespace an app row holding one answers 302 to its per-app origin
  *     instead of serving the app under the node's name.
  *   v1.32.1 — 2026-10-20 — serveApp's viewer is the resolved caller (resolveIdentity), not the token's
@@ -184,7 +184,7 @@ import { detectLocale, type Locale } from '../i18n.js';
 import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
 import { pageOriginRefused } from './page-open.js';
 import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
-import { isNodeApexLabel, nodeLabelAppOrigin } from './subdomain-node-labels.js';
+import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -237,7 +237,7 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
   if (forTarget.length > 0) return null;
 
   const taken = new Set(sites.map(s => s.subdomain));
-  // A node name (login, account, pay...) is never an app's label (routes/subdomain-node-labels.ts).
+  // A node name (login, account, pay...) is never an app's label (services/subdomain-node-labels.ts).
   const free = (n: string) => SUBDOMAIN_RE.test(n) && !RESERVED_SUBDOMAINS.has(n) && !isNodeApexLabel(n, config) && !taken.has(n) && draftBaseLabel(n) === null;
   let base = filename.replace(/\.html?$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
   if (base.length < 2) base = `app-${base}`.replace(/-+$/g, '').slice(0, 50);
@@ -655,7 +655,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
     // A node name (login, account, pay...) never shows an app on the apex namespace, where the
     // node's own pages answer on the same host. A row that already holds one keeps serving on its
-    // per-app origin, and the apex sends the visitor there (routes/subdomain-node-labels.ts).
+    // per-app origin, and the apex sends the visitor there (services/subdomain-node-labels.ts).
     if (!req.appOrigin && isNodeApexLabel(sub, config)) {
       const there = nodeLabelAppOrigin(config, sub, req.originalUrl);
       if (!there) return notFound();
