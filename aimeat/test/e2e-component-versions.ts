@@ -9,6 +9,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=component-versions
  * @version-history
+ *   v1.2.0 — 2026-10-25 — Another owner reads a private cortex's versions as 404 NOT_FOUND, and a
+ *     bundled cortex's versions still answer any owner (secaudit2026oct22).
  *   v1.1.0 — 2026-09-24 — A kept version is immutable (secaudit 2026-09, A6-7): re-publishing 1.1.0
  *     with other code is refused on both kinds and the pinned address keeps its bytes; the same code
  *     again is a no-op; a PATCH of a live action becomes 1.1.1 while a call pinned to 1.1.0 runs the
@@ -220,6 +222,25 @@ await test('a PATCH naming a version already kept with other code is refused, an
     assert(says(bare).includes('"patched"'), `the live code is still the patch: ${says(bare).slice(0, 200)}`);
     const old = await callExt(`${EXT}@1.0.0`);
     assert(says(old).includes('"1.0.0"') && !says(old).includes('again'), `1.0.0 still runs its own code: ${says(old).slice(0, 200)}`);
+});
+
+// ── The versions list asks canSeeCortex like the detail read (secaudit2026oct22) ──
+//
+// A private cortex of another owner answers the same 404 as a missing name on every read, so a
+// caller cannot learn that it exists, who installed it or when its versions were made.
+await test('another owner reads a private cortex\'s versions as 404, the same answer as its detail', async () => {
+    const other = await makeOwner(`verownb${stamp}`);
+    const detail = await json(`/v1/cortex/${CORTEX}`, auth(other));
+    assert(detail.status === 404, `precondition: the cortex is private, detail answered ${detail.status}`);
+    const list = await json(`/v1/cortex/${CORTEX}/versions`, auth(other));
+    assert(list.status === 404 && list.body.error?.code === 'NOT_FOUND', `expected 404 NOT_FOUND, got ${list.status} ${JSON.stringify(list.body).slice(0, 200)}`);
+    assert(!JSON.stringify(list.body).includes(owner), 'the answer names the installer');
+});
+
+await test('a bundled cortex\'s versions still answer any signed-in owner', async () => {
+    const other = await makeOwner(`verownc${stamp}`);
+    const list = await json('/v1/cortex/aimeat-input/versions', auth(other));
+    assert(list.status === 200 && typeof list.body.data?.current === 'string', `bundled versions: ${list.status} ${JSON.stringify(list.body).slice(0, 200)}`);
 });
 
 await test('uninstalling drops the kept versions', async () => {
