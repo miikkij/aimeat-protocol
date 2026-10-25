@@ -2,7 +2,12 @@
  * @file calendar.test.ts
  * @description Calendar contract: civil-time recurrence, exceptions, interchange and free time.
  * @version-history v1.0.0 - 2026-09-18 - New feature assertions, red before implementation.
+ *   v1.1.0 - 2026-10-25 - Rules that held the recurrence engine without end, or walked it to the year
+ *     9999, end with no occurrence or a refusal; reachable sub-daily rules expand as before
+ *     (secaudit2026oct22).
  */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { calendar } from '../../../src/static/sdk-libs/calendar/core.js';
 
@@ -85,6 +90,50 @@ describe('calendar', () => {
     expect(calendar.occurrences([impossible],range)).toEqual([]);
     const until={...meeting,rrule:'FREQ=WEEKLY;UNTIL=20260330T060000Z'};
     expect(calendar.occurrences([until],range).map(r=>r.start)).toEqual(['2026-03-23T07:00:00Z','2026-03-30T06:00:00Z']);
+  });
+  // secaudit2026oct22: rrule 2.8.1 loops without end inside one step when a sub-daily BY-time limit
+  // can never be reached, and walks every period to the year 9999 when a day filter never matches.
+  // The engine runs synchronously, so the hanging cases run in a child process with a kill.
+  const probe = (rule: string, ...rest: string[]) => {
+    const r = spawnSync(process.execPath, [fileURLToPath(new URL('./rrule-probe.mjs', import.meta.url)), rule, ...rest], { timeout: 10000, encoding: 'utf8' });
+    if (r.error) return { killed: true } as const;
+    return JSON.parse(r.stdout.trim()) as { ok: boolean; starts?: string[]; error?: string; ms: number };
+  };
+  it.each([
+    'FREQ=HOURLY;BYHOUR=25', 'FREQ=HOURLY;INTERVAL=2;BYHOUR=1', 'FREQ=MINUTELY;BYMINUTE=61',
+    'FREQ=SECONDLY;BYSECOND=60', 'FREQ=MINUTELY;INTERVAL=120;BYHOUR=1',
+  ])('ends a sub-daily rule whose BY-time limit is never reached (%s) with no occurrence', (rule) => {
+    expect(probe(rule)).toMatchObject({ ok: true, starts: [] });
+  });
+  it.each(['FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30', 'FREQ=HOURLY;BYMONTH=2;BYMONTHDAY=30', 'FREQ=WEEKLY;BYMONTH=2;BYMONTHDAY=30'])(
+    'stops an impossible day filter (%s) at the end of the range', (rule) => {
+      const out = probe(rule);
+      expect(out).toMatchObject({ ok: true, starts: [] });
+      expect('ms' in out && out.ms).toBeLessThan(1500);
+    });
+  it('refuses an impossible rule that would walk from the year 1, instead of walking it', () => {
+    expect(probe('FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30', '0001-01-01T00:00:00')).toMatchObject({ ok: false, error: 'Recurrence iteration limit exceeded; shorten the series' });
+  });
+  it.each([
+    ['FREQ=HOURLY;INTERVAL=3;BYHOUR=9,12,15', '2026-01-01T00:00:00', '2026-01-03T00:00:00Z', ['2026-01-01T09:00:00','2026-01-01T12:00:00','2026-01-01T15:00:00','2026-01-02T09:00:00','2026-01-02T12:00:00','2026-01-02T15:00:00']],
+    ['FREQ=MINUTELY;INTERVAL=15;BYHOUR=9,10;BYMINUTE=0,30', '2026-01-01T08:00:00', '2026-01-02T00:00:00Z', ['2026-01-01T09:00:00','2026-01-01T09:30:00','2026-01-01T10:00:00','2026-01-01T10:30:00']],
+    ['FREQ=HOURLY;BYHOUR=9;COUNT=3', '2026-01-01T10:00:00', '2026-02-01T00:00:00Z', ['2026-01-02T09:00:00','2026-01-03T09:00:00','2026-01-04T09:00:00']],
+    ['FREQ=SECONDLY;INTERVAL=20;BYHOUR=9;BYMINUTE=0;BYSECOND=0,40;COUNT=5', '2026-01-01T08:59:00', '2026-02-01T00:00:00Z', ['2026-01-01T09:00:00','2026-01-01T09:00:40','2026-01-02T09:00:00','2026-01-02T09:00:40','2026-01-03T09:00:00']],
+    ['FREQ=HOURLY;INTERVAL=5;BYDAY=MO;BYHOUR=10,15', '2026-01-05T00:00:00', '2026-01-20T00:00:00Z', ['2026-01-05T10:00:00','2026-01-05T15:00:00']],
+    ['FREQ=HOURLY;INTERVAL=2;BYHOUR=1,3;BYMINUTE=0,20;BYSETPOS=-1', '2026-01-01T01:00:00', '2026-01-02T00:00:00Z', ['2026-01-01T01:20:00','2026-01-01T03:20:00']],
+    // The engine's own answer for this one was 03:30, 03:00, 06:30. With INTERVAL 90 and BYHOUR the
+    // limit is applied to the yielded dates, which gives the RFC 5545 answer.
+    ['FREQ=MINUTELY;INTERVAL=90;BYHOUR=3,6', '2026-01-01T00:00:00', '2026-01-03T00:00:00Z', ['2026-01-01T03:00:00','2026-01-01T06:00:00','2026-01-02T03:00:00','2026-01-02T06:00:00']],
+  ])('expands the reachable sub-daily rule %s as before', (rule, start, to, starts) => {
+    const end = new Date(Date.parse(start + 'Z') + 60_000).toISOString().slice(0, 19);
+    const rows = calendar.occurrences([{ id: 'r', start, end, timeZone: 'UTC', rrule: rule }], { from: '2026-01-01T00:00:00Z', to });
+    expect(rows.map(r => r.localStart)).toEqual(starts);
+  });
+  it('keeps every date of a long range and of a sparse rule that started long ago', () => {
+    const daily = calendar.occurrences([{ id: 'd', start: '2026-01-01T09:00:00', end: '2026-01-01T10:00:00', timeZone: 'UTC', rrule: 'FREQ=DAILY' }], { from: '2026-01-01T00:00:00Z', to: '2026-12-31T00:00:00Z' });
+    expect(daily).toHaveLength(364);
+    const leap = calendar.occurrences([{ id: 'l', start: '2000-01-01T09:00:00', end: '2000-01-01T10:00:00', timeZone: 'UTC', rrule: 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=29' }], { from: '2028-02-01T00:00:00Z', to: '2028-03-01T00:00:00Z' });
+    expect(leap.map(r => r.localStart)).toEqual(['2028-02-29T09:00:00']);
   });
   it('escapes a lone carriage return instead of writing a new ICS property', () => {
     const ics=calendar.toICS([{...meeting,title:'Meeting\rATTENDEE:unexpected'}]);

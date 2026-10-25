@@ -15,6 +15,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=extension-calendar
  * @version-history
+ *   v1.1.0 — 2026-10-25 — Rules the recurrence engine could not finish answer with no occurrence,
+ *     and the node keeps answering (secaudit2026oct22).
  *   v1.0.0 — 2026-10-13 — Initial (the October agents plan, brief 11).
  */
 import { ownerSignIn } from './helpers/owner-login.js';
@@ -155,6 +157,22 @@ await test('The host\'s own bounds refuse a call that is too large, before the l
     assert(notList.status >= 400 && /CALENDAR: event series must be an array/.test(JSON.stringify(notList.body)), `not a list: ${notList.status} ${JSON.stringify(notList.body?.error)}`);
     const noRange = await invoke('occurrences', A.token, { events: [WEEKLY], options: {} });
     assert(noRange.status >= 400 && /CALENDAR: from must be a string/.test(JSON.stringify(noRange.body)), `no range: ${noRange.status} ${JSON.stringify(noRange.body?.error)}`);
+});
+
+// secaudit2026oct22: a sub-daily rule whose BYHOUR the counter never reaches held the recurrence
+// engine in an endless synchronous loop on the node's own thread, so every tenant waited.
+await test('A rule the recurrence engine could not finish answers with no occurrence, and the node keeps answering', async () => {
+    const events = [
+        { id: 'never', start: '2026-10-12T00:00:00', end: '2026-10-12T00:30:00', timeZone: 'UTC', rrule: 'FREQ=HOURLY;BYHOUR=25' },
+        { id: 'parity', start: '2026-10-12T00:00:00', end: '2026-10-12T00:30:00', timeZone: 'UTC', rrule: 'FREQ=HOURLY;INTERVAL=2;BYHOUR=1' },
+        { id: 'feb30', start: '2026-10-12T09:00:00', end: '2026-10-12T09:30:00', timeZone: 'UTC', rrule: 'FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30' },
+    ];
+    const r = await invoke('occurrences', A.token, { events: [...events, WEEKLY], options: { from: '2026-10-12T00:00:00Z', to: '2026-11-09T00:00:00Z' } });
+    assert(r.status === 200, `occurrences ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const ids = new Set((r.body.data.list as Array<{ eventId: string }>).map(o => o.eventId));
+    assert(ids.size === 1 && ids.has('standup'), `only the weekly event occurs: ${JSON.stringify([...ids])}`);
+    const build = await fetch(`${BASE}/v1/build`, { signal: AbortSignal.timeout(5000) });
+    assert(build.ok, `GET /v1/build ${build.status}`);
 });
 
 await test('Another owner calling the extension gets the same computation, and no credential gets none', async () => {
