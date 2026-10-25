@@ -7,6 +7,8 @@
  *   poll-before-approval). Also unit-asserts the gaii.ts GEAI/GAII discrimination. Additive: the
  *   agent path is unaffected (regression covered by e2e-agent-onboarding).
  * @version-history
+ *   2026-10-25 — owner_scope on PUT and restore stays inside the ecosystem app's own namespace, and a
+ *     sibling agent keeps the reach (secaudit2026oct22, memory-key-route:owner-scope-ecosystem-not-excluded).
  *   v1.5.0 — 2026-10-09 — The app pins a real Ed25519 key, and a refresh needs a fresh signature by
  *     it: no proof and a foreign key are refused, the pinned key's proof renews the credential with
  *     its `auth_time` and the date of the next approval (secrets audit 2026-10-09, S-2).
@@ -80,6 +82,7 @@ async function json(path: string, opts: RequestInit = {}, retries = 5): Promise<
 }
 
 import { registerOwner } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 
 const GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 
@@ -434,6 +437,49 @@ await test('GEAI denied a scope it was not granted (memory:delete) → 403', asy
   });
   assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${body.error?.code}`);
+});
+
+// secaudit2026oct22 (memory-key-route:owner-scope-ecosystem-not-excluded). An ecosystem app works in
+// its own eco: namespace; ?owner_scope=true on PUT and restore must not reach the records of its
+// owner's agents, as it already does not on GET and on the list. A sibling agent keeps that reach.
+await test('owner_scope on PUT and restore does not reach the owner\'s agents for an ecosystem app; a sibling agent keeps it', async () => {
+  const owner = { name: ownerName, token: ownerToken };
+  const writer = await makeAgent(BASE, owner, ['memory:read', 'memory:write', 'memory:delete']);
+  const sibling = await makeAgent(BASE, owner, ['memory:read', 'memory:write']);
+  const asAgent = (t: string) => ({ Authorization: `Bearer ${t}` });
+  const KEY = 'probe.r6e.agentrec';
+  const BIN = 'probe.r6e.binned';
+  for (const k of [KEY, BIN]) {
+    const w = await json('/v1/memory', { method: 'POST', headers: asAgent(writer.token), body: JSON.stringify({ key: k, value: { from: 'agent' }, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `agent write ${k}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+  }
+  const del = await json(`/v1/memory/${encodeURIComponent(BIN)}`, { method: 'DELETE', headers: asAgent(writer.token) });
+  assert(del.status === 200, `agent delete: ${del.status} ${JSON.stringify(del.body?.error)}`);
+
+  const probe = await json(`/v1/memory/${encodeURIComponent(KEY)}?owner_scope=true`, {
+    method: 'PUT', headers: asAgent(geaiToken), body: JSON.stringify({ value: { from: 'eco' }, version: 99 }),
+  });
+  assert(probe.status === 404, `an ecosystem app's owner_scope PUT reached an agent's record: ${probe.status} ${JSON.stringify(probe.body)}`);
+  const put = await json(`/v1/memory/${encodeURIComponent(KEY)}?owner_scope=true`, {
+    method: 'PUT', headers: asAgent(geaiToken), body: JSON.stringify({ value: { from: 'eco' }, version: 1 }),
+  });
+  assert(put.status === 404, `an ecosystem app's owner_scope PUT wrote an agent's record: ${put.status} ${JSON.stringify(put.body)}`);
+  const restore = await json(`/v1/memory/${encodeURIComponent(BIN)}/restore?owner_scope=true`, { method: 'POST', headers: asAgent(geaiToken) });
+  assert(restore.status === 404, `an ecosystem app's owner_scope restore reached an agent's bin: ${restore.status} ${JSON.stringify(restore.body)}`);
+  const still = await json(`/v1/memory/${encodeURIComponent(KEY)}`, { headers: asAgent(writer.token) });
+  assert(still.status === 200 && still.body.data.value?.from === 'agent', `the agent's record changed: ${JSON.stringify(still.body?.data?.value)}`);
+
+  // The designed same-owner reach: a sibling agent updates the record with owner_scope.
+  const sib = await json(`/v1/memory/${encodeURIComponent(KEY)}?owner_scope=true`, {
+    method: 'PUT', headers: asAgent(sibling.token), body: JSON.stringify({ value: { from: 'sibling' }, version: 1 }),
+  });
+  assert(sib.status === 200, `a sibling agent's owner_scope PUT was refused: ${sib.status} ${JSON.stringify(sib.body?.error)}`);
+  // The ecosystem app still updates its own record.
+  const own = await json(`/v1/memory/${encodeURIComponent(MEM_KEY)}`, { headers: asAgent(geaiToken) });
+  const ownPut = await json(`/v1/memory/${encodeURIComponent(MEM_KEY)}?owner_scope=true`, {
+    method: 'PUT', headers: asAgent(geaiToken), body: JSON.stringify({ value: { ticket: 'resolved' }, version: own.body.data.version }),
+  });
+  assert(ownPut.status === 200, `the ecosystem app could not update its own record: ${ownPut.status} ${JSON.stringify(ownPut.body?.error)}`);
 });
 
 await test('Polling token before approval → authorization_pending', async () => {
