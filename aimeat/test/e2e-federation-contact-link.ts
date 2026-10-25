@@ -17,6 +17,8 @@
  *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
+ *   2026-10-25 -- I11: an unsigned key exchange leaves a degraded peer's status and the operator's
+ *     narrowing as they were, with its own key and with another one (secaudit2026oct22).
  *   2026-10-23 -- I9 is pinned: a removed peer's key exchange is refused and its approvals read revoked
  *     (Core FED-15; secaudit2026oct22). I10: a new invitation lets it back in. setupOwner uses
  *     setupOperator (a password and the password sign-in): POST /v1/admin/setup/token answers 410.
@@ -822,6 +824,40 @@ await test('I10. The operator lets a removed peer back in with a new invitation'
         body: JSON.stringify({ node_id: I_NODE, node_url: I_URL, node_public_key: iKeys.publicKey, timestamp: new Date().toISOString() }),
     });
     assert(exchange.status === 200, `the admitted peer's own key exchange: ${exchange.status} ${JSON.stringify(exchange.body)}`);
+});
+
+await test('I11. An unsigned key exchange leaves a degraded peer\'s row as the operator set it (secaudit2026oct22)', async () => {
+    // A peer that stopped answering heartbeats is degraded. The key exchange takes no signature, and
+    // it rebuilt such a row from the old peering request: status active, the tier's flags, the
+    // request's key and address, whatever the operator had narrowed. Only a signed liveness signal
+    // (ping or heartbeat) lifts the status, and only an operator changes the settings.
+    const iRow = async () => {
+        const r = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
+        return (r.body.data.peers as any[]).find(p => p.node_id === I_NODE);
+    };
+    const put = await V.json(`/v1/federation/peers/${I_NODE}`, {
+        method: 'PUT', headers: auth(V.ownerToken), body: JSON.stringify({ allow_messaging: false, status: 'degraded' }),
+    });
+    assert(put.status === 200, `operator narrowing: ${put.status} ${JSON.stringify(put.body)}`);
+    const before = await iRow();
+    assert(before?.status === 'degraded' && before.allow_messaging === false, `precondition: ${JSON.stringify(before)}`);
+
+    const same = await V.json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: I_NODE, node_url: I_URL, node_public_key: iKeys.publicKey, timestamp: new Date().toISOString() }),
+    });
+    assert(same.status === 200, `the peer's own key exchange still answers: ${same.status} ${JSON.stringify(same.body)}`);
+    const other = await generateKeyPair();
+    const foreign = await V.json('/v1/federation/key-exchange', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: I_NODE, node_url: I_URL, node_public_key: other.publicKey, timestamp: new Date().toISOString() }),
+    });
+    assert(foreign.status === 409, `a different key without a signature: ${foreign.status} ${JSON.stringify(foreign.body)}`);
+
+    const after = await iRow();
+    assert(after?.status === 'degraded', `a key exchange lifted the degraded status: ${JSON.stringify(after?.status)}`);
+    assert(after.allow_messaging === false, 'a key exchange reset the operator\'s narrowing to the tier defaults');
+    assert(after.public_key === iKeys.publicKey, 'the peer key changed');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

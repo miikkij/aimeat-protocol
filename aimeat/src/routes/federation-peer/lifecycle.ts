@@ -5,6 +5,9 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.1 — 2026-10-25 — key-exchange keeps the row of a degraded, offline or unreachable peer as
+ *     the operator set it, status included, instead of rebuilding it from the peering request
+ *     (secaudit2026oct22).
  *   v1.10.0 — 2026-10-16 — DELETE /v1/federation/peers/:nodeId takes notify_network from the query as
  *     well as the body (the connector and CLI send no body), and its answer lists each peer's outcome
  *     of the signed notice (QA audit S6-06).
@@ -175,7 +178,12 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        if (!peer || (peer.status !== 'active' && peer.status !== 'approved')) {
+        // A peer that is only down (degraded, offline, unreachable) is still a peer: its row keeps
+        // what the operator set (tier, permission words, key, address, peer mode) and its status,
+        // which a signed ping or a heartbeat lifts. The branch below rebuilt such a row from the old
+        // peering request, unsigned, before the key checks further down ran (secaudit2026oct22).
+        const onlyDown = !!peer && peer.status !== 'active' && LIVENESS_RECOVERABLE.has(peer.status);
+        if (!peer || (peer.status !== 'active' && peer.status !== 'approved' && !onlyDown)) {
             // Auto-add ONLY when there is an operator-approved peering request from this node.
             // SECURITY (F1): never derive admission/trust from the request BODY (e.g. node_url ===
             // config.genesisUrl) — an unauthenticated caller could otherwise self-admit as an active
