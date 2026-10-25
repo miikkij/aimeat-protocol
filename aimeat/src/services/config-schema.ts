@@ -12,6 +12,7 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-25 — security.secret_host_ask_default (AIMEAT_SECRET_HOST_ASK_DEFAULT), mutable, default on (secaudit2026oct22).
  *   2026-10-20 — content_class.mode, content_class.ffprobe_path, content_class.ffmpeg_path
  *     (config-schema-content-class.ts; wish-sis-ll-n-purku-luokittelu-ja-owl). The email rows move
  *     to config-schema-email.ts, unchanged (max-file-lines).
@@ -462,6 +463,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // Immutable for the same reason: which sign-in methods a node accepts is decided at start.
   { key: 'ownerKeyLogin', dotPath: 'security.owner_key_login', envVar: 'AIMEAT_OWNER_KEY_LOGIN', type: 'boolean', validate: REMOVAL_SWITCHES.ownerKeyLogin, immutable: true, description: 'Deprecated, removed in 4.0.0, from which it is off whatever it is set to. When on (the default in 3.x), an owner can sign in at POST /v1/auth/token with the signing key the account was given at registration. An account with two-step sign-in is refused there either way, and a password reset replaces the key. Turn it off when nobody signs in that way.' },
   { key: 'wsQueryToken', dotPath: 'security.ws_query_token', envVar: 'AIMEAT_WS_QUERY_TOKEN', type: 'boolean', validate: REMOVAL_SWITCHES.wsQueryToken, immutable: false, description: 'Deprecated, removed in 4.0.0, from which it is off whatever it is set to. When on (the default in 3.x), a realtime room, personal node tunnel or connector tunnel connection may carry its session token in the URL (?token=), which reverse proxies write to their access logs. Current clients use a single-use ticket (POST /v1/ws/ticket). GET /v1/stats counts the uses (ws_query_token); turn it off when that stays at zero.' },
+  { key: 'secretHostAskDefault', dotPath: 'security.secret_host_ask_default', envVar: 'AIMEAT_SECRET_HOST_ASK_DEFAULT', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'The default, for every account that has not chosen, of "Ask me before my secret is sent to a new address for the first time". On (the default): when code one of the account\'s agents wrote, or an address such an agent set, sends a stored secret to an address it has never gone to, the owner is asked first with one press, unless that agent holds secrets:manage. Off: it is sent and the address is kept, as before. Each owner can switch their own on or off.' },
   { key: 'adminSetupOpenAfterFirstOperator', dotPath: 'security.admin_setup_open_after_first_operator', envVar: 'AIMEAT_ADMIN_SETUP_OPEN_AFTER_FIRST_OPERATOR', type: 'boolean', validate: v => typeof v === 'boolean', immutable: true, description: 'Test servers only; keep it off on a public server. When on, the admin password can still create operators through /v1/admin/setup/register after the first operator exists. When off (the default), that route refuses with 410 once an operator exists, and an operator adds another on the Owners page.' },
 
   // ── Email (mutable, additional) ──

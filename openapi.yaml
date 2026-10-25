@@ -40028,6 +40028,54 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/ghii/me/secret-host-ask:
+    get:
+      operationId: getSecretHostAsk
+      tags: [Identity]
+      summary: Whether the owner is asked before a secret goes to a new address for the first time
+      description: |
+        The account's "Ask me before my secret is sent to a new address for the first time". While it
+        is on, the first send of a vault secret that has no address yet, to an address chosen by code
+        one of the owner's agents wrote or by a host field such an agent set, asks the owner first with
+        one press (an agent holding secrets:manage is not asked about); while it is off, it is sent and
+        the address is kept. `setting` is `{ on, defaulted, node_default, set_by, set_at }`: `defaulted`
+        is true while the owner never chose and the node's default (security.secret_host_ask_default,
+        on) applies. Any principal of the account holding memory:read. MCP: aimeat_secret_host_ask.
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: setSecretHostAsk
+      tags: [Identity]
+      summary: Switch the question before a secret goes to a new address on or off
+      description: |
+        `{ on: true }` switches it on at once, for any principal of the account holding memory:write.
+        `{ on: false }` switches it off at once for the owner in person or a principal holding
+        secrets:manage; anyone else gets 202 with `approval_request` (awaiting_owner, the approve_url),
+        the owner is asked with Allow and Don't allow, it stays on until the owner allows it, and the
+        one who asked hears the answer either way. MCP: aimeat_secret_host_ask.
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [on]
+              properties:
+                on: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '202':
+          description: Switching it off waits for the owner (`data.approval_request`); `data.setting` is what is in force now.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/ghii/me/adult:
     get:
       x-aimeat-scope: { word: 'memory:read' }
