@@ -26,6 +26,8 @@
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
+ *   2026-10-25 -- NotifyInput.ref: the question a notice asks, so the flow that decides it can mark
+ *     the notice answered and take its buttons away (services/notification-answers.ts; secaudit2026oct22).
  *   v1.4.0 -- 2026-08-30 -- The owner's settings decide what happens (notification-settings.ts): a
  *     muted sender's notification is dropped before it is written, a sender or group with push off
  *     stays in the bell, quiet hours hold the push (the record is marked `held` and the morning
@@ -186,6 +188,11 @@ export interface NotifyInput {
    *  and the bell can say the title and body in the reader's language. `title`/`body` stay as the
    *  English fallback and as what the push carries. */
   i18n?: NotifText;
+  /**
+   * The question this notice asks, when it carries buttons that decide one (`publish-request:<id>`):
+   * the flow that decides it marks every notice with this ref answered (services/notification-answers.ts).
+   */
+  ref?: string;
 }
 
 export interface NotifyResult { stored: boolean; pushed: boolean; held: boolean; muted: boolean }
@@ -239,7 +246,7 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
       ownerGaii: recipientGhii,
       value: {
         id, type: input.type, title: input.title, body: input.body ?? '', link: input.link ?? '', actions, read: false, createdAt: now,
-        source, ...(input.i18n ? { i18n: input.i18n } : {}), ...(quiet ? { held: true } : {}),
+        source, ...(input.i18n ? { i18n: input.i18n } : {}), ...(quiet ? { held: true } : {}), ...(input.ref ? { ref: input.ref } : {}),
       },
       visibility: 'private',
       tags: ['notif'],

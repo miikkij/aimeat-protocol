@@ -283,5 +283,13 @@ await test('A second refusal of the same permission asks nothing new; the other 
     assert((await pageNotices(strangerToken)).length === 0, 'the other owner was told');
 });
 
+await test('A "no" given on the agent\'s card reads as answered on the allow page, with when (2026-10-25)', async () => {
+  const no = await json(`/v1/agents/${AGENT}/refusals/decline`, auth(ownerToken, { method: 'POST', body: JSON.stringify({ needed: ['ai:use'] }) }));
+  assert(no.status === 200 && no.body?.data?.declined >= 1, `decline ${no.status} ${JSON.stringify(no.body)}`);
+  const g = await json(`/v1/agents/${AGENT}/allow?need=ai:use`, auth(ownerToken));
+  const w = g.body?.data?.words?.[0];
+  assert(g.status === 200 && w?.held === false && typeof w?.declined_at === 'string', `the page does not see the answer: ${JSON.stringify(g.body?.data)}`);
+});
+
 console.log(`\n=== Agent permission ask: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);
