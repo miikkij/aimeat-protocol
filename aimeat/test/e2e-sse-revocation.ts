@@ -87,6 +87,12 @@ await test('Two agents\' streams receive the owner\'s memory domain', async () =
     await waitUntil(() => memoryFrames(doomedStream.text()) >= 1 && memoryFrames(keptStream.text()) >= 1, 5000, 'a memory frame on both streams');
 });
 
+await test('FAILURE: another agent without agent:delete cannot delete it, and its stream stays open', async () => {
+    const del = await json(`/v1/agents/${doomed.name}`, { method: 'DELETE', headers: bearer(kept.token) });
+    assert(del.status === 403, `expected 403, got ${del.status} ${JSON.stringify(del.body?.error)}`);
+    assert(!doomedStream.ended() && !doomedStream.text().includes('event: revoked'), 'the stream ended on a refused delete');
+});
+
 await test('FAILURE: after the agent is deleted, its stream gets a revoked frame and ends, with no further domain frame', async () => {
     const del = await json(`/v1/agents/${doomed.name}`, { method: 'DELETE', headers: bearer(owner.token) });
     assert(del.status === 200, `delete agent: ${del.status} ${JSON.stringify(del.body?.error)}`);
