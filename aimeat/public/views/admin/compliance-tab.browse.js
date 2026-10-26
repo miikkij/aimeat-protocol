@@ -16,6 +16,8 @@
  * @structure RecordsBrowser({ target, gaps, onClose, onPrint, onChanged })
  * @usage <${RecordsBrowser} target=${{ kind: 'registers' }} gaps=${report.processing.gaps} ... />
  * @version-history
+ *   v1.1.0 — 2026-10-26 — A place the node answers with a draft (`draft: true`) says so above its
+ *     entries and in an opened entry.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.7).
  */
 import { h } from 'preact';
@@ -119,6 +121,7 @@ export function RecordsBrowser({ target, gaps, onClose, onPrint, onChanged }) {
       : item ? html`
         <${Actions}><${Action} small soft onClick=${() => setView(null)}>${O('back')}<//><//>
         <${SubHeading} level=${3} desc=${`${placeWord(open.place)}: ${open.place.name}`}>${itemName(kind, item, ctxOf(open.place, item))}<//>
+        ${open.draft ? html`<${Note} kind="quiet">${O('draft')}<//>` : null}
         <${ItemDetail} kind=${kind} item=${item} place=${open.place} mayWrite=${open.may_write} gaps=${gaps} busy=${busy}
           ctx=${{ catalog, answers: open.answers, sources: open.answerSources, ...ctxOf(open.place, item) }}
           onPatch=${(set, done) => patch(open.place, item.id, set, done)}
@@ -129,6 +132,7 @@ export function RecordsBrowser({ target, gaps, onClose, onPrint, onChanged }) {
         ${shown.map(p => html`
           <${Space} key=${keyOf(p.place)} below="part">
             <${SubHeading} part desc=${placeWord(p.place)}>${p.place.name}<//>
+            ${p.draft ? html`<${Note} kind="quiet">${O('draft')}<//>` : null}
             <${Actions}>
               ${placeHref(p.place) ? html`<${Action} small soft href=${placeHref(p.place)}>${O('openPlace.' + p.place.scope)}<//>` : null}
               ${kind === 'registers' && p.entries.length ? html`<${Action} small soft onClick=${() => onPrint(p.entries, p.place.name)}>${O('printPlace')}<//>` : null}
