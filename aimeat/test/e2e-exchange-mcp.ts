@@ -15,7 +15,6 @@
  *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
- *   2026-10-25 — The app-tool setup looks the capability up by `ext:<provider>/<name>:echo`, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.4.2 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
  *     agent-work listing states `toll_morsels: 5` and the app tool `tollMorsels: 3`, which 3.x accepts too.
@@ -314,9 +313,7 @@ await test('Setup: provider installs a priced extension and sells it as an app-t
     // now so the app-tool has something to bind to.
     const { runCapabilityAggregation } = await import('../src/services/capability-aggregator.js');
     await runCapabilityAggregation(config, storage);
-    // The capability carries the stored name, `<provider>/<name>`; the provider's own tool manifest
-    // below keeps the short binding, which the node resolves for its owner.
-    assert(!!(await storage.getCapability(`ext:${provider.name}/${EXT}:echo`)), 'capability must be registered for the action');
+    assert(!!(await storage.getCapability(`ext:${EXT}:echo`)), 'capability must be registered for the action');
 
     const put = await json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
         key: 'apps.plotter.tools', visibility: 'public',

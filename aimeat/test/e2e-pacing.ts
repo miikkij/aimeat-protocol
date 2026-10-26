@@ -11,7 +11,6 @@
  *   provider (chargePacing).
  * @usage cd aimeat && pnpm exec tsx test/e2e-pacing.ts
  * @version-history
- *   2026-10-25 — Listings and contracts carry `ext` as `<provider>/<short>`, and the consumer and the signed-out caller address the extension by that full name, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.2.0 — 2026-10-11 — Pacing is charged through chargePacing (decision-morseli-on-tahdistus-ei-
  *     hinta-tarjouksen-kaksi-arvoa): the "toll is a burn" case reads a share burned and the rest, at
@@ -81,10 +80,6 @@ console.log('\n=== AIMEAT PACING E2E (morsels bound the rate, whatever pays) ===
 const provider = await setupOwner('prov');
 const consumer = await setupOwner('cons');
 const EXT = `pace${Date.now().toString().slice(-7)}`;
-// The provider manages its extensions by the short name; listings, contracts and every other caller
-// name them in the provider's namespace, encoded in a URL path.
-const full = (short: string) => `${provider.name}/${short}`;
-const extPath = (short: string) => encodeURIComponent(full(short));
 const SCHEMA = { type: 'object', properties: { q: { type: 'string' } } };
 let offeringId = '';
 
@@ -102,7 +97,7 @@ await test('Setup: provider lists a MONEY-priced capability that declares no tol
   assert(ins.status === 201 || ins.status === 200, `install ${ins.status}: ${JSON.stringify(ins.body?.error)}`);
   await json(`/v1/extensions/${EXT}/activate`, { method: 'POST', headers: auth(provider.token) });
   const list = await json('/v1/exchange/offerings');
-  const o = (list.body.data.offerings as any[]).find(x => x.ext === full(EXT) && x.action === 'run');
+  const o = (list.body.data.offerings as any[]).find(x => x.ext === EXT && x.action === 'run');
   assert(!!o && o.unit === 'money', `money listing projected: ${JSON.stringify(o)}`);
   offeringId = o.offeringId;
 });
@@ -119,7 +114,7 @@ await test('A money contract is paced: each call burns the node toll from the CA
     body: JSON.stringify({ offering_id: offeringId, cap_units: 100_000_000 }) });
   assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
   const before = await balance(consumer.token);
-  const call = await json(`/v1/ext/${extPath(EXT)}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'x' }) });
+  const call = await json(`/v1/ext/${EXT}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'x' }) });
   assert(call.status === 200, `metered money call ${call.status}: ${JSON.stringify(call.body?.error)}`);
   const after = await balance(consumer.token);
   assert(before - after === TOLL, `caller burned exactly the toll: ${before} -> ${after} (expected -${TOLL})`);
@@ -127,7 +122,7 @@ await test('A money contract is paced: each call burns the node toll from the CA
 
 await test('A signed-out caller is refused before anything burns, and cannot read the pacing flag', async () => {
   const pBefore = await balance(provider.token);
-  const call = await json(`/v1/ext/${extPath(EXT)}/run`, { method: 'POST', body: JSON.stringify({ q: 'anon' }) });
+  const call = await json(`/v1/ext/${EXT}/run`, { method: 'POST', body: JSON.stringify({ q: 'anon' }) });
   assert(call.status === 401 || call.status === 403, `signed-out paced call ${call.status}`);
   assert(await balance(provider.token) === pBefore, 'a refused call moved no morsels');
   const w = await json('/v1/wallet');
@@ -142,7 +137,7 @@ await test('The toll is PACING: a share burns, and the provider is credited at m
   const burn = Math.min(TOLL, Math.ceil(TOLL * (Math.round(rate * 10_000) / 100) / 100));
   const cBefore = await balance(consumer.token);
   const pBefore = await balance(provider.token);
-  const call = await json(`/v1/ext/${extPath(EXT)}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'y' }) });
+  const call = await json(`/v1/ext/${EXT}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'y' }) });
   assert(call.status === 200, `call ${call.status}`);
   assert(cBefore - await balance(consumer.token) === TOLL, `the caller is charged the ${TOLL} morsels of pacing`);
   const gained = await balance(provider.token) - pBefore;
@@ -159,7 +154,7 @@ await test('Pacing stops a runaway loop before the money budget does', async () 
   // balance is the ceiling now, so the loop ends in 402 while the EUR budget is nowhere near spent.
   let calls = 0, blocked = false;
   for (let i = 0; i < 400; i++) {
-    const r = await json(`/v1/ext/${extPath(EXT)}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'loop' }) });
+    const r = await json(`/v1/ext/${EXT}/run`, { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ q: 'loop' }) });
     if (r.status === 200) { calls++; continue; }
     blocked = r.status === 402 && r.body?.error?.code === 'INSUFFICIENT_MORSELS';
     break;
@@ -167,7 +162,7 @@ await test('Pacing stops a runaway loop before the money budget does', async () 
   assert(blocked, `the loop hit the morsel ceiling, not an open till (made ${calls} calls)`);
   const contracts = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
   const list = (contracts.body.data.entitlements ?? contracts.body.data.contracts ?? []) as any[];
-  const ent = list.find(c => c.ext === full(EXT));
+  const ent = list.find(c => c.ext === EXT);
   assert(ent && (ent.budget.remainingUnits ?? ent.budget.remaining_units) > 0, `and the money budget still had room: ${JSON.stringify(ent?.budget)}`);
 });
 
@@ -197,7 +192,7 @@ async function listExtAction(token: string, name: string, toll: number | undefin
   assert(ins.status === 201 || ins.status === 200, `install ${name}: ${ins.status} ${JSON.stringify(ins.body?.error)}`);
   await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(token) });
   const list = await json('/v1/exchange/offerings');
-  const o = (list.body.data.offerings as any[]).find(x => x.ext === full(name) && x.action === 'run' && x.unit === 'money');
+  const o = (list.body.data.offerings as any[]).find(x => x.ext === name && x.action === 'run' && x.unit === 'money');
   assert(!!o, `listing projected for ${name}`);
   return o.offeringId;
 }
@@ -207,7 +202,7 @@ async function burnOfOneCall(offering: string, ext: string): Promise<number> {
     body: JSON.stringify({ offering_id: offering, cap_units: 100_000_000 }) });
   assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
   const before = await balance(dialConsumer.token);
-  const call = await json(`/v1/ext/${extPath(ext)}/run`, { method: 'POST', headers: auth(dialConsumer.token), body: JSON.stringify({ q: 'x' }) });
+  const call = await json(`/v1/ext/${ext}/run`, { method: 'POST', headers: auth(dialConsumer.token), body: JSON.stringify({ q: 'x' }) });
   assert(call.status === 200, `call ${call.status}: ${JSON.stringify(call.body?.error)}`);
   return before - await balance(dialConsumer.token);
 }
@@ -231,7 +226,7 @@ await test('A declared 0 switches pacing OFF for that capability, whatever the n
 
 await test('The declared toll is stated on the listing BEFORE a buyer signs', async () => {
   const list = await json('/v1/exchange/offerings');
-  const o = (list.body.data.offerings as any[]).find(x => x.ext === full(EXT_HIGH) && x.unit === 'money');
+  const o = (list.body.data.offerings as any[]).find(x => x.ext === EXT_HIGH && x.unit === 'money');
   const detail = await json(`/v1/exchange/offerings/${o.offeringId}`);
   const pacing = detail.body.data.pacing;
   assert(pacing?.toll_morsels === 7, `detail states the real burn: ${JSON.stringify(pacing)}`);
@@ -241,7 +236,7 @@ await test('The declared toll is stated on the listing BEFORE a buyer signs', as
 await test('The contract remembers the toll it was signed at', async () => {
   const contracts = await json('/v1/exchange/entitlements', { headers: auth(dialConsumer.token) });
   const list = (contracts.body.data.entitlements ?? contracts.body.data.contracts ?? []) as any[];
-  const ent = list.find(c => c.ext === full(EXT_HIGH));
+  const ent = list.find(c => c.ext === EXT_HIGH);
   assert(ent, 'the contract exists');
   assert((ent.tollMorsels ?? ent.toll_morsels) === 7, `captured at signature: ${JSON.stringify(ent.tollMorsels ?? ent.toll_morsels)}`);
 });

@@ -22,7 +22,6 @@
  *   by default, with production settings apart from anonymous mode.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-purpose-visitors
  * @version-history
- *   v1.0.1 -- 2026-10-25 -- Test 5 calls the public action by `<owner>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 -- 2026-10-21 -- Initial (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -103,8 +102,6 @@ async function stopNode(): Promise<void> {
 
 const anon = (path: string, opts: RequestInit = {}) => json(path, opts, ANON);
 let minted = '';
-/** The action's stored name, `<owner>/<name>`: a visitor names the owner's extension in full. */
-let extFull = '';
 
 try {
     await h.test('3. Setup: a node with anonymous mode on; its first owner shares a public action and a public record', async () => {
@@ -112,7 +109,6 @@ try {
         await waitForServer(node, ANON, { label: 'the anonymous-mode node' });
         const op = await registerOwner(ANON, `anonop${STAMP}`);
         await installExtension(op.token, EXT, EXT_MANIFEST, EXT_SCRIPTS, ANON);
-        extFull = `${op.name}/${EXT}`;
         const w = await anon('/v1/memory', { method: 'POST', headers: auth(op.token), body: JSON.stringify({ key: PUBLIC_KEY, value: { open: '8-16' }, visibility: 'public' }) });
         assert(w.status === 201, `the public record: ${w.status} ${JSON.stringify(w.body?.error)}`);
         const r = await anon(`/v1/memory/${encodeURIComponent(`${op.name}@${ANON_NODE_ID}`)}/${encodeURIComponent(PUBLIC_KEY)}`);
@@ -135,7 +131,7 @@ try {
 
     await h.test('5. A public extension action answers the minted token and a caller with no token', async () => {
         for (const headers of [auth(minted), {}]) {
-            const r = await anon(`/v1/ext/${encodeURIComponent(extFull)}/hello`,{ method: 'POST', headers, body: JSON.stringify({ name: 'guest' }) });
+            const r = await anon(`/v1/ext/${EXT}/hello`, { method: 'POST', headers, body: JSON.stringify({ name: 'guest' }) });
             assert(r.status === 200 && r.body.data?.hello === 'welcome, guest', `the action: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
         }
     });

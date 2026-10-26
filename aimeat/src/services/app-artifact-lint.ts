@@ -587,7 +587,7 @@ async function probeNodeAssets(paths: string[], config: AimeatConfig): Promise<A
     + '/v1/libs/ (aimeat-auth.js, aimeat-data.js, …) and the vendored packs under /lib/ — take the exact '
     + 'URLs from GET /v1/prompts/build-app rather than guessing one that looks right.'
     + (dead.some(p => p.startsWith('/v1/cortex/'))
-      ? ' A cortex installed since 2026-10-25 carries its owner\'s name and loads from '
+      ? ' A cortex installed under its owner\'s name (`full_name` in the install answer) loads from '
         + '/v1/cortex/<owner>/<name>/libs/<file>; the install answer lists its exact addresses.'
       : ''))];
 }

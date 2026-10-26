@@ -16,7 +16,6 @@
  *   FIRST FAIL: before the change, PUT /v1/admin/config answers 400 for every path (unknown setting).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-ext-operator-limits
  * @version-history
- *   v1.1.1 — 2026-10-25 — Another account names the operator's extension `<operator>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — The run slots (secaudit2026oct22, lead 817).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, leads 750).
  */
@@ -48,9 +47,6 @@ async function call(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, tok
 }
 
 const EXT = `oplim${stamp}`;
-/** The operator calls its own extension by the short name; another account names it in full,
- *  `<operator>/<name>` encoded as one segment (services/component-address.ts). */
-const extAs = (token: string): string => (token === op.token ? EXT : encodeURIComponent(`${op.name}/${EXT}`));
 const SCRIPTS = {
   put: `export default async function(ctx, input){
     await ctx.memory.set(input.key, { text: 'x'.repeat(input.kb * 1024) });
@@ -160,7 +156,7 @@ const far = http.createServer((req, res) => {
   setTimeout(() => { res.writeHead(200, { 'Content-Type': 'text/plain' }); res.end('slow'); }, 1500);
 });
 await new Promise<void>(r => far.listen(FAR_PORT, () => r()));
-const waitRun = (token: string) => call('POST', `/v1/ext/${extAs(token)}/wait`, token, { port: FAR_PORT });
+const waitRun = (token: string) => call('POST', `/v1/ext/${EXT}/wait`, token, { port: FAR_PORT });
 const pause = (ms: number) => new Promise(r => setTimeout(r, ms));
 let other!: RegisteredOwner;
 
@@ -181,7 +177,7 @@ await test('FAILURE: with extensions.run_slots_per_account 1, the account\'s sec
   assert(Number(second.headers.get('retry-after')) > 0, `Retry-After: ${second.headers.get('retry-after')}`);
   assert(String(second.body?.error?.message ?? '').includes('extensions.run_slots_per_account'), `names the setting: ${second.body?.error?.message}`);
   // Another account has its own share while the first run is still waiting.
-  const theirs = await call('POST', `/v1/ext/${extAs(other.token)}/get`, other.token, { key: 'big.one' });
+  const theirs = await call('POST', `/v1/ext/${EXT}/get`, other.token, { key: 'big.one' });
   assert(theirs.status === 200, `another account runs: ${theirs.status} ${JSON.stringify(theirs.body?.error)}`);
   const done = await first;
   assert(done.status === 200, `the first run finishes: ${done.status} ${JSON.stringify(done.body?.error)}`);
@@ -195,7 +191,7 @@ await test('FAILURE: with extensions.run_slots 1, another account is answered 50
   assert(s.status === 200, `PUT ${s.status}: ${JSON.stringify(s.body?.error ?? s.body?.data?.errors)}`);
   const first = waitRun(op.token);
   await pause(400);
-  const theirs = await call('POST', `/v1/ext/${extAs(other.token)}/get`, other.token, { key: 'big.one' });
+  const theirs = await call('POST', `/v1/ext/${EXT}/get`, other.token, { key: 'big.one' });
   assert(theirs.status === 503, `expected 503, got ${theirs.status}: ${JSON.stringify(theirs.body)}`);
   assert(String(theirs.body?.error?.message ?? '').includes('extensions.run_slots'), `names the setting: ${theirs.body?.error?.message}`);
   assert((await first).status === 200, 'the run holding the slot finishes');
@@ -211,7 +207,7 @@ await test('extensions.run_slots 0 is no limit: two runs at once both answer', a
 await test('FAILURE: another account changes none of these settings and makes no copy of the operator\'s extension', async () => {
   const put = await call('PUT', '/v1/admin/config', other.token, { changes: [{ path: 'extensions.run_slots', value: 1 }] });
   assert(put.status === 403, `a non-operator PUT /v1/admin/config: expected 403, got ${put.status}`);
-  const inst = await call('POST', `/v1/extensions/${extAs(other.token)}/instances`, other.token, { id: 'not-theirs' });
+  const inst = await call('POST', `/v1/extensions/${EXT}/instances`, other.token, { id: 'not-theirs' });
   assert(inst.status === 403, `another account's copy: expected 403, got ${inst.status} ${JSON.stringify(inst.body?.error)}`);
 });
 

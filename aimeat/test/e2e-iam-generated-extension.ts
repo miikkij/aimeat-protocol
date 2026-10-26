@@ -19,8 +19,6 @@
  *   Part C the arms that generate nothing · Part D refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-generated-extension
  * @version-history
- *   2026-10-25 — D3: the installed extension's name is `<owner>/<short>`, as names live in the
- *     owner's namespace (secaudit2026oct22).
  *   v1.2.0 — 2026-10-17 — D2: a memory:read agent is offered aimeat_extension_install and
  *     aimeat_memory_write (permission ask, mcp/permission-ask-gate.ts), and each call is refused
  *     SCOPE_DENIED with the allow address.
@@ -491,8 +489,7 @@ await test('D3. REFUSAL: the REST door that installs what this tool designs is 4
         body: JSON.stringify({ manifest: rich.extension.manifest, scripts: rich.extension.scripts }),
     });
     assert(ok.status === 201, `the generated gate installs as written: ${ok.status}: ${JSON.stringify(ok.body.error ?? '')}`);
-    // Stored in the installer's namespace; the owner still manages it by the short name (cleanup below).
-    assert(ok.body.data.extension.name === `${ownerName}/${EXT_NAME}`, `installed under its own name: ${ok.body.data.extension?.name}`);
+    assert(ok.body.data.extension.name === EXT_NAME, `installed under its own name: ${ok.body.data.extension?.name}`);
     const ids = ok.body.data.extension.actions.map((a: any) => a.id).sort();
     assert(ids.join(',') === 'check,commands,roles', `all three actions survived the manifest parse: ${ids}`);
 });

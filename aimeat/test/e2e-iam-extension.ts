@@ -19,9 +19,6 @@
  *   v1.4.0 — 2026-10-12 — The agents hold ext:invoke as well, the word node 4.0.0 asks on the
  *            extension action route (REST scope gates): there the agent tests were refused at the
  *            route, and the stranger-agent refusals of tests 8 and 12 passed on that refusal.
- *   2026-10-25 — B and B's agent, the no-token caller and the public memory read name A's install as
- *            `<A>/<short>`, so the refusals are still the extension's own, as names live in the
- *            owner's namespace (secaudit2026oct22).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-extension
 
@@ -79,11 +76,6 @@ const extComponent = aimeatIamPackage().components.find(c => c.type === 'extensi
 const extDef = JSON.parse(extComponent.content) as { manifest: string; scripts: Record<string, string> };
 const manifest = extDef.manifest.replace('name: iam', `name: ${EXT}`);
 const scripts = extDef.scripts;
-/**
- * A's install as anyone but A names it: `<A>/<short>`, encoded for a URL path. A and A's agents keep
- * the bare short name; a stranger's bare name would mean nothing (or their own copy).
- */
-const fullPath = (short: string) => encodeURIComponent(`${A.name}/${short}`);
 
 console.log('\n=== AIMEAT aimeat-iam Extension Evolution E2E ===\n');
 
@@ -179,7 +171,7 @@ await test('6. a DIFFERENT authenticated owner CANNOT drive the admin surface', 
     B = await setupOwner('b');
     const bGhii = `${B.name}@${NODE_ID}`;
     const asB = (op: string, extra: Record<string, unknown> = {}) =>
-        json(`/v1/ext/${fullPath(EXT)}/admin`, { method: 'POST', headers: authH(B.token), body: JSON.stringify({ op, ...extra }) });
+        json(`/v1/ext/${EXT}/admin`, { method: 'POST', headers: authH(B.token), body: JSON.stringify({ op, ...extra }) });
 
     const st = data(await asB('getState'));
     assert(st.isOwner === false, `B must not be the extension owner: ${JSON.stringify(st.isOwner)}`);
@@ -204,7 +196,7 @@ await test('6. a DIFFERENT authenticated owner CANNOT drive the admin surface', 
     // be made against nothing — and every refusal proven above would have been proven against the
     // one principal the check can see. This is the only assertion in the suite that tests the door
     // rather than the script behind it.
-    const noone = await json(`/v1/ext/${fullPath(EXT)}/admin`, { method: 'POST', body: JSON.stringify({ op: 'getState' }) });
+    const noone = await json(`/v1/ext/${EXT}/admin`, { method: 'POST', body: JSON.stringify({ op: 'getState' }) });
     assert(noone.status === 401 || noone.status === 403,
         `the admin action answered a caller with no token at all: ${noone.status} ${JSON.stringify(noone.body?.data ?? noone.body?.error)}`);
 
@@ -257,9 +249,8 @@ await test('7. a member\'s AGENT inherits the member\'s role (owner-keyed by def
 await test('8. the owner administers through their own agent, a stranger\'s agent does not', async () => {
     const mine = await setupAgent('admin-hand', A.name, A.token);
     const theirs = await setupAgent('intruder', B.name, B.token);
-    // A's agent uses the bare name, as A does; B's agent names A's install in full.
     const adminAs = (token: string, op: string, extra: Record<string, unknown> = {}) =>
-        json(`/v1/ext/${token === mine.token ? EXT : fullPath(EXT)}/admin`, { method: 'POST', headers: authH(token), body: JSON.stringify({ op, ...extra }) });
+        json(`/v1/ext/${EXT}/admin`, { method: 'POST', headers: authH(token), body: JSON.stringify({ op, ...extra }) });
 
     const ok = data(await adminAs(mine.token, 'getState'));
     assert(ok.isOwner === true, `the owner's own agent must administer: ${JSON.stringify(ok.isOwner)}`);
@@ -277,7 +268,7 @@ await test('8. the owner administers through their own agent, a stranger\'s agen
  *  anyone who asks for the key. The roster and config must be private; the capability vocabulary
  *  is product configuration and stays public. */
 await test('9. the roster is NOT readable without a token, the capability vocabulary still is', async () => {
-    const anon = (key: string) => json(`/v1/memory/${encodeURIComponent(`ext:${A.name}/${EXT}`)}/${key}`);
+    const anon = (key: string) => json(`/v1/memory/ext:${EXT}/${key}`);
 
     for (const key of ['iam.assignments', 'iam.config']) {
         const r = await anon(key);
@@ -404,7 +395,7 @@ await test('12. an UNCLAIMED install refuses a different owner: no claim, no adm
     const EXT2 = `${EXT}u`;
     await installFresh(EXT2, A.token);
     const bGhii = `${B.name}@${NODE_ID}`;
-    const asB = (op: string, extra: Record<string, unknown> = {}) => adminOn(fullPath(EXT2), B.token, op, extra);
+    const asB = (op: string, extra: Record<string, unknown> = {}) => adminOn(EXT2, B.token, op, extra);
 
     const claim = data(await asB('claim'));
     assert(claim.ok === false && claim.isOwner === false && /forbidden/.test(claim.error || ''),
@@ -428,7 +419,7 @@ await test('12. an UNCLAIMED install refuses a different owner: no claim, no adm
 
     // B's own agent is the same account as B, so it is refused the same way.
     const bAgent = await setupAgent('claimer', B.name, B.token);
-    const agentClaim = data(await adminOn(fullPath(EXT2), bAgent.token, 'claim'));
+    const agentClaim = data(await adminOn(EXT2, bAgent.token, 'claim'));
     assert(agentClaim.ok === false && agentClaim.isOwner === false,
         `another owner's agent must not claim either: ${JSON.stringify(agentClaim)}`);
 

@@ -88,14 +88,11 @@ let agentGaii = '';
 const ownerName = `cortexowner${Date.now()}`;
 const agentName = 'cortexagent';
 
-// Extension names as the node stores them: the manifest's metadata.name in the installing owner's
-// namespace (services/component-address.ts, since 2026-10-25).
-const RECIPE_EXT = `${ownerName}/recipe-collection`;
-const PROJECT_EXT = `${ownerName}/project-tracker`;
-const RESEARCH_EXT = `${ownerName}/research-assistant`;
-const IOT_EXT = `${ownerName}/iot-dashboard`;
-/** The cortex name as one id segment, as board and action ids carry it (`<owner>-<name>`). */
-const RECIPE_STEM = `${ownerName}-recipe-collection`;
+// Extension names (as they appear in the manifest metadata.name field)
+const RECIPE_EXT = 'recipe-collection';
+const PROJECT_EXT = 'project-tracker';
+const RESEARCH_EXT = 'research-assistant';
+const IOT_EXT = 'iot-dashboard';
 
 // URL-encoded extension names
 const RECIPE_ENC = encodeURIComponent(RECIPE_EXT);
@@ -492,11 +489,11 @@ await test('Active action appears in action catalogue', async () => {
   assert(Array.isArray(actions), 'actions is array');
 
   // Cortex actions are prefixed with cortex-{ext.name}-{comp.name}
-  const searchAction = actions.find((a: any) => a.id === `cortex-${RECIPE_STEM}-search-recipes`);
+  const searchAction = actions.find((a: any) => a.id === `cortex-${RECIPE_EXT}-search-recipes`);
   assert(searchAction, `found search-recipes action: ${JSON.stringify(actions.map((a: any) => a.id))}`);
   assert(searchAction.description.includes('Search recipes'), `description: ${searchAction.description}`);
 
-  const addAction = actions.find((a: any) => a.id === `cortex-${RECIPE_STEM}-add-recipe`);
+  const addAction = actions.find((a: any) => a.id === `cortex-${RECIPE_EXT}-add-recipe`);
   assert(addAction, `found add-recipe action`);
 });
 
@@ -512,7 +509,7 @@ await test('Activation created board', async () => {
   assert(Array.isArray(boards), 'boards is array');
 
   // Board ID is: cortex-{ext.name}-{comp.name}
-  const board = boards.find((b: any) => b.id === `cortex-${RECIPE_STEM}-recipe-reviews`);
+  const board = boards.find((b: any) => b.id === `cortex-${RECIPE_EXT}-recipe-reviews`);
   assert(board, `found recipe-reviews board: ${JSON.stringify(boards.map((b: any) => b.id))}`);
   assert(board.name === 'Recipe Reviews & Discussions', `name: ${board.name}`);
   assert(board.visibility === 'public', `visibility: ${board.visibility}`);

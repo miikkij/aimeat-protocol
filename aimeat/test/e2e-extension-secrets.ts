@@ -95,8 +95,7 @@ await test('POST /v1/extensions — install rest-connector (from shipped files)'
     body: JSON.stringify({ manifest: manifestYaml, scripts: { 'actions/pull.js': pullScript } }),
   });
   assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-  // Stored in the owner's namespace (services/component-address.ts); the owner keeps the bare name.
-  assert(body.data?.extension?.name === `${ownerName}/rest-connector`, `name: ${body.data?.extension?.name}`);
+  assert(body.data?.extension?.name === 'rest-connector', 'name');
   assert(body.data?.extension?.instances?.supported === true, 'instances supported');
   const props = body.data?.extension?.instances?.configSchema?.properties;
   assert(props?.apiKey?.type === 'secret', 'apiKey declared as secret in configSchema');
@@ -143,7 +142,7 @@ await test('ciphertext at rest (SQLite raw-read) — stored as {encrypted}, not 
   const db = new Database(serverSqlitePath(), { readonly: true });
   try {
     const row = db.prepare('SELECT config FROM extension_instances WHERE extensionName = ? AND id = ?')
-      .get(`${ownerName}/rest-connector`, 'acme') as { config: string } | undefined;
+      .get('rest-connector', 'acme') as { config: string } | undefined;
     assert(!!row, 'instance row present');
     assert(row!.config.indexOf(SECRET) === -1, 'raw stored config must NOT contain plaintext secret');
     const parsed = JSON.parse(row!.config);
@@ -172,7 +171,7 @@ await test('POST action pull — secret decrypted to plaintext string inside the
 });
 
 await test('GET ext: memory — action populated latest', async () => {
-  const ns = encodeURIComponent(`ext:${ownerName}/rest-connector.acme`);
+  const ns = encodeURIComponent('ext:rest-connector.acme');
   const { status, body } = await json(`/v1/memory/${ns}/latest`);
   assert(status === 200, `status ${status}`);
   assert(body.data?.value?.apiKeyTail === SECRET.slice(-2), 'ext memory carries the synced summary');
@@ -225,7 +224,7 @@ await test('trigger schedule — scheduled run writes beta ext: memory with its 
   });
   assert(trig.status === 200, `trigger status ${trig.status}: ${JSON.stringify(trig.body)}`);
 
-  const ns = encodeURIComponent(`ext:${ownerName}/rest-connector.beta`);
+  const ns = encodeURIComponent('ext:rest-connector.beta');
   const { status, body } = await json(`/v1/memory/${ns}/latest`);
   assert(status === 200, `beta ext memory status ${status}`);
   assert(body.data?.value?.apiKeyType === 'string', 'scheduled run decrypted the secret');
@@ -273,7 +272,7 @@ await test('an unauthenticated caller cannot read the instance', async () => {
 });
 
 await test('a second owner cannot read the instance, masked or otherwise', async () => {
-  const { status, body } = await json(`/v1/extensions/${encodeURIComponent(`${ownerName}/rest-connector`)}/instances/acme`, {
+  const { status, body } = await json('/v1/extensions/rest-connector/instances/acme', {
     headers: { Authorization: `Bearer ${strangerToken}` },
   });
   // 404 and not 403, which is the shape the fix chose: the instance id is the caller's guess, and
@@ -286,11 +285,11 @@ await test('a second owner cannot read the instance, masked or otherwise', async
 });
 
 await test('a second owner cannot delete the extension', async () => {
-  const { status } = await json(`/v1/extensions/${encodeURIComponent(`${ownerName}/rest-connector`)}`, {
+  const { status } = await json('/v1/extensions/rest-connector', {
     method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` },
   });
-  // 403 and not 404, unlike the instance above: an extension's full name, `<owner>/<name>`, is
-  // discoverable, so its existence is not the secret — who may uninstall it is.
+  // 403 and not 404, unlike the instance above: an extension is installed under a name that is
+  // node-wide and discoverable, so its existence is not the secret — who may uninstall it is.
   assert(status === 403, `expected 403, got ${status}`);
 });
 

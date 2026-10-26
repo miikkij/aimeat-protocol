@@ -16,6 +16,9 @@
  * @structure registerPublicReadRoute(router, ctx)
  * @usage registerPublicReadRoute(router, ctx);   // from registerKeyRoutes, last
  * @version-history
+ *   2026-10-26 — A signed-in account reads its own extension's memory by the short name too:
+ *     `ext:<name>` falls back to `ext:<account>/<name>` when the account holds that extension (owner
+ *     namespaces, secaudit2026oct22).
  *   2026-10-24 — A 'members' record is read by this node's accounts and the agents and apps acting for
  *     one; a visitor signed in on another node gets the miss unless a share or a consent admits it
  *     (secaudit2026oct22, members-tier-admits-federated-visitor).
@@ -51,6 +54,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { denyScope403 } from '../../auth/deny.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { isOrganismVisibilityWord } from '../../utils/visibility-words.js';
+import { ownExtensionMemoryOwner } from '../../services/component-address.js';
 
 export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, stats, resolve } = ctx;
@@ -79,7 +83,11 @@ export function registerPublicReadRoute(router: Router, ctx: MemoryRouteCtx): vo
       return;
     }
 
-    const stored = await storage.getMemory(gaii, key);
+    // A signed-in account that names its own extension's memory by the short name, `ext:weather`
+    // for `alice/weather`, reads `ext:alice/weather` (services/component-address.ts), as its calls do.
+    const signedIn = !!req.auth?.owner && !isAnonymousPrincipal(req.auth);
+    const ownForm = signedIn ? await ownExtensionMemoryOwner(storage, gaii, req.auth!.owner as string) : null;
+    const stored = await storage.getMemory(gaii, key) ?? (ownForm ? await storage.getMemory(ownForm, key) : null);
     if (!stored) { miss(); return; }
 
     // The reader, resolved: an OWNER session carries a bare `sub`, while memberships, group shares

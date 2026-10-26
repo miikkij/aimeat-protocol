@@ -10,7 +10,6 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=library-packs).
  * @version-history
- *   v1.4.1 - 2026-10-25 - A community pack's id is its cortex's `<owner>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.4.0 - 2026-10-05 - aimeat-validate: served, discoverable, a wrong check digit refused in Finnish.
  *   v1.3.0 - 2026-09-18 - Execute calendar and print APIs, including a malformed ICS refusal.
  *   v1.0.0 — 2026-07-16 — initial (Library Acceleration Program, Phase 1).
@@ -270,8 +269,6 @@ await test('community pack: active+public user cortex appears with ai_doc', asyn
   const auth = { Authorization: `Bearer ${tok}` };
 
   const extName = uname + '-greeter';
-  // The pack id is the cortex's stored name, `<owner>/<name>` (services/component-address.ts).
-  const packId = `${uname}/${extName}`;
   const manifest = [
     'apiVersion: cortex.aimeat.org/v1',
     'kind: Extension',
@@ -310,13 +307,13 @@ await test('community pack: active+public user cortex appears with ai_doc', asyn
 
   // Appears in the index with scope community
   const { body: idx } = await json('/v1/library-packs?scope=community');
-  const entry = (idx.data?.packs || []).find((p: any) => p.id === packId);
+  const entry = (idx.data?.packs || []).find((p: any) => p.id === extName);
   assert(!!entry, 'community pack missing from index');
   assert(entry.scope === 'community' && entry.status === 'preview', `bad scope/status: ${entry.scope}/${entry.status}`);
-  assert(entry.include[0].includes(`/v1/cortex/${uname}/${extName}/libs/${extName}.js`), 'include line wrong');
+  assert(entry.include[0].includes(`/v1/cortex/${extName}/libs/${extName}.js`), 'include line wrong');
 
   // Detail serves the type:prompt content as ai_doc, with {{node_url}} rendered
-  const { status: ds, body: det } = await json(`/v1/library-packs/${encodeURIComponent(packId)}`);
+  const { status: ds, body: det } = await json(`/v1/library-packs/${extName}`);
   assert(ds === 200, `detail expected 200, got ${ds}`);
   const doc = det.data?.pack?.ai_doc || '';
   assert(doc.includes('AIMEAT.greeter.hello'), 'ai_doc missing prompt content');
@@ -376,7 +373,6 @@ await test('community pack: a stranger cannot publish proofs onto another owner\
   const bAuth = await mk(bName, 'PackImp1!');
 
   const extName = aName + '-lib';
-  const packId = `${aName}/${extName}`;
   const manifest = [
     'apiVersion: cortex.aimeat.org/v1', 'kind: Extension', 'metadata:', `  name: ${extName}`,
     `  namespace: ${aName}`, '  description: "owner A community lib"', '  author: e2e',
@@ -399,26 +395,26 @@ await test('community pack: a stranger cannot publish proofs onto another owner\
   const { status: wrote } = await json('/v1/memory', {
     method: 'POST', headers: bAuth,
     body: JSON.stringify({
-      key: `libpack.proofs.${packId}`,
-      value: { packId, proofs: [{ model: 'forged-model-x', verdict: 'pass', evidence: 'none', date: '2026-08-15', selfReported: true }] },
+      key: `libpack.proofs.${extName}`,
+      value: { packId: extName, proofs: [{ model: 'forged-model-x', verdict: 'pass', evidence: 'none', date: '2026-08-15', selfReported: true }] },
       visibility: 'public',
     }),
   });
   assert(wrote === 200 || wrote === 201, `B memory write expected 2xx, got ${wrote}`);
 
   const { body: idx } = await json('/v1/library-packs?scope=community');
-  const entry = (idx.data?.packs || []).find((p: any) => p.id === packId);
+  const entry = (idx.data?.packs || []).find((p: any) => p.id === extName);
   assert(!!entry, 'A pack missing from the community index');
   assert(!(entry.proven_models || []).includes('forged-model-x'),
     `a stranger's proof was served on A's pack: proven_models=${JSON.stringify(entry.proven_models)}`);
   assert(!(entry.proofs || []).some((p: any) => p.model === 'forged-model-x'),
     'a stranger\'s proof was served in the pack proofs array');
 
-  const { body: det } = await json(`/v1/library-packs/${encodeURIComponent(packId)}`);
+  const { body: det } = await json(`/v1/library-packs/${extName}`);
   assert(!((det.data?.pack?.proven_models) || []).includes('forged-model-x'),
     'the detail endpoint served the stranger\'s proof');
 
-  await json(`/v1/memory/${encodeURIComponent(`libpack.proofs.${packId}`)}`, { method: 'DELETE', headers: bAuth });
+  await json(`/v1/memory/libpack.proofs.${extName}`, { method: 'DELETE', headers: bAuth });
   await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: aAuth });
 });
 

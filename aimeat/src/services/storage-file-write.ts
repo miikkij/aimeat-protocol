@@ -38,6 +38,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.9.1 — 2026-10-26 — removeStorageFile and changeStorageFileVisibility reach the account's own extension file by its short key
+ *     `ext/<name>/...` too, stored as `ext/<account>/<name>/...` (owner namespaces, secaudit2026oct22).
  *   v1.9.0 — 2026-10-20 — setStorageFileHooks(): the write and the delete tell the content class
  *     pipeline about a stored or removed file once it has landed or gone (services/content/intake.ts),
  *     scheduled and never awaited.
@@ -92,7 +94,8 @@ import {
     provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, contentHashOf,
     ProvenanceScopeError, type DeclaredProvenance,
 } from './ai-provenance.js';
-import { ownerGhiiOf } from '../utils/gaii.js';
+import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+import { ownExtensionFileKey } from './component-address.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
 import { emitChange } from './event-bus.js';
 import type { CallerContext } from './caller-context.js';
@@ -499,14 +502,22 @@ export type StorageFileDeleteResult =
 export async function removeStorageFile(
     deps: StorageWriteDeps,
     ownerGaii: string,
-    key: string,
+    asked: string,
 ): Promise<StorageFileDeleteResult> {
     const { storage } = deps;
 
-    const fenced = checkKey(ownerGaii, key);
+    const fenced = checkKey(ownerGaii, asked);
     if (fenced) return fenced;
 
-    const existing = await storage.getStorageFile(ownerGaii, key);
+    // The account's own extension's file named by its short key is stored under the stored name
+    // (services/component-address.ts ownExtensionFileKey); tried only when the key as written names no file.
+    let key = asked;
+    let existing = await storage.getStorageFile(ownerGaii, key);
+    if (!existing) {
+        const stored = await ownExtensionFileKey(storage, key, localAccountName(ownerGaii));
+        const found = stored ? await storage.getStorageFile(ownerGaii, stored) : null;
+        if (found && stored) { existing = found; key = stored; }
+    }
     if (!existing) {
         return {
             ok: false, status: 404, code: 'NOT_FOUND',
@@ -657,11 +668,14 @@ export type StorageVisibilityResult =
 export async function changeStorageFileVisibility(
     deps: StorageWriteDeps,
     ownerGaii: string,
-    key: string,
+    asked: string,
     requested: StorageFileRecord['visibility'],
     opts: { workspaceRef?: string; federated?: boolean; publishGate?: StoragePublishGate } = {},
 ): Promise<StorageVisibilityResult> {
     const { storage, config } = deps;
+    // The account's own extension's file by its short key, as removeStorageFile reads it.
+    const key = await storage.getStorageFileMeta(ownerGaii, asked)
+        ? asked : (await ownExtensionFileKey(storage, asked, localAccountName(ownerGaii))) ?? asked;
     // 'organism:<id>' names an organism the file owner's account is an active member of.
     const audience = await organismVisibilityRefusal(storage, requested, { identity: ownerGaii, ...(opts.federated !== undefined ? { federated: opts.federated } : {}) });
     if (audience) return { ok: false, ...audience };

@@ -4,8 +4,6 @@
  * @structure Authenticated fixtures; free calls and caller identity; refusal paths; cleanup.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-tool-free-mcp
  * @version-history
- *   2026-10-25 — The buyer calls the seller's extension on the raw route by its full name
- *     `<seller>/<EXT>`, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-17 — The raw route runs an action that only a free paced tool sells (`paced-only`), where
  *     it answered 402; an action a money-priced tool sells still answers 402.
  *   2026-10-13 — From 4.0.0 POST /v1/memory refuses a manifest with price.morsels, so the `priced` tool
@@ -187,11 +185,9 @@ try {
   // (a pacing amount, no money price), so a person could not acknowledge a test in Kehitysputki. It is
   // paced at the tool's amount and runs; a money price still answers 402 (the echo action, sold by `usd`).
   await test('the raw route runs an action sold only by a free paced tool, and paces it', async () => {
-    // The buyer is another account, so it names the seller's extension by its full name.
-    const extPath = '/v1/ext/' + encodeURIComponent(seller!.owner + '/' + EXT);
-    const raw = await json(extPath + '/paced', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ query: 'acknowledge' }) });
+    const raw = await json('/v1/ext/' + EXT + '/paced', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ query: 'acknowledge' }) });
     assert(raw.status === 200, 'raw paced action ' + raw.status + ' ' + JSON.stringify(raw.body.error));
-    const echoed = await json(extPath + '/echo', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ query: 'sold for money' }) });
+    const echoed = await json('/v1/ext/' + EXT + '/echo', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ query: 'sold for money' }) });
     assert(echoed.status === 402, 'an action a money-priced tool sells still asks for a contract ' + echoed.status);
   });
   await test('a free tool cannot remove the backing action money price', async () => {

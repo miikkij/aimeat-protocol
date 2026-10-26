@@ -312,7 +312,7 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-26",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -322,7 +322,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:34cf30d74902aa9626af7470"
+      "digest": "sha256:0df7ddfaf3faa05ad5a41551"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-24",
@@ -484,13 +484,13 @@
       "digest": "sha256:8c61e7dcccc52219f8bcdd8b"
     },
     "project:aimeat-library-authoring": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-26",
       "watches": [
         "aimeat/scripts/build-sdk-libs.ts",
         ".githooks/pre-commit",
         "aimeat/src/services/build-extension-prompt.ts"
       ],
-      "digest": "sha256:70d445f28c1ce6f234ea3660"
+      "digest": "sha256:b88887de471323fccde113ed"
     },
     "project:aimeat-organism-records": {
       "reviewedOn": "2026-09-19",
@@ -685,7 +685,7 @@
     "project:aimeat-library-authoring": {
       "aimeat/scripts/build-sdk-libs.ts": "ce24737f2db6272f",
       ".githooks/pre-commit": "ba558088830eb13c",
-      "aimeat/src/services/build-extension-prompt.ts": "6fc8f61fdb3ecfac"
+      "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1"
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
@@ -746,11 +746,11 @@
       "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
     },
     "node:aimeat-extension-builder": {
-      "aimeat/src/services/build-extension-prompt.ts": "6fc8f61fdb3ecfac",
+      "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1",
       "aimeat/src/services/extension-ctx-contract.ts": "6861be8a58b438ec",
       "aimeat/src/services/extension-manifest.ts": "09e04a048b7c541f",
       "aimeat/src/routes/extensions/paywall.ts": "11ff2227c7028795",
-      "aimeat/src/routes/extensions/crud.ts": "f34780cb7263cc5b",
+      "aimeat/src/routes/extensions/crud.ts": "fd6b664c774355b1",
       "aimeat/src/routes/extensions/instances.ts": "d7ace6eb026fee79",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },

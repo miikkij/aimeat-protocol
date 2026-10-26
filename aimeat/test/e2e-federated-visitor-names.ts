@@ -19,8 +19,6 @@
  *   peer door before the visitors sign in.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federated-visitor-names
  * @version-history
- *   2026-10-25 — The visitors call the owner's priced extension by its full name, as names live in the
- *     owner's namespace (secaudit2026oct22).
  *   v1.2.1 — 2026-10-12 — The priced extension action carries its pacing amount as the action's own
  *     tollMorsels; node 4.0.0 refuses commercial.payMorsels in a manifest (MORSEL_PRICE_REMOVED), so
  *     the install failed and the test with it. 3.x charges tollMorsels the same way. The peer's visitor
@@ -315,16 +313,14 @@ async function run() {
         assert(act.status === 200, `setup: activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
 
         const said = (r: { body: any }) => String(JSON.stringify(r.body?.error ?? r.body?.data ?? r.body)).slice(0, 200);
-        // A visitor names the extension in full (it lives in the owner's namespace); the owner keeps the short name.
-        const extFull = encodeURIComponent(`${namesake}/${ext}`);
         for (const action of ['paidcall', 'tollcall']) {
-            const call = (token: string, name = extFull) => json(`/v1/ext/${name}/${action}`, as(token, { method: 'POST', body: JSON.stringify({ hi: 1 }) }));
+            const call = (token: string) => json(`/v1/ext/${ext}/${action}`, as(token, { method: 'POST', body: JSON.stringify({ hi: 1 }) }));
             const control = await call(strangerToken);
             assert(control.status === 402, `the control visitor pays for ${action}: ${control.status} ${said(control)}`);
             const namesakeVisitor = await call(visitorToken);
             assert(namesakeVisitor.status === control.status,
                 `${action} answered the visitor named like the owner ${namesakeVisitor.status} ${said(namesakeVisitor)}, and the control ${control.status}`);
-            const own = await call(alice.token, ext);
+            const own = await call(alice.token);
             assert(own.status === 200, `positive control: the owner calls her own ${action} free: ${own.status} ${said(own)}`);
         }
     });

@@ -14,8 +14,6 @@
  *   first test asserts the 401 INVALID_TOKEN refusal instead of the 3.x acceptance.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-token-rest
  * @version-history
- *   2026-10-25 — aimeat_capabilities_invoke names the seller's capability by its full id
- *     `ext:<seller>/<EXT>:echo`, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.1.0 — 2026-10-12 — The first test asks the node which release it runs (helpers/node-release.ts):
  *     3.x asserts the acceptance with the Deprecation headers and the count, as before; 4.0.0 asserts
  *     401 INVALID_TOKEN with the removal message and the invalid_token challenge, and no count.
@@ -32,7 +30,6 @@ const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const stamp = randomBytes(5).toString('hex');
 const EXT = 'tokenrest' + stamp;
 const FILE = 'tokenrest-' + stamp + '.html';
-/** The seller's own app-tool binding, which may keep the bare name; another caller names `ext:<seller>/<EXT>:echo`. */
 const CAPABILITY = `ext:${EXT}:echo`;
 const PASSWORD = 'TokenRestTest1234';
 const FULL_SCOPES = ['memory:read', 'memory:write', 'work:request', 'exchange:write', 'ext:invoke', 'social:read'];
@@ -193,8 +190,7 @@ try {
   });
   await test('aimeat_capabilities_invoke runs an extension capability as the caller and counts nothing', async () => {
     const before = await restUses();
-    // The caller is the buyer's agent, so it names the seller's extension capability by its full id.
-    const out = await callTool(actorMcp, 'aimeat_capabilities_invoke', { id: `ext:${seller!.owner}/${EXT}:echo`, input: { query: 'cap' } });
+    const out = await callTool(actorMcp, 'aimeat_capabilities_invoke', { id: CAPABILITY, input: { query: 'cap' } });
     assert(!out.isError, out.text);
     assert(out.data?.result?.caller === actor.gaii, 'caller ' + JSON.stringify(out.data?.result));
     assert(await restUses() === before, 'the loopback request is the node\'s own');

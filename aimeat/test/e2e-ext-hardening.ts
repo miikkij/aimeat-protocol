@@ -26,9 +26,6 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
- *   2026-10-25 — The emailPolicy notices are matched by the stored name `<owner>/<name>` (merge of the approval standard with the owner namespaces, secaudit2026oct22).
- *   2026-10-25 — Names live in the owner's namespace: capability ids and schedule ids carry the
- *     owner, and another account reads source by `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — 7 reworked to the developer's ruling: an agent of the operator without
  *     operator:admin ASKS for emailPolicy 'unrestricted' (202, pending for the operators, answered
  *     back on Don't allow and Allow), and a script it writes holds the grant back until an operator
@@ -273,7 +270,7 @@ async function run() {
     assert((survived as Record<string, unknown>).cron === '30 1 * * *',
       `it survived but was rewritten: ${JSON.stringify(survived)}`);
     // And the manifest's own is still there, replaced rather than skipped.
-    const declared = jobs.find(j => j.id === `ext:${ownerA.name}/${name}:ping-scheduled`);
+    const declared = jobs.find(j => j.id === `ext:${name}:ping-scheduled`);
     assert(!!declared,
       `the manifest's own schedule must still be registered: ${JSON.stringify(jobs.map(j => j.id))}`);
     // The manifest asked for Helsinki and the record can carry it, but the builder never read the
@@ -567,10 +564,9 @@ async function run() {
   const sellerExt = `h17seller${h17}`;      // ownerC's extension: a capability ownerC genuinely owns
   const buyerExt = `h17buyer${h17}`;        // ownerB's extension: hands ctx.buy whatever it is told
   const pacedExt = `h17paced${h17}`;        // ownerA's extension sold only by a free tool with a pacing amount
-  // A capability is keyed by the extension's stored name, which carries its owner (services/component-address.ts).
-  const victimCap = `ext:${ownerA.name}/${victimExt}:ping`;
-  const sellerCap = `ext:${ownerC.name}/${sellerExt}:ping`;
-  const pacedCap = `ext:${ownerA.name}/${pacedExt}:ping`;
+  const victimCap = `ext:${victimExt}:ping`;
+  const sellerCap = `ext:${sellerExt}:ping`;
+  const pacedCap = `ext:${pacedExt}:ping`;
   const appA = `h17a${h17}.html`;           // ownerA's own app, the legitimate seller of victimCap
   const appB = `h17b${h17}.html`;           // ownerB's forgery, aimed at the paywall
   const appC = `h17c${h17}.html`;           // ownerC's forgery, aimed at ctx.buy
@@ -718,8 +714,7 @@ async function run() {
     assert(mine.status === 200, `the installer must still read their own source, got ${mine.status}`);
     assert(typeof mine.body.data.action.scriptContent === 'string', 'own source should come back');
 
-    // Another account names the extension with its owner (services/component-address.ts).
-    const theirs = await json(`/v1/extensions/${encodeURIComponent(`${ownerA.name}/${name}`)}/actions/ping`, { headers: auth(ownerB.token) });
+    const theirs = await json(`/v1/extensions/${name}/actions/ping`, { headers: auth(ownerB.token) });
     assert(theirs.status === 403,
       `a stranger got ${theirs.status} on someone else's source; body ${JSON.stringify(theirs.body?.data ?? theirs.body?.error)}`);
   });
@@ -738,8 +733,6 @@ async function run() {
   // operator holds without operator:admin.
   const opAgent = await makeAgent(BASE, seed, ['*']);
   const mailExt = `hardpolicy${Date.now()}`;
-  // The notices name the extension by its stored name, `<owner>/<name>` (services/component-address.ts).
-  const mailExtFull = `${seed.name}/${mailExt}`;
   await test('setup: the operator in person installs an extension whose config holds emailPolicy', async () => {
     assert(rolesOf(seed.token).includes('operator'), 'the seed owner must be the operator for this section');
     const res = await install(seed.token, mailExt, { emailPolicy: { default: 'restricted' }, greeting: { default: 'hi' } });
@@ -786,7 +779,7 @@ async function run() {
 
   await test('the operator hears it with what is checked and why, and Allow and Don\'t allow; the asking agent cannot answer it', async () => {
     const n = await json('/v1/notifications', { headers: auth(seed.token) });
-    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'approval_request' && x.i18n?.vars?.extension === mailExtFull);
+    const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'approval_request' && x.i18n?.vars?.extension === mailExt);
     assert(!!notice && /any address/.test(notice.title) && /mail identity/.test(notice.body ?? ''), `no plain notice: ${JSON.stringify(notice)}`);
     const ids = (notice.actions ?? []).map((a: any) => a.id).sort().join(',');
     assert(ids === 'allow,deny', `actions ${ids}`);
@@ -846,7 +839,7 @@ async function run() {
     assert(cfg.emailPolicy === undefined, `the agent's code inherited emailPolicy=${JSON.stringify(cfg.emailPolicy)} before an operator confirmed it`);
     assert(cfg.greeting === 'hello', 'the other config fields stay');
     const n = await json('/v1/notifications', { headers: auth(seed.token) });
-    assert((n.body?.data?.notifications ?? []).some((x: any) => x.i18n?.key === 'approval_email_policy_code' && x.i18n?.vars?.extension === mailExtFull),
+    assert((n.body?.data?.notifications ?? []).some((x: any) => x.i18n?.key === 'approval_email_policy_code' && x.i18n?.vars?.extension === mailExt),
       'the operator was not asked to confirm the grant for the new code');
     const yes = await json(`/v1/publish-requests/${held.request_id}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
     assert(yes.status === 200, `confirm ${yes.status}: ${JSON.stringify(yes.body?.error)}`);

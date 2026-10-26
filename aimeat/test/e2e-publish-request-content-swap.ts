@@ -24,8 +24,6 @@
  *   test/unit/publish-request-content-binding.test.ts.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-request-content-swap
  * @version-history
- *   2026-10-25 — Another account reads A's cortex by its full name `<A>/<short>`, as names live in the
- *     owner's namespace (secaudit2026oct22).
  *   2026-10-22 — The asking agent and a sibling without publish:public are refused the approval with a
  *     403, and the request still waits (check:denial-coverage).
  *   2026-10-22 — Initial (secaudit 2026-10, apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate,
@@ -214,8 +212,8 @@ spec:
 const lib = (word: string) => ({ 'helper.js': `export function hello() { return "${word}"; }` });
 const install = (token: string, name: string, description: string, word = 'hi') =>
     call('/v1/cortex', { token, method: 'POST', body: { manifest: cortexManifest(name, description), libs: lib(word) } });
-/** The cortex as another account reads it, by the full name `<A>/<short>`: 200 only when it is public. */
-const otherReads = (name: string) => call(`/v1/cortex/${encodeURIComponent(`${A.name}/${name}`)}`, { token: B.token });
+/** The cortex as another account reads it: 200 only when it is public. */
+const otherReads = (name: string) => call(`/v1/cortex/${encodeURIComponent(name)}`, { token: B.token });
 
 await test('POSITIVE CONTROL: the owner approves an unchanged cortex request, and another account reads it', async () => {
     const name = `pcs-cx-ok-${STAMP}`;

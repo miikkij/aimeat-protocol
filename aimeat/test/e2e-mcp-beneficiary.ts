@@ -10,8 +10,7 @@
  *   declares a split against somebody else's revenue.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-beneficiary
  * @version-history
- *   2026-10-25 — The consumer accepts and calls the provider's extension by its full name `<provider>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
- *   2026-10-17 —The narrow agent is listed the three selling tools (permission ask,
+ *   2026-10-17 — The narrow agent is listed the three selling tools (permission ask,
  *     mcp/permission-ask-gate.ts: exchange:beneficiary is one-press), and each call is refused
  *     SCOPE_DENIED with the allow address.
  *   2026-10-16 — The two split refusals assert INVALID_INPUT, the code POST /v1/commerce/beneficiary-splits
@@ -168,8 +167,6 @@ let provAgent: Awaited<ReturnType<typeof agentSession>>;
 let benefAgent: Awaited<ReturnType<typeof agentSession>>;
 let narrowAgent: Awaited<ReturnType<typeof agentSession>>;
 let trackingCode = '';
-/** The extension's full name in the provider's namespace: how another account (the consumer) names it. */
-const extFull = () => `${provider.name}/${EXT}`;
 
 await test('Setup: operator, provider, beneficiary and consumer, each with an MCP agent', async () => {
     operator = await setupOwner('op');   // first owner on a fresh DB auto-becomes operator
@@ -263,12 +260,12 @@ await test('The agent lists its owner\'s splits, and only those', async () => {
 await test('A settled call accrues a share the BENEFICIARY reads over MCP', async () => {
     const a = await json('/v1/exchange/entitlements', {
         method: 'POST', headers: auth(consumer.token),
-        body: JSON.stringify({ ext: extFull(), action: 'lookup', contract_ref: 'c-mcpben', cap_units: 50_000_000 }),
+        body: JSON.stringify({ ext: EXT, action: 'lookup', contract_ref: 'c-mcpben', cap_units: 50_000_000 }),
     });
     assert(a.status === 201, `accept ${a.status}: ${JSON.stringify(a.body?.error)}`);
     const rake = Number(a.body.data.entitlement.rake_per_call);
 
-    const call = await json(`/v1/ext/${encodeURIComponent(extFull())}/lookup`, {
+    const call = await json(`/v1/ext/${EXT}/lookup`, {
         method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ pay_to: benef.ghii }),
     });
     assert(call.status === 200, `call ${call.status}: ${JSON.stringify(call.body?.error)}`);

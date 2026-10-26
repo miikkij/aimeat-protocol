@@ -54,7 +54,8 @@
  * @version-history
  *   v1.10.1 -- 2026-10-25 -- The extension is found through services/component-address.ts, the owner's
  *     own first, so a run named with the bare name of an install made since names carry the owner
- *     reaches it (owner namespaces wish, secaudit2026oct22).
+ *     reaches it (owner namespaces wish, secaudit2026oct22). A name another account now keeps under its
+ *     own is refused as another owner's, as before (2026-10-26).
  *   v1.10.0 -- 2026-10-25 -- A run for a deactivated account is refused with a sentence that names the
  *     deactivation (code ACCOUNT_DEACTIVATED), unless somebody waits for its answer
  *     (`servesWaitingCaller`: an app's markdown action, an AI provider call). Nothing is deleted
@@ -108,7 +109,7 @@ import { buildUnattendedExtensionWorkspace } from './extension-workspace-rows.js
 import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
 import { installerActor, type PublishActor } from './publish-actors.js';
 import { getEncryptionKey } from './encryption.js';
-import { findExtension } from './component-address.js';
+import { findExtension, extensionHoldersOf } from './component-address.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
 import { deactivatedAccountSkip } from './account-deactivated.js';
@@ -261,7 +262,13 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
     // (services/component-address.ts): a schedule or a workflow step written as `weather` reaches
     // `<owner>/weather`, and one stored before names carried an owner reaches its bare record.
     const ext = await findExtension(storage, extensionName, ownerName, 'manage');
-    if (!ext) throw new Error(`Extension "${extensionName}" not found`);
+    if (!ext) {
+        // The name is another account's now (it reinstalled a name this owner removed): said as before.
+        if ((await extensionHoldersOf(storage, extensionName)).length > 0) {
+            throw new Error(`Extension "${extensionName}" belongs to another owner — an unattended run may only call your own`);
+        }
+        throw new Error(`Extension "${extensionName}" not found`);
+    }
     if (ext.status !== 'active') throw new Error(`Extension "${extensionName}" is not active`);
     // The fence. See the file header: an unattended call has no door where a price could be asked.
     if (ext.installedBy !== ownerName) {

@@ -2,8 +2,8 @@
  * @file src/services/component-address.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Extension and cortex names live in the owner's namespace. One place decides what an
- *   address names and under which name a new install is stored.
+ * @description The owner is ADDED to extension and cortex names; every address that worked before
+ *   works as before. One place decides what an address names and under which name an install is stored.
  *
  *   WHY. An extension name (/v1/ext/<name>, memory `ext:<name>`, consents `ext:<name>`) and a cortex
  *   name (/v1/cortex/<name>/libs) were node-wide keys. A name an owner uninstalled, or a name the
@@ -12,24 +12,33 @@
  *   2827; wish wish-cortex-and-extension-names-live-in-the-owner-s-namespace, Jouni 2026-10-25:
  *   "tämä on nyt fixattava!").
  *
- *   THE RULE.
- *   - A new install is stored as `<owner>/<name>`: the installing account, one slash, the name the
- *     manifest gives. Only that account can create a name under its own prefix.
- *   - A name stored bare before that (or shipped by the node) stays the record's key, so memory,
- *     consents, schedules, versions and published apps keep their address. `<holder>/<name>` is an
- *     alias for it, and `system/<name>` for a shipped one.
+ *   THE RULE (Jouni, 2026-10-26: "piti lisätä omistaja johonkin tohon ja pitää toi formaatti
+ *   mahdollisimman samana ... eikä nykyiset hajoa").
+ *   - An install keeps its bare name, as always, and the same name collisions are refused as always.
+ *     Every answer keeps `name` and adds `owner` and `full_name` (withOwnerFields).
+ *   - `<owner>/<name>` is the exact address everywhere: the record stored so, or the alias of the
+ *     bare record that account holds; `system/<name>` for a shipped one.
  *   - A bare name an uninstall released is written down with its holder (ReleasedComponentName).
- *     Only that holder installs under it again; for everybody else it stays retired.
- *   - A bare address names the bare record when there is one: that is what a published app, a
- *     capability or an offering meant by it, and nobody can create a bare name any more. Without one,
- *     it names the signed-in caller's own `<caller>/<name>`, so an install made today keeps answering
- *     to the name its author typed. A caller managing their own things reads their own first.
+ *     Another account's install of it is stored as `<owner>/<name>`, so the apps, consents and
+ *     pinned versions that named the old one never reach it; only the holder takes the bare name back.
+ *     An install asked for in full (PUT to `<owner>/<name>`) is stored so too.
+ *   - A bare address: the bare record; else the caller's own `<caller>/<name>` (managing reads own
+ *     first); else the one account that keeps that name under its own, unless the name is retired;
+ *     two such accounts answer 409 AMBIGUOUS_NAME, naming both.
  * @structure SYSTEM_NAMESPACE · splitComponentAddress · isNamespacedName · namespacedName ·
  *   shortNameOf · findExtension · findCortex · ownComponent · installNameFor · releaseBareName ·
- *   isLegacyExtensionHead · extensionCallTarget · placeExtensionInstall ·
- *   placeCortexInstall · settleReclaimed · cortexLibPath · addressSegment
+ *   isLegacyExtensionHead · extensionCallTarget · ownExtensionFileKey · ownExtensionMemoryOwner · placeExtensionInstall ·
+ *   placeCortexInstall · settleReclaimed · cortexLibPath · addressSegment · withOwnerFields ·
+ *   AmbiguousComponentName · extensionHoldersOf
  * @usage const ext = await findExtension(storage, req.params.name, req.auth?.owner, 'manage');
  * @version-history
+ *   v1.2.0 — 2026-10-26 — The owner is additive: an install keeps its bare name (`<owner>/<name>` only
+ *     when asked for in full or when another account released the name), answers keep `name` and add
+ *     `owner` and `full_name`, and a bare name the caller has nothing under reaches the one account
+ *     that keeps it under its own, or answers 409 AMBIGUOUS_NAME for two (Jouni, 2026-10-26).
+ *   v1.1.0 — 2026-10-26 — ownExtensionFileKey and ownExtensionMemoryOwner: the owner's short-name
+ *     file key `ext/<name>/...` and memory owner `ext:<name>` of its own extension name the stored
+ *     ones, for the readers that try them after the address as written found nothing.
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish; secaudit2026oct22 leads 589 and 2827).
  */
 import type { Storage, ExtensionRecord, CortexExtensionRecord, CapabilityRecord } from '../storage/interface.js';
@@ -74,8 +83,28 @@ type Getter<T> = (name: string) => Promise<T | null>;
  */
 export type BareNameReading = 'call' | 'manage';
 
-async function findComponent<T extends { installedBy: string }>(
-  get: Getter<T>, address: string, callerOwner: string | null | undefined, reading: BareNameReading,
+/**
+ * The released-name row of `name`. A storage that predates the rows (a unit test's double of the
+ * storage interface) has none, so every rule reads as for a name never released.
+ */
+function releasedName(storage: Storage, kind: ComponentKind, name: string): Promise<{ holder: string } | null> {
+  return typeof storage.getReleasedComponentName === 'function' ? storage.getReleasedComponentName(kind, name) : Promise.resolve(null);
+}
+
+/** A bare name two accounts hold in their own namespaces, with no bare record: the caller names one in full. */
+export class AmbiguousComponentName extends Error {
+  readonly statusCode = 409;
+  /** Read by the global error handler (middleware/fallback-handlers.ts). */
+  readonly status = 409;
+  readonly code = 'AMBIGUOUS_NAME';
+  constructor(readonly short: string, readonly fullNames: string[]) {
+    super(`More than one account has "${short}": ${fullNames.join(', ')}. Name the one you mean in full, as <owner>/<name>.`);
+  }
+}
+
+async function findComponent<T extends { installedBy: string; name: string }>(
+  get: Getter<T>, list: () => Promise<T[]>, kind: ComponentKind, storage: Storage,
+  address: string, callerOwner: string | null | undefined, reading: BareNameReading,
 ): Promise<T | null> {
   const parts = splitComponentAddress(address);
   if (parts) {
@@ -86,27 +115,59 @@ async function findComponent<T extends { installedBy: string }>(
     return bare && holds(bare.installedBy, parts.owner) ? bare : null;
   }
   const own = callerOwner && OWNER_SEGMENT.test(callerOwner) ? () => get(namespacedName(callerOwner, address)) : null;
-  if (reading === 'manage' && own) return (await own()) ?? get(address);
-  return (await get(address)) ?? (own ? own() : null);
+  const found = reading === 'manage' && own
+    ? (await own()) ?? await get(address)
+    : (await get(address)) ?? (own ? await own() : null);
+  if (found || address.includes('/') || address.includes('@')) return found;
+  // No bare record and none of the caller's own: the one account that holds the name in its own
+  // namespace, as a bare name reached before. A name its holder released stays retired.
+  if (await releasedName(storage, kind, address)) return null;
+  const holders = (await list()).filter(r => splitComponentAddress(r.name)?.name === address);
+  if (holders.length > 1) throw new AmbiguousComponentName(address, holders.map(r => r.name).sort());
+  // The listing is lean (no scripts, no lib bodies): the whole record is read by its key.
+  return holders[0] ? get(holders[0].name) : null;
 }
 
 /**
  * The extension an address names: `<owner>/<name>` (stored, or the alias of a bare record its
  * holder holds), or a bare name: the bare record, then the caller's own `<caller>/<name>` (with
- * `reading: 'manage'`, the caller's own first). Without a caller only the stored key and the alias
- * count.
+ * `reading: 'manage'`, the caller's own first), then the one account's `<owner>/<name>`. Two such
+ * accounts throw AmbiguousComponentName (409).
  */
 export function findExtension(
   storage: Storage, address: string, callerOwner?: string | null, reading: BareNameReading = 'call',
 ): Promise<ExtensionRecord | null> {
-  return findComponent(n => storage.getExtension(n), address, callerOwner, reading);
+  return findComponent(n => storage.getExtension(n), () => leanExtensions(storage), 'extension', storage, address, callerOwner, reading);
 }
 
 /** The cortex an address names, by the same rule as findExtension. */
 export function findCortex(
   storage: Storage, address: string, callerOwner?: string | null, reading: BareNameReading = 'call',
 ): Promise<CortexExtensionRecord | null> {
-  return findComponent(n => storage.getCortexExtension(n), address, callerOwner, reading);
+  return findComponent(n => storage.getCortexExtension(n), () => (typeof storage.listCortexExtensions === 'function'
+    ? storage.listCortexExtensions({ lean: true }) : Promise.resolve([])), 'cortex', storage, address, callerOwner, reading);
+}
+
+/**
+ * A record as an answer shows it: `name` is the name its manifest gives, as always, and two fields
+ * are added, `owner` (the installing account) and `full_name` (`<owner>/<name>`, the exact address
+ * that works everywhere). A record stored under `<owner>/<name>` keeps that key internally.
+ */
+export function withOwnerFields<T extends { name: string; installedBy?: string }>(rec: T): T & { owner: string; full_name: string } {
+  const parts = splitComponentAddress(rec.name);
+  const owner = parts?.owner ?? (holds(rec.installedBy, SYSTEM_NAMESPACE) ? SYSTEM_NAMESPACE : String(rec.installedBy ?? ''));
+  const name = parts?.name ?? rec.name;
+  return { ...rec, name, owner, full_name: owner && OWNER_SEGMENT.test(owner) ? namespacedName(owner, name) : rec.name };
+}
+
+/** The full names of the extensions accounts keep under their own name for this short name. */
+export async function extensionHoldersOf(storage: Storage, short: string): Promise<string[]> {
+  return (await leanExtensions(storage)).filter(r => splitComponentAddress(r.name)?.name === short).map(r => r.name);
+}
+
+/** Every extension, without scripts. A storage double without the listing (a unit test's) lists none. */
+function leanExtensions(storage: Storage): Promise<ExtensionRecord[]> {
+  return typeof storage.listExtensions === 'function' ? storage.listExtensions({ lean: true }) : Promise.resolve([]);
 }
 
 /** The record this owner already has under this short name: `<owner>/<name>`, or a bare `<name>` they hold. */
@@ -132,53 +193,58 @@ export async function installNameFor(
   const parts = splitComponentAddress(manifestName);
   const foreignPrefix = parts && parts.owner !== ownerName ? parts.owner : null;
   const shortName = parts ? parts.name : manifestName;
-  const released = await storage.getReleasedComponentName(kind, shortName);
-  if (released && holds(released.holder, ownerName)) return { name: shortName, shortName, reclaimed: true, foreignPrefix };
-  return { name: namespacedName(ownerName, shortName), shortName, reclaimed: false, foreignPrefix };
+  // Asked for in full, in the installer's own namespace: stored so.
+  if (parts && !foreignPrefix) return { name: manifestName, shortName, reclaimed: false, foreignPrefix };
+  const released = await releasedName(storage, kind, shortName);
+  // A bare name another account uninstalled stays retired: the install goes to `<owner>/<name>`, so
+  // the apps, consents and memory that named the old one never reach this one.
+  if (released && !holds(released.holder, ownerName)) {
+    return { name: namespacedName(ownerName, shortName), shortName, reclaimed: false, foreignPrefix };
+  }
+  return { name: shortName, shortName, reclaimed: !!released, foreignPrefix };
 }
 
 /**
- * Where an extension install by `ownerName` lands. The record's `name` is the manifest's name; this
- * sets it to the stored name: the owner's existing extension of that name (`existing`, which the door
- * refuses or updates in place), else a reclaimed bare name, else `<owner>/<name>`.
+ * Where an extension install by `ownerName` lands, and what is already there. The name stays the
+ * manifest's bare name, as always; it is `<owner>/<name>` only when the installer asks for it in full
+ * or another account released the bare name. `existing` is the record under the name the install
+ * would take: the bare record, whoever holds it (the door answers as it always did: 409 for POST,
+ * the owner check for an update), or the owner's own `<owner>/<name>`.
  */
 export async function placeExtensionInstall(
   storage: Storage, ownerName: string, record: { name: string },
 ): Promise<{ existing: ExtensionRecord | null }> {
-  const short = shortNameOf(record.name);
-  const existing = await ownComponent(n => storage.getExtension(n), ownerName, short);
-  if (existing) { record.name = existing.name; return { existing }; }
-  record.name = (await installNameFor(storage, 'extension', ownerName, short)).name;
-  return { existing: null };
+  const placed = await installNameFor(storage, 'extension', ownerName, record.name);
+  const existing = (await storage.getExtension(placed.name))
+    ?? (placed.name === placed.shortName ? await storage.getExtension(namespacedName(ownerName, placed.shortName)) : null);
+  record.name = existing ? existing.name : placed.name;
+  return { existing };
 }
 
 /**
- * Where a cortex install by `ownerName` lands, by the same rule as placeExtensionInstall. A cortex
- * name could carry a slash before 2026-10-25 with any prefix, so the manifest may name another
- * account's prefix: the cortex goes into the installer's own namespace and `warning` says so. A
- * record stored under `<owner>/<name>` before that by another account (`takenByOther`) keeps it.
+ * Where a cortex install by `ownerName` lands, by the same rule as placeExtensionInstall.
+ * `takenByOther`: the name is held by another account, which the door refuses as it always did. A
+ * manifest name with another account's prefix goes into the installer's own namespace, with `warning`.
  */
 export async function placeCortexInstall(
   storage: Storage, ownerName: string, ext: { name: string; shortName?: string },
 ): Promise<{ existing: CortexExtensionRecord | null; takenByOther: boolean; warning: string | null }> {
-  const placed = await installNameFor(storage, 'cortex', ownerName, ext.name);
-  const warning = placed.foreignPrefix
-    ? `The name "${ext.name}" is in the namespace of the account "${placed.foreignPrefix}". It was installed in your own namespace, as "${namespacedName(ownerName, placed.shortName)}".`
+  const asked = splitComponentAddress(ext.name);
+  const foreign = asked && asked.owner !== ownerName;
+  const placed = await installNameFor(storage, 'cortex', ownerName, foreign ? namespacedName(ownerName, asked.name) : ext.name);
+  const warning = foreign
+    ? `The name "${ext.name}" is in the namespace of the account "${asked.owner}". It was installed in your own namespace, as "${placed.name}".`
     : null;
-  const stored = await storage.getCortexExtension(namespacedName(ownerName, placed.shortName));
-  if (stored && !holds(stored.installedBy, ownerName)) {
-    ext.name = stored.name;
-    return { existing: null, takenByOther: true, warning };
-  }
-  const existing = stored ?? await ownComponent(n => storage.getCortexExtension(n), ownerName, placed.shortName);
+  const existing = (await storage.getCortexExtension(placed.name))
+    ?? (placed.name === placed.shortName ? await storage.getCortexExtension(namespacedName(ownerName, placed.shortName)) : null);
   ext.name = existing ? existing.name : placed.name;
-  ext.shortName = placed.shortName;
-  return { existing, takenByOther: false, warning };
+  if (foreign) ext.shortName = placed.shortName;
+  return { existing, takenByOther: !!existing && !holds(existing.installedBy, ownerName), warning };
 }
 
 /** After a new install took a reclaimed bare name: it is no longer released. */
 export async function settleReclaimed(storage: Storage, kind: ComponentKind, name: string): Promise<void> {
-  if (!isNamespacedName(name)) await storage.deleteReleasedComponentName(kind, name);
+  if (!isNamespacedName(name) && typeof storage.deleteReleasedComponentName === 'function') await storage.deleteReleasedComponentName(kind, name);
 }
 
 /**
@@ -186,7 +252,7 @@ export async function settleReclaimed(storage: Storage, kind: ComponentKind, nam
  * needs nothing: nobody else can create a name under another account's prefix.
  */
 export async function releaseBareName(storage: Storage, kind: ComponentKind, name: string, holder: string): Promise<void> {
-  if (isNamespacedName(name) || name.includes('/') || !holder) return;
+  if (isNamespacedName(name) || name.includes('/') || !holder || typeof storage.recordReleasedComponentName !== 'function') return;
   await storage.recordReleasedComponentName({ kind, name, holder, releasedAt: new Date().toISOString() });
 }
 
@@ -205,10 +271,40 @@ export async function findBackingCapability(storage: Storage, actionId: string, 
   return own && own.name !== m[1] ? storage.getCapability(`ext:${own.name}:${m[2]}`) : null;
 }
 
+/**
+ * The stored form of a file key or an extension memory owner that an account writes with the short
+ * name of its own extension. An extension's files are stored under `ext/<stored name>/...` and its
+ * memory under `ext:<stored name>`, so the owner's `ext/weather/morning.txt` and `ext:weather` for
+ * `alice/weather` mean `ext/alice/weather/morning.txt` and `ext:alice/weather`. Answers that form
+ * when `ownerName` holds `<ownerName>/<name>`, null otherwise; the caller tries it only after the
+ * address as written found nothing, so a bare record keeps its own address.
+ */
+export async function ownExtensionFileKey(storage: Storage, key: string, ownerName: string): Promise<string | null> {
+  const m = /^ext\/([^/]+)\/(.+)$/.exec(key);
+  if (!m) return null;
+  const own = await ownExtensionNamed(storage, m[1], ownerName);
+  return own ? `ext/${own}/${m[2]}` : null;
+}
+
+/** As ownExtensionFileKey, for the memory owner `ext:<name>` or `ext:<name>.<instance>`. */
+export async function ownExtensionMemoryOwner(storage: Storage, memoryOwner: string, ownerName: string): Promise<string | null> {
+  const m = /^ext:([^/.]+)(\..+)?$/.exec(memoryOwner);
+  if (!m) return null;
+  const own = await ownExtensionNamed(storage, m[1], ownerName);
+  return own ? `ext:${own}${m[2] ?? ''}` : null;
+}
+
+/** The stored name `<ownerName>/<short>` when that account holds it, else null. */
+async function ownExtensionNamed(storage: Storage, short: string, ownerName: string): Promise<string | null> {
+  if (!OWNER_SEGMENT.test(ownerName) || short.includes('/')) return null;
+  const ext = await storage.getExtension(namespacedName(ownerName, short));
+  return ext && ext.installedBy === ownerName ? ext.name : null;
+}
+
 /** Is `head` a bare extension name the node knows: installed, or released by its holder? */
 export async function isLegacyExtensionHead(storage: Storage, head: string): Promise<boolean> {
   if (await storage.getExtension(head)) return true;
-  return (await storage.getReleasedComponentName('extension', head)) !== null;
+  return (await releasedName(storage, 'extension', head)) !== null;
 }
 
 /**

@@ -10,8 +10,9 @@
  * @structure buildCortexPrompt(config, opts) → { full, body }
  * @usage const { full } = buildCortexPrompt(config, { owner, lang, idea });
  * @version-history
- *   v1.0.1 — 2026-10-25 — ADDITIVE: an install's name carries the account, and an app loads it from
- *     `lib_urls` (`/v1/cortex/<account>/<name>/libs/<file>`) (owner namespaces wish, secaudit2026oct22).
+ *   v1.0.1 — 2026-10-25 — ADDITIVE: the owner is part of a cortex's address too (`owner`, `full_name`,
+ *     `/v1/cortex/<account>/<name>/libs/<file>`); the bare address keeps working (owner namespaces
+ *     wish, secaudit2026oct22; reworded 2026-10-26 when the owner became additive).
  *   v1.0.0 — 2026-09-03 — Initial: the tab's text moved here, plus versions, pinning and the map.
  */
 import type { AimeatConfig } from '../config.js';
@@ -119,12 +120,11 @@ function installSection(url: string): string {
     `<script src="${url}/v1/cortex/{name}@{version}/libs/my-cortex.js"></script>`,
     '```',
     '',
-    '**Its name carries your account.** The node stores what you install as `<account>/<metadata.name>`,',
-    'and the install answer gives that name and the exact address of every lib (`lib_urls`), which is',
-    `\`${url}/v1/cortex/<account>/<name>/libs/<file>\`. Use those addresses in a script tag: a bare`,
-    '`/v1/cortex/<name>/` names only what the node ships, or a cortex installed before 2026-10-25. You',
-    'keep managing yours by `metadata.name`. Nobody else can install under your account, so a name you',
-    'remove never serves someone else\'s code.',
+    '**Its owner is part of its address too.** The install answer gives `name`, your `owner` account and',
+    '`full_name` (`<account>/<name>`), and the exact address of every lib (`lib_urls`). The bare address',
+    `\`${url}/v1/cortex/<name>/libs/<file>\` keeps working; \`${url}/v1/cortex/<account>/<name>/libs/<file>\``,
+    'is the exact one. When another account has removed a cortex of the same name, yours is installed as',
+    '`<account>/<name>` and only that exact address serves it.',
     '',
   ].join('\n');
 }

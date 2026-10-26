@@ -35,8 +35,6 @@
  *   `network:` is ignored, so the unlisted host is reached. Each assertion of the new behaviour is
  *   marked `// HOLE:`.
  * @version-history
- *   2026-10-25 — A row records `ext:<installer>/<short>` as its writer, and the other owner's config
- *     attempt names A's extension by its full name, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.2.0 — 2026-10-09 — An in-place update keeps the host field and, by upload, the stored secret.
  *   v1.1.0 — 2026-10-09 — Host fields (wish-a-package-s-extension-hosts-settable-per-install-the-soc-s-w).
  *   v1.0.0 — 2026-10-08 — Initial (aimeat-soc core).
@@ -135,8 +133,6 @@ const root = () => `organism.${orgId}.w.${WS}`;
 const invoke = (ext: string, action: string, token: string, input: Record<string, unknown> = {}) =>
     json(`/v1/ext/${ext}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify({ org: orgId, ws: WS, port: FAR_PORT, ...input }) });
 const rows = () => json(`/v1/organisms/${orgId}/workspace/rows/alert?ws=${WS}`, { headers: auth(A.token) });
-// The stored name `<installer>/<short>`: what a row records as its writer (services/component-address.ts).
-const extFull = () => `${A.name}/${EXT}`;
 
 await test('Setup: two owners, an organism, a workspace whose alert space names the extensions', async () => {
     A = await setupOwner('a'); X = await setupOwner('x');
@@ -184,7 +180,7 @@ await test('On a call: appendRows writes into the space that names it, as ext:<n
     assert(page.status === 200, `rows ${page.status}`);
     const got = page.body.data.rows as Array<{ rowId: string; createdBy: string }>;
     assert(got.length === 2, `two rows: ${got.length}`);
-    assert(got.every(x => x.createdBy === `ext:${extFull()}`),`writer: ${JSON.stringify(got.map(x => x.createdBy))}`);
+    assert(got.every(x => x.createdBy === `ext:${EXT}`), `writer: ${JSON.stringify(got.map(x => x.createdBy))}`);
 });
 
 await test('A repeated rowId replaces the row instead of adding one', async () => {
@@ -205,7 +201,7 @@ await test('readRow gives one row by its id in one call, and null for an id that
     // HOLE: 500 EXTENSION_ERROR (readRow is not a function) before this change.
     assert(r.status === 200, `read_one ${r.status}: ${JSON.stringify(r.body?.error)}`);
     const row = r.body.data.row as { rowId: string; body: { note: string }; createdBy: string } | null;
-    assert(row?.rowId === 'a2' && row.body.note === 'alert a2' && row.createdBy === `ext:${extFull()}`,`the row: ${JSON.stringify(row)}`);
+    assert(row?.rowId === 'a2' && row.body.note === 'alert a2' && row.createdBy === `ext:${EXT}`, `the row: ${JSON.stringify(row)}`);
     const none = await invoke(EXT, 'read_one', A.token, { id: 'no-such-row' });
     assert(none.status === 200 && none.body.data.row === null, `an absent row answers null: ${none.status} ${JSON.stringify(none.body?.data ?? none.body?.error)}`);
 });
@@ -398,8 +394,7 @@ await test('Workflow: input_from is a read, so an agent with workflow:write and 
 
 // ─── Host fields: a host the installer sets, changed by the owner without a reinstall ───
 const EXT_H = `exrowsh${STAMP}`;
-// A manages it by the short name; another owner has to name A's full name `<installer>/<short>`.
-const setHost = (token: string, value: string) => json(`/v1/extensions/${token === A.token ? EXT_H : encodeURIComponent(`${A.name}/${EXT_H}`)}/config`, {
+const setHost = (token: string, value: string) => json(`/v1/extensions/${EXT_H}/config`, {
     method: 'PATCH', headers: auth(token), body: JSON.stringify({ config: { FAR_HOST: value } }) });
 /** EXT_H's manifest at a version: an optional host field and a secret, neither with a value. */
 const hostManifest = (version: string) => {

@@ -18,9 +18,10 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
- *   v1.7.7 — 2026-10-25 — ADDITIVE: an install's name carries the account (`<account>/<name>`) and how
- *     apps, other accounts, getPublic and consents name it; with install role operator only the
- *     operator's account installs (owner namespaces wish and lead 128, secaudit2026oct22).
+ *   v1.7.7 — 2026-10-25 — ADDITIVE: the owner is part of an extension's address too (`owner`,
+ *     `full_name`, `<account>%2F<name>`) and every bare address keeps working; with install role operator
+ *     only the operator's account installs (owner namespaces wish and lead 128, secaudit2026oct22;
+ *     reworded 2026-10-26 when the owner became additive).
  *   v1.7.6 — 2026-10-25 — ADDITIVE: ctx.email takes one recipient per call and draws on the operator's
  *     hourly allowance per account, extensions.email_per_hour (secaudit2026oct22, lead 325).
  *   v1.7.5 — 2026-10-24 — ADDITIVE: `ctx.fetch(url, { responseType: 'base64' })` reads a binary answer
@@ -607,13 +608,12 @@ function installSection(url: string): string {
     '',
     'Updating: `PUT /v1/extensions/{name}` replaces in place and keeps the name.',
     '',
-    '**Its name carries your account.** The node stores what you install as `<account>/<metadata.name>`,',
-    'and the install answer gives that name. You keep calling and managing it by `metadata.name`. An app',
-    'other people use, another account, `getPublic` and a consent name it in full: the action at',
-    '`POST /v1/ext/{name}/{actionId}` with `{name}` written `<account>%2F<name>` (or `AIMEAT.data.action(\'<account>/<name>\', id)`), its',
-    'public memory at `ext:<account>/<name>`, and a consent with `data_pattern` `ext:<account>/<name>`.',
-    'Nobody else can install under your account, so a name you remove never goes to someone else. What',
-    'the node ships, and anything installed before 2026-10-25, keeps its bare name.',
+    '**Its owner is part of its address too.** The install answer gives `name` (your `metadata.name`), your',
+    '`owner` account and `full_name` (`<account>/<name>`). Every address keeps working with the name:',
+    '`POST /v1/ext/{name}/{actionId}`, `ext:<name>` memory, consents. The full name is the exact address:',
+    '`POST /v1/ext/{name}/{actionId}` with `{name}` written `<account>%2F<name>`, or',
+    '`AIMEAT.data.action(\'<account>/<name>\', id)`. When two accounts hold the same name, the bare name',
+    'answers 409 AMBIGUOUS_NAME and the full name is the one that works.',
     '',
     '**Who may install.** The owner role, or a principal holding `ext:write`. With',
     '`AIMEAT_EXT_INSTALL_ROLE=operator` only the operator\'s account installs, its agents included. An app running on its',

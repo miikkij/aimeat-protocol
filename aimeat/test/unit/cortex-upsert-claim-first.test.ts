@@ -12,7 +12,6 @@
  * @structure the race: 409 CONFLICT, the winner's bytes kept · a free name: created, record then libs
  * @usage pnpm exec vitest run test/unit/cortex-upsert-claim-first.test.ts
  * @version-history
- *   v1.1.0 — 2026-10-25 — The create lands on bob's own `bob/demo-race` (owner namespaces wish).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
@@ -43,8 +42,7 @@ const MANIFEST = [
  * held by that owner, whose bytes are already stored. Every write is recorded in order.
  */
 function raceStorage(takenBy: string | null) {
-    // The name bob's create lands on, `bob/demo-race` (services/component-address.ts).
-    const libs = new Map<string, string>(takenBy ? [['bob/demo-race/demo.js', 'A']] : []);
+    const libs = new Map<string, string>(takenBy ? [['demo-race/demo.js', 'A']] : []);
     const writes: string[] = [];
     const storage = {
         listCortexExtensions: async () => [],
@@ -60,8 +58,6 @@ function raceStorage(takenBy: string | null) {
         },
         saveComponentVersion: async () => {},
         replaceDependencyEdges: async () => {},
-        getReleasedComponentName: async () => null,
-        deleteReleasedComponentName: async () => false,
     } as unknown as Storage;
     return { storage, libs, writes };
 }
@@ -74,7 +70,7 @@ describe('upsertCortex create branch: the name is claimed before the bytes', () 
         if (out.ok) return;
         expect(out.refusal.status).toBe(409);
         expect(out.refusal.code).toBe('CONFLICT');
-        expect(libs.get('bob/demo-race/demo.js')).toBe('A');
+        expect(libs.get('demo-race/demo.js')).toBe('A');
     });
 
     it('creates a cortex under a free name: the record first, then its libs', async () => {
@@ -83,7 +79,7 @@ describe('upsertCortex create branch: the name is claimed before the bytes', () 
         expect(out.ok).toBe(true);
         if (!out.ok) return;
         expect(out.value.action).toBe('created');
-        expect(writes).toEqual(['record:bob/demo-race', 'lib:bob/demo-race/demo.js']);
-        expect(libs.get('bob/demo-race/demo.js')).toBe('B');
+        expect(writes).toEqual(['record:demo-race', 'lib:demo-race/demo.js']);
+        expect(libs.get('demo-race/demo.js')).toBe('B');
     });
 });

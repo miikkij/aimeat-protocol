@@ -152,8 +152,7 @@ const PKG = `managed-pack-${tag}`;
 
 const htmlFor = (title: string, marker = ''): string =>
     `<!DOCTYPE html><html><head><title>${title}</title>`
-    // The author's own cortex loads from the author's namespace (services/component-address.ts).
-    + `<script src="/v1/cortex/${author.owner}/${CORTEX}/libs/kit.js"></script>`
+    + `<script src="/v1/cortex/${CORTEX}/libs/kit.js"></script>`
     + `</head><body><h1>${title}</h1>${marker ? `<p>${marker}</p>` : ''}</body></html>`;
 
 let author = { token: '', owner: '' };

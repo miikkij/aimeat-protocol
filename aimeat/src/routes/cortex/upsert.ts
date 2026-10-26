@@ -9,6 +9,8 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.7.1 — 2026-10-26 — The owner is additive: a bare name is the bare record as before (403 for
+ *     another account's), a new cortex keeps its bare name (Jouni, 2026-10-26).
  *   v1.7.0 — 2026-10-25 — Names live in the owner's namespace (services/component-address.ts): the
  *     address names the caller's own cortex (or `<owner>/<name>` as written), and a new one lands in
  *     the installer's namespace or on a bare name they released (owner namespaces wish,
@@ -159,12 +161,11 @@ export async function upsertCortex(
   }
 
   // Which record the address names (services/component-address.ts): `<owner>/<name>` as written (or
-  // the alias of a bare record its holder holds); a bare name is the caller's own of that name, or for
-  // a door that lets an operator replace another's, a bare record another account holds, as before.
+  // the alias of a bare record its holder holds); a bare name is the bare record, as before (the
+  // owner check below refuses another account's), else the caller's own `<caller>/<name>`.
   let existing = splitComponentAddress(address)
     ? await findCortex(storage, address)
-    : (await ownComponent(n => storage.getCortexExtension(n), ownerName, address))
-      ?? (mayReplaceOthers ? await storage.getCortexExtension(address) : null);
+    : (await storage.getCortexExtension(address)) ?? (await ownComponent(n => storage.getCortexExtension(n), ownerName, address));
   const target = input.name ? splitComponentAddress(input.name) : null;
   if (!existing && target && target.owner !== ownerName) {
     // The URL names another account's namespace, where only that account creates a name.
@@ -172,12 +173,12 @@ export async function upsertCortex(
       `"${input.name}" is in the namespace of the account "${target.owner}". Install it under your own name, "${ownerName}/${target.name}".`);
   }
   if (!existing) {
-    // A new cortex lands in the installer's namespace, or on a bare name they released.
+    // A new cortex keeps its bare name, as always; `<owner>/<name>` when the URL asks for it in full
+    // or another account released the bare name.
+    if (target) parsed.name = address;
     const placed = await placeCortexInstall(storage, ownerName, parsed);
     if (placed.warning) (result.warnings ??= []).push(placed.warning);
-    if (placed.takenByOther) {
-      return upsertRefusal(409, 'CONFLICT', `"${parsed.name}" is held by a cortex another account installed before names carried their owner. Give yours another name.`);
-    }
+    if (placed.takenByOther) return upsertRefusal(403, 'FORBIDDEN', 'Not your extension');
     existing = placed.existing;
   }
   const name = existing ? existing.name : parsed.name;

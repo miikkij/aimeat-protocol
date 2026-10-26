@@ -22,8 +22,6 @@
  *   - Phase 6: the skill registry and an organism's namespace in a memory component
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=package-guards
  * @version-history
- *   v1.2.1 — 2026-10-25 — Phase 5's app loads B's cortex as /v1/cortex/<B>/<short>/libs/, as names
- *     live in the owner's namespace (secaudit2026oct22).
  *   v1.2.0 — 2026-10-20 — Phase 6 (secaudit 2026-10): owner C, who is not a member of A's organism,
  *     is refused an install whose memory component writes that workspace's skill keys, and the
  *     member still reads the member's own skill; a memory component naming a node built-in's skill
@@ -301,8 +299,7 @@ await test('Compose refuses an app whose cortex calls an extension, naming it, a
         method: 'POST', headers: authed(bToken),
         body: JSON.stringify({
             filename: APP, name: 'Guard kit app', description: 'Loads a kit that calls an extension',
-            // B's own cortex loads from B's namespace; the bare form answers 404 to the publish gate.
-            content: b64(`<!DOCTYPE html><html><head><title>Kit</title><script src="/v1/cortex/${B}/${CX}/libs/kit.js"></script></head><body><h1>Kit</h1></body></html>`),
+            content: b64(`<!DOCTYPE html><html><head><title>Kit</title><script src="/v1/cortex/${CX}/libs/kit.js"></script></head><body><h1>Kit</h1></body></html>`),
         }),
     });
     assert(app.status === 201, `app: ${app.status} ${JSON.stringify(app.body)}`);

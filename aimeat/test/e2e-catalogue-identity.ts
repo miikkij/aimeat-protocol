@@ -13,8 +13,6 @@
  *   person activates over REST publishes its actions under the same GHII.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=catalogue-identity
  * @version-history
- *   2026-10-25 — A cortex's action id is cortex-<installer>-<short>-<component>, as names live in
- *     the owner's namespace (secaudit2026oct22).
  *   v1.4.1 — 2026-10-12 — The service and the action are published with their pacing amount as
  *     toll_morsels / pricing.toll_morsels; node 4.0.0 refuses the old price_morsels and
  *     pricing.base_morsels (MORSEL_PRICE_REMOVED), and the new field means the same on 3.x.
@@ -183,9 +181,7 @@ await test('The publisher updates and unpublishes the action under the same name
 // Activation publishes the cortex's actions under the caller's resolved identity, as POST /v1/actions
 // does: a person's GHII. The work doors find the action there, and deactivation takes it away.
 const cortexName = `catcortex${ts}`;
-/** A cortex's action id: the installer's account and the short name, the slash made a hyphen. */
-const cortexAction = (short: string) => `cortex-${aName}-${short}-proofread`;
-const cortexActionId = cortexAction(cortexName);
+const cortexActionId = `cortex-${cortexName}-proofread`;
 
 await test('A person activates a cortex: its action is under their GHII, work on it reaches them, and deactivation removes it', async () => {
     const manifest = [
@@ -278,7 +274,7 @@ await test("An agent activates its person's cortex and the person deactivates it
     const agentTok = tok.body.data.token as string;
 
     const name = `catcortexagent${ts}`;
-    const actionId = cortexAction(name);
+    const actionId = `cortex-${name}-proofread`;
     const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest: oneActionCortex(name) }) });
     assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
     const on = await json(`/v1/cortex/${name}/activate`, { ...auth(agentTok), method: 'POST' });
@@ -306,7 +302,7 @@ await test("An operator deactivates another owner's cortex: none of its actions 
     opTok = tok.body.data.token as string;
 
     const name = `catcortexop${ts}`;
-    const actionId = cortexAction(name);
+    const actionId = `cortex-${name}-proofread`;
     const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest: oneActionCortex(name) }) });
     assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
     const on = await json(`/v1/cortex/${name}/activate`, { ...auth(aTok), method: 'POST' });
@@ -315,8 +311,7 @@ await test("An operator deactivates another owner's cortex: none of its actions 
     assert(JSON.stringify(published) === JSON.stringify([aGhii]),
         `the owner's activation publishes under their GHII: ${JSON.stringify(published)}`);
 
-    // The operator names another account's cortex by its stored name, `<owner>/<name>`.
-    const off = await json(`/v1/cortex/${encodeURIComponent(`${aName}/${name}`)}/deactivate`, { ...auth(opTok), method: 'POST' });
+    const off = await json(`/v1/cortex/${name}/deactivate`, { ...auth(opTok), method: 'POST' });
     assert(off.status === 200, `the operator deactivates: ${off.status} ${JSON.stringify(off.body)}`);
     const left = await publishedUnder(name, actionId);
     assert(left.length === 0, `an action of the deactivated cortex is still published under ${JSON.stringify(left)}`);
@@ -346,7 +341,7 @@ await test("An ecosystem app of the person activates their cortex: the work on i
     const appTok = tok.body.access_token as string;
 
     const name = `catcortexeco${ts}`;
-    const actionId = cortexAction(name);
+    const actionId = `cortex-${name}-proofread`;
     const inst = await json('/v1/cortex', { ...auth(aTok), method: 'POST', body: JSON.stringify({ manifest: oneActionCortex(name) }) });
     assert(inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body)}`);
     const on = await json(`/v1/cortex/${name}/activate`, { ...auth(appTok), method: 'POST' });

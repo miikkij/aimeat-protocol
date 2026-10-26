@@ -14,8 +14,6 @@
  *   promise made on screen, and this suite holds the server to it.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=admin-cortex-page
  * @version-history
- *   v1.1.0 — 2026-10-25 — The cortex is `<maker>/<name>` and every request and the app's script tag name
- *     it so (owner namespaces wish, secaudit2026oct22).
  *   v1.0.0 — 2026-09-12 — Initial, with the page in the poster face.
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -63,9 +61,6 @@ const operatorName = `cxop${stamp}`;
 const makerName = `cxmaker${stamp}`;
 const strangerName = `cxother${stamp}`;
 const CX = `suitecx${stamp}`;
-// The cortex lives in the maker's namespace (services/component-address.ts); the operator and a
-// bystander name it with its owner.
-const CX_FULL = `${makerName}/${CX}`;
 const APP = 'cortex-reader.html';
 const SEED_KEY = `suite-seed-${stamp}`;
 
@@ -111,7 +106,7 @@ spec:
       api_surface: hello()
 `;
 
-const cortexOf = (body: any) => (body.data?.extensions as any[]).find(e => e.name === CX_FULL);
+const cortexOf = (body: any) => (body.data?.extensions as any[]).find(e => e.name === CX);
 
 await test('Register the operator, the person who installs, and a bystander', async () => {
     operatorToken = await owner(operatorName);
@@ -136,7 +131,7 @@ await test('The cortex installs with its four kinds of piece, and is off until i
 // ── What the listing carries, and why every arrangement on the page depends on it ────────────
 
 await test('The listing carries what the page sorts, groups and counts by', async () => {
-    const act = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}/activate`, { method: 'POST', headers: auth(makerToken) });
+    const act = await json(`/v1/cortex/${encodeURIComponent(CX)}/activate`, { method: 'POST', headers: auth(makerToken) });
     assert(act.status === 200, `activate: ${act.status} ${JSON.stringify(act.body.error)}`);
 
     const { status, body } = await json('/v1/cortex', { headers: auth(operatorToken) });
@@ -160,7 +155,7 @@ await test('Nothing loads it yet, which is the page\'s whole third section', asy
 
 await test('An app that loads it is counted, and named', async () => {
     const html = `<!doctype html><title>Reader</title><body>`
-        + `<script src="/v1/cortex/${makerName}/${CX}/libs/suite.js"></script></body>`;
+        + `<script src="/v1/cortex/${CX}/libs/suite.js"></script></body>`;
     const pub = await json('/v1/apps', {
         method: 'POST',
         headers: auth(makerToken),
@@ -183,7 +178,7 @@ await test('An app that loads it is counted, and named', async () => {
 // ── One cortex opened ────────────────────────────────────────────────────────────────────────
 
 await test('The detail carries the pieces, what turning it on put here, and the versions kept', async () => {
-    const { status, body } = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { headers: auth(operatorToken) });
+    const { status, body } = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { headers: auth(operatorToken) });
     assert(status === 200, `status ${status}`);
     const ext = body.data;
     const kinds = (ext.components as any[]).map(c => c.type).sort();
@@ -207,9 +202,9 @@ await test('The detail carries the pieces, what turning it on put here, and the 
 // ── The promise the page makes about turning one off ─────────────────────────────────────────
 
 await test('Turning it off takes the instruction and the shape back out', async () => {
-    const res = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}/deactivate`, { method: 'POST', headers: auth(operatorToken) });
+    const res = await json(`/v1/cortex/${encodeURIComponent(CX)}/deactivate`, { method: 'POST', headers: auth(operatorToken) });
     assert(res.status === 200, `deactivate: ${res.status} ${JSON.stringify(res.body.error)}`);
-    const { body } = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { headers: auth(operatorToken) });
+    const { body } = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { headers: auth(operatorToken) });
     assert(body.data.status === 'inactive', 'it is off');
     assert(body.data.activation_artifacts.promptKeys.length === 0
         && body.data.activation_artifacts.schemaKeys.length === 0,
@@ -217,7 +212,7 @@ await test('Turning it off takes the instruction and the shape back out', async 
 });
 
 await test('...and leaves the file and the data it wrote, which is what the page says stays', async () => {
-    const { body } = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { headers: auth(operatorToken) });
+    const { body } = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { headers: auth(operatorToken) });
     const a = body.data.activation_artifacts;
     assert(a.seedDataKeys.includes(SEED_KEY),
         'the record it wrote belongs to whoever owns that memory now, and no switch here takes it back');
@@ -225,9 +220,9 @@ await test('...and leaves the file and the data it wrote, which is what the page
 });
 
 await test('Turning it back on puts everything back', async () => {
-    const res = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}/activate`, { method: 'POST', headers: auth(operatorToken) });
+    const res = await json(`/v1/cortex/${encodeURIComponent(CX)}/activate`, { method: 'POST', headers: auth(operatorToken) });
     assert(res.status === 200, `activate: ${res.status} ${JSON.stringify(res.body.error)}`);
-    const { body } = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { headers: auth(operatorToken) });
+    const { body } = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { headers: auth(operatorToken) });
     assert(body.data.status === 'active', 'on again');
     assert(body.data.activation_artifacts.promptKeys.length === 1
         && body.data.activation_artifacts.schemaKeys.length === 1,
@@ -237,35 +232,35 @@ await test('Turning it back on puts everything back', async () => {
 // ── Who may read the insides, and who may change them ────────────────────────────────────────
 
 await test('A private cortex is not readable by a bystander, and says only that it is not there', async () => {
-    const { status } = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { headers: auth(strangerToken) });
+    const { status } = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { headers: auth(strangerToken) });
     assert(status === 404, `expected 404, got ${status}`);
 });
 
 await test('Making it public lets anyone signed in read it, and the listing says so', async () => {
-    const res = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}/visibility`, {
+    const res = await json(`/v1/cortex/${encodeURIComponent(CX)}/visibility`, {
         method: 'POST', headers: auth(operatorToken), body: JSON.stringify({ visibility: 'public' }),
     });
     assert(res.status === 200, `visibility: ${res.status} ${JSON.stringify(res.body.error)}`);
     const { body } = await json('/v1/cortex', { headers: auth(operatorToken) });
     assert(cortexOf(body).visibility === 'public', 'the word on the row changed');
-    const asStranger = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { headers: auth(strangerToken) });
+    const asStranger = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { headers: auth(strangerToken) });
     assert(asStranger.status === 200, `a bystander may now read it, got ${asStranger.status}`);
 });
 
 await test('A bystander still cannot switch it off or throw it away', async () => {
-    const off = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}/deactivate`, { method: 'POST', headers: auth(strangerToken) });
+    const off = await json(`/v1/cortex/${encodeURIComponent(CX)}/deactivate`, { method: 'POST', headers: auth(strangerToken) });
     assert(off.status === 403, `deactivate expected 403, got ${off.status}`);
-    const gone = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { method: 'DELETE', headers: auth(strangerToken) });
+    const gone = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { method: 'DELETE', headers: auth(strangerToken) });
     assert(gone.status === 403, `delete expected 403, got ${gone.status}`);
 });
 
 await test('Nobody at all may throw one away without a session', async () => {
-    const { status } = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { method: 'DELETE' });
+    const { status } = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { method: 'DELETE' });
     assert(status === 401, `expected 401, got ${status}`);
 });
 
 await test('The operator removes it for good, and the listing no longer has it', async () => {
-    const res = await json(`/v1/cortex/${encodeURIComponent(CX_FULL)}`, { method: 'DELETE', headers: auth(operatorToken) });
+    const res = await json(`/v1/cortex/${encodeURIComponent(CX)}`, { method: 'DELETE', headers: auth(operatorToken) });
     assert(res.status === 200, `delete: ${res.status} ${JSON.stringify(res.body.error)}`);
     const { body } = await json('/v1/cortex', { headers: auth(operatorToken) });
     assert(!cortexOf(body), 'gone, which is why this one sits behind a typed name on the page');

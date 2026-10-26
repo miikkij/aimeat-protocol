@@ -8,9 +8,6 @@
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-proofs).
  * @version-history
- *   2026-10-25 -- The pack's index id, detail address, ledger key and packId are the full
- *     `<owner>/<name>`, and the non-owner names the pack in full, as names live in the owner's
- *     namespace (secaudit2026oct22).
  *   v1.1.0 -- 2026-08-11 -- Reads the pack's proofs record back: one key, version 2 after two
  *     attaches, both proofs present and still public. Pins the append-and-version behaviour now
  *     that the write goes through the shared memory write (August 2026 audit step 8).
@@ -155,8 +152,6 @@ const stamp = Date.now().toString().slice(-7);
 const ownerA = `pfrowna${stamp}`;
 const ownerB = `pfrownb${stamp}`;
 const extName = `${ownerA}-proofs-lib`;
-/** The pack's stored name: the cortex lives in A's namespace. A names it short; everyone else in full. */
-const extFull = `${ownerA}/${extName}`;
 let A: McpSession;
 let B: McpSession;
 let tokenA = '';
@@ -190,7 +185,8 @@ await test('proof attach on the community pack (owner) succeeds', async () => {
     });
     assert(!body.result?.isError, `attach failed: ${JSON.stringify(body).slice(0, 250)}`);
     const out = JSON.parse(body.result.content[0].text);
-    assert(out.attached === true && out.proofs_total === 1 && out.self_reported === true, JSON.stringify(out));});
+    assert(out.attached === true && out.proofs_total === 1 && out.self_reported === true, JSON.stringify(out));
+});
 
 await test('duplicate proof (same model+test_set+date) rejected; a second model appends', async () => {
     const dup = await A.call('aimeat_appdev_proof_attach', {
@@ -207,7 +203,7 @@ await test('duplicate proof (same model+test_set+date) rejected; a second model 
 
 await test('non-owner attach rejected', async () => {
     const body = await B.call('aimeat_appdev_proof_attach', {
-        subject_type: 'library_pack', subject_id: extFull,
+        subject_type: 'library_pack', subject_id: extName,
         model: 'claude-haiku-4.5', verdict: 'pass', evidence: 'https://example.com/spoof',
     });
     assert(body.result?.isError === true, 'non-owner attach accepted');
@@ -215,7 +211,7 @@ await test('non-owner attach rejected', async () => {
 
 await test('/v1/library-packs surfaces proofs on the community entry (status stays preview)', async () => {
     const { body } = await json(`/v1/library-packs?scope=community`);
-    const entry = (body.data?.packs ?? []).find((p: any) => p.id === extFull);
+    const entry = (body.data?.packs ?? []).find((p: any) => p.id === extName);
     assert(!!entry, 'community entry missing');
     assert(entry.status === 'preview', 'self-reported proofs must NOT upgrade the vetting status');
     assert(Array.isArray(entry.proofs) && entry.proofs.length === 2, `proofs missing: ${JSON.stringify(entry.proofs)}`);
@@ -223,7 +219,7 @@ await test('/v1/library-packs surfaces proofs on the community entry (status sta
     assert(entry.proven_models.length === 1 && entry.proven_models[0] === 'claude-haiku-4.5', `proven_models wrong: ${JSON.stringify(entry.proven_models)}`);
     assert(entry.proofs.every((p: any) => p.selfReported === true), 'per-proof selfReported flag missing');
 
-    const { body: det } = await json(`/v1/library-packs/${encodeURIComponent(extFull)}`);
+    const { body: det } = await json(`/v1/library-packs/${extName}`);
     assert(Array.isArray(det.data?.pack?.proofs) && det.data.pack.proofs.length === 2, 'detail proofs missing');
 });
 
@@ -231,14 +227,14 @@ await test('the proofs ledger is one versioned memory record, appended not repla
     // The attach goes through services/memory-write.ts now (services/contribution-proofs.ts). Two
     // attaches must be two versions of ONE record carrying both proofs: the connector's copy of
     // this tool SETS a single-proof array, and that is the shape this pins against.
-    const { status, body } = await json(`/v1/memory/${encodeURIComponent(`libpack.proofs.${extFull}`)}`, {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(`libpack.proofs.${extName}`)}`, {
         headers: { Authorization: `Bearer ${tokenA}` },
     });
     assert(status === 200, `proofs record read ${status}`);
     assert(body.data.version === 2, `two attaches should be two versions, got ${body.data.version}`);
     assert(body.data.visibility === 'public', `proofs ledger must stay public, got ${body.data.visibility}`);
     const value = body.data.value;
-    assert(value.packId === extFull && Array.isArray(value.proofs) && value.proofs.length === 2, `ledger shape: ${JSON.stringify(value).slice(0, 200)}`);
+    assert(value.packId === extName && Array.isArray(value.proofs) && value.proofs.length === 2, `ledger shape: ${JSON.stringify(value).slice(0, 200)}`);
     assert(value.proofs.every((p: any) => p.selfReported === true && typeof p.date === 'string' && (p.verdict === 'pass' || p.verdict === 'fail')), 'proof shape lost');
 });
 

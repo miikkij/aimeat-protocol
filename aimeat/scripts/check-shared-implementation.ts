@@ -30,7 +30,7 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
- *   v1.4.3 — 2026-10-25 — exchange-run.ts 3 → 2, exchange.ts 3 → 1, extensions.ts 9 → 3: their
+ *   v1.4.3 — 2026-10-25 — exchange-run.ts 3 → 2, exchange.ts 3 → 1, extensions.ts 9 → 3 (2 on 2026-10-26): their
  *     extension reads go through services/component-address.ts now (secaudit2026oct22).
  *   v1.4.2 — 2026-10-20 — index.ts leaves the list: its three admission reads moved out with the
  *     session code and then into services/mcp-agent-admission.ts, which both MCP eras call, and its
@@ -138,7 +138,7 @@ const CEILINGS: Record<string, number> = {
     'src/mcp/cortex.ts': 1,
     'src/mcp/exchange-run.ts': 2,
     'src/mcp/exchange.ts': 1,
-    'src/mcp/extensions.ts': 3,
+    'src/mcp/extensions.ts': 2,
     'src/mcp/knowledge.ts': 1,
     'src/mcp/memory-extended.ts': 1,
     'src/mcp/operator-config.ts': 2,

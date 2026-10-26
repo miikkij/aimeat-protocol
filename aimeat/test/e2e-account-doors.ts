@@ -30,9 +30,6 @@
  *            grants another party made to a deleted agent's exact GAII
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-account-doors
  * @version-history
- *   2026-10-25 — 60: the cortex is stored as `<account>/<short>` and its lib served at
- *     /v1/cortex/<account>/<short>/libs/, and the reinstall lands in the new holder's namespace, as
- *     names live in the owner's namespace (secaudit2026oct22).
  *   v1.14.0 — 2026-10-20 — Phase 14. 67: an erased account's organism membership and its entries in
  *     owners/admins/members go, so the name registered again is refused the workspace list and the
  *     creator/admin invitations list, with a non-member and a member who stayed as the two controls.
@@ -1323,29 +1320,24 @@ spec:
         type: object
 `;
     const lib = (who: string) => ({ 'helper.js': `export function hello() { return 'from ${who}'; }` });
-    // The cortex lives in the installing account's namespace: its stored name is `<account>/<short>`
-    // and its lib is served at /v1/cortex/<account>/<short>/libs/. The name registered again is the
-    // same account name, so its fresh install lands at that same full name.
-    const full = `${first.name}/${cortex}`;
     const inst = await json('/v1/cortex', { method: 'POST', headers: auth(first.token), body: JSON.stringify({ manifest: manifest(first.name), libs: lib('the first') }) });
     assert(inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
-    assert(inst.body?.data?.name === full, `the cortex is stored as ${full}, got ${inst.body?.data?.name}`);
     const on = await json(`/v1/cortex/${cortex}/activate`, { method: 'POST', headers: auth(first.token) });
     assert(on.status === 200, `activate ${on.status}: ${JSON.stringify(on.body?.error)}`);
-    const before = await fetch(`${BASE}/v1/cortex/${full}/libs/helper.js`);
+    const before = await fetch(`${BASE}/v1/cortex/${cortex}/libs/helper.js`);
     assert(before.status === 200, `the lib is served before the deletion: ${before.status}`);
 
     const del = await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(first.token) });
     assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
-    const latest = await fetch(`${BASE}/v1/cortex/${full}/libs/helper.js`);
-    const pinned = await fetch(`${BASE}/v1/cortex/${full}@1.0.0/libs/helper.js`);
+    const latest = await fetch(`${BASE}/v1/cortex/${cortex}/libs/helper.js`);
+    const pinned = await fetch(`${BASE}/v1/cortex/${cortex}@1.0.0/libs/helper.js`);
 
     const again = await registerAgain(first.name);
-    const seen = await json(`/v1/cortex/${encodeURIComponent(full)}`, { headers: auth(again.token) });
+    const seen = await json(`/v1/cortex/${cortex}`, { headers: auth(again.token) });
     const off = await json(`/v1/cortex/${cortex}/deactivate`, { method: 'POST', headers: auth(again.token) });
     const reinstall = await json('/v1/cortex', { method: 'POST', headers: auth(again.token), body: JSON.stringify({ manifest: manifest(again.name), libs: lib('the second') }) });
     const onAgain = await json(`/v1/cortex/${cortex}/activate`, { method: 'POST', headers: auth(again.token) });
-    const pinnedAgain = await fetch(`${BASE}/v1/cortex/${again.name}/${cortex}@1.0.0/libs/helper.js`);
+    const pinnedAgain = await fetch(`${BASE}/v1/cortex/${cortex}@1.0.0/libs/helper.js`);
     const pinnedText = await pinnedAgain.text();
     await json(`/v1/cortex/${cortex}`, { method: 'DELETE', headers: auth(again.token) });
     await json(`/v1/owners/${first.name}`, { method: 'DELETE', headers: auth(again.token) });
@@ -1354,7 +1346,6 @@ spec:
     assert(seen.status === 404, `the freed name reads the previous person's cortex: ${seen.status}`);
     assert(off.status === 404, `the freed name acts on the previous person's cortex: ${off.status}`);
     assert(reinstall.status === 201, `the cortex name does not install anew: ${reinstall.status} ${JSON.stringify(reinstall.body?.error)}`);
-    assert(reinstall.body?.data?.name === `${again.name}/${cortex}`, `the new install lands in the new holder's namespace: ${reinstall.body?.data?.name}`);
     assert(onAgain.status === 200 && pinnedText.includes('from the second'), `the pinned address serves another person's bytes: ${pinnedAgain.status} ${pinnedText.slice(0, 80)}`);
 });
 

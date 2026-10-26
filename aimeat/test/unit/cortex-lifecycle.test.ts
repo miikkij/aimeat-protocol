@@ -7,8 +7,6 @@
  *   an in-memory storage double: the function needs no server.
  * @usage pnpm exec vitest run test/unit/cortex-lifecycle.test.ts
  * @version-history
- *   v1.6.0 — 2026-10-25 — The doubles answer the released-name reads, and an install is stored as
- *     `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   v1.5.0 — 2026-09-26 — The uninstall deletes a seed record under the principal that activated the
  *     cortex, and keeps a record of the person's own under the same key.
  *   v1.4.0 — 2026-09-26 — A package's active cortex is taken down before its record goes
@@ -53,13 +51,6 @@ const MANIFEST = [
     '      api_surface: AIMEAT.laake.lookup(id)',
 ].join('\n');
 
-/** No bare name was released (services/component-address.ts reads and writes these). */
-const RELEASED_NAMES = {
-    getReleasedComponentName: async () => null,
-    recordReleasedComponentName: async () => {},
-    deleteReleasedComponentName: async () => false,
-};
-
 /** Only what installCortex touches, recording every write. */
 function fakeStorage() {
     const writes: string[] = [];
@@ -70,7 +61,6 @@ function fakeStorage() {
         setCortexLibFile: async (name: string, file: string) => { writes.push(`lib:${name}/${file}`); },
         saveComponentVersion: async () => {},
         replaceDependencyEdges: async () => {},
-        ...RELEASED_NAMES,
     } as unknown as Storage;
     return { storage, writes };
 }
@@ -111,8 +101,7 @@ describe('installCortex: a lib component needs its bytes', () => {
         const { storage, writes } = fakeStorage();
         const out = await installCortex({ storage, config }, caller, { manifest: MANIFEST, libs: { 'laake.js': '(function(){})();' } });
         expect(out.ok).toBe(true);
-        // Stored in the installer's namespace (services/component-address.ts).
-        expect(writes).toEqual(['record:alice/laake', 'lib:alice/laake/laake.js']);
+        expect(writes).toEqual(['record:laake', 'lib:laake/laake.js']);
     });
 });
 
@@ -158,7 +147,6 @@ describe('activateCortex and deactivateCortex: a cortex action is keyed on the r
             getGHIIByOwner: async (name: string) => (name === 'alice' ? { ghii: 'alice@test-node', ownerName: 'alice' } : null),
             getAgentsByOwner: async (name: string) => (name === 'alice' ? [{ gaii: 'bot#alice@test-node', owner: 'alice' }] : []),
             getEcosystemAppsByOwner: async (name: string) => (name === 'alice' ? [{ geai: 'eco:drum#alice@test-node', owner: 'alice' }] : []),
-            ...RELEASED_NAMES,
         } as unknown as Storage;
         return { storage, created, deleted, memoryDeleted, stored: () => record };
     }
@@ -255,7 +243,6 @@ describe('deleteCortex: the seed data an activation wrote goes with the uninstal
             getGHIIByOwner: async () => ({ ghii: 'alice@test-node', ownerName: 'alice' }),
             getAgentsByOwner: async () => [{ gaii: 'bot#alice@test-node', owner: 'alice' }],
             getEcosystemAppsByOwner: async () => [{ geai: 'eco:drum#alice@test-node', owner: 'alice' }],
-            ...RELEASED_NAMES,
         } as unknown as Storage;
 
         expect((await deleteCortex({ storage, config }, person, 'laake')).ok).toBe(true);
@@ -294,7 +281,6 @@ describe('deleteComponent: a package that goes takes its active cortex down firs
             getGHIIByOwner: async () => ({ ghii: 'alice@test-node' }),
             getAgentsByOwner: async () => [],
             getEcosystemAppsByOwner: async () => [],
-            ...RELEASED_NAMES,
         } as unknown as Storage;
         return { storage, deleted, removed };
     }
