@@ -850,6 +850,9 @@ const ALL_SUITES = [
     'test/e2e-hello-mcp.ts',
     'test/e2e-device-token-grace.ts',
     'test/e2e-agent-reapproval.ts',
+    // The OpenHands and Dify enrolment scripts keep the agent's key and prove a reconnect is the
+    // agent coming back, so the owner sees no takeover warning for a return they set up themselves.
+    'test/e2e-device-return-clients.ts',
     // The account doors nothing drove: the GHII register/login validators, and the whole agent
     // lifecycle surface (export, import, rekey, port, scopes, federate, delete, CORS) plus both
     // registration doors. Most of its assertions are refusals.
