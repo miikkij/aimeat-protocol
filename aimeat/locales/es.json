@@ -2684,6 +2684,7 @@
         "lead": "Qué datos personales guardan esta instalación, sus lugares compartidos y sus aplicaciones, de quién, para qué y durante cuánto tiempo, y los documentos que lo acompañan. Tu IA los escribe con el prompt de la sección 10. Esta sección muestra en qué punto están.",
         "registers": "Registros",
         "registersWhy": "{personal} contienen datos personales. Esta instalación {node}, lugares compartidos {organism}, aplicaciones {app}.",
+        "registersDrafts": "{n} borradores esperan revisión: los de esta instalación {node}, aplicaciones {apps}. Esta instalación los hizo a partir de los mapas de datos y ninguno está guardado.",
         "domains": "Datos regulados",
         "domainsNone": "Ningún registro nombra datos regulados.",
         "requests": "Solicitudes de las personas",
@@ -2881,6 +2882,7 @@
             "app": "Abrir la aplicación →"
           },
           "printPlace": "Imprimir el registro de este lugar",
+          "draft": "Borrador sin revisar. Esta instalación lo hizo a partir del mapa de datos y no está guardado.",
           "printOne": "Imprimir este registro",
           "gapsN": "{n} pendientes",
           "gapsNone": "Nada pendiente",

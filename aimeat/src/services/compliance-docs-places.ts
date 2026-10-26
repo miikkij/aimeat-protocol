@@ -18,6 +18,8 @@
  * @structure readAllPlacesOp()
  * @usage const out = await readAllPlacesOp(deps, caller, 'registers');
  * @version-history
+ *   v1.1.0 — 2026-10-26 — Registers: a place that keeps none and has a draft (the installation's own,
+ *     an app with personal data) answers the draft, `draft: true` and `may_write: false`.
  *   v1.0.1 — 2026-10-25 — A parked or hidden app is named by its filename too (adminView listing).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.7).
  */
@@ -30,6 +32,7 @@ import { listDocs, readDoc, scopeAllows, type ComplianceScope } from './complian
 import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './compliance-derived.js';
 import { COMPLIANCE_DOC_KINDS, isComplianceDocKind, type ComplianceDocKind, type ComplianceDocs } from './compliance-docs-schemas.js';
 import { ComplianceDocError } from './compliance-docs-ops.js';
+import { registerDrafts } from './compliance-register-drafts.js';
 
 type Deps = { storage: Storage; config: AimeatConfig };
 
@@ -48,11 +51,20 @@ export async function readAllPlacesOp(deps: Deps, caller: OperatorCaller, rawKin
   if (!a.ok) throw new ComplianceDocError(a.status, a.code, a.message);
 
   const stored = await listDocs(storage, config.nodeId, kind);
-  const places: Array<{ scope: ComplianceScope; doc: ComplianceDocs[typeof kind] }> = [];
+  const places: Array<{ scope: ComplianceScope; doc: ComplianceDocs[typeof kind]; draft?: boolean }> = [];
   if (scopeAllows(kind, { kind: 'node' }) && !stored.some(s => s.scope.kind === 'node')) {
     places.push({ scope: { kind: 'node' }, doc: await readDoc(storage, config.nodeId, kind, { kind: 'node' }) });
   }
   places.push(...stored);
+  // Registers the node can draft where none is stored: the installation's own in its empty place,
+  // and each app with personal data and no register as a place of its own, marked as a draft.
+  if (kind === 'registers') {
+    for (const d of await registerDrafts(deps, stored as Array<{ scope: ComplianceScope; doc: { items: unknown[] } }>)) {
+      const empty = places.find(p => p.scope.kind === d.scope.kind && d.scope.kind === 'node' && !(p.doc as { items: unknown[] }).items.length);
+      if (empty) { empty.doc = { ...(empty.doc as object), items: d.items } as ComplianceDocs[typeof kind]; empty.draft = true; }
+      else places.push({ scope: d.scope, doc: { items: d.items } as ComplianceDocs[typeof kind], draft: true });
+    }
+  }
 
   const apps = places.some(p => p.scope.kind === 'app') ? (await storage.listApps({ limit: APP_SCAN, adminView: true })).apps : [];
   const appBySlug = new Map<string, { filename: string; title?: string }>();
@@ -62,7 +74,7 @@ export async function readAllPlacesOp(deps: Deps, caller: OperatorCaller, rawKin
   }
 
   const out = [];
-  for (const { scope: raw, doc } of places) {
+  for (const { scope: raw, doc, draft } of places) {
     let scope = raw;
     let place: PlaceName;
     if (raw.kind === 'node') place = { scope: 'node', name: config.nodeId };
@@ -80,7 +92,8 @@ export async function readAllPlacesOp(deps: Deps, caller: OperatorCaller, rawKin
       : kind === 'frameworks'
         ? { ...(doc as ComplianceDocs['frameworks']), verdicts: frameworkVerdicts(doc as ComplianceDocs['frameworks'], raw.kind === 'organism' ? 'organism' : 'node') }
         : doc;
-    out.push({ place, may_write: may.ok, ...(body as object) });
+    // A draft is not stored, so nothing in it can be changed in place: it is written whole first.
+    out.push({ place, may_write: may.ok && !draft, ...(draft ? { draft: true } : {}), ...(body as object) });
   }
   return { kind, scope: 'all', places: out };
 }

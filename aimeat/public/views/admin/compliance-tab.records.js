@@ -19,6 +19,7 @@
  * @structure RecordsGapsSection · RecordsSection · recordsCsv() · buildRecordsPrompt() · RecordsPromptSection
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v1.2.0 — 2026-10-26 — The registers row says how many drafts the node made and nobody stored.
  *   v1.1.0 — 2026-10-24 — Every row of section 09 but the security classes opens its list, and a law
  *     row its questions (onOpen, compliance-tab.browse.js; C7.7).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.3, C7.6).
@@ -95,9 +96,10 @@ export function RecordsSection({ processing, registers, nodeId, onOpen }) {
       <${Columns}>
         <div>
           <${Readings} rows=${[
-            row('registers', R('registers'), R('registersWhy', {
+            row('registers', R('registers'), [R('registersWhy', {
               personal: num(reg.personal), node: num(reg.by_scope?.node ?? 0), organism: num(reg.by_scope?.organism ?? 0), app: num(reg.by_scope?.app ?? 0),
-            }), num(reg.total)),
+            }), reg.drafts?.total ? R('registersDrafts', { n: num(reg.drafts.total), node: num(reg.drafts.node), apps: num(reg.drafts.apps) }) : '']
+              .filter(Boolean).join(' '), num(reg.total)),
             row('domains', R('domains'), domains.length ? domains.map(([d, n]) => `${W('domain', d)} ${num(n)}`).join(' · ') : R('domainsNone'), num(domains.length)),
             row('requests', R('requests'), R('requestsWhy', { open: num(p.requests?.open ?? 0) }), num(p.requests?.total ?? 0)),
             row('breaches', R('breaches'), R('breachesWhy', { open: num(p.breaches?.open ?? 0) }), num(p.breaches?.total ?? 0)),

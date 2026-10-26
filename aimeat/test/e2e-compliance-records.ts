@@ -299,6 +299,13 @@ await test('WHOLE NODE: a parked app with no map, a map row with no personal-dat
     assert(!transfers.some(t => t.processor === 'azure-se'), `an EU region is no transfer: ${JSON.stringify(transfers)}`);
     assert(transfers.some(t => t.processor === 'us-analytics'), 'a US processor still is');
     assert(!gaps.some(g => g.kind === 'transfer-without-basis' && g.evidence?.processor === 'azure-se'), 'no transfer gap for Sweden');
+    // The draft the node can make for that app is counted and listed, marked as a draft nobody stored.
+    const drafts = r.body.data.processing.registers.drafts;
+    assert(drafts?.apps >= 1 && drafts.total >= 1, `drafts counted: ${JSON.stringify(r.body.data.processing.registers)}`);
+    const all = await call('GET', '/v1/compliance/docs/registers?scope=all', op.token);
+    const draftPlace = (all.body.data.places as Body[]).find(p => p.place.app === MAPPED && p.place.owner === carol.name);
+    assert(draftPlace?.draft === true && draftPlace.may_write === false && draftPlace.items?.[0]?.type === 'personal', `the draft place: ${JSON.stringify(draftPlace)}`);
+    assert(!(all.body.data.places as Body[]).some(p => p.place.app === PARKED), 'an app with no map has no draft');
 });
 
 // ─── Every place at once, and one entry changed in place (C7.7) ───

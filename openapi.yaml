@@ -22962,7 +22962,9 @@ paths:
         description: >
           Whose document. `all` is read only and for the operator: every place that keeps this kind
           (the installation, each organism, each app) as `places`, each with its name, `may_write`
-          and its entries.
+          and its entries. For `registers`, a place that keeps none and has a draft (the
+          installation's own registers, an app whose data map names personal data) answers the
+          draft with `draft: true` and `may_write: false`; nothing in it is stored.
       - name: organism_id
         in: query
         required: false

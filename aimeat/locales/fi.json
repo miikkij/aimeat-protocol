@@ -3739,6 +3739,7 @@
         "lead": "Mitä henkilötietoja tämä asennus, sen yhteiset paikat ja sen sovellukset pitävät, keistä, miksi ja kuinka kauan, sekä selosteeseen liittyvät asiakirjat. Tekoälysi kirjoittaa ne kohdan 10 kehotteella. Tämä kohta näyttää, missä ollaan.",
         "registers": "Rekisterit",
         "registersWhy": "Henkilötietoja on {personal} rekisterissä. Tämä asennus {node}, yhteiset paikat {organism}, sovellukset {app}.",
+        "registersDrafts": "{n} luonnosta odottaa tarkistusta: tämän asennuksen omat {node}, sovellukset {apps}. Asennus teki ne tietokartoista, eikä niitä ole tallennettu.",
         "domains": "Säännelty tieto",
         "domainsNone": "Mikään rekisteri ei nimeä säänneltyä tietoa.",
         "requests": "Rekisteröityjen pyynnöt",
@@ -3936,6 +3937,7 @@
             "app": "Avaa sovellus →"
           },
           "printPlace": "Tulosta tämän paikan seloste",
+          "draft": "Luonnos, tarkistamatta. Asennus teki sen tietokartasta, eikä sitä ole tallennettu.",
           "printOne": "Tulosta tämä rekisteri",
           "gapsN": "{n} auki",
           "gapsNone": "Ei mitään auki",
