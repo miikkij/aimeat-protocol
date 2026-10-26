@@ -10435,6 +10435,7 @@
   "contacts.cover.state.none": "Ette ole vielä viestitelleet; ensimmäinen viesti kysyy lupaa.",
   "contacts.cover.savedOn": "tallennettu {when}",
   "contacts.cover.savedWord": "tallennettu",
+  "contacts.cover.colleagueWord": "kollega",
   "contacts.cover.messagedTimes": "viestitelty {n} kertaa",
   "contacts.cover.noMessagesYet": "ei viestejä vielä",
   "contacts.cover.inviteSent": "kutsuttu {when}",
@@ -12029,6 +12030,7 @@
     "cfg_mcp_session_idle_minutes": "MCP-session jouten-raja",
     "cfg_mcp_unused_client_days": "Käyttämättömät asiakasrekisteröinnit (päivää)",
     "cfg_registration_mode": "Kuka saa rekisteröityä",
+    "cfg_registration_members_see_each_other": "Kaikki tämän palvelimen käyttäjät näkevät toisensa",
     "cfg_scopes_default_agent_scopes": "Agentin oletusoikeudet",
     "cfg_scopes_max_agent_scopes": "Tarjolla olevat agenttioikeudet",
     "cfg_sso_enabled": "Organisaatiokirjautuminen",
@@ -12340,6 +12342,7 @@
     "cfgDesc_mcp_session_idle_minutes": "Sulje MCP-sessio, kun pyyntöjä ei ole tullut näin moneen minuuttiin (murto-osat sallittu; suljettu asiakas alustaa itsensä uudelleen).",
     "cfgDesc_mcp_unused_client_days": "Jos MCP-asiakkaan rekisteröinnillä ei ole kirjauduttu sisään, se poistetaan näin monen päivän jälkeen. Rekisteröinti, jolla joku on kirjautunut, säilyy. 0 säilyttää kaikki rekisteröinnit.",
     "cfgDesc_registration_mode": "Kuka saa uuden tilin: open (kaikki), oauth (ensikirjautuminen tunnistautumispalvelun kautta tai kutsulla; salasanalla ei voi rekisteröityä), invite (vain jäsenten kutsut), closed (ei kukaan). Olemassa olevat tilit kirjautuvat aina.",
+    "cfgDesc_registration_members_see_each_other": "Yrityksen palvelimelle. Jokainen täällä tilin omistava näkyy jokaisen muun osoitekirjassa kollegana, eikä kahden käyttäjän ensimmäinen viesti tarvitse hyväksyntää. Oletuksena pois päältä.",
     "cfgDesc_scopes_default_agent_scopes": "Oikeudet, jotka agentti saa, kun kukaan ei valitse niitä. Yksi oikeus rivillä. Valmiiksi agentti saa lukea ja kirjoittaa omistajansa muistia, lukea katalogia, lukea omistajansa organismien työtiloja ja nähdä omistajansa muut agentit.",
     "cfgDesc_scopes_max_agent_scopes": "Oikeudet, joita agentille voi enintään antaa, yksi rivillä (* = kaikki).",
     "cfgDesc_sso_enabled": "Organisaatiokirjautumisen (SAML) ja provisioinnin (SCIM) ovet käytössä.",
@@ -27143,6 +27146,19 @@
           "ex1": "10 (oletus): uusi agentti, jolla ei ole töitä, saa noin 27 pistettä, joten se voi myydä heti. Agentti, jolla on epäonnistuneita töitä tai hävittyjä riitoja, voi pudota rajan alle.",
           "ex2": "41: vain agentit, jotka ovat toimittaneet työtä vähintään kolmelle eri tilaajalle, voivat myydä.",
           "tip": "Nosta rajaa, kun uudet tilit julkaisevat maksullisia toimintoja, jotka eivät toimita mitään. Kun raja on yli 40, uuden agentin pitää ensin toimittaa työtä vähintään kolmelle eri tilaajalle ennen kuin se voi myydä."
+        }
+      },
+      "registration": {
+        "members_see_each_other": {
+          "title": "Kaikki tämän palvelimen käyttäjät näkevät toisensa",
+          "short": "Yrityksen palvelimelle. Jokainen täällä tilin omistava näkyy jokaisen muun osoitekirjassa, eikä kahden käyttäjän ensimmäinen viesti tarvitse hyväksyntää. Oletuksena pois päältä.",
+          "what": "Kun asetus on päällä, jokainen näkee osoitekirjassaan kaikki muut tämän palvelimen käyttäjät kollegoina. Kenenkään ei tarvitse tallentaa heitä ensin. Sama lista täyttää jokaisen lomakkeen henkilövalitsimen ja tekoälyn lukeman yhteystietolistan. Jäsenluettelo näyttää kaikki, myös ne, jotka eivät ole itse valinneet näkyvyyttä. Kollegan ensimmäinen viesti menee saapuneisiin, ei pyyntöihin. Kun lisäät kollegan ryhmäkeskusteluun, hän liittyy heti. Agentit ja sovellukset kysyvät yhä ensin. Estämäsi henkilö pysyy estettynä. Tiliä, jonka ylläpitäjä on poistanut käytöstä, ei näytetä, eivätkä muiden palvelinten käyttäjät näe listaa. Muutos tulee voimaan heti.",
+          "range": "Päällä tai pois. Oletus on pois.",
+          "low": "Pois: osoitekirjassa ovat vain ne, jotka olet tallentanut tai joiden kanssa olet viestinyt. Jäsenluettelossa näkyvät vain ne, jotka ovat itse valinneet näkyvyyden. Uuden henkilön ensimmäinen viesti odottaa hyväksyntää.",
+          "high": "Päällä: jokainen löytää heti kaikki muut tämän palvelimen käyttäjät ja voi kirjoittaa heille heti.",
+          "ex1": "Pois (oletus): julkinen palvelin, jonka käyttäjät eivät enimmäkseen tunne toisiaan.",
+          "ex2": "Päällä: palvelin, jota yksi yritys ylläpitää omalle henkilöstölleen.",
+          "tip": "Kytke päälle vain, kun jokainen tämän palvelimen tili kuuluu samaan organisaatioon. Julkisella palvelimella asetus näyttää jokaisen tilin kaikille. Käytä sitä yhdessä näiden kanssa: Kuka näkee täällä olevan sisällön on signed-in, ja Kuka saa rekisteröityä on oauth tai invite."
         }
       },
       "auth": {

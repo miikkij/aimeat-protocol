@@ -1108,6 +1108,7 @@ const ALL_SUITES = [
     'test/e2e-invite-grants.ts',
     'test/e2e-contact-picker.ts',
     'test/e2e-contacts.ts',
+    'test/e2e-colleagues.ts',               // a company server: everyone on it sees each other (members see each other)
     // The answers of selected operations against openapi.yaml: status, schema, no undeclared field.
     'test/e2e-contract.ts',
     'test/e2e-agent-offers.ts',

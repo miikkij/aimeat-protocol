@@ -26,6 +26,9 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.7.0 — 2026-10-26 — A fourth source on a node with members see each other on (services/colleagues.ts):
+ *     every other person of the node, origin 'colleague', capped at 2000 and reported in `truncated`.
+ *     listContactsFor takes the config instead of the node id, to read the setting.
  *   v2.6.1 — 2026-10-16 — removeContact reads the conversation before it removes anything and lets a
  *     failed read propagate: a failed read had been taken as "no history" and the consent row with
  *     its gate state was deleted (QA audit F2-06).
@@ -77,6 +80,8 @@ import type { ConversationSummary } from '../storage/repositories/direct-message
 import { sharedOrganisms, SHARED_LOOKUP_CAP, type SharedOrganism } from './contacts-together.js';
 import { pendingContactInvitation } from './contact-invitations.js';
 import { takeEmailLookup } from './email-lookup-limit.js';
+import { membersSeeEachOther, nodeColleagues } from './colleagues.js';
+import type { GHIIRecord } from '../storage/types/identity.js';
 
 /**
  * How many contact RECORDS the projection folds in. The consent sources are naturally bounded by
@@ -85,6 +90,10 @@ import { takeEmailLookup } from './email-lookup-limit.js';
  * an address book that quietly stops at N reads as "this is everyone".
  */
 const MAX_PERSON_ROWS = 2000;
+
+/** How many colleagues the projection folds in on a node with members see each other on. The same
+ *  reasoning as the contact records: a large company node grows this source, and the cap is reported. */
+const MAX_COLLEAGUE_ROWS = 2000;
 
 /** A validation/precondition failure the caller maps to its own error shape (HTTP envelope / MCP text). */
 export class ContactsError extends Error {
@@ -299,10 +308,11 @@ export interface MergedContacts {
  * this through the route over loopback HTTP until 2026-10-05 (secaudit 2026-10, M6).
  */
 export async function listContactsFor(
-  storage: Storage, nodeId: string,
+  storage: Storage, config: Pick<AimeatConfig, 'nodeId' | 'membersSeeEachOther'>,
   auth: MailboxPrincipal,
   query: { q?: unknown; state?: unknown; include?: unknown },
 ): Promise<{ contacts: ContactRow[]; total: number; truncated: boolean }> {
+  const nodeId = config.nodeId;
   const reader = mailboxReaderOf(auth, nodeId);
   const include = parseContactInclude(query.include);
   if (reader?.kind !== 'owner' && !scopeIsCovered(auth.scopes ?? [], 'organism:read')) include.delete('together');
@@ -310,6 +320,7 @@ export async function listContactsFor(
     state: typeof query.state === 'string' ? query.state as ContactConsentRecord['state'] : undefined,
     q: typeof query.q === 'string' ? query.q : undefined,
     include,
+    colleagues: membersSeeEachOther(config) ? await nodeColleagues(storage, nodeId) : undefined,
   });
   const rows = reader ? contacts : contacts.map(withoutCorrespondence);
   return { contacts: rows, total: rows.length, truncated };
@@ -317,7 +328,7 @@ export async function listContactsFor(
 
 export async function listContactsMerged(
   storage: Storage, ownerGhii: string,
-  opts?: { state?: ContactConsentRecord['state']; q?: string; include?: Iterable<ContactInclude> },
+  opts?: { state?: ContactConsentRecord['state']; q?: string; include?: Iterable<ContactInclude>; colleagues?: GHIIRecord[] },
 ): Promise<MergedContacts> {
   const include = new Set(opts?.include ?? []);
   const [rows, conversations, people] = await Promise.all([
@@ -334,7 +345,9 @@ export async function listContactsMerged(
   const convByPeer = new Map(conversations.filter(c => c.peerGhii).map(c => [c.peerGhii, c]));
   const messaged = new Set(convByPeer.keys());
 
-  const truncated = people.length > MAX_PERSON_ROWS;
+  let truncated = people.length > MAX_PERSON_ROWS;
+  // Names already in hand (a colleague's record), so the sweep below does not read them one by one.
+  const knownNames = new Map<string, string>();
   const personRows = truncated ? people.slice(0, MAX_PERSON_ROWS) : people;
   if (truncated) {
     logger.warn('listContactsMerged: contact records capped', { ownerGhii, cap: MAX_PERSON_ROWS, found: people.length });
@@ -370,6 +383,24 @@ export async function listContactsMerged(
         created_at: null, updated_at: null,
       });
     }
+    // Colleagues, when the node has members see each other on (services/colleagues.ts): every other
+    // person of the node, origin 'colleague'. `byId` keeps a blocked colleague out, as below. A saved
+    // card merges onto the row through emit(). Capped like the contact records, and reported.
+    if (opts?.colleagues) {
+      const emitted = new Set(out.map(r => r.contact_id));
+      const others = opts.colleagues.filter(p => p.ghii !== ownerGhii && !byId.has(p.ghii) && !emitted.has(p.ghii));
+      if (others.length > MAX_COLLEAGUE_ROWS) {
+        truncated = true;
+        logger.warn('listContactsMerged: colleagues capped', { ownerGhii, cap: MAX_COLLEAGUE_ROWS, found: others.length });
+      }
+      for (const p of others.slice(0, MAX_COLLEAGUE_ROWS)) {
+        if (p.displayName) knownNames.set(p.ghii, p.displayName);
+        emit(p.ghii, {
+          contact_id: p.ghii, kind: 'ghii', state: null, origin: 'colleague',
+          created_at: null, updated_at: null,
+        });
+      }
+    }
     // Contact records: a person with no identity here gets their own row; one who HAS an identity
     // was already merged onto it above, unless neither of the first two sources produced that row.
     //
@@ -390,9 +421,9 @@ export async function listContactsMerged(
       });
     }
   }
-  const names = await resolveDisplayNames(storage, out.map(r => r.contact_id));
+  const names = await resolveDisplayNames(storage, out.map(r => r.contact_id).filter(id => !knownNames.has(id)));
   // The identity's own name wins where there is one; the owner's note is what is left.
-  for (const r of out) r.display_name = names.get(r.contact_id) ?? r.saved_name ?? null;
+  for (const r of out) r.display_name = knownNames.get(r.contact_id) ?? names.get(r.contact_id) ?? r.saved_name ?? null;
 
   if (include.has('together')) {
     const shared = await sharedOrganisms(storage, ownerGhii, out.filter(r => r.kind === 'ghii').map(r => r.contact_id));

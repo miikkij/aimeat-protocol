@@ -441,6 +441,13 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    * AND inside provisionOwner, so a door added later cannot forget it.
    */
   registrationMode: 'open' | 'oauth' | 'invite' | 'closed';
+  /**
+   * The organisation-node setting (AIMEAT_MEMBERS_SEE_EACH_OTHER, default false): every person of this
+   * node is in every other's address book, the member directory lists everyone without the opt-in, and
+   * a first message or group invitation between two people of the node needs no approval. Agents and
+   * apps still ask first, and a block still wins. services/colleagues.ts reads it.
+   */
+  membersSeeEachOther: boolean;
   loginRateLimitMax: number;
   loginRateLimitWindowMs: number;
   registrationRateLimitMax: number;

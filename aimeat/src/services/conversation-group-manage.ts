@@ -34,6 +34,8 @@
  * @usage
  *   const r = await startGroupConversation(ctx, { actor, members: ['bob', 'carol'], subject, body });
  * @version-history
+ *   v1.1.0 — 2026-10-26 — classifyMember adds a colleague directly on a node with members see each other
+ *     on (areColleagues, services/colleagues.ts); a block still refuses first.
  *   v1.0.0 — 2026-10-21 — Initial: user-created group chat on the Messages page.
  */
 import type { ConversationRecord, DirectMessageAttachment } from '../storage/interface.js';
@@ -42,6 +44,7 @@ import {
   MAX_GROUP_PARTICIPANTS, createGroupConversation, emitGroupChange, isParticipant, sendGroupMessage,
 } from './conversation-group.js';
 import { acceptedSameAccount } from './contact-same-account.js';
+import { areColleagues } from './colleagues.js';
 import { normalizeContactId } from './contacts.js';
 import { isIdentityShaped, localIdentityExists, missingIdentityReason } from './local-identity.js';
 import { notify } from './notify.js';
@@ -126,7 +129,8 @@ export async function classifyMember(ctx: DeliveryCtx, actor: string, raw: strin
   if (byActor?.state === 'blocked' || byAccount?.state === 'blocked') {
     return { identity, result: 'refused', code: 'BLOCKED', message: `${identity} is not taking messages from you.` };
   }
-  if (byActor?.state === 'accepted' || byAccount?.state === 'accepted' || await acceptedSameAccount(storage, mailbox, actor)) {
+  if (byActor?.state === 'accepted' || byAccount?.state === 'accepted' || await acceptedSameAccount(storage, mailbox, actor)
+    || await areColleagues(storage, config, mailbox, actor)) {
     return { identity, result: 'added' };
   }
   return { identity, result: 'invited' };

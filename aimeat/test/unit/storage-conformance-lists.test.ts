@@ -19,6 +19,7 @@
  *   ordered lists
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-conformance-lists.test.ts
  * @version-history
+ *   2026-10-26 — listDisabledOwnerNames: only the disabled accounts, oldest first, within the limit.
  *   2026-10-25 — Subdomain sites: listSubdomainSitesPage pages in byte order of the label, and origin
  *     round-trips on create and update (secaudit2026oct22).
  *   2026-10-16 — Initial (QA audit P4-09, D4-01, E4-01, D4-04, D4-05, D4-07).
@@ -181,6 +182,21 @@ describe('the operator question without the owner table (QA audit P7-10)', () =>
       });
       await expect(createdAccountIsOperator(noTableScan)).resolves.toBe(false);
     }
+  });
+
+  it('listDisabledOwnerNames gives the disabled accounts only, oldest first, within the limit, the same on both', async () => {
+    const r = await onEach(async (s, p) => {
+      const names = [0, 1, 2, 3].map(i => `dis${RUN}${p}${i}`);
+      for (const n of names) await s.createOwner({ name: n, displayName: n, publicKey: 'pk', roles: ['owner'], createdAt: new Date().toISOString() });
+      const t0 = Date.parse('2001-01-01T00:00:00Z');
+      // 2 then 0 disabled, 1 and 3 left active.
+      await s.updateOwner(names[2], { disabledAt: new Date(t0).toISOString(), disabledBy: 'op' });
+      await s.updateOwner(names[0], { disabledAt: new Date(t0 + 1000).toISOString(), disabledBy: 'op' });
+      const all = (await s.listDisabledOwnerNames({ limit: 10_000 })).filter(n => names.includes(n)).map(n => n.slice(-1));
+      const one = await s.listDisabledOwnerNames({ limit: 1 });
+      return { all, oneCount: one.length };
+    });
+    expect(same(r)).toEqual({ all: ['2', '0'], oneCount: 1 });
   });
 });
 

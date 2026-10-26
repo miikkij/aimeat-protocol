@@ -7,6 +7,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-10-26 — listDisabledOwnerNames: the disabled accounts' names, one filtered query with a limit.
  *   2026-10-25 — credentialsValidAfter on read (migration 0117); updateAgent passes it through
  *     (secaudit2026oct22, mcp-oauth:rekey-leaves-oauth-grant-live).
  *   2026-10-20 — clearGrantsToIdentity, and deleteAgent runs it: the grants another party made TO the
@@ -139,6 +140,11 @@ export const identityMethods = {
   },
   async listOwners(this: PostgresKyselyStorage): Promise<OwnerRecord[]> {
     return (await this.db.selectFrom('Owner').selectAll().execute()).map(toOwnerRecord);
+  },
+  async listDisabledOwnerNames(this: PostgresKyselyStorage, opts: { limit: number }): Promise<string[]> {
+    const rows = await this.db.selectFrom('Owner').select('name').where('disabledAt', 'is not', null)
+      .orderBy('disabledAt').limit(Math.max(0, Math.floor(opts.limit))).execute();
+    return rows.map(r => r.name);
   },
   async operatorAccountState(this: PostgresKyselyStorage, opts?: { claim?: boolean }): Promise<{ anyOwner: boolean; anyOperator: boolean }> {
     // The claim: held until the open transaction ends, so two writers of a first operator read one

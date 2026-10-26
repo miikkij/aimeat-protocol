@@ -6,6 +6,8 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-26 — GET /v1/ghii/list on a node with members see each other on lists every active person of
+ *     the node without the opt-in, for a caller of this node (services/colleagues.ts).
  *   2026-10-21 — GET /v1/ghii/list refuses the shared anonymous principal by identity
  *     (refuseAnonymousPrincipal), and GET /v1/ghii/:ghii gives the agent roster only to an owner that
  *     isAnonymousPrincipal says is not the anonymous account: the minted anonymous token carries no
@@ -55,6 +57,7 @@ import { readAdult, NOT_VERIFIED } from '../../services/adult-assurance.js';
 import { callerOf } from '../../middleware/caller.js';
 import { readAvatarsOrEmpty } from '../../services/agent-avatar.js';
 import { logger } from '../../utils/logger.js';
+import { membersSeeEachOther, nodeColleagues } from '../../services/colleagues.js';
 
 export function registerProfileRoutes(
     router: Router,
@@ -90,7 +93,12 @@ export function registerProfileRoutes(
         const callerOwner = req.auth!.owner;
         const others = all.filter(r => r.ownerName !== callerOwner);
         const optInGaiis = new Set<string>();
-        if (others.length) {
+        // A company node (members see each other, services/colleagues.ts) lists every active person of
+        // the node without the opt-in. A visitor from another node is not a colleague and keeps the
+        // opt-in list.
+        if (membersSeeEachOther(config) && !isForeignPrincipal(req.auth!)) {
+            for (const r of await nodeColleagues(storage, config.nodeId)) optInGaiis.add(r.ghii);
+        } else if (others.length) {
             const keys = others.map(r => `profile.${r.username}.directory_listed`);
             const recs = storage.getMemoryByKeysAnyOwner
                 ? await storage.getMemoryByKeysAnyOwner(keys)
