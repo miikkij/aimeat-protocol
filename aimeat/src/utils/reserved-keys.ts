@@ -20,6 +20,8 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.31.0 -- 2026-10-26 -- `mcp.tasks.` is service-owned: an MCP task and the tool result it hands
+ *     back on tasks/get (services/mcp-tasks.ts; wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
  *   v1.30.0 -- 2026-10-25 -- `agent-device-return.` is service-owned: an existing agent's proven
  *     return on device authorization (services/device-return-proof.ts; secaudit2026oct22, lead 2150).
  *   v1.29.0 -- 2026-10-25 -- `identity.verified-name.` is service-owned: the name an identity
@@ -376,6 +378,12 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * stranger's takeover off as the agent coming back. services/device-return-proof.ts is its one
  * writer. A new prefix: nothing wrote it through the memory API before this.
  *
+ * `mcp.tasks.` (2026-10-26) is an MCP task: a tool call that answered with a handle, and the result
+ * the node hands back on tasks/get as that call's own result. A principal that could write it, such as
+ * an app granted the owner's memory, could put words into the owner's AI as a tool result.
+ * services/mcp-tasks.ts is its one writer, straight to storage. A new prefix: nothing wrote it
+ * through the memory API before this.
+ *
  * `commerce.subscription.` (2026-10-18, Comicland v3 A-5) is a subscription the buyer paid for: its end
  * date, which an extension reads as the right to the subscribed content, and the kept card a renewal
  * charges. A principal that could write it could give itself any period for free.
@@ -389,7 +397,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * into a provider's payout. The two books are their writers, straight to storage; people read them
  * through /v1/commerce/holds and /v1/commerce/beneficiary.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -405,6 +413,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['agent-goals.', 'an agent goal, and only the goals service writes it. Read and change goals with /v1/goals or the aimeat_goal_set, aimeat_goal_get, aimeat_goal_work and aimeat_goal_answer MCP tools.'],
   ['scope-use.', 'a record of permission use, and only the node writes it.'],
   ['agent-device-return.', 'the mark that an agent proved it is coming back, and only the device authorization writes it.'],
+  ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
 ];
 
 /**
