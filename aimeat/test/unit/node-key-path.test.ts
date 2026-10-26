@@ -14,19 +14,25 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/node-key-path.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-26 — A key file written while other processes read it is never seen half
+ *     written, and the first write keeps the first key. Both went red on the code before the fix:
+ *     the E2E sweep of 6e56f34c0 lost 1186 SQLite suites to a key file four lanes wrote at once.
  *   v1.1.0 — 2026-09-03 — The claim helpers apply to ANY key file, not only the legacy one, and the
  *     encrypted case is pinned. The refusal moved to the resolved path; the legacy branch declines
  *     and generates instead, which is what the E2E federation suite needed to start at all.
  *   v1.0.0 — 2026-09-03 — Initial.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { __testables } from '../../src/auth/node-keys.js';
 
-const { getNodeKeyPath, getLegacyNodeKeyPath, readKeyFileClaim, stampKeyFileClaim } = __testables;
+const { getNodeKeyPath, getLegacyNodeKeyPath, readKeyFileClaim, stampKeyFileClaim, persistNodeKey } = __testables;
+const AIMEAT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 let home = '';
 const asConfig = (nodeId: string) => ({ nodeId } as never);
@@ -141,4 +147,105 @@ describe('who owns a key file', () => {
         expect(after.encrypted).toBe(true);
         expect(after.data).toBe('d');
     });
+});
+
+describe('several processes of one node on one key file', () => {
+    // One child process per role. They import the module first (a second or more), then wait for
+    // one shared start time, so the writes and the reads overlap for the whole window.
+    //   write   stamps a claim over and over, alternating two claims so the file changes length
+    //   read    parses the file over and over and counts the reads that were not whole JSON
+    //   create  does what a starting node does with no key file, for 150 files in turn: writes its
+    //           own key, or adopts the key in the file when another process was first
+    const CHILD = `
+import { readFileSync } from 'node:fs';
+const [role, keyPath, startAt, ms, moduleUrl] = process.argv.slice(2);
+const { __testables } = await import(moduleUrl);
+while (Date.now() < Number(startAt)) { /* wait for the shared start */ }
+const end = Number(startAt) + Number(ms);
+let runs = 0, bad = 0, firstError = '';
+const keys = [];
+if (role === 'create') {
+    for (let round = 0; round < 150; round++) {
+        const path = keyPath + '.' + round + '.json';
+        const own = { publicKey: 'pub-' + process.pid + '-' + round, privateKey: 'priv-' + process.pid + '-' + round };
+        const outcome = __testables.persistNodeKey(own, path, 'aimeat-iso-001-a');
+        keys.push(outcome === 'exists' ? JSON.parse(readFileSync(path, 'utf-8')).publicKey : own.publicKey);
+        runs++;
+    }
+}
+while (role !== 'create' && Date.now() < end) {
+    if (role === 'write') __testables.stampKeyFileClaim(keyPath, runs % 2 ? 'aimeat-iso-001-a' : 'aimeat-iso-001-with-a-longer-id');
+    else {
+        try { JSON.parse(readFileSync(keyPath, 'utf-8')); } catch (err) {
+            // Windows can show the file missing for an instant while another process renames over
+            // it; a missing file is not a half-written one, and only a half-written one is counted.
+            if (err.code !== 'ENOENT') { bad++; firstError ||= String(err); }
+        }
+    }
+    runs++;
+}
+process.stdout.write('\\nRESULT ' + JSON.stringify({ role, runs, bad, firstError, keys }) + '\\n');
+`;
+
+    type ChildResult = { role: string; runs: number; bad: number; firstError: string; keys: string[] };
+    const runChild = (script: string, args: string[]) => new Promise<ChildResult>((done, fail) => {
+        const child = spawn(process.execPath, ['--import', 'tsx', script, ...args], { cwd: AIMEAT, stdio: ['ignore', 'pipe', 'pipe'] });
+        let out = '';
+        child.stdout.on('data', (c: Buffer) => { out += c.toString(); });
+        child.stderr.on('data', (c: Buffer) => { out += c.toString(); });
+        child.on('error', fail);
+        child.on('close', () => {
+            const line = out.split('\n').find(l => l.startsWith('RESULT '));
+            if (line) done(JSON.parse(line.slice('RESULT '.length)));
+            else fail(new Error(`child printed no result:\n${out.slice(-2000)}`));
+        });
+    });
+
+    it('never shows a reader a half-written file while the claim is stamped', async () => {
+        const p = getLegacyNodeKeyPath();
+        mkdirSync(join(home, '.aimeat'), { recursive: true });
+        writeFileSync(p, JSON.stringify({ publicKey: 'pub', privateKey: 'priv' }, null, 2) + '\n');
+        const script = join(home, 'key-file-child.mjs');
+        writeFileSync(script, CHILD);
+        const moduleUrl = pathToFileURL(join(AIMEAT, 'src', 'auth', 'node-keys.ts')).href;
+        const startAt = String(Date.now() + 8000);
+        const roles = ['write', 'write', 'read', 'read'];
+        const results = await Promise.all(roles.map(role => runChild(script, [role, p, startAt, '1500', moduleUrl])));
+        for (const r of results) expect(r.runs).toBeGreaterThan(0);
+        expect(results.filter(r => r.role === 'read').map(r => `${r.bad} ${r.firstError}`.trim())).toEqual(['0', '0']);
+        const after = JSON.parse(readFileSync(p, 'utf-8'));
+        expect(after.publicKey).toBe('pub');
+        expect(after.privateKey).toBe('priv');
+        // No temporary file is left beside the key file.
+        expect(readdirSync(join(home, '.aimeat')).filter(f => f.endsWith('.tmp'))).toEqual([]);
+    }, 30_000);
+
+    it('keeps the first key when a second process finds no file and writes its own', () => {
+        const p = getNodeKeyPath(asConfig('aimeat-iso-001-a'));
+        expect(persistNodeKey({ publicKey: 'pub-first', privateKey: 'priv-first' }, p, 'aimeat-iso-001-a')).toBe('written');
+        expect(persistNodeKey({ publicKey: 'pub-second', privateKey: 'priv-second' }, p, 'aimeat-iso-001-a')).toBe('exists');
+        const onDisk = JSON.parse(readFileSync(p, 'utf-8'));
+        expect(onDisk.publicKey).toBe('pub-first');
+        expect(onDisk.privateKey).toBe('priv-first');
+        // The claim is in the file from its first write.
+        expect(readKeyFileClaim(p)).toBe('aimeat-iso-001-a');
+        expect(readdirSync(dirname(p)).filter(f => f.endsWith('.tmp'))).toEqual([]);
+    });
+
+    it('gives four processes of one node that start at once one key between them', async () => {
+        // What the E2E runner does: four lanes start the same node id with no key file yet.
+        const base = join(home, '.aimeat', 'nodes', 'aimeat-iso-001-a', 'node-key');
+        mkdirSync(dirname(base), { recursive: true });
+        const script = join(home, 'key-file-child.mjs');
+        writeFileSync(script, CHILD);
+        const moduleUrl = pathToFileURL(join(AIMEAT, 'src', 'auth', 'node-keys.ts')).href;
+        const startAt = String(Date.now() + 8000);
+        const results = await Promise.all([1, 2, 3, 4].map(() => runChild(script, ['create', base, startAt, '0', moduleUrl])));
+        for (let round = 0; round < 150; round++) {
+            const onDisk = JSON.parse(readFileSync(`${base}.${round}.json`, 'utf-8'));
+            expect(results.map(r => r.keys[round]), `round ${round}`).toEqual([onDisk.publicKey, onDisk.publicKey, onDisk.publicKey, onDisk.publicKey]);
+            expect(onDisk.nodeId).toBe('aimeat-iso-001-a');
+        }
+        expect(readdirSync(dirname(base)).filter(f => f.endsWith('.tmp'))).toEqual([]);
+    }, 30_000);
 });
