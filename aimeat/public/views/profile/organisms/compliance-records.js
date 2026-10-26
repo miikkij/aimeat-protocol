@@ -47,6 +47,8 @@ const KIND_ORDER = [
 ];
 
 /** The name one gap's evidence carries, in the reader's language where it is a word of ours. */
+export function gapName(ev) { return nameOf(ev); }
+
 function nameOf(ev) {
   if (!ev) return '';
   if (ev.framework) return tOr(`admin.compliance.records.framework.${ev.framework}`, ev.framework);

@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.46.0 -- 2026-10-26 -- Reactions: aimeat_dm_react, the palette record and the dm.reaction wake-up.
+ *     The wake-up names the symbol and the reactor; the meaning stays in the person's palette record.
  *   v1.45.0 -- 2026-10-25 -- Goals: propose first (the person approves), and runner "model" when no agent fits.
  *   v1.44.0 -- 2026-10-25 -- Goals: aimeat_goal_get, _set, _work, _answer (session cc-jouni-goals).
  *   v1.43.0 -- 2026-10-25 -- One app open to the internet on a closed node: aimeat_app_internet_open, _get, _close.
@@ -223,6 +225,13 @@ the first message; \`as_owner\` opens it in your owner's name with messages:send
 \`aimeat_dm_group_leave\` · \`aimeat_dm_group_invitations\` · \`aimeat_dm_group_answer\`. Write in a
 group with \`aimeat_dm_send\` and its conversation_id, read it with \`aimeat_dm_thread\`. A person whose
 contacts accept you joins at once; anybody else is invited, so say so when you report the group.
+
+**Reactions — a mark instead of a reply.** \`aimeat_dm_react\` (message_id, a symbol such as ✓ or a
+short word; \`remove\` takes your own back; \`as_owner\` marks in your owner's name with
+messages:send-as-owner). Use it when a reply would only say "got it", "done" or "thanks". The person's
+usual symbols and what each means are in their memory record \`messages.reactions\`. A thread you read
+carries each message's \`reactions\`, and a mark on a message you wrote reaches you as \`dm.reaction\`
+(the symbol and who gave it); what your owner means by it is in that record or your own instructions.
 
 **Workflows — declared, ordered agent pipelines.** \`aimeat_workflow_save\` (create/update; pass the
 whole descriptor) · \`aimeat_workflow_get\` (list, or one workflow's derived blueprint + recent runs) ·

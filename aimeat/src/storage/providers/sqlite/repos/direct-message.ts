@@ -8,6 +8,8 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.9.0 -- 2026-10-26 -- Reactions on a single message (direct_message_reactions, Postgres 0118) and
+ *     listDirectMessageCopies.
  *   v1.8.0 -- 2026-10-21 -- Group chat: a conversation's open invitations (`invited`), updateConversation
  *     writes them and the manager (`createdBy`), listConversationsInvitingMailbox reads them.
  *   v1.7.0 -- 2026-10-17 -- sentByAgent / sentByAgentName on the message, and lastSentByAgent on both
@@ -29,7 +31,7 @@
  */
 
 import type Database from 'better-sqlite3';
-import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats, MessageReactionRecord } from '../../../interface.js';
 import type { ConversationSummary, ConversationUpdate } from '../../../repositories/direct-message.repository.js';
 
 // ── Helpers ──
@@ -142,6 +144,40 @@ export function getDirectMessagesByIds(db: Database.Database, ids: string[], own
   const ph = ids.map(() => '?').join(',');
   const rows = db.prepare(`SELECT * FROM direct_messages WHERE ownerGhii = ? AND id IN (${ph})`).all(ownerGhii, ...ids) as Record<string, unknown>[];
   return rows.map(deserializeMessage);
+}
+
+/** Every mailbox copy of one message on this node. */
+export function listDirectMessageCopies(db: Database.Database, id: string): DirectMessageRecord[] {
+  const rows = db.prepare('SELECT * FROM direct_messages WHERE id = ?').all(id) as Record<string, unknown>[];
+  return rows.map(deserializeMessage);
+}
+
+// ── Reactions (table direct_message_reactions) ──
+
+export function addMessageReaction(db: Database.Database, r: MessageReactionRecord): boolean {
+  const out = db.prepare(`INSERT OR IGNORE INTO direct_message_reactions (messageId, reaction, reactorGhii, byAgent, createdAt)
+    VALUES (?, ?, ?, ?, ?)`).run(r.messageId, r.reaction, r.reactorGhii, r.byAgent ?? null, r.createdAt);
+  return out.changes > 0;
+}
+
+export function removeMessageReaction(db: Database.Database, messageId: string, reaction: string, reactorGhii: string): boolean {
+  const out = db.prepare('DELETE FROM direct_message_reactions WHERE messageId = ? AND reaction = ? AND reactorGhii = ?')
+    .run(messageId, reaction, reactorGhii);
+  return out.changes > 0;
+}
+
+export function listMessageReactions(db: Database.Database, messageIds: string[], opts?: { limit?: number }): MessageReactionRecord[] {
+  if (messageIds.length === 0) return [];
+  const ph = messageIds.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT * FROM direct_message_reactions WHERE messageId IN (${ph}) ORDER BY createdAt ASC, rowid ASC LIMIT ?`)
+    .all(...messageIds, opts?.limit ?? 5000) as Array<Record<string, unknown>>;
+  return rows.map(row => ({
+    messageId: row.messageId as string,
+    reaction: row.reaction as string,
+    reactorGhii: row.reactorGhii as string,
+    ...(row.byAgent ? { byAgent: row.byAgent as string } : {}),
+    createdAt: row.createdAt as string,
+  }));
 }
 
 export function listInbox(

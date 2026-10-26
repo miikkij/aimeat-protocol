@@ -5,7 +5,7 @@
  * @description Subdomain-site mapping domain for the Postgres+Kysely backend (SubdomainSite table, keyed
  *   by unique `subdomain`). Maps a subdomain to an app or redirect target. Translated 1:1 from Prisma.
  * @version-history
- *   v1.2.0 — 2026-10-25 — The `heldSince` column (migration 0118) is written on create and update (null
+ *   v1.2.0 — 2026-10-25 — The `heldSince` column (migration 0119) is written on create and update (null
  *     clears it) and read back (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.1.0 — 2026-10-25 — The `origin` column (migration 0116) is written on create and update and read
  *     back, null when unset; listSubdomainSitesPage reads a keyset page in byte order (secaudit2026oct22).

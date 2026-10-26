@@ -38,6 +38,7 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.4.0 — 2026-10-26 — readOwnerThread: each message carries its reactions (services/message-reactions.ts).
  *   v1.3.0 — 2026-10-25 — readOwnerOverview takes `compact`: each row's last message is cut to a
  *     preview and each agent is its id and names. The Messages page renders nothing more, and on
  *     aimeat.io the whole answer was 557 kB, 300 kB of it full message bodies and 218 kB agent records.
@@ -59,6 +60,7 @@ import { createMessagesInboxService, type InboxOverview } from './db/messages-in
 import type { AgentRecordView } from './agent-record-view.js';
 import { withMessageProvenance } from './message-provenance.js';
 import { readAgentDmThread } from './agent-dm-reads.js';
+import { withReactions } from './message-reactions.js';
 import { isParticipant } from './conversation-group.js';
 import { logger } from '../utils/logger.js';
 
@@ -195,9 +197,11 @@ export async function readOwnerThread(
   // `agentGaii` reads under the agent, and a GROUP thread's copies live in the owner's mailbox rather
   // than the agent's, so the plain owner-keyed read returned an empty thread for exactly the rows the
   // list had just advertised. readAgentDmThread resolves that the way the agent's own door does.
+  // Each message's reactions come with it (readAgentDmThread attaches its own).
   const result = opts.agentGaii
     ? await readAgentDmThread(storage, opts.agentGaii, conversationId, { page: opts.page, perPage: opts.perPage })
-    : await storage.listConversation(readAs, conversationId, { page: opts.page, perPage: opts.perPage });
+    : await storage.listConversation(readAs, conversationId, { page: opts.page, perPage: opts.perPage })
+      .then(async page => ({ ...page, messages: await withReactions(storage, page.messages) }));
   // A group thread carries its membership, which is part of reading it for a PARTICIPANT and for
   // nobody else: anyone holding the id would otherwise get the subject, the creator and every
   // participant back with the empty page.

@@ -1,4 +1,4 @@
--- 0118_subdomain_site_held_since.sql
+-- 0119_subdomain_site_held_since.sql
 --
 -- When the app a per-app label served went away, so the label is held for that app's owner.
 --

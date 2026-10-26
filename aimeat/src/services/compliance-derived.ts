@@ -21,6 +21,11 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.1.1 — 2026-10-26 — A map whose `leaves` are sentences gives those sentences as recipients
+ *     ("undefined → undefined" on innokas-outreach).
+ *   v1.1.0 — 2026-10-25 — A map row with no personal-data mark is unsaid (or personal when it is
+ *     schema:Person) instead of skipped, and its family is read from `key` too; a country written as
+ *     a cloud region ("Sweden Central (EU/EEA)") is read for the member state in it.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.3, C1.4, C1.6, C4.1, C4.2, C6).
  */
 import type { AimeatConfig } from '../config.js';
@@ -30,6 +35,7 @@ import { readAppDataMap } from './data-map/data-map-store.js';
 import { classifyUseCase, type ComplianceRiskVerdict } from './compliance-register.js';
 import { COMPLIANCE_FRAMEWORKS } from '../data/compliance-frameworks.js';
 import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './compliance-docs-schemas.js';
+import type { DataMapRow } from './data-map/data-map-types.js';
 
 const EVIDENCE = 'evidence' as const;
 
@@ -80,6 +86,25 @@ export function nodeRegistersDraft(config: Pick<AimeatConfig, 'operator' | 'cons
 }
 
 /**
+ * What one map row says about personal data. A row stored without the mark (a map an AI wrote to
+ * its own shape: `key` for `what`, `isA` and no `personalData`) is read for what it does say: a
+ * family that is `schema:Person` is about people, and any other family is unsaid, never a "no".
+ */
+function personalMark(row: DataMapRow): 'yes' | 'no' | 'unstated' {
+  const mark: unknown = row.personalData;
+  if (mark === 'yes' || mark === true) return 'yes';
+  if (mark === 'no' || mark === false) return 'no';
+  if (mark === 'unstated') return 'unstated';
+  return row.isA === 'schema:Person' ? 'yes' : 'unstated';
+}
+
+/** The row's key family: `what`, or `key` in a map that named it so. */
+function familyOf(row: DataMapRow): string {
+  const legacy = (row as DataMapRow & { key?: unknown }).key;
+  return row.what || (typeof legacy === 'string' ? legacy : '') || '(unnamed)';
+}
+
+/**
  * C1.4, C1.6: an app's register from its data map. Null when the app has no map: nobody has said
  * what it keeps, which the report names as a gap.
  */
@@ -88,8 +113,8 @@ export async function appRegisterDraft(
 ): Promise<{ register: ComplianceRegister | null; unstated: string[]; hasMap: boolean }> {
   const map = await readAppDataMap(storage, ownerGhii, filename.replace(/\.html$/i, ''));
   if (!map) return { register: null, unstated: [], hasMap: false };
-  const personal = map.held.filter(r => r.personalData === 'yes');
-  const unstated = map.held.filter(r => r.personalData === 'unstated').map(r => r.what);
+  const personal = map.held.filter(r => personalMark(r) === 'yes');
+  const unstated = map.held.filter(r => personalMark(r) === 'unstated').map(familyOf);
   const keptForever = personal.some(r => r.keptFor === 'until-deleted' || r.keptFor === 'append-only');
   return {
     hasMap: true, unstated,
@@ -97,8 +122,9 @@ export async function appRegisterDraft(
       id: `app-${filename.replace(/\.html$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-')}`,
       title: `${map.what.slice(0, 120) || filename}`, type: 'personal', role: 'controller',
       purposeText: map.usedFor.slice(0, 2000) || undefined,
-      dataCategories: personal.map(r => `${r.what}: ${r.holds}`.slice(0, 300)),
-      recipients: map.leaves.map(l => `${l.what} → ${l.to}`.slice(0, 300)),
+      dataCategories: personal.map(r => `${familyOf(r)}: ${r.holds}`.slice(0, 300)),
+      // A map an AI wrote to its own shape names what leaves as plain sentences, not { what, to }.
+      recipients: map.leaves.map(l => (typeof l === 'string' ? l : `${l.what} → ${l.to}`).slice(0, 300)),
       retentionText: keptForever ? 'Kept until deleted (data map).' : undefined,
       containers: [{ kind: 'app', app: filename }], reviewEveryMonths: 12,
       answerSources: src(['type', 'purposeText', 'dataCategories', 'recipients', 'retentionText', 'containers']),
@@ -153,10 +179,17 @@ export function processorsView(derived: ComplianceProcessor[], stored: Complianc
   return [...merged, ...stored.filter(p => !ids.has(p.id)).map(p => ({ ...p, derived: false }))];
 }
 
-/** Is a country, as written, inside the EU or the EEA? Unknown when nothing is written. */
+/**
+ * Is a country, as written, inside the EU or the EEA? Unknown when nothing is written. A cloud
+ * region is written with the country in it ("Sweden Central (EU/EEA)"), so a member state's name
+ * anywhere in the text as a whole word counts; a two-letter code counts only as the whole text,
+ * because "it" or "no" inside a sentence is not Italy or Norway.
+ */
 export function inEea(country: string | undefined): boolean | null {
-  if (!country?.trim()) return null;
-  return EEA.has(country.trim().toLowerCase());
+  const text = country?.trim().toLowerCase();
+  if (!text) return null;
+  if (EEA.has(text)) return true;
+  return text.split(/[^\p{L}]+/u).some(word => word.length > 2 && EEA.has(word));
 }
 
 /** C4.2: every processor outside the EU and the EEA, or whose country nobody wrote. */

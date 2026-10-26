@@ -13,11 +13,14 @@
  *   `explain.high`, `explain.examples`, `explain.when`) come from each locale, as on the page.
  *
  *   PARTS. `start` lists the terms by area (the first segment of the term id) with the English
- *   title and short text; `<term>` is one explanation in full, in English, Finnish and Spanish.
+ *   title, and a concept also with its short text; `<term>` is one explanation in full, in English,
+ *   Finnish and Spanish.
  *   The same split as the feature map (services/feature-map.ts).
  * @structure settingsExplainPieceIds() · settingsExplainParts() · settingsExplainPiece(id)
  * @usage const piece = settingsExplainPiece('ai.temperature'); piece?.text
  * @version-history
+ *   v1.2.0 — 2026-10-26 — The start part lists a setting by its title only (a concept keeps its short
+ *     text), so the index stays within one tool result (24 000 characters) as settings are added.
  *   v1.1.0 — 2026-10-03 — The `concept` area (explain.concept.<id>.*: the system's own words in plain
  *     language) is listed first, and the start part's lead says what it is for.
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
@@ -72,8 +75,11 @@ function startText(): string {
     const sections = areasInOrder().flatMap(area => [
         '',
         `## ${area}`,
-        ...TERMS.filter(t => areaOf(t) === area).map(t =>
-            `- \`settings/${t}\` **${part('en', t, 'title') || t}**: ${part('en', t, 'short')}`),
+        // A concept carries its short text here; a setting carries its title only, so the index of
+        // every setting stays within one tool result as settings are added. Its part has the rest.
+        ...TERMS.filter(t => areaOf(t) === area).map(t => area === 'concept'
+            ? `- \`settings/${t}\` **${part('en', t, 'title') || t}**: ${part('en', t, 'short')}`
+            : `- \`settings/${t}\` **${part('en', t, 'title') || t}**`),
     ]);
     const concepts = TERMS.filter(t => areaOf(t) === 'concept').length;
     return [

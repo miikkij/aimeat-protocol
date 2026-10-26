@@ -322,7 +322,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:0df7ddfaf3faa05ad5a41551"
+      "digest": "sha256:8baa34c1b4642d1875c2b84a"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-24",
@@ -750,7 +750,7 @@
       "aimeat/src/services/extension-ctx-contract.ts": "6861be8a58b438ec",
       "aimeat/src/services/extension-manifest.ts": "09e04a048b7c541f",
       "aimeat/src/routes/extensions/paywall.ts": "11ff2227c7028795",
-      "aimeat/src/routes/extensions/crud.ts": "fd6b664c774355b1",
+      "aimeat/src/routes/extensions/crud.ts": "0d6ef9babdda6ff3",
       "aimeat/src/routes/extensions/instances.ts": "d7ace6eb026fee79",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
     },

@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-10-26 -- /v1/messages/:id/reactions is registered here (./message-reactions.ts); a thread carries each message's reactions.
  *   2026-10-25 -- GET /v1/messages/overview takes `?compact=true`: previews and agent names only, for a list.
  *   2026-10-21 -- Group chat: /v1/messages/groups/* is registered here (./message-groups.ts).
  *   2026-10-17 -- POST /v1/messages/as-owner is registered here (./messages-as-owner.ts).
@@ -119,6 +120,7 @@ import { resolveGroupTarget, soleParticipantNote } from '../services/message-ali
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { registerSendAsOwnerRoute } from './messages-as-owner.js';
 import { registerGroupRoutes } from './message-groups.js';
+import { registerMessageReactionRoutes } from './message-reactions.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
@@ -146,6 +148,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
   registerSendAsOwnerRoute(router, config, storage, peers);
   // Group chat: /v1/messages/groups/* (./message-groups.ts), before the /v1/messages/:id routes.
   registerGroupRoutes(router, config, storage, peers);
+  // Acknowledgement marks: /v1/messages/:id/reactions (./message-reactions.ts).
+  registerMessageReactionRoutes(router, config, storage, peers);
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);

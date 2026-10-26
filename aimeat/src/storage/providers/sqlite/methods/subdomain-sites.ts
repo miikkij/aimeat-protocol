@@ -9,7 +9,7 @@
  * @usage Object.assign(SqliteStorage.prototype, subdomainSiteMethods) in ../index.ts
  * @version-history
  *   v1.2.0 — 2026-10-25 — The `heldSince` column is written on create and update (null clears it) and
- *     read back, mirroring Postgres 0118 (secaudit2026oct22, app-label-recycled-after-delete).
+ *     read back, mirroring Postgres 0119 (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.1.0 — 2026-10-25 — The `origin` column is written on create and update and read back (null when
  *     unset), mirroring Postgres 0116; listSubdomainSitesPage reads a keyset page (secaudit2026oct22).
  *   v1.0.0 — 2026-10-05 — createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
