@@ -20,6 +20,8 @@
  *   v1.4.0 — 2026-07-13 — Split handler groups into ./federation-sync/* siblings (max-file-lines); order/behaviour preserved
  *   v1.5.0 — 2026-10-20 — POST /v1/federation/retract (./federation-sync/retract.ts): a peer removes a
  *     replica it sent here when the record stopped being eligible (secaudit 2026-10).
+ *   v1.6.0 — 2026-10-26 — POST /v1/federation/message/reaction (./federation-sync/message-reactions.ts):
+ *     an acknowledgement mark on a direct message, given on another node.
  */
 
 import { Router } from 'express';
@@ -32,6 +34,7 @@ import { registerCatalogueTrustRoutes } from './federation-sync/catalogue-trust.
 import { registerRoutingRoutes } from './federation-sync/routing.js';
 import { registerTemplatesRoutes } from './federation-sync/templates.js';
 import { registerFederationPackageRoutes } from './federation-sync/packages.js';
+import { registerMessageReactionFederationRoute } from './federation-sync/message-reactions.js';
 
 export function federationSyncRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -47,6 +50,8 @@ export function federationSyncRouter(config: AimeatConfig, storage: Storage, pee
     // After templates: /v1/federation/packages/* shares no path prefix with anything above, so the
     // order is for reading rather than for matching.
     registerFederationPackageRoutes(router, config, storage, peers);
+    // A mark on a direct message from another node (./federation-sync/message-reactions.ts).
+    registerMessageReactionFederationRoute(router, config, storage, peers);
 
     return router;
 }

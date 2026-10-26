@@ -13,9 +13,11 @@
  *     M8).
  *   v1.1.0 — 2026-10-21 — listConversationsInvitingMailbox, and updateConversation takes ConversationUpdate
  *     (group chat invitations).
+ *   v1.2.0 — 2026-10-26 — listDirectMessageCopies and the message reactions (add, remove, list).
  */
 import type {
   DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats,
+  MessageReactionRecord,
 } from '../../../interface.js';
 import type { ConversationUpdate } from '../../../repositories/direct-message.repository.js';
 import type { SqliteStorage } from '../index.js';
@@ -37,6 +39,22 @@ export const directMessageMethods = {
 
   async getDirectMessagesByIds(this: SqliteStorage, ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]> {
     return directMessageRepo.getDirectMessagesByIds(this.db, ids, ownerGhii);
+  },
+
+  async listDirectMessageCopies(this: SqliteStorage, id: string): Promise<DirectMessageRecord[]> {
+    return directMessageRepo.listDirectMessageCopies(this.db, id);
+  },
+
+  async addMessageReaction(this: SqliteStorage, record: MessageReactionRecord): Promise<boolean> {
+    return directMessageRepo.addMessageReaction(this.db, record);
+  },
+
+  async removeMessageReaction(this: SqliteStorage, messageId: string, reaction: string, reactorGhii: string): Promise<boolean> {
+    return directMessageRepo.removeMessageReaction(this.db, messageId, reaction, reactorGhii);
+  },
+
+  async listMessageReactions(this: SqliteStorage, messageIds: string[], opts?: { limit?: number }): Promise<MessageReactionRecord[]> {
+    return directMessageRepo.listMessageReactions(this.db, messageIds, opts);
   },
 
   async listInbox(this: SqliteStorage, ownerGhii: string, opts?: { unreadOnly?: boolean; page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {

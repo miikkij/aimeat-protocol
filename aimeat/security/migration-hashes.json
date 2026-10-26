@@ -118,6 +118,7 @@
     "0114_knowledge_link_owner.sql": "0eb30d092c158473754bbc35906393a75438b4c9a05dc34d5b0fa03390fa19c6",
     "0115_task_start_floor.sql": "26097ba46fcebe83e24155329a726ce0c0346d3929e17f06ff8b18c4f8464ac8",
     "0116_subdomain_site_origin.sql": "0a4ecf826b04fbfc6d9ad443b54eed0e28836067f57b7ce23450cf8ed6bb94b6",
-    "0117_agent_credentials_valid_after.sql": "422dbd04d3d189583d8d242ee8594466d8171f835e23cac7a2294905b856cc77"
+    "0117_agent_credentials_valid_after.sql": "422dbd04d3d189583d8d242ee8594466d8171f835e23cac7a2294905b856cc77",
+    "0118_direct_message_reactions.sql": "4523a5a708ec0dcb8fdef8eced6d336413f049009012fa3c988630c3a419785b"
   }
 }

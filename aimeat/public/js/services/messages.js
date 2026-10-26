@@ -12,6 +12,7 @@
  *   listGroupInvitations / answerGroupInvitation
  * @usage import * as messages from '/js/services/messages.js';
  * @version-history
+ *   v1.8.0 -- 2026-10-26 -- reactToMessage: a mark on one message (POST/DELETE /v1/messages/:id/reactions).
  *   v1.7.0 -- 2026-10-21 -- Group chat: createGroup, getGroup, changeGroupMembers, leaveGroup,
  *     listGroupInvitations and answerGroupInvitation over /v1/messages/groups.
  *   v1.6.0 -- 2026-10-08 -- send() takes aiProvenanceId and sends it as ai_provenance_id (aiprov D17).
@@ -111,6 +112,13 @@ export async function markRead(id) {
 
 export async function deleteMessage(id) {
   return api(`/v1/messages/${enc(id)}`, { method: 'DELETE' });
+}
+
+/** Give (or with `remove`, take back) one's own mark on a message. Answers { ok, data: { reactions, changed } }. */
+export async function reactToMessage(id, reaction, remove = false) {
+  return remove
+    ? api(`/v1/messages/${enc(id)}/reactions?reaction=${enc(reaction)}`, { method: 'DELETE' })
+    : api(`/v1/messages/${enc(id)}/reactions`, { method: 'POST', body: JSON.stringify({ reaction }) });
 }
 
 /** How the owner's list is organised: { auto_archive, fold_same_subject, rules, archived_count, kept_count }. */

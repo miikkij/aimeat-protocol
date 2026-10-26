@@ -15,6 +15,7 @@
  *   (./inbox-tab/helpers.js) · thread UX hooks (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v2.15.0 -- 2026-10-26 -- Marks on a single message (./inbox-tab/reactions.js), passed to the thread.
  *   v2.14.0 -- 2026-10-25 -- The list draws at once from this browser's last overview (./inbox-tab/overview-cache.js) and is replaced when the server answers; the mount asks for `?compact=true` (previews and agent names, not whole bodies and agent records).
  *   v2.13.0 -- 2026-10-21 -- Group chat: "New group" opens a group with its first message, the list carries the
  *     group invitations, an open group has its members strip (./inbox-tab/group-chat.js). The peer names moved to ./inbox-tab/use-peer-names.js.
@@ -185,6 +186,7 @@ import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { usePeerNames } from './inbox-tab/use-peer-names.js';
 import { readCachedOverview, saveCachedOverview } from './inbox-tab/overview-cache.js';
+import { useMessageReactions } from './inbox-tab/reactions.js';
 import { useGroupChat, GroupComposePane, GroupInvitations } from './inbox-tab/group-chat.js';
 import { isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, openTrackedRecord, buildContactOptions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
@@ -437,6 +439,8 @@ export default function InboxTab({ showToast }) {
 
   // Voice messages: can this owner transcribe, how long may a recording run, and the call that does it.
   const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
+  // Marks on a single message: the person's palette and the press that gives or takes one back.
+  const reactions = useMessageReactions({ setThread, showToast });
 
   // Mount: one composite call seeds all six sections (requests/conversations/important/tracked/agents/groups).
   // The saved copy first, so the list is on screen before the server answers.
@@ -772,7 +776,7 @@ export default function InboxTab({ showToast }) {
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
           threadAll=${threadAll} toggleThreadAll=${toggleThreadAll} archiveItem=${org.menuItemFor(activeConv, conversations)}
           onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds}
-          groupDoor=${group.door} groupStrip=${group.strip} />` : null}
+          groupDoor=${group.door} groupStrip=${group.strip} reactions=${reactions} />` : null}
 
         ${mode === 'idle' ? html`<${Pane} empty>${t('inbox.selectConversation')}<//>` : null}
       <//>`}

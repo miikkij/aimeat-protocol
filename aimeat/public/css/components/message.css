@@ -12,6 +12,8 @@
  *   poster.css; a page never styles it from outside.
  * @usage Linked from public/spa.html in the component block, after turn.css.
  * @version-history
+ *   v1.3.0 — 2026-10-26 — .message-reactions and .message-react-pick: the marks on a message and the
+ *     palette, as Tags (Message `reactions`).
  *   v1.2.0 — 2026-09-27 — On your own message the writer's name, the time and the read marks take the
  *     turn's words' colour (inherit): ink on the sun in AIMEAT, light in Pebble's dark mode.
  *   v1.1.1 — 2026-09-26 — The flash ring and the quote's left edge read var(--shape-frame-heavy) (3px
@@ -57,6 +59,15 @@
 .poster-turn--user .message-receipt { color: inherit; }
 /* The line under the message: Copy, Listen and ⋯ (its place under the spine is the turn's own). */
 .message-actions { gap: 4px; }
+/* The marks on a message (Tags, the person's own in ink) and, while picking, the palette and the
+   field for another symbol. On the sun the plain Tag takes the words' colour, as the marks above do. */
+.message-reactions,
+.message-react-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+.message-reactions .poster-chip,
+.message-react-pick .poster-chip { font-size: 13px; letter-spacing: normal; white-space: nowrap; }
+.poster-turn--user .message-reactions .poster-chip:not(.poster-chip--ink),
+.poster-turn--user .message-react-pick .poster-chip { color: inherit; border-color: currentColor; }
+.message-react-pick .og-input { max-width: 16rem; }
 
 /* A quote jumps to the message it answers, which shows itself for a moment. */
 .message--flash .poster-turn-body {

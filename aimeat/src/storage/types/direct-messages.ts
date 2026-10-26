@@ -10,9 +10,12 @@
  *   changed in the move, and agents-messaging re-exports the whole block, so every existing import
  *   still resolves — the same shape the Capability Layer was split out in.
  * @structure One interface per record, in the order a message meets them: attachment → interactive
- *   payload → message → conversation → delivery log → contact consent.
+ *   payload → message → reaction → conversation → delivery log → contact consent.
  * @usage import type { DirectMessageRecord } from '../storage/interface.js';
  * @version-history
+ *   v1.3.0 — 2026-10-26 — MessageReactionRecord and MessageReactionSummary: acknowledgement marks on a
+ *     single message (table DirectMessageReaction, migration 0118); DirectMessageRecord.reactions is
+ *     attached on read, never stored.
  *   v1.2.0 — 2026-10-22 — DirectMessageAttachment.version: the sent file's createdAt, so a copy or a
  *     storage grant serves only the version that was sent (secaudit 2026-10 wave 3, v82). Stored in
  *     the attachments JSON column, so neither provider needs a migration.
@@ -195,6 +198,37 @@ export interface DirectMessageRecord {
    * field null — which is what the direction test stood in for until such a copy existed.
    */
   ownerReadAt?: string;
+  /**
+   * The acknowledgement marks on this message, grouped by symbol in the order each was first given
+   * ({@link MessageReactionRecord}). Never stored on the row: the reads that hand a thread to a reader
+   * attach it (services/message-reactions.ts withReactions). Absent means nobody has reacted, or the
+   * read did not ask.
+   */
+  reactions?: MessageReactionSummary[];
+}
+
+/**
+ * One person's acknowledgement mark on one message: a symbol (an emoji or a short word, 1-32
+ * characters) instead of a reply. One row per message, symbol and reactor, so the same person gives
+ * the same symbol once. Every mailbox copy of a message carries the same id, so the rows of one node
+ * serve all of its copies; a reactor on another node sends the mark there signed, as a read receipt
+ * travels (services/message-reactions.ts).
+ */
+export interface MessageReactionRecord {
+  messageId: string;
+  reaction: string;
+  /** Who gave it: the person (GHII), or an agent reacting as itself (GAII). */
+  reactorGhii: string;
+  /** The agent that gave it in its owner's name, when one did; `reactorGhii` is then the owner. */
+  byAgent?: string;
+  createdAt: string;
+}
+
+/** The marks of one symbol on one message, as a reader is shown them. */
+export interface MessageReactionSummary {
+  reaction: string;
+  /** Who gave it, earliest first. */
+  by: string[];
 }
 
 /**

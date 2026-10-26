@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-26 -- definitions/dm-reactions.ts: aimeat_dm_react (a mark on one message).
  *   v1.x -- 2026-10-25 -- definitions/internet-opening.ts: an app opened to the internet on a closed node (six tools).
  *   v1.x -- 2026-10-25 -- definitions/goals.ts: aimeat_goal_get, _set, _work and _answer (agent goals).
  *   v1.x -- 2026-10-24 -- definitions/compliance-agreements.ts: aimeat_compliance_agreement (plan doc-mvmr4i2wdk0p).
@@ -99,6 +100,7 @@ import { goalTools } from './definitions/goals.js';
 import { exposureTools } from './definitions/exposure.js';
 import { internetOpeningTools } from './definitions/internet-opening.js';
 import { dmGroupTools } from './definitions/dm-groups.js';
+import { dmReactionTools } from './definitions/dm-reactions.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
@@ -144,6 +146,7 @@ const CATALOG = [
     ...exposureTools,
     ...internetOpeningTools,
     ...dmGroupTools,
+    ...dmReactionTools,
     ...publishRequestTools,
     ...accountRightsTools,
     ...secretAddressTools,

@@ -6057,6 +6057,41 @@ components:
         createdAt: { type: string, format: date-time }
         deliveredAt: { type: string, format: date-time }
         readAt: { type: string, format: date-time }
+        reactions:
+          type: array
+          description: >-
+            The acknowledgement marks on this message, one entry per symbol in the order each was first
+            given (POST /v1/messages/{id}/reactions). Attached when a thread or an inbox is read; absent
+            when nobody has reacted.
+          items:
+            $ref: '#/components/schemas/MessageReactionSummary'
+
+    MessageReactionResult:
+      allOf:
+        - $ref: '#/components/schemas/AimeatEnvelope'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                message_id: { type: string }
+                reaction: { type: string }
+                removed: { type: boolean }
+                changed: { type: boolean, description: false when the mark was already there (POST). }
+                reactions:
+                  type: array
+                  description: Every mark on the message after the change.
+                  items:
+                    $ref: '#/components/schemas/MessageReactionSummary'
+
+    MessageReactionSummary:
+      type: object
+      properties:
+        reaction: { type: string, description: 'The symbol: an emoji or a short word, 1-32 characters.' }
+        by:
+          type: array
+          description: Who gave it (GHII, or the GAII of an agent that reacted as itself), earliest first.
+          items: { type: string }
 
     DirectMessageWire:
       type: object
@@ -61049,6 +61084,97 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/messages/{id}/reactions:
+    post:
+      operationId: reactToMessage
+      summary: Acknowledge one message with a mark instead of a reply
+      description: >-
+        Gives a mark (an emoji or a short word, 1-32 characters) on one direct message. Each person
+        gives a symbol once; giving it again changes nothing (200, `changed: false`). The owner in
+        person, a published app acting for the person and an agent as itself mark on messages:send; an
+        agent marks a message it is a party to (it sent it, it was sent to it, or it is in the group
+        thread). `as_owner: true` lets an agent mark in its owner's name on its owner's copy, on
+        messages:send-as-owner. Every local party's Messages page hears `messages` over SSE, the agent
+        that wrote the message is woken with a `dm.reaction` delivery naming the symbol and who gave it,
+        and a party on another node gets the mark signed (POST /v1/federation/message/reaction). The
+        person's usual symbols and what each means live in the memory record `messages.reactions`
+        (`{ symbols: [{ symbol, meaning }] }`), which the node never reads on anyone's behalf. Same rules
+        as the MCP tool aimeat_dm_react.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reaction]
+              properties:
+                reaction: { type: string, minLength: 1, maxLength: 32 }
+                as_owner: { type: boolean, description: An agent marks in its owner's name (messages:send-as-owner). }
+      responses:
+        '201':
+          description: The mark was given
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageReactionResult'
+        '200':
+          description: The caller had already given this mark; nothing changed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageReactionResult'
+        '400':
+          description: VALIDATION_ERROR, a reaction that is empty, longer than 32 characters or not on one line
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: SCOPE_DENIED (as_owner without messages:send-as-owner, or messages:send missing), or FORBIDDEN for a session that cannot react
+        '404':
+          description: NOT_FOUND, the caller holds no copy of this message as a party
+    delete:
+      operationId: unreactToMessage
+      summary: Take your own mark back
+      description: Removes the caller's own mark of one symbol. Only ever the caller's own; with `as_owner=true` the owner's, given in their name.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: reaction
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 32 }
+        - name: as_owner
+          in: query
+          required: false
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: The mark was taken back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageReactionResult'
+        '400':
+          description: VALIDATION_ERROR
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: SCOPE_DENIED or FORBIDDEN, as for POST
+        '404':
+          description: NOT_FOUND, no such message for the caller, or no such mark of theirs on it
+
   /v1/messages/{id}/attachments/{attId}/transcribe:
     post:
       operationId: transcribeMessageAttachment
@@ -62134,6 +62260,46 @@ paths:
           description: Missing or invalid signature; WRONG_AUDIENCE, AUDIENCE_REQUIRED or REPLAYED for the delivery proof.
         '403':
           description: Source not an active peer
+
+  /v1/federation/message/reaction:
+    post:
+      operationId: receiveFederatedMessageReaction
+      summary: Receive a mark on a direct message from a peer node (signed)
+      description: >-
+        A person or agent of the sending node gave (or took back) an acknowledgement mark on a message
+        this node holds a copy of. The signature covers source_node, message_id, reaction, reactor,
+        by_agent, op and timestamp, in that order, and the audience proof names this node. Refused:
+        a peer without the messaging right, a reactor or by_agent that is not the sending node's own,
+        and a message this node holds no copy of with the reactor as a party. Never sent on. Not for
+        client use.
+      tags: [Federation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_node, message_id, reaction, reactor, op, timestamp, signature]
+              properties:
+                source_node: { type: string }
+                message_id: { type: string }
+                reaction: { type: string, minLength: 1, maxLength: 32 }
+                reactor: { type: string, description: The person (GHII) or agent (GAII) of the sending node who gave it. }
+                by_agent: { type: string, nullable: true, description: The agent that gave it in the reactor's name, when one did. }
+                op: { type: string, enum: [add, remove] }
+                timestamp: { type: string, format: date-time }
+                signature: { type: string }
+                audience: { type: string, description: The node this mark is for. }
+                audience_signature: { type: string, description: The sending node's signature over the audience and the signed payload. }
+      responses:
+        '200':
+          description: Applied (`changed` says whether anything changed)
+        '400':
+          description: INVALID_INPUT, or a stale timestamp
+        '401':
+          description: Missing or invalid signature, or the audience proof does not name this node
+        '403':
+          description: Source not an active messaging peer, a reactor that is not the source node's own, or no message here the reactor is a party of
 
   /v1/federation/storage/grant:
     post:

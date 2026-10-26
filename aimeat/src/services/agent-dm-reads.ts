@@ -26,6 +26,7 @@
  *   - readAgentDmInbox()  — messages addressed to the agent, group threads folded in
  * @usage const { messages, total } = await readAgentDmThread(storage, agentGaii, conversationId, { page, perPage });
  * @version-history
+ *   v1.2.0 — 2026-10-26 — The thread and the inbox carry each message's reactions (services/message-reactions.ts).
  *   v1.1.0 — 2026-10-17 — readOneToOneWithOwner: an agent's 1:1 conversation is read from both mailboxes
  *     as one, for the owner and for the agent, so the owner can answer in it and the agent sees the
  *     answer (decision-viestin-puoli-ja-merkint-kertovat-kuka-sen-kirjoitti-ja-omis).
@@ -34,6 +35,7 @@
 import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import { isParticipant } from './conversation-group.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
+import { withReactions } from './message-reactions.js';
 
 export interface DmPageOpts {
   page?: number;
@@ -55,10 +57,10 @@ export async function readAgentDmThread(
   opts?: DmPageOpts,
 ): Promise<DmPage> {
   const convo = await storage.getConversation(conversationId);
-  if (convo && isParticipant(convo, agentGaii)) {
-    return storage.listConversation(deliveryTargetFor(agentGaii), conversationId, opts);
-  }
-  return readOneToOneWithOwner(storage, agentGaii, conversationId, opts);
+  const page = convo && isParticipant(convo, agentGaii)
+    ? await storage.listConversation(deliveryTargetFor(agentGaii), conversationId, opts)
+    : await readOneToOneWithOwner(storage, agentGaii, conversationId, opts);
+  return { ...page, messages: await withReactions(storage, page.messages) };
 }
 
 /** How many messages of one conversation are merged from the two mailboxes before the page is cut. */
@@ -108,9 +110,11 @@ export async function readAgentDmInbox(
   // would hand it every group thread anyone in the household belongs to.
   const groups = await storage.listConversationsForParticipant(agentGaii);
   const conversationIds = groups.map(g => g.id);
-  if (!conversationIds.length) return storage.listDmsAddressedTo(agentGaii, opts);
-  return storage.listDmsAddressedTo(agentGaii, {
-    ...opts,
-    groupScope: { mailboxGhii: deliveryTargetFor(agentGaii), conversationIds },
-  });
+  const page = !conversationIds.length
+    ? await storage.listDmsAddressedTo(agentGaii, opts)
+    : await storage.listDmsAddressedTo(agentGaii, {
+      ...opts,
+      groupScope: { mailboxGhii: deliveryTargetFor(agentGaii), conversationIds },
+    });
+  return { ...page, messages: await withReactions(storage, page.messages) };
 }
