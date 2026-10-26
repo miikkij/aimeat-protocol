@@ -3,8 +3,8 @@
 *How to run one AIMEAT node for your company and the partner companies you approve, with Microsoft
 Entra ID as the way in.*
 
-**Version:** 1.4 — Section 5: the domains a gated Entra sign-in vouches for (`AIMEAT_ENTRA_LINK_DOMAINS`)
-**Date:** 2026-10-25
+**Version:** 1.5 — Section 6b step 9: everyone on the node sees each other (`AIMEAT_MEMBERS_SEE_EACH_OTHER`)
+**Date:** 2026-10-26
 **License:** MIT
 
 ---
@@ -295,6 +295,19 @@ sensitive a piece of content is. On a company node it also limits who may see th
    Agents that exist keep what they have. The owner changes it on the agent's card ("May read at
    most") or with `PATCH /v1/agents/{name}/clearance`; another agent may only lower it
    (`aimeat_operator_agent_configure` with `clearance`). Empty means no limit.
+
+**9. Everyone sees each other.** `AIMEAT_MEMBERS_SEE_EACH_OTHER=true` (Config tab:
+`registration.members_see_each_other`, applies at once). Every person with an active account on the
+node is in every other person's address book as a colleague, without anyone saving them: on the
+Contacts page, in the person picker of every form (who may build an app, organism and workspace
+members, app grants), and in what an AI reads with `aimeat_contact_list` or `GET /v1/contacts`. The
+member directory (`GET /v1/ghii/list`) lists everyone, without each person's opt-in. A colleague's
+first message lands in the inbox instead of the requests, and a colleague added to a group chat
+joins at once. What stays: an agent or an app still asks first, a person someone blocked stays
+blocked, a disabled account is not shown, and a person signed in from another node sees the opt-in
+directory only. At most 2000 colleagues are listed in one address book; the answer says
+`truncated` when there are more. Leave it off on any node whose accounts do not all belong to the
+same organisation: it shows every account to everybody.
 
 ## 7. SAML and SCIM: the organisation's own identity provider (BR-04)
 

@@ -10,6 +10,7 @@
  * @structure c · rel · day · parts · nameOf · initials · kindWord · stateWord · sortPeople · peopleRows · noAccountRows · agentRows · crumb · pageLinks · renderPage
  * @usage import { c, renderPage, peopleRows } from './frame.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-26 -- A row of origin 'colleague' (a person of a company server, members see each other on) says "colleague" where a saved row says "saved".
  *   v1.11.0 -- 2026-10-19 -- An agent's row shows the agent's own avatar when it has one (leadProps); the initials stay its mark otherwise.
  *   v1.10.0 -- 2026-09-26 -- Every part is a kit component (List with its Lead, Name, Cell, Desc, Who, When and Doors; Mark; Action; SettingsPage with the crumb and the rail as data): the page passes data and writes no class. The people table's heading row is the List's head, as main drew it over the rows (page group G8).
  *   v1.9.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -66,8 +67,10 @@ export const isAgentLike = (r) => r.kind === 'gaii' || r.kind === 'geai';
 export const kindWord = (kind) => c('kind.' + (kind === 'gaii' ? 'agent' : kind === 'geai' ? 'app' : kind === 'mail' ? 'mail' : 'person'));
 /** The message gate, as a sentence. */
 export const stateWord = (r) => (r.state === 'accepted' ? c('state.accepted') : r.state === 'pending' ? c('state.pending') : r.state === 'blocked' ? c('state.blocked') : c('state.none'));
-/** "saved 26.8." or "messaged 41 times". */
-export const originWords = (r) => (r.origin === 'saved' && r.created_at ? c('savedOn', { when: day(r.created_at) }) : r.message_count ? c('messagedTimes', { n: r.message_count }) : c('savedWord'));
+/** "saved 26.8.", "messaged 41 times", or "colleague" for a person of a company server nobody saved. */
+export const originWords = (r) => (r.origin === 'saved' && r.created_at ? c('savedOn', { when: day(r.created_at) })
+  : r.message_count ? c('messagedTimes', { n: r.message_count })
+  : r.origin === 'colleague' ? c('colleagueWord') : c('savedWord'));
 
 /** Last message first; then the ones with a name; then by name. */
 export function sortPeople(rows) {

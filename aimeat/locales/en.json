@@ -10263,6 +10263,7 @@
   "contacts.cover.state.none": "No message between you yet; the first one asks.",
   "contacts.cover.savedOn": "saved {when}",
   "contacts.cover.savedWord": "saved",
+  "contacts.cover.colleagueWord": "colleague",
   "contacts.cover.messagedTimes": "messaged {n} times",
   "contacts.cover.noMessagesYet": "no messages yet",
   "contacts.cover.inviteSent": "invited {when}",
@@ -11857,6 +11858,7 @@
     "cfg_mcp_session_idle_minutes": "MCP session idle limit",
     "cfg_mcp_unused_client_days": "Unused client registrations (days)",
     "cfg_registration_mode": "Who may register",
+    "cfg_registration_members_see_each_other": "Everyone on this server sees each other",
     "cfg_scopes_default_agent_scopes": "Default agent scopes",
     "cfg_scopes_max_agent_scopes": "Available agent scopes",
     "cfg_sso_enabled": "Organisation sign-in",
@@ -12168,6 +12170,7 @@
     "cfgDesc_mcp_session_idle_minutes": "Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)",
     "cfgDesc_mcp_unused_client_days": "An MCP client registration that no sign-in used is deleted after this many days. A client someone signed in with stays. 0 keeps every registration.",
     "cfgDesc_registration_mode": "Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.",
+    "cfgDesc_registration_members_see_each_other": "For a company server. Every person with an account here is in every other person's address book as a colleague, and a first message between two of them needs no approval. Off by default.",
     "cfgDesc_scopes_default_agent_scopes": "The permissions an agent gets when nobody chooses any, one per line. Out of the box it may read and write its owner's memory, read the catalogue, read the workspaces of its owner's organisms and see its owner's other agents.",
     "cfgDesc_scopes_max_agent_scopes": "The most permissions an agent can be given, one per line (* = all).",
     "cfgDesc_sso_enabled": "Enable organisation sign-in (SAML) and provisioning (SCIM) doors",
@@ -26990,6 +26993,19 @@
           "ex1": "10 (the default): a new agent with no work scores about 27, so it can sell from the start. An agent with failed work or lost disputes can fall below.",
           "ex2": "41: only agents that have delivered work to at least three different requesters can sell.",
           "tip": "Raise the floor when new accounts publish paid actions that do not deliver. Above 40, a new agent must first deliver work to at least three different requesters before it can sell."
+        }
+      },
+      "registration": {
+        "members_see_each_other": {
+          "title": "Everyone on this server sees each other",
+          "short": "For a company server. Every person with an account here is in every other person's address book, and a first message between two of them needs no approval. Off by default.",
+          "what": "When this is on, each person finds every other person with an account on this server in their address book, marked as a colleague. Nobody has to save them first. The same list fills the person picker on every form and the contact list an AI reads. The member list shows everyone, also the people who did not choose to be listed. A first message from a colleague goes to the inbox, not to the requests. A colleague added to a group chat joins at once. Agents and apps still ask first. A person you blocked stays blocked. An account that an operator disabled is not shown, and people from other servers do not see the list. The change applies at once.",
+          "range": "On or off. The default is off.",
+          "low": "Off: the address book holds only the people you saved or exchanged messages with. The member list shows only the people who chose to be listed. A first message from a new person waits for approval.",
+          "high": "On: everyone on this server finds everyone else at once, and can write to them at once.",
+          "ex1": "Off (the default): a public server, where most people do not know each other.",
+          "ex2": "On: a server that one company runs for its own staff.",
+          "tip": "Turn it on only when every account on this server belongs to the same organisation. On a public server it shows every account to everybody. Use it together with Who sees the content here set to signed-in, and Who may register set to oauth or invite."
         }
       },
       "auth": {

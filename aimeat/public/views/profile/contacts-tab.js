@@ -10,6 +10,8 @@
  * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.4.0 — 2026-10-26 — Reloads on the 'ghii' live domain too: on a company server a person who joins or
+ *     renames changes everyone's address book.
  *   v2.3.0 — 2026-10-16 — The menu find opens one contact here (useOpenItem, js/open-item.js).
  *   v2.2.0 — 2026-10-16 — A failed load is drawn as one (contactsFailed: the could-not-load note with
  *     Retry), never as "nobody yet" (QA audit F6-05).
@@ -98,7 +100,8 @@ export default function ContactsTab({ showToast }) {
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(null);
   liveRef.current = () => { load({ showSpinner: false }); };
-  useEffect(() => onLiveUpdate(['messages', 'organisms'], () => liveRef.current()), []);
+  // 'ghii': a person joined, left or renamed; on a company server (members see each other) that changes the book.
+  useEffect(() => onLiveUpdate(['messages', 'organisms', 'ghii'], () => liveRef.current()), []);
   useEffect(() => { if (view.kind === 'person' && contacts.length && personData?.id !== view.id) loadPerson(view.id); }, [view, contacts.length]);   // eslint-disable-line react-hooks/exhaustive-deps -- loadPerson changes with contacts; the id guard stops a loop
 
   const rowOf = useCallback((id) => contacts.find(r => r.contact_id === id) || null, [contacts]);

@@ -273,6 +273,12 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
           value: config.registrationMode,
           defaultVal: 'open',
         },
+        {
+          envVar: 'AIMEAT_MEMBERS_SEE_EACH_OTHER',
+          description: 'Company node: every person of this node is in every other person\'s contacts, and a first message between them needs no approval',
+          value: String(config.membersSeeEachOther),
+          defaultVal: 'false',
+        },
       ],
     },
     {

@@ -13,6 +13,8 @@
  *   aimeat_contact_list, aimeat_contact_add, aimeat_contact_remove, aimeat_contact_resolve_email.
  * @usage import { registerContactTools } from './contacts.js';
  * @version-history
+ *   2026-10-26 — aimeat_contact_list passes the config to listContactsFor, which reads members see each
+ *     other from it: on a company node the list holds every other person of the node.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -100,7 +102,7 @@ export function registerContactTools(
             annotations: annotationsFor('aimeat_contact_list'),
         },
         async ({ q, state, include }) => {
-            const answer = await listContactsFor(storage, config.nodeId, session(), { q, state, include });
+            const answer = await listContactsFor(storage, config, session(), { q, state, include });
             return { content: [{ type: 'text' as const, text: JSON.stringify(answer, null, 2) }] };
         },
     );

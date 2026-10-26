@@ -9152,6 +9152,7 @@
   "contacts.cover.state.none": "Todavía no hay mensajes entre ustedes; el primero pide permiso.",
   "contacts.cover.savedOn": "guardado {when}",
   "contacts.cover.savedWord": "guardado",
+  "contacts.cover.colleagueWord": "colega",
   "contacts.cover.messagedTimes": "{n} mensajes",
   "contacts.cover.noMessagesYet": "sin mensajes todavía",
   "contacts.cover.inviteSent": "invitado {when}",
@@ -10415,6 +10416,7 @@
     "cfg_mcp_session_idle_minutes": "Inactividad máxima de sesión MCP",
     "cfg_mcp_unused_client_days": "Registros de clientes sin uso (días)",
     "cfg_registration_mode": "Quién puede registrarse",
+    "cfg_registration_members_see_each_other": "Todos en este servidor se ven entre sí",
     "cfg_scopes_default_agent_scopes": "Ámbitos de agente predeterminados",
     "cfg_scopes_max_agent_scopes": "Ámbitos de agente disponibles",
     "cfg_sso_enabled": "Inicio de sesión de organización",
@@ -10726,6 +10728,7 @@
     "cfgDesc_mcp_session_idle_minutes": "Cerrar una sesión MCP tras estos minutos sin solicitudes (se admiten fracciones; un cliente cerrado se reinicializa).",
     "cfgDesc_mcp_unused_client_days": "Un registro de cliente MCP con el que nadie inició sesión se borra pasados estos días. Un cliente con el que alguien inició sesión se conserva. 0 conserva todos los registros.",
     "cfgDesc_registration_mode": "Quién puede tener cuenta nueva: open (todos), oauth (primer inicio por un proveedor de identidad, o invitación — sin registro por contraseña), invite (solo invitaciones de miembros), closed (nadie). Las cuentas existentes siempre entran.",
+    "cfgDesc_registration_members_see_each_other": "Para el servidor de una empresa. Cada persona con cuenta aquí aparece como colega en la libreta de direcciones de todas las demás, y el primer mensaje entre dos de ellas no necesita aprobación. Desactivado por defecto.",
     "cfgDesc_scopes_default_agent_scopes": "Los permisos que recibe un agente cuando nadie elige ninguno, uno por línea. De serie puede leer y escribir la memoria de su dueño, leer el catálogo, leer los espacios de trabajo de los organismos de su dueño y ver los demás agentes de su dueño.",
     "cfgDesc_scopes_max_agent_scopes": "Los permisos que como máximo puede recibir un agente, uno por línea (* = todos).",
     "cfgDesc_sso_enabled": "Puertas de inicio de sesión de organización (SAML) y aprovisionamiento (SCIM) activadas.",
@@ -24786,6 +24789,19 @@
           "ex1": "10 (el predeterminado): un agente nuevo sin trabajo tiene unos 27 puntos, así que puede vender desde el principio. Un agente con trabajos fallidos o disputas perdidas puede quedar por debajo.",
           "ex2": "41: solo pueden vender los agentes que entregaron trabajo a al menos tres solicitantes distintos.",
           "tip": "Sube el mínimo cuando cuentas nuevas publiquen acciones de pago que no entregan. Por encima de 40, un agente nuevo primero tiene que entregar trabajo a al menos tres solicitantes distintos antes de poder vender."
+        }
+      },
+      "registration": {
+        "members_see_each_other": {
+          "title": "Todos en este servidor se ven entre sí",
+          "short": "Para el servidor de una empresa. Cada persona con cuenta aquí aparece en la libreta de direcciones de todas las demás, y el primer mensaje entre dos de ellas no necesita aprobación. Desactivado por defecto.",
+          "what": "Cuando está activado, cada persona ve en su libreta de direcciones a todas las demás personas con cuenta en este servidor, marcadas como colegas. Nadie tiene que guardarlas antes. La misma lista llena el selector de personas de cada formulario y la lista de contactos que lee una IA. La lista de miembros muestra a todos, también a quienes no eligieron aparecer. El primer mensaje de un colega llega a la bandeja de entrada, no a las solicitudes. Un colega que añades a una conversación de grupo entra enseguida. Los agentes y las aplicaciones siguen preguntando antes. Una persona que bloqueaste sigue bloqueada. Una cuenta que un operador desactivó no aparece, y las personas de otros servidores no ven la lista. El cambio se aplica enseguida.",
+          "range": "Activado o desactivado. Por defecto está desactivado.",
+          "low": "Desactivado: la libreta guarda solo a las personas que guardaste o con las que intercambiaste mensajes. La lista de miembros muestra solo a quienes eligieron aparecer. El primer mensaje de una persona nueva espera aprobación.",
+          "high": "Activado: todos en este servidor encuentran enseguida a todos los demás y pueden escribirles enseguida.",
+          "ex1": "Desactivado (por defecto): un servidor público, donde la mayoría no se conoce.",
+          "ex2": "Activado: un servidor que una empresa mantiene para su propio personal.",
+          "tip": "Actívalo solo cuando todas las cuentas de este servidor pertenecen a la misma organización. En un servidor público muestra cada cuenta a todo el mundo. Úsalo junto con Quién ve el contenido de aquí en signed-in y Quién puede registrarse en oauth o invite."
         }
       },
       "auth": {

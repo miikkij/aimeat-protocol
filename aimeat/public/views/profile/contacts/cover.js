@@ -11,6 +11,7 @@
  * @structure renderContactsView · renderCover · secPeople · secNoAccount · secAgents · whereUsed
  * @usage import { renderContactsView } from './contacts/cover.js';
  * @version-history
+ *   v1.14.0 -- 2026-10-26 -- The saved card's "the other N came from messages" counts the rows of origin 'message'; it took everything not saved, colleagues included.
  *   v1.13.0 -- 2026-10-16 -- A failed first load shows the could-not-load note with Retry under People and
  *     no "nobody yet" line in the other sections (ctx.contactsFailed) (QA audit F6-05).
  *   v1.12.0 -- 2026-09-26 -- Every part is a kit component (SettingsPage with its head, strip and rail as data; FigureStrip; Tabs and Tab in their fold tone; TextField; List; More; Note; Tinted; Action): the page passes data and writes no class. Put back from main: the blocked people are a dim tag (page group G8).
@@ -70,6 +71,8 @@ function renderCover(ctx) {
   const invitesOpen = noAccount.filter(r => r.invitation).length;
   const latest = sortPeople(people.filter(r => r.last_message_at))[0];
   const savedByMe = ctx.contacts.filter(r => r.origin === 'saved').length;
+  // "The other N came from messages": counted, not derived, since a colleague row came from neither.
+  const fromMessages = ctx.contacts.filter(r => r.origin === 'message').length;
   const sharedTotal = people.reduce((n, r) => n + (r.shared_organisms || []).length, 0);
   const sharedNames = (() => { const m = new Map(); for (const r of people) for (const o of r.shared_organisms || []) m.set(o.name, (m.get(o.name) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n, k]) => `${n} ${k}`).join(' · '); })();
   const mark = (n, key, tone) => ({ label: c(key, { n }), tone });
@@ -80,7 +83,7 @@ function renderCover(ctx) {
     { key: 'invites', n: invitesOpen, tone: invitesOpen ? 'coral' : undefined, label: c('stripInvites'),
       sub: invitesOpen ? noAccount.filter(r => r.invitation).map(r => `${nameOf(r)} · ${c('sentOn', { when: rel(r.invitation.created_at) })}`).join(' · ') : c('stripInvitesNone') },
     { key: 'shared', n: sharedTotal, label: c('stripShared'), sub: sharedNames || c('stripSharedNone') },
-    { key: 'saved', n: savedByMe, label: c('stripSaved'), sub: c('stripSavedSub', { n: Math.max(0, ctx.contacts.length - savedByMe) }) },
+    { key: 'saved', n: savedByMe, label: c('stripSaved'), sub: c('stripSavedSub', { n: fromMessages }) },
   ]} />`;
   return html`
     <${SettingsPage} name="ct"

@@ -61788,6 +61788,11 @@ paths:
         invites, workspace grants, app grants); a 'mail' contact cannot be granted anything until
         that person joins.
 
+        On a node with members see each other on (AIMEAT_MEMBERS_SEE_EACH_OTHER, the company-node
+        setting) a fourth source joins: every other person of the node with an active account,
+        origin 'colleague', without anyone saving them. A blocked colleague stays out. At most 2000
+        colleagues are folded in, and `truncated` says when more exist.
+
         Who may call it: the owner in person, and anything acting in the owner's name that holds
         `contacts:read` (an app grant, an agent, an ecosystem app). Every caller reads the owner's
         own book; no caller names whose book it reads. Without the word the answer is 403
@@ -61866,7 +61871,7 @@ paths:
                                   nullable: true
                                   description: The owner's own word for the relationship. No vocabulary is imposed.
                                 state: { type: string, nullable: true, enum: [pending, accepted, blocked, null] }
-                                origin: { type: string, enum: [message, saved] }
+                                origin: { type: string, enum: [message, saved, colleague] }
                                 has_messages: { type: boolean }
                                 created_at: { type: string, nullable: true }
                                 updated_at: { type: string, nullable: true }
@@ -73603,7 +73608,9 @@ paths:
       description: |
         Lists opt-in human identities (the member "phone book"). Requires a signed-in caller —
         the anonymous internet is rejected. Only members who set `directory_listed: true` appear;
-        the caller always sees their own entry.
+        the caller always sees their own entry. On a node with members see each other on
+        (AIMEAT_MEMBERS_SEE_EACH_OTHER, the company-node setting) every person of the node with an
+        active account appears, without the opt-in.
       security:
         - BearerAuth: []
       parameters:

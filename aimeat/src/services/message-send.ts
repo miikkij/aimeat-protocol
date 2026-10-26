@@ -11,6 +11,9 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.11.0 — 2026-10-26 — On a node with members see each other on, a first message from another person
+ *     of the node is accepted, not a request (areColleagues, services/colleagues.ts). A block still wins:
+ *     the gate only decides when there is no row or the row is pending.
  *   v1.10.0 — 2026-10-22 — Each attachment of this node records the version that was sent (the held
  *     file's createdAt, DirectMessageAttachment.version), read from the same metadata the holder
  *     check already reads (secaudit 2026-10 wave 3, v82).
@@ -58,6 +61,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
 import { acceptedSameAccount } from './contact-same-account.js';
+import { areColleagues } from './colleagues.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../utils/messaging.js';
 import { notify } from './notify.js';
@@ -350,10 +354,13 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       if (!contact) {
         // skipContactGate (operator announcements) auto-accepts so a node/federation-wide notice lands
         // in the inbox instead of the first-contact requests bucket.
+        // A colleague on a company node (members see each other, services/colleagues.ts) is accepted too.
         const autoAccept = isSameOwner(senderGhii, deliveryGhii) || !!input.skipContactGate
-          || await acceptedSameAccount(storage, deliveryGhii, senderGhii);
+          || await acceptedSameAccount(storage, deliveryGhii, senderGhii)
+          || await areColleagues(storage, config, deliveryGhii, senderGhii);
         contact = await storage.setContactState(deliveryGhii, senderGhii, autoAccept ? 'accepted' : 'pending', id);
-      } else if (contact.state === 'pending' && await acceptedSameAccount(storage, deliveryGhii, senderGhii)) {
+      } else if (contact.state === 'pending' && (await acceptedSameAccount(storage, deliveryGhii, senderGhii)
+        || await areColleagues(storage, config, deliveryGhii, senderGhii))) {
         contact = await storage.setContactState(deliveryGhii, senderGhii, 'accepted');
       }
       isRequest = contact.state === 'pending';

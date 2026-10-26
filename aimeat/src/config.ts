@@ -420,6 +420,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Security limits
     registrationMode: (['open', 'oauth', 'invite', 'closed'] as const).find(m => m === process.env.AIMEAT_REGISTRATION_MODE) ?? 'open',
+    membersSeeEachOther: process.env.AIMEAT_MEMBERS_SEE_EACH_OTHER === 'true',
     loginRateLimitMax: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '15', 10),
     loginRateLimitWindowMs: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
     registrationRateLimitMax: parseInt(process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '5', 10),

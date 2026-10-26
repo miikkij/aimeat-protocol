@@ -143,7 +143,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * own card on each person (saved name, email, note, tags, links) stays: it is the owner's data and
    * the reason the word exists. ── */
   router.get('/v1/contacts', requireAuth(), requireLocalSession(), requireScope('contacts:read'), async (req, res) => {
-    res.json(success(config.nodeId, await listContactsFor(storage, config.nodeId, req.auth!, req.query)));
+    res.json(success(config.nodeId, await listContactsFor(storage, config, req.auth!, req.query)));
   });
 
   /* ── GET /v1/contacts/:contactId/together — what the owner and ONE person have in common: the

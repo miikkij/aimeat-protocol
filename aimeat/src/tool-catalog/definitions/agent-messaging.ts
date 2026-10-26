@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-26 — aimeat_contact_list's description names origin 'colleague', every other person of a company node (members see each other).
  *   2026-10-23 — aimeat_agent_runtime_report's `llm` takes 'local' (plan doc-mvlftkh9zmc9, C3.4).
  *   2026-10-18 — aimeat_agents_list's description names `invites_people` (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-17 — aimeat_dm_send_as_owner's description: the message names the sending agent to the owner
@@ -641,7 +642,7 @@ export const agentMessagingTools = [
     {
         // ── Contacts (address book): thin proxies over /v1/contacts on the connector. ──
         name: 'aimeat_contact_list',
-        description: "The owner's address book: everyone they saved, everyone they have exchanged direct messages with, and every PERSON they wrote down who has no account on this node. Each entry carries kind (ghii = a person here, gaii = an agent, geai = an app, mail = a person with no account here), the name to show, their email when one is known, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a ghii contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant. A 'mail' contact cannot be granted anything until they join; invite them with aimeat_organism_invite_email. It takes contacts:read, here and on GET /v1/contacts alike. The conversation columns (last message, who wrote it, when, how many, the conversation id) are empty unless you may also read the owner's mailbox (messages:read-as-owner), and include \"together\" is answered only with organism:read.",
+        description: "The owner's address book: everyone they saved, everyone they have exchanged direct messages with, and every PERSON they wrote down who has no account on this node. Each entry carries kind (ghii = a person here, gaii = an agent, geai = an app, mail = a person with no account here), the name to show, their email when one is known, and origin ('saved' vs 'message'; 'colleague' on a company node whose operator turned on that everyone sees each other, where every other person of the node is listed without being saved). Use it as the identity source when granting access — pair a ghii contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant. A 'mail' contact cannot be granted anything until they join; invite them with aimeat_organism_invite_email. It takes contacts:read, here and on GET /v1/contacts alike. The conversation columns (last message, who wrote it, when, how many, the conversation id) are empty unless you may also read the owner's mailbox (messages:read-as-owner), and include \"together\" is answered only with organism:read.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List Contacts', readOnlyHint: true },
