@@ -29,7 +29,7 @@
  *   v1.0.0 — 2026-10-26 — Initial (secaudit2026oct22; developer decision 2026-10-26).
  */
 import type { CapabilityRecord } from '../storage/interface.js';
-import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
+import { isSameOwner } from '../utils/gaii.js';
 
 /** Every visibility word the code knows for a capability (storage/types/capabilities.ts). */
 export const CAPABILITY_VISIBILITIES: readonly CapabilityRecord['visibility'][] = ['private', 'owner', 'public'];
@@ -58,7 +58,7 @@ export function capabilityVisibilityRefusal(word: unknown): string | null {
 export function isCapabilityOwnersSide(cap: Pick<CapabilityRecord, 'ownerGhii'>, identity: string | null | undefined): boolean {
     if (!identity) return false;
     if (identity === cap.ownerGhii) return true;
-    return !!parseGaiiLoose(identity).owner && isSameOwner(identity, cap.ownerGhii);
+    return identity.includes('@') && cap.ownerGhii.includes('@') && isSameOwner(identity, cap.ownerGhii);
 }
 
 /** True when a caller outside the owner's side may reach the capability by its id. */

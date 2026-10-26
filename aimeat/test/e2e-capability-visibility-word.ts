@@ -8,7 +8,7 @@
  *   INVALID_INPUT with a sentence that lists the known words, and nothing is stored.
  *
  *   AND WHAT STAYS. A known word is stored on POST and PUT, and a PUT that sends the stored word back
- *   unchanged goes through.
+ *   unchanged goes through. Another account's PUT is refused with 403 FORBIDDEN, as before.
  * @usage
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capability-visibility-word
  * @version-history
@@ -87,6 +87,16 @@ await test('PUT with a known word, and a PUT that sends the stored word back, go
     assert(priv.status === 200 && priv.body.data?.visibility === 'private', `known word: ${priv.status}`);
     const same = await json(`/v1/capabilities/${capId}`, { method: 'PUT', headers: auth(token), body: JSON.stringify({ visibility: 'private', summary: 'renamed' }) });
     assert(same.status === 200 && same.body.data?.summary === 'renamed', `unchanged word: ${same.status}`);
+});
+
+await test('another account PUTs a known word on this capability: 403 FORBIDDEN, and the stored word stays', async () => {
+    const otherName = `capword-other-${suffix}`;
+    const other = (await registerOwner(BASE, otherName)).token;
+    const r = await json(`/v1/capabilities/${capId}`, { method: 'PUT', headers: auth(other), body: JSON.stringify({ visibility: 'owner' }) });
+    await json(`/v1/owners/${otherName}`, { method: 'DELETE', headers: auth(other) });
+    assert(r.status === 403 && r.body.error?.code === 'FORBIDDEN', `another account changed the word: ${r.status} ${r.body.error?.code}`);
+    const back = await json(`/v1/capabilities/${capId}`, { headers: auth(token) });
+    assert(back.body.data?.visibility === 'private', `stored word: ${back.body.data?.visibility}`);
 });
 
 await test('Cleanup', async () => {
