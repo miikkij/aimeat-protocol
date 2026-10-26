@@ -57,10 +57,10 @@ import { descriptionFor } from '../tool-catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {
-  publishSkill, listSkills, listSkillLibrary, resolveSkillRef,
-  getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, setSkillVisibility,
+  publishSkill, listSkills, listSkillLibrary, resolveSkillRef, setSkillVisibility,
   listSkillsByBinding, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
+import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent } from '../services/skill-agent-links.js';
 import type { SkillVisibility } from '../services/skill-audience.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';

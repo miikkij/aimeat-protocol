@@ -28,10 +28,12 @@
  *   - SkillManifestValue / SkillSummary / ResolvedSkill / SkillAccessor
  *   - publishSkill / deleteSkill / listSkills / listSkillLibrary
  *   - resolveSkillRef — access-checked manifest+files materialization
- *   - getAgentSkillLinks / linkSkillToAgent / unlinkSkillFromAgent / resolveAgentSkills
+ *   - agent links: skill-agent-links.ts (getAgentSkillLinks / linkSkillToAgent / unlinkSkillFromAgent / resolveAgentSkills)
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.13.1 -- 2026-10-26 -- The agent attachment section moved to skill-agent-links.ts (pure
+ *     extraction, max-file-lines); its importers import it from there.
  *   v1.13.0 -- 2026-10-22 -- deleteSkill settles a user skill's waiting publish requests `outdated`
  *     (secaudit 2026-10, apply-skill.ts:applySkillPublish:semver-restarts-on-delete-recreate).
  *   v1.12.0 -- 2026-10-20 -- The workspace readers (listSkills, listSkillLibraryPlain,
@@ -90,7 +92,6 @@
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry core (node + user scopes, SkillRef resolver).
  */
 import type { AimeatConfig } from '../config.js';
-import { recordAccountEvent } from './account-events.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
@@ -102,6 +103,7 @@ import { CAS_ATTEMPTS } from './record-cas.js';
 import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenance.js';
 import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
 import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
+import { getAgentSkillLinks } from './skill-agent-link-records.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -687,108 +689,5 @@ async function assertSkillVisibility(
   }
 }
 
-// ── Agent attachment (links are refs, never copies) ──
-
-export interface AgentSkillLink {
-  ref: string;
-  name: string;
-  description: string;
-  linkedAt: string;
-  linkedBy: string;
-}
-
-const agentSkillsKey = (agentName: string): string => `agents.${agentName}.skills`;
-
-export async function getAgentSkillLinks(
-  storage: Storage, config: AimeatConfig, ownerName: string, agentName: string,
-): Promise<AgentSkillLink[]> {
-  const ownerGhii = `${ownerName}@${config.nodeId}`;
-  const record = await storage.getMemory(ownerGhii, agentSkillsKey(agentName));
-  return Array.isArray(record?.value) ? record.value as AgentSkillLink[] : [];
-}
-
-/**
- * Link a skill to an agent: validates the ref resolves for this owner, then appends to the
- * owner-GHII-owned `agents.{name}.skills` record (idempotent per ref).
- */
-export async function linkSkillToAgent(
-  storage: Storage, config: AimeatConfig,
-  ownerName: string, agentName: string, refStr: string, linkedBy: string,
-  accessor?: SkillAccessor,
-): Promise<AgentSkillLink[]> {
-  const resolved = await resolveSkillRef(storage, config, refStr, accessor ?? { ownerName }, { manifestOnly: true });
-  const links = await getAgentSkillLinks(storage, config, ownerName, agentName);
-  if (!links.some(l => l.ref === resolved.ref)) {
-    links.push({
-      ref: resolved.ref,
-      name: resolved.name,
-      description: resolved.description,
-      linkedAt: new Date().toISOString(),
-      linkedBy,
-    });
-    await writeAgentSkillLinks(storage, config, ownerName, agentName, links);
-    // Inside the `if`, so re-linking a skill an agent already has says nothing. The event is the
-    // agent gaining a capability it did not have, not the request having been made.
-    void recordAccountEvent(storage, {
-      ownerGhii: `${ownerName}@${config.nodeId}`,
-      kind: 'skill_installed',
-      actorGaii: linkedBy,
-      subject: resolved.ref,
-      link: '/v1/profile?tab=skills',
-      data: { name: resolved.name || resolved.ref, agent: agentName },
-    }, config);
-  }
-  return links;
-}
-
-export async function unlinkSkillFromAgent(
-  storage: Storage, config: AimeatConfig, ownerName: string, agentName: string, refStr: string,
-): Promise<AgentSkillLink[]> {
-  const links = await getAgentSkillLinks(storage, config, ownerName, agentName);
-  const next = links.filter(l => l.ref !== refStr);
-  if (next.length !== links.length) {
-    await writeAgentSkillLinks(storage, config, ownerName, agentName, next);
-  }
-  return next;
-}
-
-async function writeAgentSkillLinks(
-  storage: Storage, config: AimeatConfig, ownerName: string, agentName: string, links: AgentSkillLink[],
-): Promise<void> {
-  const ownerGhii = `${ownerName}@${config.nodeId}`;
-  const key = agentSkillsKey(agentName);
-  const existing = await storage.getMemory(ownerGhii, key);
-  const now = new Date().toISOString();
-  await storage.setMemory({
-    key,
-    ownerGaii: ownerGhii,
-    value: links,
-    visibility: existing?.visibility ?? 'owner',
-    tags: existing?.tags ?? ['skill-links'],
-    ttlHours: null,
-    version: (existing?.version ?? 0) + 1,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  });
-}
-
-/**
- * Resolve everything linked to an agent — the read crewaimeat's run_crew consumes. Unresolvable
- * links (deleted skill, revoked visibility) are reported, never silently dropped.
- */
-export async function resolveAgentSkills(
-  storage: Storage, config: AimeatConfig, ownerName: string, agentName: string,
-  opts: { manifestOnly?: boolean; accessor?: SkillAccessor } = {},
-): Promise<{ skills: ResolvedSkill[]; unresolved: Array<{ ref: string; error: string }> }> {
-  const links = await getAgentSkillLinks(storage, config, ownerName, agentName);
-  const skills: ResolvedSkill[] = [];
-  const unresolved: Array<{ ref: string; error: string }> = [];
-  for (const link of links) {
-    try {
-      skills.push(await resolveSkillRef(storage, config, link.ref, opts.accessor ?? { ownerName }, opts));
-    } catch (err) {
-      unresolved.push({ ref: link.ref, error: (err as Error).message });
-    }
-  }
-  return { skills, unresolved };
-}
+// Agent attachment (getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills)
+// lives in skill-agent-links.ts since 2026-10-26 (max-file-lines).

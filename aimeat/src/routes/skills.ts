@@ -77,9 +77,9 @@ import { readerFor } from '../services/classification/reader.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import {
   publishSkill, deleteSkill, listSkills, listSkillLibrary, resolveSkillRef,
-  getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills,
   listSkillsByBinding, setSkillVisibility, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
+import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent, resolveAgentSkills } from '../services/skill-agent-links.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { requireScopeUnlessSelf } from '../auth/self-or-scope.js';
 import { callerOf } from '../middleware/caller.js';
