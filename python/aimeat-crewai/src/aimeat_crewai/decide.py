@@ -50,7 +50,7 @@ from .credentials import (
     expired_token_message,
     stored_agent_token,
 )
-from .paths import aimeat_home, connector_node_url
+from .paths import aimeat_home, connector_config_path, connector_node_url, home_is_explicit
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +234,21 @@ class _Node:
         return requests
 
 
+#: config.yaml files already reported as not used, so a crew that calls on every step logs each once.
+_IGNORED_CONFIGS: set[str] = set()
+
+
+def _report_ignored_config(path: Path) -> None:
+    if str(path) in _IGNORED_CONFIGS:
+        return
+    _IGNORED_CONFIGS.add(str(path))
+    logger.warning(
+        "The node_url in %s is not used: that file is in the current folder and the agent token did "
+        "not come from it. Set AIMEAT_NODE_URL, or set AIMEAT_HOME to use that folder's config.",
+        path,
+    )
+
+
 def _node(
     *,
     agent_name: str | None = None,
@@ -253,6 +268,11 @@ def _node(
     The daemon is used only when the caller passed neither ``node_url`` nor ``agent_token``.
     ``prefer_daemon`` puts it first, ahead of a stored token: ``node_llm()`` sets it, because the
     daemon's credential is always current and a v1 token in the home may not be.
+
+    The address is the argument, then ``AIMEAT_NODE_URL``, then ``node_url:`` in the connector home's
+    ``config.yaml``. That file is read for a token from the argument or the environment only when
+    ``AIMEAT_HOME`` is set; a token stored in the same home always pairs with it. Otherwise the file
+    is ignored with one logged line naming it.
     """
     explicit = bool(node_url or agent_token)
     daemon = None if explicit else daemon_route(agent_name)
@@ -262,17 +282,39 @@ def _node(
     )
     if prefer_daemon and via_daemon is not None:
         return via_daemon
-    url = (node_url or os.environ.get("AIMEAT_NODE_URL") or connector_node_url() or "").rstrip("/")
     token = agent_token
     expired: list[ExpiredToken] = []
+    token_from_home = False
     if not token and agent_name:
         token, expired = stored_agent_token(agent_name)
+        token_from_home = bool(token)
     token = token or os.environ.get("AIMEAT_AGENT_TOKEN")
+    url = node_url or os.environ.get("AIMEAT_NODE_URL") or ""
+    ignored_config: Path | None = None
+    if not url:
+        # The home's config.yaml names the node only for a token of the same source: a home set with
+        # AIMEAT_HOME, or a token read from that home. Without AIMEAT_HOME the home is the current
+        # folder, which may be one somebody else wrote, so a token from the argument or the
+        # environment is not sent to the address it names (secaudit2026oct22). With no token at all
+        # nothing is sent, and reading the address keeps the "no agent token" message.
+        home_url = connector_node_url()
+        if home_url and token and not token_from_home and not home_is_explicit():
+            ignored_config = connector_config_path()
+            _report_ignored_config(ignored_config)
+        else:
+            url = home_url or ""
+    url = url.rstrip("/")
     if url and token:
         return _Node(url=url, token=token, session=session)
     if via_daemon is not None:
         return via_daemon
     if not url:
+        if ignored_config is not None:
+            raise DecideError(
+                f"node_url is required: the node_url in {ignored_config} was not used, because that file is in "
+                "the current folder and the agent token did not come from it. Pass node_url=, set "
+                "AIMEAT_NODE_URL, or set AIMEAT_HOME to the folder that holds your connector home."
+            )
         raise DecideError("node_url is required (pass it, set AIMEAT_NODE_URL, or name it in the connector home's config.yaml).")
     if expired:
         raise DecideError(expired_token_message(agent_name or "", expired))
