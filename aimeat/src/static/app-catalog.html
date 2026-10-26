@@ -11346,16 +11346,15 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
   }
   function skillGetMine(name) {
     var base4 = skillApiBase();
-    return fetch(base4 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    return fetch(base4 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user&body_only=true", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skill || null;
     });
   }
-  function skillPublish(skillMd, files) {
+  function skillPublish(skillMd) {
     var base4 = skillApiBase();
-    var body = { skill_md: skillMd };
-    if (files && Object.keys(files).length) body.files = files;
+    var body = { skill_md: skillMd, keep_files: true };
     return fetch(base4 + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
       return r.json().then(function(j) {
         if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
@@ -11382,9 +11381,7 @@ dialog.dlg.dlg--xl { --dlg-width: 1080px; }
           fm = fm.replace(/^metadata:\s*\r?\n?/m, "");
         }
       }
-      var files = Object.assign({}, skill.fileContents);
-      delete files["SKILL.md"];
-      return skillPublish(m[1] + fm + m[3] + m[4], files);
+      return skillPublish(m[1] + fm + m[3] + m[4]);
     });
   }
   function detailAboutEdit() {

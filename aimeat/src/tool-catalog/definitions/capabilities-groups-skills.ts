@@ -8,6 +8,9 @@
  *   2026-10-25 — aimeat_share_list declares memory:read, the word its REST twins ask (secaudit2026oct22, aimeat_share_list:missing-memory-read).
  *   2026-10-20 — aimeat_knowledge_list, aimeat_knowledge_get and aimeat_knowledge_links declare memory:read, as aimeat_memory_read does (secaudit 2026-10, v56).
  *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, lowering only (plan doc-mvdipuyqraas, L2.3).
+ *   2026-10-26 — Agent Skills standard: aimeat_skill_publish takes any file of the skill folder,
+ *     a binary file as { content, encoding: "base64" }, and keep_files, and says a new skill must
+ *     follow the standard (NOT_STANDARD); aimeat_skill_get takes body_only and path.
  *   2026-10-18 — aimeat_skill_publish and aimeat_skill_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_skill_publish and aimeat_skill_update take visibility `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.9).
  *   2026-10-17 — aimeat_skill_publish's description: a SKILL.md description with a colon is folded or quoted, or BAD_YAML (pitfall-list round).
@@ -659,7 +662,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_publish',
-        description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages. When the node asks the owner before making something public, a user skill published as public keeps the level it had (owner when new) and the answer carries publish_request: tell the owner what waits and give them its approve_url.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Publish or update a skill in the skills registry — a SKILL.md pack in the Agent Skills format (agentskills.io; YAML frontmatter with name + description, markdown body = the expertise; write a description that contains `: ` as a folded block (`description: >-`) or quote it, because unquoted YAML reads it as a nested map and the publish is refused with BAD_YAML) plus any other files of the skill folder (scripts/, references/, assets/, a LICENSE.txt …; a path stays inside the folder). A NEW skill must follow the standard\'s hard rules: no two hyphens in a row in the name and compatibility at most 500 characters, or it is refused with NOT_STANDARD; a skill already in the registry publishes, and every answer lists what breaks the standard (those two, a top-level field it does not define, a metadata value that is not a string) in skill.standardIssues. Pass skill_md inline (files as text, or { content, encoding: "base64" } for an image or other binary file; keep_files=true keeps the files the skill already holds that you do not send); omit skill_md to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages. When the node asks the owner before making something public, a user skill published as public keeps the level it had (owner when new) and the answer carries publish_request: tell the owner what waits and give them its approve_url.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Publish Skill', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -667,7 +670,8 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             skill_md: { type: 'string', description: 'SKILL.md content (frontmatter + body). Omit for presigned ZIP upload mode.' },
-            files: { type: 'object', description: 'Additional files as relative-path -> content (scripts/, references/, assets/).', zod: z.record(z.string(), z.string()) },
+            files: { type: 'object', description: 'The skill\'s other files as relative path -> content: the text of a text file, or { "content": "<base64>", "encoding": "base64" } for an image or other binary file. Any path inside the skill folder (scripts/, references/, assets/, LICENSE.txt …).', zod: z.record(z.string(), z.union([z.string(), z.object({ content: z.string(), encoding: z.literal('base64') })])) },
+            keep_files: { type: 'boolean', description: 'Keep every file the skill already holds that `files` does not name (default false: a republish holds exactly SKILL.md plus `files`). Use it to change SKILL.md alone.' },
             scope: { type: 'string', enum: ['user', 'node', 'workspace'], description: 'Registry scope (default user).' },
             visibility: { type: 'string', description: 'Registry visibility (node/user): owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of). Defaults: user->owner, node->members. public = federated.', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
             organism_id: { type: 'string', description: 'Workspace scope: the organism id.' },
@@ -695,7 +699,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_skill_get',
-        description: 'Resolve one skill from the registry: manifest (name, description, version, file index) plus the file bodies (SKILL.md and any scripts/, references/, assets/). Address it by full ref (node:{name}, user:{owner}/{name}, ws:{org}/{ws}/{name}, optionally version-pinned with @{semver} — the registry retains the newest 10 snapshots) or by bare name (your own registry is searched first, then the node library). Set manifest_only=true to skip bodies. Access follows the skill\'s scope + visibility.',
+        description: 'Resolve one skill from the registry: manifest (name, description, version, file index) plus the file bodies. Load in steps, as the Agent Skills standard does: body_only=true returns SKILL.md alone (the instructions), then path="references/x.md" returns the one file the instructions point at (FILE_NOT_FOUND when the skill has no such file); without either, every file comes back at once, and manifest_only=true returns no file at all. A file whose `files` entry says encoding "base64" comes back as base64 (an image, a font): decode it before writing it to disk. Address the skill by full ref (node:{name}, user:{owner}/{name}, ws:{org}/{ws}/{name}, optionally version-pinned with @{semver} — the registry retains the newest 10 snapshots) or by bare name (your own registry is searched first, then the node library). Access follows the skill\'s scope + visibility.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Resolve Skill', readOnlyHint: true },
@@ -704,6 +708,8 @@ export const capabilitiesGroupsSkillsTools = [
             ref: { type: 'string', description: 'Full skill ref: node:{name}, user:{owner}/{name}, or ws:{org}/{ws}/{name}.' },
             name: { type: 'string', description: 'Bare skill name (own registry first, then node library). Ignored when ref is given.' },
             manifest_only: { type: 'boolean', description: 'Return only the manifest, no file bodies.' },
+            body_only: { type: 'boolean', description: 'Return the manifest and SKILL.md alone, without the other files.' },
+            path: { type: 'string', description: 'Return the manifest and this one file (a path from the manifest\'s files, such as references/forms.md).' },
         },
     },
     {

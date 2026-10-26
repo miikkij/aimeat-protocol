@@ -9,6 +9,9 @@
  * @structure SKILL_ZIP_LIMITS · handleSkillUpload(res, config, storage, sub, meta, data)
  * @usage await handleSkillUpload(res, config, storage, verified.sub, verified.meta, data);
  * @version-history
+ *   v1.5.0 — 2026-10-26 — Agent Skills standard: the ZIP may hold any file whose path stays inside the
+ *     skill folder (LICENSE.txt, forms.md, templates/ …), a binary file is stored as its bytes
+ *     (skill-files.ts), and the answer's skill names the standard's rules SKILL.md breaks.
  *   v1.4.0 — 2026-10-18 — On a node that shows its content to signed-in accounts only, a user skill
  *     asked as public is stored at 'members' with the warning PUBLIC_IS_SIGNED_IN_HERE (plan V1.6).
  *   v1.3.0 — 2026-10-18 — A user skill made public asks the publish gate with the uploader's grant:
@@ -38,7 +41,8 @@ import { skillPublishAsk, fileSkillAsk, closedSkillLevel } from '../services/ski
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 
-/** Skill-directory ZIP layout: SKILL.md (+ scripts/references/assets), optionally inside ONE wrapping dir. */
+/** Skill-directory ZIP layout: SKILL.md and any other file of the skill folder whose path stays inside it
+ *  (isAllowedSkillPath), optionally inside ONE wrapping dir. A file that is not text is kept as its bytes. */
 const SKILL_ZIP_LIMITS = {
     maxFiles: 200,
     maxFileBytes: 5 * 1024 * 1024,     // 5 MB per entry
@@ -71,6 +75,12 @@ export async function handleSkillUpload(
             return;
         }
         throw err;
+    }
+
+    // The Finder's own entries (__MACOSX/ resource forks, .DS_Store) are not files of the skill, and
+    // an archive made on a Mac carries them; with every path allowed they would be stored as files.
+    for (const name of [...entries.keys()]) {
+        if (name.startsWith('__MACOSX/') || name === '.DS_Store' || name.endsWith('/.DS_Store')) entries.delete(name);
     }
 
     // Strip a single wrapping directory when every entry shares it (skill-name/SKILL.md ...).

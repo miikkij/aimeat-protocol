@@ -40,6 +40,8 @@
  *   cd aimeat && pnpm gate --base=HEAD~3   # measure against another base
  *   cd aimeat && pnpm gate --plan          # print the plan and run nothing
  * @version-history
+ *   2026-10-26 -- The Agent Skills validator (pnpm check:skills-standard, skills-ref through uv) runs when
+ *     a built-in skill, the SKILL.md parser or the check changed (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  *   2026-10-21 -- The purpose tier runs wherever the guard tier runs (pnpm test:e2e:purpose:*), so a fix
  *     that removes a designed use turns the gate red (docs/pitfalls.md §126).
  *   2026-10-18 -- The Python parity tests run when aimeat-crewai, the offer or signal schemas or the
@@ -116,6 +118,12 @@ const POSTGRES_TRIGGER = /^aimeat\/(?:src\/(?:storage|auth|routes|mcp|tool-catal
  * package's CI workflow paths for these files (Jouni, 2026-10-18: the parity pytest runs in pnpm gate).
  */
 const PYTHON_PARITY = /^(?:python\/aimeat-crewai\/|aimeat\/src\/models\/(?:offer-schemas|workflow-signals|odps-schemas)\.ts$|aimeat\/src\/commerce\/money\.ts$|aimeat\/security\/python-shape-parity\.json$|aimeat\/scripts\/(?:check-python-shapes|python-parity-test|inventory\/python-shapes)\.ts$)/;
+/**
+ * Paths that change what a built-in skill says, or how the reference validator is run on them: the
+ * built-in skills themselves, the SKILL.md parser and the check (scripts/check-skills-standard.ts runs
+ * skills-ref, the Agent Skills specification's validator, through uv).
+ */
+const SKILLS_STANDARD = /^aimeat\/(?:src\/data\/builtin-skills[^/]*\.ts$|src\/services\/skill-md\.ts$|scripts\/(?:check-skills-standard\.ts|skills-standard-validate\.py)$)/;
 /** Paths a unit test can reach at all. The whole test tree: the runner has unit tests of its own (QA audit P2-06). */
 const UNIT_REACH = /^aimeat\/(src\/|test\/|public\/|scripts\/|package\.json|vitest\.config|tsconfig|eslint\.config|locales\/)/;
 
@@ -194,6 +202,13 @@ function plan(files: string[], mergeBase: string): Step[] {
         steps.push({ name: 'Python parity tests (uv, Python 3.12)', cmd: ['pnpm', '-s', 'test:python-parity'], why: FULL ? '--full' : pythonParity.slice(0, 3).join(', ') + (pythonParity.length > 3 ? ', …' : '') });
     }
 
+    // Every built-in skill against skills-ref, the Agent Skills specification's own validator, through
+    // uv; the TypeScript half of the same rules is test/unit/skill-standard.test.ts, which CI runs.
+    const skillsStandard = files.filter(f => SKILLS_STANDARD.test(f));
+    if (FULL || skillsStandard.length > 0) {
+        steps.push({ name: 'Agent Skills validator (skills-ref, uv)', cmd: ['pnpm', '-s', 'check:skills-standard'], why: FULL ? '--full' : skillsStandard.slice(0, 3).join(', ') + (skillsStandard.length > 3 ? ', …' : '') });
+    }
+
     if (ownSuites.length > 0) {
         // Past a few dozen suites the names go in a file: one `--test=` each made a command line of
         // about 13000 characters for 404 suites, and Windows refused it ("The command line is too
@@ -266,6 +281,7 @@ async function main(): Promise<void> {
     const skipped: string[] = [];
     if (!FULL && !files.some(f => UNIT_REACH.test(f))) skipped.push('unit tests (nothing a test can reach changed)');
     if (!FULL && !files.some(f => PYTHON_PARITY.test(f))) skipped.push('Python parity tests (no aimeat-crewai, offer schema or shape-allowlist change)');
+    if (!FULL && !files.some(f => SKILLS_STANDARD.test(f))) skipped.push('Agent Skills validator (no built-in skill, SKILL.md parser or check change)');
     if (!FULL && !files.some(f => GUARDED.test(f))) skipped.push('guard and purpose tiers (no server source, dependency or E2E machinery changed)');
     if (postgresWhy(files) === null) skipped.push('PostgreSQL legs (no storage, identity, door or runner change; --postgres forces them)');
     for (const s of skipped) console.log(`  · skipped: ${s}`);

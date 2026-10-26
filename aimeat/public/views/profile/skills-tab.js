@@ -12,6 +12,8 @@
  * @structure SkillsTab() — state (library, apps, orgs, details, filters, editor, picker) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'skills'
  * @version-history
+ *   v2.1.2 — 2026-10-26 — Publishing from the editor keeps the skill's other files (keepFiles); it had
+ *     sent SKILL.md alone and the republish removed references/, assets/ and the rest.
  *   v2.1.1 — 2026-10-19 — The attach picker holds [name, shown name] pairs, in alphabetical order of the shown name.
  *   v2.1.0 — 2026-10-16 — The menu find opens one of your skills here (useOpenItem, js/open-item.js).
  *   v2.0.0 — 2026-09-03 — Poster face (design canvas "AIMEAT Taidot-sivu", direction A with the
@@ -180,7 +182,8 @@ export default function SkillsTab({ session, showToast }) {
   const publish = async () => {
     setEditor({ publishing: true });
     try {
-      const skill = await skillsService.publishSkill({ skillMd: editor.md, visibility: editor.visibility });
+      // keepFiles: the editor changes SKILL.md; the skill's other files stay as they are.
+      const skill = await skillsService.publishSkill({ skillMd: editor.md, visibility: editor.visibility, keepFiles: true });
       showToast?.(x('publishedToast', { name: skill?.name ?? '' }));
       setEditorState(emptyEditor());
       setDetails((m) => { const n = { ...m }; if (skill?.ref) delete n[skill.ref]; return n; });

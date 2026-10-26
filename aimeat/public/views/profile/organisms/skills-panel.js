@@ -12,6 +12,8 @@
  *   import { SkillsPanel } from '/views/profile/organisms/skills-panel.js';
  *   html`<${SkillsPanel} orgId=${orgId} wsId=${wsId} showToast=${showToast} />`
  * @version-history
+ *   v1.9.1 -- 2026-10-26 -- Publishing from the editor keeps the skill's other files (keepFiles); it had
+ *     sent SKILL.md alone and the republish removed references/, assets/ and the rest.
  *   v1.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the panel is the Section (its title, and New skill as its door), the editor the TextArea with FormActions and the Note, the skills the List (the version a tag, the description under the name, the ways at the end; View opens the row's panel with the ref, the front matter and the body in the Box's copy tone). The page writes no class.
  *   v1.8.0 -- 2026-09-26 -- A skill's front matter is the Code block (css/components/code-block.css), a unification: Jouni's decision "Code block".
  *   v1.7.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -90,8 +92,9 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
   const handlePublish = async () => {
     setPublishing(true);
     try {
+      // keepFiles: the editor changes SKILL.md; the skill's other files stay as they are.
       const skill = await skillsService.publishSkill({
-        skillMd: editorMd, scope: 'workspace', organism: orgId, ws: wsId,
+        skillMd: editorMd, scope: 'workspace', organism: orgId, ws: wsId, keepFiles: true,
       });
       showToast((t('skills.publishOk') || 'Skill {name} published').replace('{name}', skill?.name ?? ''));
       setEditorOpen(false);

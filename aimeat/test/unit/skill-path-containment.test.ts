@@ -8,6 +8,8 @@
  *   folders a real skill uses keep working.
  * @usage pnpm exec vitest run test/unit/skill-path-containment.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-26 — Any file of the folder is allowed (Agent Skills standard); the cases a path
+ *     on Windows, a device name, a .git folder and a second SKILL.md add are refused.
  *   v1.0.0 — 2026-10-22 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
@@ -22,9 +24,27 @@ describe('isAllowedSkillPath', () => {
             expect(isAllowedSkillPath(p), p).toBe(true);
         }
     });
+    it('keeps any other file of the folder, as the Agent Skills standard allows (2026-10-26)', () => {
+        for (const p of ['other/x', 'LICENSE.txt', 'forms.md', 'reference.md', 'templates/letter.docx', '.gitignore', 'references/SKILL.md', 'a/b/c/d.json']) {
+            expect(isAllowedSkillPath(p), p).toBe(true);
+        }
+    });
     it('refuses a path that leaves its folder or names nothing', () => {
         for (const p of ['scripts/../../.bashrc', 'scripts/..', 'references/a/../../../x',
-            'assets/a\\..\\..\\x', 'scripts/a\\b', '/scripts/x', 'scripts/', 'other/x']) {
+            'assets/a\\..\\..\\x', 'scripts/a\\b', '/scripts/x', 'scripts/', '..', '.', '', './', 'a/.']) {
+            expect(isAllowedSkillPath(p), p).toBe(false);
+        }
+    });
+    it('refuses a path that does not stay one file on every platform (2026-10-26)', () => {
+        for (const p of ['C:/x', 'assets/a:stream', 'notes/a<b', 'a|b', 'a?b', 'a*b', 'a"b', 'a\u0001b', 'a\nb',
+            'nul', 'NUL.txt', 'assets/con', 'lpt1.md', 'com9.log', 'dir./x', 'x ', 'a/b.', '.git/hooks/pre-commit', 'refs/.GIT/x',
+            'x'.repeat(201)]) {
+            expect(isAllowedSkillPath(p), JSON.stringify(p)).toBe(false);
+        }
+        expect(isAllowedSkillPath('x'.repeat(200))).toBe(true);
+    });
+    it('refuses a second spelling of SKILL.md, which would replace the validated one on install', () => {
+        for (const p of ['./SKILL.md', 'skill.md', 'Skill.MD', './/SKILL.md']) {
             expect(isAllowedSkillPath(p), p).toBe(false);
         }
     });

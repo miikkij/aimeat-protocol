@@ -15,6 +15,8 @@
  *   - frontmatterOf / bumpPatch: reading a name and a version out of the text being edited
  * @usage registered in views/admin.js NAV_GROUPS
  * @version-history
+ *   v3.0.1 — 2026-10-26 — Publishing from the editor keeps the skill's other files (keepFiles); it had
+ *     sent SKILL.md alone and the republish removed references/, assets/ and the rest.
  *   v3.0.0 — 2026-09-27 — Library components only (Jouni, 2026-09-22: "all admin pages onto the
  *     shared set"): the strip FigureStrip, the section Section, the headline a Label, a Figure and a
  *     hint in Columns, the search SearchLine, the five chips a filter Tabs row, the skills a List
@@ -223,8 +225,9 @@ export default function SkillsAdminTab() {
   const publish = async () => {
     setBusy(true);
     try {
+      // keepFiles: the editor changes SKILL.md; the skill's other files stay as they are.
       const skill = await skillsService.publishSkill({
-        skillMd: editing.md, scope: 'node', visibility: editing.visibility,
+        skillMd: editing.md, scope: 'node', visibility: editing.visibility, keepFiles: true,
       });
       showOk(S('publishOk', { name: skill?.name ?? '' }));
       setEditing(null);

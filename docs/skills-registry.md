@@ -1,8 +1,9 @@
 # Skills Registry — SKILL.md packs for agents, crews, workspaces and apps
 
-The skills registry makes **expertise a first-class, portable unit**: a `SKILL.md` pack
-(the same format as Claude skills and CrewAI skills) that lives in a scoped registry on the
-node and is loaded by agents **by reference** — never copied into prompts by hand.
+The skills registry makes **expertise a first-class, portable unit**: a `SKILL.md` pack in the
+[Agent Skills format](https://agentskills.io/specification) (the format Claude Code, Claude.ai,
+Cursor, Copilot, CrewAI and the other clients read) that lives in a scoped registry on the node and
+is loaded by agents **by reference** — never copied into prompts by hand.
 
 Core principle: **skill (content) ≠ registry (scope) ≠ attachment (consumer).**
 A skill doesn't know where it lives; a registry is just a memory-key namespace with the
@@ -14,8 +15,20 @@ through one choke point (`resolveSkillRef()` in `aimeat/src/services/skills.ts`)
 
 ## The SKILL.md contract
 
-A skill is a directory `skill-name/` with a required `SKILL.md` plus optional
-`scripts/`, `references/`, `assets/` — no other paths are accepted (422).
+A skill is a directory `skill-name/` with a required `SKILL.md` plus any other files beside it:
+`scripts/`, `references/` and `assets/` by convention, and a `LICENSE.txt`, a `forms.md` at the root
+or a `templates/` folder just as well. A file path must stay inside the folder on every platform
+(`isAllowedSkillPath` in `aimeat/src/services/skill-md.ts`): no `..` segment, no leading `/`, no
+backslash, no `:` or other character Windows reserves, no control character, no device name such as
+`NUL`, no segment ending in a dot or a space, no `.git` folder, at most 200 characters, and no second
+spelling of `SKILL.md`. A path that breaks one is refused with 422 `BAD_FILE_PATH`. A ZIP upload drops
+the Finder's `__MACOSX/` and `.DS_Store` entries.
+
+`SKILL.md` is UTF-8 text. Any other file may be text or bytes: a file that is not UTF-8 text (an
+image, a font, a PDF) is stored as base64 and its entry in the manifest's `files` says
+`encoding: "base64"`. Readers decode it: the ZIP download and `aimeat skill install` write the bytes,
+and an AI reading `fileContents` is told so in the tool description. Over JSON (POST `/v1/skills`,
+`aimeat_skill_publish`) a binary file is sent as `{ "content": "<base64>", "encoding": "base64" }`.
 
 ```markdown
 ---
@@ -35,7 +48,24 @@ Keep it focused (<~50k chars; hard cap 100k). Big material goes into references/
 
 - `description` is the **discovery index key** — write "what it does + when to use it".
 - Republishing the same name **patch-bumps** the registry version (`1.0.0 → 1.0.1 → …`).
+  A republish holds exactly the files it sends; `keep_files: true` keeps the files the skill already
+  holds that it does not send, which is how the Skills pages and the app binding change SKILL.md alone.
 - `allowed-tools` is accepted as inert metadata only — it never provisions tools.
+
+**The standard's stricter rules.** A skill NEW to its registry must also follow the two rules of
+the Agent Skills specification that its reference validator (`skills-ref`) refuses, or it is refused
+with 422 `NOT_STANDARD`: no two hyphens in a row in `name`, and `compatibility` at most 500
+characters. A skill already in the registry was published under the older rules and republishes as
+before. Either way the answer's `skill.standardIssues` lists everything that breaks the standard,
+including what only warns: a top-level field the standard does not define (Claude Code adds some;
+move it under `metadata` to keep the skill portable), an empty `compatibility`, an `allowed-tools`
+that is not a string, and a `metadata` value that is not a string. The last one warns rather than
+refuses because `skills-ref` reads every YAML value as a string and accepts `version: 1.0`, a list or a
+map, so AIMEAT refuses no skill the reference validator accepts, with one exception: a name with a
+letter outside a–z (`café-notes`), which `skills-ref` accepts and the specification's own text does
+not, is refused with `BAD_NAME`, because a name is part of every ref and memory key. A package install publishes its
+skills with warnings only, so a package composed before 2026-10-26 still installs. The built-in
+skills are checked against the reference validator in the gate (below).
 
 ## Scopes and refs
 
@@ -201,9 +231,22 @@ auto-trigger via Claude's native skill discovery.
 
 ## Where AI chats see skills (MCP)
 
+Loading follows the Agent Skills standard's three levels of progressive disclosure, so a large skill
+never fills the reader's context at once:
+
+| Level | What the reader gets | MCP | REST |
+|---|---|---|---|
+| 1. Metadata | name, description, version, file index | `aimeat_skill_list`, or `aimeat_skill_get { manifest_only: true }` | `GET /v1/skills`, `GET /v1/skills/{name}?manifest_only=true` |
+| 2. Instructions | the above plus SKILL.md | `aimeat_skill_get { body_only: true }` | `GET /v1/skills/{name}?body_only=true` |
+| 3. Resources | the above plus one file | `aimeat_skill_get { path: "references/forms.md" }` | `GET /v1/skills/{name}?path=references/forms.md` |
+
+Without any of the three, `aimeat_skill_get` returns every file at once, as it always did. A `path`
+the skill does not hold is 404 / `FILE_NOT_FOUND`, and the lookup stops there instead of trying the
+node library's skill of the same name.
+
 - `aimeat_skill_list` — `library` (node + user + workspace memberships), `linked`, `mine`,
   `workspace`, or `binding=` views; manifests only (progressive disclosure).
-- `aimeat_skill_get {ref}` — the body; supports `@semver` pins.
+- `aimeat_skill_get {ref}` — the body; supports `@semver` pins, on the connector too.
 - **`aimeat_workspace_overview` includes a "Skills (loadable expertise)" table** with
   ready-to-copy `ws:` refs — an AI connected to a workspace sees available expertise in the
   same single map read it already does, no extra calls.
@@ -212,12 +255,24 @@ auto-trigger via Claude's native skill discovery.
   the app builders, the game skills, and the conversation skills that steer the node's own chat
   (`aimeat-first-conversation`, `aimeat-welcome-pages`, `aimeat-paying-for-the-ai`, …). An
   unedited copy follows the repo; a copy edited on the node is kept. List them with
-  `aimeat_skill_list`.
+  `aimeat_skill_list`. `pnpm check:skills-standard` writes each one out as a skill folder and runs
+  the specification's reference validator, `skills-ref` (pinned, through uv), on all of them; `pnpm
+  gate` runs it when a built-in skill or the check changed, so a built-in skill that breaks the
+  standard does not reach main.
+
+## Discovery from outside, and other nodes
+
+`GET /.well-known/agent-skills/index.json` (Agent Skills Discovery RFC v0.2.0) lists every public
+node-scope skill with the URL of its exact SKILL.md and that file's sha256; the other files of such a
+skill are read with `GET /v1/skills/{name}?scope=node&path=…`, which needs no sign-in for a public
+skill. A session from another node reads skills as an anonymous caller does, so it sees public skills
+only. Skills are not copied between nodes: the federated ref form (`skill:{name}#{owner}@{node}`) is
+not built, and a skill reaches another node only inside a package (above) or a workspace export.
 
 ## Security
 
 Skill ZIP uploads go through the hardened `safeUnzip` (traversal/symlink/zip-bomb guards) with
-a strict layout allowlist; publish/link are owner-authed; operator config-writes use
+the path rule of the contract above; publish/link are owner-authed; operator config-writes use
 propose-then-confirm tokens.
 
 **Reading a workspace skill is membership-gated** (`canReadWorkspace`). **Writing one asks the

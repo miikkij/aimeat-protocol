@@ -2467,10 +2467,10 @@
     },
     "src/services/skills.ts": {
       "reads": {
-        "getMemory": 7,
+        "getMemory": 9,
         "listMemory": 8
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Skill bodies and manifests pass the reader (skill-reader.ts) in listing, resolve and pinned reads; publish, delete, visibility, version lists and links are the node's own."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Skill bodies and manifests pass the reader (skill-reader.ts) in listing, resolve and pinned reads; publish, delete, visibility, version lists and links are the node's own. 2026-10-26: publishSkill reads the publisher's own manifest before writing (whether the skill is new to the registry, for the Agent Skills standard's rules) and, with keepFiles, the file records of that same copy to publish them again; a workspace copy is the freshest one its writers made, which the publisher has already passed the workspace read and write rules for. Neither hands content to another caller."
     },
     "src/services/storage-file-publish.ts": {
       "reads": {
