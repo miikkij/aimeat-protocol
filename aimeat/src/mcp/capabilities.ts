@@ -10,6 +10,10 @@
  * @usage Registered by mcp/index.ts per agent session; the shared write lives in
  *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
+ *   2026-10-26 — aimeat_capabilities_get and _invoke answer "not found" for a private capability, an
+ *     unknown visibility word, and a draft, pending_review or rejected one, unless the session is the
+ *     owner's side or the operator's agent; the get asked nothing before (services/capability-reach.ts;
+ *     secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-16 — A catch-all failure carries the caught error (withCaughtError, mcp/tool-fault.ts): an internal exception is logged, reported and answered with a sentence instead of its text (QA audit E5-01, D2-01).
@@ -41,7 +45,8 @@ import {
     createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
 } from '../services/capability-record.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, CapabilityRecord } from '../storage/interface.js';
+import { capabilityHiddenFrom } from '../services/capability-reach.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { resolveOperatorAgentName } from '../services/operator-principal.js';
@@ -81,6 +86,12 @@ export function registerCapabilitiesTools(
         return { gaii, isOperator: (await resolveOperatorAgentName(storage, gaii, scopes)) !== null };
     }
 
+    /** True when this session may not reach `cap` by its id: closed to it, and not the operator's agent. */
+    async function hiddenFromThisSession(cap: CapabilityRecord): Promise<boolean> {
+        if (!capabilityHiddenFrom(cap, getAgentGaii())) return false;
+        return !(await caller()).isOperator;
+    }
+
     mcp.registerTool(
         'aimeat_capabilities_list',
         {
@@ -114,6 +125,11 @@ export function registerCapabilitiesTools(
         async ({ id }) => {
             const cap = await storage.getCapability(id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
+            // The REST twin's rule (services/capability-reach.ts): this tool served any capability by
+            // id, a private one or a draft of another owner included (secaudit2026oct22).
+            if (await hiddenFromThisSession(cap)) {
+                return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
+            }
             return { content: [{ type: 'text' as const, text: JSON.stringify(cap, null, 2) }] };
         },
     );
@@ -131,12 +147,12 @@ export function registerCapabilitiesTools(
 
             const callerGhii = getAgentGaii();
 
-            // A PRIVATE capability may only be invoked by its owner. The read path hides private
-            // capabilities from everyone else, so invoke has to as well, and it answers "not found"
-            // rather than "forbidden" so the id is not confirmed. routes/capabilities.ts:244 has said
-            // this since it was written; this tool invoked anything by id, including another owner's
-            // private manual webhook capability.
-            if (cap.visibility === 'private' && cap.ownerGhii !== callerGhii) {
+            // What the read path hides, invoke hides too, and it answers "not found" rather than
+            // "forbidden" so the id is not confirmed: a private capability, an unknown visibility word
+            // and a capability never published reach the owner's side and the operator only
+            // (services/capability-reach.ts; secaudit2026oct22). This tool once invoked anything by
+            // id, including another owner's private manual webhook capability.
+            if (await hiddenFromThisSession(cap)) {
                 return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
             }
 
