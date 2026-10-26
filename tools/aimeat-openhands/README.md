@@ -71,4 +71,7 @@ State persists in `~/.openhands`, so restarts (`docker compose restart`) keep th
   the agent's `SystemPromptEvent`). Edit the skill → re-run `build-runtime.sh` → restart.
 
 Token lifetime: the agent token is long-lived (node `agentJwtTtlSeconds`, ~90 days). When it
-expires, delete `secrets/aimeat.env` and re-run `scripts/setup.sh`.
+expires, delete `secrets/aimeat.env` and re-run `scripts/setup.sh`. Keep
+`secrets/<agent>@<owner>.key`: the connect script keeps the agent's key there and signs the
+reconnect with it, so your approval page shows the agent coming back and not a new device
+taking it over.

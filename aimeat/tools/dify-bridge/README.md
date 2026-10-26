@@ -85,7 +85,10 @@ pnpm exec node --import tsx tools/dify-bridge/src/connect-onboard.ts
 ```
 It prints a code + URL → **approve it in AIMEAT (Profile → Agents)** → it finishes Hello
 Integration and prints the agent **GAII + token**. (For a long-lived credential, instead
-create a PAT in AIMEAT Profile → Access and skip the token-expiry concern.)
+create a PAT in AIMEAT Profile → Access and skip the token-expiry concern.) The token and the
+agent's key are kept in `.aimeat-dify/` (or `AIMEAT_DIFY_HOME`), readable only by you. When the
+token expires, run the same command again: it signs the request with the key, so the approval
+page shows the agent coming back and not a new device taking it over.
 
 ### Step 2 (one-time): import the tools into Dify
 In Dify: **Tools → Custom → Create Custom Tool** → paste/URL-import
