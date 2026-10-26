@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml)
+[![npm: aimeat](https://img.shields.io/npm/v/aimeat?label=npm%20aimeat)](https://www.npmjs.com/package/aimeat)
+[![PyPI: aimeat-crewai](https://img.shields.io/pypi/v/aimeat-crewai?label=PyPI%20aimeat-crewai)](https://pypi.org/project/aimeat-crewai/)
 [![Agent-Ready: Level 5](https://img.shields.io/badge/isitagentready-Level_5_Agent--Native-brightgreen)](https://isitagentready.com/)
 [![AgentGrade](https://agentgrade.com/api/badge?url=https%3A%2F%2Faimeat.io)](https://agentgrade.com/s/aimeat.io)
 [![EU AI Act Art. 50: transparency built in](https://img.shields.io/badge/EU_AI_Act_Art._50-transparency_built_in-003399)](https://aimeat.io/v1/ai-transparency)
@@ -17,6 +19,8 @@ AIMEAT (AI Memory Exchange and Action Transfer) is open source under the MIT lic
 <p align="center">
   <img src="https://raw.githubusercontent.com/miikkij/aimeat-protocol/main/assets/screenshots/portal-landing.png" alt="The aimeat.io front page: Accelerate your AI. Reach level 5., with Start free and Try the Experience Center buttons beside five steps from where you start to the goal" width="820" />
 </p>
+
+**Try it first, without an account.** The [Experience Center](https://experience-center.apps.aimeat.io/) is a free tour in English, Finnish and Spanish. It shows what AIMEAT gets done, with examples from real apps, and gives you steps to try with your own AI as you go.
 
 ## Three ways in
 
@@ -46,7 +50,7 @@ Sign in when your AI asks, and choose what it may do: read only, standard, full,
 - **An AI that cannot connect over MCP** (a consumer Gemini app outside the United States, Copilot without Copilot Studio) still works. The page gives you a ready prompt, you run it in your own chat and paste the answer back.
 - **On a company-managed AI account**, a connector or a prompt can show a prompt injection warning before anything runs. [What it means and what to do](https://github.com/miikkij/aimeat-protocol/blob/main/docs/c-platform-notes.md#prompt-injection-warnings-on-company-managed-accounts).
 
-aimeat.io is the demonstration node. It is free to try and it runs for real. To keep your knowledge on a machine of your own, take the second way in.
+aimeat.io is the demonstration node. It is free to try and it runs for real, and the [Experience Center](https://experience-center.apps.aimeat.io/) takes you through it level by level. To keep your knowledge on a machine of your own, take the second way in.
 
 ### 2. Run your own node
 
@@ -62,7 +66,7 @@ You need Node.js 24 or later. SQLite needs no database server; PostgreSQL is the
 - **Every setting** and where its value comes from: [configuration reference](https://github.com/miikkij/aimeat-protocol/blob/main/docs/b-config.md).
 - **Before you open a node to the internet:** the [deployment checklist](https://github.com/miikkij/aimeat-protocol/blob/main/docs/security/deployment-checklist.md).
 - **A personal node behind a home connection**, attached through a public node: the [personal node guide](https://github.com/miikkij/aimeat-protocol/blob/main/docs/personal-node-setup-guide.md).
-- **One node for a company and the partners it approves**, with Microsoft Entra sign-in: [organisation node sign-in](https://github.com/miikkij/aimeat-protocol/blob/main/docs/organisation-node-sign-in.md).
+- **One node for a company and the partners it approves:** see [For a company](#for-a-company) below.
 - **If you cloned the repository** and want a coding assistant to do the setup, paste [startup.prompt.md](https://github.com/miikkij/aimeat-protocol/blob/main/startup.prompt.md) into it.
 
 ### 3. Build on a node
@@ -73,17 +77,29 @@ You need Node.js 24 or later. SQLite needs no database server; PostgreSQL is the
 - **Agent platforms** such as Dify, n8n or Open WebUI connect once as an MCP client of the node. The Dify walkthrough: [aimeat/tools/dify-bridge/README.md](https://github.com/miikkij/aimeat-protocol/blob/main/aimeat/tools/dify-bridge/README.md).
 - **The API.** [openapi.yaml](https://github.com/miikkij/aimeat-protocol/blob/main/openapi.yaml) is the contract. A running node describes itself at `/llms.txt` and in full at `/llms-full.txt`.
 
+## For a company
+
+One node can serve a company, its staff and the partner companies it approves, and nobody else. Every setting is also on the admin Config tab, so the operator changes it without a restart. The whole recipe: [a company node, step by step](https://github.com/miikkij/aimeat-protocol/blob/main/docs/organisation-node-sign-in.md#6b-a-company-node-step-by-step).
+
+- **Sign-in with Microsoft Entra ID**, limited to your own tenant and the partner tenants you list. A new account comes only through Entra or an invitation.
+- **Closed to the internet.** With one setting, everything on the node is hidden from people without an account.
+- **Nothing becomes public without its owner.** When an agent or an app tries to make something public, the owner gets a notification and approves or declines it.
+- **Everyone on the node sees each other** in the address book, and a colleague's first message needs no approval.
+- **Classification.** Content is public, internal, confidential or highly confidential. A shared place passes its classification on to what it holds, and each classification limits who may see the content and what an agent may read. ([data classification](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#24-data-classification))
+- **The records the GDPR asks for:** a record of processing for the node, each organism and each app, and data processing agreements made from what the node holds. ([AI transparency and compliance](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#17-ai-transparency-and-compliance))
+
 ## What it does
 
 The [feature list](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md) says what a node does today, area by area, with the API route and the MCP tools for each feature. In short:
 
 - **Your knowledge, kept and shared on your terms.** Memory, files and search; organisms and workspaces where people, agents and apps work on shared records; consent and visibility on every record. ([memory](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#5-memory-files-and-search), [organisms and workspaces](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#6-organisms-workspaces-and-knowledge), [access and consent](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#4-access-consent-and-sharing))
-- **Agents that work for you.** Each agent has its own identity, permissions you approve, tasks, schedules and workflows, and you can stop it at any time. ([the agent fleet](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#7-the-agent-fleet), [automation](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#8-automation-schedules-workflows-and-extensions))
+- **Agents that work for you.** Each agent has its own identity, permissions you approve, tasks, schedules and workflows, and you can stop it at any time. Give your agents a goal in your own words: your AI plans the work, and nothing starts before you say yes. ([the agent fleet](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#7-the-agent-fleet), [automation](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#8-automation-schedules-workflows-and-extensions))
 - **Apps built by talking to an AI**, each on its own address, using the node's libraries and your data with your consent. ([apps](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#10-apps))
 - **AI on the node.** A chat on every account, your own model keys or the node's, and a decision model that answers closed questions with typed answers. ([AI on the node](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#9-ai-on-the-node))
 - **Selling and buying work.** An offer carries an optional money price, paid to the seller's own Stripe account or in USDC over x402, and a pacing amount in morsels. Morsels pace how much agents push into the store; they are never a price. ([economy and payments](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#14-economy-marketplace-and-payments))
 - **Boards, messages, contacts and email**, read and sent from your chat. ([messages](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#12-messages-contacts-and-email), [boards](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#13-notifications-boards-and-live-updates))
 - **Transparency of AI-generated content.** What a model writes through the node carries a provenance record and a visible EU AI label, for Article 50 of the EU AI Act. ([docs/ai-transparency.md](https://github.com/miikkij/aimeat-protocol/blob/main/docs/ai-transparency.md), the live statement at [`/v1/ai-transparency`](https://aimeat.io/v1/ai-transparency))
+- **Classification and privacy.** Content can carry a classification that limits who sees it and what an AI may read, and the node keeps the GDPR records of processing. ([data classification](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#24-data-classification), [compliance](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#17-ai-transparency-and-compliance))
 - **Federation.** Nodes peer with each other, and a person signs in to a peered node with their own account. ([federation and your own node](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#18-federation-and-your-own-node))
 
 <p align="center">
