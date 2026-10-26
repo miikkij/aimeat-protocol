@@ -55,6 +55,9 @@
  *     source as createCapability does; both answer 400 INVALID_INPUT otherwise (secaudit2026oct22).
  *   2026-10-25 — updateCapability applies the publishing policy to a change of visibility to public:
  *     self_only refuses it for a non-operator, moderated sends an active capability to review (secaudit2026oct22).
+ *   2026-10-26 — createCapability and updateCapability store only a visibility word the node knows
+ *     (private, owner, public); any other is 400 INVALID_INPUT with a sentence that lists them. A PUT of
+ *     the stored word unchanged passes (secaudit2026oct22; services/capability-reach.ts).
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -62,6 +65,7 @@ import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { normalizeCapabilityCost } from './toll-morsels-names.js';
 import { extensionRefRefusal } from './capability-extension-ref.js';
+import { capabilityVisibilityRefusal } from './capability-reach.js';
 
 /** The fields a caller may set. Everything absent takes the shape's own default. */
 export interface CapabilityInput {
@@ -240,6 +244,14 @@ export async function createCapability(
 ): Promise<CapabilityResult<CapabilityRecord>> {
     const { storage, config } = deps;
 
+    // The visibility word first: a word the node does not know was stored as given, and the read
+    // and the list then read it two ways (services/capability-reach.ts; secaudit2026oct22). Absent
+    // means the default, private.
+    if (input.visibility !== undefined && input.visibility !== null) {
+        const refusal = capabilityVisibilityRefusal(input.visibility);
+        if (refusal) return refuse(400, 'INVALID_INPUT', refusal);
+    }
+
     // Who may offer work to others is the operator's decision, not a per-surface accident. The
     // operator is exempt: this was the HTTP door's rule and nowhere else, which on a default node
     // ('disabled') meant the operator's own agent could not create what the operator could.
@@ -339,6 +351,15 @@ export async function updateCapability(
     delete updates.id;
     delete updates.ownerGhii;
     delete updates.createdAt;
+
+    // A CHANGED visibility must be a word the node knows, as at create. The stored word sent back
+    // unchanged passes, so a client that PUTs the whole record back keeps working on a record that
+    // carries an older unknown word (named on the operator's Security page,
+    // services/capability-visibility-words.ts).
+    if ('visibility' in updates && updates.visibility !== cap.visibility) {
+        const refusal = capabilityVisibilityRefusal(updates.visibility);
+        if (refusal) return refuse(400, 'INVALID_INPUT', refusal);
+    }
 
     // A CHANGED source is normalised and checked as at create. It was stored as given, so a PUT put
     // an extension ref on a record that create would have refused (secaudit2026oct22). A source

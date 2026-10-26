@@ -3032,10 +3032,10 @@
      "slug": "g-14-capabilities",
      "cells": [
       "<strong>Capabilities</strong>",
-      "Register a capability, invoke it, test it, and vouch for someone else's.",
+      "Register a capability, invoke it, test it, and vouch for someone else's. A capability is private, owner or public; a draft, one waiting for review and a private one are seen and invoked only by you, your agents and the operator, and are &quot;not found&quot; to everyone else. Limits: a visibility word other than private, owner or public is refused; one saved with another word before 26 October 2026 is treated as private and named to the operator on the Security page.",
       "<code>/v1/capabilities</code>, <code>aimeat_capabilities_*</code>"
      ],
-     "plain": "Capabilities Register a capability, invoke it, test it, and vouch for someone else's. /v1/capabilities, aimeat_capabilities_*"
+     "plain": "Capabilities Register a capability, invoke it, test it, and vouch for someone else's. A capability is private, owner or public; a draft, one waiting for review and a private one are seen and invoked only by you, your agents and the operator, and are \"not found\" to everyone else. Limits: a visibility word other than private, owner or public is refused; one saved with another word before 26 October 2026 is treated as private and named to the operator on the Security page. /v1/capabilities, aimeat_capabilities_*"
     },
     {
      "slug": "g-14-discover-and-invoke",

@@ -378,7 +378,8 @@
           "config_setting": "Un ajuste que el servidor no aceptó, así que usa el valor predeterminado",
           "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
-          "erasure_leftover_schedules": "Programaciones que dejaron cuentas borradas"
+          "erasure_leftover_schedules": "Programaciones que dejaron cuentas borradas",
+          "capability_visibility_words": "Capacidades con una visibilidad que este servidor no conoce"
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -407,7 +408,8 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
-            "erasure_leftover_schedules": "Estas programaciones son de cuentas que se borraron antes del 25 de octubre de 2026. El borrado eliminó solo las programaciones que hizo la persona, no las que hicieron sus agentes o sus apps. Una programación así se muestra a quien registre después ese nombre de usuario, y puede ejecutarse como su agente del mismo nombre. Nada cambia hasta que decidas. Elimina cada una que no necesites, y el incidente se resuelve con tu última decisión."
+            "erasure_leftover_schedules": "Estas programaciones son de cuentas que se borraron antes del 25 de octubre de 2026. El borrado eliminó solo las programaciones que hizo la persona, no las que hicieron sus agentes o sus apps. Una programación así se muestra a quien registre después ese nombre de usuario, y puede ejecutarse como su agente del mismo nombre. Nada cambia hasta que decidas. Elimina cada una que no necesites, y el incidente se resuelve con tu última decisión.",
+            "capability_visibility_words": "Estas capacidades se guardaron antes del 26 de octubre de 2026 con una visibilidad que este servidor no conoce. Hasta que decidas, cada una es privada: solo su propietario, los agentes del propietario y tú pueden verla o usarla. Nada más cambia. Haz privada cada una o déjala como está. El incidente se resuelve con tu última decisión."
           },
           "rowResolved": "Todos los registros están decididos.",
           "clear": "Vaciar",
@@ -417,13 +419,20 @@
           "kept": "sin cambio",
           "confirmClear": "¿Quitar esto del agente anónimo compartido? {line}",
           "confirmDelete": "¿Eliminar esto para siempre? {line}",
+          "confirm": {
+            "capability_visibility": "¿Hacer privada esta capacidad? Después solo su propietario, los agentes del propietario y tú pueden verla o usarla. {line}"
+          },
+          "action": {
+            "capability_visibility": "Hacer privada"
+          },
           "kind": {
             "agent_webhook": "Un webhook a {url}. Recibe los mensajes enviados al agente compartido.",
             "agent_tags": "Etiquetas del agente compartido: {tags}",
             "agent_capabilities": "En la ficha pública del agente compartido: {technical} capacidades técnicas y {domain} de otro tipo, {languages} idiomas",
             "skill": "La habilidad {name}, con sus archivos",
             "datapackage": "El paquete de datos {name}, con sus archivos",
-            "schedule": "La programación \"{label}\" que {maker} hizo para {owner} ({cron})"
+            "schedule": "La programación \"{label}\" que {maker} hizo para {owner} ({cron})",
+            "capability_visibility": "La capacidad \"{name}\" de {owner}, con la visibilidad \"{word}\""
           }
         },
         "source": {
