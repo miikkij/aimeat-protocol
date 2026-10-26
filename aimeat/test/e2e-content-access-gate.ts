@@ -20,6 +20,8 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-10-26 — POST /v1/federation/message/reaction joins the open list beside the receipt route:
+ *     a signed peer message, refused without the messaging right or with a bad signature.
  *   2026-10-19 — The open list names the node's own documents, the live stream and the connection
  *     callback (signed-in browser audit; the cases are in e2e-content-access-browser.ts).
  *   v1.1.0 — 2026-10-18 — A stranger's browser gets the shell with the sign-in page at every page
@@ -99,7 +101,7 @@ const OPEN_CODE_ROUTES = new Set<string>([
     'POST /v1/federation/auth/verify', 'POST /v1/federation/book/pull', 'POST /v1/federation/book/rebuild', 'POST /v1/federation/broadcast', 'POST /v1/federation/catalogue-sync',
     'POST /v1/federation/cross-node/work', 'POST /v1/federation/genesis-catalogue-ingest', 'POST /v1/federation/genesis-memory-read', 'POST /v1/federation/genesis-peer',
     'POST /v1/federation/heartbeat', 'POST /v1/federation/key-exchange', 'POST /v1/federation/link-invites', 'POST /v1/federation/memory/list', 'POST /v1/federation/message',
-    'POST /v1/federation/message/receipt', 'POST /v1/federation/network-policy/pull', 'POST /v1/federation/package-claims/{}', 'POST /v1/federation/packages/pull',
+    'POST /v1/federation/message/receipt', 'POST /v1/federation/message/reaction','POST /v1/federation/network-policy/pull', 'POST /v1/federation/package-claims/{}', 'POST /v1/federation/packages/pull',
     'POST /v1/federation/peer/activate', 'POST /v1/federation/peer/introduce', 'POST /v1/federation/peer/request', 'POST /v1/federation/peers', 'POST /v1/federation/peers/{}/promote',
     'POST /v1/federation/ping', 'POST /v1/federation/presence', 'POST /v1/federation/replicate', 'POST /v1/federation/retract', 'POST /v1/federation/route', 'POST /v1/federation/settle',
     'POST /v1/federation/settle/outbound', 'POST /v1/federation/storage/grant', 'POST /v1/federation/templates/sync', 'POST /v1/federation/test', 'POST /v1/federation/trust-advisory',
