@@ -10,9 +10,22 @@
  * @structure
  *   - encryptNodeKey/decryptNodeKey: AES-256-GCM + PBKDF2 key-file protection (P3-8)
  *   - loadPersistedNodeKey/persistNodeKey: read/write the on-disk key file (0o600)
+ *   - replaceKeyFile/createKeyFile: a key file is written whole, never in place
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.5.0 — 2026-10-26 — A key file is written whole or not at all, and only the first of several
+ *     processes of one node creates it. The claim stamp and the first write used writeFileSync in
+ *     place, so a process that read the file during another's write saw a truncated or overlapped
+ *     file and refused to start ("not valid JSON"), and two processes that both found no file each
+ *     wrote their own key. The E2E sweep of 6e56f34c0 lost 1186 SQLite suites to it: four lanes start
+ *     one node id at once and share the default key path. The stamp now writes a temporary file and
+ *     renames it over the key file; the first write links a complete temporary file to the key path,
+ *     which fails when the file exists, and a process that loses that race adopts the key it finds.
+ *     A new file carries the node's claim from its first write, so it is not rewritten to add it.
+ *     On Windows a reader can still see the file missing for an instant while a claim is renamed
+ *     over it (measured in node-key-path.test.ts); that takes two processes stamping a file that has
+ *     no claim yet, which only a key file from before this version can be.
  *   2026-10-25 — The key path and the passphrase are read from the config first (node.key_path,
  *     node.key_passphrase, shown on the admin Config tab), the environment after it.
  *   v1.4.0 — 2026-10-16 — The page frame token (services/page-frame-token.ts) is signed with the node keys too.
@@ -47,7 +60,7 @@
  *     logged at error, because the node is then one restart away from a new identity.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, linkSync, renameSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { pbkdf2Sync, randomBytes as cryptoRandomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -135,12 +148,59 @@ function readKeyFileClaim(keyPath: string): string | null {
   }
 }
 
+/** A temporary file beside the key file, unique to this process and this write. */
+function writeTempKeyFile(keyPath: string, content: string): string {
+  const tmp = `${keyPath}.${process.pid}.${cryptoRandomBytes(6).toString('hex')}.tmp`;
+  writeFileSync(tmp, content, { mode: 0o600, flag: 'wx' });
+  return tmp;
+}
+
+/**
+ * Replace a key file whole. A rename over the file is atomic, so a process reading it at the same
+ * moment reads the old file or the new one, never a truncated one. writeFileSync in place truncates
+ * first and writes after, and a reader in between refused to start over "not valid JSON".
+ */
+function replaceKeyFile(keyPath: string, content: string): void {
+  const tmp = writeTempKeyFile(keyPath, content);
+  try {
+    renameSync(tmp, keyPath);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
+}
+
+/**
+ * Create a key file only when there is none, and whole. `false` means another process created it
+ * first, and its key is the identity. A hard link of a complete temporary file fails with EEXIST
+ * when the path exists, and the file appears complete when it does not; a file system without hard
+ * links gets an exclusive create, which keeps the first writer but can show a reader a partial file.
+ */
+function createKeyFile(keyPath: string, content: string): boolean {
+  const tmp = writeTempKeyFile(keyPath, content);
+  try {
+    linkSync(tmp, keyPath);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    try {
+      writeFileSync(keyPath, content, { mode: 0o600, flag: 'wx' });
+      return true;
+    } catch (createErr) {
+      if ((createErr as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      throw createErr;
+    }
+  } finally {
+    rmSync(tmp, { force: true });
+  }
+}
+
 /** Record which node owns a key file, leaving the keypair itself untouched. */
 function stampKeyFileClaim(keyPath: string, nodeId: string): void {
   try {
     const data = JSON.parse(readFileSync(keyPath, 'utf-8')) as Record<string, unknown>;
     if (data.nodeId === nodeId) return;
-    writeFileSync(keyPath, JSON.stringify({ ...data, nodeId }, null, 2) + '\n', { mode: 0o600 });
+    replaceKeyFile(keyPath, JSON.stringify({ ...data, nodeId }, null, 2) + '\n');
   } catch (err) {
     // Not fatal: the node has its key and runs. It means a SECOND node could later adopt the same
     // file and share this identity, so it is loud.
@@ -252,24 +312,32 @@ function loadPersistedNodeKey(keyPath: string): { publicKey: string; privateKey:
   process.exit(1);
 }
 
-function persistNodeKey(kp: { publicKey: string; privateKey: string }, keyPath: string): void {
+/**
+ * Write a NEW key file, with the claim of the node that owns it, so the file is never rewritten
+ * to add the claim later. `exists` means another process of this node created the file after this
+ * one found none, and the caller adopts the key in it instead of its own: two processes that each
+ * kept their own key would be one node with two identities.
+ */
+function persistNodeKey(kp: { publicKey: string; privateKey: string }, keyPath: string, nodeId: string): 'written' | 'exists' | 'failed' {
   try {
     const dir = dirname(keyPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
     const passphrase = process.env.AIMEAT_KEY_PASSPHRASE;
     if (passphrase) {
-      // P3-8: Encrypt the key file using AES-256-GCM with passphrase-derived key
+      // P3-8: Encrypt the key file using AES-256-GCM with passphrase-derived key. The claim sits
+      // outside the encrypted blob, as stampKeyFileClaim puts it.
       const encrypted = encryptNodeKey(kp, passphrase);
-      writeFileSync(keyPath, JSON.stringify(encrypted, null, 2) + '\n', { mode: 0o600 });
+      if (!createKeyFile(keyPath, JSON.stringify({ ...encrypted, nodeId }, null, 2) + '\n')) return 'exists';
       logger.info('Node key encrypted and saved', { path: keyPath });
     } else {
       // Backward compatible: write plaintext
-      writeFileSync(keyPath, JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey }, null, 2) + '\n', { mode: 0o600 });
+      if (!createKeyFile(keyPath, JSON.stringify({ publicKey: kp.publicKey, privateKey: kp.privateKey, nodeId }, null, 2) + '\n')) return 'exists';
       if (process.platform === 'win32') {
         logger.warn('Node key saved without encryption. Windows does not enforce 0o600 permissions. Set AIMEAT_KEY_PASSPHRASE.');
       }
     }
+    return 'written';
   } catch (err) {
     // Not fatal (a read-only home directory is a legitimate deployment), but it MUST be loud: the
     // node is now running on an in-memory key and will come back with a different identity after a
@@ -278,6 +346,7 @@ function persistNodeKey(kp: { publicKey: string; privateKey: string }, keyPath: 
       + 'have a DIFFERENT identity after restart — previously issued tokens and pinned peer keys will '
       + 'stop verifying. Fix the path permissions or set the key explicitly in config.',
       { path: keyPath, error: (err as Error).message });
+    return 'failed';
   }
 }
 
@@ -411,12 +480,13 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
       if (!nodeKey) {
         logger.info('Generating node keypair...');
         const kp = await generateKeyPair();
-        await storage.setNodeKey(kp.publicKey, kp.privateKey);
-        nodeKey = kp;
-        persistNodeKey(kp, keyPath);
-        // Stamp it now, not on the next boot: the claim is what a SECOND node reads to know this
-        // file is taken, and a file written without one is a file anyone may adopt.
-        if (existsSync(keyPath)) stampKeyFileClaim(keyPath, config.nodeId);
+        // Persisted before the database copy: when another process of this node created the file
+        // since the read above (the E2E lanes start one node id at once), its key is the identity.
+        // The file is written with this node's claim in it, not stamped on the next boot: the claim
+        // is what a SECOND node reads to know this file is taken.
+        nodeKey = persistNodeKey(kp, keyPath, config.nodeId) === 'exists' ? (loadPersistedNodeKey(keyPath) ?? kp) : kp;
+        if (nodeKey !== kp) logger.info('Another process of this node created the key file first; this one uses that key.', { path: keyPath, nodeId: config.nodeId });
+        await storage.setNodeKey(nodeKey.publicKey, nodeKey.privateKey);
         logger.info('Node keypair generated and saved', { path: keyPath, nodeId: config.nodeId });
       }
     }
@@ -440,4 +510,4 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
  * Deliberately not part of the module's API: nothing else should be deciding where a node's key
  * lives, and a second caller would be a second answer to that question.
  */
-export const __testables = { getNodeKeyPath, getLegacyNodeKeyPath, readKeyFileClaim, stampKeyFileClaim };
+export const __testables = { getNodeKeyPath, getLegacyNodeKeyPath, readKeyFileClaim, stampKeyFileClaim, persistNodeKey };
