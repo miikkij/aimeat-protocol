@@ -14,8 +14,11 @@
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
  *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
+ *   - the ARD manifest (/.well-known/ard.json, /.well-known/ai-catalog.json) is routes/ard-manifest.ts, mounted here
  *
  * @version-history
+ *   v1.13.0 — 2026-10-26 — Mounts aiCatalogRouter, and the API catalog links the ARD manifest
+ *     (wish-ai-catalog-well-known-ai-catalog-json-ard).
  *   v1.12.0 — 2026-10-20 — The MCP server card states 2026-07-28 and lists every revision the node
  *     serves in supportedProtocolVersions (MCP SDK v2 migration step 8, plan item 9).
  *   v1.11.2 — 2026-10-19 — The MCP server card states the revision the node negotiates (MCP_PROTOCOL_VERSION,
@@ -70,6 +73,7 @@ import { coreDiscoveryFields } from '../services/core-discovery.js';
 import {
   getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
 } from '../services/web-bot-auth.js';
+import { aiCatalogRouter } from './ard-manifest.js';
 
 /**
  * RFC 8288 discovery Link headers on every GET/HEAD response, so agents that land on
@@ -116,6 +120,7 @@ const publicDiscovery: RequestHandler = (_req, res, next) => {
 export function wellknownRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   router.use('/.well-known', publicDiscovery);
+  router.use(aiCatalogRouter(config, storage));
 
   router.get('/.well-known/aimeat', async (_req, res) => {
     const nodeKey = await storage.getNodeKey();
@@ -256,6 +261,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
             { href: `${b}/.well-known/aimeat`, type: 'application/json' },
             { href: `${b}/.well-known/ucp`, type: 'application/json' },
             { href: `${b}/.well-known/agent-skills/index.json`, type: 'application/json' },
+            { href: `${b}/.well-known/ard.json`, type: 'application/json' },
             // What this node marks as AI-generated, how, and in which posture (TARGET-058). A
             // discovery document rather than a page: it is the first thing a regulator, a
             // researcher or a buyer's compliance officer needs, and it must be findable without

@@ -7,6 +7,8 @@
     sibling is front-start.fi.html. Same skeleton, same /front-start.css and /front-start.js.
     Served at / when AIMEAT_FRONT_PAGE=start, and reachable at /front-start.html either way.
   @version-history
+    v1.0.1 - 2026-10-26 - Loads /v1/libs/aimeat-webmcp.js?expose=node, as spa.html does: the root
+      served this page without it from 2026-10-21, and isitagentready.com found no WebMCP tools.
     v1.0.0 - 2026-10-21 - Initial: the canvas design Jouni approved on 2026-10-21.
 -->
 <html lang="en">
@@ -18,6 +20,8 @@
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <link rel="stylesheet" href="/front-start.css">
   <script src="/front-start.js" defer></script>
+  <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
+  <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
 </head>
 <body>
 

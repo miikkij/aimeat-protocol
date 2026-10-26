@@ -5,6 +5,8 @@
     translated (aimeat-writing skill). Same skeleton, same CSS, same /front-demo.js; only
     the words differ. Served at / for Finnish readers when AIMEAT_FRONT_PAGE=demo.
   @version-history
+    v1.2.1 - 2026-10-26 - Loads /v1/libs/aimeat-webmcp.js?expose=node, as spa.html does, so the
+      root has WebMCP tools whichever front page it serves.
     v1.2.0 - 2026-08-19 - Apps are called apps (matching front-demo.html v1.2.0): sovellus,
       appi ja työkalu, ei koneita.
     v1.1.0 - 2026-08-19 - The working floor replaces the arcade (matching front-demo.html
@@ -19,6 +21,8 @@
   <meta name="description" content="aimeat.io on maailman rehellisin demo: täysin toimiva AIMEAT, jota kuka tahansa saa ajaa tänään ilmaiseksi. Kun haluat omasi, jossa ei ole ketään muita kuin sinä ja kutsumasi, kauppa on oven takana." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <script src="/front-demo.js" defer></script>
+  <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
+  <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
   <style>
     :root {
       --ink: #2b1230;

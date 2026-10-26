@@ -29542,6 +29542,70 @@ paths:
         '404':
           description: Unknown skill, or one not publicly readable
 
+  /.well-known/ard.json:
+    get:
+      operationId: ardManifest
+      summary: Agentic Resource Discovery (ARD) manifest
+      description: >-
+        One document listing every agent-facing resource the node publishes (ARD v0.91,
+        agenticresourcediscovery.org): the MCP server card, the OpenAPI contract, the A2A agent
+        card of each agent whose owner published an offering (the same agents as
+        /.well-known/agent-card.json) and each public node skill (the same skills as
+        /.well-known/agent-skills/index.json). Every entry points at a document another route
+        serves. The top level also holds to the ai-catalog data model (specVersion, host,
+        entries), so the same document answers at /.well-known/ai-catalog.json. Public, CORS *,
+        apex host only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The manifest
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [specVersion, host, entries]
+                additionalProperties: false
+                properties:
+                  specVersion: { type: string, enum: ['1.0'] }
+                  host:
+                    type: object
+                    required: [displayName, identifier]
+                    properties:
+                      displayName: { type: string }
+                      identifier: { type: string, description: "The node's did:web when AIMEAT_VC_ISSUER_DID is set, its origin otherwise" }
+                      documentationUrl: { type: string }
+                  entries:
+                    type: array
+                    items:
+                      type: object
+                      required: [identifier, displayName, type, url]
+                      properties:
+                        identifier: { type: string, pattern: '^urn:air:[a-zA-Z0-9.-]+(:[a-zA-Z0-9._-]+)+$' }
+                        displayName: { type: string }
+                        type:
+                          type: string
+                          enum: [application/mcp-server-card+json, application/a2a-agent-card+json, application/agent-skills+md, application/vnd.oai.openapi]
+                        url: { type: string }
+                        description: { type: string }
+                        tags: { type: array, items: { type: string } }
+                        representativeQueries: { type: array, minItems: 2, maxItems: 5, items: { type: string } }
+                        version: { type: string }
+
+  /.well-known/ai-catalog.json:
+    get:
+      operationId: aiCatalogManifest
+      summary: The ARD manifest at its predecessor path (ai-catalog)
+      description: >-
+        The same document as /.well-known/ard.json, at the path the ai-catalog data model and
+        ARD's predecessor name. Scanners such as isitagentready.com read this path.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: The manifest, identical to /.well-known/ard.json
+          content:
+            application/json:
+              schema: { type: object }
+
   /auth.md:
     get:
       operationId: authMd
